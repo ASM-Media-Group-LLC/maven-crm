@@ -138,20 +138,20 @@ export default function TemplatesPage() {
       {/* View modal */}
       {viewTemplate && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center" onClick={() => setViewTemplate(null)}>
-          <div className="bg-background rounded-lg p-6 max-w-md w-full mx-4 space-y-3" onClick={e => e.stopPropagation()}>
+          <div className="bg-muted rounded-lg p-6 max-w-2xl w-full mx-4 space-y-4 max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold">{viewTemplate.name}</h3>
-            <Badge variant={viewTemplate.type === "invoice" ? "default" : "secondary"}>
-              {viewTemplate.type === "invoice" ? "Invoice" : "Nota de pago"}
-            </Badge>
-            {viewTemplate.type === "invoice" && (
-              <div className="space-y-2 text-sm">
-                {viewTemplate.company_name && <p><span className="text-muted-foreground">Compañía:</span> {viewTemplate.company_name}</p>}
-                {viewTemplate.company_address && <p><span className="text-muted-foreground">Dirección:</span> {viewTemplate.company_address}</p>}
-                {viewTemplate.company_email && <p><span className="text-muted-foreground">Email:</span> {viewTemplate.company_email}</p>}
-                {viewTemplate.logo_url && <img src={viewTemplate.logo_url} alt="Logo" className="h-16 object-contain mt-2" />}
-              </div>
-            )}
-            <Button variant="outline" className="w-full mt-4" onClick={() => setViewTemplate(null)}>Cerrar</Button>
+            <div className="flex justify-center">
+              <InvoiceA4Preview
+                invoice={{}}
+                template={{
+                  company_name: viewTemplate.company_name,
+                  company_address: viewTemplate.company_address,
+                  company_email: viewTemplate.company_email,
+                  logo_url: viewTemplate.logo_url,
+                }}
+              />
+            </div>
+            <Button variant="outline" className="w-full" onClick={() => setViewTemplate(null)}>Cerrar</Button>
           </div>
         </div>
       )}
