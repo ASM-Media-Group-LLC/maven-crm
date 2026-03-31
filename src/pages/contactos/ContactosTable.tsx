@@ -104,7 +104,14 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
           <TableRow key={c.id}>
             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{c.creacion}</TableCell>
             <TableCell className="text-sm font-mono text-muted-foreground">{c.ticket}</TableCell>
-            <TableCell className="text-sm font-medium max-w-[180px] truncate">{c.nombre}</TableCell>
+            <TableCell className="text-sm font-medium max-w-[180px] truncate">
+              {c.pais && <span className="mr-1.5">{getCountryFlag(c.pais)}</span>}
+              {c.nombre}
+            </TableCell>
+            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+              {c.pais ? `${getCountryFlag(c.pais)} ${c.pais}` : "—"}
+            </TableCell>
+            <TableCell className="text-sm text-muted-foreground">{c.city || "—"}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.creadoPor}</TableCell>
             <TableCell>
               <a

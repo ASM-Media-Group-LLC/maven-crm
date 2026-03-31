@@ -295,6 +295,7 @@ const ContactosContent = () => {
               hasActiveFilters={hasActiveFilters}
               onClear={() => setFilters(emptyFilters)}
               creators={creatorsList}
+              cities={citiesList}
             />
             </div>
 

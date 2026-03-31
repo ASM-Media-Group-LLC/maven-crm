@@ -185,6 +185,7 @@ const NuevoContactoForm = () => {
         email: form.email || null,
         country_code: form.countryCode,
         phone: form.phone || null,
+        city: form.ciudad || null,
         ticket_number: form.ticket || null,
         notes: form.notas || null,
         profile_picture_url: profilePhoto?.url || null,

@@ -90,7 +90,10 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert }: Props) => {
               </div>
 
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">{c.pais}</p>
+                <p className="text-sm text-muted-foreground">
+                  {c.pais && <span className="mr-1">{getCountryFlag(c.pais)}</span>}
+                  {c.pais}{c.city ? `, ${c.city}` : ""}
+                </p>
                 {c.creadoPor && (
                   <p className="text-xs text-muted-foreground">Creado por: {c.creadoPor}</p>
                 )}
