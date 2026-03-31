@@ -33,6 +33,7 @@ export default function NuevoInvoicePage() {
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [zoom, setZoom] = useState(0.65);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const calcFitZoom = useCallback(() => {
