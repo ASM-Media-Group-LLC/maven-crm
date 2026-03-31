@@ -445,6 +445,7 @@ const SuperContactProfile = () => {
               <TabsTrigger value="dashboard"><BarChart3 className="h-3.5 w-3.5 mr-1" /> Dashboard</TabsTrigger>
               <TabsTrigger value="calendar"><Calendar className="h-3.5 w-3.5 mr-1" /> Calendario</TabsTrigger>
               <TabsTrigger value="interactions"><MessageCircle className="h-3.5 w-3.5 mr-1" /> Notas</TabsTrigger>
+              <TabsTrigger value="ai"><Bot className="h-3.5 w-3.5 mr-1" /> IA Asistente</TabsTrigger>
             </TabsList>
 
             {/* OUTREACH TAB */}
