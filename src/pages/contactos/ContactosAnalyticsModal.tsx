@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell, Legend, LabelList,
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -27,8 +27,30 @@ const COLORS = [
   "hsl(30, 70%, 50%)",
 ];
 
+// Resolve country_code that might be a phone prefix like "+57"
+function resolveCountryCode(code: string | null): string {
+  if (!code) return "N/A";
+  const trimmed = code.trim();
+  // If it's a 2-letter ISO code, return as-is
+  if (/^[A-Z]{2}$/i.test(trimmed)) return trimmed.toUpperCase();
+  // Phone prefix mapping
+  const phoneMap: Record<string, string> = {
+    "+54": "AR", "+591": "BO", "+55": "BR", "+44": "GB", "+56": "CL",
+    "+57": "CO", "+506": "CR", "+53": "CU", "+1809": "DO", "+593": "EC",
+    "+503": "SV", "+34": "ES", "+1": "US", "+502": "GT", "+504": "HN",
+    "+39": "IT", "+52": "MX", "+505": "NI", "+507": "PA", "+595": "PY",
+    "+51": "PE", "+1787": "PR", "+66": "TH", "+598": "UY", "+58": "VE",
+  };
+  if (trimmed.startsWith("+")) {
+    for (const len of [5, 4, 3, 2]) {
+      const prefix = trimmed.slice(0, len);
+      if (phoneMap[prefix]) return phoneMap[prefix];
+    }
+  }
+  return trimmed;
+}
+
 const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
-  // Fetch all contacts with created_by
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["contactos-analytics-full"],
     enabled: open,
@@ -42,7 +64,6 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     },
   });
 
-  // Fetch profiles for agent names
   const agentIds = useMemo(() => {
     const ids = new Set<string>();
     contacts.forEach((c) => { if (c.created_by) ids.add(c.created_by); });
@@ -64,7 +85,12 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     },
   });
 
-  // === Chart data ===
+  // Helper: short agent name (First name + Last initial)
+  const shortName = (full: string) => {
+    const parts = full.trim().split(/\s+/);
+    if (parts.length <= 1) return full;
+    return `${parts[0]} ${parts[1]?.[0] || ""}.`;
+  };
 
   // 1. Monthly trend
   const monthlyData = useMemo(() => {
@@ -92,7 +118,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     return result;
   }, [contacts]);
 
-  // 2. By agent
+  // 2. By agent (with counts)
   const agentData = useMemo(() => {
     const map: Record<string, number> = {};
     contacts.forEach((c) => {
@@ -100,43 +126,49 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
       map[name] = (map[name] || 0) + 1;
     });
     return Object.entries(map)
-      .map(([name, count]) => ({ name, count }))
+      .map(([name, count]) => ({ name: shortName(name), fullName: name, count }))
       .sort((a, b) => b.count - a.count);
   }, [contacts, profiles]);
 
-  // 3. By agent per month (stacked)
+  // 3. Agent per month (stacked) with counts
   const agentMonthlyData = useMemo(() => {
     if (!contacts.length) return { data: [] as any[], agents: [] as string[] };
     const agentSet = new Set<string>();
     const monthMap: Record<string, Record<string, number>> = {};
+    const monthLabels: Record<string, string> = {};
     contacts.forEach((c) => {
       if (!c.created_at) return;
-      const month = format(parseISO(c.created_at), "MMM yy", { locale: es });
       const key = format(parseISO(c.created_at), "yyyy-MM");
-      const agent = (c.created_by && profiles[c.created_by]) || "Sin asignar";
+      const label = format(parseISO(c.created_at), "MMM yy", { locale: es });
+      monthLabels[key] = label;
+      const agent = shortName((c.created_by && profiles[c.created_by]) || "Sin asignar");
       agentSet.add(agent);
-      if (!monthMap[key]) monthMap[key] = { _label: month as any };
+      if (!monthMap[key]) monthMap[key] = {};
       monthMap[key][agent] = (monthMap[key][agent] || 0) + 1;
     });
     const agents = Array.from(agentSet);
     const data = Object.keys(monthMap)
       .sort()
-      .map((k) => ({ label: monthMap[k]._label, ...monthMap[k] }));
+      .map((k) => ({ label: monthLabels[k], ...monthMap[k] }));
     return { data, agents };
   }, [contacts, profiles]);
 
-  // 4. By country
+  // 4. By country — normalize phone prefixes to ISO codes first
   const countryData = useMemo(() => {
     const map: Record<string, number> = {};
     contacts.forEach((c) => {
-      const country = c.country_code || "N/A";
-      map[country] = (map[country] || 0) + 1;
+      const code = resolveCountryCode(c.country_code);
+      map[code] = (map[code] || 0) + 1;
     });
     return Object.entries(map)
-      .map(([code, count]) => ({
-        name: code !== "N/A" ? `${getCountryFlag(code)} ${getCountryName(code) || code}` : "Sin país",
-        count,
-      }))
+      .map(([code, count]) => {
+        const flag = getCountryFlag(code);
+        const name = getCountryName(code);
+        return {
+          name: code !== "N/A" ? `${flag} ${name || code}` : "Sin país",
+          count,
+        };
+      })
       .sort((a, b) => b.count - a.count);
   }, [contacts]);
 
@@ -189,6 +221,12 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     fontSize: 12,
   };
 
+  // Custom label for pie that avoids overlap — only show if percent > 5%
+  const renderPieLabel = ({ name, percent }: { name: string; percent: number }) => {
+    if (percent < 0.05) return null;
+    return `${name} (${(percent * 100).toFixed(0)}%)`;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
@@ -224,20 +262,24 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
                     <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                     <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [v, "Contactos"]} />
-                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </TabsContent>
 
-              {/* By Agent */}
+              {/* By Agent — horizontal bar with count labels */}
               <TabsContent value="agents" className="mt-0 h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={agentData} layout="vertical" margin={{ left: 100 }}>
+                  <BarChart data={agentData} layout="vertical" margin={{ left: 80, right: 40 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={100} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [v, "Contactos"]} />
-                    <Bar dataKey="count" fill="hsl(210, 70%, 55%)" radius={[0, 4, 4, 0]} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={80} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number, _: any, props: any) => [v, props.payload.fullName]} />
+                    <Bar dataKey="count" fill="hsl(210, 70%, 55%)" radius={[0, 4, 4, 0]}>
+                      <LabelList dataKey="count" position="right" style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </TabsContent>
@@ -251,7 +293,9 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
                     <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                     <Tooltip contentStyle={tooltipStyle} />
                     {agentMonthlyData.agents.map((agent, i) => (
-                      <Bar key={agent} dataKey={agent} stackId="a" fill={COLORS[i % COLORS.length]} />
+                      <Bar key={agent} dataKey={agent} stackId="a" fill={COLORS[i % COLORS.length]}>
+                        <LabelList dataKey={agent} position="inside" style={{ fontSize: 9, fill: "#fff" }} formatter={(v: number) => v > 0 ? v : ""} />
+                      </Bar>
                     ))}
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                   </BarChart>
@@ -261,12 +305,14 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
               {/* By Country */}
               <TabsContent value="country" className="mt-0 h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={countryData} layout="vertical" margin={{ left: 120 }}>
+                  <BarChart data={countryData} layout="vertical" margin={{ left: 140, right: 40 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={120} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={140} />
                     <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [v, "Contactos"]} />
-                    <Bar dataKey="count" fill="hsl(150, 60%, 45%)" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="count" fill="hsl(150, 60%, 45%)" radius={[0, 4, 4, 0]}>
+                      <LabelList dataKey="count" position="right" style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </TabsContent>
@@ -275,7 +321,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
               <TabsContent value="city" className="mt-0 h-[400px]">
                 {cityData.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                    No hay datos de ciudad disponibles
+                    No hay datos de ciudad disponibles todavía. Asigna ciudades a los contactos para ver esta gráfica.
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
@@ -284,57 +330,47 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
                       <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                       <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={100} />
                       <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [v, "Contactos"]} />
-                      <Bar dataKey="count" fill="hsl(180, 50%, 45%)" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="count" fill="hsl(180, 50%, 45%)" radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="count" position="right" style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }} />
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
               </TabsContent>
 
-              {/* Category Pie */}
+              {/* Category — bar chart instead of pie to avoid overlap */}
               <TabsContent value="category" className="mt-0 h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={140}
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      labelLine
-                    >
+                  <BarChart data={categoryData} layout="vertical" margin={{ left: 120, right: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={120} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [v, "Contactos"]} />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                       {categoryData.map((_, i) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
                       ))}
-                    </Pie>
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                  </PieChart>
+                      <LabelList dataKey="value" position="right" style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }} />
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
               </TabsContent>
 
-              {/* Status Pie */}
+              {/* Status — bar chart instead of pie to avoid label overlap */}
               <TabsContent value="status" className="mt-0 h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={statusData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={140}
-                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      labelLine
-                    >
+                  <BarChart data={statusData} layout="vertical" margin={{ left: 100, right: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={100} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [v, "Contactos"]} />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                       {statusData.map((_, i) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
                       ))}
-                    </Pie>
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                  </PieChart>
+                      <LabelList dataKey="value" position="right" style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }} />
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
               </TabsContent>
             </div>
