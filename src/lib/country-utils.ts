@@ -37,12 +37,30 @@ Object.entries(COUNTRY_DATA).forEach(([code, { name }]) => {
 NAME_TO_CODE["república dominicana"] = "DO";
 NAME_TO_CODE["estados unidos"] = "US";
 
+// Phone prefix → ISO code mapping
+const PHONE_TO_CODE: Record<string, string> = {
+  "+54": "AR", "+591": "BO", "+55": "BR", "+44": "GB", "+56": "CL",
+  "+57": "CO", "+506": "CR", "+53": "CU", "+1809": "DO", "+593": "EC",
+  "+503": "SV", "+34": "ES", "+1": "US", "+502": "GT", "+504": "HN",
+  "+39": "IT", "+52": "MX", "+505": "NI", "+507": "PA", "+595": "PY",
+  "+51": "PE", "+1787": "PR", "+66": "TH", "+598": "UY", "+58": "VE",
+};
+
 function resolveCode(input: string): string | null {
   if (!input) return null;
-  const upper = input.trim().toUpperCase();
+  const trimmed = input.trim();
+  const upper = trimmed.toUpperCase();
   if (COUNTRY_DATA[upper]) return upper;
-  const lower = input.trim().toLowerCase();
+  const lower = trimmed.toLowerCase();
   if (NAME_TO_CODE[lower]) return NAME_TO_CODE[lower];
+  // Try phone prefix
+  if (trimmed.startsWith("+")) {
+    // Try longest match first
+    for (const len of [5, 4, 3, 2]) {
+      const prefix = trimmed.slice(0, len);
+      if (PHONE_TO_CODE[prefix]) return PHONE_TO_CODE[prefix];
+    }
+  }
   return null;
 }
 
