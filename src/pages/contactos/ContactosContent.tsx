@@ -422,8 +422,7 @@ const ContactosContent = () => {
         contacto={convertRawContacto}
         onConverted={() => setConvertOpen(false)}
       />
-      <ContactosAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
-      <AuditLogModal open={auditOpen} onOpenChange={setAuditOpen} />
+      <ContactosAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} defaultTab={analyticsTab} />
     </main>
   );
 };
