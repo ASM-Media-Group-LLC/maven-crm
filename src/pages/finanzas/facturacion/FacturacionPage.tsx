@@ -219,7 +219,7 @@ export default function FacturacionPage() {
     document.body.appendChild(wrapper);
 
     const root = createRoot(wrapper);
-    root.render(<InvoiceA4PreviewComp invoice={inv} />);
+    root.render(<InvoiceA4PreviewComp invoice={inv} template={inv?.invoice_templates} />);
 
     // Wait for render
     await new Promise(r => setTimeout(r, 500));
@@ -606,7 +606,7 @@ export default function FacturacionPage() {
         <DialogContent
           className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button:last-child]:hidden"
         >
-          {viewItem && <InvoiceA4Preview invoice={viewItem as any} />}
+          {viewItem && <InvoiceA4Preview invoice={viewItem as any} template={(viewItem as any)?.invoice_templates} />}
         </DialogContent>
       </Dialog>
 
