@@ -45,7 +45,7 @@ const interactionTypes = [
   { value: "seguimiento", label: "🔄 Seguimiento" },
 ];
 
-const BRANDS = ["Cash", "Exchange", "Ora", "Link Hunter", "Lumina", "Big Link", "Maven", "Blue", "Traffix"];
+const BRANDS = ["Kashback", "Exchange", "Ora", "Picklink", "Lumina", "Big Link", "Maven", "Blue", "Traffix"];
 const MESSAGE_TYPES = [
   { value: "dm", label: "DM" },
   { value: "story_reply", label: "Story Reply" },
@@ -61,10 +61,10 @@ const RESPONSE_STATUSES = [
 ];
 
 const BRAND_COLORS: Record<string, string> = {
-  Cash: "hsl(var(--primary))",
+  Kashback: "hsl(var(--primary))",
   Exchange: "hsl(210, 70%, 55%)",
   Ora: "hsl(45, 80%, 50%)",
-  "Link Hunter": "hsl(150, 60%, 45%)",
+  Picklink: "hsl(150, 60%, 45%)",
   Lumina: "hsl(280, 60%, 55%)",
   "Big Link": "hsl(0, 65%, 55%)",
   Maven: "hsl(180, 50%, 45%)",
@@ -313,13 +313,12 @@ const SuperContactProfile = () => {
 
       {/* === HEADER COMPACTO === */}
       <div className="flex items-center gap-4 flex-wrap">
-        {contact.profile_photo_url ? (
-          <img src={contact.profile_photo_url} alt="" className="h-14 w-14 rounded-full object-cover" />
-        ) : (
-          <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
-            <Instagram className="h-6 w-6 text-muted-foreground" />
-          </div>
-        )}
+        <img
+          src={contact.profile_photo_url || `https://unavatar.io/instagram/${contact.instagram_handle.replace(/^@/, "")}`}
+          alt={contact.instagram_handle}
+          className="h-14 w-14 rounded-full object-cover bg-muted"
+          onError={(e) => { (e.target as HTMLImageElement).src = ""; (e.target as HTMLImageElement).style.display = "none"; }}
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-bold">@{contact.instagram_handle}</h1>
@@ -464,51 +463,64 @@ const SuperContactProfile = () => {
 
               {/* Outreach form (expandable) */}
               {showOutreachForm && (
-                <div className="border border-dashed rounded-lg p-3 space-y-3 bg-muted/30">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contacto desde cuenta de marca</p>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <div>
-                      <Label className="text-xs">Marca *</Label>
-                      <Select value={outBrand} onValueChange={setOutBrand}>
-                        <SelectTrigger><SelectValue placeholder="Marca" /></SelectTrigger>
-                        <SelectContent>{BRANDS.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
-                      </Select>
+                <div className="rounded-lg border bg-muted/20 p-3 space-y-2.5">
+                  {/* Row 1: Brand pills + message type */}
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Marca</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {BRANDS.map(b => (
+                        <button key={b} type="button" onClick={() => setOutBrand(b)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                            outBrand === b
+                              ? "text-white shadow-sm scale-105"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          }`}
+                          style={outBrand === b ? { backgroundColor: BRAND_COLORS[b] || "hsl(var(--primary))" } : {}}>
+                          {b}
+                        </button>
+                      ))}
                     </div>
-                    <div>
-                      <Label className="text-xs">Cuenta IG usada</Label>
-                      <Input value={outAccount} onChange={e => setOutAccount(e.target.value)} placeholder="@cuenta" />
+                  </div>
+
+                  {/* Row 2: Compact fields in a single line */}
+                  <div className="flex flex-wrap gap-2 items-end">
+                    <div className="w-32">
+                      <Label className="text-[10px]">Cuenta IG</Label>
+                      <Input value={outAccount} onChange={e => setOutAccount(e.target.value)} placeholder="@cuenta" className="h-8 text-xs" />
                     </div>
-                    <div>
-                      <Label className="text-xs">Tipo</Label>
+                    <div className="w-28">
+                      <Label className="text-[10px]">Vía</Label>
                       <Select value={outMsgType} onValueChange={setOutMsgType}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>{MESSAGE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label className="text-xs">Respuesta</Label>
+                    <div className="w-32">
+                      <Label className="text-[10px]">Estado</Label>
                       <Select value={outStatus} onValueChange={setOutStatus}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>{RESPONSE_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label className="text-xs">URL pantallazo</Label>
-                      <Input value={outScreenshot} onChange={e => setOutScreenshot(e.target.value)} placeholder="https://..." />
+                    <div className="flex-1 min-w-[140px]">
+                      <Label className="text-[10px]">Qué le dijiste</Label>
+                      <Input value={outNotes} onChange={e => setOutNotes(e.target.value)} placeholder="Mensaje..." className="h-8 text-xs" />
                     </div>
-                    <div>
-                      <Label className="text-xs">Qué le dijiste</Label>
-                      <Input value={outNotes} onChange={e => setOutNotes(e.target.value)} placeholder="Mensaje enviado..." />
+                  </div>
+
+                  {/* Row 3: Response + screenshot + submit */}
+                  <div className="flex flex-wrap gap-2 items-end">
+                    <div className="flex-1 min-w-[140px]">
+                      <Label className="text-[10px]">Qué respondió</Label>
+                      <Input value={outResponse} onChange={e => setOutResponse(e.target.value)} placeholder="Respuesta..." className="h-8 text-xs" />
                     </div>
-                    <div className="sm:col-span-2">
-                      <Label className="text-xs">Qué respondió</Label>
-                      <Input value={outResponse} onChange={e => setOutResponse(e.target.value)} placeholder="Respuesta..." />
+                    <div className="w-40">
+                      <Label className="text-[10px]">Screenshot URL</Label>
+                      <Input value={outScreenshot} onChange={e => setOutScreenshot(e.target.value)} placeholder="https://..." className="h-8 text-xs" />
                     </div>
-                    <div className="flex items-end">
-                      <Button onClick={addOutreach} disabled={!outBrand || createOutreach.isPending} className="w-full">
-                        <Send className="h-4 w-4 mr-1" /> Registrar
-                      </Button>
-                    </div>
+                    <Button onClick={addOutreach} disabled={!outBrand || createOutreach.isPending} size="sm" className="h-8">
+                      <Send className="h-3.5 w-3.5 mr-1" /> Registrar
+                    </Button>
                   </div>
                 </div>
               )}
