@@ -255,6 +255,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader className="pr-8">
