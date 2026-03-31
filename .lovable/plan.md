@@ -1,28 +1,25 @@
 
 
-## Plan: Vista previa A4 en Templates + integración en creación de Invoice
+## Plan: Preview A4 en Templates sin datos de ejemplo
 
-### Situación actual
-- La página de Templates ya existe con tabla, modal de creación/edición, y un botón "Ver" que abre un modal simple con texto plano (nombre, dirección, email, logo).
-- `InvoiceA4Preview.tsx` ya acepta un prop `template` opcional y aplica sus datos al header del documento.
-- `NuevoInvoicePage.tsx` ya tiene un selector de template que carga templates tipo "invoice" y pasa el seleccionado al preview inline — pero **no usa el componente `InvoiceA4Preview`**, tiene el A4 duplicado inline.
+### Problema
+El botón "Ver" en templates muestra un modal de texto plano. Se quiere mostrar el `InvoiceA4Preview` pero **sin datos ficticios de invoice** — solo el branding del template (logo, nombre de empresa, dirección, email).
 
-### Cambios
+### Cambio
 
-#### 1. TemplatesPage.tsx — Reemplazar modal de "Ver" con preview A4
+**Archivo: `src/pages/finanzas/facturacion/TemplatesPage.tsx`**
 
-Sustituir el modal actual (texto plano) por un Dialog/modal más amplio que renderice `InvoiceA4Preview` pasando el template seleccionado. Se usarán datos de ejemplo (placeholder) para el invoice (nombre ficticio, montos en cero) para que el usuario vea cómo quedará el branding del documento.
+Reemplazar el modal actual (líneas 137-156) por uno más amplio que renderice `InvoiceA4Preview` con:
+- `template`: datos reales del template (company_name, company_address, company_email, logo_url)
+- `invoice`: objeto vacío `{}` — sin número, sin montos, sin nombre de creador, sin fechas
 
-#### 2. NuevoInvoicePage.tsx — Usar InvoiceA4Preview en lugar del A4 inline
+Esto mostrará la estructura del documento A4 con el branding aplicado (header con logo y datos de empresa) pero todas las celdas de datos del invoice quedarán en blanco o con guiones ("—"), dejando claro que es solo una vista previa del template.
 
-Reemplazar el bloque de preview A4 duplicado (líneas ~297-420) por el componente `InvoiceA4Preview`, pasándole el `selectedTemplate` y los datos calculados del invoice. Esto elimina duplicación y garantiza consistencia entre el preview de templates y la creación de invoices.
+Modal con `max-w-2xl`, fondo oscuro, scroll interno, y botón "Cerrar".
 
 ### Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/finanzas/facturacion/TemplatesPage.tsx` | Reemplazar modal de vista plana por Dialog con `InvoiceA4Preview` usando datos de ejemplo + template |
-| `src/pages/finanzas/facturacion/NuevoInvoicePage.tsx` | Reemplazar A4 inline por `InvoiceA4Preview` component, pasando template y datos del formulario |
-
-No se requieren cambios en la base de datos ni en `InvoiceA4Preview.tsx` — el componente ya soporta el prop `template`.
+| `TemplatesPage.tsx` | Reemplazar modal texto plano por `InvoiceA4Preview` con invoice vacío `{}` |
 
