@@ -192,15 +192,15 @@ const App = () => (
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/contactos" element={<PermissionRoute module="Contactos"><Contactos /></PermissionRoute>} />
               <Route path="/contactos/nuevo" element={<PermissionRoute module="Contactos"><NuevoContacto /></PermissionRoute>} />
-              <Route path="/creadores/dashboard" element={<PermissionRoute module="Creadores"><CreadorasDashboardPage /></PermissionRoute>} />
-              <Route path="/creadores" element={<PermissionRoute module="Creadores"><Creadores /></PermissionRoute>} />
-              <Route path="/creadores/onboarding" element={<PermissionRoute module="Creadores"><OnboardingPage /></PermissionRoute>} />
-              <Route path="/creadores/onboarding/nuevo" element={<PermissionRoute module="Creadores"><OnboardingWizardPage /></PermissionRoute>} />
-              <Route path="/creadores/onboarding/:id" element={<PermissionRoute module="Creadores"><OnboardingWizardPage /></PermissionRoute>} />
-              <Route path="/creadores/offboarding" element={<PermissionRoute module="Creadores"><OffboardingListPage /></PermissionRoute>} />
-              <Route path="/creadores/offboarding/:offboardingId" element={<PermissionRoute module="Creadores"><OffboardingDetailPage /></PermissionRoute>} />
-              <Route path="/creadores/nuevo" element={<PermissionRoute module="Creadores"><NuevoCreador /></PermissionRoute>} />
-              <Route path="/creadores/:id" element={<PermissionRoute module="Creadores"><CreadorProfile /></PermissionRoute>} />
+              <Route path="/creadores/dashboard" element={<PermissionRoute module="Creadores" submodule="Dashboard"><CreadorasDashboardPage /></PermissionRoute>} />
+              <Route path="/creadores" element={<PermissionRoute module="Creadores" submodule="Lista"><Creadores /></PermissionRoute>} />
+              <Route path="/creadores/onboarding" element={<PermissionRoute module="Creadores" submodule="Onboarding"><OnboardingPage /></PermissionRoute>} />
+              <Route path="/creadores/onboarding/nuevo" element={<PermissionRoute module="Creadores" submodule="Onboarding"><OnboardingWizardPage /></PermissionRoute>} />
+              <Route path="/creadores/onboarding/:id" element={<PermissionRoute module="Creadores" submodule="Onboarding"><OnboardingWizardPage /></PermissionRoute>} />
+              <Route path="/creadores/offboarding" element={<PermissionRoute module="Creadores" submodule="Offboarding"><OffboardingListPage /></PermissionRoute>} />
+              <Route path="/creadores/offboarding/:offboardingId" element={<PermissionRoute module="Creadores" submodule="Offboarding"><OffboardingDetailPage /></PermissionRoute>} />
+              <Route path="/creadores/nuevo" element={<PermissionRoute module="Creadores" submodule="Nuevo"><NuevoCreador /></PermissionRoute>} />
+              <Route path="/creadores/:id" element={<PermissionRoute module="Creadores" submodule="Perfil"><CreadorProfile /></PermissionRoute>} />
               <Route path="/eventos" element={<PermissionRoute module="Eventos"><Eventos /></PermissionRoute>} />
               <Route path="/leadgen" element={<PermissionRoute module="LeadGen"><LeadGen /></PermissionRoute>} />
               <Route path="/leadgen/base-datos" element={<PermissionRoute module="LeadGen"><LeadGenBaseDatos /></PermissionRoute>} />
