@@ -319,13 +319,15 @@ const CreadoresTable = ({ creators }: Props) => {
               </TableCell>
               <TableCell className="sticky right-0 bg-card">
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingCreator(c)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
+                  {!isCloser && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingCreator(c)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewingCreator(c)}>
                     <Eye className="h-4 w-4" />
                   </Button>
-                  {(c.status === "leaving" || c.status === "terminated") && (
+                  {!isCloser && (c.status === "leaving" || c.status === "terminated") && (
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
