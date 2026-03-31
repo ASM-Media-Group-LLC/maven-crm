@@ -1,0 +1,1 @@
+ALTER TABLE public.promolog_entries ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES auth.users(id);

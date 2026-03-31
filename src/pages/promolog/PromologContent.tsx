@@ -176,7 +176,7 @@ const PromologContent = () => {
 
       // Closers/agents/employees only see their own entries
       if (!isManagement && user?.id) {
-        query = query.eq("reviewed_by", user.id);
+        query = query.or(`reviewed_by.eq.${user.id},created_by.eq.${user.id}`);
       }
 
       if (dateFrom) {
