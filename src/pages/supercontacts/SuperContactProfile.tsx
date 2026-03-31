@@ -91,6 +91,7 @@ const SuperContactProfile = () => {
   const [intType, setIntType] = useState("nota");
   const [intNotes, setIntNotes] = useState("");
   const [showOutreachForm, setShowOutreachForm] = useState(false);
+  const [timelineFilter, setTimelineFilter] = useState<"todos" | "marcas" | "contactos">("todos");
 
   // Outreach form
   const [outBrand, setOutBrand] = useState("");
@@ -150,6 +151,12 @@ const SuperContactProfile = () => {
     interactions.forEach(i => all.push({ date: i.created_at, type: "interaction", data: i }));
     return all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [outreach, interactions]);
+
+  const filteredTimeline = useMemo(() => {
+    if (timelineFilter === "marcas") return timelineData.filter(t => t.type === "outreach");
+    if (timelineFilter === "contactos") return timelineData.filter(t => t.type === "interaction");
+    return timelineData;
+  }, [timelineData, timelineFilter]);
 
   // AI Chat functions
   const sendAiMessage = useCallback(async () => {
@@ -426,8 +433,15 @@ const SuperContactProfile = () => {
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Tasa +</p>
         </div>
         <div className="rounded-lg border p-3 text-center">
-          <p className="text-sm font-bold">{dashKPIs.lastContact ? formatDistanceToNow(parseISO(dashKPIs.lastContact), { locale: es, addSuffix: true }) : "—"}</p>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Último</p>
+          {dashKPIs.lastContact ? (
+            <>
+              <p className="text-sm font-bold">{format(parseISO(dashKPIs.lastContact), "dd MMM yyyy", { locale: es })}</p>
+              <p className="text-[10px] text-muted-foreground">{format(parseISO(dashKPIs.lastContact), "HH:mm")} · {formatDistanceToNow(parseISO(dashKPIs.lastContact), { locale: es, addSuffix: true })}</p>
+            </>
+          ) : (
+            <p className="text-xl font-bold">—</p>
+          )}
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Último contacto</p>
         </div>
       </div>
 
@@ -527,23 +541,34 @@ const SuperContactProfile = () => {
             </CardContent>
           </Card>
 
-          {/* TIMELINE COMPLETO */}
+          {/* TIMELINE CON FILTROS */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Clock className="h-4 w-4" /> Historial Completo ({timelineData.length})
-              </CardTitle>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Clock className="h-4 w-4" /> Historial ({filteredTimeline.length})
+                </CardTitle>
+                <div className="flex rounded-lg border overflow-hidden">
+                  {([["todos", "Todos"], ["marcas", "Por Marca"], ["contactos", "Interacciones"]] as const).map(([key, label]) => (
+                    <button key={key} onClick={() => setTimelineFilter(key)}
+                      className={`px-3 py-1 text-xs font-medium transition-colors ${
+                        timelineFilter === key ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                      }`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              {timelineData.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">Sin actividad registrada. Empieza registrando un contacto arriba.</p>
+              {filteredTimeline.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">Sin actividad registrada.</p>
               ) : (
                 <div className="space-y-2 max-h-[500px] overflow-auto pr-1">
-                  {timelineData.map((item, i) => (
+                  {filteredTimeline.map((item, i) => (
                     <div key={i} className={`flex items-start gap-3 p-2.5 rounded-lg text-sm ${
-                      item.type === "outreach" ? "bg-muted/40 border-l-3" : "bg-muted/20"
-                    }`} style={item.type === "outreach" ? { borderLeftColor: BRAND_COLORS[item.data.brand] || "hsl(var(--primary))", borderLeftWidth: 3 } : {}}>
-                      {/* Icon */}
+                      item.type === "outreach" ? "bg-muted/40" : "bg-muted/20"
+                    }`} style={item.type === "outreach" ? { borderLeftColor: BRAND_COLORS[item.data.brand] || "hsl(var(--primary))", borderLeftWidth: 3, borderLeftStyle: "solid" } : {}}>
                       <div className="shrink-0 mt-0.5">
                         {item.type === "outreach" ? (
                           <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
@@ -556,8 +581,6 @@ const SuperContactProfile = () => {
                           </div>
                         )}
                       </div>
-
-                      {/* Content */}
                       <div className="flex-1 min-w-0">
                         {item.type === "outreach" ? (
                           <>
@@ -584,7 +607,7 @@ const SuperContactProfile = () => {
                           </>
                         )}
                         <p className="text-[10px] text-muted-foreground mt-1">
-                          {formatDistanceToNow(parseISO(item.date), { locale: es, addSuffix: true })}
+                          {format(parseISO(item.date), "dd MMM yyyy · HH:mm", { locale: es })} · {formatDistanceToNow(parseISO(item.date), { locale: es, addSuffix: true })}
                         </p>
                       </div>
                     </div>
