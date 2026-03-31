@@ -948,6 +948,7 @@ export type Database = {
           agency_commission: number | null
           assigned_to: string | null
           category: string | null
+          city: string | null
           company_id: string | null
           completed_date: string | null
           confirmed_date: string | null
@@ -975,6 +976,7 @@ export type Database = {
           agency_commission?: number | null
           assigned_to?: string | null
           category?: string | null
+          city?: string | null
           company_id?: string | null
           completed_date?: string | null
           confirmed_date?: string | null
@@ -1002,6 +1004,7 @@ export type Database = {
           agency_commission?: number | null
           assigned_to?: string | null
           category?: string | null
+          city?: string | null
           company_id?: string | null
           completed_date?: string | null
           confirmed_date?: string | null
@@ -1336,6 +1339,7 @@ export type Database = {
       contactos: {
         Row: {
           categoria_fisica: string | null
+          city: string | null
           compania: string | null
           country_code: string | null
           created_at: string
@@ -1353,6 +1357,7 @@ export type Database = {
         }
         Insert: {
           categoria_fisica?: string | null
+          city?: string | null
           compania?: string | null
           country_code?: string | null
           created_at?: string
@@ -1370,6 +1375,7 @@ export type Database = {
         }
         Update: {
           categoria_fisica?: string | null
+          city?: string | null
           compania?: string | null
           country_code?: string | null
           created_at?: string
