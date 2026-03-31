@@ -1178,6 +1178,7 @@ const PromologContent = () => {
                         notes: entryNotes || null,
                         action_taken: entryResult === "si" ? entryStrategy || null : null,
                         evidence_url: entryEvidencePreview || null,
+                        reviewed_by: user?.id,
                       });
                       if (error) {
                         toast({ title: "Error", description: error.message, variant: "destructive" });
