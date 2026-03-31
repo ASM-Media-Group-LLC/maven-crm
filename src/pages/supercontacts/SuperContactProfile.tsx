@@ -103,6 +103,8 @@ const SuperContactProfile = () => {
   const [intType, setIntType] = useState("nota");
   const [intNotes, setIntNotes] = useState("");
   const [showOutreachForm, setShowOutreachForm] = useState(false);
+  const [activeBrandContext, setActiveBrandContext] = useState<string | null>(null);
+  const [expandedBrandForm, setExpandedBrandForm] = useState<string | null>(null);
 
   // Outreach form
   const [outBrand, setOutBrand] = useState("");
