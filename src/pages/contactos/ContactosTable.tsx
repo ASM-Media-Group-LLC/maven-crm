@@ -146,6 +146,21 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 </TableCell>
+                <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}>
+                  {(c as any).onlyfans_url ? (
+                    <a
+                      href={(c as any).onlyfans_url.startsWith("http") ? (c as any).onlyfans_url : `https://onlyfans.com/${(c as any).onlyfans_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      <span className="truncate max-w-[80px]">OF</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {c.whatsapp ? (
                     <a href={`https://wa.me/${c.whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"
