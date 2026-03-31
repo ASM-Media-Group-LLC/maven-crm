@@ -83,7 +83,8 @@ const CreadoresTable = ({ creators }: Props) => {
   const [statusChangeCreator, setStatusChangeCreator] = useState<CreatorWithBusiness | null>(null);
   const updateCreador = useUpdateCreador();
   const navigate = useNavigate();
-  const { isAgent, isAdmin, isManager } = useUserRole();
+  const { isAgent, isAdmin, isManager, role } = useUserRole();
+  const isCloser = role === "closer";
   const canSeeAllData = isAdmin || isManager || !isAgent;
 
   const handleSort = (key: SortKey) => {
