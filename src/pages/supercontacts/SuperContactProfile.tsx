@@ -266,6 +266,51 @@ const SuperContactProfile = () => {
     }
   }, [id]);
 
+  // Monitoring helpers
+  const getNextCheckDate = useCallback(() => {
+    if (!contact) return null;
+    const freq = (contact as any).check_frequency;
+    const lastChecked = (contact as any).last_checked_at;
+    if (!freq || !lastChecked) return null;
+    const last = new Date(lastChecked);
+    const days: Record<string, number> = { diario: 1, semanal: 7, quincenal: 15, mensual: 30 };
+    const d = days[freq] || 7;
+    last.setDate(last.getDate() + d);
+    return last;
+  }, [contact]);
+
+  const isCheckOverdue = useMemo(() => {
+    const next = getNextCheckDate();
+    return next ? next < new Date() : false;
+  }, [getNextCheckDate]);
+
+  const markAsChecked = async () => {
+    if (!contact) return;
+    await updateMutation.mutateAsync({ id: contact.id, last_checked_at: new Date().toISOString() } as any);
+    toast({ title: "Marcado como chequeado ✅" });
+  };
+
+  // Brand insight via AI
+  const fetchBrandInsight = useCallback(async (brand: string, entries: SuperContactOutreach[]) => {
+    setBrandInsights(prev => ({ ...prev, [brand]: { loading: true, text: null } }));
+    try {
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/supercontact-ai`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+          body: JSON.stringify({ action: "brand_summary", contactId: id, brand, brandOutreach: entries }),
+        }
+      );
+      if (!resp.ok) throw new Error("Failed");
+      const data = await resp.json();
+      setBrandInsights(prev => ({ ...prev, [brand]: { loading: false, text: data.summary } }));
+    } catch {
+      setBrandInsights(prev => ({ ...prev, [brand]: { loading: false, text: "Error al generar insight." } }));
+      toast({ title: "Error al obtener insight", variant: "destructive" });
+    }
+  }, [id]);
+
   const shell = (children: React.ReactNode) => (
     <SidebarProvider>
       <div className="flex h-screen w-full overflow-hidden">
