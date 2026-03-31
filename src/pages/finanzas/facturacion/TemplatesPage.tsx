@@ -106,7 +106,7 @@ export default function TemplatesPage() {
                 <TableBody>
                   {templates.map((t) => (
                     <TableRow key={t.id} className="group hover:bg-muted/30 transition-colors">
-                      <TableCell className="text-sm font-medium">{t.name}</TableCell>
+                      <TableCell className="text-sm font-medium">{`${t.company_name || t.name} - ${t.type === "invoice" ? "Invoice" : "Nota de pago"}`}</TableCell>
                       <TableCell>
                         <Badge variant={t.type === "invoice" ? "default" : "secondary"}>
                           {t.type === "invoice" ? "Invoice" : "Nota de pago"}

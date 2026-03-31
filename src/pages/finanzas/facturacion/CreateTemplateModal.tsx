@@ -30,7 +30,7 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
   const queryClient = useQueryClient();
   const isEdit = !!template?.id;
 
-  const [name, setName] = useState(template?.name || "");
+  
   const [type, setType] = useState(template?.type || "invoice");
   const [companyName, setCompanyName] = useState(template?.company_name || "");
   const [companyAddress, setCompanyAddress] = useState(template?.company_address || "");
@@ -41,7 +41,7 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
   const [dragOver, setDragOver] = useState(false);
 
   const resetForm = () => {
-    setName(""); setType("invoice"); setCompanyName(""); setCompanyAddress(""); setCompanyZip(""); setCompanyEmail(""); setLogoUrl("");
+    setType("invoice"); setCompanyName(""); setCompanyAddress(""); setCompanyZip(""); setCompanyEmail(""); setLogoUrl("");
   };
 
   const handleFile = async (file: File) => {
@@ -73,8 +73,9 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
   const mutation = useMutation({
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
+      const typeLabel = type === "invoice" ? "Invoice" : "Nota de pago";
       const payload: any = {
-        name, type,
+        name: `${companyName || "Template"} - ${typeLabel}`, type,
         company_name: type === "invoice" ? companyName || null : null,
         company_address: type === "invoice" ? companyAddress || null : null,
         company_zip: type === "invoice" ? companyZip || null : null,
@@ -107,10 +108,6 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
           <DialogTitle>{isEdit ? "Editar Template" : "Crear Template"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div>
-            <Label>Nombre del template</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: KASH Agency Invoice" />
-          </div>
           <div>
             <Label>Tipo de template</Label>
             <Select value={type} onValueChange={setType}>
@@ -180,7 +177,7 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => mutation.mutate()} disabled={!name || mutation.isPending}>
+          <Button onClick={() => mutation.mutate()} disabled={!companyName || mutation.isPending}>
             {isEdit ? "Guardar" : "Crear Template"}
           </Button>
         </DialogFooter>
