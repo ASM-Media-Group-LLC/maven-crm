@@ -13,6 +13,13 @@ import { getCountryDisplay } from "@/lib/country-utils";
 import ImportModal from "./ImportModal";
 import AddSingleContactModal from "./AddSingleContactModal";
 
+interface SuperContactsContentProps {
+  importOpen: boolean;
+  setImportOpen: (open: boolean) => void;
+  addSingleOpen: boolean;
+  setAddSingleOpen: (open: boolean) => void;
+}
+
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   nuevo: { label: "Nuevo", variant: "secondary" },
   contactado: { label: "Contactado", variant: "default" },
