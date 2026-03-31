@@ -291,6 +291,10 @@ const PromologContent = () => {
   const [viewEntryOpen, setViewEntryOpen] = useState(false);
   const [editEntryOpen, setEditEntryOpen] = useState(false);
   const [deleteEntryOpen, setDeleteEntryOpen] = useState(false);
+  const [assignAgentOpen, setAssignAgentOpen] = useState(false);
+  const [assignAgentTarget, setAssignAgentTarget] = useState<PromologEntry | null>(null);
+  const [assignAgentSelected, setAssignAgentSelected] = useState<string>("");
+  const [assignAgentSearch, setAssignAgentSearch] = useState("");
 
   const handleViewEntry = (entry: PromologEntry) => {
     setSelectedEntry(entry);
@@ -303,6 +307,12 @@ const PromologContent = () => {
   const handleDeleteEntry = (entry: PromologEntry) => {
     setSelectedEntry(entry);
     setDeleteEntryOpen(true);
+  };
+  const handleAssignAgent = (entry: PromologEntry) => {
+    setAssignAgentTarget(entry);
+    setAssignAgentSelected(entry.reviewed_by || "");
+    setAssignAgentSearch("");
+    setAssignAgentOpen(true);
   };
   const handleNotesChange = async (entryId: string, notes: string | null) => {
     const { error } = await supabase.from("promolog_entries").update({ notes }).eq("id", entryId);
