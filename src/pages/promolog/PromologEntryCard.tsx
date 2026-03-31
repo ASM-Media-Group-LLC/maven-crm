@@ -32,6 +32,7 @@ export interface PromologEntry {
   agent: string;
   notes: string;
   creator_id?: string;
+  reviewed_by?: string;
 }
 
 interface PromologEntryCardProps {

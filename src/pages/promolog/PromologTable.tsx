@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +29,8 @@ interface Props {
   onEdit?: (entry: PromologEntry) => void;
   onDelete?: (entry: PromologEntry) => void;
   onNotesChange?: (entryId: string, notes: string | null) => void;
+  onAssignAgent?: (entry: PromologEntry) => void;
+  isManagement?: boolean;
 }
 
 type SortKey = "model" | "network" | "platform" | "result" | "agent" | "date";
@@ -110,7 +112,7 @@ const InlineNotes = ({ value, onSave }: { value: string; onSave: (v: string | nu
   );
 };
 
-const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange }: Props) => {
+const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange, onAssignAgent, isManagement }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -227,6 +229,15 @@ const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange }: Pro
                       <Pencil className="mr-2 h-4 w-4" />
                       Editar
                     </DropdownMenuItem>
+                    {isManagement && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onAssignAgent?.(entry)}>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Asignar agente
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-destructive" onClick={() => onDelete?.(entry)}>
                       <Trash2 className="mr-2 h-4 w-4" />
