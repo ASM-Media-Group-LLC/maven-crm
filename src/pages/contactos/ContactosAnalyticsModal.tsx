@@ -592,8 +592,9 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
 
               {/* Revenue Tab */}
               <TabsContent value="revenue" className="mt-0">
-                {/* KPIs */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+              <TabsContent value="revenue" className="mt-0">
+                {/* KPI Row 1 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                   <div className="rounded-lg border bg-card p-3 text-center">
                     <p className="text-xs text-muted-foreground">Revenue OF</p>
                     <p className="text-xl font-bold" style={{ color: "hsl(280, 60%, 55%)" }}>{fmtMoney(revenueData.totalOF)}</p>
@@ -603,18 +604,68 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
                     <p className="text-xl font-bold" style={{ color: "hsl(45, 80%, 50%)" }}>{fmtMoney(revenueData.totalPlatform)}</p>
                   </div>
                   <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Monetización Real</p>
+                    <p className="text-xl font-bold" style={{ color: "hsl(150, 60%, 45%)" }}>{fmtMoney(revenueData.totalMonetization)}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
                     <p className="text-xs text-muted-foreground">Revenue Total</p>
                     <p className="text-xl font-bold text-foreground">{fmtMoney(revenueData.totalRevenue)}</p>
                   </div>
+                </div>
+
+                {/* KPI Row 2 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Total Leads</p>
+                    <p className="text-lg font-bold text-foreground">{revenueData.totalLeads}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Convertidos</p>
+                    <p className="text-lg font-bold" style={{ color: "hsl(150, 60%, 45%)" }}>{revenueData.totalConverted}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Rev. Prom/Creadora</p>
+                    <p className="text-lg font-bold text-foreground">{fmtMoney(revenueData.avgRevenuePerCreator)}</p>
+                  </div>
                   <div className="rounded-lg border bg-card p-3 text-center">
                     <p className="text-xs text-muted-foreground">Tasa Monetización</p>
-                    <p className="text-xl font-bold text-foreground">{revenueData.monetizationRate}%</p>
+                    <p className="text-lg font-bold text-foreground">{revenueData.monetizationRate}%</p>
                   </div>
                 </div>
 
+                {/* Stage Funnel */}
+                {revenueData.stageFunnel.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs text-muted-foreground mb-2 font-semibold">Funnel por Etapa</p>
+                    <div className="flex gap-1 h-6 rounded-md overflow-hidden">
+                      {revenueData.stageFunnel.map((s, i) => {
+                        const pct = revenueData.totalLeads > 0 ? (s.count / revenueData.totalLeads) * 100 : 0;
+                        return (
+                          <div
+                            key={s.stage}
+                            className="flex items-center justify-center text-[9px] font-medium text-white"
+                            style={{ width: `${Math.max(pct, 3)}%`, backgroundColor: COLORS[i % COLORS.length] }}
+                            title={`${s.stage}: ${s.count} (${Math.round(pct)}%)`}
+                          >
+                            {pct > 8 ? `${s.stage} (${s.count})` : ""}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex flex-wrap gap-3 mt-1">
+                      {revenueData.stageFunnel.map((s, i) => (
+                        <span key={s.stage} className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                          {s.stage}: {s.count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Monthly Revenue Chart */}
                 {revenueData.monthlyChart.length > 0 ? (
-                  <div className="h-[280px] mb-6">
+                  <div className="h-[280px] mb-4">
                     <p className="text-xs text-muted-foreground mb-2 font-semibold">Revenue por Mes</p>
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={revenueData.monthlyChart}>
@@ -622,52 +673,77 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
                         <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                         <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                         <Tooltip content={<RevenueTooltip />} />
-                        <Bar dataKey="of" fill="hsl(280, 60%, 55%)" radius={[4, 4, 0, 0]} name="OF" stackId="rev">
-                          <LabelList dataKey="of" position="inside" style={{ fontSize: 9, fill: "#fff" }} formatter={(v: number) => v > 0 ? `$${(v / 1000).toFixed(1)}k` : ""} />
-                        </Bar>
-                        <Bar dataKey="platform" fill="hsl(45, 80%, 50%)" radius={[4, 4, 0, 0]} name="Plataformas" stackId="rev">
-                          <LabelList dataKey="platform" position="inside" style={{ fontSize: 9, fill: "#fff" }} formatter={(v: number) => v > 0 ? `$${(v / 1000).toFixed(1)}k` : ""} />
-                        </Bar>
+                        <Bar dataKey="of" fill="hsl(280, 60%, 55%)" radius={[4, 4, 0, 0]} name="OF" stackId="rev" />
+                        <Bar dataKey="platform" fill="hsl(45, 80%, 50%)" radius={[0, 0, 0, 0]} name="Plataformas" stackId="rev" />
+                        <Bar dataKey="monetization" fill="hsl(150, 60%, 45%)" radius={[4, 4, 0, 0]} name="Monetización" stackId="rev" />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground mb-6">
-                    Sin datos de revenue todavía. Conforme se conviertan contactos y se registre monetización, los datos aparecerán aquí.
+                  <div className="flex items-center justify-center h-[150px] text-sm text-muted-foreground mb-4">
+                    Sin datos de revenue todavía.
                   </div>
                 )}
 
-                {/* Agent Revenue Ranking */}
-                {revenueData.agentRanking.length > 0 && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2 font-semibold">Top Agentes por Revenue</p>
-                    <div className="rounded-lg border overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b bg-muted/50">
-                            <th className="text-left p-2 text-xs font-semibold text-muted-foreground">#</th>
-                            <th className="text-left p-2 text-xs font-semibold text-muted-foreground">Agente</th>
-                            <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Contactos</th>
-                            <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Conv.</th>
-                            <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Revenue</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {revenueData.agentRanking.map((a, i) => (
-                            <tr key={i} className="border-b last:border-0">
-                              <td className="p-2 text-xs text-muted-foreground">{i + 1}</td>
-                              <td className="p-2 text-xs font-medium text-foreground">{a.fullName}</td>
-                              <td className="p-2 text-xs text-right text-muted-foreground">{a.contacts}</td>
-                              <td className="p-2 text-xs text-right" style={{ color: "hsl(150, 60%, 45%)" }}>{a.converted}</td>
-                              <td className="p-2 text-xs text-right font-semibold text-foreground">{fmtMoney(a.revenue)}</td>
+                {/* Platform Breakdown + Agent Ranking side by side */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Platform breakdown */}
+                  {revenueData.platformBreakdown.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2 font-semibold">Ventas por Plataforma</p>
+                      <div className="rounded-lg border overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b bg-muted/50">
+                              <th className="text-left p-2 text-xs font-semibold text-muted-foreground">Plataforma</th>
+                              <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Revenue</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {revenueData.platformBreakdown.map((p, i) => (
+                              <tr key={i} className="border-b last:border-0">
+                                <td className="p-2 text-xs font-medium text-foreground">{p.platform}</td>
+                                <td className="p-2 text-xs text-right font-semibold text-foreground">{fmtMoney(p.revenue)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+
+                  {/* Agent Revenue Ranking */}
+                  {revenueData.agentRanking.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2 font-semibold">Top Agentes por Revenue</p>
+                      <div className="rounded-lg border overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b bg-muted/50">
+                              <th className="text-left p-2 text-xs font-semibold text-muted-foreground">#</th>
+                              <th className="text-left p-2 text-xs font-semibold text-muted-foreground">Agente</th>
+                              <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Conv.</th>
+                              <th className="text-right p-2 text-xs font-semibold text-muted-foreground">%Conv</th>
+                              <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Revenue</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {revenueData.agentRanking.map((a, i) => (
+                              <tr key={i} className="border-b last:border-0">
+                                <td className="p-2 text-xs text-muted-foreground">{i + 1}</td>
+                                <td className="p-2 text-xs font-medium text-foreground">{a.fullName}</td>
+                                <td className="p-2 text-xs text-right" style={{ color: "hsl(150, 60%, 45%)" }}>{a.converted}</td>
+                                <td className="p-2 text-xs text-right text-muted-foreground">{a.convRate}%</td>
+                                <td className="p-2 text-xs text-right font-semibold text-foreground">{fmtMoney(a.revenue)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </TabsContent>
 
               {/* By Country */}
