@@ -135,11 +135,11 @@ const ContactosContent = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name")
+        .select("id, full_name, email")
         .in("id", creatorIds);
       if (error) throw error;
       const map: Record<string, string> = {};
-      (data ?? []).forEach((p) => { map[p.id] = p.full_name || ""; });
+      (data ?? []).forEach((p) => { map[p.id] = p.full_name || p.email || ""; });
       return map;
     },
   });
