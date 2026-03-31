@@ -45,6 +45,7 @@ const SuperContacts = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </div>
             </div>
             <SuperContactsContent
               importOpen={importOpen}
@@ -52,6 +53,7 @@ const SuperContacts = () => {
               addSingleOpen={addSingleOpen}
               setAddSingleOpen={setAddSingleOpen}
             />
+            <SuperContactsAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
           </div>
         </div>
       </div>
