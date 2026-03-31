@@ -3915,6 +3915,45 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_templates: {
+        Row: {
+          company_address: string | null
+          company_email: string | null
+          company_name: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_address?: string | null
+          company_email?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_address?: string | null
+          company_email?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           agency_amount: number | null
