@@ -148,7 +148,7 @@ const ContactosContent = () => {
     const map = new Map<string, string>();
     creatorIds.forEach((id) => {
       const name = profilesMap[id];
-      map.set(id, name || `Usuario #${id.slice(0, 8)}`);
+      map.set(id, name || "Agente");
     });
     const entries = Array.from(map.entries())
       .map(([, label]) => ({ value: label, label }));
@@ -190,7 +190,7 @@ const ContactosContent = () => {
       categoria: c.physical_appearance || "",
       whatsapp: c.phone ? `${c.country_code || ""}${c.phone}` : "",
       interacciones: interactionCounts[c.id] || 0,
-      creadoPor: (c.created_by && profilesMap[c.created_by]) || (c.created_by ? `Usuario #${c.created_by.slice(0, 8)}` : ""),
+      creadoPor: (c.created_by && profilesMap[c.created_by]) || "",
       email: c.email || "",
       phone: c.phone || "",
       country_code: c.country_code || "",
