@@ -23,7 +23,7 @@ const SuperContacts = () => {
           <DashboardTopbar />
           <div className="flex-1 overflow-auto p-4 md:p-6">
             <div className="flex items-center justify-between mb-6">
-              <h1 className="text-2xl font-bold">SuperContacts</h1>
+              <h1 className="text-2xl font-bold">Wishlist</h1>
               <div className="flex items-center gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

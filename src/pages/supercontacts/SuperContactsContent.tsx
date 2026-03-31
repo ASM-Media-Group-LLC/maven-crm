@@ -152,7 +152,7 @@ const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAdd
                 filtered.map((c) => {
                   const st = statusConfig[c.status] || statusConfig.nuevo;
                   return (
-                    <TableRow key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/supercontacts/${c.id}`)}>
+                    <TableRow key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/wishlist/${c.id}`)}>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {c.profile_photo_url ? (

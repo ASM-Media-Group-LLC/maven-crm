@@ -184,7 +184,7 @@ const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Analytics — SuperContacts</DialogTitle>
+          <DialogTitle>Analytics — Wishlist</DialogTitle>
         </DialogHeader>
 
         {isLoading ? (
