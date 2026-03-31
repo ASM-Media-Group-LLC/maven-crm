@@ -130,6 +130,19 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
     },
   });
 
+  // Fetch creator monetization (real monthly revenue tracking)
+  const { data: creatorMonetization = [] } = useQuery({
+    queryKey: ["contactos-creator-monetization"],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creator_monetization")
+        .select("creator_id, month_year, amount");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const agentIds = useMemo(() => {
     const ids = new Set<string>();
     contacts.forEach((c) => { if (c.created_by) ids.add(c.created_by); });
