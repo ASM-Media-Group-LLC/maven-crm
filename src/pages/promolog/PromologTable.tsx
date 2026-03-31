@@ -215,37 +215,43 @@ const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange, onAss
             </TableCell>
             <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-end">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onView?.(entry)}>
-                      <Eye className="mr-2 h-4 w-4" />
-                      Ver detalle
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onEdit?.(entry)}>
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Editar
-                    </DropdownMenuItem>
-                    {isManagement && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => onAssignAgent?.(entry)}>
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Asignar agente
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onClick={() => onDelete?.(entry)}>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Eliminar
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {viewOnly ? (
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(entry)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onView?.(entry)}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        Ver detalle
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onEdit?.(entry)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Editar
+                      </DropdownMenuItem>
+                      {isManagement && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => onAssignAgent?.(entry)}>
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            Asignar agente
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive" onClick={() => onDelete?.(entry)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Eliminar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </TableCell>
           </TableRow>

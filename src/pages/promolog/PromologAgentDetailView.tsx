@@ -336,12 +336,9 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
             >
               <PromologTable
                 entries={filtered.slice((page - 1) * pageSize, page * pageSize)}
-                onView={() => {}}
-                onEdit={() => {}}
-                onDelete={() => {}}
+                onView={(entry) => setViewingEntry(entry)}
                 onNotesChange={handleNotesChange}
-                onAssignAgent={() => {}}
-                isManagement={isManagement}
+                viewOnly
               />
             </DataTableShell>
           </div>
