@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Cell, Legend, LabelList,
+  Cell, Legend, LabelList, ComposedChart, Line,
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -28,13 +28,10 @@ const COLORS = [
   "hsl(30, 70%, 50%)",
 ];
 
-// Resolve country_code that might be a phone prefix like "+57"
 function resolveCountryCode(code: string | null): string {
   if (!code) return "N/A";
   const trimmed = code.trim();
-  // If it's a 2-letter ISO code, return as-is
   if (/^[A-Z]{2}$/i.test(trimmed)) return trimmed.toUpperCase();
-  // Phone prefix mapping
   const phoneMap: Record<string, string> = {
     "+54": "AR", "+591": "BO", "+55": "BR", "+44": "GB", "+56": "CL",
     "+57": "CO", "+506": "CR", "+53": "CU", "+1809": "DO", "+593": "EC",
@@ -58,10 +55,29 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("closers_contacts")
-        .select("created_at, created_by, country_code, physical_appearance, status, city")
+        .select("created_at, created_by, country_code, physical_appearance, status, city, handle")
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data ?? [];
+    },
+  });
+
+  // Fetch creator handles to determine conversions
+  const { data: creatorHandles = new Set<string>() } = useQuery({
+    queryKey: ["creator-handles-for-analytics"],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creators")
+        .select("instagram_handle");
+      if (error) throw error;
+      const set = new Set<string>();
+      (data ?? []).forEach((c) => {
+        if (c.instagram_handle) {
+          set.add(c.instagram_handle.toLowerCase().replace(/^@+/, "").trim());
+        }
+      });
+      return set;
     },
   });
 
@@ -86,40 +102,63 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     },
   });
 
-  // Helper: short agent name (First name + Last initial)
   const shortName = (full: string) => {
     const parts = full.trim().split(/\s+/);
     if (parts.length <= 1) return full;
     return `${parts[0]} ${parts[1]?.[0] || ""}.`;
   };
 
-  // 1. Monthly trend
+  // Check if a contact was converted to creator
+  const isConverted = (handle: string) => {
+    if (!handle) return false;
+    const normalized = handle.toLowerCase().replace(/^@+/, "").trim();
+    return creatorHandles instanceof Set && creatorHandles.has(normalized);
+  };
+
+  // 1. Monthly trend with conversions
   const monthlyData = useMemo(() => {
     if (!contacts.length) return [];
-    const months: Record<string, number> = {};
+    const months: Record<string, { count: number; converted: number }> = {};
     contacts.forEach((c) => {
       if (!c.created_at) return;
       const key = format(parseISO(c.created_at), "yyyy-MM");
-      months[key] = (months[key] || 0) + 1;
+      if (!months[key]) months[key] = { count: 0, converted: 0 };
+      months[key].count += 1;
+      if (isConverted(c.handle)) months[key].converted += 1;
     });
     const keys = Object.keys(months).sort();
     if (!keys.length) return [];
-    const result: { label: string; count: number; cumulative: number }[] = [];
+    const result: { label: string; count: number; converted: number; cumulative: number; convRate: string }[] = [];
     let cumulative = 0;
     const start = parseISO(`${keys[0]}-01`);
     const end = parseISO(`${keys[keys.length - 1]}-01`);
     const current = new Date(start);
     while (current <= end) {
       const key = format(current, "yyyy-MM");
-      const count = months[key] || 0;
+      const count = months[key]?.count || 0;
+      const converted = months[key]?.converted || 0;
       cumulative += count;
-      result.push({ label: format(current, "MMM yy", { locale: es }), count, cumulative });
+      const convRate = count > 0 ? `${Math.round((converted / count) * 100)}%` : "0%";
+      result.push({ label: format(current, "MMM yy", { locale: es }), count, converted, cumulative, convRate });
       current.setMonth(current.getMonth() + 1);
     }
     return result;
-  }, [contacts]);
+  }, [contacts, creatorHandles]);
 
-  // 2. By agent (with counts)
+  // KPIs
+  const kpis = useMemo(() => {
+    if (!monthlyData.length) return { total: 0, totalConverted: 0, avg: 0, bestMonth: "", bestCount: 0, convRate: "0%" };
+    const total = monthlyData.reduce((s, m) => s + m.count, 0);
+    const totalConverted = monthlyData.reduce((s, m) => s + m.converted, 0);
+    const avg = Math.round(total / monthlyData.length);
+    let bestMonth = "";
+    let bestCount = 0;
+    monthlyData.forEach((m) => { if (m.count > bestCount) { bestCount = m.count; bestMonth = m.label; } });
+    const convRate = total > 0 ? `${Math.round((totalConverted / total) * 100)}%` : "0%";
+    return { total, totalConverted, avg, bestMonth, bestCount, convRate };
+  }, [monthlyData]);
+
+  // 2. By agent
   const agentData = useMemo(() => {
     const map: Record<string, number> = {};
     contacts.forEach((c) => {
@@ -131,7 +170,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
       .sort((a, b) => b.count - a.count);
   }, [contacts, profiles]);
 
-  // 3. Agent per month (stacked) with counts
+  // 3. Agent per month (stacked) with totals
   const agentMonthlyData = useMemo(() => {
     if (!contacts.length) return { data: [] as any[], agents: [] as string[] };
     const agentSet = new Set<string>();
@@ -150,11 +189,15 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     const agents = Array.from(agentSet);
     const data = Object.keys(monthMap)
       .sort()
-      .map((k) => ({ label: monthLabels[k], ...monthMap[k] }));
+      .map((k) => {
+        const row: any = { label: monthLabels[k], ...monthMap[k] };
+        row._total = Object.values(monthMap[k]).reduce((s: number, v: number) => s + v, 0);
+        return row;
+      });
     return { data, agents };
   }, [contacts, profiles]);
 
-  // 4. By country — normalize phone prefixes to ISO codes first
+  // 4. By country
   const countryData = useMemo(() => {
     const map: Record<string, number> = {};
     contacts.forEach((c) => {
@@ -201,7 +244,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
       .sort((a, b) => b.value - a.value);
   }, [contacts]);
 
-  // 7. By city (top 10)
+  // 7. By city
   const cityData = useMemo(() => {
     const map: Record<string, number> = {};
     contacts.forEach((c) => {
@@ -220,6 +263,23 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     border: "1px solid hsl(var(--border))",
     borderRadius: 8,
     fontSize: 12,
+  };
+
+  // Custom tooltip for monthly chart
+  const MonthlyTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    const count = payload.find((p: any) => p.dataKey === "count")?.value || 0;
+    const converted = payload.find((p: any) => p.dataKey === "converted")?.value || 0;
+    const cumulative = payload.find((p: any) => p.dataKey === "cumulative")?.value || 0;
+    const rate = count > 0 ? Math.round((converted / count) * 100) : 0;
+    return (
+      <div style={tooltipStyle} className="p-2 shadow-lg">
+        <p className="font-semibold text-foreground">{label}</p>
+        <p className="text-sm" style={{ color: "hsl(210, 70%, 55%)" }}>Contactos: {count}</p>
+        <p className="text-sm" style={{ color: "hsl(150, 60%, 45%)" }}>Convertidos: {converted} ({rate}%)</p>
+        <p className="text-sm text-muted-foreground">Acumulado: {cumulative}</p>
+      </div>
+    );
   };
 
   return (
@@ -250,22 +310,52 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
             </TabsList>
 
             <div className="flex-1 min-h-0 overflow-auto pt-4">
-              {/* Monthly */}
-              <TabsContent value="monthly" className="mt-0 h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [v, "Contactos"]} />
-                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+              {/* Monthly with KPIs and dual bars */}
+              <TabsContent value="monthly" className="mt-0">
+                {/* KPI row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Total Registrados</p>
+                    <p className="text-xl font-bold text-foreground">{kpis.total}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Convertidos a Creadoras</p>
+                    <p className="text-xl font-bold" style={{ color: "hsl(150, 60%, 45%)" }}>{kpis.totalConverted}</p>
+                    <p className="text-xs text-muted-foreground">{kpis.convRate} tasa</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Promedio Mensual</p>
+                    <p className="text-xl font-bold text-foreground">{kpis.avg}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Mejor Mes</p>
+                    <p className="text-xl font-bold text-foreground">{kpis.bestCount}</p>
+                    <p className="text-xs text-muted-foreground">{kpis.bestMonth}</p>
+                  </div>
+                </div>
+
+                <div className="h-[350px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={monthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                      <YAxis yAxisId="left" allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                      <YAxis yAxisId="right" orientation="right" allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                      <Tooltip content={<MonthlyTooltip />} />
+                      <Bar yAxisId="left" dataKey="count" fill="hsl(210, 70%, 55%)" radius={[4, 4, 0, 0]} name="Contactos">
+                        <LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                      </Bar>
+                      <Bar yAxisId="left" dataKey="converted" fill="hsl(150, 60%, 45%)" radius={[4, 4, 0, 0]} name="Convertidos">
+                        <LabelList dataKey="converted" position="top" style={{ fontSize: 10, fill: "hsl(150, 60%, 45%)" }} formatter={(v: number) => v > 0 ? v : ""} />
+                      </Bar>
+                      <Line yAxisId="right" type="monotone" dataKey="cumulative" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Acumulado" />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
               </TabsContent>
 
-              {/* By Agent — horizontal bar with count labels */}
+              {/* By Agent */}
               <TabsContent value="agents" className="mt-0 h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={agentData} layout="vertical" margin={{ left: 80, right: 40 }}>
@@ -280,7 +370,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
                 </ResponsiveContainer>
               </TabsContent>
 
-              {/* Agent x Month (stacked) */}
+              {/* Agent x Month (stacked) with totals */}
               <TabsContent value="agentTrend" className="mt-0 h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={agentMonthlyData.data}>
@@ -293,6 +383,12 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
                         <LabelList dataKey={agent} position="inside" style={{ fontSize: 9, fill: "#fff" }} formatter={(v: number) => v > 0 ? v : ""} />
                       </Bar>
                     ))}
+                    {/* Total label on top of stacked bars */}
+                    {agentMonthlyData.agents.length > 0 && (
+                      <Bar dataKey="_total" stackId="b" fill="transparent" isAnimationActive={false}>
+                        <LabelList dataKey="_total" position="top" style={{ fontSize: 11, fontWeight: 700, fill: "hsl(var(--foreground))" }} />
+                      </Bar>
+                    )}
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -334,7 +430,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
                 )}
               </TabsContent>
 
-              {/* Category — bar chart instead of pie to avoid overlap */}
+              {/* Category */}
               <TabsContent value="category" className="mt-0 h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={categoryData} layout="vertical" margin={{ left: 120, right: 40 }}>
@@ -352,7 +448,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
                 </ResponsiveContainer>
               </TabsContent>
 
-              {/* Status — bar chart instead of pie to avoid label overlap */}
+              {/* Status */}
               <TabsContent value="status" className="mt-0 h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={statusData} layout="vertical" margin={{ left: 100, right: 40 }}>
