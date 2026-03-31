@@ -1,19 +1,26 @@
 import { useState, useMemo, useCallback } from "react";
-import { ArrowLeft, Search, Check, Minus, X, TrendingUp, Table2, Users } from "lucide-react";
+import { ArrowLeft, Search, Check, Minus, X, TrendingUp, Table2, Users, BarChart3, Clock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import DataTableShell from "@/components/ui/data-table-shell";
 import PromologTable from "./PromologTable";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { format, subDays, startOfDay, isToday } from "date-fns";
+import { es } from "date-fns/locale";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, Cell, PieChart, Pie, Legend,
+} from "recharts";
 import type { PromologEntry } from "./PromologEntryCard";
 
 const networkOptions = [
@@ -38,6 +45,22 @@ interface PromologAgentDetailViewProps {
   onBack: () => void;
 }
 
+const COLORS = {
+  si: "hsl(var(--success))",
+  parcial: "hsl(var(--warning))",
+  no: "hsl(var(--destructive))",
+  primary: "hsl(var(--primary))",
+  accent: "hsl(var(--accent))",
+  muted: "hsl(var(--muted-foreground))",
+};
+
+const NETWORK_COLORS: Record<string, string> = {
+  instagram: "#E4405F",
+  tiktok: "#000000",
+  x: "#1DA1F2",
+  telegram: "#0088cc",
+};
+
 const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps) => {
   const { user } = useAuth();
   const { role } = useUserRole();
@@ -45,6 +68,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const [activeTab, setActiveTab] = useState("promos");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterNetwork, setFilterNetwork] = useState("");
   const [filterPlatform, setFilterPlatform] = useState("");
@@ -58,7 +82,11 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
     if (e.currentTarget.scrollTop > 40) setStatsCollapsed(true);
   }, []);
 
-  // Fetch profiles for agent name resolution
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setStatsCollapsed(false);
+  };
+
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles"],
     queryFn: async () => {
@@ -73,7 +101,6 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
     return map;
   }, [profiles]);
 
-  // Own query for this agent's entries
   const { data: rawEntries = [], isLoading } = useQuery({
     queryKey: ["promolog-agent-detail", agent.id, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
@@ -83,9 +110,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
         .or(`reviewed_by.eq.${agent.id},created_by.eq.${agent.id}`)
         .order("date", { ascending: false });
 
-      if (dateFrom) {
-        query = query.gte("date", dateFrom.toISOString().split("T")[0]);
-      }
+      if (dateFrom) query = query.gte("date", dateFrom.toISOString().split("T")[0]);
       if (dateTo) {
         const toDate = new Date(dateTo);
         toDate.setDate(toDate.getDate() + 1);
@@ -95,7 +120,6 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
       const { data, error } = await query;
       if (error) throw error;
 
-      // Deduplicate
       const map = new Map<string, any>();
       for (const e of data ?? []) {
         const dayKey = e.date?.split("T")[0] ?? e.date;
@@ -142,7 +166,59 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
   const noCount = entries.filter(e => e.result === "No").length;
   const successRate = totalEntries > 0 ? Math.round((siCount / totalEntries) * 100) : 0;
 
-  // Filtered entries
+  // Performance data
+  const promosByDay = useMemo(() => {
+    const days: { date: string; total: number; si: number; parcial: number; no: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = subDays(new Date(), i);
+      const dayStr = format(d, "yyyy-MM-dd");
+      const dayLabel = format(d, "EEE d", { locale: es });
+      const dayEntries = rawEntries.filter((e: any) => (e.date?.split("T")[0] ?? "") === dayStr);
+      days.push({
+        date: dayLabel,
+        total: dayEntries.length,
+        si: dayEntries.filter((e: any) => e.promoted === "true").length,
+        parcial: dayEntries.filter((e: any) => e.promoted === "partial").length,
+        no: dayEntries.filter((e: any) => e.promoted === "false").length,
+      });
+    }
+    return days;
+  }, [rawEntries]);
+
+  const promosByHour = useMemo(() => {
+    const hours: { hour: string; count: number }[] = [];
+    for (let h = 0; h < 24; h++) {
+      const label = `${h.toString().padStart(2, "0")}:00`;
+      const count = rawEntries.filter((e: any) => {
+        const d = new Date(e.date);
+        return isToday(d) && d.getHours() === h;
+      }).length;
+      hours.push({ hour: label, count });
+    }
+    return hours;
+  }, [rawEntries]);
+
+  const networkDistribution = useMemo(() => {
+    const map: Record<string, number> = {};
+    rawEntries.forEach((e: any) => {
+      const net = (e.network || "otro").toLowerCase();
+      map[net] = (map[net] || 0) + 1;
+    });
+    return Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  }, [rawEntries]);
+
+  const resultDistribution = useMemo(() => [
+    { name: "Sí", value: siCount, color: COLORS.si },
+    { name: "Parcial", value: parcialCount, color: COLORS.parcial },
+    { name: "No", value: noCount, color: COLORS.no },
+  ], [siCount, parcialCount, noCount]);
+
+  const avgPerDay = useMemo(() => {
+    const daySet = new Set(rawEntries.map((e: any) => e.date?.split("T")[0]));
+    return daySet.size > 0 ? Math.round(totalEntries / daySet.size * 10) / 10 : 0;
+  }, [rawEntries, totalEntries]);
+
+  // Filtered entries for table
   const filtered = useMemo(() => {
     return entries.filter(e => {
       if (searchTerm) {
@@ -168,140 +244,259 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header */}
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-3">
           <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{agent.name}</h1>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold truncate">{agent.name}</h1>
+              <Badge variant="outline" className="text-xs shrink-0">{totalEntries} promos</Badge>
+            </div>
             <p className="text-sm text-muted-foreground">Detalle del agente — Promolog</p>
           </div>
         </div>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <TabsList>
+            <TabsTrigger value="promos">
+              <Table2 className="h-4 w-4 mr-1.5" />Promos
+            </TabsTrigger>
+            <TabsTrigger value="rendimiento">
+              <BarChart3 className="h-4 w-4 mr-1.5" />Rendimiento
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </header>
 
-      {/* KPI Cards */}
-      <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[200px] opacity-100 pb-2"}`}>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <Card className="border border-accent/40 bg-card/80">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/20 shrink-0">
-                <Table2 className="h-4 w-4 text-accent" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-accent">{totalEntries}</p>
-                <p className="text-xs text-muted-foreground">Total</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border border-success/40 bg-card/80">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success/20 shrink-0">
-                <Check className="h-4 w-4 text-success" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-success">{siCount}</p>
-                <p className="text-xs text-muted-foreground">Sí</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border border-warning/40 bg-card/80">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-warning/20 shrink-0">
-                <Minus className="h-4 w-4 text-warning" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-warning">{parcialCount}</p>
-                <p className="text-xs text-muted-foreground">Parcial</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border border-destructive/40 bg-card/80">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/20 shrink-0">
-                <X className="h-4 w-4 text-destructive" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-destructive">{noCount}</p>
-                <p className="text-xs text-muted-foreground">No</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border border-primary/40 bg-card/80">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 shrink-0">
-                <TrendingUp className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-primary">{successRate}%</p>
-                <p className="text-xs text-muted-foreground">Éxito</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="shrink-0 px-6 pb-2">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar modelo..." className="pl-9 h-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+      {activeTab === "promos" && (
+        <>
+          {/* KPI Cards */}
+          <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[200px] opacity-100 pb-2"}`}>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              {[
+                { label: "Total", value: totalEntries, icon: Table2, color: "accent" },
+                { label: "Sí", value: siCount, icon: Check, color: "success" },
+                { label: "Parcial", value: parcialCount, icon: Minus, color: "warning" },
+                { label: "No", value: noCount, icon: X, color: "destructive" },
+                { label: "Éxito", value: `${successRate}%`, icon: TrendingUp, color: "primary" },
+              ].map((kpi) => (
+                <Card key={kpi.label} className={`border border-${kpi.color}/40 bg-card/80`}>
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-full bg-${kpi.color}/20 shrink-0`}>
+                      <kpi.icon className={`h-4 w-4 text-${kpi.color}`} />
+                    </div>
+                    <div>
+                      <p className={`text-2xl font-bold text-${kpi.color}`}>{kpi.value}</p>
+                      <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-          <Select value={filterNetwork || undefined} onValueChange={(v) => setFilterNetwork(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Red Social" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              {networkOptions.map(n => <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={filterPlatform || undefined} onValueChange={(v) => setFilterPlatform(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Plataforma" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              <SelectItem value="onlyfans">OnlyFans</SelectItem>
-              <SelectItem value="unlok">Unlok</SelectItem>
-              <SelectItem value="otra">Otra</SelectItem>
-            </SelectContent>
-          </Select>
-          <DateRangePicker
-            from={dateFrom}
-            to={dateTo}
-            onApply={(from, to) => { setDateFrom(from); setDateTo(to); setStatsCollapsed(false); }}
-            placeholder="Fechas"
-            className="h-9"
-          />
-          {(searchTerm || filterNetwork || filterPlatform || dateFrom || dateTo) && (
-            <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchTerm(""); setFilterNetwork(""); setFilterPlatform(""); setDateFrom(undefined); setDateTo(undefined); }}>
-              <X className="mr-1.5 h-4 w-4" />
-              Limpiar
-            </Button>
-          )}
-        </div>
-      </div>
 
-      {/* Table */}
-      <div className="flex-1 min-h-0 px-6 pb-4 flex flex-col">
-        <DataTableShell
-          onScroll={handleScroll}
-          className="flex-1 min-h-0"
-          currentPage={page}
-          totalPages={Math.max(1, Math.ceil(filtered.length / pageSize))}
-          totalCount={filtered.length}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
-        >
-          <PromologTable
-            entries={filtered.slice((page - 1) * pageSize, page * pageSize)}
-            onView={() => {}}
-            onEdit={() => {}}
-            onDelete={() => {}}
-            onNotesChange={handleNotesChange}
-            onAssignAgent={() => {}}
-            isManagement={isManagement}
-          />
-        </DataTableShell>
-      </div>
+          {/* Filters */}
+          <div className="shrink-0 px-6 pb-2 pt-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar modelo..." className="pl-9 h-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              </div>
+              <Select value={filterNetwork || undefined} onValueChange={(v) => setFilterNetwork(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Red Social" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  {networkOptions.map(n => <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filterPlatform || undefined} onValueChange={(v) => setFilterPlatform(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Plataforma" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  <SelectItem value="onlyfans">OnlyFans</SelectItem>
+                  <SelectItem value="unlok">Unlok</SelectItem>
+                  <SelectItem value="otra">Otra</SelectItem>
+                </SelectContent>
+              </Select>
+              <DateRangePicker
+                from={dateFrom}
+                to={dateTo}
+                onApply={(from, to) => { setDateFrom(from); setDateTo(to); setStatsCollapsed(false); }}
+                placeholder="Fechas"
+                className="h-9"
+              />
+              {(searchTerm || filterNetwork || filterPlatform || dateFrom || dateTo) && (
+                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchTerm(""); setFilterNetwork(""); setFilterPlatform(""); setDateFrom(undefined); setDateTo(undefined); }}>
+                  <X className="mr-1.5 h-4 w-4" />
+                  Limpiar
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="flex-1 min-h-0 px-6 pb-4 flex flex-col">
+            <DataTableShell
+              onScroll={handleScroll}
+              className="flex-1 min-h-0"
+              currentPage={page}
+              totalPages={Math.max(1, Math.ceil(filtered.length / pageSize))}
+              totalCount={filtered.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+            >
+              <PromologTable
+                entries={filtered.slice((page - 1) * pageSize, page * pageSize)}
+                onView={() => {}}
+                onEdit={() => {}}
+                onDelete={() => {}}
+                onNotesChange={handleNotesChange}
+                onAssignAgent={() => {}}
+                isManagement={isManagement}
+              />
+            </DataTableShell>
+          </div>
+        </>
+      )}
+
+      {activeTab === "rendimiento" && (
+        <div className="flex-1 min-h-0 overflow-auto p-6 space-y-6">
+          {/* Summary KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Card className="border border-primary/40">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 shrink-0">
+                  <Table2 className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-primary">{totalEntries}</p>
+                  <p className="text-xs text-muted-foreground">Total Promos</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border border-accent/40">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/20 shrink-0">
+                  <TrendingUp className="h-4 w-4 text-accent" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-accent">{avgPerDay}</p>
+                  <p className="text-xs text-muted-foreground">Promedio/Día</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border border-success/40">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success/20 shrink-0">
+                  <Check className="h-4 w-4 text-success" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-success">{successRate}%</p>
+                  <p className="text-xs text-muted-foreground">Tasa de Éxito</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border border-warning/40">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-warning/20 shrink-0">
+                  <Clock className="h-4 w-4 text-warning" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-warning">
+                    {rawEntries.filter((e: any) => isToday(new Date(e.date))).length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Hoy</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Charts row 1: Promos por Día + Promos por Hora */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Promos por Día (últimos 7 días)</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={promosByDay} barSize={20}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                    <Tooltip contentStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="si" stackId="a" fill={COLORS.si} name="Sí" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="parcial" stackId="a" fill={COLORS.parcial} name="Parcial" />
+                    <Bar dataKey="no" stackId="a" fill={COLORS.no} name="No" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Promos por Hora (Hoy)</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={promosByHour}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="hour" tick={{ fontSize: 10 }} interval={2} className="text-muted-foreground" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                    <Tooltip contentStyle={{ fontSize: 12 }} />
+                    <Line type="monotone" dataKey="count" stroke={COLORS.primary} strokeWidth={2} dot={{ r: 3 }} name="Promos" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Charts row 2: Redes + Resultados */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Distribución por Red Social</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={networkDistribution} layout="vertical" barSize={18}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={80} />
+                    <Tooltip contentStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="value" name="Promos" radius={[0, 4, 4, 0]}>
+                      {networkDistribution.map((entry, i) => (
+                        <Cell key={i} fill={NETWORK_COLORS[entry.name] || COLORS.muted} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Distribución por Resultado</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={resultDistribution} layout="vertical" barSize={18}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={60} />
+                    <Tooltip contentStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="value" name="Promos" radius={[0, 4, 4, 0]}>
+                      {resultDistribution.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
     </main>
   );
 };

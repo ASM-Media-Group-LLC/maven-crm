@@ -884,57 +884,67 @@ const PromologContent = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className={agentesView === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" : "space-y-3"}>
-              {agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).map((agent) => (
-                <Card key={agent.id} className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setSelectedAgent({ id: agent.id, name: agent.name })}>
-                  <CardContent className={cn("flex items-center gap-4 p-4", agentesView === "grid" && "flex-col text-center")}>
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-muted">
-                        <Users className="h-5 w-5 text-muted-foreground" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className={cn("flex-1 min-w-0", agentesView === "grid" && "w-full")}>
-                      <p className="text-sm font-semibold">{agent.name}</p>
-                      <p className="text-xs text-muted-foreground">{agent.tickets} tickets ingresados</p>
-                    </div>
-                    <div className={cn("flex items-center gap-3", agentesView === "grid" && "flex-wrap justify-center")}>
-                      <div className="flex items-center gap-1.5">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success/15">
-                          <Check className="h-3 w-3 text-success" />
-                        </span>
-                        <span className="text-sm font-medium">{agent.si}</span>
-                        <span className="text-xs text-muted-foreground">Sí</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-warning/15">
-                          <Minus className="h-3 w-3 text-warning" />
-                        </span>
-                        <span className="text-sm font-medium">{agent.parcial}</span>
-                        <span className="text-xs text-muted-foreground">Parcial</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive/15">
-                          <X className="h-3 w-3 text-destructive" />
-                        </span>
-                        <span className="text-sm font-medium">{agent.no}</span>
-                        <span className="text-xs text-muted-foreground">No</span>
-                      </div>
-                      <Separator orientation="vertical" className={cn("h-8", agentesView === "grid" && "hidden")} />
-                      <div className="flex items-center gap-1.5">
-                        {agent.badges.map((b) => (
-                          <Badge key={b.label} variant="outline" className="text-xs">
-                            {b.label} {b.value}
-                          </Badge>
-                        ))}
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={(e) => { e.stopPropagation(); setSelectedAgent({ id: agent.id, name: agent.name }); }}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <DataTableShell
+              currentPage={1}
+              totalPages={1}
+              totalCount={agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).length}
+              pageSize={50}
+              onPageChange={() => {}}
+              className="flex-1 min-h-0"
+            >
+              <Table className="min-w-[700px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="sticky top-0 bg-background z-10 min-w-[200px]">Agente</TableHead>
+                    <TableHead className="sticky top-0 bg-background z-10 text-center min-w-[70px]">Total</TableHead>
+                    <TableHead className="sticky top-0 bg-background z-10 text-center min-w-[60px]">Sí</TableHead>
+                    <TableHead className="sticky top-0 bg-background z-10 text-center min-w-[70px]">Parcial</TableHead>
+                    <TableHead className="sticky top-0 bg-background z-10 text-center min-w-[60px]">No</TableHead>
+                    <TableHead className="sticky top-0 bg-background z-10 text-center min-w-[120px]">Redes</TableHead>
+                    <TableHead className="sticky top-0 bg-background z-10 text-right w-[80px]">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).map((agent) => {
+                    const initials = agent.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+                    const successRate = agent.tickets > 0 ? Math.round((agent.si / agent.tickets) * 100) : 0;
+                    return (
+                      <TableRow key={agent.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedAgent({ id: agent.id, name: agent.name })}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9">
+                              <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">{initials}</AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold truncate">{agent.name}</p>
+                              <p className="text-xs text-muted-foreground">{successRate}% éxito</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="text-xs">{agent.tickets}</Badge>
+                        </TableCell>
+                        <TableCell className="text-center text-sm font-medium text-success">{agent.si}</TableCell>
+                        <TableCell className="text-center text-sm font-medium text-warning">{agent.parcial}</TableCell>
+                        <TableCell className="text-center text-sm font-medium text-destructive">{agent.no}</TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1 flex-wrap">
+                            {agent.badges.map((b: { label: string; value: number }) => (
+                              <Badge key={b.label} variant="outline" className="text-xs">{b.label} {b.value}</Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setSelectedAgent({ id: agent.id, name: agent.name }); }}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </DataTableShell>
           ))}
         </div>
       )}
