@@ -674,6 +674,9 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 )}
               </div>
             </TableCell>
+            <TableCell>
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+            </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20">
               <div className="flex items-center justify-end gap-1">
                 <DropdownMenu>
