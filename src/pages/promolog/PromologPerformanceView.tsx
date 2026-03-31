@@ -53,10 +53,13 @@ const PromologPerformanceView = ({ profiles }: Props) => {
   });
 
   const agents = useMemo(() => {
-    return agentIds.map(id => {
-      const p = profiles.find(pr => pr.id === id);
-      return { id, name: p?.full_name || `Agente ${id.slice(0, 6)}` };
-    }).sort((a, b) => a.name.localeCompare(b.name));
+    return agentIds
+      .map(id => {
+        const p = profiles.find(pr => pr.id === id);
+        return p?.full_name ? { id, name: p.full_name } : null;
+      })
+      .filter((a): a is { id: string; name: string } => a !== null)
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [agentIds, profiles]);
 
   // Fetch entries for selected agent
