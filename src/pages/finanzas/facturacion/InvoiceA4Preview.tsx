@@ -3,6 +3,7 @@ import kashLogo from "@/assets/kash-logo.png";
 interface TemplateInfo {
   company_name?: string | null;
   company_address?: string | null;
+  company_zip?: string | null;
   company_email?: string | null;
   logo_url?: string | null;
 }
