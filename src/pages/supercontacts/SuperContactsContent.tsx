@@ -28,13 +28,11 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   convertido: { label: "Convertido", variant: "outline" },
 };
 
-const SuperContactsContent = () => {
+const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAddSingleOpen }: SuperContactsContentProps) => {
   const { data: contacts = [], isLoading } = useSuperContacts();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [importOpen, setImportOpen] = useState(false);
-  const [addSingleOpen, setAddSingleOpen] = useState(false);
 
   const filtered = useMemo(() => {
     let list = contacts;
