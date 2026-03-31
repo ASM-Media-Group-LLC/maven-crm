@@ -35,6 +35,7 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
   const [companyName, setCompanyName] = useState(template?.company_name || "");
   const [companyAddress, setCompanyAddress] = useState(template?.company_address || "");
   const [companyEmail, setCompanyEmail] = useState(template?.company_email || "");
+  const [companyZip, setCompanyZip] = useState((template as any)?.company_zip || "");
   const [logoUrl, setLogoUrl] = useState(template?.logo_url || "");
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
