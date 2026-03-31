@@ -29,6 +29,8 @@ interface Props {
   onEdit?: (entry: PromologEntry) => void;
   onDelete?: (entry: PromologEntry) => void;
   onNotesChange?: (entryId: string, notes: string | null) => void;
+  onAssignAgent?: (entry: PromologEntry) => void;
+  isManagement?: boolean;
 }
 
 type SortKey = "model" | "network" | "platform" | "result" | "agent" | "date";
