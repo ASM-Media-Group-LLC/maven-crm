@@ -107,28 +107,6 @@ const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAdd
           </SelectContent>
         </Select>
 
-        {/* Add contact dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" /> Agregar
-              <ChevronDown className="h-3 w-3 ml-1" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setAddSingleOpen(true)}>
-              <UserPlus className="h-4 w-4 mr-2" /> Agregar uno
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setImportOpen(true)}>
-              <ClipboardPaste className="h-4 w-4 mr-2" /> Pegar handles
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => {
-              setImportOpen(true);
-            }}>
-              <FileSpreadsheet className="h-4 w-4 mr-2" /> Importar archivo
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
       {/* Table */}
