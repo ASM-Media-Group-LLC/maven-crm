@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,36 +32,8 @@ const CreadoresContent = () => {
   const { user } = useAuth();
   const isCloser = role === "closer";
 
-  const { creators: rawCreators, allCreators: rawAllCreators, isLoading, statusCounts, agencies, categories, countries, cities, managers, totalCount: rawTotalCount, totalPages: rawTotalPages } =
+  const { creators, allCreators, isLoading, statusCounts, agencies, categories, countries, cities, managers, totalCount, totalPages } =
     useCreadores(filters, page, pageSize);
-
-  // Closers only see creators they created (closer_responsible_id or created_by)
-  const creators = useMemo(() => {
-    if (!isCloser || !user?.id) return rawCreators;
-    return rawCreators.filter(c => c.closer_responsible_id === user.id || c.created_by === user.id);
-  }, [rawCreators, isCloser, user?.id]);
-
-  const allCreators = useMemo(() => {
-    if (!isCloser || !user?.id) return rawAllCreators;
-    return rawAllCreators.filter(c => c.closer_responsible_id === user.id || c.created_by === user.id);
-  }, [rawAllCreators, isCloser, user?.id]);
-
-  const totalCount = isCloser ? creators.length : rawTotalCount;
-  const totalPages = isCloser ? Math.max(1, Math.ceil(creators.length / pageSize)) : rawTotalPages;
-
-  const closerStatusCounts = useMemo(() => {
-    if (!isCloser) return statusCounts;
-    const counts = { total: 0, active: 0, onboarding: 0, pendiente: 0, pendiente_verificacion: 0, paused: 0, leaving: 0, terminated: 0 };
-    allCreators.forEach(c => {
-      counts.total++;
-      const s = c.status?.toLowerCase();
-      if (s === "activa") counts.active++;
-      else if (s === "pausada") counts.paused++;
-      else if (s === "retiro" || s === "leaving") counts.leaving++;
-      else if (s === "terminada" || s === "terminated") counts.terminated++;
-    });
-    return counts;
-  }, [isCloser, allCreators, statusCounts]);
 
   const updateFilters = (patch: Partial<CreadorFilters>) => {
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -96,7 +68,7 @@ const CreadoresContent = () => {
       ) : (
         <div className="flex-1 flex flex-col min-h-0 p-6 gap-4">
           <div className="shrink-0">
-            <CreadoresKPICards counts={isCloser ? closerStatusCounts : statusCounts} isCloser={isCloser} />
+            <CreadoresKPICards counts={statusCounts} isCloser={isCloser} />
           </div>
 
           <div className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
