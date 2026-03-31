@@ -74,14 +74,12 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
         options={["A+", "A", "B+", "B", "C"]}
         onChange={(v) => onChange({ categoria: v })}
       />
-      {cities.length > 0 && (
-        <FilterSelect
-          placeholder="Ciudad"
-          value={filters.ciudad}
-          options={cities}
-          onChange={(v) => onChange({ ciudad: v })}
-        />
-      )}
+      <FilterSelect
+        placeholder="Ciudad"
+        value={filters.ciudad}
+        options={cities}
+        onChange={(v) => onChange({ ciudad: v })}
+      />
 
       {/* Searchable Agente selector */}
       <Popover open={agentOpen} onOpenChange={setAgentOpen}>
