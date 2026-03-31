@@ -420,6 +420,10 @@ const PromologContent = () => {
   const [searchEntry, setSearchEntry] = useState("");
   const [promoPage, setPromoPage] = useState(1);
   const [promoPageSize, setPromoPageSize] = useState(25);
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
+  const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setStatsCollapsed(e.currentTarget.scrollTop > 40);
+  }, []);
 
   // KPI modal state
   const [kpiModalType, setKpiModalType] = useState<"ingresados" | "no_chequeadas" | "completadas" | null>(null);
