@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import kashLogo from "@/assets/kash-logo.png";
+import InvoiceA4Preview from "./InvoiceA4Preview";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, FileText, Minus, Plus, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
