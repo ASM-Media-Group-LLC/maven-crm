@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import CreadoresTable from "./CreadoresTable";
 import CreadoresGrid from "./CreadoresGrid";
 import CreadoresKPICards from "./CreadoresKPICards";
 import { useCreadores, type CreadorFilters } from "./useCreadores";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/hooks/useAuth";
 
 const emptyFilters: CreadorFilters = {
   search: "",
