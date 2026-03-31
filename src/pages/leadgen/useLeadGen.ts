@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import { supabase } from "@/integrations/supabase/client";
 
 // Only the columns we actually use
-const ENTRY_COLUMNS = "id,lg_user_id,model_handle,platform,status,quality,notes,source_link,created_at,updated_at,phone_raw,phone_e164,country_code,created_creator_id,entry_date,ticket_number,state,city,company";
+const ENTRY_COLUMNS = "id,lg_user_id,model_handle,platform,status,quality,notes,source_link,created_at,updated_at,phone_raw,phone_e164,country_code,created_creator_id,entry_date,ticket_number,state,city,company,onlyfans_url";
 
 // Shared type matching leadgen_entries schema
 export type LeadGenEntry = {
