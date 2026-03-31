@@ -45,7 +45,7 @@ const EventosCalendar = ({ events }: Props) => {
 
   const upcoming = events
     .filter((e) => isAfter(new Date(e.date), today) || isSameDay(new Date(e.date), today))
-    .slice(0, 4);
+    .slice(0, 3);
 
   const goToToday = () => setMonth(new Date());
 
