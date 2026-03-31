@@ -39,6 +39,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const qc = useQueryClient();
   const { canAccess } = usePermissions();
   const { isTypeEnabled } = useNotificationPreferences();
+  const { settings: notifSettings } = useNotificationSettings();
 
   const query = useQuery({
     queryKey: ["notifications", options.moduleFilter, options.priorityFilter, options.statusFilter],
