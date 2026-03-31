@@ -69,6 +69,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
       case "nombre": va = a.nombre; vb = b.nombre; break;
       case "instagram": va = a.instagram; vb = b.instagram; break;
       case "pais": va = a.pais; vb = b.pais; break;
+      case "ciudad": va = a.city; vb = b.city; break;
       case "categoria": va = a.categoria; vb = b.categoria; break;
       case "creadoPor": va = a.creadoPor; vb = b.creadoPor; break;
     }
