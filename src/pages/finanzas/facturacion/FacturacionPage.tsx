@@ -54,6 +54,7 @@ export default function FacturacionPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { methods: configuredPaymentMethods } = usePaymentMethods();
+  const [crearOpen, setCrearOpen] = useState(false);
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["invoices"],
