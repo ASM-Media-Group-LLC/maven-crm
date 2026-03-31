@@ -145,6 +145,40 @@ const NuevoContactoForm = () => {
 
     setIsSaving(true);
     try {
+      // VALIDATION 1: Check if creator exists
+      const creatorCheck = await checkCreatorExists(form.accountLink, form.onlyfansUrl);
+      if (creatorCheck.exists) {
+        setCreatorAlert({ name: creatorCheck.creatorName!, id: creatorCheck.creatorId! });
+        setIsSaving(false);
+        return;
+      }
+
+      // VALIDATION 2: Check if lead was created in last 24h
+      const recentCheck = await checkRecentLead(form.accountLink, form.onlyfansUrl);
+      if (recentCheck.exists) {
+        toast({
+          title: "Lead duplicado reciente",
+          description: "Este lead ya fue registrado hace menos de 24 horas. Intenta nuevamente más tarde.",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      // VALIDATION 3: Check duplicate OnlyFans URL
+      if (form.onlyfansUrl?.trim()) {
+        const ofCheck = await checkDuplicateOnlyFans(form.onlyfansUrl);
+        if (ofCheck.existsInLeads || ofCheck.existsInContacts) {
+          toast({
+            title: "OnlyFans duplicado",
+            description: `Esta URL de OnlyFans ya está registrada en ${ofCheck.existsInLeads ? "leads" : "contactos"}.`,
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
+      }
+
       // Phone duplicate check
       const trimmedPhone = form.phone?.trim();
       if (trimmedPhone) {
