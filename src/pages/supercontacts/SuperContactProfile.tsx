@@ -633,6 +633,89 @@ const SuperContactProfile = () => {
                 </div>
               )}
             </TabsContent>
+
+            {/* AI ASSISTANT TAB */}
+            <TabsContent value="ai" className="space-y-4">
+              <div className="flex flex-col h-[500px]">
+                {/* Chat messages */}
+                <div className="flex-1 overflow-auto space-y-3 p-3 rounded-lg border bg-muted/20 mb-3">
+                  {aiMessages.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+                      <Bot className="h-10 w-10 opacity-40" />
+                      <p className="text-sm text-center">Pregúntame sobre esta modelo o sube una foto para analizar</p>
+                    </div>
+                  )}
+                  {aiMessages.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card border shadow-sm"
+                      }`}>
+                        {msg.role === "assistant" ? (
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                          </div>
+                        ) : (
+                          <p>{msg.content}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {aiLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-card border rounded-2xl px-4 py-2.5 shadow-sm">
+                        <div className="flex gap-1">
+                          <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "0ms" }} />
+                          <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "150ms" }} />
+                          <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "300ms" }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Image upload indicator */}
+                {imageAnalyzing && (
+                  <div className="flex items-center gap-2 p-2 mb-2 rounded-lg bg-primary/10 text-primary text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analizando imagen... el resultado se guardará en notas automáticamente
+                  </div>
+                )}
+
+                {/* Input area */}
+                <div className="flex gap-2 items-end">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={imageAnalyzing}
+                    title="Subir foto para analizar"
+                  >
+                    {imageAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  </Button>
+                  <Input
+                    placeholder="Pregunta sobre esta modelo..."
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendAiMessage()}
+                    className="flex-1"
+                    disabled={aiLoading}
+                  />
+                  <Button onClick={sendAiMessage} disabled={aiLoading || !aiInput.trim()}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
