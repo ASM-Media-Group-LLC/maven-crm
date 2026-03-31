@@ -1378,7 +1378,7 @@ const PromologContent = () => {
                       toast({ title: "Error", description: error.message, variant: "destructive" });
                       return;
                     }
-                    queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
+                    queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
                     toast({ title: "Promoción actualizada", description: `Los cambios para ${selectedEntry.name} han sido guardados.` });
                     resetEntryModal();
                     setEditEntryOpen(false);
