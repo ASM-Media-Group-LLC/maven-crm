@@ -408,6 +408,7 @@ const ContactosContent = () => {
         onConverted={() => setConvertOpen(false)}
       />
       <ContactosAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
+      <AuditLogModal open={auditOpen} onOpenChange={setAuditOpen} />
     </main>
   );
 };
