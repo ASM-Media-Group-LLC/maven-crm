@@ -140,7 +140,7 @@ const SuperContactsContent = () => {
                       </TableCell>
                       <TableCell>{c.full_name || "—"}</TableCell>
                       <TableCell>{c.followers_count?.toLocaleString() || "—"}</TableCell>
-                      <TableCell>{c.country || "—"}</TableCell>
+                      <TableCell>{getCountryDisplay(c.country)}</TableCell>
                       <TableCell><Badge variant={st.variant}>{st.label}</Badge></TableCell>
                     </TableRow>
                   );

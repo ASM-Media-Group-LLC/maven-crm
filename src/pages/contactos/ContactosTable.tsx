@@ -117,12 +117,12 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">
               {c.whatsapp ? (
-                <a href={`https://wa.me/${c.whatsapp}`} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-primary hover:underline">
-                  <MessageCircle className="h-3.5 w-3.5" />
-                  {c.country_code}{c.phone}
+                <a href={`https://wa.me/${c.whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-primary hover:underline">
+                  <Phone className="h-3.5 w-3.5" />
+                  {maskPhone(c.whatsapp)}
                 </a>
-              ) : c.phone ? `${c.country_code || ""}${c.phone}` : "—"}
+              ) : c.phone ? maskPhone(`${c.country_code || ""}${c.phone}`) : "—"}
             </TableCell>
             <TableCell>
               <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="font-normal">
