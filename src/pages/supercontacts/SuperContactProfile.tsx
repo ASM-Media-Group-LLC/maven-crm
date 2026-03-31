@@ -61,10 +61,10 @@ const RESPONSE_STATUSES = [
 ];
 
 const BRAND_COLORS: Record<string, string> = {
-  Cash: "hsl(var(--primary))",
+  Kashback: "hsl(var(--primary))",
   Exchange: "hsl(210, 70%, 55%)",
   Ora: "hsl(45, 80%, 50%)",
-  "Link Hunter": "hsl(150, 60%, 45%)",
+  Picklink: "hsl(150, 60%, 45%)",
   Lumina: "hsl(280, 60%, 55%)",
   "Big Link": "hsl(0, 65%, 55%)",
   Maven: "hsl(180, 50%, 45%)",
