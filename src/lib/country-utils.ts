@@ -48,10 +48,19 @@ const PHONE_TO_CODE: Record<string, string> = {
 
 function resolveCode(input: string): string | null {
   if (!input) return null;
-  const upper = input.trim().toUpperCase();
+  const trimmed = input.trim();
+  const upper = trimmed.toUpperCase();
   if (COUNTRY_DATA[upper]) return upper;
-  const lower = input.trim().toLowerCase();
+  const lower = trimmed.toLowerCase();
   if (NAME_TO_CODE[lower]) return NAME_TO_CODE[lower];
+  // Try phone prefix
+  if (trimmed.startsWith("+")) {
+    // Try longest match first
+    for (const len of [5, 4, 3, 2]) {
+      const prefix = trimmed.slice(0, len);
+      if (PHONE_TO_CODE[prefix]) return PHONE_TO_CODE[prefix];
+    }
+  }
   return null;
 }
 
