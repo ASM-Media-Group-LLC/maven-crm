@@ -46,7 +46,9 @@ const ClosersContent = () => {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [statsCollapsed, setStatsCollapsed] = useState(false);
   const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setStatsCollapsed(e.currentTarget.scrollTop > 40);
+    if (e.currentTarget.scrollTop > 40) {
+      setStatsCollapsed(true);
+    }
   }, []);
 
   const handleConvertToCreator = async (c: CloserCreatorRow) => {
