@@ -103,7 +103,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, qc]);
+  }, [user, qc, notifSettings.sound_enabled, notifSettings.dnd_enabled]);
 
   // ─── Permission-filtered notifications ───────────────────────────
   const filteredNotifications = (query.data ?? []).filter((n) => {
