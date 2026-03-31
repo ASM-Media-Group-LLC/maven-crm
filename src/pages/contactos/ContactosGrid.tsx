@@ -55,7 +55,10 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert }: Props) => {
                   <AvatarFallback className="text-sm">{initials}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="truncate text-sm font-semibold text-primary">{c.nombre}</p>
+                  <p className="truncate text-sm font-semibold text-primary">
+                    {c.pais && <span className="mr-1">{getCountryFlag(c.pais)}</span>}
+                    {c.nombre}
+                  </p>
                   <p className="text-xs text-muted-foreground font-mono">{c.ticket}</p>
                   <div className="flex items-center gap-1.5 mt-1">
                     <Badge variant={statusVariant[c.estado] ?? "secondary-soft"} className="text-[10px] px-1.5 py-0">
