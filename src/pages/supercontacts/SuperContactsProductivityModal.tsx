@@ -59,24 +59,18 @@ const SuperContactsProductivityModal = ({ open, onOpenChange }: Props) => {
     return Array.from(ids);
   }, [contacts]);
 
-  const { data: profiles = [] } = useQuery({
+  const { data: profileMap = {} } = useQuery({
     queryKey: ["productivity-profiles", agentIds],
     enabled: agentIds.length > 0 && open,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", agentIds);
+        .rpc("get_agent_names", { _user_ids: agentIds });
       if (error) throw error;
-      return data ?? [];
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((p: any) => { map[p.id] = p.full_name || "Sin nombre"; });
+      return map;
     },
   });
-
-  const profileMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    profiles.forEach((p) => { map[p.id] = p.full_name || "Sin nombre"; });
-    return map;
-  }, [profiles]);
 
   // --- DAILY DATA ---
   const dailyData = useMemo(() => {

@@ -142,12 +142,10 @@ const ContactosContent = () => {
     enabled: creatorIds.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", creatorIds);
+        .rpc("get_agent_names", { _user_ids: creatorIds });
       if (error) throw error;
       const map: Record<string, string> = {};
-      (data ?? []).forEach((p) => { map[p.id] = p.full_name || ""; });
+      (data ?? []).forEach((p: any) => { map[p.id] = p.full_name || ""; });
       return map;
     },
   });

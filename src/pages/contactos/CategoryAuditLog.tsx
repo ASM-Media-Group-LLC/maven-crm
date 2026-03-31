@@ -40,12 +40,10 @@ const CategoryAuditLog = ({ open }: Props) => {
     enabled: agentIds.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", agentIds);
+        .rpc("get_agent_names", { _user_ids: agentIds });
       if (error) throw error;
       const map: Record<string, string> = {};
-      (data ?? []).forEach((p) => { map[p.id] = p.full_name || "Desconocido"; });
+      (data ?? []).forEach((p: any) => { map[p.id] = p.full_name || "Desconocido"; });
       return map;
     },
   });
