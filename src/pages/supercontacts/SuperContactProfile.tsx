@@ -120,6 +120,9 @@ const SuperContactProfile = () => {
   const [imageAnalyzing, setImageAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const drawerFileInputRef = useRef<HTMLInputElement>(null);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
+  const [brandInsights, setBrandInsights] = useState<Record<string, { loading: boolean; text: string | null }>>({});
 
   const editCities = getCitiesByCountryCode(form.country);
 
