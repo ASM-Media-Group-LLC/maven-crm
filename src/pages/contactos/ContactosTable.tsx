@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ArrowUpDown, ExternalLink, MessageCircle, MoreHorizontal, ChevronDown, Eye, Pencil, Sparkles } from "lucide-react";
+import { ArrowUpDown, ExternalLink, MessageCircle, MoreHorizontal, ChevronDown, Eye, Pencil, Sparkles, Phone } from "lucide-react";
+import { getCountryDisplay, maskPhone } from "@/lib/country-utils";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import {
   Table,
@@ -34,7 +35,7 @@ const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning
   C: "destructive-soft",
 };
 
-type SortKey = "creacion" | "ticket" | "nombre" | "creadoPor" | "instagram" | "pais" | "categoria";
+type SortKey = "creacion" | "registro" | "nombre" | "creadoPor" | "instagram" | "pais" | "categoria";
 
 interface Props {
   contactos: Contacto[];
@@ -64,7 +65,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
     let va = "";
     let vb = "";
     switch (sortKey) {
-      case "ticket": va = a.ticket; vb = b.ticket; break;
+      case "registro": va = a.ticket; vb = b.ticket; break;
       case "nombre": va = a.nombre; vb = b.nombre; break;
       case "instagram": va = a.instagram; vb = b.instagram; break;
       case "pais": va = a.pais; vb = b.pais; break;
@@ -86,7 +87,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
       <TableHeader>
         <TableRow>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="creacion" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" col="ticket" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Registro" col="registro" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] max-w-[180px]"><SortHeader label="Nombre" col="nombre" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="creadoPor" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Instagram" col="instagram" /></TableHead>
@@ -116,12 +117,12 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">
               {c.whatsapp ? (
-                <a href={`https://wa.me/${c.whatsapp}`} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-primary hover:underline">
-                  <MessageCircle className="h-3.5 w-3.5" />
-                  {c.country_code}{c.phone}
+                <a href={`https://wa.me/${c.whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-primary hover:underline">
+                  <Phone className="h-3.5 w-3.5" />
+                  {maskPhone(c.whatsapp)}
                 </a>
-              ) : c.phone ? `${c.country_code || ""}${c.phone}` : "—"}
+              ) : c.phone ? maskPhone(`${c.country_code || ""}${c.phone}`) : "—"}
             </TableCell>
             <TableCell>
               <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="font-normal">
