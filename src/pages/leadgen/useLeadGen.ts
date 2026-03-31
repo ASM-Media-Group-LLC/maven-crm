@@ -25,6 +25,7 @@ export type LeadGenEntry = {
   state: string | null;
   city: string | null;
   company: string | null;
+  onlyfans_url: string | null;
   // Joined from profiles
   agent_name?: string | null;
   // Joined from leadgen_qa
