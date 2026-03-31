@@ -70,6 +70,7 @@ const defaultForm: FormData = {
   ciudad: "",
   plataforma: "Instagram",
   accountLink: "",
+  onlyfansUrl: "",
   ticket: "",
   notas: "",
 };
