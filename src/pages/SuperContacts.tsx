@@ -22,6 +22,10 @@ const SuperContacts = () => {
           <div className="flex-1 overflow-auto p-4 md:p-6">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold">SuperContacts</h1>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setAnalyticsOpen(true)}>
+                  <BarChart3 className="h-4 w-4 mr-2" /> Analytics
+                </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button>
