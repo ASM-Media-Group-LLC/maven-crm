@@ -97,9 +97,7 @@ const resultToBadgeVariant = (result: string): "success-soft" | "destructive-sof
   }
 };
 
-const agentsData = [
-  { name: "lorena_lozano", tickets: 5, si: 5, parcial: 0, no: 0, badges: [{ label: "IG", value: 3 }, { label: "X", value: 2 }] },
-];
+// agentsData is now computed dynamically via useMemo inside the component
 
 const tabItems = [
   { id: "promos" as const, label: "Promos", icon: Table2 },
