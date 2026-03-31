@@ -5,11 +5,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, LabelList,
+  Cell, Legend, LabelList,
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCountryFlag, getCountryName } from "@/lib/country-utils";
+import CategoryAuditLog from "./CategoryAuditLog";
 
 interface Props {
   open: boolean;
@@ -221,12 +222,6 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     fontSize: 12,
   };
 
-  // Custom label for pie that avoids overlap — only show if percent > 5%
-  const renderPieLabel = ({ name, percent }: { name: string; percent: number }) => {
-    if (percent < 0.05) return null;
-    return `${name} (${(percent * 100).toFixed(0)}%)`;
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
@@ -251,6 +246,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
               <TabsTrigger value="city">Por Ciudad</TabsTrigger>
               <TabsTrigger value="category">Categoría</TabsTrigger>
               <TabsTrigger value="status">Estado</TabsTrigger>
+              <TabsTrigger value="audit" className="text-amber-500">⚠ Auditoría</TabsTrigger>
             </TabsList>
 
             <div className="flex-1 min-h-0 overflow-auto pt-4">
@@ -321,7 +317,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
               <TabsContent value="city" className="mt-0 h-[400px]">
                 {cityData.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                    No hay datos de ciudad disponibles todavía. Asigna ciudades a los contactos para ver esta gráfica.
+                    No hay datos de ciudad disponibles todavía.
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
@@ -372,6 +368,10 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+              </TabsContent>
+
+              <TabsContent value="audit" className="mt-0">
+                <CategoryAuditLog open={open} />
               </TabsContent>
             </div>
           </Tabs>
