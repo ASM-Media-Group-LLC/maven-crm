@@ -201,7 +201,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
           })}
           {sorted.length === 0 && (
             <TableRow>
-              <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                 No se encontraron contactos.
               </TableCell>
             </TableRow>
