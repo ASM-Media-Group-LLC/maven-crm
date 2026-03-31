@@ -1,30 +1,65 @@
 
 
-## Plan: Insertar 6 creadoras faltantes del CSV anterior
+## Plan: Reducir calendario + auto-hide al scroll en /eventos
 
-### Hallazgos
+### Problema
+El calendario y la card de próximos eventos ocupan demasiado espacio vertical (~400px), dejando poco espacio para la tabla de datos. No hay auto-hide al hacer scroll.
 
-Del CSV del Maven anterior, las 7 creadoras que mencionaste están **todas en el CSV** con datos completos. Comparando contra la DB actual:
+### Cambios
 
-- **6 no existen**: PaulydelanyVIP, TheAlediazvip, Exclusive_laura, Julirodriguezok, EsmeraldaModel, SweetGirl4
-- **1 ya existe**: AgathaVipOnly — ya está como "Agatha Gomez Casiano" con handle `Agathainsta` (ID `0bc0fe9a`). En el CSV hay **dos** registros de Agatha (uno con `Agathainsta` y otro nuevo `4b594060` sin handle, categoría B+). No se insertará duplicado.
+**1. Compactar EventosCalendar (`EventosCalendar.tsx`)**
+- Reducir el calendario: celdas más pequeñas (`h-8` en vez de `h-10`), padding reducido
+- Limitar "Próximos eventos" a 3 items máximo, con card height reducida (`max-h-[280px]`)
+- Reducir padding general y tipografía
 
-### Datos a insertar (6 registros)
+**2. Auto-hide con ratchet en EventosContent (`EventosContent.tsx`)**
+- Aplicar el mismo patrón ratchet usado en LeadGen/Closers/Promolog:
+  - Estado `statsCollapsed` que se activa al scrollear > 40px
+  - Se resetea solo al cambiar tabs de proyecto/status
+  - El calendario + próximos eventos se oculta con `hidden` cuando colapsado
+- Mover el scroll container para que envuelva tabs + filtros + tabla, y el `onScroll` detecte el desplazamiento
+- Añadir transición suave con `overflow-hidden` y `max-h` animado
 
-| Nombre | Artístico | Instagram | OF URL | Status | Cat | País | Ciudad | Phone | Email |
-|--------|-----------|-----------|--------|--------|-----|------|--------|-------|-------|
-| Vicente Paul McDonald | — | delanyprecilla | — | active | A+ | EEUU | Miami | — | paul09mcdonald@gmail.com |
-| Alejandra Frnciasca Díaz Palestini | TheAlediazvip | alediazpalestini | — | active | A+ | Chile | Santiago | — | — |
-| Gleivimar Carolina Valero González | Exclusive_laura | laura_cookie02 | — | active | A+ | Colombia | Medellín | 3207612680 | — |
-| Julieta Rodriguez | JulietaRodriguezok | julietarodriguezok | — | active | A+ | México | CDMX | +5215667767611 | — |
-| Esmeralda Arango Sánchez | — | esmeralda_arang0 | — | active | B+ | Colombia | Medellín | +573242761716 | Esmeraldaarango635@gmail.com |
-| Katty Juliet Roldán Correa | SweetGirl4 | kattyroldan04 | — | active | B+ | Colombia | Medellín | — | — |
+**3. Estructura resultante**
+```text
+<main flex-col>
+  <header shrink-0>  ← fijo siempre
+  <calendar>         ← se oculta al scroll > 40px
+  <scroll-container> ← tabs + filtros + tabla (onScroll aquí)
+```
 
-### Implementación
+### Detalles técnicos
 
-Usar la herramienta de inserción de datos para ejecutar 6 `INSERT INTO creators (...)` con los datos del CSV, preservando los UUIDs originales para mantener consistencia con el sistema anterior. Se incluirán también `assigned_agency`, `kash_type`, `birth_date`, y `languages` tal como aparecen en el CSV.
+**EventosContent.tsx:**
+```tsx
+const [statsCollapsed, setStatsCollapsed] = useState(false);
 
-### Nota sobre Agatha
+const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+  if (e.currentTarget.scrollTop > 40) {
+    setStatsCollapsed(true);
+  }
+}, []);
 
-El segundo registro de Agatha (ID `4b594060`, categoría B+, sin handle) parece ser una versión actualizada. Ya existe un registro activo con handle `Agathainsta`. Se puede actualizar el existente para agregar el teléfono (+17874133008) y email (Management.agatha@gmail.com) si no los tiene, pero no se creará duplicado.
+// Reset al cambiar tab
+const updateFilters = (patch: Partial<EventoFilters>) => {
+  setStatsCollapsed(false);
+  setFilters((prev) => ({ ...prev, ...patch }));
+};
+```
+
+El calendario se envuelve en un div con transición:
+```tsx
+<div className={cn(
+  "transition-all duration-300 overflow-hidden",
+  statsCollapsed ? "max-h-0 opacity-0 mb-0" : "max-h-[500px] opacity-100 mb-4"
+)}>
+  <EventosCalendar events={allEvents} />
+</div>
+```
+
+**EventosCalendar.tsx:**
+- `h-10` → `h-8` en day cells
+- `max-h-[360px]` → `max-h-[260px]` en próximos eventos
+- `.slice(0, 4)` → `.slice(0, 3)` para mostrar menos items
+- Reducir padding de `p-5` a `p-4`
 
