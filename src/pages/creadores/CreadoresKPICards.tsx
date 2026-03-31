@@ -17,10 +17,10 @@ const CreadoresKPICards = ({ counts, isCloser = false }: Props) => {
     { label: "Pausadas", count: counts.paused, subtitle: "Temporales", icon: Pause, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
     { label: "Retiros", count: counts.leaving, subtitle: "Próximas salidas", icon: UserMinus, colorClass: "text-destructive", bgClass: "bg-destructive/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40" },
     { label: "Terminadas", count: counts.terminated, subtitle: "Inactivas", icon: UserX, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
-  ];
+  ].filter(card => !(isCloser && card.label === "En Onboarding"));
 
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+    <div className={`grid grid-cols-2 gap-4 md:grid-cols-3 ${isCloser ? 'lg:grid-cols-5' : 'lg:grid-cols-6'}`}>
       {cards.map((card) => (
         <Card key={card.label} className={`transition-all duration-200 ${card.hoverClass}`}>
           <CardContent className="p-4">

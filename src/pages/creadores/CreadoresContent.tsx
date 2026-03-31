@@ -49,6 +49,20 @@ const CreadoresContent = () => {
   const totalCount = isCloser ? creators.length : rawTotalCount;
   const totalPages = isCloser ? Math.max(1, Math.ceil(creators.length / pageSize)) : rawTotalPages;
 
+  const closerStatusCounts = useMemo(() => {
+    if (!isCloser) return statusCounts;
+    const counts = { total: 0, active: 0, onboarding: 0, pendiente: 0, pendiente_verificacion: 0, paused: 0, leaving: 0, terminated: 0 };
+    allCreators.forEach(c => {
+      counts.total++;
+      const s = c.status?.toLowerCase();
+      if (s === "activa") counts.active++;
+      else if (s === "pausada") counts.paused++;
+      else if (s === "retiro" || s === "leaving") counts.leaving++;
+      else if (s === "terminada" || s === "terminated") counts.terminated++;
+    });
+    return counts;
+  }, [isCloser, allCreators, statusCounts]);
+
   const updateFilters = (patch: Partial<CreadorFilters>) => {
     setFilters((prev) => ({ ...prev, ...patch }));
     setPage(1);
