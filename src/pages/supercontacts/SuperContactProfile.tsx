@@ -427,9 +427,17 @@ const SuperContactProfile = () => {
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Tasa +</p>
         </div>
         <div className="rounded-lg border p-3 text-center">
-          <p className="text-sm font-bold">{dashKPIs.lastContact ? formatDistanceToNow(parseISO(dashKPIs.lastContact), { locale: es, addSuffix: true }) : "—"}</p>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Último</p>
-        </div>
+          <div className="rounded-lg border p-3 text-center">
+            {dashKPIs.lastContact ? (
+              <>
+                <p className="text-sm font-bold">{format(parseISO(dashKPIs.lastContact), "dd MMM yyyy", { locale: es })}</p>
+                <p className="text-[10px] text-muted-foreground">{format(parseISO(dashKPIs.lastContact), "HH:mm")} · {formatDistanceToNow(parseISO(dashKPIs.lastContact), { locale: es, addSuffix: true })}</p>
+              </>
+            ) : (
+              <p className="text-xl font-bold">—</p>
+            )}
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Último contacto</p>
+          </div>
       </div>
 
       {/* === MAIN LAYOUT: 2 columns === */}
