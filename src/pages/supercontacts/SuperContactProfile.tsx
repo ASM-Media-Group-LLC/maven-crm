@@ -15,6 +15,7 @@ import {
   ArrowLeft, Instagram, MapPin, MessageCircle, Save, Sparkles, UserCheck,
   Send, Image, Bot, Upload, Loader2, Phone, Mail,
   Clock, CheckCircle, XCircle, MinusCircle, Plus, BarChart3, Target, TrendingUp,
+  CalendarCheck, AlertTriangle, Zap,
 } from "lucide-react";
 import {
   useSuperContact, useSuperContactInteractions, useSuperContactOutreach,
