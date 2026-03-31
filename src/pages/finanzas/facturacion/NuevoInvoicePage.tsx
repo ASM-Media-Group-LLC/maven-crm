@@ -403,7 +403,7 @@ export default function NuevoInvoicePage() {
                         )}
                         <div className="h-px bg-gray-200 mt-3" />
                         <p className="text-[8px] text-gray-300 text-center pt-1">
-                          Documento generado por KASH AGENCY · {today}
+                          Documento generado por {selectedTemplate?.company_name || "KASH AGENCY"} · {today}
                         </p>
                       </div>
                     </div>
