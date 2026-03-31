@@ -65,7 +65,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
     let va = "";
     let vb = "";
     switch (sortKey) {
-      case "ticket": va = a.ticket; vb = b.ticket; break;
+      case "registro": va = a.ticket; vb = b.ticket; break;
       case "nombre": va = a.nombre; vb = b.nombre; break;
       case "instagram": va = a.instagram; vb = b.instagram; break;
       case "pais": va = a.pais; vb = b.pais; break;
