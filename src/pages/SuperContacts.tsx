@@ -4,12 +4,14 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, UserPlus, ClipboardPaste, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { Plus, UserPlus, ClipboardPaste, FileSpreadsheet, ChevronDown, BarChart3 } from "lucide-react";
 import SuperContactsContent from "./supercontacts/SuperContactsContent";
+import SuperContactsAnalyticsModal from "./supercontacts/SuperContactsAnalyticsModal";
 
 const SuperContacts = () => {
   const [importOpen, setImportOpen] = useState(false);
   const [addSingleOpen, setAddSingleOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   return (
     <SidebarProvider>
@@ -20,6 +22,10 @@ const SuperContacts = () => {
           <div className="flex-1 overflow-auto p-4 md:p-6">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold">SuperContacts</h1>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setAnalyticsOpen(true)}>
+                  <BarChart3 className="h-4 w-4 mr-2" /> Analytics
+                </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button>
@@ -39,6 +45,7 @@ const SuperContacts = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </div>
             </div>
             <SuperContactsContent
               importOpen={importOpen}
@@ -46,6 +53,7 @@ const SuperContacts = () => {
               addSingleOpen={addSingleOpen}
               setAddSingleOpen={setAddSingleOpen}
             />
+            <SuperContactsAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
           </div>
         </div>
       </div>
