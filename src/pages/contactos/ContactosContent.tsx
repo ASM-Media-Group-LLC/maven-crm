@@ -1,14 +1,16 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Users, Building2 } from "lucide-react";
+import { Plus, Users, Building2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
 import ContactosKPICards from "./ContactosKPICards";
 import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
 import ContactosTable from "./ContactosTable";
 import ContactosGrid from "./ContactosGrid";
+import ContactosAnalyticsModal from "./ContactosAnalyticsModal";
 import ViewContactoModal from "./ViewContactoModal";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
@@ -73,9 +75,11 @@ const ContactosContent = () => {
   const [convertOpen, setConvertOpen] = useState(false);
   const [convertRawContacto, setConvertRawContacto] = useState<any>(null);
   const [addAgenciaOpen, setAddAgenciaOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isAdmin } = useUserRole();
 
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [filters]);
@@ -241,17 +245,25 @@ const ContactosContent = () => {
               Total: {totalCount} contactos
             </p>
           </div>
-          {activeTab === "contactos" ? (
-            <Button onClick={() => navigate("/contactos/nuevo")}>
-              <Plus className="mr-2 h-4 w-4" />
-              Agregar Contacto
-            </Button>
-          ) : (
-            <Button variant="outline" onClick={() => setAddAgenciaOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Agregar Agencia
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {activeTab === "contactos" && isAdmin && (
+              <Button variant="outline" onClick={() => setAnalyticsOpen(true)}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Analítica
+              </Button>
+            )}
+            {activeTab === "contactos" ? (
+              <Button onClick={() => navigate("/contactos/nuevo")}>
+                <Plus className="mr-2 h-4 w-4" />
+                Agregar Contacto
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setAddAgenciaOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Agregar Agencia
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -341,6 +353,7 @@ const ContactosContent = () => {
         contacto={convertRawContacto}
         onConverted={() => setConvertOpen(false)}
       />
+      <ContactosAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
     </main>
   );
 };
