@@ -6,12 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, Upload, Users, UserPlus, MessageCircle, UserCheck, Instagram, Plus, FileSpreadsheet, ClipboardPaste, ChevronDown } from "lucide-react";
+import { Search, Users, UserPlus, MessageCircle, UserCheck, Instagram } from "lucide-react";
 import { useSuperContacts } from "./useSuperContacts";
 import { getCountryDisplay } from "@/lib/country-utils";
 import ImportModal from "./ImportModal";
 import AddSingleContactModal from "./AddSingleContactModal";
+
+interface SuperContactsContentProps {
+  importOpen: boolean;
+  setImportOpen: (open: boolean) => void;
+  addSingleOpen: boolean;
+  setAddSingleOpen: (open: boolean) => void;
+}
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   nuevo: { label: "Nuevo", variant: "secondary" },
@@ -21,13 +27,11 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   convertido: { label: "Convertido", variant: "outline" },
 };
 
-const SuperContactsContent = () => {
+const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAddSingleOpen }: SuperContactsContentProps) => {
   const { data: contacts = [], isLoading } = useSuperContacts();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [importOpen, setImportOpen] = useState(false);
-  const [addSingleOpen, setAddSingleOpen] = useState(false);
 
   const filtered = useMemo(() => {
     let list = contacts;
@@ -102,28 +106,6 @@ const SuperContactsContent = () => {
           </SelectContent>
         </Select>
 
-        {/* Add contact dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" /> Agregar
-              <ChevronDown className="h-3 w-3 ml-1" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setAddSingleOpen(true)}>
-              <UserPlus className="h-4 w-4 mr-2" /> Agregar uno
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setImportOpen(true)}>
-              <ClipboardPaste className="h-4 w-4 mr-2" /> Pegar handles
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => {
-              setImportOpen(true);
-            }}>
-              <FileSpreadsheet className="h-4 w-4 mr-2" /> Importar archivo
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
       {/* Table */}

@@ -1,21 +1,56 @@
+import { useState } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Plus, UserPlus, ClipboardPaste, FileSpreadsheet, ChevronDown } from "lucide-react";
 import SuperContactsContent from "./supercontacts/SuperContactsContent";
 
-const SuperContacts = () => (
-  <SidebarProvider>
-    <div className="flex h-screen w-full overflow-hidden">
-      <DashboardSidebar />
-      <div className="flex flex-1 flex-col min-w-0">
-        <DashboardTopbar />
-        <div className="flex-1 overflow-auto p-4 md:p-6">
-          <h1 className="text-2xl font-bold mb-6">SuperContacts</h1>
-          <SuperContactsContent />
+const SuperContacts = () => {
+  const [importOpen, setImportOpen] = useState(false);
+  const [addSingleOpen, setAddSingleOpen] = useState(false);
+
+  return (
+    <SidebarProvider>
+      <div className="flex h-screen w-full overflow-hidden">
+        <DashboardSidebar />
+        <div className="flex flex-1 flex-col min-w-0">
+          <DashboardTopbar />
+          <div className="flex-1 overflow-auto p-4 md:p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-2xl font-bold">SuperContacts</h1>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" /> Agregar Contacto
+                    <ChevronDown className="h-3 w-3 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setAddSingleOpen(true)}>
+                    <UserPlus className="h-4 w-4 mr-2" /> Agregar uno
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                    <ClipboardPaste className="h-4 w-4 mr-2" /> Pegar handles
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" /> Importar archivo
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <SuperContactsContent
+              importOpen={importOpen}
+              setImportOpen={setImportOpen}
+              addSingleOpen={addSingleOpen}
+              setAddSingleOpen={setAddSingleOpen}
+            />
+          </div>
         </div>
       </div>
-    </div>
-  </SidebarProvider>
-);
+    </SidebarProvider>
+  );
+};
 
 export default SuperContacts;
