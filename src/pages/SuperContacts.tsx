@@ -13,6 +13,7 @@ const SuperContacts = () => {
   const [importOpen, setImportOpen] = useState(false);
   const [addSingleOpen, setAddSingleOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [productivityOpen, setProductivityOpen] = useState(false);
 
   return (
     <SidebarProvider>
@@ -24,9 +25,22 @@ const SuperContacts = () => {
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold">SuperContacts</h1>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setAnalyticsOpen(true)}>
-                  <BarChart3 className="h-4 w-4 mr-2" /> Analytics
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <BarChart3 className="h-4 w-4 mr-2" /> Analytics
+                      <ChevronDown className="h-3 w-3 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setAnalyticsOpen(true)}>
+                      <BarChart3 className="h-4 w-4 mr-2" /> Gráficas
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setProductivityOpen(true)}>
+                      <TrendingUp className="h-4 w-4 mr-2" /> Productividad
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button>
