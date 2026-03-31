@@ -46,6 +46,7 @@ export interface Contacto {
   source: string;
   profile_picture_url: string;
   assigned_to: string;
+  onlyfans_url: string;
 }
 
 const statusMap: Record<string, string> = {
