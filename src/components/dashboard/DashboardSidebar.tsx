@@ -47,15 +47,15 @@ const DashboardSidebar = () => {
   const mainMenu = mainMenuAll.filter((item) => canAccess(item.module));
 
   const creadoresSubItems = [
-    { title: "Dashboard", url: "/creadores/dashboard" },
-    { title: "Listado", url: "/creadores" },
-    { title: "Onboarding", url: "/creadores/onboarding" },
-    { title: "Offboarding", url: "/creadores/offboarding" },
-  ];
+    { title: "Dashboard", url: "/creadores/dashboard", submodule: "Dashboard" },
+    { title: "Listado", url: "/creadores", submodule: "Lista" },
+    { title: "Onboarding", url: "/creadores/onboarding", submodule: "Onboarding" },
+    { title: "Offboarding", url: "/creadores/offboarding", submodule: "Offboarding" },
+  ].filter(item => canAccess("Creadores", item.submodule));
 
   const creadoresSubItemsExtra = [
-    { title: "Personalizados", url: "/creadores/personalizados" },
-  ];
+    { title: "Personalizados", url: "/creadores/personalizados", submodule: "Personalizados" },
+  ].filter(item => canAccess("Creadores", item.submodule));
 
   const allCreadoresItems = [...creadoresSubItems, ...creadoresSubItemsExtra];
   const isCreadoresActive = allCreadoresItems.some((item) =>
