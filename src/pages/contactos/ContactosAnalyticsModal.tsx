@@ -592,7 +592,6 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
 
               {/* Revenue Tab */}
               <TabsContent value="revenue" className="mt-0">
-              <TabsContent value="revenue" className="mt-0">
                 {/* KPI Row 1 */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                   <div className="rounded-lg border bg-card p-3 text-center">
