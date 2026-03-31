@@ -7,7 +7,7 @@ interface Props {
   isCloser?: boolean;
 }
 
-const CreadoresKPICards = ({ counts }: Props) => {
+const CreadoresKPICards = ({ counts, isCloser = false }: Props) => {
   const activePercent = counts.total > 0 ? Math.round((counts.active / counts.total) * 100) : 0;
 
   const cards = [
