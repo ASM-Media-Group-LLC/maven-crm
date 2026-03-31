@@ -80,7 +80,7 @@ export default function TemplatesPage() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 min-h-0 flex flex-col px-6 py-4">
         {isLoading ? (
           <p className="text-muted-foreground text-sm">Cargando...</p>
         ) : templates.length === 0 ? (
@@ -89,43 +89,54 @@ export default function TemplatesPage() {
             <p className="text-sm mt-1">Crea tu primer template para personalizar tus documentos</p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Fecha creación</TableHead>
-                <TableHead>Creador</TableHead>
-                <TableHead className="text-right w-[100px]">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {templates.map(t => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-medium">{t.name}</TableCell>
-                  <TableCell>
-                    <Badge variant={t.type === "invoice" ? "default" : "secondary"}>
-                      {t.type === "invoice" ? "Invoice" : "Nota de pago"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{t.creator_name}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewTemplate(t)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          <DataTableShell
+            currentPage={1}
+            totalPages={1}
+            totalCount={templates.length}
+            pageSize={templates.length}
+            onPageChange={() => {}}
+            className="flex-1 min-h-0"
+          >
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="sticky top-0 z-10 bg-background w-[50px]">#</TableHead>
+                  <TableHead className="sticky top-0 z-10 bg-background">Nombre</TableHead>
+                  <TableHead className="sticky top-0 z-10 bg-background">Tipo</TableHead>
+                  <TableHead className="sticky top-0 z-10 bg-background">Fecha creación</TableHead>
+                  <TableHead className="sticky top-0 z-10 bg-background">Creador</TableHead>
+                  <TableHead className="sticky top-0 z-10 bg-background text-right w-[80px]">Acciones</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {templates.map((t, idx) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+                    <TableCell className="font-medium">{t.name}</TableCell>
+                    <TableCell>
+                      <Badge variant={t.type === "invoice" ? "default" : "secondary"}>
+                        {t.type === "invoice" ? "Invoice" : "Nota de pago"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{t.creator_name}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewTemplate(t)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </DataTableShell>
         )}
       </div>
 
