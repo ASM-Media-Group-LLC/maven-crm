@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Search, List, LayoutGrid, X, Check, ChevronsUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { getCountryFlag, getCountryName } from "@/lib/country-utils";
 import {
   Select,
   SelectContent,
@@ -59,6 +60,10 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
         placeholder="País"
         value={filters.pais}
         options={["AR", "BR", "CL", "CO", "CR", "EC", "ES", "GB", "GT", "HN", "IT", "MX", "PA", "PE", "PY", "SV", "TH", "US", "UY", "VE"]}
+        labels={Object.fromEntries(
+          ["AR", "BR", "CL", "CO", "CR", "EC", "ES", "GB", "GT", "HN", "IT", "MX", "PA", "PE", "PY", "SV", "TH", "US", "UY", "VE"]
+            .map((c) => [c, `${getCountryFlag(c)} ${getCountryName(c)}`])
+        )}
         onChange={(v) => onChange({ pais: v })}
       />
       <FilterSelect
@@ -160,23 +165,25 @@ function FilterSelect({
   placeholder,
   value,
   options = [],
+  labels,
   onChange,
 }: {
   placeholder: string;
   value: string;
   options: string[];
+  labels?: Record<string, string>;
   onChange: (v: string) => void;
 }) {
   return (
     <Select value={value || undefined} onValueChange={(v) => onChange(v === "__all__" ? "" : v)}>
-      <SelectTrigger className="w-[140px]">
+      <SelectTrigger className="w-[180px]">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="__all__">Todos</SelectItem>
         {options.map((o) => (
           <SelectItem key={o} value={o}>
-            {o}
+            {labels?.[o] || o}
           </SelectItem>
         ))}
       </SelectContent>
