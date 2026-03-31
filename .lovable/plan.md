@@ -1,49 +1,30 @@
 
 
-## Plan: Fix visibilidad de Closers + Auditoría CSV vs DB
+## Plan: Insertar 6 creadoras faltantes del CSV anterior
 
 ### Hallazgos
 
-**1. Bug del Closer (0 creadores visibles)**
+Del CSV del Maven anterior, las 7 creadoras que mencionaste están **todas en el CSV** con datos completos. Comparando contra la DB actual:
 
-El problema NO es de RLS (la política SELECT permite `true` para autenticados). El problema está en **CreadoresContent.tsx línea 39-41** que filtra:
-```tsx
-return rawCreators.filter(c => c.closer_responsible_id === user.id || c.created_by === user.id);
-```
-Como `created_by` es NULL en todos los registros y el closer de prueba (Marielby Testing) no está asignado como `closer_responsible_id` en ningún creator, ve 0 resultados.
+- **6 no existen**: PaulydelanyVIP, TheAlediazvip, Exclusive_laura, Julirodriguezok, EsmeraldaModel, SweetGirl4
+- **1 ya existe**: AgathaVipOnly — ya está como "Agatha Gomez Casiano" con handle `Agathainsta` (ID `0bc0fe9a`). En el CSV hay **dos** registros de Agatha (uno con `Agathainsta` y otro nuevo `4b594060` sin handle, categoría B+). No se insertará duplicado.
 
-**Solución**: Eliminar el filtro de ownership para closers. El acceso otorgado es "ver la lista completa", no solo sus propios registros. La restricción está en las **acciones** (no editar, no dar de baja), no en la visibilidad de la lista.
+### Datos a insertar (6 registros)
 
-**2. Auditoría CSV vs DB**
+| Nombre | Artístico | Instagram | OF URL | Status | Cat | País | Ciudad | Phone | Email |
+|--------|-----------|-----------|--------|--------|-----|------|--------|-------|-------|
+| Vicente Paul McDonald | — | delanyprecilla | — | active | A+ | EEUU | Miami | — | paul09mcdonald@gmail.com |
+| Alejandra Frnciasca Díaz Palestini | TheAlediazvip | alediazpalestini | — | active | A+ | Chile | Santiago | — | — |
+| Gleivimar Carolina Valero González | Exclusive_laura | laura_cookie02 | — | active | A+ | Colombia | Medellín | 3207612680 | — |
+| Julieta Rodriguez | JulietaRodriguezok | julietarodriguezok | — | active | A+ | México | CDMX | +5215667767611 | — |
+| Esmeralda Arango Sánchez | — | esmeralda_arang0 | — | active | B+ | Colombia | Medellín | +573242761716 | Esmeraldaarango635@gmail.com |
+| Katty Juliet Roldán Correa | SweetGirl4 | kattyroldan04 | — | active | B+ | Colombia | Medellín | — | — |
 
-| Métrica | Valor |
-|---------|-------|
-| Registros en DB | 285 |
-| Registros en CSV | 281 |
-| Registros de prueba/test en DB | 9 (`@Testing102`, `@Testing103`, `@Testing2000`, `Testing101`, `Testing Offboarding`, `Test Creator Prueba`, `Johanna Prueba`, `joha`, `Carolina `) |
-| Registros reales en DB | 276 |
+### Implementación
 
-El CSV tiene 281 filas pero incluye los duplicados como las dos "Agatha Gomez Casiano" (IDs distintos). La diferencia de 4 entre CSV (281) y DB (285) son las cuentas de testing/prueba que no estaban en el CSV más algunos registros añadidos después de la exportación.
+Usar la herramienta de inserción de datos para ejecutar 6 `INSERT INTO creators (...)` con los datos del CSV, preservando los UUIDs originales para mantener consistencia con el sistema anterior. Se incluirán también `assigned_agency`, `kash_type`, `birth_date`, y `languages` tal como aparecen en el CSV.
 
-No hay creadoras faltantes significativas — los datos del CSV coinciden con la DB.
+### Nota sobre Agatha
 
----
-
-### Cambios a implementar
-
-**Archivo: `src/pages/creadores/CreadoresContent.tsx`**
-
-Eliminar los filtros de ownership del closer (líneas 38-50). El closer verá la misma lista que cualquier otro rol, pero sin botones de editar/dar de baja (eso ya está implementado en CreadoresTable):
-
-```tsx
-// Eliminar estos bloques:
-const creators = useMemo(() => {
-  if (!isCloser || !user?.id) return rawCreators;
-  return rawCreators.filter(c => c.closer_responsible_id === user.id || c.created_by === user.id);
-}, [rawCreators, isCloser, user?.id]);
-
-// Reemplazar con uso directo de rawCreators
-```
-
-También eliminar `closerStatusCounts` y los cálculos derivados del filtro de ownership, simplificando a usar directamente los datos sin filtrar.
+El segundo registro de Agatha (ID `4b594060`, categoría B+, sin handle) parece ser una versión actualizada. Ya existe un registro activo con handle `Agathainsta`. Se puede actualizar el existente para agregar el teléfono (+17874133008) y email (Management.agatha@gmail.com) si no los tiene, pero no se creará duplicado.
 
