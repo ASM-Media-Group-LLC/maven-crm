@@ -89,6 +89,14 @@ const SuperContactProfile = () => {
   const [outResponse, setOutResponse] = useState("");
   const [outStatus, setOutStatus] = useState("pending");
 
+  // AI Chat state
+  const [aiMessages, setAiMessages] = useState<{ role: string; content: string }[]>([]);
+  const [aiInput, setAiInput] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [imageAnalyzing, setImageAnalyzing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   const editCities = getCitiesByCountryCode(form.country);
 
   // Dashboard data
