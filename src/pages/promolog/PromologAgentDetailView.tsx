@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -273,25 +274,11 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
           {/* KPI Cards */}
           <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[200px] opacity-100 pb-2"}`}>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-              {[
-                { label: "Total", value: totalEntries, icon: Table2, color: "accent" },
-                { label: "Sí", value: siCount, icon: Check, color: "success" },
-                { label: "Parcial", value: parcialCount, icon: Minus, color: "warning" },
-                { label: "No", value: noCount, icon: X, color: "destructive" },
-                { label: "Éxito", value: `${successRate}%`, icon: TrendingUp, color: "primary" },
-              ].map((kpi) => (
-                <Card key={kpi.label} className={`border border-${kpi.color}/40 bg-card/80`}>
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-full bg-${kpi.color}/20 shrink-0`}>
-                      <kpi.icon className={`h-4 w-4 text-${kpi.color}`} />
-                    </div>
-                    <div>
-                      <p className={`text-2xl font-bold text-${kpi.color}`}>{kpi.value}</p>
-                      <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              <DashboardMetricCard label="Total" value={String(totalEntries)} icon={Table2} color="accent" />
+              <DashboardMetricCard label="Sí" value={String(siCount)} icon={Check} color="success" />
+              <DashboardMetricCard label="Parcial" value={String(parcialCount)} icon={Minus} color="warning" />
+              <DashboardMetricCard label="No" value={String(noCount)} icon={X} color="destructive" />
+              <DashboardMetricCard label="Éxito" value={`${successRate}%`} icon={TrendingUp} color="primary" />
             </div>
           </div>
 
@@ -364,52 +351,10 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
         <div className="flex-1 min-h-0 overflow-auto p-6 space-y-6">
           {/* Summary KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <Card className="border border-primary/40">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 shrink-0">
-                  <Table2 className="h-4 w-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">{totalEntries}</p>
-                  <p className="text-xs text-muted-foreground">Total Promos</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border border-accent/40">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/20 shrink-0">
-                  <TrendingUp className="h-4 w-4 text-accent" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-accent">{avgPerDay}</p>
-                  <p className="text-xs text-muted-foreground">Promedio/Día</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border border-success/40">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success/20 shrink-0">
-                  <Check className="h-4 w-4 text-success" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-success">{successRate}%</p>
-                  <p className="text-xs text-muted-foreground">Tasa de Éxito</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border border-warning/40">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-warning/20 shrink-0">
-                  <Clock className="h-4 w-4 text-warning" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-warning">
-                    {rawEntries.filter((e: any) => isToday(new Date(e.date))).length}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Hoy</p>
-                </div>
-              </CardContent>
-            </Card>
+            <DashboardMetricCard label="Total Promos" value={String(totalEntries)} icon={Table2} color="primary" />
+            <DashboardMetricCard label="Promedio/Día" value={String(avgPerDay)} icon={TrendingUp} color="accent" />
+            <DashboardMetricCard label="Tasa de Éxito" value={`${successRate}%`} icon={Check} color="success" />
+            <DashboardMetricCard label="Hoy" value={String(rawEntries.filter((e: any) => isToday(new Date(e.date))).length)} icon={Clock} color="warning" />
           </div>
 
           {/* Charts row 1: Promos por Día + Promos por Hora */}

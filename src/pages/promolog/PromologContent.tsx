@@ -33,6 +33,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -578,52 +579,12 @@ const PromologContent = () => {
       {/* KPI Cards */}
       <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0 pb-0" : "max-h-[200px] opacity-100 pb-2"}`}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="border border-accent/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/20 shrink-0">
-                <Table2 className="h-4 w-4 text-accent" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-accent">{filteredEntries.length}</p>
-                <p className="text-xs text-muted-foreground">Total Promos</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border border-primary/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 shrink-0">
-                <TrendingUp className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-primary">
-                  {filteredEntries.length > 0 ? `${Math.round((filteredEntries.filter(e => e.result === "Sí").length / filteredEntries.length) * 100)}%` : "0%"}
-                </p>
-                <p className="text-xs text-muted-foreground">Tasa de éxito</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border border-destructive/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setKpiModalType("no_chequeadas")}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/20 shrink-0">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-destructive">{entries.filter(e => e.result === "Pendiente").length}</p>
-                <p className="text-xs text-muted-foreground">Sin revisar</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border border-success/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success/20 shrink-0">
-                <Users className="h-4 w-4 text-success" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-success">{new Set(filteredEntries.map(e => e.creator_id)).size}</p>
-                <p className="text-xs text-muted-foreground">Creadoras</p>
-              </div>
-            </CardContent>
-          </Card>
+          <DashboardMetricCard label="Total Promos" value={String(filteredEntries.length)} icon={Table2} color="accent" />
+          <DashboardMetricCard label="Tasa de éxito" value={filteredEntries.length > 0 ? `${Math.round((filteredEntries.filter(e => e.result === "Sí").length / filteredEntries.length) * 100)}%` : "0%"} icon={TrendingUp} color="primary" />
+          <div className="cursor-pointer" onClick={() => setKpiModalType("no_chequeadas")}>
+            <DashboardMetricCard label="Sin revisar" value={String(entries.filter(e => e.result === "Pendiente").length)} icon={AlertTriangle} color="destructive" />
+          </div>
+          <DashboardMetricCard label="Creadoras" value={String(new Set(filteredEntries.map(e => e.creator_id)).size)} icon={Users} color="success" />
         </div>
       </div>
 
