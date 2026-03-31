@@ -41,7 +41,7 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
   const [dragOver, setDragOver] = useState(false);
 
   const resetForm = () => {
-    setName(""); setType("invoice"); setCompanyName(""); setCompanyAddress(""); setCompanyEmail(""); setLogoUrl("");
+    setName(""); setType("invoice"); setCompanyName(""); setCompanyAddress(""); setCompanyZip(""); setCompanyEmail(""); setLogoUrl("");
   };
 
   const handleFile = async (file: File) => {
