@@ -1104,6 +1104,7 @@ export type Database = {
           media_files: Json | null
           name: string
           notes: string | null
+          onlyfans_url: string | null
           phone: string | null
           physical_appearance: string | null
           platform: string
@@ -1126,6 +1127,7 @@ export type Database = {
           media_files?: Json | null
           name: string
           notes?: string | null
+          onlyfans_url?: string | null
           phone?: string | null
           physical_appearance?: string | null
           platform: string
@@ -1148,6 +1150,7 @@ export type Database = {
           media_files?: Json | null
           name?: string
           notes?: string | null
+          onlyfans_url?: string | null
           phone?: string | null
           physical_appearance?: string | null
           platform?: string
@@ -4166,6 +4169,7 @@ export type Database = {
           lg_user_id: string
           model_handle: string
           notes: string | null
+          onlyfans_url: string | null
           phone_e164: string | null
           phone_raw: string | null
           platform: string
@@ -4187,6 +4191,7 @@ export type Database = {
           lg_user_id: string
           model_handle: string
           notes?: string | null
+          onlyfans_url?: string | null
           phone_e164?: string | null
           phone_raw?: string | null
           platform: string
@@ -4208,6 +4213,7 @@ export type Database = {
           lg_user_id?: string
           model_handle?: string
           notes?: string | null
+          onlyfans_url?: string | null
           phone_e164?: string | null
           phone_raw?: string | null
           platform?: string

@@ -51,7 +51,7 @@ const getPlatformIcon = (platform: string) => {
 const cleanPhoneForWhatsApp = (phone: string) =>
   phone.replace(/[^\d]/g, "");
 
-type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "categoria" | "pais" | "contacto" | "qa";
+type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "categoria" | "pais" | "contacto" | "qa" | "of";
 
 const QA_RATING_OPTIONS = [
   { value: "bien", label: "Bien", variant: "success-soft" as const },
@@ -288,6 +288,21 @@ const LeadRow = React.memo(({ lead, onView, profiles, qaMap, canReview }: { lead
           <ExternalLink className="h-3 w-3" />
         </a>
       </TableCell>
+      <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}>
+        {(lead as any).onlyfans_url ? (
+          <a
+            href={(lead as any).onlyfans_url.startsWith("http") ? (lead as any).onlyfans_url : `https://onlyfans.com/${(lead as any).onlyfans_url}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <span className="truncate max-w-[100px]">OF</span>
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
       <TableCell className="text-sm text-muted-foreground" onClick={(e) => isOrphan && e.stopPropagation()}>
         {isOrphan ? (
           <AgentReassignCell lead={lead} profiles={profiles!} />
@@ -357,10 +372,11 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
 
   const sorted = [...leads].sort((a, b) => {
     let va = "", vb = "";
-    switch (sortKey) {
+      switch (sortKey) {
       case "hora": va = a.created_at; vb = b.created_at; break;
       case "ticket": va = a.id; vb = b.id; break;
       case "handle": va = a.model_handle; vb = b.model_handle; break;
+      case "of": va = (a as any).onlyfans_url ?? ""; vb = (b as any).onlyfans_url ?? ""; break;
       case "agente": va = a.agent_name ?? ""; vb = b.agent_name ?? ""; break;
       case "agencia": va = a.company ?? ""; vb = b.company ?? ""; break;
       case "categoria": va = a.quality; vb = b.quality; break;
@@ -379,12 +395,13 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
   );
 
   return (
-    <Table containerClassName="overflow-visible" className="min-w-[900px]">
+    <Table containerClassName="overflow-visible" className="min-w-[1050px]">
       <TableHeader>
         <TableRow>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="hora" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" col="ticket" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Handle" col="handle" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="OF URL" col="of" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="agente" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agencia" col="agencia" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="categoria" /></TableHead>
@@ -400,7 +417,7 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
         ))}
         {sorted.length === 0 && (
           <TableRow>
-            <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+            <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
               No se encontraron leads.
             </TableCell>
           </TableRow>

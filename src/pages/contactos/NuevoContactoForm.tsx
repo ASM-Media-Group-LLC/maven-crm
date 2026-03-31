@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, UserPlus, Upload, Save, X, ImageIcon, Film, FileText, Check, ChevronsUpDown, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
+import { checkCreatorExists, checkRecentLead, checkDuplicateOnlyFans } from "@/lib/lead-validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,6 +55,7 @@ interface FormData {
   ciudad: string;
   plataforma: string;
   accountLink: string;
+  onlyfansUrl: string;
   ticket: string;
   notas: string;
 }
@@ -68,6 +70,7 @@ const defaultForm: FormData = {
   ciudad: "",
   plataforma: "Instagram",
   accountLink: "",
+  onlyfansUrl: "",
   ticket: "",
   notas: "",
 };
@@ -78,6 +81,7 @@ const NuevoContactoForm = () => {
   const { user } = useAuth();
   const [form, setForm] = useState<FormData>(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [creatorAlert, setCreatorAlert] = useState<{ name: string; id: string } | null>(null);
   const [companies, setCompanies] = useState<string[]>(DEFAULT_COMPANIES);
   const [uploadModal, setUploadModal] = useState<{ open: boolean; category: UploadCategory }>({ open: false, category: "piclink" });
   const [profilePhoto, setProfilePhoto] = useState<UploadedFile | null>(null);
@@ -141,6 +145,40 @@ const NuevoContactoForm = () => {
 
     setIsSaving(true);
     try {
+      // VALIDATION 1: Check if creator exists
+      const creatorCheck = await checkCreatorExists(form.accountLink, form.onlyfansUrl);
+      if (creatorCheck.exists) {
+        setCreatorAlert({ name: creatorCheck.creatorName!, id: creatorCheck.creatorId! });
+        setIsSaving(false);
+        return;
+      }
+
+      // VALIDATION 2: Check if lead was created in last 24h
+      const recentCheck = await checkRecentLead(form.accountLink, form.onlyfansUrl);
+      if (recentCheck.exists) {
+        toast({
+          title: "Lead duplicado reciente",
+          description: "Este lead ya fue registrado hace menos de 24 horas. Intenta nuevamente más tarde.",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      // VALIDATION 3: Check duplicate OnlyFans URL
+      if (form.onlyfansUrl?.trim()) {
+        const ofCheck = await checkDuplicateOnlyFans(form.onlyfansUrl);
+        if (ofCheck.existsInLeads || ofCheck.existsInContacts) {
+          toast({
+            title: "OnlyFans duplicado",
+            description: `Esta URL de OnlyFans ya está registrada en ${ofCheck.existsInLeads ? "leads" : "contactos"}.`,
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
+      }
+
       // Phone duplicate check
       const trimmedPhone = form.phone?.trim();
       if (trimmedPhone) {
@@ -188,6 +226,7 @@ const NuevoContactoForm = () => {
         city: form.ciudad || null,
         ticket_number: form.ticket || null,
         notes: form.notas || null,
+        onlyfans_url: form.onlyfansUrl?.trim() || null,
         profile_picture_url: profilePhoto?.url || null,
         created_by: user?.id || "",
         status: "new",
@@ -269,6 +308,10 @@ const NuevoContactoForm = () => {
             </Field>
           </div>
 
+          <Field label="OnlyFans URL">
+            <Input value={form.onlyfansUrl} onChange={(e) => set("onlyfansUrl", e.target.value)} placeholder="https://onlyfans.com/usuario" />
+          </Field>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Ciudad">
               <Input value={form.ciudad} onChange={(e) => set("ciudad", e.target.value)} placeholder="Ej: Bogotá, Medellín..." />
@@ -342,6 +385,24 @@ const NuevoContactoForm = () => {
       </footer>
 
       <FileUploadModal open={uploadModal.open} onClose={() => setUploadModal((prev) => ({ ...prev, open: false }))} category={uploadModal.category} tempId={tempId} onFilesUploaded={handleFilesUploaded} />
+
+      {/* Creator exists alert */}
+      {creatorAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card rounded-lg border border-border p-6 max-w-sm shadow-lg">
+            <h3 className="text-lg font-semibold mb-2">Creadora existente</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Esta creadora ya forma parte de la agencia: <strong>{creatorAlert.name}</strong>
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setCreatorAlert(null)}>Cancelar</Button>
+              <Button onClick={() => { navigate(`/creadoras/${creatorAlert.id}`); setCreatorAlert(null); }}>
+                Ver perfil
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 };

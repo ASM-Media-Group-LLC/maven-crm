@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,6 +18,7 @@ import { Upload, X, ChevronsUpDown, Check, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
+import { checkCreatorExists, checkRecentLead, checkDuplicateOnlyFans } from "@/lib/lead-validation";
 import { useQueryClient } from "@tanstack/react-query";
 
 const ALL_COUNTRIES = [
@@ -92,7 +94,10 @@ const leadSchema = z.object({
   platform: z.string().min(1, "Plataforma requerida"),
   quality: z.string().min(1, "Categoría requerida"),
   company: z.string().min(1, "Compañía requerida"),
-  
+  onlyfans_url: z.string().optional().refine(
+    (val) => !val || val.includes("onlyfans.com") || /^[a-zA-Z0-9._-]+$/.test(val),
+    "Debe ser una URL de OnlyFans válida o un handle"
+  ),
   country_code: z.string().optional(),
   notes: z.string().max(500, "Máximo 500 caracteres").optional(),
 });
@@ -111,8 +116,10 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const [isAddingCompany, setIsAddingCompany] = useState(false);
   const [customCompany, setCustomCompany] = useState("");
+  const [creatorAlert, setCreatorAlert] = useState<{ name: string; id: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
@@ -121,7 +128,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       platform: "",
       quality: "",
       company: "",
-      
+      onlyfans_url: "",
       country_code: "",
       notes: "",
     },
@@ -164,6 +171,40 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         return;
       }
 
+      // VALIDATION 1: Check if creator exists
+      const creatorCheck = await checkCreatorExists(data.source_link, data.onlyfans_url);
+      if (creatorCheck.exists) {
+        setCreatorAlert({ name: creatorCheck.creatorName!, id: creatorCheck.creatorId! });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // VALIDATION 2: Check if lead was created in last 24h
+      const recentCheck = await checkRecentLead(data.source_link, data.onlyfans_url);
+      if (recentCheck.exists) {
+        toast({
+          title: "Lead duplicado reciente",
+          description: "Este lead ya fue registrado hace menos de 24 horas. Intenta nuevamente más tarde.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // VALIDATION 3: Check duplicate OnlyFans URL
+      if (data.onlyfans_url?.trim()) {
+        const ofCheck = await checkDuplicateOnlyFans(data.onlyfans_url);
+        if (ofCheck.existsInLeads || ofCheck.existsInContacts) {
+          toast({
+            title: "OnlyFans duplicado",
+            description: `Esta URL de OnlyFans ya está registrada en ${ofCheck.existsInLeads ? "leads" : "contactos"}.`,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const { data: inserted, error } = await supabase.from("leadgen_entries").insert({
         model_handle: normalizedHandle,
         platform: data.platform,
@@ -172,7 +213,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         country_code: data.country_code || null,
         notes: data.notes || null,
         source_link: data.source_link,
-        
+        onlyfans_url: data.onlyfans_url?.trim() || null,
         lg_user_id: user.id,
         entry_date: getMiamiDateStr(),
       } as any).select("id").single();
@@ -214,6 +255,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader className="pr-8">
@@ -243,6 +285,23 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                     <p className="text-xs text-muted-foreground">
                       El handle se detectará automáticamente de la URL
                     </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="onlyfans_url"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>OnlyFans URL</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://onlyfans.com/usuario"
+                        {...field}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -444,6 +503,25 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         </Form>
       </DialogContent>
     </Dialog>
+
+    {/* Creator exists alert */}
+    <Dialog open={!!creatorAlert} onOpenChange={(o) => !o && setCreatorAlert(null)}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Creadora existente</DialogTitle>
+          <DialogDescription>
+            Esta creadora ya forma parte de la agencia: <strong>{creatorAlert?.name}</strong>
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex gap-2">
+          <Button variant="outline" onClick={() => setCreatorAlert(null)}>Cancelar</Button>
+          <Button onClick={() => { navigate(`/creadoras/${creatorAlert?.id}`); setCreatorAlert(null); onOpenChange(false); }}>
+            Ver perfil
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 

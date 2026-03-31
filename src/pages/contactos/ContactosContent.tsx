@@ -46,6 +46,7 @@ export interface Contacto {
   source: string;
   profile_picture_url: string;
   assigned_to: string;
+  onlyfans_url: string;
 }
 
 const statusMap: Record<string, string> = {
@@ -246,6 +247,7 @@ const ContactosContent = () => {
         source: c.source || "",
         profile_picture_url: c.profile_picture_url || "",
         assigned_to: c.assigned_to || "",
+        onlyfans_url: (c as any).onlyfans_url || "",
       };
     }),
   [dbContactos, interactionCounts, profilesMap, creatorsCityMap]);

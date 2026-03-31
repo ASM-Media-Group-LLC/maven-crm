@@ -87,7 +87,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
 
   return (
     <TooltipProvider>
-      <Table containerClassName="overflow-visible" className="min-w-[1000px]">
+      <Table containerClassName="overflow-visible" className="min-w-[1100px]">
         <TableHeader>
           <TableRow>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="creacion" /></TableHead>
@@ -97,6 +97,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ciudad" col="ciudad" /></TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="creadoPor" /></TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Instagram" col="instagram" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">OF URL</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Contacto</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="categoria" /></TableHead>
             <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"></TableHead>
@@ -145,6 +146,21 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 </TableCell>
+                <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}>
+                  {(c as any).onlyfans_url ? (
+                    <a
+                      href={(c as any).onlyfans_url.startsWith("http") ? (c as any).onlyfans_url : `https://onlyfans.com/${(c as any).onlyfans_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      <span className="truncate max-w-[80px]">OF</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {c.whatsapp ? (
                     <a href={`https://wa.me/${c.whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"
@@ -185,7 +201,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
           })}
           {sorted.length === 0 && (
             <TableRow>
-              <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                 No se encontraron contactos.
               </TableCell>
             </TableRow>
