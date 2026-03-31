@@ -51,6 +51,7 @@ const ClosersContent = () => {
 
   const handleConvertToCreator = async (c: CloserCreatorRow) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase.from("creators").insert({
         name: c.instagram_handle,
         instagram_handle: c.instagram_handle,
@@ -58,6 +59,7 @@ const ClosersContent = () => {
         phone: c.phone,
         notes: c.notes,
         closer_responsible_id: c.assigned_to,
+        created_by: user?.id,
       });
       if (error) throw error;
       toast({ title: "Creadora creada", description: `${c.instagram_handle} fue convertida a creadora.` });
