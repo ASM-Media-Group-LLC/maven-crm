@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Share2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,8 +32,15 @@ const projectTabs = [
 const EventosContent = () => {
   const [filters, setFilters] = useState<EventoFilters>(emptyFilters);
   const [view, setView] = useState<"table" | "grid">("table");
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (e.currentTarget.scrollTop > 40) {
+      setStatsCollapsed(true);
+    }
+  }, []);
 
   const { events, allEvents, isLoading } = useEventos(filters);
 
@@ -83,8 +91,10 @@ const EventosContent = () => {
     toast({ title: "Enlace copiado al portapapeles" });
   };
 
-  const updateFilters = (patch: Partial<EventoFilters>) =>
+  const updateFilters = (patch: Partial<EventoFilters>) => {
+    setStatsCollapsed(false);
     setFilters((prev) => ({ ...prev, ...patch }));
+  };
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -117,8 +127,15 @@ const EventosContent = () => {
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-auto p-6 space-y-4">
-          <EventosCalendar events={allEvents} />
+        <>
+          <div className={cn(
+            "transition-all duration-300 overflow-hidden shrink-0 px-6 pt-6",
+            statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[500px] opacity-100 pb-4"
+          )}>
+            <EventosCalendar events={allEvents} />
+          </div>
+
+          <div className="flex-1 overflow-auto p-6 pt-0 space-y-4" onScroll={handleScroll}>
 
           <div className="flex flex-wrap items-center gap-3">
             {/* Project type tabs */}
@@ -166,7 +183,8 @@ const EventosContent = () => {
           ) : (
             <EventosGrid events={events} />
           )}
-        </div>
+          </div>
+        </>
       )}
 
       {/* Share Agenda Modal */}

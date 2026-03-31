@@ -45,15 +45,15 @@ const EventosCalendar = ({ events }: Props) => {
 
   const upcoming = events
     .filter((e) => isAfter(new Date(e.date), today) || isSameDay(new Date(e.date), today))
-    .slice(0, 4);
+    .slice(0, 3);
 
   const goToToday = () => setMonth(new Date());
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.9fr] gap-6">
       <Card className="overflow-hidden border-border/80">
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between mb-4">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
             <div className="space-y-1">
               <div className="flex items-center gap-3">
                 <h3 className="text-xl font-bold capitalize tracking-tight">
@@ -99,7 +99,7 @@ const EventosCalendar = ({ events }: Props) => {
               cell: "flex-1 text-center p-0 relative",
               day: cn(
                 buttonVariants({ variant: "ghost" }),
-                "h-10 w-full p-0 text-sm rounded-xl font-medium aria-selected:opacity-100 transition-all duration-150 hover:scale-[1.03]"
+                "h-8 w-full p-0 text-sm rounded-xl font-medium aria-selected:opacity-100 transition-all duration-150 hover:scale-[1.03]"
               ),
               day_selected: "bg-primary text-primary-foreground hover:bg-primary shadow-md",
               day_today: "calendar-day-today",
@@ -112,7 +112,7 @@ const EventosCalendar = ({ events }: Props) => {
       </Card>
 
       <Card className="overflow-hidden border-border/80">
-        <CardContent className="p-5 max-h-[360px] overflow-auto">
+        <CardContent className="p-4 max-h-[260px] overflow-auto">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="h-4 w-4 text-accent" />
             <h3 className="text-base font-bold tracking-tight">Próximos eventos</h3>
