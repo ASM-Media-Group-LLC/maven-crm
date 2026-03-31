@@ -98,12 +98,12 @@ export const useCreateSuperContact = () => {
 
 export const useImportSuperContacts = () => {
   const qc = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async (handles: string[]) => {
+      const { data: { user } } = await supabase.auth.getUser();
       const rows = handles.map((h) => ({
         instagram_handle: h.replace(/^@/, "").trim(),
-        created_by: user?.id,
+        created_by: user?.id || null,
       }));
       const { data, error } = await supabase
         .from("super_contacts")
