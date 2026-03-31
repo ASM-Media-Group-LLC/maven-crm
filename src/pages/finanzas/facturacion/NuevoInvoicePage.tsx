@@ -141,7 +141,7 @@ export default function NuevoInvoicePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast({ title: "Invoice creado" });
-      navigate("/finanzas/facturacion");
+      navigate("/finanzas/facturacion/invoices");
     },
     onError: () => toast({ title: "Error al crear", variant: "destructive" }),
   });
@@ -171,12 +171,12 @@ export default function NuevoInvoicePage() {
       {/* Header */}
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
         <nav className="text-sm text-muted-foreground mb-2">
-          <button onClick={() => navigate("/finanzas/facturacion")} className="hover:text-foreground transition-colors">Facturación</button>
+          <button onClick={() => navigate("/finanzas/facturacion/invoices")} className="hover:text-foreground transition-colors">Facturación</button>
           <span className="mx-2">›</span>
           <span className="text-foreground font-medium">Nuevo Invoice</span>
         </nav>
         <button
-          onClick={() => navigate("/finanzas/facturacion")}
+          onClick={() => navigate("/finanzas/facturacion/invoices")}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
           <ArrowLeft className="h-4 w-4" /> Volver
@@ -417,7 +417,7 @@ export default function NuevoInvoicePage() {
 
       {/* Footer */}
       <footer className="bg-background px-6 py-4 border-t border-border shrink-0 flex justify-end gap-2">
-        <Button variant="outline" onClick={() => navigate("/finanzas/facturacion")}>Cancelar</Button>
+        <Button variant="outline" onClick={() => navigate("/finanzas/facturacion/invoices")}>Cancelar</Button>
         <Button onClick={handleSubmit} disabled={!creatorId || !dateFrom || !dateTo || grandTotal === 0 || createInvoice.isPending}>
           Crear Invoice
         </Button>

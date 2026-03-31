@@ -262,7 +262,8 @@ const App = () => (
               {/* Finanzas routes */}
               <Route path="/finanzas" element={<PermissionRoute module="Finanzas"><FinanzasLayout><FinanzasDashboard /></FinanzasLayout></PermissionRoute>} />
               <Route path="/finanzas/nomina" element={<PermissionRoute module="Finanzas"><FinanzasLayout><NominaPage /></FinanzasLayout></PermissionRoute>} />
-              <Route path="/finanzas/facturacion" element={<PermissionRoute module="Finanzas"><FinanzasLayout><FacturacionPage /></FinanzasLayout></PermissionRoute>} />
+              <Route path="/finanzas/facturacion/invoices" element={<PermissionRoute module="Finanzas"><FinanzasLayout><FacturacionPage /></FinanzasLayout></PermissionRoute>} />
+              <Route path="/finanzas/facturacion" element={<Navigate to="/finanzas/facturacion/invoices" replace />} />
               <Route path="/finanzas/facturacion/facturas/nueva" element={<PermissionRoute module="Finanzas"><NuevoInvoice /></PermissionRoute>} />
               <Route path="/finanzas/facturacion/notasdepago/nueva" element={<PermissionRoute module="Finanzas"><NuevaNotaPago /></PermissionRoute>} />
               <Route path="/finanzas/facturacion/templates" element={<PermissionRoute module="Finanzas"><FinanzasLayout><TemplatesPage /></FinanzasLayout></PermissionRoute>} />

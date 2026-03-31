@@ -184,7 +184,7 @@ export default function FinanzasDashboard() {
   const actions = [
     { label: "Nómina por cerrar", count: nominaSinCerrar, path: "/finanzas/nomina" },
     { label: "Comisiones por aprobar", count: comisionesPorAprobar, path: "/finanzas/horas-variables" },
-    { label: "Invoices por enviar", count: invoicesPorEnviar, path: "/finanzas/facturacion" },
+    { label: "Invoices por enviar", count: invoicesPorEnviar, path: "/finanzas/facturacion/invoices" },
     { label: "Archivos bancarios por generar", count: 0, path: "/finanzas/nomina" },
   ];
 
