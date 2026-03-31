@@ -31,6 +31,20 @@ export interface SuperContactInteraction {
   created_at: string;
 }
 
+export interface SuperContactOutreach {
+  id: string;
+  contact_id: string;
+  brand: string;
+  instagram_account: string | null;
+  message_type: string;
+  screenshot_url: string | null;
+  notes: string | null;
+  response: string | null;
+  response_status: string;
+  created_by: string | null;
+  created_at: string;
+}
+
 export const useSuperContacts = () => {
   return useQuery({
     queryKey: ["super-contacts"],
@@ -73,6 +87,58 @@ export const useSuperContactInteractions = (contactId: string | undefined) => {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as SuperContactInteraction[];
+    },
+  });
+};
+
+export const useSuperContactOutreach = (contactId: string | undefined) => {
+  return useQuery({
+    queryKey: ["super-contact-outreach", contactId],
+    enabled: !!contactId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("super_contact_outreach" as any)
+        .select("*")
+        .eq("contact_id", contactId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as SuperContactOutreach[];
+    },
+  });
+};
+
+export const useAllOutreach = (enabled: boolean) => {
+  return useQuery({
+    queryKey: ["super-contact-outreach-all"],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("super_contact_outreach" as any)
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as SuperContactOutreach[];
+    },
+  });
+};
+
+export const useCreateOutreach = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (outreach: Partial<SuperContactOutreach>) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("super_contact_outreach" as any)
+        .insert({ ...outreach, created_by: user?.id || null } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["super-contact-outreach", vars.contact_id] });
+      qc.invalidateQueries({ queryKey: ["super-contact-outreach-all"] });
+      toast({ title: "Alcance registrado" });
     },
   });
 };

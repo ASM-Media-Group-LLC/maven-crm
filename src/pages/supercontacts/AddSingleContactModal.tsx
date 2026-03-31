@@ -3,22 +3,30 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Instagram } from "lucide-react";
 import { useCreateSuperContact } from "./useSuperContacts";
+import { getCountryOptions } from "@/lib/country-utils";
+import { getCitiesByCountryCode } from "@/lib/city-data";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+const countryOptions = getCountryOptions();
+
 const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
   const [handle, setHandle] = useState("");
   const [fullName, setFullName] = useState("");
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
+  const [customCity, setCustomCity] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const createMutation = useCreateSuperContact();
+
+  const cities = getCitiesByCountryCode(country);
 
   const cleanHandle = (val: string) => {
     const match = val.match(/instagram\.com\/([A-Za-z0-9_.]+)/);
@@ -29,11 +37,12 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
   const handleSubmit = async () => {
     const cleaned = cleanHandle(handle);
     if (!cleaned) return;
+    const finalCity = city === "__other__" ? customCity.trim() : city;
     await createMutation.mutateAsync({
       instagram_handle: cleaned,
       full_name: fullName.trim() || null,
-      country: country.trim() || null,
-      city: city.trim() || null,
+      country: country || null,
+      city: finalCity || null,
       phone: phone.trim() || null,
       email: email.trim() || null,
     });
@@ -42,6 +51,7 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
     setFullName("");
     setCountry("");
     setCity("");
+    setCustomCity("");
     setPhone("");
     setEmail("");
   };
@@ -74,11 +84,42 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>País</Label>
-              <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Colombia" />
+              <Select value={country} onValueChange={(v) => { setCountry(v); setCity(""); setCustomCity(""); }}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar país" /></SelectTrigger>
+                <SelectContent>
+                  {countryOptions.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.flag} {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Ciudad</Label>
-              <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Bogotá" />
+              {cities.length > 0 ? (
+                <>
+                  <Select value={city} onValueChange={setCity}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar ciudad" /></SelectTrigger>
+                    <SelectContent>
+                      {cities.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                      <SelectItem value="__other__">Otra…</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {city === "__other__" && (
+                    <Input
+                      value={customCity}
+                      onChange={(e) => setCustomCity(e.target.value)}
+                      placeholder="Escribe la ciudad"
+                      className="mt-1.5"
+                    />
+                  )}
+                </>
+              ) : (
+                <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ciudad" />
+              )}
             </div>
           </div>
 

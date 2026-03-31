@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,10 +7,12 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Cell, LabelList, ComposedChart, Line,
 } from "recharts";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isWithinInterval } from "date-fns";
 import { es } from "date-fns/locale";
-import { getCountryFlag, getCountryName } from "@/lib/country-utils";
+import { getCountryFlag } from "@/lib/country-utils";
 import { Progress } from "@/components/ui/progress";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { useAllOutreach, type SuperContactOutreach } from "./useSuperContacts";
 
 interface Props {
   open: boolean;
@@ -36,7 +38,24 @@ const STATUS_LABELS: Record<string, string> = {
   converted: "Convertido",
 };
 
+const BRAND_COLORS: Record<string, string> = {
+  Cash: "hsl(var(--primary))",
+  Exchange: "hsl(210, 70%, 55%)",
+  Ora: "hsl(45, 80%, 50%)",
+  "Link Hunter": "hsl(150, 60%, 45%)",
+  Lumina: "hsl(280, 60%, 55%)",
+  "Big Link": "hsl(0, 65%, 55%)",
+  Maven: "hsl(180, 50%, 45%)",
+  Blue: "hsl(220, 80%, 60%)",
+  Traffix: "hsl(30, 70%, 50%)",
+};
+
+const BRANDS = ["Cash", "Exchange", "Ora", "Link Hunter", "Lumina", "Big Link", "Maven", "Blue", "Traffix"];
+
 const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
+
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["super-contacts-analytics"],
     enabled: open,
@@ -50,6 +69,19 @@ const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
     },
   });
 
+  const { data: allOutreach = [] } = useAllOutreach(open);
+
+  const filteredOutreach = useMemo(() => {
+    if (!dateFrom && !dateTo) return allOutreach;
+    return allOutreach.filter((o) => {
+      const d = parseISO(o.created_at);
+      if (dateFrom && dateTo) return isWithinInterval(d, { start: dateFrom, end: dateTo });
+      if (dateFrom) return d >= dateFrom;
+      if (dateTo) return d <= dateTo;
+      return true;
+    });
+  }, [allOutreach, dateFrom, dateTo]);
+
   // --- POR MES ---
   const monthlyData = useMemo(() => {
     if (!contacts.length) return [];
@@ -62,12 +94,7 @@ const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
     let cumulative = 0;
     return sorted.map(([month, count]) => {
       cumulative += count;
-      return {
-        month,
-        label: format(parseISO(month + "-01"), "MMM yy", { locale: es }),
-        count,
-        cumulative,
-      };
+      return { month, label: format(parseISO(month + "-01"), "MMM yy", { locale: es }), count, cumulative };
     });
   }, [contacts]);
 
@@ -82,59 +109,34 @@ const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
   // --- POR ESTADO ---
   const statusData = useMemo(() => {
     const map: Record<string, number> = {};
-    contacts.forEach((c) => {
-      const s = c.status || "new";
-      map[s] = (map[s] || 0) + 1;
-    });
-    return Object.entries(map)
-      .map(([status, count]) => ({
-        status,
-        label: STATUS_LABELS[status] || status,
-        count,
-        pct: contacts.length ? Math.round((count / contacts.length) * 100) : 0,
-      }))
-      .sort((a, b) => b.count - a.count);
+    contacts.forEach((c) => { const s = c.status || "new"; map[s] = (map[s] || 0) + 1; });
+    return Object.entries(map).map(([status, count]) => ({
+      status, label: STATUS_LABELS[status] || status, count,
+      pct: contacts.length ? Math.round((count / contacts.length) * 100) : 0,
+    })).sort((a, b) => b.count - a.count);
   }, [contacts]);
 
   // --- POR PAÍS ---
   const countryData = useMemo(() => {
     const map: Record<string, number> = {};
-    contacts.forEach((c) => {
-      const country = c.country?.trim() || "N/A";
-      map[country] = (map[country] || 0) + 1;
-    });
-    return Object.entries(map)
-      .map(([code, count]) => ({
-        code,
-        label: code !== "N/A" ? `${getCountryFlag(code)} ${code}` : "N/A",
-        count,
-      }))
-      .sort((a, b) => b.count - a.count);
+    contacts.forEach((c) => { const country = c.country?.trim() || "N/A"; map[country] = (map[country] || 0) + 1; });
+    return Object.entries(map).map(([code, count]) => ({
+      code, label: code !== "N/A" ? `${getCountryFlag(code)} ${code}` : "N/A", count,
+    })).sort((a, b) => b.count - a.count);
   }, [contacts]);
 
   // --- POR CIUDAD ---
   const cityData = useMemo(() => {
     const map: Record<string, number> = {};
-    contacts.forEach((c) => {
-      const city = c.city?.trim();
-      if (city) map[city] = (map[city] || 0) + 1;
-    });
-    return Object.entries(map)
-      .map(([city, count]) => ({ city, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 15);
+    contacts.forEach((c) => { const city = c.city?.trim(); if (city) map[city] = (map[city] || 0) + 1; });
+    return Object.entries(map).map(([city, count]) => ({ city, count })).sort((a, b) => b.count - a.count).slice(0, 15);
   }, [contacts]);
 
   // --- POR CATEGORÍA ---
   const categoryData = useMemo(() => {
     const map: Record<string, number> = {};
-    contacts.forEach((c) => {
-      const cat = c.category?.trim() || "Sin categoría";
-      map[cat] = (map[cat] || 0) + 1;
-    });
-    return Object.entries(map)
-      .map(([category, count]) => ({ category, count }))
-      .sort((a, b) => b.count - a.count);
+    contacts.forEach((c) => { const cat = c.category?.trim() || "Sin categoría"; map[cat] = (map[cat] || 0) + 1; });
+    return Object.entries(map).map(([category, count]) => ({ category, count })).sort((a, b) => b.count - a.count);
   }, [contacts]);
 
   // --- ENRICHMENT ---
@@ -144,6 +146,39 @@ const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
     const pct = contacts.length ? Math.round((enriched / contacts.length) * 100) : 0;
     return { enriched, notEnriched, pct };
   }, [contacts]);
+
+  // --- OUTREACH BY BRAND ---
+  const outreachByBrand = useMemo(() => {
+    const map: Record<string, number> = {};
+    filteredOutreach.forEach((o) => { map[o.brand] = (map[o.brand] || 0) + 1; });
+    return Object.entries(map).map(([brand, count]) => ({ brand, count })).sort((a, b) => b.count - a.count);
+  }, [filteredOutreach]);
+
+  // --- RESPONSE RATES ---
+  const responseRates = useMemo(() => {
+    const map: Record<string, { total: number; positive: number; negative: number; no_response: number; pending: number }> = {};
+    filteredOutreach.forEach((o) => {
+      if (!map[o.brand]) map[o.brand] = { total: 0, positive: 0, negative: 0, no_response: 0, pending: 0 };
+      map[o.brand].total++;
+      map[o.brand][o.response_status as keyof typeof map[string]]++;
+    });
+    return Object.entries(map).map(([brand, stats]) => ({
+      brand, ...stats,
+      rate: stats.total > 0 ? Math.round((stats.positive / stats.total) * 100) : 0,
+    })).sort((a, b) => b.total - a.total);
+  }, [filteredOutreach]);
+
+  // --- OUTREACH CALENDAR ---
+  const outreachCalendar = useMemo(() => {
+    const map: Record<string, number> = {};
+    filteredOutreach.forEach((o) => {
+      const day = format(parseISO(o.created_at), "yyyy-MM-dd");
+      map[day] = (map[day] || 0) + 1;
+    });
+    return Object.entries(map).map(([date, count]) => ({
+      date, label: format(parseISO(date), "d MMM", { locale: es }), count,
+    })).sort((a, b) => a.date.localeCompare(b.date)).slice(-30);
+  }, [filteredOutreach]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -163,25 +198,19 @@ const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
               <TabsTrigger value="status">Por Estado</TabsTrigger>
               <TabsTrigger value="country">Por País</TabsTrigger>
               <TabsTrigger value="city">Por Ciudad</TabsTrigger>
-              <TabsTrigger value="category">Por Categoría</TabsTrigger>
+              <TabsTrigger value="category">Categoría</TabsTrigger>
               <TabsTrigger value="enrichment">Enrichment</TabsTrigger>
+              <TabsTrigger value="outreach">Alcance</TabsTrigger>
+              <TabsTrigger value="responses">Respuestas</TabsTrigger>
+              <TabsTrigger value="activity">Actividad</TabsTrigger>
             </TabsList>
 
             {/* POR MES */}
             <TabsContent value="month" className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-lg border p-3 text-center">
-                  <p className="text-2xl font-bold">{monthlyKPIs.total}</p>
-                  <p className="text-xs text-muted-foreground">Total contactos</p>
-                </div>
-                <div className="rounded-lg border p-3 text-center">
-                  <p className="text-2xl font-bold">{monthlyKPIs.avg}</p>
-                  <p className="text-xs text-muted-foreground">Promedio mensual</p>
-                </div>
-                <div className="rounded-lg border p-3 text-center">
-                  <p className="text-2xl font-bold">{monthlyKPIs.bestMonth}</p>
-                  <p className="text-xs text-muted-foreground">Mejor mes</p>
-                </div>
+                <div className="rounded-lg border p-3 text-center"><p className="text-2xl font-bold">{monthlyKPIs.total}</p><p className="text-xs text-muted-foreground">Total contactos</p></div>
+                <div className="rounded-lg border p-3 text-center"><p className="text-2xl font-bold">{monthlyKPIs.avg}</p><p className="text-xs text-muted-foreground">Promedio mensual</p></div>
+                <div className="rounded-lg border p-3 text-center"><p className="text-2xl font-bold">{monthlyKPIs.bestMonth}</p><p className="text-xs text-muted-foreground">Mejor mes</p></div>
               </div>
               <ResponsiveContainer width="100%" height={320}>
                 <ComposedChart data={monthlyData}>
@@ -207,9 +236,7 @@ const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
                   <YAxis type="category" dataKey="label" width={120} fontSize={12} />
                   <Tooltip formatter={(val: number, _: string, entry: any) => [`${val} (${entry.payload.pct}%)`, "Contactos"]} />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                    {statusData.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
+                    {statusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     <LabelList dataKey="count" position="right" fontSize={11} />
                   </Bar>
                 </BarChart>
@@ -230,9 +257,7 @@ const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">Sin datos de país</p>
-              )}
+              ) : <p className="text-center text-muted-foreground py-8">Sin datos de país</p>}
             </TabsContent>
 
             {/* POR CIUDAD */}
@@ -249,12 +274,10 @@ const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">Sin datos de ciudad</p>
-              )}
+              ) : <p className="text-center text-muted-foreground py-8">Sin datos de ciudad</p>}
             </TabsContent>
 
-            {/* POR CATEGORÍA */}
+            {/* CATEGORÍA */}
             <TabsContent value="category" className="space-y-4">
               {categoryData.length ? (
                 <ResponsiveContainer width="100%" height={Math.max(200, categoryData.length * 40)}>
@@ -268,9 +291,7 @@ const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">Sin datos de categoría</p>
-              )}
+              ) : <p className="text-center text-muted-foreground py-8">Sin datos</p>}
             </TabsContent>
 
             {/* ENRICHMENT */}
@@ -296,6 +317,84 @@ const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
                   <p className="text-xs text-muted-foreground mt-1">Pendientes de enriquecer</p>
                 </div>
               </div>
+            </TabsContent>
+
+            {/* OUTREACH */}
+            <TabsContent value="outreach" className="space-y-4">
+              <div className="flex justify-end">
+                <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Filtrar por fecha" />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-lg border p-3 text-center">
+                  <p className="text-2xl font-bold">{filteredOutreach.length}</p>
+                  <p className="text-xs text-muted-foreground">Total alcances</p>
+                </div>
+                <div className="rounded-lg border p-3 text-center">
+                  <p className="text-2xl font-bold">{new Set(filteredOutreach.map((o) => o.contact_id)).size}</p>
+                  <p className="text-xs text-muted-foreground">Creadoras contactadas</p>
+                </div>
+                <div className="rounded-lg border p-3 text-center">
+                  <p className="text-2xl font-bold">{new Set(filteredOutreach.map((o) => o.brand)).size}</p>
+                  <p className="text-xs text-muted-foreground">Marcas activas</p>
+                </div>
+              </div>
+              {outreachByBrand.length > 0 ? (
+                <ResponsiveContainer width="100%" height={Math.max(200, outreachByBrand.length * 45)}>
+                  <BarChart data={outreachByBrand} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" allowDecimals={false} />
+                    <YAxis type="category" dataKey="brand" width={100} fontSize={12} />
+                    <Tooltip />
+                    <Bar dataKey="count" name="Alcances" radius={[0, 4, 4, 0]}>
+                      {outreachByBrand.map((entry) => <Cell key={entry.brand} fill={BRAND_COLORS[entry.brand] || COLORS[0]} />)}
+                      <LabelList dataKey="count" position="right" fontSize={11} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <p className="text-center text-muted-foreground py-8">Sin datos de alcance</p>}
+            </TabsContent>
+
+            {/* RESPONSES */}
+            <TabsContent value="responses" className="space-y-4">
+              <div className="flex justify-end">
+                <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Filtrar por fecha" />
+              </div>
+              {responseRates.length > 0 ? (
+                <ResponsiveContainer width="100%" height={Math.max(200, responseRates.length * 45)}>
+                  <BarChart data={responseRates} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" allowDecimals={false} />
+                    <YAxis type="category" dataKey="brand" width={100} fontSize={12} />
+                    <Tooltip />
+                    <Bar dataKey="positive" name="Positiva" stackId="a" fill="hsl(150, 60%, 45%)" />
+                    <Bar dataKey="negative" name="Negativa" stackId="a" fill="hsl(0, 65%, 55%)" />
+                    <Bar dataKey="no_response" name="Sin respuesta" stackId="a" fill="hsl(0, 0%, 70%)" />
+                    <Bar dataKey="pending" name="Pendiente" stackId="a" fill="hsl(45, 80%, 50%)" radius={[0, 4, 4, 0]}>
+                      <LabelList dataKey="total" position="right" fontSize={11} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <p className="text-center text-muted-foreground py-8">Sin datos</p>}
+            </TabsContent>
+
+            {/* ACTIVITY CALENDAR */}
+            <TabsContent value="activity" className="space-y-4">
+              <div className="flex justify-end">
+                <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Filtrar por fecha" />
+              </div>
+              {outreachCalendar.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={outreachCalendar}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" fontSize={10} />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Bar dataKey="count" name="Alcances" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="count" position="top" fontSize={10} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <p className="text-center text-muted-foreground py-8">Sin actividad</p>}
             </TabsContent>
           </Tabs>
         )}
