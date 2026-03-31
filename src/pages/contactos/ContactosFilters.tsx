@@ -20,6 +20,7 @@ export interface ContactoFilters {
   search: string;
   estado: string;
   pais: string;
+  ciudad: string;
   categoria: string;
   dateFrom: string;
   dateTo: string;
