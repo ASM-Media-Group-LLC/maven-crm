@@ -273,8 +273,9 @@ const NuevoContactoForm = () => {
               <Input value={form.ciudad} onChange={(e) => set("ciudad", e.target.value)} placeholder="Ej: Bogotá, Medellín..." />
             </Field>
             <Field label="Número de Ticket">
-            <Input value={form.ticket} onChange={(e) => set("ticket", e.target.value)} placeholder="Ej: CT586864" />
-          </Field>
+              <Input value={form.ticket} onChange={(e) => set("ticket", e.target.value)} placeholder="Ej: CT586864" />
+            </Field>
+          </div>
 
           <Field label="Notas">
             <Textarea value={form.notas} onChange={(e) => set("notas", e.target.value)} placeholder="Notas adicionales sobre el contacto..." rows={4} />
