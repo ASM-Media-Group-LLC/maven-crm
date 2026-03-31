@@ -353,6 +353,7 @@ const ContactosContent = () => {
         contacto={convertRawContacto}
         onConverted={() => setConvertOpen(false)}
       />
+      <ContactosAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
     </main>
   );
 };
