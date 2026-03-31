@@ -229,6 +229,15 @@ const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange, onAss
                       <Pencil className="mr-2 h-4 w-4" />
                       Editar
                     </DropdownMenuItem>
+                    {isManagement && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onAssignAgent?.(entry)}>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Asignar agente
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-destructive" onClick={() => onDelete?.(entry)}>
                       <Trash2 className="mr-2 h-4 w-4" />
