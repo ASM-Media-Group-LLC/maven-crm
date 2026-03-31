@@ -274,25 +274,11 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
           {/* KPI Cards */}
           <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[200px] opacity-100 pb-2"}`}>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-              {[
-                { label: "Total", value: totalEntries, icon: Table2, color: "accent" },
-                { label: "Sí", value: siCount, icon: Check, color: "success" },
-                { label: "Parcial", value: parcialCount, icon: Minus, color: "warning" },
-                { label: "No", value: noCount, icon: X, color: "destructive" },
-                { label: "Éxito", value: `${successRate}%`, icon: TrendingUp, color: "primary" },
-              ].map((kpi) => (
-                <Card key={kpi.label} className={`border border-${kpi.color}/40 bg-card/80`}>
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-full bg-${kpi.color}/20 shrink-0`}>
-                      <kpi.icon className={`h-4 w-4 text-${kpi.color}`} />
-                    </div>
-                    <div>
-                      <p className={`text-2xl font-bold text-${kpi.color}`}>{kpi.value}</p>
-                      <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              <DashboardMetricCard label="Total" value={String(totalEntries)} icon={Table2} color="accent" />
+              <DashboardMetricCard label="Sí" value={String(siCount)} icon={Check} color="success" />
+              <DashboardMetricCard label="Parcial" value={String(parcialCount)} icon={Minus} color="warning" />
+              <DashboardMetricCard label="No" value={String(noCount)} icon={X} color="destructive" />
+              <DashboardMetricCard label="Éxito" value={`${successRate}%`} icon={TrendingUp} color="primary" />
             </div>
           </div>
 
