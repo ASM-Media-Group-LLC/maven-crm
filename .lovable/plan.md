@@ -1,55 +1,49 @@
 
 
-## Plan: Acceso de Closers a Creadores (ver lista + agregar, sin editar/eliminar/dar de baja)
+## Plan: Fix visibilidad de Closers + Auditoría CSV vs DB
 
-### Cambios necesarios
+### Hallazgos
 
-**1. Base de datos — Agregar permisos para el rol Closer**
+**1. Bug del Closer (0 creadores visibles)**
 
-Insertar en `role_permissions` los permisos `Lista` y `Nuevo` del módulo `Creadores` para el rol closer:
-
-```sql
-INSERT INTO public.role_permissions (role_id, module, submodule, can_access, data_scope)
-SELECT rc.id, 'Creadores', 'Lista', true, 'self'
-FROM public.roles_config rc WHERE rc.name = 'closer'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO public.role_permissions (role_id, module, submodule, can_access, data_scope)
-SELECT rc.id, 'Creadores', 'Nuevo', true, 'self'
-FROM public.roles_config rc WHERE rc.name = 'closer'
-ON CONFLICT DO NOTHING;
+El problema NO es de RLS (la política SELECT permite `true` para autenticados). El problema está en **CreadoresContent.tsx línea 39-41** que filtra:
+```tsx
+return rawCreators.filter(c => c.closer_responsible_id === user.id || c.created_by === user.id);
 ```
+Como `created_by` es NULL en todos los registros y el closer de prueba (Marielby Testing) no está asignado como `closer_responsible_id` en ningún creator, ve 0 resultados.
 
-Esto habilita automáticamente las rutas `/creadores` y `/creadores/nuevo` y los ítems del sidebar para closers.
+**Solución**: Eliminar el filtro de ownership para closers. El acceso otorgado es "ver la lista completa", no solo sus propios registros. La restricción está en las **acciones** (no editar, no dar de baja), no en la visibilidad de la lista.
 
-**2. `CreadoresTable.tsx` — Ocultar botones de editar y dar de baja para closers**
+**2. Auditoría CSV vs DB**
 
-En la sección de acciones (línea ~319-357), agregar una variable `isCloser` desde `useUserRole()` y condicionar:
+| Métrica | Valor |
+|---------|-------|
+| Registros en DB | 285 |
+| Registros en CSV | 281 |
+| Registros de prueba/test en DB | 9 (`@Testing102`, `@Testing103`, `@Testing2000`, `Testing101`, `Testing Offboarding`, `Test Creator Prueba`, `Johanna Prueba`, `joha`, `Carolina `) |
+| Registros reales en DB | 276 |
 
-- **Botón Editar (Pencil)**: solo visible si `!isCloser`
-- **Botón Offboarding (LogOut)**: solo visible si `!isCloser`
-- **Botón Ver (Eye)**: se mantiene visible para todos
+El CSV tiene 281 filas pero incluye los duplicados como las dos "Agatha Gomez Casiano" (IDs distintos). La diferencia de 4 entre CSV (281) y DB (285) son las cuentas de testing/prueba que no estaban en el CSV más algunos registros añadidos después de la exportación.
+
+No hay creadoras faltantes significativas — los datos del CSV coinciden con la DB.
+
+---
+
+### Cambios a implementar
+
+**Archivo: `src/pages/creadores/CreadoresContent.tsx`**
+
+Eliminar los filtros de ownership del closer (líneas 38-50). El closer verá la misma lista que cualquier otro rol, pero sin botones de editar/dar de baja (eso ya está implementado en CreadoresTable):
 
 ```tsx
-const { isAgent, isAdmin, isManager, role } = useUserRole();
-const isCloser = role === "closer";
+// Eliminar estos bloques:
+const creators = useMemo(() => {
+  if (!isCloser || !user?.id) return rawCreators;
+  return rawCreators.filter(c => c.closer_responsible_id === user.id || c.created_by === user.id);
+}, [rawCreators, isCloser, user?.id]);
 
-// En las acciones:
-{!isCloser && (
-  <Button variant="ghost" size="icon" onClick={() => setEditingCreator(c)}>
-    <Pencil className="h-4 w-4" />
-  </Button>
-)}
-<Button variant="ghost" size="icon" onClick={() => setViewingCreator(c)}>
-  <Eye className="h-4 w-4" />
-</Button>
-{!isCloser && (c.status === "leaving" || c.status === "terminated") && (
-  // botón LogOut offboarding
-)}
+// Reemplazar con uso directo de rawCreators
 ```
 
-### Resultado
-- El closer verá "Listado" y "Nuevo" en el sidebar bajo Creadoras
-- Podrá ver la lista (filtrada a sus creators, lógica ya existente) y agregar nuevos
-- No verá botones de editar ni dar de baja en la tabla
+También eliminar `closerStatusCounts` y los cálculos derivados del filtro de ownership, simplificando a usar directamente los datos sin filtrar.
 
