@@ -152,6 +152,12 @@ const SuperContactProfile = () => {
     return all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [outreach, interactions]);
 
+  const filteredTimeline = useMemo(() => {
+    if (timelineFilter === "marcas") return timelineData.filter(t => t.type === "outreach");
+    if (timelineFilter === "contactos") return timelineData.filter(t => t.type === "interaction");
+    return timelineData;
+  }, [timelineData, timelineFilter]);
+
   // AI Chat functions
   const sendAiMessage = useCallback(async () => {
     if (!aiInput.trim() || aiLoading) return;
