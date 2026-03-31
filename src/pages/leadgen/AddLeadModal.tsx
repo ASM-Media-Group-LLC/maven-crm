@@ -502,6 +502,25 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         </Form>
       </DialogContent>
     </Dialog>
+
+    {/* Creator exists alert */}
+    <Dialog open={!!creatorAlert} onOpenChange={(o) => !o && setCreatorAlert(null)}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Creadora existente</DialogTitle>
+          <DialogDescription>
+            Esta creadora ya forma parte de la agencia: <strong>{creatorAlert?.name}</strong>
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex gap-2">
+          <Button variant="outline" onClick={() => setCreatorAlert(null)}>Cancelar</Button>
+          <Button onClick={() => { navigate(`/creadoras/${creatorAlert?.id}`); setCreatorAlert(null); onOpenChange(false); }}>
+            Ver perfil
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
