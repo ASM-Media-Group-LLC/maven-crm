@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
+import { useNotificationSettings } from "@/hooks/useNotificationSettings";
+import { playNotificationSound } from "@/hooks/useBrowserNotifications";
 
 export interface Notification {
   id: string;

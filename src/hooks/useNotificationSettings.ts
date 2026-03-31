@@ -26,7 +26,7 @@ const DEFAULTS: Omit<NotificationSettings, "id" | "user_id"> = {
   realtime_enabled: true,
   group_similar: false,
   auto_mark_read_on_open: false,
-  sound_enabled: false,
+  sound_enabled: true,
   show_critical_banners: true,
   dnd_enabled: false,
   dnd_start_time: null,
