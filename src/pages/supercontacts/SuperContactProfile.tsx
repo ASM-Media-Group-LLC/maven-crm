@@ -617,162 +617,148 @@ const SuperContactProfile = () => {
     </div>
   );
 
-  const renderMarcas = () => (
-    <div className="flex-1 overflow-auto p-4 space-y-3">
-      {/* Brand pills — quick select to add new */}
-      <div className="flex flex-wrap gap-1.5 items-center">
-        <span className="text-xs text-muted-foreground mr-1">Registrar en:</span>
-        {BRANDS.map(b => {
-          const hasData = outreachByBrand.some(([brand]) => brand === b);
-          return (
-            <button key={b} type="button"
-              onClick={() => { setOutBrand(b); setExpandedBrandForm(expandedBrandForm === b ? null : b); setActiveBrandContext(b); }}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                expandedBrandForm === b ? "text-white shadow-sm scale-105" : hasData ? "bg-muted text-foreground hover:bg-muted/80" : "bg-muted/50 text-muted-foreground hover:bg-muted/80"
-              }`}
-              style={expandedBrandForm === b ? { backgroundColor: BRAND_COLORS[b] || "hsl(var(--primary))" } : {}}>
-              {b}
-            </button>
-          );
-        })}
-      </div>
+  const renderMarcas = () => {
+    // Filter brand cards by selected brand pill
+    const filteredBrands = activeBrandContext
+      ? outreachByBrand.filter(([brand]) => brand === activeBrandContext)
+      : outreachByBrand;
 
-      {/* Inline form for selected brand */}
-      {expandedBrandForm && (
-        <Card className="border-l-4" style={{ borderLeftColor: BRAND_COLORS[expandedBrandForm] || "hsl(var(--primary))" }}>
-          <CardContent className="p-3 space-y-2">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
+    return (
+      <div className="flex-1 overflow-auto p-4 space-y-3">
+        {/* Brand pills — quick select to filter + add */}
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="text-xs text-muted-foreground mr-1">Filtrar:</span>
+          <button type="button"
+            onClick={() => { setActiveBrandContext(null); setExpandedBrandForm(null); }}
+            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              !activeBrandContext ? "bg-foreground text-background" : "bg-muted/50 text-muted-foreground hover:bg-muted/80"
+            }`}>
+            Todas
+          </button>
+          {BRANDS.map(b => {
+            const count = outreach.filter(o => o.brand === b).length;
+            return (
+              <button key={b} type="button"
+                onClick={() => {
+                  const next = activeBrandContext === b ? null : b;
+                  setActiveBrandContext(next);
+                  setExpandedBrandForm(next);
+                  if (next) setOutBrand(next);
+                }}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${
+                  activeBrandContext === b ? "text-white shadow-sm scale-105" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+                style={activeBrandContext === b ? { backgroundColor: BRAND_COLORS[b] || "hsl(var(--primary))" } : {}}>
+                {b}
+                {count > 0 && <span className={`text-[9px] ${activeBrandContext === b ? "opacity-80" : ""}`}>({count})</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Inline form for selected brand */}
+        {expandedBrandForm && (
+          <div className="rounded-lg border p-2.5 space-y-2" style={{ borderColor: BRAND_COLORS[expandedBrandForm] || "hsl(var(--primary))" }}>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
                 style={{ backgroundColor: BRAND_COLORS[expandedBrandForm] || "hsl(var(--primary))" }}>
                 {expandedBrandForm.charAt(0)}
               </div>
-              <span className="text-sm font-medium">Nuevo contacto — {expandedBrandForm}</span>
+              <span className="text-xs font-medium">Nuevo — {expandedBrandForm}</span>
             </div>
-            <div className="flex flex-wrap gap-2 items-end">
-              <div className="w-32">
-                <Label className="text-[10px]">Cuenta IG</Label>
-                <Input value={outAccount} onChange={e => setOutAccount(e.target.value)} placeholder="@cuenta" className="h-8 text-xs" />
-              </div>
+            <div className="flex flex-wrap gap-1.5 items-end">
               <div className="w-28">
-                <Label className="text-[10px]">Vía</Label>
-                <Select value={outMsgType} onValueChange={setOutMsgType}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>{MESSAGE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-                </Select>
+                <Input value={outAccount} onChange={e => setOutAccount(e.target.value)} placeholder="@cuenta" className="h-7 text-xs" />
               </div>
-              <div className="w-32">
-                <Label className="text-[10px]">Estado</Label>
-                <Select value={outStatus} onValueChange={setOutStatus}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>{RESPONSE_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1 min-w-[140px]">
-                <Label className="text-[10px]">Qué le dijiste</Label>
-                <Input value={outNotes} onChange={e => setOutNotes(e.target.value)} placeholder="Mensaje..." className="h-8 text-xs" />
-              </div>
+              <Select value={outMsgType} onValueChange={setOutMsgType}>
+                <SelectTrigger className="h-7 text-xs w-24"><SelectValue /></SelectTrigger>
+                <SelectContent>{MESSAGE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select value={outStatus} onValueChange={setOutStatus}>
+                <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
+                <SelectContent>{RESPONSE_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+              </Select>
+              <Input value={outNotes} onChange={e => setOutNotes(e.target.value)} placeholder="Qué le dijiste..." className="h-7 text-xs flex-1 min-w-[120px]" />
             </div>
-            <div className="flex flex-wrap gap-2 items-end">
-              <div className="flex-1 min-w-[140px]">
-                <Label className="text-[10px]">Qué respondió</Label>
-                <Input value={outResponse} onChange={e => setOutResponse(e.target.value)} placeholder="Respuesta..." className="h-8 text-xs" />
-              </div>
-              <Button onClick={() => { addOutreach(); setExpandedBrandForm(null); }} disabled={!outBrand || createOutreach.isPending} size="sm" className="h-8">
-                <Send className="h-3.5 w-3.5 mr-1" /> Registrar
+            <div className="flex gap-1.5 items-end">
+              <Input value={outResponse} onChange={e => setOutResponse(e.target.value)} placeholder="Qué respondió..." className="h-7 text-xs flex-1" />
+              <Button onClick={() => { addOutreach(); }} disabled={!outBrand || createOutreach.isPending} size="sm" className="h-7 text-xs px-3">
+                <Send className="h-3 w-3 mr-1" /> Registrar
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {/* Brand cards with history */}
-      {outreachByBrand.length === 0 && !expandedBrandForm ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Selecciona una marca arriba para empezar a registrar contactos.</p>
-        </div>
-      ) : (
-        outreachByBrand.map(([brand, entries]) => {
-          const accounts = new Set(entries.filter(e => e.instagram_account).map(e => e.instagram_account));
-          const positive = entries.filter(e => e.response_status === "positive").length;
-          const lastEntry = entries[0];
-          return (
-            <Card key={brand} className="cursor-pointer" onClick={() => { setActiveBrandContext(brand); }}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
-                    style={{ backgroundColor: BRAND_COLORS[brand] || "hsl(var(--primary))" }}>
-                    {brand.charAt(0)}
+        {/* Brand cards — filtered */}
+        {filteredBrands.length === 0 && !expandedBrandForm ? (
+          <div className="text-center py-10 text-muted-foreground">
+            <TrendingUp className="h-7 w-7 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">
+              {activeBrandContext
+                ? `Sin contactos registrados para ${activeBrandContext}.`
+                : "Selecciona una marca arriba para empezar."}
+            </p>
+          </div>
+        ) : (
+          filteredBrands.map(([brand, entries]) => {
+            const accounts = new Set(entries.filter(e => e.instagram_account).map(e => e.instagram_account));
+            const positive = entries.filter(e => e.response_status === "positive").length;
+            return (
+              <Card key={brand}>
+                <CardHeader className="pb-1.5 pt-3 px-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
+                      style={{ backgroundColor: BRAND_COLORS[brand] || "hsl(var(--primary))" }}>
+                      {brand.charAt(0)}
+                    </div>
+                    <span className="text-sm font-semibold">{brand}</span>
+                    <Badge variant="outline" className="text-[10px] h-4 px-1">{entries.length}</Badge>
+                    <span className="text-[10px] text-muted-foreground">{accounts.size} cuenta{accounts.size !== 1 ? "s" : ""}</span>
+                    {positive > 0 && <Badge className="text-[9px] h-4 px-1 bg-green-500/10 text-green-600 border-green-500/20">{positive} ✓</Badge>}
+                    <div className="ml-auto flex items-center gap-0.5">
+                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => { setOutBrand(brand); setExpandedBrandForm(brand); setActiveBrandContext(brand); }}
+                        title="Agregar contacto">
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => fetchBrandInsight(brand, entries)}
+                        disabled={brandInsights[brand]?.loading}>
+                        {brandInsights[brand]?.loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+                      </Button>
+                    </div>
                   </div>
-                  <CardTitle className="text-sm">{brand}</CardTitle>
-                  <Badge variant="outline" className="text-xs">{entries.length}</Badge>
-                  <span className="text-[10px] text-muted-foreground">{accounts.size} cuenta{accounts.size !== 1 ? "s" : ""} IG</span>
-                  {positive > 0 && <Badge className="text-[10px] bg-green-500/10 text-green-600 border-green-500/20">{positive} ✓</Badge>}
-                  <div className="ml-auto flex items-center gap-1">
-                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); setOutBrand(brand); setExpandedBrandForm(brand); }}
-                      title="Agregar contacto">
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-6 text-xs gap-1" onClick={(e) => { e.stopPropagation(); fetchBrandInsight(brand, entries); }}
-                      disabled={brandInsights[brand]?.loading}>
-                      {brandInsights[brand]?.loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
-                    </Button>
-                  </div>
-                </div>
-                {/* What was said summary */}
-                {entries.some(e => e.notes) && (
-                  <div className="mt-2 p-2 rounded-md bg-muted/30 text-xs space-y-0.5">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Qué se le ha dicho:</p>
-                    {entries.filter(e => e.notes).slice(0, 3).map((e, i) => (
-                      <p key={i} className="flex items-start gap-1.5">
-                        <span className="text-muted-foreground shrink-0">
-                          {e.response_status === "positive" ? "✅" : e.response_status === "negative" ? "❌" : e.response_status === "no_response" ? "⏳" : "•"}
-                        </span>
-                        <span className="flex-1">
-                          <span className="text-muted-foreground">@{(e.instagram_account || "?").replace(/^@/, "")} vía {MESSAGE_TYPES.find(t => t.value === e.message_type)?.label}:</span>{" "}
-                          "{e.notes}"
-                          {e.response && <span className="text-muted-foreground italic"> → "{e.response}"</span>}
-                        </span>
-                        <span className="text-[9px] text-muted-foreground shrink-0">{format(parseISO(e.created_at), "dd/MM", { locale: es })}</span>
-                      </p>
-                    ))}
-                    {entries.filter(e => e.notes).length > 3 && (
-                      <p className="text-muted-foreground">+{entries.filter(e => e.notes).length - 3} más</p>
-                    )}
-                  </div>
-                )}
+                </CardHeader>
                 {/* AI Insight */}
                 {brandInsights[brand]?.text && (
-                  <div className="mt-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10 text-xs">
+                  <div className="mx-3 mb-1.5 p-2 rounded-md bg-primary/5 border border-primary/10 text-xs">
                     <div className="prose prose-sm dark:prose-invert max-w-none text-xs">
                       <ReactMarkdown>{brandInsights[brand].text!}</ReactMarkdown>
                     </div>
                   </div>
                 )}
-              </CardHeader>
-              {/* Compact timeline per brand */}
-              <CardContent className="pt-0">
-                <div className="space-y-1.5">
-                  {entries.slice(0, 3).map((o, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs p-1.5 rounded bg-muted/20">
-                      {getStatusIcon(o.response_status)}
-                      <Badge variant="outline" className="text-[9px] px-1 py-0">{MESSAGE_TYPES.find(t => t.value === o.message_type)?.label}</Badge>
-                      {o.instagram_account && <span className="text-muted-foreground">@{o.instagram_account.replace(/^@/, "")}</span>}
-                      <span className="flex-1 truncate">{o.notes || "—"}</span>
-                      <span className="text-[9px] text-muted-foreground shrink-0">{format(parseISO(o.created_at), "dd MMM", { locale: es })}</span>
-                    </div>
-                  ))}
-                  {entries.length > 3 && (
-                    <p className="text-[10px] text-muted-foreground text-center">+{entries.length - 3} registros más</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })
-      )}
-    </div>
-  );
+                {/* Compact timeline */}
+                <CardContent className="pt-0 px-3 pb-2.5">
+                  <div className="space-y-0.5">
+                    {entries.map((o, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-xs py-1 border-b border-border/30 last:border-0">
+                        {getStatusIcon(o.response_status)}
+                        <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 font-normal">{MESSAGE_TYPES.find(t => t.value === o.message_type)?.label}</Badge>
+                        {o.instagram_account && <span className="text-[10px] text-muted-foreground font-medium">@{o.instagram_account.replace(/^@/, "")}</span>}
+                        <span className="flex-1 truncate text-[11px]">
+                          {o.notes || "—"}
+                          {o.response && <span className="text-muted-foreground italic"> → "{o.response}"</span>}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground shrink-0 tabular-nums">{format(parseISO(o.created_at), "dd/MM", { locale: es })}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
+    );
+  };
 
   const renderContactos = () => (
     <div className="flex-1 overflow-auto p-4 space-y-4">
