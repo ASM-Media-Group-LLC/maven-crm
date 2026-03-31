@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Instagram, MapPin, MessageCircle, Save, Sparkles, UserCheck, Send, Image, BarChart3, Calendar } from "lucide-react";
+import { ArrowLeft, Instagram, MapPin, MessageCircle, Save, Sparkles, UserCheck, Send, Image, BarChart3, Calendar, Bot, Upload, Loader2 } from "lucide-react";
 import {
   useSuperContact, useSuperContactInteractions, useSuperContactOutreach,
   useUpdateSuperContact, useCreateInteraction, useCreateOutreach,
@@ -26,6 +26,8 @@ import {
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import ReactMarkdown from "react-markdown";
 
 const interactionTypes = [
   { value: "llamada", label: "Llamada" },
