@@ -64,12 +64,10 @@ const CreadoresContent = () => {
               Total: {isLoading ? "…" : allCreators.length} creadores
             </p>
           </div>
-          {!isCloser && (
-            <Button onClick={() => navigate("/creadores/nuevo")}>
-              <Plus className="mr-2 h-4 w-4" />
-              Agregar Creador
-            </Button>
-          )}
+          <Button onClick={() => navigate("/creadores/nuevo")}>
+            <Plus className="mr-2 h-4 w-4" />
+            Agregar Creador
+          </Button>
         </div>
       </header>
 
