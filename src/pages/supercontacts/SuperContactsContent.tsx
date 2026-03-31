@@ -32,6 +32,14 @@ const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAdd
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [cityFilter, setCityFilter] = useState("all");
+
+  // Derive unique cities for filter
+  const cities = useMemo(() => {
+    const set = new Set<string>();
+    contacts.forEach((c) => { if (c.city) set.add(c.city); });
+    return Array.from(set).sort();
+  }, [contacts]);
 
   const filtered = useMemo(() => {
     let list = contacts;
@@ -46,8 +54,11 @@ const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAdd
     if (statusFilter !== "all") {
       list = list.filter((c) => c.status === statusFilter);
     }
+    if (cityFilter !== "all") {
+      list = list.filter((c) => c.city === cityFilter);
+    }
     return list;
-  }, [contacts, search, statusFilter]);
+  }, [contacts, search, statusFilter, cityFilter]);
 
   const counts = useMemo(() => {
     const map: Record<string, number> = { total: contacts.length, nuevo: 0, contactado: 0, interesado: 0, convertido: 0 };
@@ -105,7 +116,17 @@ const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAdd
             <SelectItem value="convertido">Convertido</SelectItem>
           </SelectContent>
         </Select>
-
+        <Select value={cityFilter} onValueChange={setCityFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Ciudad" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las ciudades</SelectItem>
+            {cities.map((city) => (
+              <SelectItem key={city} value={city}>{city}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}
@@ -118,14 +139,15 @@ const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAdd
                 <TableHead>Nombre</TableHead>
                 <TableHead>Seguidores</TableHead>
                 <TableHead>País</TableHead>
+                <TableHead>Ciudad</TableHead>
                 <TableHead>Estado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Cargando...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Cargando...</TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No hay contactos. Agrega tu primer contacto.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No hay contactos. Agrega tu primer contacto.</TableCell></TableRow>
               ) : (
                 filtered.map((c) => {
                   const st = statusConfig[c.status] || statusConfig.nuevo;
@@ -146,6 +168,7 @@ const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAdd
                       <TableCell>{c.full_name || "—"}</TableCell>
                       <TableCell>{c.followers_count?.toLocaleString() || "—"}</TableCell>
                       <TableCell>{getCountryDisplay(c.country)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{c.city || "—"}</TableCell>
                       <TableCell><Badge variant={st.variant}>{st.label}</Badge></TableCell>
                     </TableRow>
                   );
