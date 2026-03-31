@@ -803,6 +803,9 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm font-medium">
               ${(platformSalesByCreator?.[c.id] || []).reduce((s, x) => s + x.price, 0).toLocaleString()}
             </TableCell>
+            <TableCell>
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+            </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
