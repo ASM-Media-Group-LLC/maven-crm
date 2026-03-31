@@ -32,11 +32,11 @@ function fmt(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
 }
 
-const ZOOM = 0.82;
+const DEFAULT_ZOOM = 0.82;
 const A4_W = 595;
 const A4_H = 842;
 
-export default function InvoiceA4Preview({ invoice, template }: { invoice: InvoiceData; template?: TemplateInfo | null }) {
+export default function InvoiceA4Preview({ invoice, template, zoom = DEFAULT_ZOOM }: { invoice: InvoiceData; template?: TemplateInfo | null; zoom?: number }) {
   const agencyAmount = Number(invoice.agency_amount) || 0;
   const blueAmount = Number(invoice.blue_amount) || 0;
   const paypalAmount = Number(invoice.paypal_amount) || 0;
