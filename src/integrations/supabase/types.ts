@@ -6168,6 +6168,13 @@ export type Database = {
           status: string
         }[]
       }
+      get_agent_names: {
+        Args: { _user_ids: string[] }
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
       get_closer_stage_counts: {
         Args: { _is_admin: boolean; _user_id: string }
         Returns: {
