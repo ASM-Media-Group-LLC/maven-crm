@@ -90,6 +90,11 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
           // Only add if it's for this user or role-targeted
           if (n.user_id === user.id || (n.user_id === null && n.role_target)) {
             qc.invalidateQueries({ queryKey: ["notifications"] });
+
+            // Play sound if enabled and not in DND
+            if (notifSettings.sound_enabled && !notifSettings.dnd_enabled) {
+              playNotificationSound();
+            }
           }
         },
       )
