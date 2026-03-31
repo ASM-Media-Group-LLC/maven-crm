@@ -1,6 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Users, Building2, BarChart3, ShieldAlert } from "lucide-react";
+import { Plus, Users, Building2, BarChart3, ShieldAlert, ChevronDown, DollarSign, TrendingUp } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -11,7 +14,7 @@ import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
 import ContactosTable from "./ContactosTable";
 import ContactosGrid from "./ContactosGrid";
 import ContactosAnalyticsModal from "./ContactosAnalyticsModal";
-import AuditLogModal from "./AuditLogModal";
+
 import ViewContactoModal from "./ViewContactoModal";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
@@ -80,6 +83,7 @@ const ContactosContent = () => {
   const [convertRawContacto, setConvertRawContacto] = useState<any>(null);
   const [addAgenciaOpen, setAddAgenciaOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [analyticsTab, setAnalyticsTab] = useState("monthly");
   const [auditOpen, setAuditOpen] = useState(false);
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
@@ -293,16 +297,29 @@ const ContactosContent = () => {
           </div>
           <div className="flex items-center gap-2">
             {activeTab === "contactos" && isAdmin && (
-              <>
-                <Button variant="outline" size="sm" onClick={() => setAuditOpen(true)} className="text-amber-500 border-amber-500/30 hover:bg-amber-500/10">
-                  <ShieldAlert className="mr-2 h-4 w-4" />
-                  Auditoría
-                </Button>
-                <Button variant="outline" onClick={() => setAnalyticsOpen(true)}>
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Analítica
-                </Button>
-              </>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Analítica
+                      <ChevronDown className="ml-2 h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={() => { setAnalyticsTab("monthly"); setAnalyticsOpen(true); }}>
+                      <TrendingUp className="mr-2 h-4 w-4" />
+                      Dashboard General
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setAnalyticsTab("revenue"); setAnalyticsOpen(true); }}>
+                      <DollarSign className="mr-2 h-4 w-4" />
+                      Revenue
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setAnalyticsTab("audit"); setAnalyticsOpen(true); }} className="text-amber-500">
+                      <ShieldAlert className="mr-2 h-4 w-4" />
+                      Auditoría
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
             )}
             {activeTab === "contactos" ? (
               <Button onClick={() => navigate("/contactos/nuevo")}>
@@ -405,8 +422,7 @@ const ContactosContent = () => {
         contacto={convertRawContacto}
         onConverted={() => setConvertOpen(false)}
       />
-      <ContactosAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
-      <AuditLogModal open={auditOpen} onOpenChange={setAuditOpen} />
+      <ContactosAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} defaultTab={analyticsTab} />
     </main>
   );
 };

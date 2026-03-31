@@ -15,6 +15,7 @@ import CategoryAuditLog from "./CategoryAuditLog";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultTab?: string;
 }
 
 const COLORS = [
@@ -70,7 +71,7 @@ function resolveToISO(raw: string | null): string {
   return trimmed.toUpperCase();
 }
 
-const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
+const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }: Props) => {
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["contactos-analytics-full"],
     enabled: open,
@@ -124,6 +125,19 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
       const { data, error } = await supabase
         .from("closer_platform_sales")
         .select("creator_id, price, platform");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Fetch creator monetization (real monthly revenue tracking)
+  const { data: creatorMonetization = [] } = useQuery({
+    queryKey: ["contactos-creator-monetization"],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creator_monetization")
+        .select("creator_id, month_year, amount");
       if (error) throw error;
       return data ?? [];
     },
@@ -304,13 +318,23 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
 
   // 8. Revenue data
   const revenueData = useMemo(() => {
-    // Build map: contact_id → contact info
-    const contactMap = new Map<string, typeof contacts[0]>();
-    // We need contact IDs — but our query doesn't have id. Use source_contact_id from closer_creators
-    // Build map: closer_creator source_contact_id → creator data
     const salesByCreator = new Map<string, number>();
+    const salesByPlatform = new Map<string, number>();
     platformSales.forEach((s) => {
       salesByCreator.set(s.creator_id, (salesByCreator.get(s.creator_id) || 0) + (s.price || 0));
+      salesByPlatform.set(s.platform, (salesByPlatform.get(s.platform) || 0) + (s.price || 0));
+    });
+
+    // Real monetization data by month
+    const realMonthlyRev: Record<string, number> = {};
+    let totalMonetization = 0;
+    creatorMonetization.forEach((m) => {
+      const amt = m.amount || 0;
+      totalMonetization += amt;
+      if (m.month_year) {
+        const key = format(parseISO(m.month_year), "yyyy-MM");
+        realMonthlyRev[key] = (realMonthlyRev[key] || 0) + amt;
+      }
     });
 
     const activeStages = new Set(["Completada", "Confirmada", "completada", "confirmada"]);
@@ -318,10 +342,9 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     let totalOF = 0;
     let totalPlatform = 0;
     let monetizedCount = 0;
-    const monthlyRevenue: Record<string, { of: number; platform: number }> = {};
+    const monthlyRevenue: Record<string, { of: number; platform: number; monetization: number }> = {};
     const agentRevenue: Record<string, { contacts: number; converted: number; revenue: number }> = {};
 
-    // Process closer_creators that came from contacts
     closerCreators.forEach((cc) => {
       const ofRev = (activeStages.has(cc.stage) && cc.estimated_monetization) ? cc.estimated_monetization : 0;
       const platRev = salesByCreator.get(cc.id) || 0;
@@ -330,22 +353,25 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
       totalOF += ofRev;
       totalPlatform += platRev;
 
-      // Monthly grouping by creator created_at
       if (cc.created_at) {
         const key = format(parseISO(cc.created_at), "yyyy-MM");
-        if (!monthlyRevenue[key]) monthlyRevenue[key] = { of: 0, platform: 0 };
+        if (!monthlyRevenue[key]) monthlyRevenue[key] = { of: 0, platform: 0, monetization: 0 };
         monthlyRevenue[key].of += ofRev;
         monthlyRevenue[key].platform += platRev;
       }
 
-      // Agent revenue
       const agentId = cc.assigned_to || "sin_asignar";
       if (!agentRevenue[agentId]) agentRevenue[agentId] = { contacts: 0, converted: 0, revenue: 0 };
       agentRevenue[agentId].converted += 1;
       agentRevenue[agentId].revenue += ofRev + platRev;
     });
 
-    // Count contacts per agent
+    // Merge real monetization into monthly
+    Object.entries(realMonthlyRev).forEach(([key, amt]) => {
+      if (!monthlyRevenue[key]) monthlyRevenue[key] = { of: 0, platform: 0, monetization: 0 };
+      monthlyRevenue[key].monetization += amt;
+    });
+
     contacts.forEach((c) => {
       const agentId = c.created_by || "sin_asignar";
       if (!agentRevenue[agentId]) agentRevenue[agentId] = { contacts: 0, converted: 0, revenue: 0 };
@@ -355,15 +381,22 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     const totalRevenue = totalOF + totalPlatform;
     const totalConverted = closerCreators.filter(cc => activeStages.has(cc.stage)).length;
     const monetizationRate = totalConverted > 0 ? Math.round((monetizedCount / totalConverted) * 100) : 0;
+    const avgRevenuePerCreator = totalConverted > 0 ? Math.round(totalRevenue / totalConverted) : 0;
 
-    // Monthly chart data
-    const monthlyKeys = Object.keys(monthlyRevenue).sort();
-    const monthlyChart = monthlyKeys.map((k) => ({
+    // Monthly chart data with all revenue streams
+    const allMonthKeys = new Set([...Object.keys(monthlyRevenue)]);
+    const monthlyChart = Array.from(allMonthKeys).sort().map((k) => ({
       label: format(parseISO(`${k}-01`), "MMM yy", { locale: es }),
-      of: Math.round(monthlyRevenue[k].of),
-      platform: Math.round(monthlyRevenue[k].platform),
-      total: Math.round(monthlyRevenue[k].of + monthlyRevenue[k].platform),
+      of: Math.round(monthlyRevenue[k]?.of || 0),
+      platform: Math.round(monthlyRevenue[k]?.platform || 0),
+      monetization: Math.round(monthlyRevenue[k]?.monetization || 0),
+      total: Math.round((monthlyRevenue[k]?.of || 0) + (monthlyRevenue[k]?.platform || 0) + (monthlyRevenue[k]?.monetization || 0)),
     }));
+
+    // Platform breakdown
+    const platformBreakdown = Array.from(salesByPlatform.entries())
+      .map(([platform, revenue]) => ({ platform, revenue: Math.round(revenue) }))
+      .sort((a, b) => b.revenue - a.revenue);
 
     // Agent ranking
     const agentRanking = Object.entries(agentRevenue)
@@ -371,20 +404,36 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
         name: shortName((id !== "sin_asignar" && profiles[id]) || "Sin asignar"),
         fullName: (id !== "sin_asignar" && profiles[id]) || "Sin asignar",
         ...data,
+        convRate: data.contacts > 0 ? Math.round((data.converted / data.contacts) * 100) : 0,
       }))
-      .filter((a) => a.revenue > 0)
+      .filter((a) => a.revenue > 0 || a.converted > 0)
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
+
+    // Stage funnel
+    const stageCounts: Record<string, number> = {};
+    closerCreators.forEach((cc) => {
+      stageCounts[cc.stage] = (stageCounts[cc.stage] || 0) + 1;
+    });
+    const stageFunnel = Object.entries(stageCounts)
+      .map(([stage, count]) => ({ stage, count }))
+      .sort((a, b) => b.count - a.count);
 
     return {
       totalOF,
       totalPlatform,
       totalRevenue,
+      totalMonetization,
       monetizationRate,
+      avgRevenuePerCreator,
+      totalConverted,
+      totalLeads: closerCreators.length,
       monthlyChart,
       agentRanking,
+      platformBreakdown,
+      stageFunnel,
     };
-  }, [closerCreators, platformSales, contacts, profiles]);
+  }, [closerCreators, platformSales, contacts, profiles, creatorMonetization]);
 
   const total = contacts.length;
 
@@ -415,12 +464,15 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     if (!active || !payload?.length) return null;
     const of = payload.find((p: any) => p.dataKey === "of")?.value || 0;
     const platform = payload.find((p: any) => p.dataKey === "platform")?.value || 0;
+    const monetization = payload.find((p: any) => p.dataKey === "monetization")?.value || 0;
+    const total = of + platform + monetization;
     return (
       <div style={tooltipStyle} className="p-2 shadow-lg">
         <p className="font-semibold text-foreground">{label}</p>
         <p className="text-sm" style={{ color: "hsl(280, 60%, 55%)" }}>OF: ${of.toLocaleString()}</p>
         <p className="text-sm" style={{ color: "hsl(45, 80%, 50%)" }}>Plataformas: ${platform.toLocaleString()}</p>
-        <p className="text-sm text-muted-foreground">Total: ${(of + platform).toLocaleString()}</p>
+        {monetization > 0 && <p className="text-sm" style={{ color: "hsl(150, 60%, 45%)" }}>Monetización: ${monetization.toLocaleString()}</p>}
+        <p className="text-sm font-semibold text-foreground">Total: ${total.toLocaleString()}</p>
       </div>
     );
   };
@@ -442,7 +494,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
             <p className="text-sm text-muted-foreground">Cargando datos…</p>
           </div>
         ) : (
-          <Tabs defaultValue="monthly" className="flex-1 min-h-0 flex flex-col">
+          <Tabs defaultValue={defaultTab} key={defaultTab} className="flex-1 min-h-0 flex flex-col">
             <TabsList className="shrink-0 w-full justify-start flex-wrap h-auto gap-1 p-1">
               <TabsTrigger value="monthly">Por Mes</TabsTrigger>
               <TabsTrigger value="agents">Por Agente</TabsTrigger>
@@ -540,8 +592,8 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
 
               {/* Revenue Tab */}
               <TabsContent value="revenue" className="mt-0">
-                {/* KPIs */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                {/* KPI Row 1 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                   <div className="rounded-lg border bg-card p-3 text-center">
                     <p className="text-xs text-muted-foreground">Revenue OF</p>
                     <p className="text-xl font-bold" style={{ color: "hsl(280, 60%, 55%)" }}>{fmtMoney(revenueData.totalOF)}</p>
@@ -551,18 +603,68 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
                     <p className="text-xl font-bold" style={{ color: "hsl(45, 80%, 50%)" }}>{fmtMoney(revenueData.totalPlatform)}</p>
                   </div>
                   <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Monetización Real</p>
+                    <p className="text-xl font-bold" style={{ color: "hsl(150, 60%, 45%)" }}>{fmtMoney(revenueData.totalMonetization)}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
                     <p className="text-xs text-muted-foreground">Revenue Total</p>
                     <p className="text-xl font-bold text-foreground">{fmtMoney(revenueData.totalRevenue)}</p>
                   </div>
+                </div>
+
+                {/* KPI Row 2 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Total Leads</p>
+                    <p className="text-lg font-bold text-foreground">{revenueData.totalLeads}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Convertidos</p>
+                    <p className="text-lg font-bold" style={{ color: "hsl(150, 60%, 45%)" }}>{revenueData.totalConverted}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Rev. Prom/Creadora</p>
+                    <p className="text-lg font-bold text-foreground">{fmtMoney(revenueData.avgRevenuePerCreator)}</p>
+                  </div>
                   <div className="rounded-lg border bg-card p-3 text-center">
                     <p className="text-xs text-muted-foreground">Tasa Monetización</p>
-                    <p className="text-xl font-bold text-foreground">{revenueData.monetizationRate}%</p>
+                    <p className="text-lg font-bold text-foreground">{revenueData.monetizationRate}%</p>
                   </div>
                 </div>
 
+                {/* Stage Funnel */}
+                {revenueData.stageFunnel.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs text-muted-foreground mb-2 font-semibold">Funnel por Etapa</p>
+                    <div className="flex gap-1 h-6 rounded-md overflow-hidden">
+                      {revenueData.stageFunnel.map((s, i) => {
+                        const pct = revenueData.totalLeads > 0 ? (s.count / revenueData.totalLeads) * 100 : 0;
+                        return (
+                          <div
+                            key={s.stage}
+                            className="flex items-center justify-center text-[9px] font-medium text-white"
+                            style={{ width: `${Math.max(pct, 3)}%`, backgroundColor: COLORS[i % COLORS.length] }}
+                            title={`${s.stage}: ${s.count} (${Math.round(pct)}%)`}
+                          >
+                            {pct > 8 ? `${s.stage} (${s.count})` : ""}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex flex-wrap gap-3 mt-1">
+                      {revenueData.stageFunnel.map((s, i) => (
+                        <span key={s.stage} className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                          {s.stage}: {s.count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Monthly Revenue Chart */}
                 {revenueData.monthlyChart.length > 0 ? (
-                  <div className="h-[280px] mb-6">
+                  <div className="h-[280px] mb-4">
                     <p className="text-xs text-muted-foreground mb-2 font-semibold">Revenue por Mes</p>
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={revenueData.monthlyChart}>
@@ -570,52 +672,77 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
                         <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                         <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                         <Tooltip content={<RevenueTooltip />} />
-                        <Bar dataKey="of" fill="hsl(280, 60%, 55%)" radius={[4, 4, 0, 0]} name="OF" stackId="rev">
-                          <LabelList dataKey="of" position="inside" style={{ fontSize: 9, fill: "#fff" }} formatter={(v: number) => v > 0 ? `$${(v / 1000).toFixed(1)}k` : ""} />
-                        </Bar>
-                        <Bar dataKey="platform" fill="hsl(45, 80%, 50%)" radius={[4, 4, 0, 0]} name="Plataformas" stackId="rev">
-                          <LabelList dataKey="platform" position="inside" style={{ fontSize: 9, fill: "#fff" }} formatter={(v: number) => v > 0 ? `$${(v / 1000).toFixed(1)}k` : ""} />
-                        </Bar>
+                        <Bar dataKey="of" fill="hsl(280, 60%, 55%)" radius={[4, 4, 0, 0]} name="OF" stackId="rev" />
+                        <Bar dataKey="platform" fill="hsl(45, 80%, 50%)" radius={[0, 0, 0, 0]} name="Plataformas" stackId="rev" />
+                        <Bar dataKey="monetization" fill="hsl(150, 60%, 45%)" radius={[4, 4, 0, 0]} name="Monetización" stackId="rev" />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground mb-6">
-                    Sin datos de revenue todavía. Conforme se conviertan contactos y se registre monetización, los datos aparecerán aquí.
+                  <div className="flex items-center justify-center h-[150px] text-sm text-muted-foreground mb-4">
+                    Sin datos de revenue todavía.
                   </div>
                 )}
 
-                {/* Agent Revenue Ranking */}
-                {revenueData.agentRanking.length > 0 && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2 font-semibold">Top Agentes por Revenue</p>
-                    <div className="rounded-lg border overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b bg-muted/50">
-                            <th className="text-left p-2 text-xs font-semibold text-muted-foreground">#</th>
-                            <th className="text-left p-2 text-xs font-semibold text-muted-foreground">Agente</th>
-                            <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Contactos</th>
-                            <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Conv.</th>
-                            <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Revenue</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {revenueData.agentRanking.map((a, i) => (
-                            <tr key={i} className="border-b last:border-0">
-                              <td className="p-2 text-xs text-muted-foreground">{i + 1}</td>
-                              <td className="p-2 text-xs font-medium text-foreground">{a.fullName}</td>
-                              <td className="p-2 text-xs text-right text-muted-foreground">{a.contacts}</td>
-                              <td className="p-2 text-xs text-right" style={{ color: "hsl(150, 60%, 45%)" }}>{a.converted}</td>
-                              <td className="p-2 text-xs text-right font-semibold text-foreground">{fmtMoney(a.revenue)}</td>
+                {/* Platform Breakdown + Agent Ranking side by side */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Platform breakdown */}
+                  {revenueData.platformBreakdown.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2 font-semibold">Ventas por Plataforma</p>
+                      <div className="rounded-lg border overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b bg-muted/50">
+                              <th className="text-left p-2 text-xs font-semibold text-muted-foreground">Plataforma</th>
+                              <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Revenue</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {revenueData.platformBreakdown.map((p, i) => (
+                              <tr key={i} className="border-b last:border-0">
+                                <td className="p-2 text-xs font-medium text-foreground">{p.platform}</td>
+                                <td className="p-2 text-xs text-right font-semibold text-foreground">{fmtMoney(p.revenue)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+
+                  {/* Agent Revenue Ranking */}
+                  {revenueData.agentRanking.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2 font-semibold">Top Agentes por Revenue</p>
+                      <div className="rounded-lg border overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b bg-muted/50">
+                              <th className="text-left p-2 text-xs font-semibold text-muted-foreground">#</th>
+                              <th className="text-left p-2 text-xs font-semibold text-muted-foreground">Agente</th>
+                              <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Conv.</th>
+                              <th className="text-right p-2 text-xs font-semibold text-muted-foreground">%Conv</th>
+                              <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Revenue</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {revenueData.agentRanking.map((a, i) => (
+                              <tr key={i} className="border-b last:border-0">
+                                <td className="p-2 text-xs text-muted-foreground">{i + 1}</td>
+                                <td className="p-2 text-xs font-medium text-foreground">{a.fullName}</td>
+                                <td className="p-2 text-xs text-right" style={{ color: "hsl(150, 60%, 45%)" }}>{a.converted}</td>
+                                <td className="p-2 text-xs text-right text-muted-foreground">{a.convRate}%</td>
+                                <td className="p-2 text-xs text-right font-semibold text-foreground">{fmtMoney(a.revenue)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </TabsContent>
 
               {/* By Country */}

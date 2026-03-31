@@ -1,4 +1,5 @@
-import { Eye, MessageCircle, MoreHorizontal, Pencil, Sparkles } from "lucide-react";
+import { Eye, MoreHorizontal, Pencil, Sparkles } from "lucide-react";
+import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -124,10 +125,10 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert }: Props) => {
                         href={`https://wa.me/${(c as any).whatsapp.replace(/\D/g, "")}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-green-500 transition-colors"
+                        className="text-green-500 hover:text-green-400 transition-colors"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <MessageCircle className="h-4 w-4" />
+                        <WhatsAppIcon className="h-4 w-4" />
                       </a>
                     )}
                   </div>
