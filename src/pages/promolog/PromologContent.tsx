@@ -166,7 +166,7 @@ const PromologContent = () => {
 
   // Fetch real promolog entries
   const { data: promologEntries = [], isLoading: entriesLoading } = useQuery({
-    queryKey: ["promolog-entries", dateFrom?.toISOString(), dateTo?.toISOString()],
+    queryKey: ["promolog-entries", user?.id, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
       let query = supabase
         .from("promolog_entries")
