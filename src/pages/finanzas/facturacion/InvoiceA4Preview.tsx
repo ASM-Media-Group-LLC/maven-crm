@@ -1,5 +1,12 @@
 import kashLogo from "@/assets/kash-logo.png";
 
+interface TemplateInfo {
+  company_name?: string | null;
+  company_address?: string | null;
+  company_email?: string | null;
+  logo_url?: string | null;
+}
+
 interface InvoiceData {
   invoice_number?: string;
   amount?: number;
@@ -29,7 +36,7 @@ const ZOOM = 0.82;
 const A4_W = 595;
 const A4_H = 842;
 
-export default function InvoiceA4Preview({ invoice }: { invoice: InvoiceData }) {
+export default function InvoiceA4Preview({ invoice, template }: { invoice: InvoiceData; template?: TemplateInfo | null }) {
   const agencyAmount = Number(invoice.agency_amount) || 0;
   const blueAmount = Number(invoice.blue_amount) || 0;
   const paypalAmount = Number(invoice.paypal_amount) || 0;
@@ -43,6 +50,14 @@ export default function InvoiceA4Preview({ invoice }: { invoice: InvoiceData }) 
     ? new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })
     : new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
 
+  // Template-aware values with KASH defaults
+  const companyName = template?.company_name || "KASH AGENCY";
+  const companyAddress = template?.company_address || "333 SE 2nd Ave\nMiami, FL 33131-2176";
+  const companyEmail = template?.company_email || "kash@exclusivecontent.me";
+  const logoSrc = template?.logo_url || kashLogo;
+
+  const addressLines = companyAddress.split("\n");
+
   return (
     <div style={{ width: A4_W * ZOOM, height: A4_H * ZOOM, flexShrink: 0 }}>
       <div
@@ -53,20 +68,20 @@ export default function InvoiceA4Preview({ invoice }: { invoice: InvoiceData }) 
         <div className="flex justify-between items-start mb-6">
           <div>
             <h2 className="text-lg font-bold tracking-tight text-gray-900">Invoice</h2>
-            <p className="text-[9px] text-gray-400 mt-0.5">KASH AGENCY</p>
-            <p className="text-[9px] text-gray-400">333 SE 2nd Ave</p>
-            <p className="text-[9px] text-gray-400">Miami, FL 33131-2176</p>
-            <p className="text-[9px] text-gray-400">kash@exclusivecontent.me</p>
+            <p className="text-[9px] text-gray-400 mt-0.5">{companyName}</p>
+            {addressLines.map((line, i) => (
+              <p key={i} className="text-[9px] text-gray-400">{line}</p>
+            ))}
+            <p className="text-[9px] text-gray-400">{companyEmail}</p>
           </div>
           <div>
-            <img src={kashLogo} alt="KASH" className="h-14 object-contain" />
+            <img src={logoSrc} alt={companyName} className="h-14 object-contain" />
           </div>
         </div>
 
         <div className="h-px bg-gray-200 mb-4" />
 
         <div className="flex justify-between mb-5 text-[9px]">
-          {/* 4-column billing info */}
           <div className="grid grid-cols-[auto_auto_auto_auto] gap-x-4 gap-y-1">
             <p className="font-semibold text-gray-800">Bill to</p>
             <p className="text-gray-600">{creatorName}</p>
@@ -146,7 +161,7 @@ export default function InvoiceA4Preview({ invoice }: { invoice: InvoiceData }) 
           )}
           <div className="h-px bg-gray-200 mt-3" />
           <p className="text-[8px] text-gray-300 text-center pt-1">
-            Documento generado por KASH AGENCY · {invoiceDate}
+            Documento generado por {companyName} · {invoiceDate}
           </p>
         </div>
       </div>
