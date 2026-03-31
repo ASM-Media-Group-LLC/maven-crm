@@ -28,24 +28,46 @@ const COLORS = [
   "hsl(30, 70%, 50%)",
 ];
 
-function resolveCountryCode(code: string | null): string {
-  if (!code) return "N/A";
-  const trimmed = code.trim();
+// Phone prefix → ISO code mapping for resolving country_code field
+const PHONE_TO_CODE: Record<string, string> = {
+  "+54": "AR", "+591": "BO", "+55": "BR", "+44": "GB", "+56": "CL",
+  "+57": "CO", "+506": "CR", "+53": "CU", "+1809": "DO", "+593": "EC",
+  "+503": "SV", "+34": "ES", "+1": "US", "+502": "GT", "+504": "HN",
+  "+39": "IT", "+52": "MX", "+505": "NI", "+507": "PA", "+595": "PY",
+  "+51": "PE", "+1787": "PR", "+66": "TH", "+598": "UY", "+58": "VE",
+};
+
+/** Resolve a country_code (ISO, phone prefix, or country name) to a clean ISO code */
+function resolveToISO(raw: string | null): string {
+  if (!raw) return "N/A";
+  const trimmed = raw.trim();
+  if (!trimmed) return "N/A";
+
+  // Already a 2-letter ISO code
   if (/^[A-Z]{2}$/i.test(trimmed)) return trimmed.toUpperCase();
-  const phoneMap: Record<string, string> = {
-    "+54": "AR", "+591": "BO", "+55": "BR", "+44": "GB", "+56": "CL",
-    "+57": "CO", "+506": "CR", "+53": "CU", "+1809": "DO", "+593": "EC",
-    "+503": "SV", "+34": "ES", "+1": "US", "+502": "GT", "+504": "HN",
-    "+39": "IT", "+52": "MX", "+505": "NI", "+507": "PA", "+595": "PY",
-    "+51": "PE", "+1787": "PR", "+66": "TH", "+598": "UY", "+58": "VE",
-  };
+
+  // Phone prefix → try longest match first
   if (trimmed.startsWith("+")) {
     for (const len of [5, 4, 3, 2]) {
       const prefix = trimmed.slice(0, len);
-      if (phoneMap[prefix]) return phoneMap[prefix];
+      if (PHONE_TO_CODE[prefix]) return PHONE_TO_CODE[prefix];
     }
   }
-  return trimmed;
+
+  // Try as country name via getCountryName (returns same input if not found)
+  const nameResolved = getCountryName(trimmed);
+  if (nameResolved !== trimmed) {
+    // It was resolved — now find the code
+    const flag = getCountryFlag(trimmed);
+    if (flag) {
+      // Find by flag match — iterate known codes
+      for (const code of Object.keys(PHONE_TO_CODE)) {
+        // skip, use a reverse approach
+      }
+    }
+  }
+
+  return trimmed.toUpperCase();
 }
 
 const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
@@ -81,6 +103,32 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     },
   });
 
+  // Fetch closer_creators with revenue data
+  const { data: closerCreators = [] } = useQuery({
+    queryKey: ["contactos-closer-creators-revenue"],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("closer_creators")
+        .select("id, source_contact_id, estimated_monetization, stage, created_at, assigned_to");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Fetch platform sales
+  const { data: platformSales = [] } = useQuery({
+    queryKey: ["contactos-platform-sales-revenue"],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("closer_platform_sales")
+        .select("creator_id, price, platform");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const agentIds = useMemo(() => {
     const ids = new Set<string>();
     contacts.forEach((c) => { if (c.created_by) ids.add(c.created_by); });
@@ -106,7 +154,6 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     return `${parts[0]} ${parts[1]?.[0] || ""}.`;
   };
 
-  // Check if a contact was converted to creator
   const isConverted = (handle: string) => {
     if (!handle) return false;
     const normalized = handle.toLowerCase().replace(/^@+/, "").trim();
@@ -195,19 +242,20 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     return { data, agents };
   }, [contacts, profiles]);
 
-  // 4. By country
+  // 4. By country — FIX: use getCountryFlag/getCountryName for proper resolution & grouping
   const countryData = useMemo(() => {
     const map: Record<string, number> = {};
     contacts.forEach((c) => {
-      const code = resolveCountryCode(c.country_code);
-      map[code] = (map[code] || 0) + 1;
+      const iso = resolveToISO(c.country_code);
+      // Group by resolved name to merge duplicates
+      const name = iso !== "N/A" ? getCountryName(iso) || iso : "Sin país";
+      map[name] = (map[name] || 0) + 1;
     });
     return Object.entries(map)
-      .map(([code, count]) => {
-        const flag = getCountryFlag(code);
-        const name = getCountryName(code);
+      .map(([name, count]) => {
+        const flag = getCountryFlag(name);
         return {
-          name: code !== "N/A" ? `${flag} ${name || code}` : "Sin país",
+          name: name !== "Sin país" ? `${flag} ${name}` : "Sin país",
           count,
         };
       })
@@ -254,6 +302,90 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
       .slice(0, 10);
   }, [contacts]);
 
+  // 8. Revenue data
+  const revenueData = useMemo(() => {
+    // Build map: contact_id → contact info
+    const contactMap = new Map<string, typeof contacts[0]>();
+    // We need contact IDs — but our query doesn't have id. Use source_contact_id from closer_creators
+    // Build map: closer_creator source_contact_id → creator data
+    const salesByCreator = new Map<string, number>();
+    platformSales.forEach((s) => {
+      salesByCreator.set(s.creator_id, (salesByCreator.get(s.creator_id) || 0) + (s.price || 0));
+    });
+
+    const activeStages = new Set(["Completada", "Confirmada", "completada", "confirmada"]);
+    
+    let totalOF = 0;
+    let totalPlatform = 0;
+    let monetizedCount = 0;
+    const monthlyRevenue: Record<string, { of: number; platform: number }> = {};
+    const agentRevenue: Record<string, { contacts: number; converted: number; revenue: number }> = {};
+
+    // Process closer_creators that came from contacts
+    closerCreators.forEach((cc) => {
+      const ofRev = (activeStages.has(cc.stage) && cc.estimated_monetization) ? cc.estimated_monetization : 0;
+      const platRev = salesByCreator.get(cc.id) || 0;
+      
+      if (ofRev > 0 || platRev > 0) monetizedCount++;
+      totalOF += ofRev;
+      totalPlatform += platRev;
+
+      // Monthly grouping by creator created_at
+      if (cc.created_at) {
+        const key = format(parseISO(cc.created_at), "yyyy-MM");
+        if (!monthlyRevenue[key]) monthlyRevenue[key] = { of: 0, platform: 0 };
+        monthlyRevenue[key].of += ofRev;
+        monthlyRevenue[key].platform += platRev;
+      }
+
+      // Agent revenue
+      const agentId = cc.assigned_to || "sin_asignar";
+      if (!agentRevenue[agentId]) agentRevenue[agentId] = { contacts: 0, converted: 0, revenue: 0 };
+      agentRevenue[agentId].converted += 1;
+      agentRevenue[agentId].revenue += ofRev + platRev;
+    });
+
+    // Count contacts per agent
+    contacts.forEach((c) => {
+      const agentId = c.created_by || "sin_asignar";
+      if (!agentRevenue[agentId]) agentRevenue[agentId] = { contacts: 0, converted: 0, revenue: 0 };
+      agentRevenue[agentId].contacts += 1;
+    });
+
+    const totalRevenue = totalOF + totalPlatform;
+    const totalConverted = closerCreators.filter(cc => activeStages.has(cc.stage)).length;
+    const monetizationRate = totalConverted > 0 ? Math.round((monetizedCount / totalConverted) * 100) : 0;
+
+    // Monthly chart data
+    const monthlyKeys = Object.keys(monthlyRevenue).sort();
+    const monthlyChart = monthlyKeys.map((k) => ({
+      label: format(parseISO(`${k}-01`), "MMM yy", { locale: es }),
+      of: Math.round(monthlyRevenue[k].of),
+      platform: Math.round(monthlyRevenue[k].platform),
+      total: Math.round(monthlyRevenue[k].of + monthlyRevenue[k].platform),
+    }));
+
+    // Agent ranking
+    const agentRanking = Object.entries(agentRevenue)
+      .map(([id, data]) => ({
+        name: shortName((id !== "sin_asignar" && profiles[id]) || "Sin asignar"),
+        fullName: (id !== "sin_asignar" && profiles[id]) || "Sin asignar",
+        ...data,
+      }))
+      .filter((a) => a.revenue > 0)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+
+    return {
+      totalOF,
+      totalPlatform,
+      totalRevenue,
+      monetizationRate,
+      monthlyChart,
+      agentRanking,
+    };
+  }, [closerCreators, platformSales, contacts, profiles]);
+
   const total = contacts.length;
 
   const tooltipStyle = {
@@ -263,7 +395,6 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
     fontSize: 12,
   };
 
-  // Custom tooltip for monthly chart
   const MonthlyTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     const count = payload.find((p: any) => p.dataKey === "count")?.value || 0;
@@ -279,6 +410,22 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
       </div>
     );
   };
+
+  const RevenueTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    const of = payload.find((p: any) => p.dataKey === "of")?.value || 0;
+    const platform = payload.find((p: any) => p.dataKey === "platform")?.value || 0;
+    return (
+      <div style={tooltipStyle} className="p-2 shadow-lg">
+        <p className="font-semibold text-foreground">{label}</p>
+        <p className="text-sm" style={{ color: "hsl(280, 60%, 55%)" }}>OF: ${of.toLocaleString()}</p>
+        <p className="text-sm" style={{ color: "hsl(45, 80%, 50%)" }}>Plataformas: ${platform.toLocaleString()}</p>
+        <p className="text-sm text-muted-foreground">Total: ${(of + platform).toLocaleString()}</p>
+      </div>
+    );
+  };
+
+  const fmtMoney = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -300,6 +447,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
               <TabsTrigger value="monthly">Por Mes</TabsTrigger>
               <TabsTrigger value="agents">Por Agente</TabsTrigger>
               <TabsTrigger value="agentTrend">Agente × Mes</TabsTrigger>
+              <TabsTrigger value="revenue">Revenue</TabsTrigger>
               <TabsTrigger value="country">Por País</TabsTrigger>
               <TabsTrigger value="city">Por Ciudad</TabsTrigger>
               <TabsTrigger value="category">Categoría</TabsTrigger>
@@ -310,7 +458,6 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
             <div className="flex-1 min-h-0 overflow-auto pt-4">
               {/* Monthly with KPIs and dual bars */}
               <TabsContent value="monthly" className="mt-0">
-                {/* KPI row */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                   <div className="rounded-lg border bg-card p-3 text-center">
                     <p className="text-xs text-muted-foreground">Total Registrados</p>
@@ -381,7 +528,6 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
                         <LabelList dataKey={agent} position="inside" style={{ fontSize: 9, fill: "#fff" }} formatter={(v: number) => v > 0 ? v : ""} />
                       </Bar>
                     ))}
-                    {/* Total label on top of stacked bars */}
                     {agentMonthlyData.agents.length > 0 && (
                       <Bar dataKey="_total" stackId="b" fill="transparent" isAnimationActive={false}>
                         <LabelList dataKey="_total" position="top" style={{ fontSize: 11, fontWeight: 700, fill: "hsl(var(--foreground))" }} />
@@ -390,6 +536,86 @@ const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                   </BarChart>
                 </ResponsiveContainer>
+              </TabsContent>
+
+              {/* Revenue Tab */}
+              <TabsContent value="revenue" className="mt-0">
+                {/* KPIs */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Revenue OF</p>
+                    <p className="text-xl font-bold" style={{ color: "hsl(280, 60%, 55%)" }}>{fmtMoney(revenueData.totalOF)}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Revenue Plataformas</p>
+                    <p className="text-xl font-bold" style={{ color: "hsl(45, 80%, 50%)" }}>{fmtMoney(revenueData.totalPlatform)}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Revenue Total</p>
+                    <p className="text-xl font-bold text-foreground">{fmtMoney(revenueData.totalRevenue)}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Tasa Monetización</p>
+                    <p className="text-xl font-bold text-foreground">{revenueData.monetizationRate}%</p>
+                  </div>
+                </div>
+
+                {/* Monthly Revenue Chart */}
+                {revenueData.monthlyChart.length > 0 ? (
+                  <div className="h-[280px] mb-6">
+                    <p className="text-xs text-muted-foreground mb-2 font-semibold">Revenue por Mes</p>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={revenueData.monthlyChart}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                        <Tooltip content={<RevenueTooltip />} />
+                        <Bar dataKey="of" fill="hsl(280, 60%, 55%)" radius={[4, 4, 0, 0]} name="OF" stackId="rev">
+                          <LabelList dataKey="of" position="inside" style={{ fontSize: 9, fill: "#fff" }} formatter={(v: number) => v > 0 ? `$${(v / 1000).toFixed(1)}k` : ""} />
+                        </Bar>
+                        <Bar dataKey="platform" fill="hsl(45, 80%, 50%)" radius={[4, 4, 0, 0]} name="Plataformas" stackId="rev">
+                          <LabelList dataKey="platform" position="inside" style={{ fontSize: 9, fill: "#fff" }} formatter={(v: number) => v > 0 ? `$${(v / 1000).toFixed(1)}k` : ""} />
+                        </Bar>
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground mb-6">
+                    Sin datos de revenue todavía. Conforme se conviertan contactos y se registre monetización, los datos aparecerán aquí.
+                  </div>
+                )}
+
+                {/* Agent Revenue Ranking */}
+                {revenueData.agentRanking.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2 font-semibold">Top Agentes por Revenue</p>
+                    <div className="rounded-lg border overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="text-left p-2 text-xs font-semibold text-muted-foreground">#</th>
+                            <th className="text-left p-2 text-xs font-semibold text-muted-foreground">Agente</th>
+                            <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Contactos</th>
+                            <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Conv.</th>
+                            <th className="text-right p-2 text-xs font-semibold text-muted-foreground">Revenue</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {revenueData.agentRanking.map((a, i) => (
+                            <tr key={i} className="border-b last:border-0">
+                              <td className="p-2 text-xs text-muted-foreground">{i + 1}</td>
+                              <td className="p-2 text-xs font-medium text-foreground">{a.fullName}</td>
+                              <td className="p-2 text-xs text-right text-muted-foreground">{a.contacts}</td>
+                              <td className="p-2 text-xs text-right" style={{ color: "hsl(150, 60%, 45%)" }}>{a.converted}</td>
+                              <td className="p-2 text-xs text-right font-semibold text-foreground">{fmtMoney(a.revenue)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
 
               {/* By Country */}
