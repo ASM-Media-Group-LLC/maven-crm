@@ -14,7 +14,7 @@ import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
 import ContactosTable from "./ContactosTable";
 import ContactosGrid from "./ContactosGrid";
 import ContactosAnalyticsModal from "./ContactosAnalyticsModal";
-import AuditLogModal from "./AuditLogModal";
+
 import ViewContactoModal from "./ViewContactoModal";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
