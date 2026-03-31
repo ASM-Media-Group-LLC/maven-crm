@@ -1,37 +1,34 @@
 
 
-## Plan: Mejorar Analítica de Contactos — Sumatorias y Tasa de Conversión
+## Plan: Cambiar ruta de Invoices a `/finanzas/facturacion/invoices`
 
-### Problema
-1. **Mes de marzo confuso**: La pestaña "Por Mes" solo muestra barras sin sumatoria acumulada visible ni totales claros.
-2. **Sin tasa de conversión**: No se ve cuántos contactos de cada mes se convirtieron en creadoras. Por ejemplo, de los 106 contactos de febrero, ¿cuántos ya son creadoras?
-3. **Status inconsistente**: Solo 1 contacto tiene status `converted` (el trigger `cleanup_closer_on_creator_insert` debería marcarlos, pero la mayoría quedó como `new`).
-
-### Datos actuales
-- 502 contactos totales, 495 en status `new`
-- Creadoras creadas: Oct=76, Nov=123, Dic=24, Ene=26, Feb=29, Mar=6
-- Solo 1 contacto marcado como `converted`
+### Por qué es mejor
+Tienes razón — cambiar la URL de Invoices de `/finanzas/facturacion` a `/finanzas/facturacion/invoices` elimina el conflicto de prefijos de raíz, sin necesidad de lógica compleja en el sidebar. Solución limpia y definitiva.
 
 ### Cambios
 
-**Archivo: `ContactosAnalyticsModal.tsx`**
+**1. `src/App.tsx`** — Cambiar la ruta del componente `FacturacionPage`:
+- `/finanzas/facturacion` → `/finanzas/facturacion/invoices`
 
-1. **Pestaña "Por Mes" mejorada**:
-   - Agregar una fila de KPIs arriba del chart: total del periodo, promedio mensual, mejor mes
-   - Mostrar doble barra: contactos registrados (azul) + contactos convertidos a creadoras (verde)
-   - Para calcular conversiones: cruzar `closers_contacts.handle` con `creators.instagram_handle` por mes de creación del contacto
-   - Agregar línea acumulativa superpuesta para ver crecimiento total
-   - Tooltip mostrando: "X contactos, Y convertidos (Z%)"
+**2. `src/components/dashboard/DashboardSidebar.tsx`** — Actualizar URL del item:
+- `{ title: "Invoices", url: "/finanzas/facturacion/invoices" }`
 
-2. **Nuevo query de conversión**: Traer de `creators` los `instagram_handle` existentes, luego cruzar con `closers_contacts.handle` para determinar cuáles se convirtieron — independiente del campo `status` (que está desactualizado)
+**3. Actualizar todas las referencias de navegación** (navigate, links, breadcrumbs):
+- `NuevoInvoicePage.tsx` — ~4 referencias a `navigate("/finanzas/facturacion")`
+- `NuevaNotaPagoPage.tsx` — ~4 referencias a `navigate("/finanzas/facturacion")`
+- `FinanzasDashboard.tsx` — 1 referencia en el path de "Invoices por enviar"
+- `notificationHelpers.ts` — 1 referencia en el link de notificación de invoice
 
-3. **Sumatoria en cada barra**: Mantener `LabelList` con el conteo, pero agregar debajo en texto más pequeño el acumulado
+**4. Opcional**: Agregar un redirect de `/finanzas/facturacion` → `/finanzas/facturacion/invoices` para no romper bookmarks existentes.
 
-4. **Pestaña "Agente × Mes" mejorada**: Agregar fila de totales por mes debajo de cada barra stacked (sumatoria visible)
+### Archivos a modificar (6)
 
-### Archivos a modificar
-
-| Archivo | Cambio |
-|---------|--------|
-| `ContactosAnalyticsModal.tsx` | Nuevo query a `creators` para cruzar handles, KPIs de resumen, doble barra contactos/convertidos en tab mensual, totales visibles en agent×month |
+| Archivo | Cambios |
+|---------|---------|
+| `App.tsx` | Ruta de FacturacionPage |
+| `DashboardSidebar.tsx` | URL del item Invoices |
+| `NuevoInvoicePage.tsx` | navigates de vuelta |
+| `NuevaNotaPagoPage.tsx` | navigates de vuelta |
+| `FinanzasDashboard.tsx` | path del card |
+| `notificationHelpers.ts` | link de notificación |
 
