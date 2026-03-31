@@ -5387,6 +5387,101 @@ export type Database = {
           },
         ]
       }
+      super_contact_interactions: {
+        Row: {
+          contact_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          type: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          type: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "super_contact_interactions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "super_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      super_contacts: {
+        Row: {
+          bio: string | null
+          category: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          enriched: boolean
+          followers_count: number | null
+          full_name: string | null
+          id: string
+          instagram_handle: string
+          notes: string | null
+          phone: string | null
+          profile_photo_url: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bio?: string | null
+          category?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          enriched?: boolean
+          followers_count?: number | null
+          full_name?: string | null
+          id?: string
+          instagram_handle: string
+          notes?: string | null
+          phone?: string | null
+          profile_photo_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bio?: string | null
+          category?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          enriched?: boolean
+          followers_count?: number | null
+          full_name?: string | null
+          id?: string
+          instagram_handle?: string
+          notes?: string | null
+          phone?: string | null
+          profile_photo_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       task_assignees: {
         Row: {
           created_at: string | null

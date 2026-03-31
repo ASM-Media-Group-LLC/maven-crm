@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign,
-  MessageCircle,
+  MessageCircle, Contact,
 } from "lucide-react";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { useSidebarBadges } from "@/hooks/useSidebarBadges";
@@ -43,6 +43,7 @@ const DashboardSidebar = () => {
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
     { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare, module: "Tareas" },
     { title: t("nav.events"), url: "/eventos", icon: CalendarDays, module: "Eventos" },
+    { title: "SuperContacts", url: "/supercontacts", icon: Contact, module: "SuperContacts" },
   ];
   const mainMenu = mainMenuAll.filter((item) => canAccess(item.module));
 
