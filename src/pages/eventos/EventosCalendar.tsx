@@ -52,8 +52,8 @@ const EventosCalendar = ({ events }: Props) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.9fr] gap-6">
       <Card className="overflow-hidden border-border/80">
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between mb-4">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
             <div className="space-y-1">
               <div className="flex items-center gap-3">
                 <h3 className="text-xl font-bold capitalize tracking-tight">
