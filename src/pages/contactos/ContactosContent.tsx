@@ -100,6 +100,7 @@ const ContactosContent = () => {
         q = q.eq("status", dbStatus);
       }
       if (filters.pais) q = q.eq("country_code", filters.pais);
+      if (filters.ciudad) q = q.ilike("city", filters.ciudad);
       if (filters.categoria) q = q.eq("physical_appearance", filters.categoria);
       if (filters.dateFrom) q = q.gte("created_at", filters.dateFrom);
       if (filters.dateTo) {
