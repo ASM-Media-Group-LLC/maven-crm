@@ -43,7 +43,7 @@ interface Props {
   cities?: string[];
 }
 
-const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear, creators = [] }: Props) => {
+const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear, creators = [], cities = [] }: Props) => {
   const [agentOpen, setAgentOpen] = useState(false);
 
   return (
