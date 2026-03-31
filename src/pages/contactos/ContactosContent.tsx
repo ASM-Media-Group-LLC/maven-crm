@@ -222,7 +222,14 @@ const ContactosContent = () => {
   const updateFilters = (patch: Partial<ContactoFilters>) =>
     setFilters((prev) => ({ ...prev, ...patch }));
 
-  const hasActiveFilters = !!(filters.search || filters.pais || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor);
+  // Derive unique cities for filter
+  const citiesList = useMemo(() => {
+    const set = new Set<string>();
+    allContactos.forEach((c) => { if (c.city) set.add(c.city); });
+    return Array.from(set).sort();
+  }, [allContactos]);
+
+  const hasActiveFilters = !!(filters.search || filters.pais || filters.ciudad || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor);
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
