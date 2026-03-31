@@ -55,6 +55,8 @@ import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
 import PromologTable from "./PromologTable";
 import PromologGrid from "./PromologGrid";
 import DataTableShell from "@/components/ui/data-table-shell";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const networkOptions = [
   { value: "instagram", label: "Instagram", icon: InstagramIcon },
