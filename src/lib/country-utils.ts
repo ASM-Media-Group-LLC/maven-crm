@@ -83,6 +83,14 @@ export function getCountryDisplay(countryInput: string | null | undefined): stri
   return `${COUNTRY_DATA[code].flag} ${COUNTRY_DATA[code].name}`;
 }
 
+/** Short display: flag + ISO code, e.g. "🇨🇴 CO" */
+export function getCountryShortDisplay(countryInput: string | null | undefined): string {
+  if (!countryInput) return "—";
+  const code = resolveCode(countryInput);
+  if (!code) return countryInput;
+  return `${COUNTRY_DATA[code].flag} ${code}`;
+}
+
 /** Mask a phone number: show only last 4 digits */
 export function maskPhone(phone: string | null | undefined): string {
   if (!phone) return "";

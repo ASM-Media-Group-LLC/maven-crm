@@ -109,7 +109,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
               {c.nombre}
             </TableCell>
             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-              {c.pais ? `${getCountryFlag(c.pais)} ${c.pais}` : "—"}
+              {c.pais ? getCountryShortDisplay(c.pais) : "—"}
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.city || "—"}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.creadoPor}</TableCell>
