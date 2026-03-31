@@ -317,6 +317,59 @@ const PromologContent = () => {
   const [assignAgentTarget, setAssignAgentTarget] = useState<PromologEntry | null>(null);
   const [assignAgentSelected, setAssignAgentSelected] = useState<string>("");
   const [assignAgentSearch, setAssignAgentSearch] = useState("");
+  const [selectedAgent, setSelectedAgent] = useState<{ id: string; name: string } | null>(null);
+
+  // Campaign actions state
+  const [viewCampaign, setViewCampaign] = useState<any>(null);
+  const [editCampaign, setEditCampaign] = useState<any>(null);
+  const [deleteCampaign, setDeleteCampaign] = useState<any>(null);
+  const [editCampMonth, setEditCampMonth] = useState("");
+  const [editCampGoalMonthly, setEditCampGoalMonthly] = useState("");
+  const [editCampGoalWeekly, setEditCampGoalWeekly] = useState("");
+  const [editCampStatus, setEditCampStatus] = useState("");
+
+  // Dynamic agents data
+  const agentsData = useMemo(() => {
+    const agentMap = new Map<string, { id: string; tickets: number; si: number; parcial: number; no: number; networks: Record<string, number> }>();
+
+    for (const pe of promologEntries) {
+      const agentId = pe.reviewed_by || pe.created_by;
+      if (!agentId || !profilesMap[agentId]) continue;
+
+      // Date filter for agents tab
+      if (agentDateFrom) {
+        const entryDate = new Date(pe.date);
+        if (entryDate < agentDateFrom) continue;
+      }
+      if (agentDateTo) {
+        const entryDate = new Date(pe.date);
+        const toEnd = new Date(agentDateTo);
+        toEnd.setDate(toEnd.getDate() + 1);
+        if (entryDate >= toEnd) continue;
+      }
+
+      let agent = agentMap.get(agentId);
+      if (!agent) agent = { id: agentId, tickets: 0, si: 0, parcial: 0, no: 0, networks: {} };
+      agent.tickets++;
+      if (pe.promoted === "true") agent.si++;
+      else if (pe.promoted === "partial") agent.parcial++;
+      else if (pe.promoted === "false") agent.no++;
+      const net = (pe.network || "otro").toLowerCase();
+      const netLabel = net === "instagram" ? "IG" : net === "tiktok" ? "TK" : net === "x" ? "X" : net === "telegram" ? "TG" : "Otro";
+      agent.networks[netLabel] = (agent.networks[netLabel] || 0) + 1;
+      agentMap.set(agentId, agent);
+    }
+
+    return Array.from(agentMap.entries()).map(([id, d]) => ({
+      id,
+      name: profilesMap[id] || id,
+      tickets: d.tickets,
+      si: d.si,
+      parcial: d.parcial,
+      no: d.no,
+      badges: Object.entries(d.networks).map(([label, value]) => ({ label, value })),
+    }));
+  }, [promologEntries, profilesMap, agentDateFrom, agentDateTo]);
 
   const handleViewEntry = (entry: PromologEntry) => {
     setSelectedEntry(entry);
