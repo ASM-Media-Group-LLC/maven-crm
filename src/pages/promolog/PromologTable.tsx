@@ -113,7 +113,7 @@ const InlineNotes = ({ value, onSave }: { value: string; onSave: (v: string | nu
   );
 };
 
-const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange, onAssignAgent, isManagement }: Props) => {
+const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange, onAssignAgent, isManagement, viewOnly }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
 
