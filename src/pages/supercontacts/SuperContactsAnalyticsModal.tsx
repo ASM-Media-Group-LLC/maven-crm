@@ -50,7 +50,7 @@ const BRAND_COLORS: Record<string, string> = {
   Traffix: "hsl(30, 70%, 50%)",
 };
 
-const BRANDS = ["Cash", "Exchange", "Ora", "Link Hunter", "Lumina", "Big Link", "Maven", "Blue", "Traffix"];
+const BRANDS = ["Cash", "Exchange", "Ora", "Link Hunter", "Lumina", "BLU", "Maven", "Blue", "Traffix"];
 
 const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
