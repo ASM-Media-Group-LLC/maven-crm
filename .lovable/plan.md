@@ -1,56 +1,51 @@
 
 
-## Plan: Código postal en templates + consistencia visual de tabla
+## Plan: Fix Promolog entries visibility para agentes + Fix auto-hide stats en Closers
 
-### 1. Migración SQL — nueva columna `company_zip`
+### Problema 1: Agente no ve entradas subidas en Promolog
+
+**Causa raíz**: Las entradas creadas antes del fix de `reviewed_by` tienen ese campo en `NULL`. El filtro `.eq("reviewed_by", user.id)` las excluye. Además, el `queryKey` no incluye `user.id`, lo que podría causar cache inconsistente entre roles.
+
+**Solución**:
+
+1. **Backfill de datos existentes** — Migración SQL que asigne `reviewed_by` a las entradas huérfanas. Se puede inferir el agente si hay un solo usuario agente activo, o pedirle al usuario que confirme. Opción más segura:
 
 ```sql
-ALTER TABLE public.invoice_templates ADD COLUMN company_zip text;
+-- Asignar entradas sin reviewed_by al usuario que las creó
+-- Como no hay campo created_by, buscar por la sesión de Carolina Jaramillo
+UPDATE promolog_entries 
+SET reviewed_by = (SELECT id FROM profiles WHERE full_name ILIKE '%Carolina%Jaramillo%' LIMIT 1)
+WHERE reviewed_by IS NULL;
 ```
 
-### 2. `CreateTemplateModal.tsx` — agregar campo "Código postal"
+Alternativamente, si hay múltiples agentes, se necesita una asignación manual o un criterio más específico.
 
-- Nuevo state `companyZip` inicializado desde `template?.company_zip`
-- Input debajo de "Dirección" con label "Código postal" y placeholder "Ej: 33131"
-- Incluir `company_zip` en el payload del insert/update (solo cuando `type === "invoice"`)
+2. **Agregar `user.id` al queryKey** — Para que el cache sea correcto por usuario:
 
-### 3. `InvoiceA4Preview.tsx` — mostrar zip en header
-
-- Agregar `company_zip?: string | null` a la interfaz `TemplateInfo`
-- En el header, después de las líneas de dirección y antes del email, mostrar el zip si existe:
 ```tsx
-{companyZip && <p className="text-[9px] text-gray-400">{companyZip}</p>}
+queryKey: ["promolog-entries", user?.id, dateFrom?.toISOString(), dateTo?.toISOString()],
 ```
 
-### 4. `TemplatesPage.tsx` — replicar estructura de tabla de Invoices
+3. **Verificar fecha/hora** — El insert usa `new Date().toISOString()` (UTC). La visualización usa `toLocaleDateString("es-ES")` y `toLocaleTimeString("es-ES")` que muestra hora local del navegador. Esto debería estar correcto, pero si el servidor está en otra timezone podría verse desfasado. Se verificará que la hora mostrada corresponda.
 
-Cambios para igualar la tabla de `FacturacionPage.renderInvoiceTable`:
+### Problema 2: Stats cards no se ocultan al scrollear en Closers
 
-| Aspecto | Actual (Templates) | Objetivo (como Invoices) |
-|---------|-------------------|-------------------------|
-| Contenedor | Sin borde ni overflow | `rounded-lg border border-border overflow-hidden` + `overflow-auto max-h-[calc(100vh-20rem)]` |
-| Header row | Bg `background` | `bg-card border-b` |
-| Filas hover | Default | `group hover:bg-muted/30 transition-colors` |
-| Col Acciones | `text-right w-[80px]` | `sticky right-0 bg-card` con hover sync |
-| Botones acción | `variant="ghost" size="icon"` | Tooltips envolventes como en Invoices |
-| Columna `#` | Número manual | Eliminar — no existe en Invoices |
-| Badge tipo | Inline | Mantener pero con mismo estilo |
+**Causa raíz**: El componente `DataTableShell` tiene `onScroll` correctamente wired (línea 234) y el handler `handleContentScroll` está definido (línea 48-50). La estructura es idéntica a LeadGen. Posible causa: al cambiar de pestaña no se resetea `statsCollapsed` a `false`, causando inconsistencia. También verificar si el `scrollTop` del div se resetea correctamente.
 
-Estructura final de columnas: **Nombre, Tipo, Fecha creación, Creador, Acciones** (sin `#`).
+**Solución**: Agregar reset de `statsCollapsed` al cambiar de tab:
 
-### 5. Actualizar queries que usen `invoice_templates`
+```tsx
+// En el onValueChange del Tabs
+onValueChange={(v) => { setActiveTab(v); setStatsCollapsed(false); }}
+```
 
-- `NuevoInvoicePage.tsx` línea 102: agregar `company_zip` al select
-- `TemplatesPage.tsx`: ya usa `select("*")`, se incluye automáticamente
-- `TemplatesPage.tsx` view modal: pasar `company_zip` al `InvoiceA4Preview`
+Y asegurar que el scroll event se propague correctamente verificando que no haya un contenedor intermedio absorbiendo el scroll.
 
 ### Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| Migración SQL | `ADD COLUMN company_zip text` |
-| `CreateTemplateModal.tsx` | Nuevo campo zip + incluir en payload |
-| `InvoiceA4Preview.tsx` | Agregar `company_zip` a `TemplateInfo`, renderizar en header |
-| `TemplatesPage.tsx` | Reestructurar tabla para igualar Invoices, pasar `company_zip` al preview |
-| `NuevoInvoicePage.tsx` | Agregar `company_zip` al select de templates |
+| Migración SQL | Backfill `reviewed_by` en entradas NULL |
+| `PromologContent.tsx` | Agregar `user?.id` al queryKey (línea 169) |
+| `ClosersContent.tsx` | Reset `statsCollapsed` en cambio de tab (línea 106) |
 
