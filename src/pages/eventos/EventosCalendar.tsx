@@ -99,7 +99,7 @@ const EventosCalendar = ({ events }: Props) => {
               cell: "flex-1 text-center p-0 relative",
               day: cn(
                 buttonVariants({ variant: "ghost" }),
-                "h-10 w-full p-0 text-sm rounded-xl font-medium aria-selected:opacity-100 transition-all duration-150 hover:scale-[1.03]"
+                "h-8 w-full p-0 text-sm rounded-xl font-medium aria-selected:opacity-100 transition-all duration-150 hover:scale-[1.03]"
               ),
               day_selected: "bg-primary text-primary-foreground hover:bg-primary shadow-md",
               day_today: "calendar-day-today",
