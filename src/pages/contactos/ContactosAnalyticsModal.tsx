@@ -443,7 +443,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
             <p className="text-sm text-muted-foreground">Cargando datos…</p>
           </div>
         ) : (
-          <Tabs defaultValue="monthly" className="flex-1 min-h-0 flex flex-col">
+          <Tabs defaultValue={defaultTab} key={defaultTab} className="flex-1 min-h-0 flex flex-col">
             <TabsList className="shrink-0 w-full justify-start flex-wrap h-auto gap-1 p-1">
               <TabsTrigger value="monthly">Por Mes</TabsTrigger>
               <TabsTrigger value="agents">Por Agente</TabsTrigger>

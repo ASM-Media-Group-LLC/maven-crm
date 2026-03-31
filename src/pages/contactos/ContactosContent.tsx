@@ -297,16 +297,29 @@ const ContactosContent = () => {
           </div>
           <div className="flex items-center gap-2">
             {activeTab === "contactos" && isAdmin && (
-              <>
-                <Button variant="outline" size="sm" onClick={() => setAuditOpen(true)} className="text-amber-500 border-amber-500/30 hover:bg-amber-500/10">
-                  <ShieldAlert className="mr-2 h-4 w-4" />
-                  Auditoría
-                </Button>
-                <Button variant="outline" onClick={() => setAnalyticsOpen(true)}>
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Analítica
-                </Button>
-              </>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Analítica
+                      <ChevronDown className="ml-2 h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={() => { setAnalyticsTab("monthly"); setAnalyticsOpen(true); }}>
+                      <TrendingUp className="mr-2 h-4 w-4" />
+                      Dashboard General
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setAnalyticsTab("revenue"); setAnalyticsOpen(true); }}>
+                      <DollarSign className="mr-2 h-4 w-4" />
+                      Revenue
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setAnalyticsTab("audit"); setAnalyticsOpen(true); }} className="text-amber-500">
+                      <ShieldAlert className="mr-2 h-4 w-4" />
+                      Auditoría
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
             )}
             {activeTab === "contactos" ? (
               <Button onClick={() => navigate("/contactos/nuevo")}>
