@@ -528,7 +528,7 @@ const PromologContent = () => {
       {/* Tabs */}
       <div className="shrink-0 px-6 pb-2">
         <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
-          {tabItems.map((tab) => (
+          {tabItems.filter(tab => isManagement || tab.id !== "agentes").map((tab) => (
             <Button
               key={tab.id}
               variant={activeTab === tab.id ? "secondary" : "ghost"}
