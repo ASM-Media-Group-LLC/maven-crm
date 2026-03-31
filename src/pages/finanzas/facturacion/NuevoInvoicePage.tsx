@@ -258,6 +258,20 @@ export default function NuevoInvoicePage() {
               <Label>Notas</Label>
               <Textarea placeholder="Notas opcionales..." value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
+            {templates.length > 0 && (
+              <div>
+                <Label>Template</Label>
+                <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar template (opcional)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin template (KASH por defecto)</SelectItem>
+                    {templates.map(t => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           {/* Right: Preview */}
