@@ -764,7 +764,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableRow>
             {expandedId === c.id && (
               <TableRow>
-                <TableCell colSpan={11} className="bg-muted/30 p-4">
+                <TableCell colSpan={13} className="bg-muted/30 p-4">
                   <PlatformSalesPanel creatorId={c.id} />
                 </TableCell>
               </TableRow>
