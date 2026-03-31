@@ -318,13 +318,23 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
 
   // 8. Revenue data
   const revenueData = useMemo(() => {
-    // Build map: contact_id → contact info
-    const contactMap = new Map<string, typeof contacts[0]>();
-    // We need contact IDs — but our query doesn't have id. Use source_contact_id from closer_creators
-    // Build map: closer_creator source_contact_id → creator data
     const salesByCreator = new Map<string, number>();
+    const salesByPlatform = new Map<string, number>();
     platformSales.forEach((s) => {
       salesByCreator.set(s.creator_id, (salesByCreator.get(s.creator_id) || 0) + (s.price || 0));
+      salesByPlatform.set(s.platform, (salesByPlatform.get(s.platform) || 0) + (s.price || 0));
+    });
+
+    // Real monetization data by month
+    const realMonthlyRev: Record<string, number> = {};
+    let totalMonetization = 0;
+    creatorMonetization.forEach((m) => {
+      const amt = m.amount || 0;
+      totalMonetization += amt;
+      if (m.month_year) {
+        const key = format(parseISO(m.month_year), "yyyy-MM");
+        realMonthlyRev[key] = (realMonthlyRev[key] || 0) + amt;
+      }
     });
 
     const activeStages = new Set(["Completada", "Confirmada", "completada", "confirmada"]);
@@ -332,10 +342,9 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
     let totalOF = 0;
     let totalPlatform = 0;
     let monetizedCount = 0;
-    const monthlyRevenue: Record<string, { of: number; platform: number }> = {};
+    const monthlyRevenue: Record<string, { of: number; platform: number; monetization: number }> = {};
     const agentRevenue: Record<string, { contacts: number; converted: number; revenue: number }> = {};
 
-    // Process closer_creators that came from contacts
     closerCreators.forEach((cc) => {
       const ofRev = (activeStages.has(cc.stage) && cc.estimated_monetization) ? cc.estimated_monetization : 0;
       const platRev = salesByCreator.get(cc.id) || 0;
@@ -344,22 +353,25 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
       totalOF += ofRev;
       totalPlatform += platRev;
 
-      // Monthly grouping by creator created_at
       if (cc.created_at) {
         const key = format(parseISO(cc.created_at), "yyyy-MM");
-        if (!monthlyRevenue[key]) monthlyRevenue[key] = { of: 0, platform: 0 };
+        if (!monthlyRevenue[key]) monthlyRevenue[key] = { of: 0, platform: 0, monetization: 0 };
         monthlyRevenue[key].of += ofRev;
         monthlyRevenue[key].platform += platRev;
       }
 
-      // Agent revenue
       const agentId = cc.assigned_to || "sin_asignar";
       if (!agentRevenue[agentId]) agentRevenue[agentId] = { contacts: 0, converted: 0, revenue: 0 };
       agentRevenue[agentId].converted += 1;
       agentRevenue[agentId].revenue += ofRev + platRev;
     });
 
-    // Count contacts per agent
+    // Merge real monetization into monthly
+    Object.entries(realMonthlyRev).forEach(([key, amt]) => {
+      if (!monthlyRevenue[key]) monthlyRevenue[key] = { of: 0, platform: 0, monetization: 0 };
+      monthlyRevenue[key].monetization += amt;
+    });
+
     contacts.forEach((c) => {
       const agentId = c.created_by || "sin_asignar";
       if (!agentRevenue[agentId]) agentRevenue[agentId] = { contacts: 0, converted: 0, revenue: 0 };
@@ -369,15 +381,22 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
     const totalRevenue = totalOF + totalPlatform;
     const totalConverted = closerCreators.filter(cc => activeStages.has(cc.stage)).length;
     const monetizationRate = totalConverted > 0 ? Math.round((monetizedCount / totalConverted) * 100) : 0;
+    const avgRevenuePerCreator = totalConverted > 0 ? Math.round(totalRevenue / totalConverted) : 0;
 
-    // Monthly chart data
-    const monthlyKeys = Object.keys(monthlyRevenue).sort();
-    const monthlyChart = monthlyKeys.map((k) => ({
+    // Monthly chart data with all revenue streams
+    const allMonthKeys = new Set([...Object.keys(monthlyRevenue)]);
+    const monthlyChart = Array.from(allMonthKeys).sort().map((k) => ({
       label: format(parseISO(`${k}-01`), "MMM yy", { locale: es }),
-      of: Math.round(monthlyRevenue[k].of),
-      platform: Math.round(monthlyRevenue[k].platform),
-      total: Math.round(monthlyRevenue[k].of + monthlyRevenue[k].platform),
+      of: Math.round(monthlyRevenue[k]?.of || 0),
+      platform: Math.round(monthlyRevenue[k]?.platform || 0),
+      monetization: Math.round(monthlyRevenue[k]?.monetization || 0),
+      total: Math.round((monthlyRevenue[k]?.of || 0) + (monthlyRevenue[k]?.platform || 0) + (monthlyRevenue[k]?.monetization || 0)),
     }));
+
+    // Platform breakdown
+    const platformBreakdown = Array.from(salesByPlatform.entries())
+      .map(([platform, revenue]) => ({ platform, revenue: Math.round(revenue) }))
+      .sort((a, b) => b.revenue - a.revenue);
 
     // Agent ranking
     const agentRanking = Object.entries(agentRevenue)
@@ -385,20 +404,36 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
         name: shortName((id !== "sin_asignar" && profiles[id]) || "Sin asignar"),
         fullName: (id !== "sin_asignar" && profiles[id]) || "Sin asignar",
         ...data,
+        convRate: data.contacts > 0 ? Math.round((data.converted / data.contacts) * 100) : 0,
       }))
-      .filter((a) => a.revenue > 0)
+      .filter((a) => a.revenue > 0 || a.converted > 0)
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
+
+    // Stage funnel
+    const stageCounts: Record<string, number> = {};
+    closerCreators.forEach((cc) => {
+      stageCounts[cc.stage] = (stageCounts[cc.stage] || 0) + 1;
+    });
+    const stageFunnel = Object.entries(stageCounts)
+      .map(([stage, count]) => ({ stage, count }))
+      .sort((a, b) => b.count - a.count);
 
     return {
       totalOF,
       totalPlatform,
       totalRevenue,
+      totalMonetization,
       monetizationRate,
+      avgRevenuePerCreator,
+      totalConverted,
+      totalLeads: closerCreators.length,
       monthlyChart,
       agentRanking,
+      platformBreakdown,
+      stageFunnel,
     };
-  }, [closerCreators, platformSales, contacts, profiles]);
+  }, [closerCreators, platformSales, contacts, profiles, creatorMonetization]);
 
   const total = contacts.length;
 
