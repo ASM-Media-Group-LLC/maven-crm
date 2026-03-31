@@ -148,7 +148,7 @@ const ContactosContent = () => {
     const map = new Map<string, string>();
     creatorIds.forEach((id) => {
       const name = profilesMap[id];
-      map.set(id, name || `Usuario #${id.slice(0, 8)}`);
+      map.set(id, name || "Agente");
     });
     const entries = Array.from(map.entries())
       .map(([, label]) => ({ value: label, label }));
