@@ -624,8 +624,22 @@ const SuperContactProfile = () => {
                   {brand.charAt(0)}
                 </div>
                 <CardTitle className="text-sm">{brand}</CardTitle>
-                <Badge variant="outline" className="ml-auto text-xs">{entries.length} contacto{entries.length !== 1 ? "s" : ""}</Badge>
+                <Badge variant="outline" className="text-xs">{entries.length} contacto{entries.length !== 1 ? "s" : ""}</Badge>
+                <span className="text-[10px] text-muted-foreground">{new Set(entries.filter(e => e.instagram_account).map(e => e.instagram_account)).size} cuentas IG</span>
+                <Button size="sm" variant="ghost" className="ml-auto h-6 text-xs gap-1" onClick={() => fetchBrandInsight(brand, entries)}
+                  disabled={brandInsights[brand]?.loading}>
+                  {brandInsights[brand]?.loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+                  IA Insight
+                </Button>
               </div>
+              {/* Brand summary from AI */}
+              {brandInsights[brand]?.text && (
+                <div className="mt-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10 text-xs">
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-xs">
+                    <ReactMarkdown>{brandInsights[brand].text!}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
