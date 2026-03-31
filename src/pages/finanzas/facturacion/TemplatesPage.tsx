@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CreateTemplateModal from "./CreateTemplateModal";
 
 interface Template {
@@ -15,6 +16,7 @@ interface Template {
   type: string;
   company_name: string | null;
   company_address: string | null;
+  company_zip: string | null;
   company_email: string | null;
   logo_url: string | null;
   created_by: string | null;
@@ -89,54 +91,43 @@ export default function TemplatesPage() {
             <p className="text-sm mt-1">Crea tu primer template para personalizar tus documentos</p>
           </div>
         ) : (
-          <DataTableShell
-            currentPage={1}
-            totalPages={1}
-            totalCount={templates.length}
-            pageSize={templates.length}
-            onPageChange={() => {}}
-            className="flex-1 min-h-0"
-          >
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="sticky top-0 z-10 bg-background w-[50px]">#</TableHead>
-                  <TableHead className="sticky top-0 z-10 bg-background">Nombre</TableHead>
-                  <TableHead className="sticky top-0 z-10 bg-background">Tipo</TableHead>
-                  <TableHead className="sticky top-0 z-10 bg-background">Fecha creación</TableHead>
-                  <TableHead className="sticky top-0 z-10 bg-background">Creador</TableHead>
-                  <TableHead className="sticky top-0 z-10 bg-background text-right w-[80px]">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {templates.map((t, idx) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-                    <TableCell className="font-medium">{t.name}</TableCell>
-                    <TableCell>
-                      <Badge variant={t.type === "invoice" ? "default" : "secondary"}>
-                        {t.type === "invoice" ? "Invoice" : "Nota de pago"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{t.creator_name}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewTemplate(t)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="overflow-auto max-h-[calc(100vh-20rem)]">
+              <Table>
+                <TableHeader>
+                  <TableRow className="sticky top-0 z-10 bg-card border-b">
+                    <TableHead className="text-xs font-medium text-muted-foreground">Nombre</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Fecha creación</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </DataTableShell>
+                </TableHeader>
+                <TableBody>
+                  {templates.map((t) => (
+                    <TableRow key={t.id} className="group hover:bg-muted/30 transition-colors">
+                      <TableCell className="text-sm font-medium">{t.name}</TableCell>
+                      <TableCell>
+                        <Badge variant={t.type === "invoice" ? "default" : "secondary"}>
+                          {t.type === "invoice" ? "Invoice" : "Nota de pago"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{t.creator_name}</TableCell>
+                      <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
+                        <div className="flex items-center gap-1">
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewTemplate(t)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(t)}><Pencil className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         )}
       </div>
 
@@ -158,6 +149,7 @@ export default function TemplatesPage() {
                 template={{
                   company_name: viewTemplate.company_name,
                   company_address: viewTemplate.company_address,
+                  company_zip: viewTemplate.company_zip,
                   company_email: viewTemplate.company_email,
                   logo_url: viewTemplate.logo_url,
                 }}

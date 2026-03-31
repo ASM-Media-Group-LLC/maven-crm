@@ -54,6 +54,7 @@ export default function InvoiceA4Preview({ invoice, template, zoom = DEFAULT_ZOO
   // Template-aware values with KASH defaults
   const companyName = template?.company_name || "KASH AGENCY";
   const companyAddress = template?.company_address || "333 SE 2nd Ave\nMiami, FL 33131-2176";
+  const companyZip = template?.company_zip || "";
   const companyEmail = template?.company_email || "kash@exclusivecontent.me";
   const logoSrc = template?.logo_url || kashLogo;
 
@@ -73,6 +74,7 @@ export default function InvoiceA4Preview({ invoice, template, zoom = DEFAULT_ZOO
             {addressLines.map((line, i) => (
               <p key={i} className="text-[9px] text-gray-400">{line}</p>
             ))}
+            {companyZip && <p className="text-[9px] text-gray-400">{companyZip}</p>}
             <p className="text-[9px] text-gray-400">{companyEmail}</p>
           </div>
           <div>

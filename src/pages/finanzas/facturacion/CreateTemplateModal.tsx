@@ -133,6 +133,10 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
                 <Input value={companyAddress} onChange={e => setCompanyAddress(e.target.value)} placeholder="Ej: 333 SE 2nd Ave, Miami, FL" />
               </div>
               <div>
+                <Label>Código postal</Label>
+                <Input value={companyZip} onChange={e => setCompanyZip(e.target.value)} placeholder="Ej: 33131" />
+              </div>
+              <div>
                 <Label>Correo electrónico</Label>
                 <Input type="email" value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} placeholder="Ej: billing@company.com" />
               </div>
