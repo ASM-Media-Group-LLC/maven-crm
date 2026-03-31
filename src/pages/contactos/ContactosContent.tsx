@@ -1,6 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Users, Building2, BarChart3, ShieldAlert } from "lucide-react";
+import { Plus, Users, Building2, BarChart3, ShieldAlert, ChevronDown, DollarSign, TrendingUp } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
