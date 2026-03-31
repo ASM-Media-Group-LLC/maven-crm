@@ -1,56 +1,43 @@
 
 
-## Plan: Monitoreo periódico + Resumen inteligente por marca + Botón flotante de IA
+## Plan: Unificar el preview A4 de creación con el componente compartido
 
-### Tres cambios
+### Problema
+El A4 en la página de creación (`NuevoInvoicePage.tsx`, líneas 297-410) tiene el layout de billing + invoice details **lado a lado** (`flex justify-between`), mientras que `InvoiceA4Preview.tsx` los muestra **uno debajo del otro** (billing grid arriba, invoice details abajo a la izquierda). Son dos renders diferentes del mismo documento.
 
-**1. Sistema de monitoreo/seguimiento periódico**
-- Agregar un campo `check_frequency` al contacto (diario, semanal, quincenal, mensual) y `last_checked_at`
-- En la pestaña Resumen, mostrar una tarjeta de "Próximo chequeo" con indicador visual (verde si al día, rojo si vencido)
-- Botón rápido "Marcar como chequeado" que actualiza `last_checked_at`
-- Migración SQL: agregar columnas `check_frequency` (text) y `last_checked_at` (timestamptz) a `super_contacts`
+### Solución
+Reemplazar el bloque inline A4 (líneas 297-410) por el componente `InvoiceA4Preview`, pasándole los datos del formulario como props. Mantener el wrapper de zoom externo y los botones +/−.
 
-**2. Resumen inteligente por marca en pestaña Marcas**
-- Debajo de cada marca agrupada, mostrar un mini-resumen: cuántas cuentas de IG se usaron, qué se le dijo (listado compacto de notas), y el estado general
-- Agregar un botón "IA Insight" por marca que llama a `supercontact-ai` con action `brand_summary` pasando solo los outreach de esa marca, y devuelve recomendaciones (qué se ha dicho, qué falta, siguiente paso)
-- Actualizar la Edge Function `supercontact-ai` para manejar `action: "brand_summary"` con un prompt específico
+### Cambio en `NuevoInvoicePage.tsx`
+1. Importar `InvoiceA4Preview`
+2. Reemplazar líneas 297-410 por:
+```tsx
+<InvoiceA4Preview
+  invoice={{
+    amount: grandTotal,
+    agency_amount: agencyTotal,
+    blue_amount: blueTotal,
+    paypal_amount: paypalAmount,
+    due_date: dueDate,
+    notes,
+    created_at: new Date().toISOString(),
+    creators: selectedCreator ? {
+      id: selectedCreator.id,
+      name: selectedCreator.name,
+      artistic_name: selectedCreator.artistic_name,
+      phone: selectedCreator.phone,
+      creator_business: selectedCreator.creator_business,
+    } : undefined,
+  }}
+  template={selectedTemplate}
+/>
+```
+3. Eliminar las constantes `A4_W` y `A4_H` locales (ya están en el componente), pero **mantener** el zoom wrapper y los botones +/− ya que el componente usa zoom fijo de 0.82, y aquí queremos zoom interactivo.
 
-**3. Botón flotante de IA (disponible en TODAS las pestañas)**
-- Botón circular flotante (`fixed bottom-6 right-6`) con icono de Bot, visible siempre excepto cuando ya estás en la pestaña IA
-- Al hacer click, abre un popup/panel lateral (tipo drawer desde la derecha, `w-96`) con el chat de IA completo (mismo que la pestaña IA)
-- Incluye input de texto, subida de imágenes, y suggestions rápidas
-- El panel se cierra con un botón X o clickeando fuera
-- Se reutiliza toda la lógica de `sendAiMessage` y `handleImageUpload` existente
-
-### Archivos a modificar
+**Ajuste necesario en `InvoiceA4Preview.tsx`**: Hacer que el `ZOOM` sea configurable via prop opcional (`zoom?: number`) para que la página de creación pueda pasar su zoom interactivo, defaulteando a 0.82.
 
 | Archivo | Cambio |
 |---------|--------|
-| Migración SQL | `ALTER TABLE super_contacts ADD check_frequency text, ADD last_checked_at timestamptz` |
-| `SuperContactProfile.tsx` | Tarjeta de monitoreo en Resumen, resumen por marca con botón IA Insight, botón flotante + panel lateral de IA |
-| `useSuperContacts.ts` | Incluir nuevos campos en el tipo `SuperContact` |
-| `supercontact-ai/index.ts` | Nuevo action `brand_summary` con prompt específico por marca |
-
-### Detalle del botón flotante
-
-```text
-┌──────────────────────────────────┐
-│  [Pestaña activa: Marcas]        │
-│                                  │
-│  ... contenido de marcas ...     │
-│                                  │
-│                         ┌──────┐ │
-│                         │ 🤖   │ │  ← Botón flotante
-│                         └──────┘ │
-└──────────────────────────────────┘
-
-Al click:
-┌──────────────────────┬───────────┐
-│  Contenido actual    │  IA Chat  │
-│                      │  Panel    │
-│                      │  w-96     │
-│                      │           │
-│                      │  [input]  │
-└──────────────────────┴───────────┘
-```
+| `InvoiceA4Preview.tsx` | Agregar prop opcional `zoom` (default 0.82) |
+| `NuevoInvoicePage.tsx` | Reemplazar inline A4 por `<InvoiceA4Preview zoom={zoom} .../>`, eliminar código duplicado |
 
