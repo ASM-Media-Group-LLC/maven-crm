@@ -174,6 +174,11 @@ const PromologContent = () => {
         .order("date", { ascending: false })
         .limit(200);
 
+      // Closers/agents/employees only see their own entries
+      if (!isManagement && user?.id) {
+        query = query.eq("reviewed_by", user.id);
+      }
+
       if (dateFrom) {
         const fromStr = dateFrom.toISOString().split("T")[0];
         query = query.gte("date", fromStr);
