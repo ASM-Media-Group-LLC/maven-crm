@@ -60,6 +60,10 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
         placeholder="País"
         value={filters.pais}
         options={["AR", "BR", "CL", "CO", "CR", "EC", "ES", "GB", "GT", "HN", "IT", "MX", "PA", "PE", "PY", "SV", "TH", "US", "UY", "VE"]}
+        labels={Object.fromEntries(
+          ["AR", "BR", "CL", "CO", "CR", "EC", "ES", "GB", "GT", "HN", "IT", "MX", "PA", "PE", "PY", "SV", "TH", "US", "UY", "VE"]
+            .map((c) => [c, `${getCountryFlag(c)} ${getCountryName(c)}`])
+        )}
         onChange={(v) => onChange({ pais: v })}
       />
       <FilterSelect
