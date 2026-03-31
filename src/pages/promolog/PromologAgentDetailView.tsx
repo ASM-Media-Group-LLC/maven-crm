@@ -23,6 +23,7 @@ import {
   LineChart, Line, Cell, PieChart, Pie, Legend,
 } from "recharts";
 import type { PromologEntry } from "./PromologEntryCard";
+import ViewPromologEntryModal from "./ViewPromologEntryModal";
 
 const networkOptions = [
   { value: "instagram", label: "Instagram" },
@@ -78,6 +79,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [statsCollapsed, setStatsCollapsed] = useState(false);
+  const [viewingEntry, setViewingEntry] = useState<PromologEntry | null>(null);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (e.currentTarget.scrollTop > 40) setStatsCollapsed(true);
@@ -335,12 +337,9 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
             >
               <PromologTable
                 entries={filtered.slice((page - 1) * pageSize, page * pageSize)}
-                onView={() => {}}
-                onEdit={() => {}}
-                onDelete={() => {}}
+                onView={(entry) => setViewingEntry(entry)}
                 onNotesChange={handleNotesChange}
-                onAssignAgent={() => {}}
-                isManagement={isManagement}
+                viewOnly
               />
             </DataTableShell>
           </div>
@@ -442,6 +441,12 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
           </div>
         </div>
       )}
+
+      <ViewPromologEntryModal
+        open={!!viewingEntry}
+        onOpenChange={(o) => !o && setViewingEntry(null)}
+        entry={viewingEntry}
+      />
     </main>
   );
 };
