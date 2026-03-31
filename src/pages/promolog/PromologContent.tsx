@@ -1756,6 +1756,125 @@ const PromologContent = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* View Campaign Modal */}
+      {viewCampaign && (
+        <Dialog open={!!viewCampaign} onOpenChange={(open) => !open && setViewCampaign(null)}>
+          <DialogContent className="sm:max-w-[450px]">
+            <DialogHeader>
+              <DialogTitle>Detalle de Campaña</DialogTitle>
+              <DialogDescription>Información completa de la campaña</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Creadora</p>
+                  <p className="text-sm font-medium">{(viewCampaign.creators as any)?.artistic_name || (viewCampaign.creators as any)?.name || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Mes</p>
+                  <p className="text-sm font-medium capitalize">{new Date(viewCampaign.month_year + "T00:00:00").toLocaleDateString("es-ES", { month: "long", year: "numeric" })}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Obj. Mensual</p>
+                  <p className="text-sm font-bold">{viewCampaign.goal_monthly}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Obj. Semanal</p>
+                  <p className="text-sm font-bold">{viewCampaign.goal_weekly}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Estado</p>
+                  <Badge variant={viewCampaign.status === "activa" ? "default" : "secondary"} className="capitalize mt-1">{viewCampaign.status}</Badge>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Creación</p>
+                  <p className="text-sm">{new Date(viewCampaign.created_at).toLocaleDateString("es-ES")}</p>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Edit Campaign Modal */}
+      {editCampaign && (
+        <Dialog open={!!editCampaign} onOpenChange={(open) => !open && setEditCampaign(null)}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle>Editar Campaña</DialogTitle>
+              <DialogDescription>Modifica los objetivos o estado de la campaña</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Obj. Mensual</Label>
+                  <Input type="number" value={editCampGoalMonthly} onChange={(e) => setEditCampGoalMonthly(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Obj. Semanal</Label>
+                  <Input type="number" value={editCampGoalWeekly} onChange={(e) => setEditCampGoalWeekly(e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Estado</Label>
+                <Select value={editCampStatus} onValueChange={setEditCampStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="activa">Activa</SelectItem>
+                    <SelectItem value="finalizada">Finalizada</SelectItem>
+                    <SelectItem value="pendiente">Pendiente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditCampaign(null)}>Cancelar</Button>
+              <Button onClick={async () => {
+                const { error } = await supabase.from("promolog_campaigns").update({
+                  goal_monthly: parseInt(editCampGoalMonthly) || 0,
+                  goal_weekly: parseInt(editCampGoalWeekly) || 0,
+                  status: editCampStatus,
+                }).eq("id", editCampaign.id);
+                if (error) {
+                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                  return;
+                }
+                queryClient.invalidateQueries({ queryKey: ["promolog-campaigns"] });
+                setEditCampaign(null);
+                toast({ title: "Campaña actualizada" });
+              }}>Guardar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Delete Campaign Modal */}
+      {deleteCampaign && (
+        <Dialog open={!!deleteCampaign} onOpenChange={(open) => !open && setDeleteCampaign(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Eliminar Campaña</DialogTitle>
+              <DialogDescription>
+                ¿Estás seguro de eliminar la campaña de <span className="font-semibold">{(deleteCampaign.creators as any)?.artistic_name || (deleteCampaign.creators as any)?.name}</span>? Esta acción no se puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteCampaign(null)}>Cancelar</Button>
+              <Button variant="destructive" onClick={async () => {
+                const { error } = await supabase.from("promolog_campaigns").delete().eq("id", deleteCampaign.id);
+                if (error) {
+                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                  return;
+                }
+                queryClient.invalidateQueries({ queryKey: ["promolog-campaigns"] });
+                setDeleteCampaign(null);
+                toast({ title: "Campaña eliminada" });
+              }}>Eliminar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </main>
   );
 };
