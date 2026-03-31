@@ -1,58 +1,40 @@
 
 
-## Plan: Fix eliminación de entradas + visibilidad para Carolina en Promolog
+## Plan: Auto-hide stats cards en Promolog al hacer scroll
 
-### Problema 1: Las entradas NO se borran
+### Cambio
 
-En `PromologContent.tsx` línea 1403, el botón "Eliminar" solo cierra el dialog y muestra un toast — **nunca llama a Supabase para eliminar**:
-
-```tsx
-// ACTUAL (fake delete)
-onClick={() => { setDeleteEntryOpen(false); toast({ title: "Entrada eliminada" }); }}
-```
-
-**Fix**: Reemplazar con una llamada real a `supabase.from("promolog_entries").delete().eq("id", selectedEntry.id)` seguida de `invalidateQueries`.
-
-### Problema 2: Carolina no ve entradas de "sofiaen el mundo"
-
-Las 31,205 entradas en la DB tienen `created_by = NULL`. Solo 4,059 tienen `reviewed_by` seteado. Las entradas de "sofiaen el mundo" (y la mayoría) vienen del webhook externo (`sync-promolog-external`) que **no setea** `reviewed_by` ni `created_by`.
-
-El filtro para agentes (línea 178-179) busca `reviewed_by.eq.${user.id},created_by.eq.${user.id}` → no encuentra nada.
-
-**Fix en dos partes**:
-
-1. **Backfill SQL** — Asignar `reviewed_by` a Carolina (`e3355f39-1d3c-4986-99d1-ee583df9b38c`) en todas las entradas huérfanas. Si hay múltiples agentes, se necesita un criterio. Como parece haber un solo agente activo, se asignan todas a ella.
-
-```sql
-UPDATE promolog_entries 
-SET reviewed_by = 'e3355f39-1d3c-4986-99d1-ee583df9b38c'
-WHERE reviewed_by IS NULL;
-```
-
-2. **Fix del webhook** — Actualizar la edge function `sync-promolog-external` para que setee `reviewed_by` al insertar, si es posible identificar al agente. Alternativamente, cambiar la query del agente para que vea **todas** las entradas (sin filtro por usuario) ya que RLS está deshabilitado y el filtro client-side es innecesario si solo hay un agente.
+Aplicar el mismo patrón de colapso de KPI cards que existe en LeadGen y Closers: cuando el usuario hace scroll en la tabla, las stats cards se ocultan con una transición suave.
 
 ### Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `PromologContent.tsx` línea 1403 | Implementar delete real con `supabase.delete()` + `invalidateQueries` |
-| Migración SQL | Backfill: `UPDATE promolog_entries SET reviewed_by = 'e3355f39...' WHERE reviewed_by IS NULL` |
+| `PromologContent.tsx` | Agregar state `statsCollapsed`, callback `handleContentScroll`, transición CSS en el div de KPI cards, y pasar `onScroll` al `DataTableShell` |
 
-### Detalle del fix de delete
+### Detalle
 
+1. **Nuevo state + callback** (junto a los otros states, ~línea 420):
 ```tsx
-<Button variant="destructive" onClick={async () => {
-  const { error } = await supabase
-    .from("promolog_entries")
-    .delete()
-    .eq("id", selectedEntry.id);
-  if (error) {
-    toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
-    return;
-  }
-  queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
-  setDeleteEntryOpen(false);
-  toast({ title: "Entrada eliminada" });
-}}>Eliminar</Button>
+const [statsCollapsed, setStatsCollapsed] = useState(false);
+const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+  setStatsCollapsed(e.currentTarget.scrollTop > 40);
+}, []);
 ```
+
+2. **KPI cards div** (línea 477): cambiar de clase fija a transición dinámica:
+```tsx
+// Antes
+<div className="shrink-0 px-6 pt-4 pb-2">
+
+// Después  
+<div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0 pb-0" : "max-h-[200px] opacity-100 pb-2"}`}>
+```
+
+3. **DataTableShell** (línea 610): agregar `onScroll`:
+```tsx
+<DataTableShell onScroll={handleContentScroll} ...>
+```
+
+4. Importar `useCallback` (ya está importado `useRef`, agregar `useCallback` al import de react en línea 1).
 
