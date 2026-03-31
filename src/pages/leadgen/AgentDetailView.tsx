@@ -75,9 +75,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
   const createQA = useCreateQAReview();
 
   const handleContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const scrollTop = e.currentTarget.scrollTop;
-    if (scrollTop > 40) setStatsCollapsed(true);
-    else if (scrollTop < 10) setStatsCollapsed(false);
+    if (e.currentTarget.scrollTop > 40) setStatsCollapsed(true);
   };
   
   const [filterContacto, setFilterContacto] = useState("");
