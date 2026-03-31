@@ -303,13 +303,14 @@ export default function NuevoInvoicePage() {
                       <div className="flex justify-between items-start mb-6">
                         <div>
                           <h2 className="text-lg font-bold tracking-tight text-gray-900">Invoice</h2>
-                          <p className="text-[9px] text-gray-400 mt-0.5">KASH AGENCY</p>
-                          <p className="text-[9px] text-gray-400">333 SE 2nd Ave</p>
-                          <p className="text-[9px] text-gray-400">Miami, FL 33131-2176</p>
-                          <p className="text-[9px] text-gray-400">kash@exclusivecontent.me</p>
+                          <p className="text-[9px] text-gray-400 mt-0.5">{selectedTemplate?.company_name || "KASH AGENCY"}</p>
+                          {(selectedTemplate?.company_address || "333 SE 2nd Ave\nMiami, FL 33131-2176").split("\n").map((line, i) => (
+                            <p key={i} className="text-[9px] text-gray-400">{line}</p>
+                          ))}
+                          <p className="text-[9px] text-gray-400">{selectedTemplate?.company_email || "kash@exclusivecontent.me"}</p>
                         </div>
                         <div>
-                          <img src={kashLogo} alt="KASH" className="h-14 object-contain" />
+                          <img src={selectedTemplate?.logo_url || kashLogo} alt="Logo" className="h-14 object-contain" />
                         </div>
                       </div>
 
