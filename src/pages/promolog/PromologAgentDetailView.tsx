@@ -441,6 +441,12 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
           </div>
         </div>
       )}
+
+      <ViewPromologEntryModal
+        open={!!viewingEntry}
+        onOpenChange={(o) => !o && setViewingEntry(null)}
+        entry={viewingEntry}
+      />
     </main>
   );
 };
