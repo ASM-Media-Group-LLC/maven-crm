@@ -15,6 +15,7 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
   const [handle, setHandle] = useState("");
   const [fullName, setFullName] = useState("");
   const [country, setCountry] = useState("");
+  const [city, setCity] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const createMutation = useCreateSuperContact();
@@ -32,6 +33,7 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
       instagram_handle: cleaned,
       full_name: fullName.trim() || null,
       country: country.trim() || null,
+      city: city.trim() || null,
       phone: phone.trim() || null,
       email: email.trim() || null,
     });
@@ -39,6 +41,7 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
     setHandle("");
     setFullName("");
     setCountry("");
+    setCity("");
     setPhone("");
     setEmail("");
   };
@@ -74,14 +77,20 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
               <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Colombia" />
             </div>
             <div className="space-y-1.5">
-              <Label>Teléfono</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+57 300..." />
+              <Label>Ciudad</Label>
+              <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Bogotá" />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Email</Label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@ejemplo.com" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Teléfono</Label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+57 300..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@ejemplo.com" />
+            </div>
           </div>
         </div>
 
