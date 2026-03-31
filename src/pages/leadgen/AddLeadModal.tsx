@@ -115,8 +115,10 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const [isAddingCompany, setIsAddingCompany] = useState(false);
   const [customCompany, setCustomCompany] = useState("");
+  const [creatorAlert, setCreatorAlert] = useState<{ name: string; id: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
