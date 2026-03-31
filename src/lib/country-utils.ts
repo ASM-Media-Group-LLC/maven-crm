@@ -16,6 +16,7 @@ const COUNTRY_DATA: Record<string, { name: string; flag: string }> = {
   US: { name: "Estados Unidos", flag: "🇺🇸" },
   GT: { name: "Guatemala", flag: "🇬🇹" },
   HN: { name: "Honduras", flag: "🇭🇳" },
+  IT: { name: "Italia", flag: "🇮🇹" },
   MX: { name: "México", flag: "🇲🇽" },
   NI: { name: "Nicaragua", flag: "🇳🇮" },
   PA: { name: "Panamá", flag: "🇵🇦" },
