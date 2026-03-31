@@ -45,7 +45,7 @@ const interactionTypes = [
   { value: "seguimiento", label: "🔄 Seguimiento" },
 ];
 
-const BRANDS = ["Cash", "Exchange", "Ora", "Link Hunter", "Lumina", "Big Link", "Maven", "Blue", "Traffix"];
+const BRANDS = ["Kashback", "Exchange", "Ora", "Picklink", "Lumina", "Big Link", "Maven", "Blue", "Traffix"];
 const MESSAGE_TYPES = [
   { value: "dm", label: "DM" },
   { value: "story_reply", label: "Story Reply" },
