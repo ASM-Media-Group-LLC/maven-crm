@@ -18,14 +18,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Contacto } from "./ContactosContent";
-
-const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
-  Nuevo: "primary-soft",
-  Contactado: "warning-soft",
-  Convertido: "success-soft",
-  Descartado: "destructive-soft",
-};
 
 const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
   "A+": "success-soft",
@@ -43,6 +37,14 @@ interface Props {
   onEdit?: (contacto: Contacto) => void;
   onConvert?: (contacto: Contacto) => void;
 }
+
+const getAgentInitials = (name: string) => {
+  const trimmed = name?.trim() || "";
+  if (!trimmed) return "NA";
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+};
 
 const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("creacion");
@@ -84,93 +86,113 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
   );
 
   return (
-    <Table containerClassName="overflow-visible" className="min-w-[1000px]">
-      <TableHeader>
-        <TableRow>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="creacion" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Registro" col="registro" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] max-w-[180px]"><SortHeader label="Nombre" col="nombre" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ciudad" col="ciudad" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="creadoPor" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Instagram" col="instagram" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Contacto</TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="categoria" /></TableHead>
-          <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"></TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {sorted.map((c) => (
-          <TableRow key={c.id}>
-            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{c.creacion}</TableCell>
-            <TableCell className="text-sm font-mono text-muted-foreground">{c.ticket}</TableCell>
-            <TableCell className="text-sm font-medium max-w-[180px] truncate">
-              {c.pais && <span className="mr-1.5">{getCountryFlag(c.pais)}</span>}
-              {c.nombre}
-            </TableCell>
-            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-              {c.pais ? getCountryShortDisplay(c.pais) : "—"}
-            </TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c.city || "—"}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c.creadoPor}</TableCell>
-            <TableCell>
-              <a
-                href={`https://instagram.com/${c.instagram}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-              >
-                <InstagramIcon className="h-4 w-4" />
-                <span>{c.instagram}</span>
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </TableCell>
-            <TableCell className="text-sm text-muted-foreground">
-              {c.whatsapp ? (
-                <a href={`https://wa.me/${c.whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-primary hover:underline">
-                  <Phone className="h-3.5 w-3.5" />
-                  {maskPhone(c.whatsapp)}
-                </a>
-              ) : c.phone ? maskPhone(`${c.country_code || ""}${c.phone}`) : "—"}
-            </TableCell>
-            <TableCell>
-              <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="font-normal">
-                {c.categoria}
-              </Badge>
-            </TableCell>
-            
-            <TableCell className="sticky right-0 z-10 bg-card">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                   <DropdownMenuItem onClick={() => onView?.(c)}>
-                     <Eye className="mr-2 h-4 w-4" /> Ver detalle
-                   </DropdownMenuItem>
-                   <DropdownMenuItem onClick={() => onEdit?.(c)}>
-                     <Pencil className="mr-2 h-4 w-4" /> Editar
-                   </DropdownMenuItem>
-                   <DropdownMenuItem onClick={() => onConvert?.(c)}>
-                     <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
-                   </DropdownMenuItem>
-                 </DropdownMenuContent>
-              </DropdownMenu>
-            </TableCell>
-          </TableRow>
-        ))}
-        {sorted.length === 0 && (
+    <TooltipProvider>
+      <Table containerClassName="overflow-visible" className="min-w-[1000px]">
+        <TableHeader>
           <TableRow>
-            <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
-              No se encontraron contactos.
-            </TableCell>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="creacion" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Registro" col="registro" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] max-w-[180px]"><SortHeader label="Nombre" col="nombre" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ciudad" col="ciudad" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="creadoPor" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Instagram" col="instagram" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Contacto</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="categoria" /></TableHead>
+            <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"></TableHead>
           </TableRow>
-        )}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {sorted.map((c) => {
+            const cleanHandle = c.instagram.replace(/^@/, "");
+            return (
+              <TableRow key={c.id}>
+                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{c.creacion}</TableCell>
+                <TableCell className="text-sm font-mono text-muted-foreground">{c.ticket}</TableCell>
+                <TableCell className="text-sm font-medium max-w-[180px] truncate">
+                  {c.pais && <span className="mr-1.5">{getCountryFlag(c.pais)}</span>}
+                  {c.nombre}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                  {c.pais ? getCountryShortDisplay(c.pais) : "No aplicable"}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{c.city || "No aplicable"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {c.creadoPor ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex h-7 w-7 cursor-default items-center justify-center rounded-full border border-border bg-muted text-[11px] font-semibold text-foreground">
+                          {getAgentInitials(c.creadoPor)}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{c.creadoPor}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    "No asignado"
+                  )}
+                </TableCell>
+                <TableCell>
+                  <a
+                    href={`https://instagram.com/${cleanHandle}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    <InstagramIcon className="h-4 w-4" />
+                    <span>@{cleanHandle}</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {c.whatsapp ? (
+                    <a href={`https://wa.me/${c.whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-primary hover:underline">
+                      <Phone className="h-3.5 w-3.5" />
+                      {maskPhone(c.whatsapp)}
+                    </a>
+                  ) : c.phone ? maskPhone(`${c.country_code || ""}${c.phone}`) : "No aplicable"}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="font-normal">
+                    {c.categoria}
+                  </Badge>
+                </TableCell>
+
+                <TableCell className="sticky right-0 z-10 bg-card">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onView?.(c)}>
+                        <Eye className="mr-2 h-4 w-4" /> Ver detalle
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onEdit?.(c)}>
+                        <Pencil className="mr-2 h-4 w-4" /> Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onConvert?.(c)}>
+                        <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+          {sorted.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                No se encontraron contactos.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </TooltipProvider>
   );
 };
 

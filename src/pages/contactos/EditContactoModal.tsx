@@ -58,6 +58,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
   const [email, setEmail] = useState("");
   const [countryCode, setCountryCode] = useState("+57");
   const [phone, setPhone] = useState("");
+  const [city, setCity] = useState("");
   const [plataforma, setPlataforma] = useState("Instagram");
   const [accountLink, setAccountLink] = useState("");
   const [ticket, setTicket] = useState("");
@@ -79,6 +80,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
     setEmail(contacto.email);
     setCountryCode(contacto.country_code || "+57");
     setPhone(contacto.phone);
+    setCity(contacto.city && contacto.city !== "No aplicable" ? contacto.city : "");
     setNotas(contacto.notes);
     setTicket(contacto.ticket || "");
     setPlataforma(contacto.platform || "Instagram");
@@ -138,6 +140,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
           email: email || null,
           country_code: countryCode,
           phone: phone || null,
+          city: city.trim() || null,
           notes: notas || null,
           profile_picture_url: profilePhoto?.url || null,
           ticket_number: ticket || null,
@@ -221,9 +224,15 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Número de Ticket</Label>
-                <Input value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="Ej: CT586864" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Ciudad</Label>
+                  <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej: Bogotá" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Número de Ticket</Label>
+                  <Input value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="Ej: CT586864" />
+                </div>
               </div>
 
               <div className="space-y-1.5">

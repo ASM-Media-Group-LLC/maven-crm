@@ -64,6 +64,9 @@ const emptyFilters: ContactoFilters = {
 
 const PAGE_SIZE = 50;
 
+const normalizeHandleKey = (value: string | null | undefined) =>
+  (value ?? "").trim().replace(/^@+/, "").toLowerCase();
+
 const ContactosContent = () => {
   const [activeTab, setActiveTab] = useState<"contactos" | "agencias">("contactos");
   const [filters, setFilters] = useState<ContactoFilters>(emptyFilters);
@@ -104,7 +107,6 @@ const ContactosContent = () => {
         q = q.eq("status", dbStatus);
       }
       if (filters.pais) q = q.eq("country_code", filters.pais);
-      if (filters.ciudad) q = q.ilike("city", filters.ciudad);
       if (filters.categoria) q = q.eq("physical_appearance", filters.categoria);
       if (filters.dateFrom) q = q.gte("created_at", filters.dateFrom);
       if (filters.dateTo) {
@@ -148,6 +150,38 @@ const ContactosContent = () => {
     },
   });
 
+  // Fallback city from creators table by matching instagram handle
+  const handlesForCity = useMemo(() => {
+    const set = new Set<string>();
+    dbContactos.forEach((c) => {
+      const normalized = normalizeHandleKey(c.handle);
+      if (!normalized) return;
+      set.add(normalized);
+      set.add(`@${normalized}`);
+    });
+    return Array.from(set);
+  }, [dbContactos]);
+
+  const { data: creatorsCityMap = {} } = useQuery({
+    queryKey: ["creator_city_by_handle", handlesForCity],
+    enabled: handlesForCity.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creators")
+        .select("instagram_handle, city")
+        .in("instagram_handle", handlesForCity);
+      if (error) throw error;
+
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((row) => {
+        const key = normalizeHandleKey(row.instagram_handle);
+        const city = row.city?.trim();
+        if (key && city) map[key] = city;
+      });
+      return map;
+    },
+  });
+
   const creatorsList = useMemo(() => {
     const map = new Map<string, string>();
     creatorIds.forEach((id) => {
@@ -180,37 +214,45 @@ const ContactosContent = () => {
   });
 
   const allContactos: Contacto[] = useMemo(() =>
-    dbContactos.map((c) => ({
-      id: c.id,
-      rawCreatedAt: c.created_at || "",
-      creacion: new Date(c.created_at || "").toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
-      ticket: c.ticket_number || "",
-      nombre: c.name,
-      estado: statusMap[c.status || ""] || c.status || "Nuevo",
-      instagram: c.handle || "",
-      platform: c.platform || "Instagram",
-      pais: c.country_code || "",
-      city: c.city || "",
-      categoria: c.physical_appearance || "",
-      whatsapp: c.phone ? `${c.country_code || ""}${c.phone}` : "",
-      interacciones: interactionCounts[c.id] || 0,
-      creadoPor: (c.created_by && profilesMap[c.created_by]) || "",
-      email: c.email || "",
-      phone: c.phone || "",
-      country_code: c.country_code || "",
-      company: c.company || "",
-      notes: c.notes || "",
-      source: c.source || "",
-      profile_picture_url: c.profile_picture_url || "",
-      assigned_to: c.assigned_to || "",
-    })),
-  [dbContactos, interactionCounts, profilesMap]);
+    dbContactos.map((c) => {
+      const normalizedHandle = normalizeHandleKey(c.handle);
+      const fallbackCity = creatorsCityMap[normalizedHandle] || "";
+      const resolvedCity = (c.city || "").trim() || fallbackCity || "No aplicable";
 
-  // Client-side creadoPor filter (since it's resolved from profiles, not in DB)
+      return {
+        id: c.id,
+        rawCreatedAt: c.created_at || "",
+        creacion: new Date(c.created_at || "").toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
+        ticket: c.ticket_number || "",
+        nombre: c.name,
+        estado: statusMap[c.status || ""] || c.status || "Nuevo",
+        instagram: c.handle || "",
+        platform: c.platform || "Instagram",
+        pais: c.country_code || "",
+        city: resolvedCity,
+        categoria: c.physical_appearance || "",
+        whatsapp: c.phone ? `${c.country_code || ""}${c.phone}` : "",
+        interacciones: interactionCounts[c.id] || 0,
+        creadoPor: (c.created_by && profilesMap[c.created_by]) || "",
+        email: c.email || "",
+        phone: c.phone || "",
+        country_code: c.country_code || "",
+        company: c.company || "",
+        notes: c.notes || "",
+        source: c.source || "",
+        profile_picture_url: c.profile_picture_url || "",
+        assigned_to: c.assigned_to || "",
+      };
+    }),
+  [dbContactos, interactionCounts, profilesMap, creatorsCityMap]);
+
+  // Client-side filters for resolved fields
   const filtered = useMemo(() => {
-    if (!filters.creadoPor) return allContactos;
-    return allContactos.filter((c) => c.creadoPor === filters.creadoPor);
-  }, [filters.creadoPor, allContactos]);
+    let list = allContactos;
+    if (filters.creadoPor) list = list.filter((c) => c.creadoPor === filters.creadoPor);
+    if (filters.ciudad) list = list.filter((c) => c.city === filters.ciudad);
+    return list;
+  }, [filters.creadoPor, filters.ciudad, allContactos]);
 
   const handleView = (c: Contacto) => { setSelectedContacto(c); setViewOpen(true); };
   const handleEdit = (c: Contacto) => { setSelectedContacto(c); setEditOpen(true); };
@@ -229,8 +271,12 @@ const ContactosContent = () => {
   // Derive unique cities for filter
   const citiesList = useMemo(() => {
     const set = new Set<string>();
-    allContactos.forEach((c) => { if (c.city) set.add(c.city); });
-    return Array.from(set).sort();
+    allContactos.forEach((c) => set.add(c.city || "No aplicable"));
+    return Array.from(set).sort((a, b) => {
+      if (a === "No aplicable") return -1;
+      if (b === "No aplicable") return 1;
+      return a.localeCompare(b);
+    });
   }, [allContactos]);
 
   const hasActiveFilters = !!(filters.search || filters.pais || filters.ciudad || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor);
