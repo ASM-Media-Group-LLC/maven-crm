@@ -29,6 +29,7 @@ import {
   ChevronRight,
   Pencil,
   Trash2,
+  BarChart3,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,7 @@ import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
 import PromologTable from "./PromologTable";
 import PromologGrid from "./PromologGrid";
 import PromologAgentDetailView from "./PromologAgentDetailView";
+import PromologPerformanceView from "./PromologPerformanceView";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -106,6 +108,7 @@ const tabItems = [
   { id: "promos" as const, label: "Promos", icon: Table2 },
   { id: "agentes" as const, label: "Agentes", icon: Users },
   { id: "campanas" as const, label: "Campañas", icon: Target },
+  { id: "rendimiento" as const, label: "Rendimiento", icon: BarChart3 },
 ];
 
 const DAY_LABELS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
@@ -274,7 +277,7 @@ const PromologContent = () => {
     { value: "otro", label: "Otro" },
   ];
 
-  const [activeTab, setActiveTab] = useState<"promos" | "agentes" | "campanas">("promos");
+  const [activeTab, setActiveTab] = useState<"promos" | "agentes" | "campanas" | "rendimiento">("promos");
   const [agentesView, setAgentesView] = useState<"list" | "grid" | "calendar">("list");
   const [agentWeekOffset, setAgentWeekOffset] = useState(0);
   const [campanasView, setCampanasView] = useState<"list" | "grid">("list");
@@ -1055,6 +1058,13 @@ const PromologContent = () => {
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* Rendimiento tab */}
+      {activeTab === "rendimiento" && (
+        <div className="flex-1 min-h-0 overflow-auto p-6">
+          <PromologPerformanceView profiles={profiles} />
         </div>
       )}
 
