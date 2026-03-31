@@ -550,9 +550,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <SortHeader label="% Comisión" sortKey="agency_commission" {...sp} />
             <TableHead className={stickyBase}>Extras</TableHead>
             <TableHead className={stickyBase}>Plataforma</TableHead>
-            <TableHead className={stickyBase}>Revenue</TableHead>
-            <TableHead className={`w-10 ${stickyBase}`}></TableHead>
-            <TableHead className={stickyAction}>Acciones</TableHead>
+              <TableHead className={stickyBase}>Revenue</TableHead>
+              <TableHead className={stickyBase}>Notas</TableHead>
+              <TableHead className={`w-10 ${stickyBase}`}></TableHead>
+              <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
         );
       case "completadas":
