@@ -1581,6 +1581,68 @@ const PromologContent = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Assign Agent Dialog */}
+      <Dialog open={assignAgentOpen} onOpenChange={setAssignAgentOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Asignar Agente</DialogTitle>
+            <DialogDescription>
+              Selecciona el agente para la entrada de <span className="font-semibold">{assignAgentTarget?.name}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder="Buscar agente..."
+              value={assignAgentSearch}
+              onChange={(e) => setAssignAgentSearch(e.target.value)}
+              className="h-9"
+            />
+            <ScrollArea className="h-[200px] border rounded-md">
+              <div className="p-1">
+                {profiles
+                  .filter((p: any) => p.full_name?.toLowerCase().includes(assignAgentSearch.toLowerCase()))
+                  .map((p: any) => (
+                    <button
+                      key={p.id}
+                      onClick={() => setAssignAgentSelected(p.id)}
+                      className={cn(
+                        "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
+                        assignAgentSelected === p.id
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-muted"
+                      )}
+                    >
+                      {p.full_name}
+                    </button>
+                  ))}
+              </div>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignAgentOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={!assignAgentSelected}
+              onClick={async () => {
+                if (!assignAgentTarget) return;
+                const { error } = await supabase
+                  .from("promolog_entries")
+                  .update({ reviewed_by: assignAgentSelected })
+                  .eq("id", assignAgentTarget.id);
+                if (error) {
+                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                  return;
+                }
+                queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
+                setAssignAgentOpen(false);
+                toast({ title: "Agente asignado", description: `Agente asignado a ${assignAgentTarget.name}.` });
+              }}
+            >
+              Asignar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };
