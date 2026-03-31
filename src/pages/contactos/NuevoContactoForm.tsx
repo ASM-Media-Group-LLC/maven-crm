@@ -385,6 +385,24 @@ const NuevoContactoForm = () => {
       </footer>
 
       <FileUploadModal open={uploadModal.open} onClose={() => setUploadModal((prev) => ({ ...prev, open: false }))} category={uploadModal.category} tempId={tempId} onFilesUploaded={handleFilesUploaded} />
+
+      {/* Creator exists alert */}
+      {creatorAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card rounded-lg border border-border p-6 max-w-sm shadow-lg">
+            <h3 className="text-lg font-semibold mb-2">Creadora existente</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Esta creadora ya forma parte de la agencia: <strong>{creatorAlert.name}</strong>
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setCreatorAlert(null)}>Cancelar</Button>
+              <Button onClick={() => { navigate(`/creadoras/${creatorAlert.id}`); setCreatorAlert(null); }}>
+                Ver perfil
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 };
