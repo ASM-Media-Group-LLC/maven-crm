@@ -127,8 +127,15 @@ const EventosContent = () => {
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-auto p-6 space-y-4">
-          <EventosCalendar events={allEvents} />
+        <>
+          <div className={cn(
+            "transition-all duration-300 overflow-hidden shrink-0 px-6 pt-6",
+            statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[500px] opacity-100 pb-4"
+          )}>
+            <EventosCalendar events={allEvents} />
+          </div>
+
+          <div className="flex-1 overflow-auto p-6 pt-0 space-y-4" onScroll={handleScroll}>
 
           <div className="flex flex-wrap items-center gap-3">
             {/* Project type tabs */}
