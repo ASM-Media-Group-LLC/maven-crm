@@ -1,0 +1,1 @@
+UPDATE role_permissions SET can_access = true WHERE role_id = (SELECT id FROM roles_config WHERE name = 'closer') AND module IN ('Promolog', 'Tickets') AND submodule IS NULL;
