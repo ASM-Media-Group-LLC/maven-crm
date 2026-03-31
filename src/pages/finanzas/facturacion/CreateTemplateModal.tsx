@@ -109,10 +109,6 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label>Nombre del template</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: KASH Agency Invoice" />
-          </div>
-          <div>
             <Label>Tipo de template</Label>
             <Select value={type} onValueChange={setType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
