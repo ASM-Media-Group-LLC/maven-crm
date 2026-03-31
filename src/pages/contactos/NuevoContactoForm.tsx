@@ -51,6 +51,7 @@ interface FormData {
   email: string;
   countryCode: string;
   phone: string;
+  ciudad: string;
   plataforma: string;
   accountLink: string;
   ticket: string;
@@ -64,6 +65,7 @@ const defaultForm: FormData = {
   email: "",
   countryCode: "+57",
   phone: "",
+  ciudad: "",
   plataforma: "Instagram",
   accountLink: "",
   ticket: "",
@@ -183,6 +185,7 @@ const NuevoContactoForm = () => {
         email: form.email || null,
         country_code: form.countryCode,
         phone: form.phone || null,
+        city: form.ciudad || null,
         ticket_number: form.ticket || null,
         notes: form.notas || null,
         profile_picture_url: profilePhoto?.url || null,
@@ -266,9 +269,14 @@ const NuevoContactoForm = () => {
             </Field>
           </div>
 
-          <Field label="Número de Ticket">
-            <Input value={form.ticket} onChange={(e) => set("ticket", e.target.value)} placeholder="Ej: CT586864" />
-          </Field>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Ciudad">
+              <Input value={form.ciudad} onChange={(e) => set("ciudad", e.target.value)} placeholder="Ej: Bogotá, Medellín..." />
+            </Field>
+            <Field label="Número de Ticket">
+              <Input value={form.ticket} onChange={(e) => set("ticket", e.target.value)} placeholder="Ej: CT586864" />
+            </Field>
+          </div>
 
           <Field label="Notas">
             <Textarea value={form.notas} onChange={(e) => set("notas", e.target.value)} placeholder="Notas adicionales sobre el contacto..." rows={4} />

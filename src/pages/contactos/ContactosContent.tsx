@@ -53,6 +53,7 @@ const emptyFilters: ContactoFilters = {
   search: "",
   estado: "",
   pais: "",
+  ciudad: "",
   categoria: "",
   dateFrom: "",
   dateTo: "",
@@ -99,6 +100,7 @@ const ContactosContent = () => {
         q = q.eq("status", dbStatus);
       }
       if (filters.pais) q = q.eq("country_code", filters.pais);
+      if (filters.ciudad) q = q.ilike("city", filters.ciudad);
       if (filters.categoria) q = q.eq("physical_appearance", filters.categoria);
       if (filters.dateFrom) q = q.gte("created_at", filters.dateFrom);
       if (filters.dateTo) {
@@ -220,7 +222,14 @@ const ContactosContent = () => {
   const updateFilters = (patch: Partial<ContactoFilters>) =>
     setFilters((prev) => ({ ...prev, ...patch }));
 
-  const hasActiveFilters = !!(filters.search || filters.pais || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor);
+  // Derive unique cities for filter
+  const citiesList = useMemo(() => {
+    const set = new Set<string>();
+    allContactos.forEach((c) => { if (c.city) set.add(c.city); });
+    return Array.from(set).sort();
+  }, [allContactos]);
+
+  const hasActiveFilters = !!(filters.search || filters.pais || filters.ciudad || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor);
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -286,6 +295,7 @@ const ContactosContent = () => {
               hasActiveFilters={hasActiveFilters}
               onClear={() => setFilters(emptyFilters)}
               creators={creatorsList}
+              cities={citiesList}
             />
             </div>
 

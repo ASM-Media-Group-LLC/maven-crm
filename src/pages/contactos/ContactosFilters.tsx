@@ -20,6 +20,7 @@ export interface ContactoFilters {
   search: string;
   estado: string;
   pais: string;
+  ciudad: string;
   categoria: string;
   dateFrom: string;
   dateTo: string;
@@ -39,9 +40,10 @@ interface Props {
   hasActiveFilters?: boolean;
   onClear?: () => void;
   creators?: CreatorOption[];
+  cities?: string[];
 }
 
-const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear, creators = [] }: Props) => {
+const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear, creators = [], cities = [] }: Props) => {
   const [agentOpen, setAgentOpen] = useState(false);
 
   return (
@@ -72,6 +74,14 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
         options={["A+", "A", "B+", "B", "C"]}
         onChange={(v) => onChange({ categoria: v })}
       />
+      {cities.length > 0 && (
+        <FilterSelect
+          placeholder="Ciudad"
+          value={filters.ciudad}
+          options={cities}
+          onChange={(v) => onChange({ ciudad: v })}
+        />
+      )}
 
       {/* Searchable Agente selector */}
       <Popover open={agentOpen} onOpenChange={setAgentOpen}>

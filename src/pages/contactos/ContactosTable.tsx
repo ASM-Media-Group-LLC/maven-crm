@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { ArrowUpDown, ExternalLink, MessageCircle, MoreHorizontal, ChevronDown, Eye, Pencil, Sparkles, Phone } from "lucide-react";
-import { getCountryDisplay, maskPhone } from "@/lib/country-utils";
+import { ArrowUpDown, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Phone } from "lucide-react";
+import { getCountryFlag, maskPhone } from "@/lib/country-utils";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import {
   Table,
@@ -35,7 +35,7 @@ const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning
   C: "destructive-soft",
 };
 
-type SortKey = "creacion" | "registro" | "nombre" | "creadoPor" | "instagram" | "pais" | "categoria";
+type SortKey = "creacion" | "registro" | "nombre" | "creadoPor" | "instagram" | "pais" | "ciudad" | "categoria";
 
 interface Props {
   contactos: Contacto[];
@@ -69,6 +69,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
       case "nombre": va = a.nombre; vb = b.nombre; break;
       case "instagram": va = a.instagram; vb = b.instagram; break;
       case "pais": va = a.pais; vb = b.pais; break;
+      case "ciudad": va = a.city; vb = b.city; break;
       case "categoria": va = a.categoria; vb = b.categoria; break;
       case "creadoPor": va = a.creadoPor; vb = b.creadoPor; break;
     }
@@ -89,6 +90,8 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="creacion" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Registro" col="registro" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] max-w-[180px]"><SortHeader label="Nombre" col="nombre" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ciudad" col="ciudad" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="creadoPor" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Instagram" col="instagram" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Contacto</TableHead>
@@ -101,7 +104,14 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
           <TableRow key={c.id}>
             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{c.creacion}</TableCell>
             <TableCell className="text-sm font-mono text-muted-foreground">{c.ticket}</TableCell>
-            <TableCell className="text-sm font-medium max-w-[180px] truncate">{c.nombre}</TableCell>
+            <TableCell className="text-sm font-medium max-w-[180px] truncate">
+              {c.pais && <span className="mr-1.5">{getCountryFlag(c.pais)}</span>}
+              {c.nombre}
+            </TableCell>
+            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+              {c.pais ? `${getCountryFlag(c.pais)} ${c.pais}` : "—"}
+            </TableCell>
+            <TableCell className="text-sm text-muted-foreground">{c.city || "—"}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.creadoPor}</TableCell>
             <TableCell>
               <a
