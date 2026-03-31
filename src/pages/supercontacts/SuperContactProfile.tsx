@@ -91,6 +91,7 @@ const SuperContactProfile = () => {
   const [intType, setIntType] = useState("nota");
   const [intNotes, setIntNotes] = useState("");
   const [showOutreachForm, setShowOutreachForm] = useState(false);
+  const [timelineFilter, setTimelineFilter] = useState<"todos" | "marcas" | "contactos">("todos");
 
   // Outreach form
   const [outBrand, setOutBrand] = useState("");
