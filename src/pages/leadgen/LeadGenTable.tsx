@@ -288,6 +288,21 @@ const LeadRow = React.memo(({ lead, onView, profiles, qaMap, canReview }: { lead
           <ExternalLink className="h-3 w-3" />
         </a>
       </TableCell>
+      <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}>
+        {(lead as any).onlyfans_url ? (
+          <a
+            href={(lead as any).onlyfans_url.startsWith("http") ? (lead as any).onlyfans_url : `https://onlyfans.com/${(lead as any).onlyfans_url}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <span className="truncate max-w-[100px]">OF</span>
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
       <TableCell className="text-sm text-muted-foreground" onClick={(e) => isOrphan && e.stopPropagation()}>
         {isOrphan ? (
           <AgentReassignCell lead={lead} profiles={profiles!} />
