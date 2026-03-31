@@ -14,7 +14,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { action, contactId, messages, imageBase64 } = await req.json();
+    const { action, contactId, messages, imageBase64, brand, brandOutreach } = await req.json();
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -51,9 +51,11 @@ serve(async (req) => {
 - Categoría: ${contact.category || "Sin categoría"}
 - Bio: ${contact.bio || "Sin bio"}
 - Notas: ${contact.notes || "Sin notas"}
+- Frecuencia de chequeo: ${contact.check_frequency || "No configurada"}
+- Último chequeo: ${contact.last_checked_at || "Nunca"}
 
 Historial de alcance (${outreach?.length || 0} registros):
-${outreach?.map((o: any) => `  - ${o.brand} via ${o.message_type} | Estado: ${o.response_status} | ${o.notes || ""} ${o.response ? "→ " + o.response : ""}`).join("\n") || "Sin registros"}
+${outreach?.map((o: any) => `  - ${o.brand} via ${o.message_type} | Estado: ${o.response_status} | desde @${o.instagram_account || "?"} | ${o.notes || ""} ${o.response ? "→ " + o.response : ""}`).join("\n") || "Sin registros"}
 
 Interacciones/Notas (${interactions?.length || 0}):
 ${interactions?.map((i: any) => `  - [${i.type}] ${i.notes}`).join("\n") || "Sin interacciones"}`
@@ -70,6 +72,48 @@ Instrucciones:
 - Sugiere estrategias de acercamiento basadas en el perfil
 - Si te comparten screenshots, analiza el contenido y sugiere acciones concretas
 - Guarda un tono profesional pero cercano`;
+
+    // Handle brand_summary
+    if (action === "brand_summary" && brand && brandOutreach) {
+      const brandPrompt = `Analiza el historial de contacto con la marca "${brand}" para esta creadora.
+
+Datos de contacto por marca:
+${brandOutreach.map((o: any) => `- Vía: ${o.message_type} | Cuenta IG: @${o.instagram_account || "?"} | Estado: ${o.response_status} | Lo que se dijo: "${o.notes || "N/A"}" | Respuesta: "${o.response || "Sin respuesta"}" | Fecha: ${o.created_at}`).join("\n")}
+
+Dame:
+1. **Resumen**: Qué se ha hecho hasta ahora con esta marca
+2. **Cuentas usadas**: Cuántas y cuáles cuentas de IG se usaron
+3. **Análisis de respuestas**: Patrón de respuestas (positivas, negativas, sin respuesta)
+4. **Recomendación**: Qué hacer ahora, siguiente paso concreto
+5. **Estrategia sugerida**: Cómo mejorar el approach con esta marca
+
+Sé específico y práctico.`;
+
+      const aiMessages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: brandPrompt },
+      ];
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "google/gemini-2.5-flash", messages: aiMessages }),
+      });
+
+      if (!response.ok) {
+        const status = response.status;
+        if (status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (status === 402) return new Response(JSON.stringify({ error: "Credits exhausted" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        throw new Error(`AI gateway error: ${status}`);
+      }
+
+      const data = await response.json();
+      const summary = data.choices?.[0]?.message?.content || "No se pudo generar el resumen.";
+
+      return new Response(JSON.stringify({ summary }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Handle image analysis
     if (action === "analyze_image" && imageBase64) {

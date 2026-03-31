@@ -5560,6 +5560,7 @@ export type Database = {
         Row: {
           bio: string | null
           category: string | null
+          check_frequency: string | null
           city: string | null
           country: string | null
           created_at: string
@@ -5570,6 +5571,7 @@ export type Database = {
           full_name: string | null
           id: string
           instagram_handle: string
+          last_checked_at: string | null
           notes: string | null
           phone: string | null
           profile_photo_url: string | null
@@ -5579,6 +5581,7 @@ export type Database = {
         Insert: {
           bio?: string | null
           category?: string | null
+          check_frequency?: string | null
           city?: string | null
           country?: string | null
           created_at?: string
@@ -5589,6 +5592,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           instagram_handle: string
+          last_checked_at?: string | null
           notes?: string | null
           phone?: string | null
           profile_photo_url?: string | null
@@ -5598,6 +5602,7 @@ export type Database = {
         Update: {
           bio?: string | null
           category?: string | null
+          check_frequency?: string | null
           city?: string | null
           country?: string | null
           created_at?: string
@@ -5608,6 +5613,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           instagram_handle?: string
+          last_checked_at?: string | null
           notes?: string | null
           phone?: string | null
           profile_photo_url?: string | null
