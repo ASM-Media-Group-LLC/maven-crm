@@ -171,6 +171,40 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         return;
       }
 
+      // VALIDATION 1: Check if creator exists
+      const creatorCheck = await checkCreatorExists(data.source_link, data.onlyfans_url);
+      if (creatorCheck.exists) {
+        setCreatorAlert({ name: creatorCheck.creatorName!, id: creatorCheck.creatorId! });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // VALIDATION 2: Check if lead was created in last 24h
+      const recentCheck = await checkRecentLead(data.source_link, data.onlyfans_url);
+      if (recentCheck.exists) {
+        toast({
+          title: "Lead duplicado reciente",
+          description: "Este lead ya fue registrado hace menos de 24 horas. Intenta nuevamente más tarde.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // VALIDATION 3: Check duplicate OnlyFans URL
+      if (data.onlyfans_url?.trim()) {
+        const ofCheck = await checkDuplicateOnlyFans(data.onlyfans_url);
+        if (ofCheck.existsInLeads || ofCheck.existsInContacts) {
+          toast({
+            title: "OnlyFans duplicado",
+            description: `Esta URL de OnlyFans ya está registrada en ${ofCheck.existsInLeads ? "leads" : "contactos"}.`,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const { data: inserted, error } = await supabase.from("leadgen_entries").insert({
         model_handle: normalizedHandle,
         platform: data.platform,
@@ -179,7 +213,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         country_code: data.country_code || null,
         notes: data.notes || null,
         source_link: data.source_link,
-        
+        onlyfans_url: data.onlyfans_url?.trim() || null,
         lg_user_id: user.id,
         entry_date: getMiamiDateStr(),
       } as any).select("id").single();
