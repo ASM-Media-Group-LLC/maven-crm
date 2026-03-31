@@ -630,6 +630,13 @@ export default function FacturacionPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CrearInvoiceModal
+        open={crearOpen}
+        onClose={() => setCrearOpen(false)}
+        onSubmit={(data) => { createInvoice.mutate(data); setCrearOpen(false); }}
+        isPending={createInvoice.isPending}
+      />
     </div>
   );
 }
