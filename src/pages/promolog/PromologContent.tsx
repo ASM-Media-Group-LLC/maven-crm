@@ -799,14 +799,14 @@ const PromologContent = () => {
           {/* Calendar view or agent cards */}
           {agentesView === "calendar" ? (() => {
             const weekDays = getAgentWeekDays(agentWeekOffset);
-            const entriesInDay = (agentName: string, day: Date) =>
+            const entriesInDay = (agentId: string, day: Date) =>
               promologEntries.filter(pe =>
-                pe.reviewed_by === agentName &&
+                (pe.reviewed_by === agentId || pe.created_by === agentId) &&
                 pe.promoted === "true" &&
                 isSameDay(new Date(pe.date), day)
               ).length;
             const colTotals = weekDays.map(day =>
-              agentsData.reduce((sum, ag) => sum + entriesInDay(ag.name, day), 0)
+              agentsData.reduce((sum, ag) => sum + entriesInDay(ag.id, day), 0)
             );
             const grandTotal = colTotals.reduce((a, b) => a + b, 0);
             return (
