@@ -494,17 +494,17 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
           })()}
 
         {activeTab === "qa" && (() => {
-          const qaLeads = agentLeads.filter(l => l.quality);
+          const qaLeads = agentLeads.filter(l => qaMap[l.id]);
           const pagedQaLeads = qaLeads.slice((qaPage - 1) * 50, qaPage * 50);
           return (
             <div className="flex-1 flex flex-col min-h-0 px-6 pb-6 pt-4 gap-4">
               <p className="text-sm text-muted-foreground">
-                Leads con categoría asignada: <span className="font-semibold text-foreground">{qaLeads.length}</span>
+                Leads con QA realizado: <span className="font-semibold text-foreground">{qaLeads.length}</span>
               </p>
               {qaLeads.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16">
                   <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground text-sm">No hay leads con categoría asignada</p>
+                  <p className="text-muted-foreground text-sm">No hay leads con QA realizado</p>
                 </div>
               ) : (
                 <DataTableShell
