@@ -15,6 +15,7 @@ import CategoryAuditLog from "./CategoryAuditLog";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultTab?: string;
 }
 
 const COLORS = [
