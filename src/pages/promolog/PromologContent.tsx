@@ -300,7 +300,7 @@ const PromologContent = () => {
     { value: "otro", label: "Otro" },
   ];
 
-  const [activeTab, setActiveTab] = useState<"promos" | "agentes" | "campanas">("promos");
+  const [activeTab, setActiveTab] = useState<"promos" | "agentes" | "campanas" | "rendimiento">("promos");
   const [agentesView, setAgentesView] = useState<"list" | "grid" | "calendar">("list");
   const [agentWeekOffset, setAgentWeekOffset] = useState(0);
   const [campanasView, setCampanasView] = useState<"list" | "grid">("list");
