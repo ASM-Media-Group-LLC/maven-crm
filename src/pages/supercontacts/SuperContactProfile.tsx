@@ -139,6 +139,115 @@ const SuperContactProfile = () => {
       .slice(-30);
   }, [outreach]);
 
+  // AI Chat functions
+  const sendAiMessage = useCallback(async () => {
+    if (!aiInput.trim() || aiLoading) return;
+    const userMsg = { role: "user", content: aiInput };
+    const newMessages = [...aiMessages, userMsg];
+    setAiMessages(newMessages);
+    setAiInput("");
+    setAiLoading(true);
+
+    try {
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/supercontact-ai`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ action: "chat", contactId: id, messages: newMessages }),
+        }
+      );
+
+      if (!resp.ok || !resp.body) throw new Error("Stream failed");
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let assistantText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let idx;
+        while ((idx = buffer.indexOf("\n")) !== -1) {
+          let line = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 1);
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (!line.startsWith("data: ")) continue;
+          const json = line.slice(6).trim();
+          if (json === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(json);
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) {
+              assistantText += delta;
+              setAiMessages([...newMessages, { role: "assistant", content: assistantText }]);
+            }
+          } catch {}
+        }
+      }
+
+      if (!assistantText) {
+        setAiMessages([...newMessages, { role: "assistant", content: "No se recibió respuesta." }]);
+      }
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Error al comunicarse con la IA", variant: "destructive" });
+      setAiMessages(newMessages);
+    } finally {
+      setAiLoading(false);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    }
+  }, [aiInput, aiLoading, aiMessages, id]);
+
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImageAnalyzing(true);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/supercontact-ai`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ action: "analyze_image", contactId: id, imageBase64: base64 }),
+        }
+      );
+
+      if (!resp.ok) throw new Error("Analysis failed");
+      const data = await resp.json();
+
+      setAiMessages((prev) => [
+        ...prev,
+        { role: "user", content: `📷 [Imagen subida: ${file.name}]` },
+        { role: "assistant", content: data.analysis },
+      ]);
+
+      toast({ title: "Análisis guardado en notas automáticamente ✅" });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Error al analizar imagen", variant: "destructive" });
+    } finally {
+      setImageAnalyzing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [id]);
+
   const shell = (children: React.ReactNode) => (
     <SidebarProvider>
       <div className="flex h-screen w-full overflow-hidden">
