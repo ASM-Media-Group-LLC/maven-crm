@@ -214,6 +214,7 @@ const PromologContent = () => {
         agent: (pe.reviewed_by && profilesMap[pe.reviewed_by]) || "—",
         notes: pe.notes || "",
         creator_id: pe.creator_id,
+        reviewed_by: pe.reviewed_by || undefined,
       };
     });
   }, [promologEntries, profilesMap]);
