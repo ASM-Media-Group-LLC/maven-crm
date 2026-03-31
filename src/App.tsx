@@ -223,6 +223,8 @@ const App = () => (
               <Route path="/notificaciones" element={<ProtectedRoute><Notificaciones /></ProtectedRoute>} />
               <Route path="/ajustes/notificaciones" element={<ProtectedRoute><NotificacionesSettings /></ProtectedRoute>} />
               <Route path="/creadores/personalizados" element={<PermissionRoute module="Creadores" submodule="Personalizados"><PersonalizadosPage /></PermissionRoute>} />
+              <Route path="/supercontacts" element={<ProtectedRoute><SuperContacts /></ProtectedRoute>} />
+              <Route path="/supercontacts/:id" element={<ProtectedRoute><SuperContactProfile /></ProtectedRoute>} />
               {/* HR routes */}
               <Route path="/hr" element={<PermissionRoute module="HR"><HRLayout><HRDashboard /></HRLayout></PermissionRoute>} />
               <Route path="/hr/directorio" element={<PermissionRoute module="HR"><HRLayout><EmployeeDirectory /></HRLayout></PermissionRoute>} />

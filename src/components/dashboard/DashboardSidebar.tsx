@@ -43,6 +43,7 @@ const DashboardSidebar = () => {
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
     { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare, module: "Tareas" },
     { title: t("nav.events"), url: "/eventos", icon: CalendarDays, module: "Eventos" },
+    { title: "SuperContacts", url: "/supercontacts", icon: Contact, module: "SuperContacts" },
   ];
   const mainMenu = mainMenuAll.filter((item) => canAccess(item.module));
 
