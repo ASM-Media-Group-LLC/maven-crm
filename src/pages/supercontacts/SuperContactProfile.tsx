@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Instagram, MapPin, MessageCircle, Save, Sparkles, UserCheck, Send, Image, BarChart3, Calendar } from "lucide-react";
+import { ArrowLeft, Instagram, MapPin, MessageCircle, Save, Sparkles, UserCheck, Send, Image, BarChart3, Calendar, Bot, Upload, Loader2 } from "lucide-react";
 import {
   useSuperContact, useSuperContactInteractions, useSuperContactOutreach,
   useUpdateSuperContact, useCreateInteraction, useCreateOutreach,
@@ -26,6 +26,8 @@ import {
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import ReactMarkdown from "react-markdown";
 
 const interactionTypes = [
   { value: "llamada", label: "Llamada" },
@@ -87,6 +89,14 @@ const SuperContactProfile = () => {
   const [outResponse, setOutResponse] = useState("");
   const [outStatus, setOutStatus] = useState("pending");
 
+  // AI Chat state
+  const [aiMessages, setAiMessages] = useState<{ role: string; content: string }[]>([]);
+  const [aiInput, setAiInput] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [imageAnalyzing, setImageAnalyzing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   const editCities = getCitiesByCountryCode(form.country);
 
   // Dashboard data
@@ -128,6 +138,115 @@ const SuperContactProfile = () => {
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(-30);
   }, [outreach]);
+
+  // AI Chat functions
+  const sendAiMessage = useCallback(async () => {
+    if (!aiInput.trim() || aiLoading) return;
+    const userMsg = { role: "user", content: aiInput };
+    const newMessages = [...aiMessages, userMsg];
+    setAiMessages(newMessages);
+    setAiInput("");
+    setAiLoading(true);
+
+    try {
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/supercontact-ai`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ action: "chat", contactId: id, messages: newMessages }),
+        }
+      );
+
+      if (!resp.ok || !resp.body) throw new Error("Stream failed");
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let assistantText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let idx;
+        while ((idx = buffer.indexOf("\n")) !== -1) {
+          let line = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 1);
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (!line.startsWith("data: ")) continue;
+          const json = line.slice(6).trim();
+          if (json === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(json);
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) {
+              assistantText += delta;
+              setAiMessages([...newMessages, { role: "assistant", content: assistantText }]);
+            }
+          } catch {}
+        }
+      }
+
+      if (!assistantText) {
+        setAiMessages([...newMessages, { role: "assistant", content: "No se recibió respuesta." }]);
+      }
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Error al comunicarse con la IA", variant: "destructive" });
+      setAiMessages(newMessages);
+    } finally {
+      setAiLoading(false);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    }
+  }, [aiInput, aiLoading, aiMessages, id]);
+
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImageAnalyzing(true);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/supercontact-ai`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ action: "analyze_image", contactId: id, imageBase64: base64 }),
+        }
+      );
+
+      if (!resp.ok) throw new Error("Analysis failed");
+      const data = await resp.json();
+
+      setAiMessages((prev) => [
+        ...prev,
+        { role: "user", content: `📷 [Imagen subida: ${file.name}]` },
+        { role: "assistant", content: data.analysis },
+      ]);
+
+      toast({ title: "Análisis guardado en notas automáticamente ✅" });
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Error al analizar imagen", variant: "destructive" });
+    } finally {
+      setImageAnalyzing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [id]);
 
   const shell = (children: React.ReactNode) => (
     <SidebarProvider>
@@ -326,6 +445,7 @@ const SuperContactProfile = () => {
               <TabsTrigger value="dashboard"><BarChart3 className="h-3.5 w-3.5 mr-1" /> Dashboard</TabsTrigger>
               <TabsTrigger value="calendar"><Calendar className="h-3.5 w-3.5 mr-1" /> Calendario</TabsTrigger>
               <TabsTrigger value="interactions"><MessageCircle className="h-3.5 w-3.5 mr-1" /> Notas</TabsTrigger>
+              <TabsTrigger value="ai"><Bot className="h-3.5 w-3.5 mr-1" /> IA Asistente</TabsTrigger>
             </TabsList>
 
             {/* OUTREACH TAB */}
@@ -512,6 +632,89 @@ const SuperContactProfile = () => {
                   ))}
                 </div>
               )}
+            </TabsContent>
+
+            {/* AI ASSISTANT TAB */}
+            <TabsContent value="ai" className="space-y-4">
+              <div className="flex flex-col h-[500px]">
+                {/* Chat messages */}
+                <div className="flex-1 overflow-auto space-y-3 p-3 rounded-lg border bg-muted/20 mb-3">
+                  {aiMessages.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+                      <Bot className="h-10 w-10 opacity-40" />
+                      <p className="text-sm text-center">Pregúntame sobre esta modelo o sube una foto para analizar</p>
+                    </div>
+                  )}
+                  {aiMessages.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card border shadow-sm"
+                      }`}>
+                        {msg.role === "assistant" ? (
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                          </div>
+                        ) : (
+                          <p>{msg.content}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {aiLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-card border rounded-2xl px-4 py-2.5 shadow-sm">
+                        <div className="flex gap-1">
+                          <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "0ms" }} />
+                          <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "150ms" }} />
+                          <span className="w-2 h-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "300ms" }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Image upload indicator */}
+                {imageAnalyzing && (
+                  <div className="flex items-center gap-2 p-2 mb-2 rounded-lg bg-primary/10 text-primary text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analizando imagen... el resultado se guardará en notas automáticamente
+                  </div>
+                )}
+
+                {/* Input area */}
+                <div className="flex gap-2 items-end">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={imageAnalyzing}
+                    title="Subir foto para analizar"
+                  >
+                    {imageAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  </Button>
+                  <Input
+                    placeholder="Pregunta sobre esta modelo..."
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendAiMessage()}
+                    className="flex-1"
+                    disabled={aiLoading}
+                  />
+                  <Button onClick={sendAiMessage} disabled={aiLoading || !aiInput.trim()}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>
