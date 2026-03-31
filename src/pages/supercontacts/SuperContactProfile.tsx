@@ -425,6 +425,46 @@ const SuperContactProfile = () => {
 
   const renderResumen = () => (
     <div className="flex-1 overflow-auto p-4 space-y-4">
+      {/* Monitoring Card */}
+      <Card className={`border-l-4 ${isCheckOverdue ? "border-l-red-500" : "border-l-green-500"}`}>
+        <CardContent className="p-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {isCheckOverdue ? (
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+            ) : (
+              <CalendarCheck className="h-5 w-5 text-green-500" />
+            )}
+            <div>
+              <p className="text-sm font-medium">
+                {(contact as any)?.check_frequency
+                  ? `Chequeo ${(contact as any).check_frequency}`
+                  : "Sin frecuencia configurada"}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {(contact as any)?.last_checked_at
+                  ? `Último: ${format(parseISO((contact as any).last_checked_at), "dd MMM yyyy · HH:mm", { locale: es })} · ${formatDistanceToNow(parseISO((contact as any).last_checked_at), { locale: es, addSuffix: true })}`
+                  : "Nunca chequeado"}
+                {getNextCheckDate() && ` · Próximo: ${format(getNextCheckDate()!, "dd MMM", { locale: es })}`}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={(contact as any)?.check_frequency || ""} onValueChange={v => updateMutation.mutate({ id: contact!.id, check_frequency: v } as any)}>
+              <SelectTrigger className="h-7 w-28 text-xs"><SelectValue placeholder="Frecuencia" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="diario">Diario</SelectItem>
+                <SelectItem value="semanal">Semanal</SelectItem>
+                <SelectItem value="quincenal">Quincenal</SelectItem>
+                <SelectItem value="mensual">Mensual</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={markAsChecked}>
+              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Chequeado
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <button onClick={() => setActiveTab("contactos")} className="rounded-lg border p-3 text-center hover:bg-muted/50 transition-colors cursor-pointer">
