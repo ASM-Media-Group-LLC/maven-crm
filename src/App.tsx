@@ -77,9 +77,9 @@ const ProjectSharePage = lazy(() => import("./pages/tareas/ProjectSharePage"));
 const AdminUsuarios = lazy(() => import("./pages/admin/AdminUsuarios"));
 const AuditoriaRoles = lazy(() => import("./pages/admin/AuditoriaRoles"));
 
-// SuperContacts
-const SuperContacts = lazy(() => import("./pages/SuperContacts"));
-const SuperContactProfile = lazy(() => import("./pages/supercontacts/SuperContactProfile"));
+// Wishlist
+const Wishlist = lazy(() => import("./pages/SuperContacts"));
+const WishlistProfile = lazy(() => import("./pages/supercontacts/SuperContactProfile"));
 
 // Misc
 const Roadmap = lazy(() => import("./pages/Roadmap"));
