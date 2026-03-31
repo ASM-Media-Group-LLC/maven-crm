@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowUpDown, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Phone } from "lucide-react";
-import { getCountryFlag, maskPhone } from "@/lib/country-utils";
+import { getCountryFlag, getCountryShortDisplay, maskPhone } from "@/lib/country-utils";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import {
   Table,
