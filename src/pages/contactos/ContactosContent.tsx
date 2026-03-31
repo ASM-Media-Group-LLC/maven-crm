@@ -53,6 +53,7 @@ const emptyFilters: ContactoFilters = {
   search: "",
   estado: "",
   pais: "",
+  ciudad: "",
   categoria: "",
   dateFrom: "",
   dateTo: "",
