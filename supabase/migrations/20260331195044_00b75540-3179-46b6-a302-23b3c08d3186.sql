@@ -1,0 +1,1 @@
+ALTER TABLE public.invoice_templates ADD COLUMN company_zip text;
