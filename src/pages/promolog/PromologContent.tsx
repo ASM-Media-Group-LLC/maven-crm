@@ -54,6 +54,7 @@ import TelegramIcon from "@/components/icons/TelegramIcon";
 import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
 import PromologTable from "./PromologTable";
 import PromologGrid from "./PromologGrid";
+import PromologAgentDetailView from "./PromologAgentDetailView";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
