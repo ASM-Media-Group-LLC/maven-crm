@@ -28,9 +28,26 @@ const CreadoresContent = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const navigate = useNavigate();
+  const { role } = useUserRole();
+  const { user } = useAuth();
+  const isCloser = role === "closer";
 
-  const { creators, allCreators, isLoading, statusCounts, agencies, categories, countries, cities, managers, totalCount, totalPages } =
+  const { creators: rawCreators, allCreators: rawAllCreators, isLoading, statusCounts, agencies, categories, countries, cities, managers, totalCount: rawTotalCount, totalPages: rawTotalPages } =
     useCreadores(filters, page, pageSize);
+
+  // Closers only see creators they created (closer_responsible_id or created_by)
+  const creators = useMemo(() => {
+    if (!isCloser || !user?.id) return rawCreators;
+    return rawCreators.filter(c => c.closer_responsible_id === user.id || c.created_by === user.id);
+  }, [rawCreators, isCloser, user?.id]);
+
+  const allCreators = useMemo(() => {
+    if (!isCloser || !user?.id) return rawAllCreators;
+    return rawAllCreators.filter(c => c.closer_responsible_id === user.id || c.created_by === user.id);
+  }, [rawAllCreators, isCloser, user?.id]);
+
+  const totalCount = isCloser ? creators.length : rawTotalCount;
+  const totalPages = isCloser ? Math.max(1, Math.ceil(creators.length / pageSize)) : rawTotalPages;
 
   const updateFilters = (patch: Partial<CreadorFilters>) => {
     setFilters((prev) => ({ ...prev, ...patch }));
