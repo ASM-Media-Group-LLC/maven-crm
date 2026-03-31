@@ -30,7 +30,7 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
   const queryClient = useQueryClient();
   const isEdit = !!template?.id;
 
-  const [name, setName] = useState(template?.name || "");
+  
   const [type, setType] = useState(template?.type || "invoice");
   const [companyName, setCompanyName] = useState(template?.company_name || "");
   const [companyAddress, setCompanyAddress] = useState(template?.company_address || "");
