@@ -884,7 +884,7 @@ const PromologContent = () => {
           ) : (
             <div className={agentesView === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" : "space-y-3"}>
               {agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).map((agent) => (
-                <Card key={agent.name}>
+                <Card key={agent.id} className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setSelectedAgent({ id: agent.id, name: agent.name })}>
                   <CardContent className={cn("flex items-center gap-4 p-4", agentesView === "grid" && "flex-col text-center")}>
                     <Avatar className="h-10 w-10">
                       <AvatarFallback className="bg-muted">
@@ -925,6 +925,9 @@ const PromologContent = () => {
                           </Badge>
                         ))}
                       </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={(e) => { e.stopPropagation(); setSelectedAgent({ id: agent.id, name: agent.name }); }}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
