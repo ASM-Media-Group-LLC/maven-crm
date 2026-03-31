@@ -541,6 +541,16 @@ const PromologContent = () => {
   const formattedDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
   const shortDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
 
+  // If agent detail is selected, render that view
+  if (selectedAgent) {
+    return (
+      <PromologAgentDetailView
+        agent={selectedAgent}
+        onBack={() => setSelectedAgent(null)}
+      />
+    );
+  }
+
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header sticky */}
