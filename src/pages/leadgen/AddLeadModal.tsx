@@ -289,6 +289,23 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="onlyfans_url"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>OnlyFans URL</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://onlyfans.com/usuario"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
