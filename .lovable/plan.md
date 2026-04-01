@@ -1,57 +1,71 @@
 
 
-## Permitir reingreso de modelos + campo "Tipo de registro" (Nuevo/Reactivado)
+## Corregir lógica de validación: LeadGen, Contactos y Creators
 
-### Resumen
-Eliminar el bloqueo cuando un Instagram ya existe en leads/contactos. En su lugar, detectar si el handle ya fue registrado previamente y marcar el nuevo registro como "Reactivado", mostrando un mensaje informativo (no bloqueante). Agregar columna `record_type` a `leadgen_entries` y `closers_contacts`.
+### Problema actual
+- `checkCreatorExists` bloquea siempre sin importar el estado de la creadora (activa, pausada, terminada, etc.)
+- Contactos valida por handle contra creators (bloquea incorrectamente)
+- Contactos bloquea por teléfono duplicado (debería ser warning)
+- LeadGen no tiene bloqueo de 24h para mismo handle
+- `AddContactoModal` (LeadGen) tiene validación independiente desalineada
 
-### 1. Migración SQL
-Agregar columna `record_type` con default `'nuevo'` a ambas tablas:
-```sql
-ALTER TABLE public.leadgen_entries 
-  ADD COLUMN record_type text NOT NULL DEFAULT 'nuevo';
+### Estados reales en `creators`
+`active`, `onboarding`, `pendiente`, `pendiente_verificacion`, `borrador`, `paused`, `leaving`, `terminated`
 
-ALTER TABLE public.closers_contacts 
-  ADD COLUMN record_type text NOT NULL DEFAULT 'nuevo';
-```
+### Reglas a implementar
 
-### 2. `src/lib/lead-validation.ts`
-- **Renombrar** `checkRecentLead` → mantener pero cambiar su uso. Crear nueva función `checkPreviousLead(handle, onlyfansUrl)` que busque cualquier registro previo (sin límite de 24h) en `leadgen_entries` y `closers_contacts` por handle.
-- Retorna `{ existed: boolean }` — solo informativo, **no bloquea**.
-- **Mantener** `checkCreatorExists` (bloqueo si ya es creadora de la agencia — esto sigue vigente).
-- **Eliminar** la validación de 24h (`checkRecentLead`) que actualmente bloquea duplicados por handle.
-- **Mantener** `checkDuplicateOnlyFans` como validación (OnlyFans sí debe seguir siendo único).
+**Creators check (global, antes de todo):**
+- Si status es `active`, `onboarding`, `pendiente`, `pendiente_verificacion` → **bloquear**: "Esta creadora ya forma parte de la agencia"
+- Si status es `paused`, `leaving`, `terminated`, `borrador` → **permitir**, marcar como `reactivado`, toast informativo
 
-### 3. `src/pages/leadgen/AddLeadModal.tsx`
-- **Eliminar** VALIDATION 2 (checkRecentLead bloqueante, líneas 114-124).
-- **Agregar** antes del insert: llamar a `checkPreviousLead(handle)`. Si `existed === true`:
-  - Mostrar toast informativo (no destructive): "Esta modelo ya existía en el sistema. Se registrará como un nuevo lead reactivado."
-  - Insertar con `record_type: 'reactivado'`
-- Si no existía: insertar con `record_type: 'nuevo'` (default).
+**LeadGen (handle only):**
+- Mismo handle < 24h en `leadgen_entries` → bloquear
+- Mismo handle > 24h → permitir, marcar `reactivado`
+- Nuevo → permitir
 
-### 4. `src/pages/contactos/NuevoContactoForm.tsx`
-- **Eliminar** VALIDATION 2 (checkRecentLead bloqueante, líneas 156-166).
-- **Agregar** misma lógica: detectar si handle ya existía → insertar con `record_type: 'reactivado'` y mostrar mensaje informativo.
+**Contactos (teléfono only, NO handle):**
+- Mismo teléfono encontrado → warning informativo, **NO bloquear**
+- Mismo handle → mensaje informativo, NO bloquear, marcar `reactivado`
+- Handle existente en creators inactiva → permitir con toast
 
-### 5. `src/pages/leadgen/LeadGenTable.tsx`
-- Agregar columna "Tipo" en la tabla con badge visual:
-  - `nuevo` → Badge verde ("Nuevo")
-  - `reactivado` → Badge amarillo ("Reactivado")
-- Ubicar después de la columna de categoría/calidad.
+---
 
-### 6. `src/pages/contactos/ContactosTable.tsx`
-- Agregar columna "Tipo" con mismos badges (verde/amarillo) basado en `record_type`.
+### Cambios por archivo
 
-### 7. Tipo TypeScript
-- En `useLeadGen.ts` (tipo `LeadGenEntry`): agregar `record_type?: string`.
-- Actualizar el tipo de contacto en `ContactosTable` si tiene interfaz explícita.
+**1. `src/lib/lead-validation.ts`**
+
+- **`checkCreatorExists`**: Agregar filtro por status. Retornar `{ exists, isActive, creatorName, creatorId, creatorStatus }`.
+  - Estados activos (bloquean): `active`, `onboarding`, `pendiente`, `pendiente_verificacion`
+  - Estados inactivos (no bloquean): `paused`, `leaving`, `terminated`, `borrador`
+- **`checkPreviousLead`**: Retornar también `lastEntryDate` (la fecha del registro más reciente en `leadgen_entries`) para calcular la regla de 24h.
+- **Nueva función `checkExistingContact(handle)`**: Busca en `closers_contacts`, retorna `{ exists, contactName }` — solo informativo.
+
+**2. `src/pages/leadgen/AddLeadModal.tsx` (líneas 106-137)**
+
+- VALIDATION 1 (creators): Usar nuevo `checkCreatorExists` con lógica de estado.
+  - Si `isActive` → bloquear con alerta.
+  - Si existe pero inactiva → permitir, `recordType = "reactivado"`, toast informativo.
+- VALIDATION 2 (handle 24h): Usar `lastEntryDate` de `checkPreviousLead`.
+  - Si < 24h → bloquear con toast destructivo.
+  - Si > 24h → `recordType = "reactivado"`, toast informativo.
+- VALIDATION 3 (OnlyFans): Se mantiene igual (bloqueo por unicidad).
+
+**3. `src/pages/contactos/NuevoContactoForm.tsx` (líneas 148-213)**
+
+- VALIDATION 1 (creators): Misma lógica de estado (bloquear solo activas).
+- **Eliminar VALIDATION 2** (checkPreviousLead por handle) → reemplazar por `checkExistingContact` solo informativo, sin bloquear.
+- VALIDATION 3 (OnlyFans): Se mantiene.
+- **Teléfono**: Cambiar de bloqueo a warning informativo (toast normal, no destructivo). Permitir guardar.
+
+**4. `src/pages/leadgen/AddContactoModal.tsx` (líneas 73-126)**
+
+- Reemplazar check de handle contra `creators` por `checkCreatorExists` con lógica de estado.
+- Cambiar bloqueo de teléfono a warning informativo.
+- Agregar detección de handle existente en contactos → toast informativo + `record_type: "reactivado"`.
 
 ### Archivos a modificar
-- Migración SQL (1 archivo)
-- `src/lib/lead-validation.ts` — nueva función, eliminar bloqueo 24h
-- `src/pages/leadgen/AddLeadModal.tsx` — nueva lógica de reactivación
-- `src/pages/contactos/NuevoContactoForm.tsx` — misma lógica
-- `src/pages/leadgen/LeadGenTable.tsx` — columna visual
-- `src/pages/contactos/ContactosTable.tsx` — columna visual
-- Tipos en hooks correspondientes
+- `src/lib/lead-validation.ts`
+- `src/pages/leadgen/AddLeadModal.tsx`
+- `src/pages/contactos/NuevoContactoForm.tsx`
+- `src/pages/leadgen/AddContactoModal.tsx`
 
