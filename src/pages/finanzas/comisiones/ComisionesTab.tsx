@@ -132,7 +132,7 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
                 <TableHead className="text-xs font-medium text-muted-foreground">Ganancia</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Comisión</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Blue</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Comisión total</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">Total a pagar</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
               </TableRow>
             </TableHeader>
