@@ -210,11 +210,6 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
             </div>
           </div>
 
-          {/* Notes */}
-          <div>
-            <Label>Observaciones</Label>
-            <Textarea placeholder="Notas adicionales..." value={notes} onChange={e => setNotes(e.target.value)} />
-          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
