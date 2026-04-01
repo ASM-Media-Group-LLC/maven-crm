@@ -262,6 +262,7 @@ export default function FacturacionPage() {
               <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground">Vencimiento</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
             </TableRow>
           </TableHeader>
