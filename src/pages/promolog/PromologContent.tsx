@@ -60,6 +60,7 @@ import PromologTable from "./PromologTable";
 import PromologGrid from "./PromologGrid";
 import PromologAgentDetailView from "./PromologAgentDetailView";
 import PromologPerformanceView from "./PromologPerformanceView";
+import AnalyticsSectionBanner from "@/components/analytics/AnalyticsSectionBanner";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
