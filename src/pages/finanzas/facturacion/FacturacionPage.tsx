@@ -268,9 +268,9 @@ export default function FacturacionPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}>{Array.from({ length: showBulkCheckbox ? 6 : 5 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+              <TableRow key={i}>{Array.from({ length: showBulkCheckbox ? 7 : 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
             )) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={showBulkCheckbox ? 6 : 5} className="text-center text-muted-foreground py-12">Sin resultados.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={showBulkCheckbox ? 7 : 6} className="text-center text-muted-foreground py-12">Sin resultados.</TableCell></TableRow>
             ) : filtered.map(inv => {
               const badge = STATUS_BADGE[inv.status] ?? STATUS_BADGE.borrador;
               const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
