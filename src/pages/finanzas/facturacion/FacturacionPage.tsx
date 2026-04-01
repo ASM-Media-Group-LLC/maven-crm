@@ -359,12 +359,14 @@ export default function FacturacionPage() {
       {filtered.length === 0 ? (
         <div className="col-span-full text-center text-muted-foreground py-12">Sin resultados.</div>
       ) : filtered.map(inv => {
-        const badge = STATUS_BADGE[inv.status] ?? STATUS_BADGE.borrador;
+        const displayStatus = getDisplayStatus(inv);
+        const badge = STATUS_BADGE[displayStatus] ?? STATUS_BADGE.borrador;
         const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
         return (
           <div key={inv.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono text-muted-foreground">#{inv.invoice_number}</span>
+              <Badge variant={badge.variant as any}>{badge.label}</Badge>
             </div>
             <p className="text-sm font-medium truncate">{creatorName}</p>
             <div className="mt-2 text-xs text-muted-foreground">
@@ -380,7 +382,7 @@ export default function FacturacionPage() {
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDownloadPdf(inv)}><Download className="h-3.5 w-3.5" /></Button>
               {(inv.status === "borrador" || inv.status === "enviada") && (
                 <>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteItem(inv)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setCancelItem(inv)}><Ban className="h-3.5 w-3.5" /></Button>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setReverseItem(inv)}><RotateCcw className="h-3.5 w-3.5" /></Button>
                 </>
               )}
