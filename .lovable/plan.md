@@ -1,20 +1,27 @@
 
 
-## Fix: Fecha de vencimiento inconsistente entre tabla e Invoice A4
+## Fix: Scroll en selector de creador (Comisiones e Invoices)
 
 ### Problema
-En `FacturacionPage.tsx` línea 285, la fecha se parsea como `new Date(inv.due_date)` sin el sufijo `T12:00:00`, lo que causa que la zona horaria del navegador desplace la fecha un día atrás. El A4 sí usa `T12:00:00` correctamente.
+El `CommandList` dentro del `Popover` no permite hacer scroll cuando está dentro de un `Dialog`. Esto ocurre porque el `Dialog` de Radix intercepta los eventos de scroll/wheel.
 
 ### Solución
-**Archivo**: `src/pages/finanzas/facturacion/FacturacionPage.tsx`
+Agregar `onWheel={(e) => e.stopPropagation()}` en el `CommandList` de ambos modales para evitar que el Dialog capture el evento de scroll.
 
-Cambiar las dos ocurrencias de `due_date` en la sección de invoices:
+### Archivos a modificar
 
-- **Línea 285** (tabla desktop):
-  `format(new Date(inv.due_date), "dd/MM/yyyy")` → `format(new Date(inv.due_date + "T12:00:00"), "dd/MM/yyyy")`
+**1. `src/pages/finanzas/comisiones/NuevaComisionModal.tsx`** (~línea 127)
+- Agregar `onWheel` stop propagation al `CommandList`
 
-- **Línea 360** (vista móvil):
-  `format(new Date(inv.due_date), "dd/MM/yyyy")` → `format(new Date(inv.due_date + "T12:00:00"), "dd/MM/yyyy")`
+**2. `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`** (~línea 196)
+- Mismo cambio en el `CommandList` del selector de creador
 
-Esto alinea el parsing con el mismo método usado en `InvoiceA4Preview.tsx` y `PaymentNoteA4Preview.tsx`.
+### Cambio específico
+```tsx
+// Antes
+<CommandList>
+
+// Después
+<CommandList onWheel={(e) => e.stopPropagation()}>
+```
 
