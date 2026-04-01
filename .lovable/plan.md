@@ -1,27 +1,13 @@
 
 
-## Fix: Scroll en selector de creador (Comisiones e Invoices)
+## Renombrar etiquetas: "Valor para la Empresa" → "Total a pagar" y "Comisión total" → "Total a pagar"
 
-### Problema
-El `CommandList` dentro del `Popover` no permite hacer scroll cuando está dentro de un `Dialog`. Esto ocurre porque el `Dialog` de Radix intercepta los eventos de scroll/wheel.
+### Cambios
 
-### Solución
-Agregar `onWheel={(e) => e.stopPropagation()}` en el `CommandList` de ambos modales para evitar que el Dialog capture el evento de scroll.
+**1. `src/pages/finanzas/comisiones/ComisionesTab.tsx`**
+- Línea 135: Cambiar `"Comisión total"` → `"Total a pagar"` (encabezado de tabla)
+- Línea 194: Cambiar `"Valor para la Empresa"` → `"Total a pagar"` (detalle/vista)
 
-### Archivos a modificar
-
-**1. `src/pages/finanzas/comisiones/NuevaComisionModal.tsx`** (~línea 127)
-- Agregar `onWheel` stop propagation al `CommandList`
-
-**2. `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`** (~línea 196)
-- Mismo cambio en el `CommandList` del selector de creador
-
-### Cambio específico
-```tsx
-// Antes
-<CommandList>
-
-// Después
-<CommandList onWheel={(e) => e.stopPropagation()}>
-```
+**2. `src/pages/finanzas/comisiones/NuevaComisionModal.tsx`**
+- Línea 207: Cambiar `"Valor para la Empresa"` → `"Total a pagar"` (resumen en modal de creación)
 
