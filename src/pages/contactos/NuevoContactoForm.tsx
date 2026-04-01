@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, UserPlus, Upload, Save, X, ImageIcon, Film, FileText, Check, ChevronsUpDown, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
-import { checkCreatorExists, checkRecentLead, checkDuplicateOnlyFans } from "@/lib/lead-validation";
+import { checkCreatorExists, checkPreviousLead, checkDuplicateOnlyFans } from "@/lib/lead-validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
