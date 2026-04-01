@@ -1,38 +1,16 @@
 
 
-## Unificar la vista de preview entre Templates e Invoices
+## Añadir acción de eliminar en la tabla de Templates
 
-### Problema
-- **Invoices** usa `<Dialog>` con fondo transparente → el A4 flota limpio sobre el overlay oscuro.
-- **Templates** usa un `div` manual con `bg-muted rounded-lg p-6` → se ve como una tarjeta gris con título y botón "Cerrar", rompiendo la consistencia visual.
-
-### Solución
+### Cambios
 
 **Archivo**: `src/pages/finanzas/facturacion/TemplatesPage.tsx`
 
-Reemplazar el modal manual (líneas 142-160) por un `Dialog` idéntico al de Invoices:
-
-```tsx
-<Dialog open={!!viewTemplate} onOpenChange={() => setViewTemplate(null)}>
-  <DialogContent className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button:last-child]:hidden">
-    {viewTemplate && (
-      <InvoiceA4Preview
-        invoice={{}}
-        template={{
-          company_name: viewTemplate.company_name,
-          company_address: viewTemplate.company_address,
-          company_zip: viewTemplate.company_zip,
-          company_email: viewTemplate.company_email,
-          logo_url: viewTemplate.logo_url,
-        }}
-      />
-    )}
-  </DialogContent>
-</Dialog>
-```
-
-Agregar imports de `Dialog` y `DialogContent` de `@/components/ui/dialog`.
+1. Añadir estado `deleteTemplate` para controlar el diálogo de confirmación
+2. Añadir botón de eliminar (icono `Trash2`) en la columna de acciones, junto a Ver y Editar
+3. Añadir un `AlertDialog` de confirmación (mismo patrón que `DeleteEventoDialog`) que al confirmar ejecute `supabase.from("invoice_templates").delete().eq("id", id)` e invalide la query
+4. Importar `Trash2` de lucide-react y los componentes de `AlertDialog`
 
 ### Resultado
-Ambas vistas (Templates e Invoices) mostrarán el A4 flotando limpio sobre overlay oscuro, con cierre al hacer clic fuera.
+Cada fila tendrá 3 acciones: Ver | Editar | Eliminar, con confirmación antes de borrar.
 
