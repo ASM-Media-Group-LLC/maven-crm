@@ -101,7 +101,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
       estimated_amount: companyValue,
       final_amount: companyValue,
       status: "pendiente",
-      notes: notes || null,
+      
       calculation_method: "fixed_percentage",
       calculation_config: { percentage: agencyPct, blue_package: hasBlue, blue_amount: blueAmount },
     });
