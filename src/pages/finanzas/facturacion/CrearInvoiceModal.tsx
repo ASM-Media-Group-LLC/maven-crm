@@ -130,7 +130,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
       blue_amount: totals.blue,
       paypal_amount: totals.paypal,
       net_amount: totals.grand,
-      due_date: dueDate || null,
+      due_date: totals.dueDate || null,
       notes: notes || null,
       status: "borrador",
       period_start: totals.periodStart,
