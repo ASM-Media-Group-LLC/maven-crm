@@ -1,42 +1,38 @@
 
 
-## Plan: Fix sidebar badges — solo entradas nuevas del día
+## Unificar la vista de preview entre Templates e Invoices
 
 ### Problema
+- **Invoices** usa `<Dialog>` con fondo transparente → el A4 flota limpio sobre el overlay oscuro.
+- **Templates** usa un `div` manual con `bg-muted rounded-lg p-6` → se ve como una tarjeta gris con título y botón "Cerrar", rompiendo la consistencia visual.
 
-`useSidebarBadges.ts` cuenta **todos** los registros sin filtro de fecha:
-- **Closers**: `stage = 'Nuevo'` → 441 (acumulado histórico)
-- **LeadGen**: `quality = 'pending'` → sin filtro de fecha tampoco
+### Solución
 
-El badge debería mostrar solo las entradas creadas **hoy** que el usuario aún no ha procesado.
+**Archivo**: `src/pages/finanzas/facturacion/TemplatesPage.tsx`
 
-### Fix
+Reemplazar el modal manual (líneas 142-160) por un `Dialog` idéntico al de Invoices:
 
-**Archivo**: `src/hooks/useSidebarBadges.ts`
-
-Agregar filtro `.gte("created_at", todayISO)` a las queries de Closers y LeadGen:
-
-```ts
-const today = new Date().toISOString().split("T")[0];
-
-// Closers: solo leads nuevos creados hoy
-supabase.from("closer_creators")
-  .select("id", { count: "exact", head: true })
-  .eq("stage", "Nuevo")
-  .gte("created_at", today)
-
-// LeadGen: solo pending creados hoy
-supabase.from("leadgen_entries")
-  .select("id", { count: "exact", head: true })
-  .eq("quality", "pending")
-  .gte("created_at", today)
+```tsx
+<Dialog open={!!viewTemplate} onOpenChange={() => setViewTemplate(null)}>
+  <DialogContent className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button:last-child]:hidden">
+    {viewTemplate && (
+      <InvoiceA4Preview
+        invoice={{}}
+        template={{
+          company_name: viewTemplate.company_name,
+          company_address: viewTemplate.company_address,
+          company_zip: viewTemplate.company_zip,
+          company_email: viewTemplate.company_email,
+          logo_url: viewTemplate.logo_url,
+        }}
+      />
+    )}
+  </DialogContent>
+</Dialog>
 ```
 
-Promolog ya filtra por fecha del día (`gte("date", today)`), así que está correcto.
+Agregar imports de `Dialog` y `DialogContent` de `@/components/ui/dialog`.
 
-### Archivos a modificar
-
-| Archivo | Cambio |
-|---------|--------|
-| `src/hooks/useSidebarBadges.ts` | Agregar `.gte("created_at", today)` a queries de closers y leadgen |
+### Resultado
+Ambas vistas (Templates e Invoices) mostrarán el A4 flotando limpio sobre overlay oscuro, con cierre al hacer clic fuera.
 
