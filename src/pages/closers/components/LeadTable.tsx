@@ -533,6 +533,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <SortHeader label="# Contactos" sortKey="contact_count" {...sp} />
             <SortHeader label="Último contacto" sortKey="last_contact_date" {...sp} />
             <SortHeader label="Teléfono" sortKey="phone" {...sp} />
+            <TableHead className={stickyBase}>OF URL</TableHead>
             <TableHead className={stickyBase}>Alertas</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
             <TableHead className={stickyAction}>Acciones</TableHead>
