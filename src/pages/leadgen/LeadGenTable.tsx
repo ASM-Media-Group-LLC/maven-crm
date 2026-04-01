@@ -360,7 +360,7 @@ const LeadRow = React.memo(({ lead, onView, onDelete, profiles, qaMap, canReview
 });
 LeadRow.displayName = "LeadRow";
 
-const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
+const LeadGenTable = ({ leads, onView, onEdit, onDelete, profiles }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("hora");
   const [sortAsc, setSortAsc] = useState(false);
   const { isAdmin, isSupervisor } = useUserRole();
