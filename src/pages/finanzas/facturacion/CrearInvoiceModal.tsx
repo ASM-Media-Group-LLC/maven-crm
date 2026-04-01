@@ -108,7 +108,14 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
     const periodStart = starts.length ? starts.sort()[0] : null;
     const periodEnd = ends.length ? ends.sort().reverse()[0] : null;
 
-    return { agency, blue, paypal, grand, periodStart, periodEnd, count: selected.length };
+    let dueDate: string | null = null;
+    if (periodEnd) {
+      const d = new Date(periodEnd + "T12:00:00");
+      d.setDate(d.getDate() + 5);
+      dueDate = d.toISOString().split("T")[0];
+    }
+
+    return { agency, blue, paypal, grand, periodStart, periodEnd, dueDate, count: selected.length };
   }, [commissions, selectedCommissionIds]);
 
   const canSubmit = !!templateId && !!creatorId && totals.count > 0;
