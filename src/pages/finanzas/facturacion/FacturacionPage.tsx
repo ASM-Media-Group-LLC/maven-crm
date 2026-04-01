@@ -33,13 +33,24 @@ import ComisionesTab from "../comisiones/ComisionesTab";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format } from "date-fns";
 
-const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline" | "warning"; label: string }> = {
   borrador: { variant: "secondary", label: "Borrador" },
   enviada: { variant: "outline", label: "Enviada" },
   pagada: { variant: "default", label: "Pagada" },
   parcial: { variant: "outline", label: "Parcial" },
   vencida: { variant: "destructive", label: "Vencida" },
   reversada: { variant: "destructive", label: "Reversada" },
+  cancelada: { variant: "destructive", label: "Cancelada" },
+};
+
+const getDisplayStatus = (inv: any): string => {
+  if (inv.status === "enviada" && inv.due_date) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(inv.due_date + "T12:00:00");
+    if (due < today) return "vencida";
+  }
+  return inv.status;
 };
 
 const FACTURA_TABS = ["Invoices", "Notas de Pago", "Reversos", "Comisiones", "Mail", "Archivo de PagoMundo"] as const;
