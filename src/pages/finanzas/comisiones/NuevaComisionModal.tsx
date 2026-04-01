@@ -31,7 +31,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
   const [periodStart, setPeriodStart] = useState<Date>();
   const [periodEnd, setPeriodEnd] = useState<Date>();
   const [baseAmount, setBaseAmount] = useState("");
-  const [notes, setNotes] = useState("");
+  
 
   const { data: creators = [] } = useQuery({
     queryKey: ["creators-for-commission"],
@@ -61,7 +61,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
       setPeriodStart(undefined);
       setPeriodEnd(undefined);
       setBaseAmount("");
-      setNotes("");
+      
     }
   }, [open]);
 
@@ -101,7 +101,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
       estimated_amount: companyValue,
       final_amount: companyValue,
       status: "pendiente",
-      notes: notes || null,
+      
       calculation_method: "fixed_percentage",
       calculation_config: { percentage: agencyPct, blue_package: hasBlue, blue_amount: blueAmount },
     });
@@ -210,11 +210,6 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
             </div>
           </div>
 
-          {/* Notes */}
-          <div>
-            <Label>Observaciones</Label>
-            <Textarea placeholder="Notas adicionales..." value={notes} onChange={e => setNotes(e.target.value)} />
-          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
