@@ -1,15 +1,20 @@
 import { useState } from "react";
 import InvoiceA4Preview from "./InvoiceA4Preview";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Eye } from "lucide-react";
+import { Plus, Pencil, Eye, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CreateTemplateModal from "./CreateTemplateModal";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface Template {
   id: string;
@@ -26,9 +31,24 @@ interface Template {
 }
 
 export default function TemplatesPage() {
+  const [deleteTemplate, setDeleteTemplate] = useState<Template | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editTemplate, setEditTemplate] = useState<Template | null>(null);
   const [viewTemplate, setViewTemplate] = useState<Template | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const handleDelete = async () => {
+    if (!deleteTemplate) return;
+    const { error } = await supabase.from("invoice_templates").delete().eq("id", deleteTemplate.id);
+    if (error) {
+      toast({ title: "Error al eliminar", variant: "destructive" });
+    } else {
+      toast({ title: `Template eliminado` });
+      queryClient.invalidateQueries({ queryKey: ["invoice-templates"] });
+    }
+    setDeleteTemplate(null);
+  };
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["invoice-templates"],
@@ -121,6 +141,7 @@ export default function TemplatesPage() {
                         <div className="flex items-center gap-1">
                           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewTemplate(t)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
                           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(t)}><Pencil className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteTemplate(t)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -155,6 +176,23 @@ export default function TemplatesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTemplate} onOpenChange={() => setDeleteTemplate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar el template <span className="font-semibold">"{deleteTemplate?.company_name || deleteTemplate?.name}"</span>. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }
