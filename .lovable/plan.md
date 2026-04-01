@@ -1,72 +1,57 @@
 
 
-## Plan: Fix 5 Issues — Promolog selector, Ticket column, AddLeadModal fields, LeadGen banner, Closers notes
+## Plan: Fix selector de agentes en Rendimiento + Consistencia de banner
 
-### Issue 1: Promolog Rendimiento — Agent selector not working
+### Hallazgos de datos
 
-**Root cause**: `CommandItem` lacks an explicit `value` prop. The cmdk library defaults to the text content and lowercases it, which can cause issues with `onSelect` not firing properly.
+Al consultar la base de datos directamente:
 
-**Fix in `PromologPerformanceView.tsx`**:
-- Add `value={a.id}` to each `CommandItem`
-- This ensures the selection works regardless of name normalization
+| Agente | ID en profiles | Entries asignadas | 
+|--------|---------------|-------------------|
+| Lorena | `bf9c58cc` | 57 |
+| Fabiana | `dd959846` | 8 (5 + 3) |
+| Carolina | `e3355f39` | 6 |
+| **Sin asignar** | NULL / NULL | **27,248** |
+| IDs externos (webhook) | `3a4720ac`, `abc3ee9b`, etc. | ~3,900 |
 
-### Issue 2: Ticket column inconsistency
+**27,248 entradas no tienen agente asignado** (`reviewed_by` y `created_by` son NULL). Los IDs externos del webhook no existen en `profiles`. Esto explica por qué Carolina y Fabiana muestran pocos registros — solo tienen 6 y 8 entradas asignadas respectivamente. El sistema funciona correctamente; el problema es que la mayoría de entradas importadas nunca fueron asignadas a un agente.
 
-The "Ticket" column (`ticket_number`) appears in LeadGen table but serves no clear UX purpose — it's an auto-generated ID (`#LG` + last 7 chars of UUID). It adds visual noise without actionable information.
+### Bug 1: Selector no permite seleccionar agentes
 
-**Changes**:
-- **Remove** the Ticket column from `LeadGenTable.tsx` (header and cell)
-- Remove `ticket` sort key
-- Keep `ticket_number` in data model (used internally for conversions to Closers)
-- Remove `ticket` field from `NuevoContactoForm.tsx` form (it was already in Contactos but unused in display)
-- Update search placeholder in `LeadGenContent.tsx`: "Buscar lead, agente..." (drop "ticket")
+**Causa raíz**: `CommandItem value={a.id}` usa UUIDs como valor. La librería cmdk filtra items comparando el texto que escribes en el input contra el `value` (lowercased). Escribir "Carolina" no matchea contra un UUID, y la selección puede fallar.
 
-### Issue 3: AddLeadModal should match NuevoContactoForm fields
+**Fix**: Cambiar `value={a.id}` → `value={a.name}` en ambos archivos. El `onSelect` usa closure (`a.id`) así que la selección sigue funcionando, y ahora la búsqueda por nombre funciona correctamente.
 
-Currently `AddLeadModal` is missing fields that `NuevoContactoForm` has:
-- **Nombre** (name)
-- **Email**
-- **Teléfono** (country code + phone)
-- **Ciudad** (city)
+### Bug 2: LeadGen banner ya existe en código
 
-**Changes in `AddLeadModal.tsx`**:
-- Add fields: `nombre`, `email`, `countryCode` + `phone`, `ciudad` to the zod schema and form
-- Add corresponding form inputs (matching NuevoContactoForm layout)
-- Save these fields in the insert: `model_name`, `email`, `phone_raw` (with country code prefix), `city`
-- Keep existing fields (URL, platform, category, company, country, OF URL, notes, evidence)
+El código de `LeadGenPerformanceView.tsx` ya tiene el banner con gradiente (líneas 75-111). Sin embargo, falta el `value` prop en `CommandItem` (línea 97). Se agregará `value={a.name}` para consistencia.
 
-### Issue 4: LeadGen Performance banner — still plain header
+### Cambios
 
-Looking at the image, the Promolog "Rendimiento de Agentes" section header is plain text ("Rendimiento de Agentes / 31 de marzo, 2026 · 8 agentes activos") without the gradient banner style.
-
-The `LeadGenPerformanceView.tsx` already has the banner (lines 75-111). The issue is in `PromologPerformanceView.tsx` lines 136-165 — it uses a plain `div` with just `flex items-center` instead of the gradient banner.
-
-**Fix in `PromologPerformanceView.tsx`**:
-- Replace the plain header (lines 136-165) with the gradient banner pattern from `LeadGenPerformanceView.tsx`:
-  - `rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary`
-  - Title, subtitle, selector on right, icon in circle badge
-
-### Issue 5: Closers — OF URLs appearing in Notes field
-
-The code correctly separates OF URL and Notes columns in all tabs. The issue is **data-level**: existing records in `closers_contacts` have OnlyFans URLs stored in the `notes` column (entered before the `onlyfans_url` column existed).
-
-**Fix**: Run a data migration to move OF URLs from `notes` to `onlyfans_url`:
-```sql
-UPDATE closers_contacts
-SET onlyfans_url = notes, notes = NULL
-WHERE notes ILIKE '%onlyfans.com%'
-  AND (onlyfans_url IS NULL OR onlyfans_url = '');
+**`src/pages/promolog/PromologPerformanceView.tsx`** (línea 163):
+```tsx
+// De:
+<CommandItem key={a.id} value={a.id} onSelect={() => { ... }}>
+// A:
+<CommandItem key={a.id} value={a.name} onSelect={() => { ... }}>
 ```
 
-Also do the same for `closers_creators` if applicable.
+**`src/pages/leadgen/LeadGenPerformanceView.tsx`** (línea 97):
+```tsx
+// De:
+<CommandItem key={a.id} onSelect={() => { ... }}>
+// A:
+<CommandItem key={a.id} value={a.name} onSelect={() => { ... }}>
+```
 
-### Files to modify
+### Nota sobre datos faltantes
 
-| File | Change |
-|------|--------|
-| `PromologPerformanceView.tsx` | Add `value` prop to CommandItem + gradient banner header |
-| `LeadGenTable.tsx` | Remove Ticket column |
-| `LeadGenContent.tsx` | Update search placeholder |
-| `AddLeadModal.tsx` | Add nombre, email, phone, ciudad fields |
-| Migration SQL | Move OF URLs from notes to onlyfans_url in closers tables |
+Las 27,248 entradas sin agente no se pueden arreglar con código — requieren asignación manual o una regla de mapeo entre IDs externos del webhook y perfiles reales. Esto es un tema operativo/de datos, no un bug de UI.
+
+### Archivos a modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| `PromologPerformanceView.tsx` | `value={a.name}` en CommandItem |
+| `LeadGenPerformanceView.tsx` | `value={a.name}` en CommandItem |
 
