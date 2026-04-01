@@ -1,5 +1,6 @@
 import { useState } from "react";
 import InvoiceA4Preview from "./InvoiceA4Preview";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { supabase } from "@/integrations/supabase/client";
