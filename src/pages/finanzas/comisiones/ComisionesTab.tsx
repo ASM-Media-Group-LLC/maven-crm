@@ -132,7 +132,7 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
                 <TableHead className="text-xs font-medium text-muted-foreground">Ganancia</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Comisión</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Blue</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Comisión total</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">Total a pagar</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -191,7 +191,7 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
               {config.blue_package && config.blue_amount > 0 && (
                 <div className="flex justify-between"><span className="text-muted-foreground">Blue</span><span className="font-medium">{fmt(config.blue_amount)}</span></div>
               )}
-              <div className="flex justify-between"><span className="text-muted-foreground">Valor para la Empresa</span><span className="text-primary font-medium">{fmt(Number(viewItem.final_amount) || 0)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Total a pagar</span><span className="text-primary font-medium">{fmt(Number(viewItem.final_amount) || 0)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Estado</span><Badge variant={STATUS_BADGE[viewItem.status]?.variant || "outline"}>{STATUS_BADGE[viewItem.status]?.label || viewItem.status}</Badge></div>
               {viewItem.payment_method && <div className="flex justify-between"><span className="text-muted-foreground">Método de Pago</span><span>{viewItem.payment_method}</span></div>}
               {viewItem.payment_date && <div className="flex justify-between"><span className="text-muted-foreground">Fecha de Pago</span><span>{format(new Date(viewItem.payment_date + "T12:00:00"), "dd/MM/yyyy")}</span></div>}
