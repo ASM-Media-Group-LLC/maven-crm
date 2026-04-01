@@ -336,6 +336,7 @@ export default function FacturacionPage() {
             <SelectItem value="parcial">Parcial</SelectItem>
             <SelectItem value="vencida">Vencida</SelectItem>
             <SelectItem value="reversada">Reversada</SelectItem>
+            <SelectItem value="cancelada">Cancelada</SelectItem>
           </SelectContent>
         </Select>
       )}
