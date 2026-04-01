@@ -140,42 +140,22 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
             </Popover>
           </div>
 
-          {/* Period dates */}
+          {/* Period + Earnings */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Fecha Inicio</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !periodStart && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {periodStart ? format(periodStart, "dd/MM/yyyy") : "Seleccionar"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={periodStart} onSelect={setPeriodStart} locale={es} className="p-3 pointer-events-auto" />
-                </PopoverContent>
-              </Popover>
+              <Label>Período</Label>
+              <DateRangePicker
+                from={periodStart}
+                to={periodEnd}
+                onApply={(from, to) => { setPeriodStart(from); setPeriodEnd(to); }}
+                placeholder="Seleccionar período"
+                className="w-full"
+              />
             </div>
             <div>
-              <Label>Fecha Fin</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !periodEnd && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {periodEnd ? format(periodEnd, "dd/MM/yyyy") : "Seleccionar"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={periodEnd} onSelect={setPeriodEnd} locale={es} className="p-3 pointer-events-auto" />
-                </PopoverContent>
-              </Popover>
+              <Label>Ganancia Total (USD)</Label>
+              <Input type="number" placeholder="0.00" value={baseAmount} onChange={e => setBaseAmount(e.target.value)} />
             </div>
-          </div>
-
-          {/* Earnings */}
-          <div>
-            <Label>Ganancia Total (USD)</Label>
-            <Input type="number" placeholder="0.00" value={baseAmount} onChange={e => setBaseAmount(e.target.value)} />
           </div>
 
           {/* Auto-calc preview */}
