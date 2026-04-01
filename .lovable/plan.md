@@ -1,46 +1,45 @@
 
 
-## Agregar opción de eliminar (solo admin) en Contactos y LeadGen
+## Reemplazar eliminación por cancelación + columna Estado en Invoices
 
 ### Resumen
-Agregar un botón/opción "Eliminar" visible solo para administradores en los menús de acción de Contactos (tabla y grid) y en la vista de leads de LeadGen (tabla y modal).
+Eliminar la funcionalidad de borrado de invoices y reemplazarla por "Cancelar" (cambia status a `cancelada`). Agregar columna "Estado" visible en la tabla con badges para todos los estados. Agregar `cancelada` como nuevo estado posible.
 
-### Cambios
+### Cambios en `src/pages/finanzas/facturacion/FacturacionPage.tsx`
 
-**1. `src/pages/contactos/ContactosTable.tsx`**
-- Agregar prop `onDelete?: (contacto: Contacto) => void`
-- Agregar `<DropdownMenuItem>` con icono `Trash2` y texto "Eliminar" al final del menú dropdown (solo si `onDelete` está definido), con clase `text-destructive`
+**1. Actualizar STATUS_BADGE (línea 36-43)**
+- Agregar `cancelada: { variant: "destructive", label: "Cancelada" }`
 
-**2. `src/pages/contactos/ContactosGrid.tsx`**
-- Agregar prop `onDelete?: (contacto: Contacto) => void`
-- Agregar `<DropdownMenuItem>` "Eliminar" al final del menú dropdown (solo si `onDelete` está definido)
+**2. Reemplazar `deleteMutation` (líneas 149-160) por `cancelMutation`**
+- En vez de `.delete()`, hacer `.update({ status: "cancelada" })` en la tabla `invoices`
+- Renombrar estado `deleteItem` → `cancelItem` y actualizar toda referencia
 
-**3. `src/pages/contactos/ContactosContent.tsx`**
-- Pasar `onDelete={isAdmin ? handleDelete : undefined}` a `ContactosTable` y `ContactosGrid`
-- `handleDelete` = `(c) => { setSelectedContacto(c); setDeleteOpen(true); }`
-- Ya existe `DeleteContactoDialog` montado — solo falta conectar el trigger desde tabla/grid
+**3. Tabla: agregar columna "Estado" y reemplazar icono Trash**
+- Agregar `<TableHead>Estado</TableHead>` después de "Vencimiento" (línea 252)
+- Agregar `<TableCell>` con `<Badge>` del estado correspondiente en cada fila
+- Reemplazar `Trash2` por icono `Ban` (de lucide-react) con tooltip "Cancelar"
+- El click abre un diálogo de confirmación para cancelar (no eliminar)
+- Solo mostrar botón cancelar si `canEdit` (borrador o enviada)
 
-**4. `src/pages/leadgen/LeadGenTable.tsx`**
-- Agregar prop `onDelete?: (lead: LeadGenEntry) => void`
-- En `LeadRow`: si `onDelete` está definido, cambiar el botón `Eye` por un `DropdownMenu` con "Ver detalle" y "Eliminar" (destructive)
-- Pasar `onDelete` desde el componente padre
+**4. Grid: mismo cambio (líneas 362-369)**
+- Reemplazar `Trash2` por `Ban`, mismo comportamiento de cancelación
+- Agregar badge de estado en la card
 
-**5. `src/pages/leadgen/ViewLeadModal.tsx`**
-- Agregar prop `onDelete?: () => void`
-- Si `onDelete` está definido, mostrar botón "Eliminar" destructive en el footer del modal
+**5. AlertDialog de confirmación (líneas 621-632)**
+- Separar la lógica: para invoices usar textos de "Cancelar" en vez de "Eliminar"
+- El diálogo de notas de pago mantiene eliminación real (ya que son payment notes)
+- Texto: "¿Cancelar invoice #X?" / "El invoice se marcará como cancelado. Esta acción no elimina el registro."
+- Botón: "Confirmar Cancelación"
 
-**6. Crear `src/pages/leadgen/DeleteLeadDialog.tsx`**
-- Componente AlertDialog similar a `DeleteContactoDialog`
-- Elimina de la tabla `leadgen_entries` por `id`
-- Invalida queries `["leadgen"]`
+**6. Filtro de estado (línea 314-324)**
+- Agregar `<SelectItem value="cancelada">Cancelada</SelectItem>` al dropdown de filtro
 
-**7. `src/pages/leadgen/LeadGenContent.tsx`** (o donde se montan los modales de leads)
-- Importar `useUserRole`, verificar `isAdmin`
-- Agregar estado `deleteOpen` y `deleteLead`
-- Pasar `onDelete={isAdmin ? handleDeleteLead : undefined}` a `LeadGenTable` y `ViewLeadModal`
-- Montar `DeleteLeadDialog`
+**7. Lógica de vencimiento automática (client-side)**
+- En el query de invoices o al renderizar, si `status === "enviada"` y `due_date < hoy`, mostrar badge "Vencida" visualmente (sin mutar DB por ahora, solo visual)
 
-### Seguridad
-- Las opciones de eliminar solo se renderizan si el usuario es admin (`isAdmin` del hook `useUserRole`)
-- La eliminación se hace via Supabase client con las RLS policies existentes
+### Importaciones
+- Reemplazar `Trash2` por `Ban` en el import de lucide-react (mantener `Trash2` solo para notas de pago)
+
+### Archivos a modificar
+- `src/pages/finanzas/facturacion/FacturacionPage.tsx`
 
