@@ -1,20 +1,21 @@
 
 
-## Cambios en la tabla de Comisiones
+## Edición inline en columna Comisión (porcentaje)
 
-### Archivo: `src/pages/finanzas/comisiones/ComisionesTab.tsx`
+### Cambios en `src/pages/finanzas/comisiones/ComisionesTab.tsx`
 
-**1. Quitar color rojo de la columna Comisión (línea 160)**
-- Cambiar `text-destructive` → `text-foreground` (blanco en tema oscuro)
+**1. Agregar estados para edición de comisión**
+- Añadir `editingCommId` y `editCommValue` (similar a los existentes para Blue)
 
-**2. Edición inline en la columna Blue (línea 161)**
-- Agregar estados `editingBlueId` y `editBlueValue` para controlar qué fila se edita
-- En la celda Blue: al hacer click se muestra un `<Input>` numérico; al presionar Enter o perder foco se guarda
-- Crear `updateBlueMutation` que actualice `calculation_config.blue_amount` y recalcule `final_amount` en Supabase
-- Recálculo: `final_amount = base_amount * (percentage / 100) + nuevo_blue_amount`
+**2. Crear mutation `updateCommissionMutation`**
+- Actualiza `calculation_config.percentage` y recalcula `final_amount = base_amount * (newPercentage / 100) + blue_amount`
 
-### Flujo de edición
-- Click en valor Blue → aparece input con el monto actual
-- Enter o blur → guarda via mutation → invalida query → tabla se actualiza
-- Escape → cancela edición
+**3. Hacer clickeable la celda de Comisión (línea 182)**
+- Reemplazar el texto estático por lógica condicional:
+  - Si `editingCommId === c.id` → mostrar `<Input>` numérico (igual que Blue)
+  - Si no → mostrar `<span>` clickeable con `cursor-pointer hover:underline`
+- Guardar con Enter o blur, cancelar con Escape
+
+### Archivo a modificar
+- `src/pages/finanzas/comisiones/ComisionesTab.tsx`
 
