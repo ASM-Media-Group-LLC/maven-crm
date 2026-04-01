@@ -16,6 +16,9 @@ import { Button } from "@/components/ui/button";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useUpdateLeadQuality, useUpdateLeadField, useLeadGenQA, useCreateQAReview } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 import { useUserRole } from "@/hooks/useUserRole";
