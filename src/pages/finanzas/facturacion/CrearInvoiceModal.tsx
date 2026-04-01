@@ -193,7 +193,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
               <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)]" align="start">
                 <Command>
                   <CommandInput placeholder="Buscar creador..." />
-                  <CommandList>
+                  <CommandList onWheel={(e) => e.stopPropagation()}>
                     <CommandEmpty>No se encontró creador.</CommandEmpty>
                     <CommandGroup>
                       {creators.map(c => (
