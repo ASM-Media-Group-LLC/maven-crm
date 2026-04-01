@@ -362,6 +362,7 @@ const LeadGenContent = () => {
                 <LeadGenTable
                   leads={filteredLeads}
                   onView={lead => { setSelectedLead(lead); setViewLeadOpen(true); }}
+                  onDelete={isAdmin ? (lead) => { setDeleteLead(lead); setDeleteLeadOpen(true); } : undefined}
                   profiles={profiles}
                 />
               </DataTableShell>
