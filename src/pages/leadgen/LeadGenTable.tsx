@@ -333,9 +333,27 @@ const LeadRow = React.memo(({ lead, onView, onDelete, profiles, qaMap, canReview
         <QACell lead={lead} qaMap={qaMap} canReview={canReview} />
       </TableCell>
       <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(lead)}>
-          <Eye className="h-4 w-4" />
-        </Button>
+        {onDelete ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onView?.(lead)}>
+                <Eye className="mr-2 h-4 w-4" /> Ver detalle
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDelete(lead)} className="text-destructive focus:text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(lead)}>
+            <Eye className="h-4 w-4" />
+          </Button>
+        )}
       </TableCell>
     </TableRow>
   );
