@@ -424,45 +424,6 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
 
 
 
-              <FormField
-                control={form.control}
-                name="country_code"
-                render={({ field }) => {
-                  const selected = ALL_COUNTRIES.find(c => c.code === field.value);
-                  return (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>País</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal", !field.value && "text-muted-foreground")}>
-                              {selected ? `${selected.flag} ${selected.name}` : "Selecciona un país"}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder="Buscar país..." />
-                            <CommandList>
-                              <CommandEmpty>No se encontró el país.</CommandEmpty>
-                              <CommandGroup className="max-h-60 overflow-y-auto">
-                                {ALL_COUNTRIES.map((country) => (
-                                  <CommandItem key={country.code} value={`${country.name} ${country.code}`} onSelect={() => field.onChange(country.code)}>
-                                    <Check className={cn("mr-2 h-4 w-4", field.value === country.code ? "opacity-100" : "opacity-0")} />
-                                    {country.flag} {country.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
 
               <FormField
                 control={form.control}
