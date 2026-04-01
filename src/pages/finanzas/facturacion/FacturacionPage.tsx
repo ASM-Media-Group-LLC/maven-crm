@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  FileText, Clock, CheckCircle, DollarSign, Plus, Eye, Trash2, RotateCcw, Send, Download, Mail,
+  FileText, Clock, CheckCircle, DollarSign, Plus, Eye, Trash2, Ban, RotateCcw, Send, Download, Mail,
   Search, X, LayoutGrid, List,
 } from "lucide-react";
 import html2canvas from "html2canvas";
