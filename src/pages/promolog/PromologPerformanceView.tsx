@@ -160,7 +160,7 @@ const PromologPerformanceView = ({ profiles }: Props) => {
                     <CommandList>
                       <CommandEmpty>No encontrado</CommandEmpty>
                       {agents.map(a => (
-                        <CommandItem key={a.id} value={a.id} onSelect={() => { setSelectedAgent(a.id); setOpen(false); }}>
+                        <CommandItem key={a.id} value={a.name} onSelect={() => { setSelectedAgent(a.id); setOpen(false); }}>
                           {a.name}
                           {selectedAgent === a.id && <Check className="ml-auto h-4 w-4" />}
                         </CommandItem>
