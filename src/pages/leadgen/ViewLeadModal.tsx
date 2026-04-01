@@ -58,7 +58,7 @@ const InfoCard = ({ label, children }: { label: string; children: React.ReactNod
   </div>
 );
 
-const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
+const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showNoteForm, setShowNoteForm] = useState(false);
