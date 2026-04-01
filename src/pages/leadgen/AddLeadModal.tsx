@@ -18,7 +18,7 @@ import { Upload, X, ChevronsUpDown, Check, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
-import { checkCreatorExists, checkRecentLead, checkDuplicateOnlyFans } from "@/lib/lead-validation";
+import { checkCreatorExists, checkPreviousLead, checkDuplicateOnlyFans } from "@/lib/lead-validation";
 import { useQueryClient } from "@tanstack/react-query";
 
 
