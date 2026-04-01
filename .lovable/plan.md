@@ -1,38 +1,23 @@
 
 
-## Fix: Mostrar "Agregar Contacto" para closers en /leadgen
+## Auto-calcular fecha de vencimiento en Invoices
 
-### Problema
-El botón "Agregar Contacto" está condicionado a `viewMode !== "agent"`. El rol **closer** tiene `data_scope: "self"` en LeadGen, lo que resulta en `viewMode = "agent"`, ocultando el botón.
+### Lógica
+La fecha de vencimiento (`due_date`) se calculará automáticamente como **period_end + 5 días** (la fecha final más tardía entre las comisiones seleccionadas). Se elimina el campo manual de fecha.
 
-### Causa raíz
-La condición `viewMode !== "agent"` fue diseñada para ocultar el botón solo a agentes de LeadGen, pero afecta también a closers que necesitan agregar contactos.
+### Cambios
 
-### Solución
-Cambiar la condición para que el botón "Agregar Contacto" sea visible siempre, independientemente del `viewMode`. Los closers necesitan esta funcionalidad para alimentar su pipeline.
+**1. `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`**
+- Eliminar el estado `dueDate` y su input manual
+- En `totals` (useMemo), calcular `dueDate` como `periodEnd + 5 días`
+- Pasar ese valor calculado en `handleSubmit` → `due_date`
+- Mostrar la fecha calculada en el resumen de comisiones seleccionadas
+- Ajustar el grid de "Notas" para ocupar ancho completo (ya no comparte fila con fecha)
 
-### Cambio
+**2. `src/pages/finanzas/facturacion/InvoiceA4Preview.tsx`**
+- Eliminar la condición `{invoice.due_date && ...}` para que **siempre** muestre el campo "Due date" (con fallback "—" si no existe)
 
-**Archivo**: `src/pages/leadgen/LeadGenContent.tsx` (línea ~229)
-
-Eliminar la condición `viewMode !== "agent"` del wrapper del botón, dejándolo siempre visible:
-
-```tsx
-// Antes
-{viewMode !== "agent" && (
-  <Button variant="outline" size="sm" onClick={() => setAddContactoOpen(true)}>
-    <UserPlus className="h-4 w-4" />
-    Agregar Contacto
-  </Button>
-)}
-
-// Después
-<Button variant="outline" size="sm" onClick={() => setAddContactoOpen(true)}>
-  <UserPlus className="h-4 w-4" />
-  Agregar Contacto
-</Button>
-```
-
-### Alternativa (si solo closers deben verlo)
-Si prefieres que agentes LeadGen NO vean el botón pero closers sí, necesitaríamos distinguir el rol real del usuario. Pero dado que los agentes LeadGen también podrían necesitar agregar contactos, la solución más simple es mostrar el botón siempre.
+### Sin cambios necesarios
+- La tabla en `FacturacionPage.tsx` ya muestra `due_date` correctamente desde la BD
+- El campo `due_date` en la BD se sigue persistiendo igual, solo cambia el origen del valor
 
