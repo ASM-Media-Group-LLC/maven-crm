@@ -103,18 +103,36 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         return;
       }
 
-      // VALIDATION 1: Check if creator exists
+      // VALIDATION 1: Check if creator exists (status-aware)
       const creatorCheck = await checkCreatorExists(data.source_link, data.onlyfans_url);
       if (creatorCheck.exists) {
-        setCreatorAlert({ name: creatorCheck.creatorName!, id: creatorCheck.creatorId! });
-        setIsSubmitting(false);
-        return;
+        if (creatorCheck.isActive) {
+          setCreatorAlert({ name: creatorCheck.creatorName!, id: creatorCheck.creatorId! });
+          setIsSubmitting(false);
+          return;
+        }
+        // Inactive creator — allow as reactivated
+        toast({
+          title: "Creadora inactiva detectada",
+          description: `${creatorCheck.creatorName} está como ${creatorCheck.creatorStatus}. Se registrará como lead reactivado.`,
+        });
       }
 
-      // VALIDATION 2: Check if handle previously existed (informational, non-blocking)
+      // VALIDATION 2: Check handle in leads with 24h rule
       const previousCheck = await checkPreviousLead(data.source_link, data.onlyfans_url);
-      let recordType = "nuevo";
+      let recordType = creatorCheck.exists ? "reactivado" : "nuevo";
       if (previousCheck.existed) {
+        const lastDate = previousCheck.lastEntryDate ? new Date(previousCheck.lastEntryDate) : null;
+        const hoursSince = lastDate ? (Date.now() - lastDate.getTime()) / (1000 * 60 * 60) : Infinity;
+        if (hoursSince < 24) {
+          toast({
+            title: "Lead duplicado",
+            description: "Este lead ya fue subido hace menos de 24 horas.",
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
         recordType = "reactivado";
         toast({
           title: "Modelo reactivada",

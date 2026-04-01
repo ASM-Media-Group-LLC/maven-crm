@@ -6,16 +6,25 @@ import { normalizeHandle } from "@/lib/handle-utils";
  */
 export function normalizeOnlyFansUrl(input: string): string {
   if (!input) return "";
-  return normalizeHandle(input); // handle-utils already supports onlyfans.com
+  return normalizeHandle(input);
 }
+
+const ACTIVE_STATUSES = ["active", "onboarding", "pendiente", "pendiente_verificacion"];
 
 /**
  * Check if a handle or OF URL already belongs to an existing creator.
+ * Returns status info so callers can decide to block (active) or allow (inactive).
  */
 export async function checkCreatorExists(
   handle: string,
   onlyfansUrl?: string
-): Promise<{ exists: boolean; creatorName?: string; creatorId?: string }> {
+): Promise<{
+  exists: boolean;
+  isActive: boolean;
+  creatorName?: string;
+  creatorId?: string;
+  creatorStatus?: string;
+}> {
   const normalizedHandle = normalizeHandle(handle);
   const normalizedOf = onlyfansUrl ? normalizeOnlyFansUrl(onlyfansUrl) : "";
 
@@ -23,15 +32,18 @@ export async function checkCreatorExists(
   if (normalizedHandle) {
     const { data } = await supabase
       .from("creators")
-      .select("id, name, artistic_name")
+      .select("id, name, artistic_name, status")
       .or(`instagram_handle.ilike.${normalizedHandle},instagram_handle.ilike.@${normalizedHandle}`)
       .limit(1)
       .maybeSingle();
     if (data) {
+      const status = (data as any).status || "";
       return {
         exists: true,
+        isActive: ACTIVE_STATUSES.includes(status),
         creatorName: data.artistic_name || data.name || "Creadora",
         creatorId: data.id,
+        creatorStatus: status,
       };
     }
   }
@@ -40,7 +52,7 @@ export async function checkCreatorExists(
   if (normalizedOf) {
     const { data } = await supabase
       .from("creators")
-      .select("id, name, artistic_name, onlyfans_url")
+      .select("id, name, artistic_name, onlyfans_url, status")
       .not("onlyfans_url", "is", null)
       .limit(100);
 
@@ -50,48 +62,64 @@ export async function checkCreatorExists(
         return creatorOf && creatorOf === normalizedOf;
       });
       if (match) {
+        const status = (match as any).status || "";
         return {
           exists: true,
+          isActive: ACTIVE_STATUSES.includes(status),
           creatorName: match.artistic_name || match.name || "Creadora",
           creatorId: match.id,
+          creatorStatus: status,
         };
       }
     }
   }
 
-  return { exists: false };
+  return { exists: false, isActive: false };
 }
 
 /**
- * Check if a handle already has previous records in leads or contacts.
- * Returns informational data — does NOT block creation.
+ * Check if a handle already has previous records in leads.
+ * Returns the date of the most recent entry for 24h rule.
  */
 export async function checkPreviousLead(
   handle: string,
   onlyfansUrl?: string
-): Promise<{ existed: boolean }> {
+): Promise<{ existed: boolean; lastEntryDate?: string }> {
   const normalizedHandle = normalizeHandle(handle);
 
   if (normalizedHandle) {
     const { data } = await supabase
       .from("leadgen_entries")
-      .select("id")
+      .select("id, created_at")
       .eq("model_handle", normalizedHandle)
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (data) return { existed: true };
-
-    // Also check closers_contacts
-    const { data: contactData } = await supabase
-      .from("closers_contacts")
-      .select("id")
-      .ilike("handle", normalizedHandle)
-      .limit(1)
-      .maybeSingle();
-    if (contactData) return { existed: true };
+    if (data) return { existed: true, lastEntryDate: data.created_at };
   }
 
   return { existed: false };
+}
+
+/**
+ * Check if a handle already exists in closers_contacts.
+ * Informational only — does NOT block.
+ */
+export async function checkExistingContact(
+  handle: string
+): Promise<{ exists: boolean; contactName?: string }> {
+  const normalizedHandle = normalizeHandle(handle);
+  if (!normalizedHandle) return { exists: false };
+
+  const { data } = await supabase
+    .from("closers_contacts")
+    .select("id, name")
+    .ilike("handle", normalizedHandle)
+    .limit(1)
+    .maybeSingle();
+
+  if (data) return { exists: true, contactName: data.name };
+  return { exists: false };
 }
 
 /**
@@ -103,7 +131,6 @@ export async function checkDuplicateOnlyFans(
   const normalized = normalizeOnlyFansUrl(url);
   if (!normalized) return { existsInLeads: false, existsInContacts: false };
 
-  // Check leads
   const { data: leads } = await supabase
     .from("leadgen_entries")
     .select("id, onlyfans_url" as any)
@@ -114,7 +141,6 @@ export async function checkDuplicateOnlyFans(
     (e) => normalizeOnlyFansUrl(e.onlyfans_url || "") === normalized
   );
 
-  // Check contacts
   const { data: contacts } = await supabase
     .from("closers_contacts")
     .select("id, onlyfans_url" as any)
