@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { format, subDays, isSameDay, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from "recharts";
-import { BarChart3, Clock, Users, ChevronsUpDown, Check } from "lucide-react";
+import { BarChart3, Clock, ChevronsUpDown, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
