@@ -51,7 +51,7 @@ const getPlatformIcon = (platform: string) => {
 const cleanPhoneForWhatsApp = (phone: string) =>
   phone.replace(/[^\d]/g, "");
 
-type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "categoria" | "pais" | "contacto" | "qa" | "of";
+type SortKey = "hora" | "handle" | "agente" | "agencia" | "categoria" | "pais" | "contacto" | "qa" | "of";
 
 const QA_RATING_OPTIONS = [
   { value: "bien", label: "Bien", variant: "success-soft" as const },
