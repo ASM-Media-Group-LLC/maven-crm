@@ -89,7 +89,12 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
   // Calculate totals from selected commissions
   const totals = useMemo(() => {
     const selected = commissions.filter(c => selectedCommissionIds.includes(c.id));
-    const agency = selected.reduce((sum, c) => sum + (c.estimated_amount || 0), 0);
+    const agency = selected.reduce((sum, c) => {
+      const config = c.calculation_config as any;
+      const base = Number(c.base_amount) || 0;
+      const pct = Number(config?.percentage) || 0;
+      return sum + (base * pct / 100);
+    }, 0);
     // Blue: from calculation_config if present
     const blue = selected.reduce((sum, c) => {
       const config = c.calculation_config as any;
