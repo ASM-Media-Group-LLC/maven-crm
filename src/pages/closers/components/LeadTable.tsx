@@ -905,6 +905,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v)} />
             </TableCell>
             <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
+            <TableCell className="text-sm">
+              {c.onlyfans_url ? (
+                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
+                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
+                </a>
+              ) : <span className="text-muted-foreground">—</span>}
+            </TableCell>
             <TableCell>
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
