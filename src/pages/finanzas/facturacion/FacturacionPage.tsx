@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  FileText, Clock, CheckCircle, DollarSign, Plus, Eye, Trash2, RotateCcw, Send, Download, Mail,
+  FileText, Clock, CheckCircle, DollarSign, Plus, Eye, Trash2, Ban, RotateCcw, Send, Download, Mail,
   Search, X, LayoutGrid, List,
 } from "lucide-react";
 import html2canvas from "html2canvas";
@@ -33,13 +33,24 @@ import ComisionesTab from "../comisiones/ComisionesTab";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format } from "date-fns";
 
-const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline" | "warning"; label: string }> = {
   borrador: { variant: "secondary", label: "Borrador" },
   enviada: { variant: "outline", label: "Enviada" },
   pagada: { variant: "default", label: "Pagada" },
   parcial: { variant: "outline", label: "Parcial" },
   vencida: { variant: "destructive", label: "Vencida" },
   reversada: { variant: "destructive", label: "Reversada" },
+  cancelada: { variant: "destructive", label: "Cancelada" },
+};
+
+const getDisplayStatus = (inv: any): string => {
+  if (inv.status === "enviada" && inv.due_date) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(inv.due_date + "T12:00:00");
+    if (due < today) return "vencida";
+  }
+  return inv.status;
 };
 
 const FACTURA_TABS = ["Invoices", "Notas de Pago", "Reversos", "Comisiones", "Mail", "Archivo de PagoMundo"] as const;
@@ -146,17 +157,17 @@ export default function FacturacionPage() {
     onError: () => toast({ title: "Error en envío masivo", variant: "destructive" }),
   });
 
-  const deleteMutation = useMutation({
+  const cancelMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("invoices").delete().eq("id", id);
+      const { error } = await supabase.from("invoices").update({ status: "cancelada" }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      toast({ title: "Invoice eliminado" });
-      setDeleteItem(null);
+      toast({ title: "Invoice cancelado" });
+      setCancelItem(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: "Error al cancelar", variant: "destructive" }),
   });
 
   type TabFilters = { search: string; statusFilter: string; dateFrom?: Date; dateTo?: Date; viewMode: "list" | "grid" };
@@ -174,6 +185,7 @@ export default function FacturacionPage() {
   const [viewItem, setViewItem] = useState<any>(null);
   const [viewNoteItem, setViewNoteItem] = useState<any>(null);
   const [deleteItem, setDeleteItem] = useState<any>(null);
+  const [cancelItem, setCancelItem] = useState<any>(null);
   const [reverseItem, setReverseItem] = useState<any>(null);
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
 
@@ -250,16 +262,18 @@ export default function FacturacionPage() {
               <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground">Vencimiento</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}>{Array.from({ length: showBulkCheckbox ? 6 : 5 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+              <TableRow key={i}>{Array.from({ length: showBulkCheckbox ? 7 : 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
             )) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={showBulkCheckbox ? 6 : 5} className="text-center text-muted-foreground py-12">Sin resultados.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={showBulkCheckbox ? 7 : 6} className="text-center text-muted-foreground py-12">Sin resultados.</TableCell></TableRow>
             ) : filtered.map(inv => {
-              const badge = STATUS_BADGE[inv.status] ?? STATUS_BADGE.borrador;
+              const displayStatus = getDisplayStatus(inv);
+              const badge = STATUS_BADGE[displayStatus] ?? STATUS_BADGE.borrador;
               const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
               const initials = creatorName.slice(0, 2).toUpperCase();
               const canEdit = inv.status === "borrador" || inv.status === "enviada";
@@ -283,12 +297,13 @@ export default function FacturacionPage() {
                       : "—"}
                   </TableCell>
                   <TableCell className="text-sm whitespace-nowrap">{inv.due_date ? format(new Date(inv.due_date + "T12:00:00"), "dd/MM/yyyy") : "—"}</TableCell>
+                  <TableCell><Badge variant={badge.variant as any}>{badge.label}</Badge></TableCell>
                   <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                     <div className="flex items-center gap-1">
                       <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
                       <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDownloadPdf(inv)}><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Descargar PDF</TooltipContent></Tooltip>
                       {canEdit && (
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(inv)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setCancelItem(inv)}><Ban className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Cancelar</TooltipContent></Tooltip>
                       )}
                       {canEdit && (
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setReverseItem(inv)}><RotateCcw className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Reversar</TooltipContent></Tooltip>
@@ -321,6 +336,7 @@ export default function FacturacionPage() {
             <SelectItem value="parcial">Parcial</SelectItem>
             <SelectItem value="vencida">Vencida</SelectItem>
             <SelectItem value="reversada">Reversada</SelectItem>
+            <SelectItem value="cancelada">Cancelada</SelectItem>
           </SelectContent>
         </Select>
       )}
@@ -343,12 +359,14 @@ export default function FacturacionPage() {
       {filtered.length === 0 ? (
         <div className="col-span-full text-center text-muted-foreground py-12">Sin resultados.</div>
       ) : filtered.map(inv => {
-        const badge = STATUS_BADGE[inv.status] ?? STATUS_BADGE.borrador;
+        const displayStatus = getDisplayStatus(inv);
+        const badge = STATUS_BADGE[displayStatus] ?? STATUS_BADGE.borrador;
         const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
         return (
           <div key={inv.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono text-muted-foreground">#{inv.invoice_number}</span>
+              <Badge variant={badge.variant as any}>{badge.label}</Badge>
             </div>
             <p className="text-sm font-medium truncate">{creatorName}</p>
             <div className="mt-2 text-xs text-muted-foreground">
@@ -364,7 +382,7 @@ export default function FacturacionPage() {
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDownloadPdf(inv)}><Download className="h-3.5 w-3.5" /></Button>
               {(inv.status === "borrador" || inv.status === "enviada") && (
                 <>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteItem(inv)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setCancelItem(inv)}><Ban className="h-3.5 w-3.5" /></Button>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setReverseItem(inv)}><RotateCcw className="h-3.5 w-3.5" /></Button>
                 </>
               )}
@@ -446,7 +464,7 @@ export default function FacturacionPage() {
                           <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                             <div className="flex items-center gap-1">
                               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewNoteItem(n)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
-                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem({ ...n, _isPaymentNote: true })}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(n)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -621,12 +639,25 @@ export default function FacturacionPage() {
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{deleteItem?._isPaymentNote ? "¿Eliminar nota de pago?" : "¿Eliminar invoice?"}</AlertDialogTitle>
-            <AlertDialogDescription>{deleteItem?._isPaymentNote ? "Se eliminará esta nota de pago permanentemente." : `Se eliminará el invoice #${deleteItem?.invoice_number}.`}</AlertDialogDescription>
+            <AlertDialogTitle>¿Eliminar nota de pago?</AlertDialogTitle>
+            <AlertDialogDescription>Se eliminará esta nota de pago permanentemente.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { if (!deleteItem) return; deleteItem._isPaymentNote ? deletePaymentNoteMutation.mutate(deleteItem.id) : deleteMutation.mutate(deleteItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+            <AlertDialogAction onClick={() => { if (!deleteItem) return; deletePaymentNoteMutation.mutate(deleteItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!cancelItem} onOpenChange={() => setCancelItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cancelar invoice #{cancelItem?.invoice_number}?</AlertDialogTitle>
+            <AlertDialogDescription>El invoice se marcará como cancelado. Esta acción no elimina el registro.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (!cancelItem) return; cancelMutation.mutate(cancelItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Confirmar Cancelación</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
