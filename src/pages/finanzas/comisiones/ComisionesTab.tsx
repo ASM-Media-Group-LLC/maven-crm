@@ -42,6 +42,8 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
   const [viewItem, setViewItem] = useState<any>(null);
   const [editingBlueId, setEditingBlueId] = useState<string | null>(null);
   const [editBlueValue, setEditBlueValue] = useState("");
+  const [editingCommId, setEditingCommId] = useState<string | null>(null);
+  const [editCommValue, setEditCommValue] = useState("");
 
   const { data: commissions = [], isLoading } = useQuery({
     queryKey: ["commissions"],
@@ -92,6 +94,25 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
       setDeleteId(null);
     },
     onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+  });
+
+  const updateCommMutation = useMutation({
+    mutationFn: async ({ id, newPercentage, baseAmount, config }: { id: string; newPercentage: number; baseAmount: number; config: Record<string, any> }) => {
+      const blueAmount = (config.blue_package && config.blue_amount > 0) ? config.blue_amount : 0;
+      const newFinal = (baseAmount * newPercentage / 100) + blueAmount;
+      const newConfig = { ...config, percentage: newPercentage };
+      const { error } = await supabase.from("commissions").update({
+        calculation_config: newConfig as any,
+        final_amount: newFinal,
+      }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["commissions"] });
+      toast({ title: "Comisión actualizada" });
+      setEditingCommId(null);
+    },
+    onError: () => toast({ title: "Error al actualizar comisión", variant: "destructive" }),
   });
 
   const updateBlueMutation = useMutation({
@@ -179,7 +200,36 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
                     </TableCell>
                     <TableCell className="text-sm">{c.period || "—"}</TableCell>
                     <TableCell className="text-sm font-medium">{fmt(Number(c.base_amount) || 0)}</TableCell>
-                    <TableCell className="text-sm text-foreground font-medium">{(() => { const cfg = (c.calculation_config || {}) as Record<string, any>; return cfg.percentage ? `${cfg.percentage}%` : "—"; })()}</TableCell>
+                    <TableCell className="text-sm text-foreground font-medium">{(() => {
+                      const cfg = (c.calculation_config || {}) as Record<string, any>;
+                      if (editingCommId === c.id) {
+                        return (
+                          <Input
+                            type="number"
+                            className="h-7 w-24 text-sm"
+                            value={editCommValue}
+                            onChange={(e) => setEditCommValue(e.target.value)}
+                            onBlur={() => {
+                              const val = parseFloat(editCommValue) || 0;
+                              updateCommMutation.mutate({ id: c.id, newPercentage: val, baseAmount: Number(c.base_amount) || 0, config: cfg });
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { const val = parseFloat(editCommValue) || 0; updateCommMutation.mutate({ id: c.id, newPercentage: val, baseAmount: Number(c.base_amount) || 0, config: cfg }); }
+                              if (e.key === "Escape") setEditingCommId(null);
+                            }}
+                            autoFocus
+                          />
+                        );
+                      }
+                      return (
+                        <span
+                          className="cursor-pointer hover:underline"
+                          onClick={() => { setEditingCommId(c.id); setEditCommValue(String(cfg.percentage || 0)); }}
+                        >
+                          {cfg.percentage ? `${cfg.percentage}%` : "—"}
+                        </span>
+                      );
+                    })()}</TableCell>
                     <TableCell className="text-sm font-medium">{(() => {
                       const cfg = (c.calculation_config || {}) as Record<string, any>;
                       if (editingBlueId === c.id) {
