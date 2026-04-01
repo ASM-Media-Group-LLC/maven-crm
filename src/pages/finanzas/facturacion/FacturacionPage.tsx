@@ -357,7 +357,7 @@ export default function FacturacionPage() {
                 : "—"}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
-              Vence: {inv.due_date ? format(new Date(inv.due_date), "dd/MM/yyyy") : "—"}
+              Vence: {inv.due_date ? format(new Date(inv.due_date + "T12:00:00"), "dd/MM/yyyy") : "—"}
             </div>
             <div className="flex items-center gap-1 mt-3">
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button>
