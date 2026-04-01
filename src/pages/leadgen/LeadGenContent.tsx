@@ -368,17 +368,16 @@ const LeadGenContent = () => {
           {/* === AGENTS TAB === */}
           {activeTab === "agentes" && (
             <div className="flex-1 min-h-0 overflow-auto space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold">Rendimiento de Agentes</h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {dateFrom && dateTo
-                      ? `${format(dateFrom, "d 'de' MMMM", { locale: es })} — ${format(dateTo, "d 'de' MMMM, yyyy", { locale: es })}`
-                      : format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}
-                    {" · "}{agentStats.length} agentes activos
-                  </p>
-                </div>
-              </div>
+              <AnalyticsSectionBanner
+                title="Rendimiento de Agentes"
+                subtitle={
+                  dateFrom && dateTo
+                    ? `${format(dateFrom, "d 'de' MMMM", { locale: es })} — ${format(dateTo, "d 'de' MMMM, yyyy", { locale: es })} · ${agentStats.length} agentes activos`
+                    : `${format(new Date(), "d 'de' MMMM, yyyy", { locale: es })} · ${agentStats.length} agentes activos`
+                }
+                count={agentStats.length}
+                countLabel="Agentes Activos"
+              />
 
               {listView === "calendar" ? (
                 <AgentsWeeklyCalendar
