@@ -93,6 +93,25 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
     onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
   });
 
+  const updateBlueMutation = useMutation({
+    mutationFn: async ({ id, newBlueAmount, baseAmount, config }: { id: string; newBlueAmount: number; baseAmount: number; config: Record<string, any> }) => {
+      const percentage = config.percentage || 0;
+      const newFinal = (baseAmount * percentage / 100) + newBlueAmount;
+      const newConfig = { ...config, blue_amount: newBlueAmount };
+      const { error } = await supabase.from("commissions").update({
+        calculation_config: newConfig as any,
+        final_amount: newFinal,
+      }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["commissions"] });
+      toast({ title: "Blue actualizado" });
+      setEditingBlueId(null);
+    },
+    onError: () => toast({ title: "Error al actualizar Blue", variant: "destructive" }),
+  });
+
   const filtered = commissions.filter(c => {
     const name = c._creator?.artistic_name || c._creator?.name || "";
     const matchSearch = !currentFilters.search || name.toLowerCase().includes(currentFilters.search.toLowerCase()) || (c.period || "").toLowerCase().includes(currentFilters.search.toLowerCase());
