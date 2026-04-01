@@ -137,13 +137,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       platform: "",
       quality: "",
       company: "",
-      nombre: "",
-      email: "",
-      phoneCode: "+1",
-      phone: "",
-      ciudad: "",
       onlyfans_url: "",
-      country_code: "",
       notes: "",
     },
   });
