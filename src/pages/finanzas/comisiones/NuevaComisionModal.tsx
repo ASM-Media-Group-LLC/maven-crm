@@ -4,15 +4,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { CalendarIcon, ChevronsUpDown, Check, AlertCircle } from "lucide-react";
+import { ChevronsUpDown, Check, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 
 interface Props {
   open: boolean;
@@ -141,42 +140,22 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
             </Popover>
           </div>
 
-          {/* Period dates */}
+          {/* Period + Earnings */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Fecha Inicio</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !periodStart && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {periodStart ? format(periodStart, "dd/MM/yyyy") : "Seleccionar"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={periodStart} onSelect={setPeriodStart} locale={es} className="p-3 pointer-events-auto" />
-                </PopoverContent>
-              </Popover>
+              <Label>Período</Label>
+              <DateRangePicker
+                from={periodStart}
+                to={periodEnd}
+                onApply={(from, to) => { setPeriodStart(from); setPeriodEnd(to); }}
+                placeholder="Seleccionar período"
+                className="w-full"
+              />
             </div>
             <div>
-              <Label>Fecha Fin</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !periodEnd && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {periodEnd ? format(periodEnd, "dd/MM/yyyy") : "Seleccionar"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={periodEnd} onSelect={setPeriodEnd} locale={es} className="p-3 pointer-events-auto" />
-                </PopoverContent>
-              </Popover>
+              <Label>Ganancia Total (USD)</Label>
+              <Input type="number" placeholder="0.00" value={baseAmount} onChange={e => setBaseAmount(e.target.value)} />
             </div>
-          </div>
-
-          {/* Earnings */}
-          <div>
-            <Label>Ganancia Total (USD)</Label>
-            <Input type="number" placeholder="0.00" value={baseAmount} onChange={e => setBaseAmount(e.target.value)} />
           </div>
 
           {/* Auto-calc preview */}
