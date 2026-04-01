@@ -297,12 +297,13 @@ export default function FacturacionPage() {
                       : "—"}
                   </TableCell>
                   <TableCell className="text-sm whitespace-nowrap">{inv.due_date ? format(new Date(inv.due_date + "T12:00:00"), "dd/MM/yyyy") : "—"}</TableCell>
+                  <TableCell><Badge variant={badge.variant as any}>{badge.label}</Badge></TableCell>
                   <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                     <div className="flex items-center gap-1">
                       <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
                       <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDownloadPdf(inv)}><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Descargar PDF</TooltipContent></Tooltip>
                       {canEdit && (
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(inv)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setCancelItem(inv)}><Ban className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Cancelar</TooltipContent></Tooltip>
                       )}
                       {canEdit && (
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setReverseItem(inv)}><RotateCcw className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Reversar</TooltipContent></Tooltip>
