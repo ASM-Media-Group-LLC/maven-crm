@@ -313,6 +313,11 @@ const LeadRow = React.memo(({ lead, onView, onDelete, profiles, qaMap, canReview
         <InlineSourceCell lead={lead} />
       </TableCell>
       <TableCell><QualityCell lead={lead} /></TableCell>
+      <TableCell>
+        <Badge variant={(lead as any).record_type === "reactivado" ? "warning-soft" : "success-soft"} className="font-normal">
+          {(lead as any).record_type === "reactivado" ? "Reactivado" : "Nuevo"}
+        </Badge>
+      </TableCell>
       <TableCell className="text-center text-lg">{countryToFlag(lead.country_code)}</TableCell>
       <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}>
         {lead.phone_raw ? (
