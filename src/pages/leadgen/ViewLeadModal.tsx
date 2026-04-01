@@ -134,15 +134,28 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
             <DialogHeader>
               <div className="flex items-start justify-between gap-4 pr-8">
                 <DialogTitle className="text-xl">Lead</DialogTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1 shrink-0"
-                  onClick={() => setShowConvertModal(true)}
-                >
-                  <UserCheck className="h-3.5 w-3.5" />
-                  Convertir a Contacto
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {onDelete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 text-destructive hover:text-destructive"
+                      onClick={onDelete}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Eliminar
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
+                    onClick={() => setShowConvertModal(true)}
+                  >
+                    <UserCheck className="h-3.5 w-3.5" />
+                    Convertir a Contacto
+                  </Button>
+                </div>
               </div>
               <DialogDescription className="sr-only">Detalle del lead</DialogDescription>
             </DialogHeader>
