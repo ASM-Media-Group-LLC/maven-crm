@@ -140,7 +140,6 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
     setTemplateId("");
     setCreatorId("");
     setSelectedCommissionIds([]);
-    setDueDate("");
     setNotes("");
     onClose();
   };
