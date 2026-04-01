@@ -157,17 +157,17 @@ export default function FacturacionPage() {
     onError: () => toast({ title: "Error en envío masivo", variant: "destructive" }),
   });
 
-  const deleteMutation = useMutation({
+  const cancelMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("invoices").delete().eq("id", id);
+      const { error } = await supabase.from("invoices").update({ status: "cancelada" }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
-      toast({ title: "Invoice eliminado" });
-      setDeleteItem(null);
+      toast({ title: "Invoice cancelado" });
+      setCancelItem(null);
     },
-    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    onError: () => toast({ title: "Error al cancelar", variant: "destructive" }),
   });
 
   type TabFilters = { search: string; statusFilter: string; dateFrom?: Date; dateTo?: Date; viewMode: "list" | "grid" };
