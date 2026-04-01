@@ -34,6 +34,7 @@ import AgentDetailView from "./AgentDetailView";
 import AgentHourlyPerformance from "./AgentHourlyPerformance";
 import LeadGenSupervisorView from "./LeadGenSupervisorView";
 import LeadGenPerformanceView from "./LeadGenPerformanceView";
+import AnalyticsSectionBanner from "@/components/analytics/AnalyticsSectionBanner";
 
 const knownStatuses = new Set(["no_response", "contactado", "respondio", "interesado", "no_interesado"]);
 
