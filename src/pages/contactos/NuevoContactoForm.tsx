@@ -153,16 +153,15 @@ const NuevoContactoForm = () => {
         return;
       }
 
-      // VALIDATION 2: Check if lead was created in last 24h
-      const recentCheck = await checkRecentLead(form.accountLink, form.onlyfansUrl);
-      if (recentCheck.exists) {
+      // VALIDATION 2: Check if handle previously existed (informational, non-blocking)
+      const previousCheck = await checkPreviousLead(form.accountLink, form.onlyfansUrl);
+      let recordType = "nuevo";
+      if (previousCheck.existed) {
+        recordType = "reactivado";
         toast({
-          title: "Lead duplicado reciente",
-          description: "Este lead ya fue registrado hace menos de 24 horas. Intenta nuevamente más tarde.",
-          variant: "destructive",
+          title: "Modelo reactivada",
+          description: "Esta modelo ya existía en el sistema. Se registrará como un nuevo contacto reactivado.",
         });
-        setIsSaving(false);
-        return;
       }
 
       // VALIDATION 3: Check duplicate OnlyFans URL
