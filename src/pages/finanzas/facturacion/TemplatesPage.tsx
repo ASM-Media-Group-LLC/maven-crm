@@ -139,27 +139,22 @@ export default function TemplatesPage() {
         key={editTemplate?.id || "new"}
       />
 
-      {/* View modal */}
-      {viewTemplate && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center" onClick={() => setViewTemplate(null)}>
-          <div className="bg-muted rounded-lg p-6 max-w-2xl w-full mx-4 space-y-4 max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold">{viewTemplate.name}</h3>
-            <div className="flex justify-center">
-              <InvoiceA4Preview
-                invoice={{}}
-                template={{
-                  company_name: viewTemplate.company_name,
-                  company_address: viewTemplate.company_address,
-                  company_zip: viewTemplate.company_zip,
-                  company_email: viewTemplate.company_email,
-                  logo_url: viewTemplate.logo_url,
-                }}
-              />
-            </div>
-            <Button variant="outline" className="w-full" onClick={() => setViewTemplate(null)}>Cerrar</Button>
-          </div>
-        </div>
-      )}
+      <Dialog open={!!viewTemplate} onOpenChange={() => setViewTemplate(null)}>
+        <DialogContent className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button:last-child]:hidden">
+          {viewTemplate && (
+            <InvoiceA4Preview
+              invoice={{}}
+              template={{
+                company_name: viewTemplate.company_name,
+                company_address: viewTemplate.company_address,
+                company_zip: viewTemplate.company_zip,
+                company_email: viewTemplate.company_email,
+                logo_url: viewTemplate.logo_url,
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
