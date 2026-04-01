@@ -29,7 +29,6 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
   const [creatorId, setCreatorId] = useState("");
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [selectedCommissionIds, setSelectedCommissionIds] = useState<string[]>([]);
-  const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
 
   // Fetch templates (type = "invoice")
