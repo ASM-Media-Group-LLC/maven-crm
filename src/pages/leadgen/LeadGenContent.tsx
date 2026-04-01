@@ -504,7 +504,17 @@ const LeadGenContent = () => {
       {/* Modals */}
       <AddLeadModal open={addLeadOpen} onOpenChange={setAddLeadOpen} />
       <AddContactoModal open={addContactoOpen} onOpenChange={setAddContactoOpen} />
-      <ViewLeadModal open={viewLeadOpen} onOpenChange={setViewLeadOpen} lead={selectedLead} />
+      <ViewLeadModal
+        open={viewLeadOpen}
+        onOpenChange={setViewLeadOpen}
+        lead={selectedLead}
+        onDelete={isAdmin ? () => {
+          setViewLeadOpen(false);
+          setDeleteLead(selectedLead);
+          setDeleteLeadOpen(true);
+        } : undefined}
+      />
+      <DeleteLeadDialog open={deleteLeadOpen} onOpenChange={setDeleteLeadOpen} lead={deleteLead} />
     </main>
   );
 };
