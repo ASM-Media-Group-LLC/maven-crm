@@ -598,6 +598,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <SortHeader label="Categoría" sortKey="category" {...sp} />
             <SortHeader label="Estado" sortKey="stage" {...sp} />
             <SortHeader label="Teléfono" sortKey="phone" {...sp} />
+            <TableHead className={stickyBase}>OF URL</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
             <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
