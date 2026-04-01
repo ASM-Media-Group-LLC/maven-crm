@@ -104,16 +104,10 @@ const leadSchema = z.object({
   platform: z.string().min(1, "Plataforma requerida"),
   quality: z.string().min(1, "Categoría requerida"),
   company: z.string().min(1, "Compañía requerida"),
-  nombre: z.string().optional(),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
-  phoneCode: z.string().optional(),
-  phone: z.string().optional(),
-  ciudad: z.string().optional(),
   onlyfans_url: z.string().optional().refine(
     (val) => !val || val.includes("onlyfans.com") || /^[a-zA-Z0-9._-]+$/.test(val),
     "Debe ser una URL de OnlyFans válida o un handle"
   ),
-  country_code: z.string().optional(),
   notes: z.string().max(500, "Máximo 500 caracteres").optional(),
 });
 
