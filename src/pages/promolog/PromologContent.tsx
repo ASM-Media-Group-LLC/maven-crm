@@ -60,6 +60,7 @@ import PromologTable from "./PromologTable";
 import PromologGrid from "./PromologGrid";
 import PromologAgentDetailView from "./PromologAgentDetailView";
 import PromologPerformanceView from "./PromologPerformanceView";
+import AnalyticsSectionBanner from "@/components/analytics/AnalyticsSectionBanner";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -737,28 +738,16 @@ const PromologContent = () => {
             </div>
           </div>
 
-          {/* Banner gradient al estilo LeadGen */}
-          <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
-            <div className="p-6 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-primary">Rendimiento de Agentes</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {agentesView === "calendar"
-                    ? (() => { const days = getAgentWeekDays(agentWeekOffset); return `${format(days[0], "d 'de' MMMM", { locale: es })} – ${format(days[6], "d 'de' MMMM, yyyy", { locale: es })}`; })()
-                    : (dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha")}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <p className="text-3xl font-bold text-primary">{agentsData.length}</p>
-                  <p className="text-xs text-muted-foreground">Agentes Activos</p>
-                </div>
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Users className="h-5 w-5 text-primary" />
-                </div>
-              </div>
-            </div>
-          </div>
+          <AnalyticsSectionBanner
+            title="Rendimiento de Agentes"
+            subtitle={
+              agentesView === "calendar"
+                ? (() => { const days = getAgentWeekDays(agentWeekOffset); return `${format(days[0], "d 'de' MMMM", { locale: es })} – ${format(days[6], "d 'de' MMMM, yyyy", { locale: es })}`; })()
+                : (dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha")
+            }
+            count={agentsData.length}
+            countLabel="Agentes Activos"
+          />
 
           {/* Calendar view or agent cards */}
           {agentesView === "calendar" ? (() => {

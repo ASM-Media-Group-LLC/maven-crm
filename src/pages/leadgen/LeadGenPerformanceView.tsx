@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { format, subDays, isSameDay, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from "recharts";
-import { BarChart3, Clock, Users, ChevronsUpDown, Check } from "lucide-react";
+import { BarChart3, Clock, ChevronsUpDown, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -72,42 +72,35 @@ const LeadGenPerformanceView = ({ profiles, agentIds, dateFrom, dateTo }: Props)
   return (
     <Card>
       <CardContent className="pt-6">
-        <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary mb-6">
-          <div className="p-6 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-primary">Rendimiento por Agente</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Selecciona un agente para analizar su actividad
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-[200px] h-9 justify-between font-normal">
-                    {selectedName}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[200px] p-0">
-                  <Command>
-                    <CommandInput placeholder="Buscar agente..." />
-                    <CommandList>
-                      <CommandEmpty>No encontrado</CommandEmpty>
-                      {agents.map(a => (
-                        <CommandItem key={a.id} value={a.name} onSelect={() => { setSelectedAgent(a.id); setOpen(false); }}>
-                          {a.name}
-                          {selectedAgent === a.id && <Check className="ml-auto h-4 w-4" />}
-                        </CommandItem>
-                      ))}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <Users className="h-5 w-5 text-primary" />
-              </div>
-            </div>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-base font-semibold">Rendimiento por Agente</h3>
+            <p className="text-sm text-muted-foreground">
+              Selecciona un agente para analizar su actividad
+            </p>
           </div>
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[220px] h-9 justify-between font-normal">
+                {selectedName}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[220px] p-0">
+              <Command>
+                <CommandInput placeholder="Buscar agente..." />
+                <CommandList>
+                  <CommandEmpty>No encontrado</CommandEmpty>
+                  {agents.map(a => (
+                    <CommandItem key={a.id} value={a.name} onSelect={() => { setSelectedAgent(a.id); setOpen(false); }}>
+                      {a.name}
+                      {selectedAgent === a.id && <Check className="ml-auto h-4 w-4" />}
+                    </CommandItem>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {!selectedAgent ? (

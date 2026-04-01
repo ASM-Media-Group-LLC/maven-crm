@@ -2,16 +2,14 @@ import { useMemo, useState, useEffect } from "react";
 import { format, subDays, isSameDay, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from "recharts";
-import { BarChart3, Clock, Users, ChevronsUpDown, Check, CheckCircle, Minus, X } from "lucide-react";
+import { BarChart3, Clock, ChevronsUpDown, Check, CheckCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePromologAgentStats, usePromologAgentEntries } from "./usePromologAgentStats";
 
 interface Props {
   profiles: Array<{ id: string; full_name: string | null }>;
@@ -35,47 +33,27 @@ const PromologPerformanceView = ({ profiles }: Props) => {
 
   const effectiveAgent = isOperational ? user?.id ?? null : selectedAgent;
 
-  // Get all unique agent IDs from promolog_entries
-  const { data: agentIds = [] } = useQuery({
-    queryKey: ["promolog-agent-ids-perf"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("promolog_entries")
-        .select("reviewed_by, created_by");
-      const ids = new Set<string>();
-      (data ?? []).forEach((e: any) => {
-        if (e.reviewed_by) ids.add(e.reviewed_by);
-        if (e.created_by) ids.add(e.created_by);
-      });
-      return Array.from(ids);
-    },
-    enabled: !isOperational,
-  });
+  // Get profile IDs for the shared hook
+  const profileIds = useMemo(() => profiles.filter(p => p.full_name).map(p => p.id), [profiles]);
 
+  // Use shared hook for agent stats (batched, all entries)
+  const { data: agentStats = [], isLoading: statsLoading } = usePromologAgentStats(profileIds);
+
+  // Build agents list from stats
   const agents = useMemo(() => {
-    return agentIds
-      .map(id => {
-        const p = profiles.find(pr => pr.id === id);
-        return p?.full_name ? { id, name: p.full_name } : null;
+    return agentStats
+      .map(stat => {
+        const p = profiles.find(pr => pr.id === stat.id);
+        return p?.full_name ? { id: stat.id, name: p.full_name } : null;
       })
       .filter((a): a is { id: string; name: string } => a !== null)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [agentIds, profiles]);
+  }, [agentStats, profiles]);
 
-  // Fetch entries for selected agent
-  const { data: agentEntries = [], isLoading } = useQuery({
-    queryKey: ["promolog-perf-entries", effectiveAgent],
-    queryFn: async () => {
-      if (!effectiveAgent) return [];
-      const { data } = await supabase
-        .from("promolog_entries")
-        .select("id, date, promoted, network, created_at")
-        .or(`reviewed_by.eq.${effectiveAgent},created_by.eq.${effectiveAgent}`)
-        .order("date", { ascending: false });
-      return data ?? [];
-    },
-    enabled: !!effectiveAgent,
-  });
+  // Use shared hook for agent entries (batched, all entries)
+  const { data: agentEntries = [], isLoading: entriesLoading } = usePromologAgentEntries(effectiveAgent);
+
+  const isLoading = statsLoading || entriesLoading;
 
   const selectedName = !effectiveAgent
     ? "Seleccionar agente"
@@ -133,44 +111,38 @@ const PromologPerformanceView = ({ profiles }: Props) => {
   return (
     <Card>
       <CardContent className="pt-6">
-        <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary mb-6">
-          <div className="p-5 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
-                <BarChart3 className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-base">Rendimiento por Agente</h3>
-                <p className="text-sm text-muted-foreground">
-                  {format(now, "dd 'de' MMMM, yyyy", { locale: es })} · {agents.length} agentes activos
-                </p>
-              </div>
-            </div>
-            {!isOperational && (
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-[200px] h-9 justify-between font-normal">
-                    {selectedName}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[200px] p-0">
-                  <Command>
-                    <CommandInput placeholder="Buscar agente..." />
-                    <CommandList>
-                      <CommandEmpty>No encontrado</CommandEmpty>
-                      {agents.map(a => (
-                        <CommandItem key={a.id} value={a.name} onSelect={() => { setSelectedAgent(a.id); setOpen(false); }}>
-                          {a.name}
-                          {selectedAgent === a.id && <Check className="ml-auto h-4 w-4" />}
-                        </CommandItem>
-                      ))}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            )}
+        {/* Simple header with selector — no banner */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-base font-semibold">Rendimiento por Agente</h3>
+            <p className="text-sm text-muted-foreground">
+              {format(now, "dd 'de' MMMM, yyyy", { locale: es })} · {agents.length} agentes activos
+            </p>
           </div>
+          {!isOperational && (
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-[220px] h-9 justify-between font-normal">
+                  {selectedName}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[220px] p-0">
+                <Command>
+                  <CommandInput placeholder="Buscar agente..." />
+                  <CommandList>
+                    <CommandEmpty>No encontrado</CommandEmpty>
+                    {agents.map(a => (
+                      <CommandItem key={a.id} value={a.name} onSelect={() => { setSelectedAgent(a.id); setOpen(false); }}>
+                        {a.name}
+                        {selectedAgent === a.id && <Check className="ml-auto h-4 w-4" />}
+                      </CommandItem>
+                    ))}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         {!effectiveAgent ? (
