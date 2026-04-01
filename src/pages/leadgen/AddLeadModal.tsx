@@ -89,11 +89,26 @@ const ALL_COUNTRIES = [
   { code: "zw", flag: "🇿🇼", name: "Zimbabue" },
 ];
 
+const PHONE_CODES = [
+  { code: "+1", flag: "🇺🇸" }, { code: "+44", flag: "🇬🇧" }, { code: "+34", flag: "🇪🇸" },
+  { code: "+52", flag: "🇲🇽" }, { code: "+57", flag: "🇨🇴" }, { code: "+54", flag: "🇦🇷" },
+  { code: "+56", flag: "🇨🇱" }, { code: "+55", flag: "🇧🇷" }, { code: "+51", flag: "🇵🇪" },
+  { code: "+58", flag: "🇻🇪" }, { code: "+593", flag: "🇪🇨" }, { code: "+507", flag: "🇵🇦" },
+  { code: "+506", flag: "🇨🇷" }, { code: "+502", flag: "🇬🇹" }, { code: "+503", flag: "🇸🇻" },
+  { code: "+504", flag: "🇭🇳" }, { code: "+505", flag: "🇳🇮" }, { code: "+591", flag: "🇧🇴" },
+  { code: "+595", flag: "🇵🇾" }, { code: "+598", flag: "🇺🇾" }, { code: "+809", flag: "🇩🇴" },
+];
+
 const leadSchema = z.object({
   source_link: z.string().url("URL de perfil requerida"),
   platform: z.string().min(1, "Plataforma requerida"),
   quality: z.string().min(1, "Categoría requerida"),
   company: z.string().min(1, "Compañía requerida"),
+  nombre: z.string().optional(),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  phoneCode: z.string().optional(),
+  phone: z.string().optional(),
+  ciudad: z.string().optional(),
   onlyfans_url: z.string().optional().refine(
     (val) => !val || val.includes("onlyfans.com") || /^[a-zA-Z0-9._-]+$/.test(val),
     "Debe ser una URL de OnlyFans válida o un handle"
@@ -128,6 +143,11 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       platform: "",
       quality: "",
       company: "",
+      nombre: "",
+      email: "",
+      phoneCode: "+1",
+      phone: "",
+      ciudad: "",
       onlyfans_url: "",
       country_code: "",
       notes: "",
@@ -205,8 +225,11 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         }
       }
 
+      const phoneRaw = data.phone?.trim() ? `${data.phoneCode || ""}${data.phone.trim()}` : null;
+
       const { data: inserted, error } = await supabase.from("leadgen_entries").insert({
         model_handle: normalizedHandle,
+        model_name: data.nombre?.trim() || null,
         platform: data.platform,
         quality: data.quality,
         company: data.company,
@@ -214,6 +237,9 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         notes: data.notes || null,
         source_link: data.source_link,
         onlyfans_url: data.onlyfans_url?.trim() || null,
+        email: data.email?.trim() || null,
+        phone_raw: phoneRaw,
+        city: data.ciudad?.trim() || null,
         lg_user_id: user.id,
         entry_date: getMiamiDateStr(),
       } as any).select("id").single();
@@ -306,6 +332,81 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="nombre"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nombre del modelo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="correo@ejemplo.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="ciudad"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ciudad</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ciudad" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <FormLabel>Teléfono</FormLabel>
+                <div className="flex gap-2">
+                  <FormField
+                    control={form.control}
+                    name="phoneCode"
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger className="w-[100px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PHONE_CODES.map(pc => (
+                            <SelectItem key={pc.code} value={pc.code}>{pc.flag} {pc.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormControl>
+                        <Input placeholder="Número de teléfono" className="flex-1" {...field} />
+                      </FormControl>
+                    )}
+                  />
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField

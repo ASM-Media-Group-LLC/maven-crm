@@ -51,7 +51,7 @@ const getPlatformIcon = (platform: string) => {
 const cleanPhoneForWhatsApp = (phone: string) =>
   phone.replace(/[^\d]/g, "");
 
-type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "categoria" | "pais" | "contacto" | "qa" | "of";
+type SortKey = "hora" | "handle" | "agente" | "agencia" | "categoria" | "pais" | "contacto" | "qa" | "of";
 
 const QA_RATING_OPTIONS = [
   { value: "bien", label: "Bien", variant: "success-soft" as const },
@@ -271,11 +271,6 @@ const LeadRow = React.memo(({ lead, onView, profiles, qaMap, canReview }: { lead
         {format(new Date(lead.created_at), "dd/MM/yyyy hh:mm a", { locale: es })}
       </TableCell>
       <TableCell>
-        <Badge variant="outline" className="font-mono text-xs">
-          {getTicketId(lead)}
-        </Badge>
-      </TableCell>
-      <TableCell>
         <a
           href={buildProfileUrl(lead)}
           target="_blank"
@@ -374,7 +369,7 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
     let va = "", vb = "";
       switch (sortKey) {
       case "hora": va = a.created_at; vb = b.created_at; break;
-      case "ticket": va = a.id; vb = b.id; break;
+      
       case "handle": va = a.model_handle; vb = b.model_handle; break;
       case "of": va = (a as any).onlyfans_url ?? ""; vb = (b as any).onlyfans_url ?? ""; break;
       case "agente": va = a.agent_name ?? ""; vb = b.agent_name ?? ""; break;
@@ -399,7 +394,6 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
       <TableHeader>
         <TableRow>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="hora" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" col="ticket" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Handle" col="handle" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="OF URL" col="of" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="agente" /></TableHead>
