@@ -1,4 +1,4 @@
-import { Eye, MoreHorizontal, Pencil, Sparkles } from "lucide-react";
+import { Eye, MoreHorizontal, Pencil, Sparkles, Trash2 } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import { Card, CardContent } from "@/components/ui/card";
