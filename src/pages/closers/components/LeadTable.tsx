@@ -871,6 +871,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm text-muted-foreground">
               {c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy hh:mm a") : "—"}
             </TableCell>
+            <TableCell className="text-sm">
+              {c.onlyfans_url ? (
+                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
+                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
+                </a>
+              ) : <span className="text-muted-foreground">—</span>}
+            </TableCell>
             <TableCell>
               <InlineText value={c.rejection_reason} onSave={(v) => onFieldChange(c.id, "rejection_reason", v)} placeholder="Sin motivo" />
             </TableCell>
