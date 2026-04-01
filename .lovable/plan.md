@@ -1,114 +1,46 @@
 
 
-## Plan: Validaciones de duplicados + Campo OnlyFans en LeadGen y Contactos
+## Plan: Fix Notas en Closers + Banner en Rendimiento LeadGen + Consistencia de columnas
 
-### Resumen
+### Problema 1: Closers — OF URL aparece donde debería ser Notas
+En la tab "Todas" del Closers (`LeadTable.tsx`), la columna "OF URL" está correctamente separada de "Notas" (líneas 613-614, 916-924). Sin embargo, en las **otras tabs** (Asignadas, Confirmadas, Completadas, Nuevo, No Interesadas) **no se incluye la columna OF URL**, lo que hace que los datos de OnlyFans no se muestren. El campo `notes` se muestra correctamente como `InlineText` editable en todas las tabs. No hay un bug de "OF en Notas" — simplemente las otras tabs no tienen la columna OF URL. Se agregará.
 
-Implementar 3 reglas de validación al crear leads y contactos, y agregar el campo OnlyFans URL a ambos módulos.
+### Problema 2: LeadGen Rendimiento — Header sin banner
+El header "Rendimiento por Agente" en `LeadGenPerformanceView.tsx` usa un simple `div` con texto y un icono, mientras que Supervisores usa un banner con gradiente (`bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary`). Se alineará al mismo estilo banner.
 
----
+### Problema 3: Consistencia en orden de columnas
+El estándar de columnas definido en la memoria es: **#, Creación, Handle, Agente, Categoría, Contacto, Notas, Acciones**. Actualmente:
 
-### 1. Migración DB: Agregar columna `onlyfans_url` a `leadgen_entries` y `closers_contacts`
+| Módulo | Orden actual | Problemas |
+|---|---|---|
+| LeadGen | Creación, Ticket, Handle, OF, Agente, Agencia, Categoría, País, Contacto, QA, Acciones | OK (tiene campos extra propios) |
+| Contactos | Creación, Registro, Nombre, País, Ciudad, Agente, Instagram, OF, Contacto, Categoría, Acciones | Categoría al final, Instagram después de Agente |
+| Closers (Todas) | #, Creación, Instagram, Estado, Cuenta origen, Categoría, Agente, Contactos, Teléfono, OF, Notas, Acciones | Agente después de Categoría |
 
-```sql
-ALTER TABLE public.leadgen_entries ADD COLUMN IF NOT EXISTS onlyfans_url text;
-ALTER TABLE public.closers_contacts ADD COLUMN IF NOT EXISTS onlyfans_url text;
-```
+Se normalizará Contactos para seguir: Creación, Registro, Nombre, Instagram, OF, Agente, Categoría, País, Ciudad, Contacto, Acciones.
 
-Ambas tablas actualmente no tienen esta columna. `creators` ya la tiene.
+### Cambios
 
----
+**1. `src/pages/closers/components/LeadTable.tsx`**
+- Agregar columna "OF URL" a las tabs que no la tienen: Asignadas (headers línea ~525-538, row ~638-709), Nuevo (línea ~588-599), No Interesadas (línea ~575-585)
+- En Confirmadas y Completadas, agregar OF URL si no está presente
+- Renderizar `c.onlyfans_url` como link externo (mismo patrón de tab "Todas")
 
-### 2. Utilidad compartida de validación: `src/lib/lead-validation.ts`
+**2. `src/pages/leadgen/LeadGenPerformanceView.tsx`**
+- Reemplazar el header simple (líneas 74-101) con un banner estilo Supervisores:
+  - `rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary`
+  - Título "Rendimiento por Agente", subtítulo descriptivo, selector a la derecha
+  - Icono en circle badge
 
-Crear un módulo con 3 funciones async reutilizables:
+**3. `src/pages/contactos/ContactosTable.tsx`**
+- Reordenar columnas a: Creación, Registro, Nombre, Instagram, OF URL, Agente, Categoría, País, Ciudad, Contacto, Acciones
+- Mover Instagram antes de Agente, Categoría antes de País
 
-**`checkCreatorExists(handle, onlyfansUrl?)`**
-- Consulta `creators` por `instagram_handle` (normalizado) O `onlyfans_url` (normalizado)
-- Retorna `{ exists: boolean, creatorName?: string, creatorId?: string }`
+### Archivos a modificar
 
-**`checkRecentLead(handle, onlyfansUrl?)`**
-- Consulta `leadgen_entries` donde `model_handle` = handle normalizado O `onlyfans_url` = url normalizada
-- Filtra `created_at > now() - 24h`
-- Retorna `{ exists: boolean, createdAt?: string, agentName?: string }`
-
-**`checkDuplicateOnlyFans(url)`**
-- Consulta `leadgen_entries` y `closers_contacts` por `onlyfans_url` normalizada
-- Retorna `{ existsInLeads: boolean, existsInContacts: boolean }`
-
----
-
-### 3. Modificar `AddLeadModal.tsx` — Validación + campo OF
-
-**Antes del insert** (en `onSubmit`), ejecutar en orden:
-1. `checkCreatorExists(handle, onlyfansUrl)` → si existe, mostrar alert con opciones "Ver perfil" / "Cancelar"
-2. `checkRecentLead(handle, onlyfansUrl)` → si existe, bloquear con toast "Este lead ya fue registrado hace menos de 24 horas"
-3. `checkDuplicateOnlyFans(url)` → si existe en leads/contactos, bloquear
-
-**Campo nuevo en el formulario:**
-- Agregar `onlyfans_url` al schema zod (opcional, validar formato URL si no vacío)
-- Agregar input "OnlyFans URL" debajo del campo URL del Perfil
-- Guardar en el insert como `onlyfans_url`
-
-**Alert de "ya es creator":** Usar un Dialog de confirmación (no toast) con botones "Ver perfil" (navega a `/creadoras/{id}`) y "Cancelar".
-
----
-
-### 4. Modificar `NuevoContactoForm.tsx` — Validación + campo OF
-
-**Antes del insert** (en `handleSubmit`), mismas validaciones:
-1. Validar handle contra creators
-2. Validar lead reciente (<24h) contra `leadgen_entries`
-3. Validar duplicado OF contra `leadgen_entries` y `closers_contacts`
-
-**Campo nuevo:**
-- Agregar `onlyfansUrl` al FormData
-- Input "OnlyFans URL" en la sección de links
-- Guardar como `onlyfans_url` en el insert
-
----
-
-### 5. Agregar columna OF URL a tablas
-
-**`LeadGenTable.tsx`:**
-- Agregar columna "OF URL" después de la columna Handle
-- Mostrar como link externo truncado (similar a source_link)
-- Actualizar `ENTRY_COLUMNS` en `useLeadGen.ts` para incluir `onlyfans_url`
-- Actualizar tipo `LeadGenEntry` con `onlyfans_url?: string | null`
-
-**`ContactosTable.tsx`:**
-- Agregar columna "OF URL" en posición similar
-- Mostrar como link externo
-
----
-
-### 6. Normalización de OnlyFans URL
-
-Reutilizar `normalizeHandle` de `handle-utils.ts` que ya soporta `onlyfans.com`. Para la validación de formato, verificar que empiece con `https://onlyfans.com/` o sea un handle simple.
-
----
-
-### Orden de validación (en ambos formularios)
-
-```text
-1. ¿Es creator existente? (instagram_handle O onlyfans_url en creators) → BLOQUEAR
-2. ¿Lead reciente <24h? (model_handle O onlyfans_url en leadgen_entries) → BLOQUEAR  
-3. ¿Duplicado OF en contactos? (onlyfans_url en closers_contacts) → BLOQUEAR
-4. Todo OK → PERMITIR creación
-```
-
----
-
-### Archivos a modificar/crear
-
-| Archivo | Acción |
+| Archivo | Cambio |
 |---------|--------|
-| Migración SQL | Agregar `onlyfans_url` a `leadgen_entries` y `closers_contacts` |
-| `src/lib/lead-validation.ts` | **Crear** — Funciones de validación compartidas |
-| `src/pages/leadgen/AddLeadModal.tsx` | Agregar campo OF + validaciones pre-submit |
-| `src/pages/leadgen/useLeadGen.ts` | Agregar `onlyfans_url` a `ENTRY_COLUMNS` y tipo |
-| `src/pages/leadgen/LeadGenTable.tsx` | Agregar columna OF URL |
-| `src/pages/contactos/NuevoContactoForm.tsx` | Agregar campo OF + validaciones pre-submit |
-| `src/pages/contactos/ContactosTable.tsx` | Agregar columna OF URL |
-| `src/pages/contactos/ContactosContent.tsx` | Incluir `onlyfans_url` en el tipo Contacto si necesario |
+| `src/pages/closers/components/LeadTable.tsx` | Agregar columna OF URL a tabs faltantes |
+| `src/pages/leadgen/LeadGenPerformanceView.tsx` | Reemplazar header por banner con gradiente |
+| `src/pages/contactos/ContactosTable.tsx` | Reordenar columnas al estándar |
 
