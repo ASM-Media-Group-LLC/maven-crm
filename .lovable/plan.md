@@ -1,45 +1,57 @@
 
 
-## Reemplazar eliminación por cancelación + columna Estado en Invoices
+## Permitir reingreso de modelos + campo "Tipo de registro" (Nuevo/Reactivado)
 
 ### Resumen
-Eliminar la funcionalidad de borrado de invoices y reemplazarla por "Cancelar" (cambia status a `cancelada`). Agregar columna "Estado" visible en la tabla con badges para todos los estados. Agregar `cancelada` como nuevo estado posible.
+Eliminar el bloqueo cuando un Instagram ya existe en leads/contactos. En su lugar, detectar si el handle ya fue registrado previamente y marcar el nuevo registro como "Reactivado", mostrando un mensaje informativo (no bloqueante). Agregar columna `record_type` a `leadgen_entries` y `closers_contacts`.
 
-### Cambios en `src/pages/finanzas/facturacion/FacturacionPage.tsx`
+### 1. Migración SQL
+Agregar columna `record_type` con default `'nuevo'` a ambas tablas:
+```sql
+ALTER TABLE public.leadgen_entries 
+  ADD COLUMN record_type text NOT NULL DEFAULT 'nuevo';
 
-**1. Actualizar STATUS_BADGE (línea 36-43)**
-- Agregar `cancelada: { variant: "destructive", label: "Cancelada" }`
+ALTER TABLE public.closers_contacts 
+  ADD COLUMN record_type text NOT NULL DEFAULT 'nuevo';
+```
 
-**2. Reemplazar `deleteMutation` (líneas 149-160) por `cancelMutation`**
-- En vez de `.delete()`, hacer `.update({ status: "cancelada" })` en la tabla `invoices`
-- Renombrar estado `deleteItem` → `cancelItem` y actualizar toda referencia
+### 2. `src/lib/lead-validation.ts`
+- **Renombrar** `checkRecentLead` → mantener pero cambiar su uso. Crear nueva función `checkPreviousLead(handle, onlyfansUrl)` que busque cualquier registro previo (sin límite de 24h) en `leadgen_entries` y `closers_contacts` por handle.
+- Retorna `{ existed: boolean }` — solo informativo, **no bloquea**.
+- **Mantener** `checkCreatorExists` (bloqueo si ya es creadora de la agencia — esto sigue vigente).
+- **Eliminar** la validación de 24h (`checkRecentLead`) que actualmente bloquea duplicados por handle.
+- **Mantener** `checkDuplicateOnlyFans` como validación (OnlyFans sí debe seguir siendo único).
 
-**3. Tabla: agregar columna "Estado" y reemplazar icono Trash**
-- Agregar `<TableHead>Estado</TableHead>` después de "Vencimiento" (línea 252)
-- Agregar `<TableCell>` con `<Badge>` del estado correspondiente en cada fila
-- Reemplazar `Trash2` por icono `Ban` (de lucide-react) con tooltip "Cancelar"
-- El click abre un diálogo de confirmación para cancelar (no eliminar)
-- Solo mostrar botón cancelar si `canEdit` (borrador o enviada)
+### 3. `src/pages/leadgen/AddLeadModal.tsx`
+- **Eliminar** VALIDATION 2 (checkRecentLead bloqueante, líneas 114-124).
+- **Agregar** antes del insert: llamar a `checkPreviousLead(handle)`. Si `existed === true`:
+  - Mostrar toast informativo (no destructive): "Esta modelo ya existía en el sistema. Se registrará como un nuevo lead reactivado."
+  - Insertar con `record_type: 'reactivado'`
+- Si no existía: insertar con `record_type: 'nuevo'` (default).
 
-**4. Grid: mismo cambio (líneas 362-369)**
-- Reemplazar `Trash2` por `Ban`, mismo comportamiento de cancelación
-- Agregar badge de estado en la card
+### 4. `src/pages/contactos/NuevoContactoForm.tsx`
+- **Eliminar** VALIDATION 2 (checkRecentLead bloqueante, líneas 156-166).
+- **Agregar** misma lógica: detectar si handle ya existía → insertar con `record_type: 'reactivado'` y mostrar mensaje informativo.
 
-**5. AlertDialog de confirmación (líneas 621-632)**
-- Separar la lógica: para invoices usar textos de "Cancelar" en vez de "Eliminar"
-- El diálogo de notas de pago mantiene eliminación real (ya que son payment notes)
-- Texto: "¿Cancelar invoice #X?" / "El invoice se marcará como cancelado. Esta acción no elimina el registro."
-- Botón: "Confirmar Cancelación"
+### 5. `src/pages/leadgen/LeadGenTable.tsx`
+- Agregar columna "Tipo" en la tabla con badge visual:
+  - `nuevo` → Badge verde ("Nuevo")
+  - `reactivado` → Badge amarillo ("Reactivado")
+- Ubicar después de la columna de categoría/calidad.
 
-**6. Filtro de estado (línea 314-324)**
-- Agregar `<SelectItem value="cancelada">Cancelada</SelectItem>` al dropdown de filtro
+### 6. `src/pages/contactos/ContactosTable.tsx`
+- Agregar columna "Tipo" con mismos badges (verde/amarillo) basado en `record_type`.
 
-**7. Lógica de vencimiento automática (client-side)**
-- En el query de invoices o al renderizar, si `status === "enviada"` y `due_date < hoy`, mostrar badge "Vencida" visualmente (sin mutar DB por ahora, solo visual)
-
-### Importaciones
-- Reemplazar `Trash2` por `Ban` en el import de lucide-react (mantener `Trash2` solo para notas de pago)
+### 7. Tipo TypeScript
+- En `useLeadGen.ts` (tipo `LeadGenEntry`): agregar `record_type?: string`.
+- Actualizar el tipo de contacto en `ContactosTable` si tiene interfaz explícita.
 
 ### Archivos a modificar
-- `src/pages/finanzas/facturacion/FacturacionPage.tsx`
+- Migración SQL (1 archivo)
+- `src/lib/lead-validation.ts` — nueva función, eliminar bloqueo 24h
+- `src/pages/leadgen/AddLeadModal.tsx` — nueva lógica de reactivación
+- `src/pages/contactos/NuevoContactoForm.tsx` — misma lógica
+- `src/pages/leadgen/LeadGenTable.tsx` — columna visual
+- `src/pages/contactos/ContactosTable.tsx` — columna visual
+- Tipos en hooks correspondientes
 
