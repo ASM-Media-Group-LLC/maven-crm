@@ -580,6 +580,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
             <SortHeader label="Closer" sortKey="agent_name" {...sp} />
             <SortHeader label="Último contacto" sortKey="last_contact_date" {...sp} />
+            <TableHead className={stickyBase}>OF URL</TableHead>
             <TableHead className={stickyBase}>Motivo rechazo</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
           </TableRow>
