@@ -229,7 +229,8 @@ const NuevoContactoForm = () => {
         profile_picture_url: profilePhoto?.url || null,
         created_by: user?.id || "",
         status: "new",
-      });
+        record_type: recordType,
+      } as any);
 
       if (error) throw error;
 

@@ -164,6 +164,11 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onDelete }: Prop
                     {c.categoria}
                   </Badge>
                 </TableCell>
+                <TableCell>
+                  <Badge variant={(c as any).record_type === "reactivado" ? "warning-soft" : "success-soft"} className="font-normal">
+                    {(c as any).record_type === "reactivado" ? "Reactivado" : "Nuevo"}
+                  </Badge>
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                   {c.pais ? getCountryShortDisplay(c.pais) : "No aplicable"}
                 </TableCell>

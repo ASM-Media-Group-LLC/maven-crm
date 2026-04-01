@@ -146,6 +146,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         onlyfans_url: data.onlyfans_url?.trim() || null,
         lg_user_id: user.id,
         entry_date: getMiamiDateStr(),
+        record_type: recordType,
       } as any).select("id").single();
 
       if (error) throw error;
