@@ -824,6 +824,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm font-medium">
               ${(platformSalesByCreator?.[c.id] || []).reduce((s, x) => s + x.price, 0).toLocaleString()}
             </TableCell>
+            <TableCell className="text-sm">
+              {c.onlyfans_url ? (
+                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
+                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
+                </a>
+              ) : <span className="text-muted-foreground">—</span>}
+            </TableCell>
             <TableCell>
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
