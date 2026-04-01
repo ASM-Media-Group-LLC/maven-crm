@@ -308,7 +308,7 @@ const NuevoContactoForm = () => {
             </Field>
           </div>
 
-          <Field label="OnlyFans URL">
+          <Field label="OnlyFans URL (opcional)">
             <Input value={form.onlyfansUrl} onChange={(e) => set("onlyfansUrl", e.target.value)} placeholder="https://onlyfans.com/usuario" />
           </Field>
 

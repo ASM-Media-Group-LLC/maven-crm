@@ -226,7 +226,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                 name="onlyfans_url"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>OnlyFans URL</FormLabel>
+                    <FormLabel>OnlyFans URL (opcional)</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="https://onlyfans.com/usuario"
