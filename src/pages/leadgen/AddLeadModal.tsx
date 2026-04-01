@@ -21,99 +21,17 @@ import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
 import { checkCreatorExists, checkRecentLead, checkDuplicateOnlyFans } from "@/lib/lead-validation";
 import { useQueryClient } from "@tanstack/react-query";
 
-const ALL_COUNTRIES = [
-  { code: "af", flag: "🇦🇫", name: "Afganistán" }, { code: "al", flag: "🇦🇱", name: "Albania" }, { code: "de", flag: "🇩🇪", name: "Alemania" },
-  { code: "ad", flag: "🇦🇩", name: "Andorra" }, { code: "ao", flag: "🇦🇴", name: "Angola" }, { code: "ag", flag: "🇦🇬", name: "Antigua y Barbuda" },
-  { code: "sa", flag: "🇸🇦", name: "Arabia Saudita" }, { code: "dz", flag: "🇩🇿", name: "Argelia" }, { code: "ar", flag: "🇦🇷", name: "Argentina" },
-  { code: "am", flag: "🇦🇲", name: "Armenia" }, { code: "au", flag: "🇦🇺", name: "Australia" }, { code: "at", flag: "🇦🇹", name: "Austria" },
-  { code: "az", flag: "🇦🇿", name: "Azerbaiyán" }, { code: "bs", flag: "🇧🇸", name: "Bahamas" }, { code: "bd", flag: "🇧🇩", name: "Bangladés" },
-  { code: "bb", flag: "🇧🇧", name: "Barbados" }, { code: "bh", flag: "🇧🇭", name: "Baréin" }, { code: "be", flag: "🇧🇪", name: "Bélgica" },
-  { code: "bz", flag: "🇧🇿", name: "Belice" }, { code: "bj", flag: "🇧🇯", name: "Benín" }, { code: "by", flag: "🇧🇾", name: "Bielorrusia" },
-  { code: "mm", flag: "🇲🇲", name: "Birmania" }, { code: "bo", flag: "🇧🇴", name: "Bolivia" }, { code: "ba", flag: "🇧🇦", name: "Bosnia y Herzegovina" },
-  { code: "bw", flag: "🇧🇼", name: "Botsuana" }, { code: "br", flag: "🇧🇷", name: "Brasil" }, { code: "bn", flag: "🇧🇳", name: "Brunéi" },
-  { code: "bg", flag: "🇧🇬", name: "Bulgaria" }, { code: "bf", flag: "🇧🇫", name: "Burkina Faso" }, { code: "bi", flag: "🇧🇮", name: "Burundi" },
-  { code: "bt", flag: "🇧🇹", name: "Bután" }, { code: "cv", flag: "🇨🇻", name: "Cabo Verde" }, { code: "kh", flag: "🇰🇭", name: "Camboya" },
-  { code: "cm", flag: "🇨🇲", name: "Camerún" }, { code: "ca", flag: "🇨🇦", name: "Canadá" }, { code: "td", flag: "🇹🇩", name: "Chad" },
-  { code: "cl", flag: "🇨🇱", name: "Chile" }, { code: "cn", flag: "🇨🇳", name: "China" }, { code: "cy", flag: "🇨🇾", name: "Chipre" },
-  { code: "co", flag: "🇨🇴", name: "Colombia" }, { code: "km", flag: "🇰🇲", name: "Comoras" }, { code: "cg", flag: "🇨🇬", name: "Congo" },
-  { code: "kp", flag: "🇰🇵", name: "Corea del Norte" }, { code: "kr", flag: "🇰🇷", name: "Corea del Sur" }, { code: "cr", flag: "🇨🇷", name: "Costa Rica" },
-  { code: "ci", flag: "🇨🇮", name: "Costa de Marfil" }, { code: "hr", flag: "🇭🇷", name: "Croacia" }, { code: "cu", flag: "🇨🇺", name: "Cuba" },
-  { code: "dk", flag: "🇩🇰", name: "Dinamarca" }, { code: "dm", flag: "🇩🇲", name: "Dominica" }, { code: "ec", flag: "🇪🇨", name: "Ecuador" },
-  { code: "eg", flag: "🇪🇬", name: "Egipto" }, { code: "sv", flag: "🇸🇻", name: "El Salvador" }, { code: "ae", flag: "🇦🇪", name: "Emiratos Árabes Unidos" },
-  { code: "er", flag: "🇪🇷", name: "Eritrea" }, { code: "sk", flag: "🇸🇰", name: "Eslovaquia" }, { code: "si", flag: "🇸🇮", name: "Eslovenia" },
-  { code: "es", flag: "🇪🇸", name: "España" }, { code: "us", flag: "🇺🇸", name: "Estados Unidos" }, { code: "ee", flag: "🇪🇪", name: "Estonia" },
-  { code: "et", flag: "🇪🇹", name: "Etiopía" }, { code: "ph", flag: "🇵🇭", name: "Filipinas" }, { code: "fi", flag: "🇫🇮", name: "Finlandia" },
-  { code: "fj", flag: "🇫🇯", name: "Fiyi" }, { code: "fr", flag: "🇫🇷", name: "Francia" }, { code: "ga", flag: "🇬🇦", name: "Gabón" },
-  { code: "gm", flag: "🇬🇲", name: "Gambia" }, { code: "ge", flag: "🇬🇪", name: "Georgia" }, { code: "gh", flag: "🇬🇭", name: "Ghana" },
-  { code: "gd", flag: "🇬🇩", name: "Granada" }, { code: "gr", flag: "🇬🇷", name: "Grecia" }, { code: "gt", flag: "🇬🇹", name: "Guatemala" },
-  { code: "gn", flag: "🇬🇳", name: "Guinea" }, { code: "gq", flag: "🇬🇶", name: "Guinea Ecuatorial" }, { code: "gw", flag: "🇬🇼", name: "Guinea-Bisáu" },
-  { code: "gy", flag: "🇬🇾", name: "Guyana" }, { code: "ht", flag: "🇭🇹", name: "Haití" }, { code: "hn", flag: "🇭🇳", name: "Honduras" },
-  { code: "hu", flag: "🇭🇺", name: "Hungría" }, { code: "in", flag: "🇮🇳", name: "India" }, { code: "id", flag: "🇮🇩", name: "Indonesia" },
-  { code: "iq", flag: "🇮🇶", name: "Irak" }, { code: "ir", flag: "🇮🇷", name: "Irán" }, { code: "ie", flag: "🇮🇪", name: "Irlanda" },
-  { code: "is", flag: "🇮🇸", name: "Islandia" }, { code: "il", flag: "🇮🇱", name: "Israel" }, { code: "it", flag: "🇮🇹", name: "Italia" },
-  { code: "jm", flag: "🇯🇲", name: "Jamaica" }, { code: "jp", flag: "🇯🇵", name: "Japón" }, { code: "jo", flag: "🇯🇴", name: "Jordania" },
-  { code: "kz", flag: "🇰🇿", name: "Kazajistán" }, { code: "ke", flag: "🇰🇪", name: "Kenia" }, { code: "kg", flag: "🇰🇬", name: "Kirguistán" },
-  { code: "ki", flag: "🇰🇮", name: "Kiribati" }, { code: "kw", flag: "🇰🇼", name: "Kuwait" }, { code: "la", flag: "🇱🇦", name: "Laos" },
-  { code: "ls", flag: "🇱🇸", name: "Lesoto" }, { code: "lv", flag: "🇱🇻", name: "Letonia" }, { code: "lb", flag: "🇱🇧", name: "Líbano" },
-  { code: "lr", flag: "🇱🇷", name: "Liberia" }, { code: "ly", flag: "🇱🇾", name: "Libia" }, { code: "li", flag: "🇱🇮", name: "Liechtenstein" },
-  { code: "lt", flag: "🇱🇹", name: "Lituania" }, { code: "lu", flag: "🇱🇺", name: "Luxemburgo" }, { code: "mk", flag: "🇲🇰", name: "Macedonia del Norte" },
-  { code: "mg", flag: "🇲🇬", name: "Madagascar" }, { code: "my", flag: "🇲🇾", name: "Malasia" }, { code: "mw", flag: "🇲🇼", name: "Malaui" },
-  { code: "mv", flag: "🇲🇻", name: "Maldivas" }, { code: "ml", flag: "🇲🇱", name: "Malí" }, { code: "mt", flag: "🇲🇹", name: "Malta" },
-  { code: "ma", flag: "🇲🇦", name: "Marruecos" }, { code: "mu", flag: "🇲🇺", name: "Mauricio" }, { code: "mr", flag: "🇲🇷", name: "Mauritania" },
-  { code: "mx", flag: "🇲🇽", name: "México" }, { code: "fm", flag: "🇫🇲", name: "Micronesia" }, { code: "md", flag: "🇲🇩", name: "Moldavia" },
-  { code: "mc", flag: "🇲🇨", name: "Mónaco" }, { code: "mn", flag: "🇲🇳", name: "Mongolia" }, { code: "me", flag: "🇲🇪", name: "Montenegro" },
-  { code: "mz", flag: "🇲🇿", name: "Mozambique" }, { code: "na", flag: "🇳🇦", name: "Namibia" }, { code: "nr", flag: "🇳🇷", name: "Nauru" },
-  { code: "np", flag: "🇳🇵", name: "Nepal" }, { code: "ni", flag: "🇳🇮", name: "Nicaragua" }, { code: "ne", flag: "🇳🇪", name: "Níger" },
-  { code: "ng", flag: "🇳🇬", name: "Nigeria" }, { code: "no", flag: "🇳🇴", name: "Noruega" }, { code: "nz", flag: "🇳🇿", name: "Nueva Zelanda" },
-  { code: "om", flag: "🇴🇲", name: "Omán" }, { code: "nl", flag: "🇳🇱", name: "Países Bajos" }, { code: "pk", flag: "🇵🇰", name: "Pakistán" },
-  { code: "pw", flag: "🇵🇼", name: "Palaos" }, { code: "pa", flag: "🇵🇦", name: "Panamá" }, { code: "pg", flag: "🇵🇬", name: "Papúa Nueva Guinea" },
-  { code: "py", flag: "🇵🇾", name: "Paraguay" }, { code: "pe", flag: "🇵🇪", name: "Perú" }, { code: "pl", flag: "🇵🇱", name: "Polonia" },
-  { code: "pt", flag: "🇵🇹", name: "Portugal" }, { code: "gb", flag: "🇬🇧", name: "Reino Unido" }, { code: "cf", flag: "🇨🇫", name: "República Centroafricana" },
-  { code: "cz", flag: "🇨🇿", name: "República Checa" }, { code: "cd", flag: "🇨🇩", name: "República Democrática del Congo" },
-  { code: "do", flag: "🇩🇴", name: "República Dominicana" }, { code: "rw", flag: "🇷🇼", name: "Ruanda" }, { code: "ro", flag: "🇷🇴", name: "Rumania" },
-  { code: "ru", flag: "🇷🇺", name: "Rusia" }, { code: "ws", flag: "🇼🇸", name: "Samoa" }, { code: "kn", flag: "🇰🇳", name: "San Cristóbal y Nieves" },
-  { code: "sm", flag: "🇸🇲", name: "San Marino" }, { code: "vc", flag: "🇻🇨", name: "San Vicente y las Granadinas" },
-  { code: "lc", flag: "🇱🇨", name: "Santa Lucía" }, { code: "st", flag: "🇸🇹", name: "Santo Tomé y Príncipe" }, { code: "sn", flag: "🇸🇳", name: "Senegal" },
-  { code: "rs", flag: "🇷🇸", name: "Serbia" }, { code: "sc", flag: "🇸🇨", name: "Seychelles" }, { code: "sl", flag: "🇸🇱", name: "Sierra Leona" },
-  { code: "sg", flag: "🇸🇬", name: "Singapur" }, { code: "sy", flag: "🇸🇾", name: "Siria" }, { code: "so", flag: "🇸🇴", name: "Somalia" },
-  { code: "lk", flag: "🇱🇰", name: "Sri Lanka" }, { code: "sz", flag: "🇸🇿", name: "Suazilandia" }, { code: "za", flag: "🇿🇦", name: "Sudáfrica" },
-  { code: "sd", flag: "🇸🇩", name: "Sudán" }, { code: "ss", flag: "🇸🇸", name: "Sudán del Sur" }, { code: "se", flag: "🇸🇪", name: "Suecia" },
-  { code: "ch", flag: "🇨🇭", name: "Suiza" }, { code: "sr", flag: "🇸🇷", name: "Surinam" }, { code: "th", flag: "🇹🇭", name: "Tailandia" },
-  { code: "tz", flag: "🇹🇿", name: "Tanzania" }, { code: "tj", flag: "🇹🇯", name: "Tayikistán" }, { code: "tl", flag: "🇹🇱", name: "Timor Oriental" },
-  { code: "tg", flag: "🇹🇬", name: "Togo" }, { code: "to", flag: "🇹🇴", name: "Tonga" }, { code: "tt", flag: "🇹🇹", name: "Trinidad y Tobago" },
-  { code: "tn", flag: "🇹🇳", name: "Túnez" }, { code: "tm", flag: "🇹🇲", name: "Turkmenistán" }, { code: "tr", flag: "🇹🇷", name: "Turquía" },
-  { code: "tv", flag: "🇹🇻", name: "Tuvalu" }, { code: "ua", flag: "🇺🇦", name: "Ucrania" }, { code: "ug", flag: "🇺🇬", name: "Uganda" },
-  { code: "uy", flag: "🇺🇾", name: "Uruguay" }, { code: "uz", flag: "🇺🇿", name: "Uzbekistán" }, { code: "vu", flag: "🇻🇺", name: "Vanuatu" },
-  { code: "va", flag: "🇻🇦", name: "Vaticano" }, { code: "ve", flag: "🇻🇪", name: "Venezuela" }, { code: "vn", flag: "🇻🇳", name: "Vietnam" },
-  { code: "ye", flag: "🇾🇪", name: "Yemen" }, { code: "dj", flag: "🇩🇯", name: "Yibuti" }, { code: "zm", flag: "🇿🇲", name: "Zambia" },
-  { code: "zw", flag: "🇿🇼", name: "Zimbabue" },
-];
 
-const PHONE_CODES = [
-  { code: "+1", flag: "🇺🇸" }, { code: "+44", flag: "🇬🇧" }, { code: "+34", flag: "🇪🇸" },
-  { code: "+52", flag: "🇲🇽" }, { code: "+57", flag: "🇨🇴" }, { code: "+54", flag: "🇦🇷" },
-  { code: "+56", flag: "🇨🇱" }, { code: "+55", flag: "🇧🇷" }, { code: "+51", flag: "🇵🇪" },
-  { code: "+58", flag: "🇻🇪" }, { code: "+593", flag: "🇪🇨" }, { code: "+507", flag: "🇵🇦" },
-  { code: "+506", flag: "🇨🇷" }, { code: "+502", flag: "🇬🇹" }, { code: "+503", flag: "🇸🇻" },
-  { code: "+504", flag: "🇭🇳" }, { code: "+505", flag: "🇳🇮" }, { code: "+591", flag: "🇧🇴" },
-  { code: "+595", flag: "🇵🇾" }, { code: "+598", flag: "🇺🇾" }, { code: "+809", flag: "🇩🇴" },
-];
 
 const leadSchema = z.object({
   source_link: z.string().url("URL de perfil requerida"),
   platform: z.string().min(1, "Plataforma requerida"),
   quality: z.string().min(1, "Categoría requerida"),
   company: z.string().min(1, "Compañía requerida"),
-  nombre: z.string().optional(),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
-  phoneCode: z.string().optional(),
-  phone: z.string().optional(),
-  ciudad: z.string().optional(),
   onlyfans_url: z.string().optional().refine(
     (val) => !val || val.includes("onlyfans.com") || /^[a-zA-Z0-9._-]+$/.test(val),
     "Debe ser una URL de OnlyFans válida o un handle"
   ),
-  country_code: z.string().optional(),
   notes: z.string().max(500, "Máximo 500 caracteres").optional(),
 });
 
@@ -143,13 +61,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       platform: "",
       quality: "",
       company: "",
-      nombre: "",
-      email: "",
-      phoneCode: "+1",
-      phone: "",
-      ciudad: "",
       onlyfans_url: "",
-      country_code: "",
       notes: "",
     },
   });
@@ -225,21 +137,14 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         }
       }
 
-      const phoneRaw = data.phone?.trim() ? `${data.phoneCode || ""}${data.phone.trim()}` : null;
-
       const { data: inserted, error } = await supabase.from("leadgen_entries").insert({
         model_handle: normalizedHandle,
-        model_name: data.nombre?.trim() || null,
         platform: data.platform,
         quality: data.quality,
         company: data.company,
-        country_code: data.country_code || null,
         notes: data.notes || null,
         source_link: data.source_link,
         onlyfans_url: data.onlyfans_url?.trim() || null,
-        email: data.email?.trim() || null,
-        phone_raw: phoneRaw,
-        city: data.ciudad?.trim() || null,
         lg_user_id: user.id,
         entry_date: getMiamiDateStr(),
       } as any).select("id").single();
@@ -333,80 +238,6 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="nombre"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nombre del modelo" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="correo@ejemplo.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="ciudad"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ciudad</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ciudad" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <FormLabel>Teléfono</FormLabel>
-                <div className="flex gap-2">
-                  <FormField
-                    control={form.control}
-                    name="phoneCode"
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger className="w-[100px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PHONE_CODES.map(pc => (
-                            <SelectItem key={pc.code} value={pc.code}>{pc.flag} {pc.code}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormControl>
-                        <Input placeholder="Número de teléfono" className="flex-1" {...field} />
-                      </FormControl>
-                    )}
-                  />
-                </div>
-              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -517,45 +348,6 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
 
 
 
-              <FormField
-                control={form.control}
-                name="country_code"
-                render={({ field }) => {
-                  const selected = ALL_COUNTRIES.find(c => c.code === field.value);
-                  return (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>País</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal", !field.value && "text-muted-foreground")}>
-                              {selected ? `${selected.flag} ${selected.name}` : "Selecciona un país"}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder="Buscar país..." />
-                            <CommandList>
-                              <CommandEmpty>No se encontró el país.</CommandEmpty>
-                              <CommandGroup className="max-h-60 overflow-y-auto">
-                                {ALL_COUNTRIES.map((country) => (
-                                  <CommandItem key={country.code} value={`${country.name} ${country.code}`} onSelect={() => field.onChange(country.code)}>
-                                    <Check className={cn("mr-2 h-4 w-4", field.value === country.code ? "opacity-100" : "opacity-0")} />
-                                    {country.flag} {country.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
 
               <FormField
                 control={form.control}
