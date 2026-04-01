@@ -42,6 +42,8 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
   const [viewItem, setViewItem] = useState<any>(null);
   const [editingBlueId, setEditingBlueId] = useState<string | null>(null);
   const [editBlueValue, setEditBlueValue] = useState("");
+  const [editingCommId, setEditingCommId] = useState<string | null>(null);
+  const [editCommValue, setEditCommValue] = useState("");
 
   const { data: commissions = [], isLoading } = useQuery({
     queryKey: ["commissions"],
