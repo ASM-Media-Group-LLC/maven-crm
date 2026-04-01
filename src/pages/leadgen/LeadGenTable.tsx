@@ -271,11 +271,6 @@ const LeadRow = React.memo(({ lead, onView, profiles, qaMap, canReview }: { lead
         {format(new Date(lead.created_at), "dd/MM/yyyy hh:mm a", { locale: es })}
       </TableCell>
       <TableCell>
-        <Badge variant="outline" className="font-mono text-xs">
-          {getTicketId(lead)}
-        </Badge>
-      </TableCell>
-      <TableCell>
         <a
           href={buildProfileUrl(lead)}
           target="_blank"
