@@ -204,7 +204,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
               </div>
             )}
             <div className="border-t border-border pt-1 flex justify-between text-sm font-semibold">
-              <span>Valor para la Empresa</span>
+              <span>Total a pagar</span>
               <span className="text-primary">{fmt(companyValue)}</span>
             </div>
           </div>
