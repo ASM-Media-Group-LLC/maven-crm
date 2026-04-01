@@ -43,7 +43,7 @@ const getAgentInitials = (name: string) => {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 };
 
-const ContactosGrid = ({ contactos, onView, onEdit, onConvert }: Props) => {
+const ContactosGrid = ({ contactos, onView, onEdit, onConvert, onDelete }: Props) => {
   return (
     <TooltipProvider>
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
