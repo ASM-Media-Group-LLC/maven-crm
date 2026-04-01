@@ -395,7 +395,7 @@ const ContactosContent = () => {
                 pageSize={50}
                 onPageChange={setPage}
               >
-                <ContactosTable contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
+                <ContactosTable contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} onDelete={isAdmin ? (c) => { setSelectedContacto(c); setDeleteOpen(true); } : undefined} />
               </DataTableShell>
             ) : (
               <div className="flex-1 min-h-0 overflow-auto">
