@@ -48,6 +48,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lead: LeadGenEntry | null;
+  onDelete?: () => void;
 }
 
 const InfoCard = ({ label, children }: { label: string; children: React.ReactNode }) => (
