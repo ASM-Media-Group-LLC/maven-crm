@@ -70,30 +70,47 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   const onSubmit = async (data: ContactoFormValues) => {
     setIsSubmitting(true);
     try {
-      // Duplicate check by handle in creators (official table)
+      // VALIDATION 1: Check if creator exists (status-aware)
       const normalizedIg = normalizeHandle(data.instagram);
+      let recordType = "nuevo";
+
       if (normalizedIg) {
-        const { data: existing } = await supabase
-          .from("creators")
-          .select("id, name, instagram_handle")
-          .ilike("instagram_handle", normalizedIg)
-          .maybeSingle();
-        if (existing) {
+        const creatorCheck = await checkCreatorExists(data.instagram);
+        if (creatorCheck.exists) {
+          if (creatorCheck.isActive) {
+            toast({
+              title: "Creadora activa",
+              description: `${creatorCheck.creatorName} ya forma parte de la agencia.`,
+              variant: "destructive",
+            });
+            setIsSubmitting(false);
+            return;
+          }
+          // Inactive creator — allow
+          recordType = "reactivado";
           toast({
-            title: "Duplicado detectado",
-            description: `Esta creadora ya existe en el sistema: ${existing.name}`,
-            variant: "destructive",
+            title: "Creadora inactiva detectada",
+            description: `${creatorCheck.creatorName} está como ${creatorCheck.creatorStatus}. Se registrará como contacto reactivado.`,
           });
-          setIsSubmitting(false);
-          return;
         }
       }
 
-      // Phone duplicate check (only if phone was provided)
+      // VALIDATION 2: Check existing contact by handle (informational, NO block)
+      if (normalizedIg) {
+        const existingContact = await checkExistingContact(normalizedIg);
+        if (existingContact.exists) {
+          recordType = "reactivado";
+          toast({
+            title: "Contacto existente",
+            description: `Esta modelo ya está registrada: ${existingContact.contactName}. Se creará un nuevo registro.`,
+          });
+        }
+      }
+
+      // Phone duplicate check — WARNING only, does NOT block
       const trimmedPhone = data.telefono?.trim();
       if (trimmedPhone) {
         const fullPhone = `${data.paisCodigo}${trimmedPhone}`;
-        // Check in closers_contacts
         const { data: phoneInContacts } = await supabase
           .from("closers_contacts")
           .select("id, name")
@@ -101,14 +118,10 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
           .maybeSingle();
         if (phoneInContacts) {
           toast({
-            title: "Teléfono duplicado",
-            description: `Este número ya está registrado para: ${phoneInContacts.name}`,
-            variant: "destructive",
+            title: "Teléfono ya registrado",
+            description: `Este número ya existe para: ${phoneInContacts.name}. Se guardará de todos modos.`,
           });
-          setIsSubmitting(false);
-          return;
         }
-        // Check in creators
         const { data: phoneInCreators } = await supabase
           .from("creators")
           .select("id, name, phone")
@@ -116,12 +129,9 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
           .maybeSingle();
         if (phoneInCreators) {
           toast({
-            title: "Teléfono duplicado",
-            description: `Este número ya está registrado en creators: ${phoneInCreators.name}`,
-            variant: "destructive",
+            title: "Teléfono ya registrado",
+            description: `Este número ya existe en creators: ${phoneInCreators.name}. Se guardará de todos modos.`,
           });
-          setIsSubmitting(false);
-          return;
         }
       }
 

@@ -145,22 +145,31 @@ const NuevoContactoForm = () => {
 
     setIsSaving(true);
     try {
-      // VALIDATION 1: Check if creator exists
+      // VALIDATION 1: Check if creator exists (status-aware)
       const creatorCheck = await checkCreatorExists(form.accountLink, form.onlyfansUrl);
-      if (creatorCheck.exists) {
+      if (creatorCheck.exists && creatorCheck.isActive) {
         setCreatorAlert({ name: creatorCheck.creatorName!, id: creatorCheck.creatorId! });
         setIsSaving(false);
         return;
       }
 
-      // VALIDATION 2: Check if handle previously existed (informational, non-blocking)
-      const previousCheck = await checkPreviousLead(form.accountLink, form.onlyfansUrl);
       let recordType = "nuevo";
-      if (previousCheck.existed) {
+
+      if (creatorCheck.exists && !creatorCheck.isActive) {
         recordType = "reactivado";
         toast({
-          title: "Modelo reactivada",
-          description: "Esta modelo ya existía en el sistema. Se registrará como un nuevo contacto reactivado.",
+          title: "Creadora inactiva detectada",
+          description: `${creatorCheck.creatorName} está como ${creatorCheck.creatorStatus}. Se registrará como contacto reactivado.`,
+        });
+      }
+
+      // VALIDATION 2: Check existing contact by handle (informational only, NO block)
+      const existingContact = await checkExistingContact(form.accountLink);
+      if (existingContact.exists) {
+        recordType = "reactivado";
+        toast({
+          title: "Contacto existente",
+          description: `Esta modelo ya está registrada como contacto: ${existingContact.contactName}. Se creará un nuevo registro.`,
         });
       }
 
@@ -178,7 +187,7 @@ const NuevoContactoForm = () => {
         }
       }
 
-      // Phone duplicate check
+      // Phone duplicate check — WARNING only, does NOT block
       const trimmedPhone = form.phone?.trim();
       if (trimmedPhone) {
         const fullPhone = `${form.countryCode}${trimmedPhone}`;
@@ -189,12 +198,9 @@ const NuevoContactoForm = () => {
           .maybeSingle();
         if (phoneInContacts) {
           toast({
-            title: "Teléfono duplicado",
-            description: `Este número ya está registrado para: ${phoneInContacts.name}`,
-            variant: "destructive",
+            title: "Teléfono ya registrado",
+            description: `Este número ya existe para: ${phoneInContacts.name}. Se guardará de todos modos.`,
           });
-          setIsSaving(false);
-          return;
         }
         const { data: phoneInCreators } = await supabase
           .from("creators")
@@ -203,12 +209,9 @@ const NuevoContactoForm = () => {
           .maybeSingle();
         if (phoneInCreators) {
           toast({
-            title: "Teléfono duplicado",
-            description: `Este número ya está registrado en creators: ${phoneInCreators.name}`,
-            variant: "destructive",
+            title: "Teléfono ya registrado",
+            description: `Este número ya existe en creators: ${phoneInCreators.name}. Se guardará de todos modos.`,
           });
-          setIsSaving(false);
-          return;
         }
       }
 
