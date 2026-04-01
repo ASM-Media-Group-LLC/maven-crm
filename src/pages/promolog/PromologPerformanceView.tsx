@@ -133,35 +133,44 @@ const PromologPerformanceView = ({ profiles }: Props) => {
   return (
     <Card>
       <CardContent className="pt-6">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-2 font-semibold">
-            <Users className="h-5 w-5" />
-            Rendimiento por Agente
+        <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary mb-6">
+          <div className="p-5 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+                <BarChart3 className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-base">Rendimiento por Agente</h3>
+                <p className="text-sm text-muted-foreground">
+                  {format(now, "dd 'de' MMMM, yyyy", { locale: es })} · {agents.length} agentes activos
+                </p>
+              </div>
+            </div>
+            {!isOperational && (
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[200px] h-9 justify-between font-normal">
+                    {selectedName}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[200px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Buscar agente..." />
+                    <CommandList>
+                      <CommandEmpty>No encontrado</CommandEmpty>
+                      {agents.map(a => (
+                        <CommandItem key={a.id} value={a.id} onSelect={() => { setSelectedAgent(a.id); setOpen(false); }}>
+                          {a.name}
+                          {selectedAgent === a.id && <Check className="ml-auto h-4 w-4" />}
+                        </CommandItem>
+                      ))}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
-          {!isOperational && (
-            <Popover open={open} onOpenChange={setOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-[200px] h-9 justify-between font-normal">
-                  {selectedName}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[200px] p-0">
-                <Command>
-                  <CommandInput placeholder="Buscar agente..." />
-                  <CommandList>
-                    <CommandEmpty>No encontrado</CommandEmpty>
-                    {agents.map(a => (
-                      <CommandItem key={a.id} onSelect={() => { setSelectedAgent(a.id); setOpen(false); }}>
-                        {a.name}
-                        {selectedAgent === a.id && <Check className="ml-auto h-4 w-4" />}
-                      </CommandItem>
-                    ))}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          )}
         </div>
 
         {!effectiveAgent ? (

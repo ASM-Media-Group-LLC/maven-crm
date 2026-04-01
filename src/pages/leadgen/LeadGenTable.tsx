@@ -394,7 +394,6 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
       <TableHeader>
         <TableRow>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="hora" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" col="ticket" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Handle" col="handle" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="OF URL" col="of" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="agente" /></TableHead>

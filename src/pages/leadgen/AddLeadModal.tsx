@@ -225,8 +225,11 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         }
       }
 
+      const phoneRaw = data.phone?.trim() ? `${data.phoneCode || ""}${data.phone.trim()}` : null;
+
       const { data: inserted, error } = await supabase.from("leadgen_entries").insert({
         model_handle: normalizedHandle,
+        model_name: data.nombre?.trim() || null,
         platform: data.platform,
         quality: data.quality,
         company: data.company,
@@ -234,6 +237,9 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         notes: data.notes || null,
         source_link: data.source_link,
         onlyfans_url: data.onlyfans_url?.trim() || null,
+        email: data.email?.trim() || null,
+        phone_raw: phoneRaw,
+        city: data.ciudad?.trim() || null,
         lg_user_id: user.id,
         entry_date: getMiamiDateStr(),
       } as any).select("id").single();
