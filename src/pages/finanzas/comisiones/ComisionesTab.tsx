@@ -96,6 +96,25 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
     onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
   });
 
+  const updateCommMutation = useMutation({
+    mutationFn: async ({ id, newPercentage, baseAmount, config }: { id: string; newPercentage: number; baseAmount: number; config: Record<string, any> }) => {
+      const blueAmount = (config.blue_package && config.blue_amount > 0) ? config.blue_amount : 0;
+      const newFinal = (baseAmount * newPercentage / 100) + blueAmount;
+      const newConfig = { ...config, percentage: newPercentage };
+      const { error } = await supabase.from("commissions").update({
+        calculation_config: newConfig as any,
+        final_amount: newFinal,
+      }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["commissions"] });
+      toast({ title: "Comisión actualizada" });
+      setEditingCommId(null);
+    },
+    onError: () => toast({ title: "Error al actualizar comisión", variant: "destructive" }),
+  });
+
   const updateBlueMutation = useMutation({
     mutationFn: async ({ id, newBlueAmount, baseAmount, config }: { id: string; newBlueAmount: number; baseAmount: number; config: Record<string, any> }) => {
       const percentage = config.percentage || 0;
