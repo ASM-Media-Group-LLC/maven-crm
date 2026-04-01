@@ -257,16 +257,10 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
             </div>
           )}
 
-          {/* Due date & Notes */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Fecha de Vencimiento</Label>
-              <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
-            </div>
-            <div>
-              <Label>Notas</Label>
-              <Textarea placeholder="Notas opcionales..." value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
-            </div>
+          {/* Notes */}
+          <div>
+            <Label>Notas</Label>
+            <Textarea placeholder="Notas opcionales..." value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
           </div>
         </div>
 
