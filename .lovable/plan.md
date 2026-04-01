@@ -1,16 +1,32 @@
 
 
-## Añadir acción de eliminar en la tabla de Templates
+## Fix: Template deletion blocked by missing RLS policy
 
-### Cambios
+### Root Cause
 
-**Archivo**: `src/pages/finanzas/facturacion/TemplatesPage.tsx`
+The `invoice_templates` table has RLS enabled with policies for SELECT, INSERT, and UPDATE — but **no DELETE policy**. Supabase silently returns success with 0 rows affected, so the UI shows a success toast but the template remains.
 
-1. Añadir estado `deleteTemplate` para controlar el diálogo de confirmación
-2. Añadir botón de eliminar (icono `Trash2`) en la columna de acciones, junto a Ver y Editar
-3. Añadir un `AlertDialog` de confirmación (mismo patrón que `DeleteEventoDialog`) que al confirmar ejecute `supabase.from("invoice_templates").delete().eq("id", id)` e invalide la query
-4. Importar `Trash2` de lucide-react y los componentes de `AlertDialog`
+### Solution
 
-### Resultado
-Cada fila tendrá 3 acciones: Ver | Editar | Eliminar, con confirmación antes de borrar.
+Create a database migration adding a DELETE policy for authenticated users:
+
+```sql
+CREATE POLICY "Authenticated can delete templates"
+ON public.invoice_templates
+FOR DELETE
+TO authenticated
+USING (true);
+```
+
+### Additional Fix
+
+The current `handleDelete` in `TemplatesPage.tsx` doesn't check if the deletion actually affected rows. We should also verify the `error` response properly — though the main fix is the RLS policy.
+
+### Files to modify
+
+| Change | Detail |
+|--------|--------|
+| **Migration** (new) | Add DELETE policy on `invoice_templates` |
+
+No code changes needed — the existing `handleDelete` logic is correct once RLS allows the operation.
 
