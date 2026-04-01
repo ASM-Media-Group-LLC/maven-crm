@@ -31,7 +31,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
   const [periodStart, setPeriodStart] = useState<Date>();
   const [periodEnd, setPeriodEnd] = useState<Date>();
   const [baseAmount, setBaseAmount] = useState("");
-  const [notes, setNotes] = useState("");
+  
 
   const { data: creators = [] } = useQuery({
     queryKey: ["creators-for-commission"],
