@@ -1,46 +1,72 @@
 
 
-## Plan: Fix Notas en Closers + Banner en Rendimiento LeadGen + Consistencia de columnas
+## Plan: Fix 5 Issues — Promolog selector, Ticket column, AddLeadModal fields, LeadGen banner, Closers notes
 
-### Problema 1: Closers — OF URL aparece donde debería ser Notas
-En la tab "Todas" del Closers (`LeadTable.tsx`), la columna "OF URL" está correctamente separada de "Notas" (líneas 613-614, 916-924). Sin embargo, en las **otras tabs** (Asignadas, Confirmadas, Completadas, Nuevo, No Interesadas) **no se incluye la columna OF URL**, lo que hace que los datos de OnlyFans no se muestren. El campo `notes` se muestra correctamente como `InlineText` editable en todas las tabs. No hay un bug de "OF en Notas" — simplemente las otras tabs no tienen la columna OF URL. Se agregará.
+### Issue 1: Promolog Rendimiento — Agent selector not working
 
-### Problema 2: LeadGen Rendimiento — Header sin banner
-El header "Rendimiento por Agente" en `LeadGenPerformanceView.tsx` usa un simple `div` con texto y un icono, mientras que Supervisores usa un banner con gradiente (`bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary`). Se alineará al mismo estilo banner.
+**Root cause**: `CommandItem` lacks an explicit `value` prop. The cmdk library defaults to the text content and lowercases it, which can cause issues with `onSelect` not firing properly.
 
-### Problema 3: Consistencia en orden de columnas
-El estándar de columnas definido en la memoria es: **#, Creación, Handle, Agente, Categoría, Contacto, Notas, Acciones**. Actualmente:
+**Fix in `PromologPerformanceView.tsx`**:
+- Add `value={a.id}` to each `CommandItem`
+- This ensures the selection works regardless of name normalization
 
-| Módulo | Orden actual | Problemas |
-|---|---|---|
-| LeadGen | Creación, Ticket, Handle, OF, Agente, Agencia, Categoría, País, Contacto, QA, Acciones | OK (tiene campos extra propios) |
-| Contactos | Creación, Registro, Nombre, País, Ciudad, Agente, Instagram, OF, Contacto, Categoría, Acciones | Categoría al final, Instagram después de Agente |
-| Closers (Todas) | #, Creación, Instagram, Estado, Cuenta origen, Categoría, Agente, Contactos, Teléfono, OF, Notas, Acciones | Agente después de Categoría |
+### Issue 2: Ticket column inconsistency
 
-Se normalizará Contactos para seguir: Creación, Registro, Nombre, Instagram, OF, Agente, Categoría, País, Ciudad, Contacto, Acciones.
+The "Ticket" column (`ticket_number`) appears in LeadGen table but serves no clear UX purpose — it's an auto-generated ID (`#LG` + last 7 chars of UUID). It adds visual noise without actionable information.
 
-### Cambios
+**Changes**:
+- **Remove** the Ticket column from `LeadGenTable.tsx` (header and cell)
+- Remove `ticket` sort key
+- Keep `ticket_number` in data model (used internally for conversions to Closers)
+- Remove `ticket` field from `NuevoContactoForm.tsx` form (it was already in Contactos but unused in display)
+- Update search placeholder in `LeadGenContent.tsx`: "Buscar lead, agente..." (drop "ticket")
 
-**1. `src/pages/closers/components/LeadTable.tsx`**
-- Agregar columna "OF URL" a las tabs que no la tienen: Asignadas (headers línea ~525-538, row ~638-709), Nuevo (línea ~588-599), No Interesadas (línea ~575-585)
-- En Confirmadas y Completadas, agregar OF URL si no está presente
-- Renderizar `c.onlyfans_url` como link externo (mismo patrón de tab "Todas")
+### Issue 3: AddLeadModal should match NuevoContactoForm fields
 
-**2. `src/pages/leadgen/LeadGenPerformanceView.tsx`**
-- Reemplazar el header simple (líneas 74-101) con un banner estilo Supervisores:
+Currently `AddLeadModal` is missing fields that `NuevoContactoForm` has:
+- **Nombre** (name)
+- **Email**
+- **Teléfono** (country code + phone)
+- **Ciudad** (city)
+
+**Changes in `AddLeadModal.tsx`**:
+- Add fields: `nombre`, `email`, `countryCode` + `phone`, `ciudad` to the zod schema and form
+- Add corresponding form inputs (matching NuevoContactoForm layout)
+- Save these fields in the insert: `model_name`, `email`, `phone_raw` (with country code prefix), `city`
+- Keep existing fields (URL, platform, category, company, country, OF URL, notes, evidence)
+
+### Issue 4: LeadGen Performance banner — still plain header
+
+Looking at the image, the Promolog "Rendimiento de Agentes" section header is plain text ("Rendimiento de Agentes / 31 de marzo, 2026 · 8 agentes activos") without the gradient banner style.
+
+The `LeadGenPerformanceView.tsx` already has the banner (lines 75-111). The issue is in `PromologPerformanceView.tsx` lines 136-165 — it uses a plain `div` with just `flex items-center` instead of the gradient banner.
+
+**Fix in `PromologPerformanceView.tsx`**:
+- Replace the plain header (lines 136-165) with the gradient banner pattern from `LeadGenPerformanceView.tsx`:
   - `rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary`
-  - Título "Rendimiento por Agente", subtítulo descriptivo, selector a la derecha
-  - Icono en circle badge
+  - Title, subtitle, selector on right, icon in circle badge
 
-**3. `src/pages/contactos/ContactosTable.tsx`**
-- Reordenar columnas a: Creación, Registro, Nombre, Instagram, OF URL, Agente, Categoría, País, Ciudad, Contacto, Acciones
-- Mover Instagram antes de Agente, Categoría antes de País
+### Issue 5: Closers — OF URLs appearing in Notes field
 
-### Archivos a modificar
+The code correctly separates OF URL and Notes columns in all tabs. The issue is **data-level**: existing records in `closers_contacts` have OnlyFans URLs stored in the `notes` column (entered before the `onlyfans_url` column existed).
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/pages/closers/components/LeadTable.tsx` | Agregar columna OF URL a tabs faltantes |
-| `src/pages/leadgen/LeadGenPerformanceView.tsx` | Reemplazar header por banner con gradiente |
-| `src/pages/contactos/ContactosTable.tsx` | Reordenar columnas al estándar |
+**Fix**: Run a data migration to move OF URLs from `notes` to `onlyfans_url`:
+```sql
+UPDATE closers_contacts
+SET onlyfans_url = notes, notes = NULL
+WHERE notes ILIKE '%onlyfans.com%'
+  AND (onlyfans_url IS NULL OR onlyfans_url = '');
+```
+
+Also do the same for `closers_creators` if applicable.
+
+### Files to modify
+
+| File | Change |
+|------|--------|
+| `PromologPerformanceView.tsx` | Add `value` prop to CommandItem + gradient banner header |
+| `LeadGenTable.tsx` | Remove Ticket column |
+| `LeadGenContent.tsx` | Update search placeholder |
+| `AddLeadModal.tsx` | Add nombre, email, phone, ciudad fields |
+| Migration SQL | Move OF URLs from notes to onlyfans_url in closers tables |
 
