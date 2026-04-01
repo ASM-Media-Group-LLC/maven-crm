@@ -53,6 +53,7 @@ const LeadGenContent = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { dataScope, isLoading: permsLoading } = usePermissions();
+  const { isAdmin } = useUserRole();
 
   // Determine viewMode from permissions
   const viewMode: ViewMode = useMemo(() => {
