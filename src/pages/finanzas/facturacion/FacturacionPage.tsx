@@ -272,7 +272,8 @@ export default function FacturacionPage() {
             )) : filtered.length === 0 ? (
               <TableRow><TableCell colSpan={showBulkCheckbox ? 7 : 6} className="text-center text-muted-foreground py-12">Sin resultados.</TableCell></TableRow>
             ) : filtered.map(inv => {
-              const badge = STATUS_BADGE[inv.status] ?? STATUS_BADGE.borrador;
+              const displayStatus = getDisplayStatus(inv);
+              const badge = STATUS_BADGE[displayStatus] ?? STATUS_BADGE.borrador;
               const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
               const initials = creatorName.slice(0, 2).toUpperCase();
               const canEdit = inv.status === "borrador" || inv.status === "enviada";
