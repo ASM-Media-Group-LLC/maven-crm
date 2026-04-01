@@ -1,69 +1,42 @@
 
-Objetivo: corregir de raíz la selección de agentes en /promolog y ordenar el uso de banners para que solo aparezcan en los tabs “Agentes”, no en las vistas de “Rendimiento por Agente”.
 
-Hallazgos clave
-- El bug de /promolog ya no está en `CommandItem`: `PromologPerformanceView.tsx` ya usa `value={a.name}`.
-- El problema real es la fuente de datos:
-  1. `PromologPerformanceView.tsx` arma el selector con una sola consulta a `promolog_entries`, por lo que la lista de agentes puede quedar vacía o incompleta.
-  2. `PromologContent.tsx` calcula `agentsData` desde `promologEntries`, pero ese query está limitado a `200`, así que los conteos de agentes también quedan truncados.
-- Por eso hoy hay dos verdades distintas en Promolog: una para el listado y otra para rendimiento.
-- En LeadGen el banner está puesto en `LeadGenPerformanceView.tsx`, pero el usuario lo quiere en el tab `Agentes` de `LeadGenContent.tsx`.
+## Plan: Fix sidebar badges — solo entradas nuevas del día
 
-Plan
-1. Unificar la data de analítica de Promolog
-- Crear un helper/hook compartido para Promolog (siguiendo el patrón de `useLeadGen.ts`) que lea `promolog_entries` por lotes y no dependa del listado limitado de 200 filas.
-- Ese helper devolverá:
-  - agentes reales del sistema (solo IDs que existan en `profiles`)
-  - métricas por agente
-  - entradas completas de un agente para charts/detalle
-- Aplicar la misma regla de deduplicación que ya usa Promolog para que Agentes, Rendimiento y Detalle muestren los mismos números.
+### Problema
 
-2. Corregir /promolog Rendimiento
-- `PromologPerformanceView.tsx`
-  - dejar de construir el selector con su query local incompleta
-  - consumir la nueva fuente compartida de agentes
-  - mantener el selector visible para roles de gestión y auto-selección para roles operativos
-  - agregar estados UX claros:
-    - cargando agentes
-    - sin agentes asignados
-    - sin datos para el agente seleccionado
-- También usar la nueva fuente paginada para las entradas del agente, para que Carolina/Fabiana/Lorena no queden subcontadas.
+`useSidebarBadges.ts` cuenta **todos** los registros sin filtro de fecha:
+- **Closers**: `stage = 'Nuevo'` → 441 (acumulado histórico)
+- **LeadGen**: `quality = 'pending'` → sin filtro de fecha tampoco
 
-3. Mover los banners al lugar correcto
-- `LeadGenContent.tsx`
-  - reemplazar el header plano del tab `Agentes` por el banner con gradiente
-- `LeadGenPerformanceView.tsx`
-  - quitar el banner y dejar un header/card simple para selector + charts
-- `PromologPerformanceView.tsx`
-  - quitar el banner y dejar un header/card simple
-- `PromologContent.tsx`
-  - conservar el banner en el tab `Agentes` y alinearlo visualmente con LeadGen
+El badge debería mostrar solo las entradas creadas **hoy** que el usuario aún no ha procesado.
 
-4. Pasarlo al design system para evitar nuevas inconsistencias
-- Extraer un componente reusable tipo `AnalyticsSectionBanner`
-  - props: `title`, `subtitle`, `count`, `countLabel`, `icon`
-- Usarlo en:
-  - `src/pages/leadgen/LeadGenContent.tsx` (tab Agentes)
-  - `src/pages/promolog/PromologContent.tsx` (tab Agentes)
-- Así el banner deja de estar copiado a mano en varios sitios y evitamos volver a ponerlo en la vista equivocada.
+### Fix
 
-Archivos a tocar
-- `src/pages/promolog/PromologContent.tsx`
-- `src/pages/promolog/PromologPerformanceView.tsx`
-- `src/pages/promolog/PromologAgentDetailView.tsx`
-- `src/pages/leadgen/LeadGenContent.tsx`
-- `src/pages/leadgen/LeadGenPerformanceView.tsx`
-- `src/components/...` nuevo componente reusable de banner
-- `src/pages/promolog/...` nuevo hook/helper compartido para analítica
+**Archivo**: `src/hooks/useSidebarBadges.ts`
 
-Resultado esperado
-- En /promolog sí se podrán seleccionar agentes reales.
-- Los totales de agentes en Promolog dejarán de depender de 200 filas o de un query truncado.
-- Los banners quedarán solo en los tabs `Agentes`.
-- LeadGen y Promolog tendrán la misma jerarquía visual y la misma lógica de layout.
+Agregar filtro `.gte("created_at", todayISO)` a las queries de Closers y LeadGen:
 
-Validación final
-- /promolog > Rendimiento: el selector abre con Carolina, Fabiana, Lorena, etc. y permite elegirlas.
-- /promolog: los números de Agentes, Rendimiento y Detalle coinciden.
-- /leadgen > Agentes: aparece el banner.
-- /leadgen > Rendimiento y /promolog > Rendimiento: ya no aparece el banner.
+```ts
+const today = new Date().toISOString().split("T")[0];
+
+// Closers: solo leads nuevos creados hoy
+supabase.from("closer_creators")
+  .select("id", { count: "exact", head: true })
+  .eq("stage", "Nuevo")
+  .gte("created_at", today)
+
+// LeadGen: solo pending creados hoy
+supabase.from("leadgen_entries")
+  .select("id", { count: "exact", head: true })
+  .eq("quality", "pending")
+  .gte("created_at", today)
+```
+
+Promolog ya filtra por fecha del día (`gte("date", today)`), así que está correcto.
+
+### Archivos a modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/hooks/useSidebarBadges.ts` | Agregar `.gte("created_at", today)` a queries de closers y leadgen |
+
