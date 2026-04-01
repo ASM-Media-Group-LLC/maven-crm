@@ -36,6 +36,7 @@ interface Props {
   onView?: (contacto: Contacto) => void;
   onEdit?: (contacto: Contacto) => void;
   onConvert?: (contacto: Contacto) => void;
+  onDelete?: (contacto: Contacto) => void;
 }
 
 const getAgentInitials = (name: string) => {
