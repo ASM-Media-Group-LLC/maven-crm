@@ -124,7 +124,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
               <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
                 <Command>
                   <CommandInput placeholder="Buscar creador..." />
-                  <CommandList>
+                  <CommandList onWheel={(e) => e.stopPropagation()}>
                     <CommandEmpty>Sin resultados.</CommandEmpty>
                     <CommandGroup>
                       {creators.map(c => (
