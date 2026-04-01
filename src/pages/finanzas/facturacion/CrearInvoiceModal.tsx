@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,7 +29,6 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
   const [creatorId, setCreatorId] = useState("");
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [selectedCommissionIds, setSelectedCommissionIds] = useState<string[]>([]);
-  const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
 
   // Fetch templates (type = "invoice")
@@ -109,7 +108,14 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
     const periodStart = starts.length ? starts.sort()[0] : null;
     const periodEnd = ends.length ? ends.sort().reverse()[0] : null;
 
-    return { agency, blue, paypal, grand, periodStart, periodEnd, count: selected.length };
+    let dueDate: string | null = null;
+    if (periodEnd) {
+      const d = new Date(periodEnd + "T12:00:00");
+      d.setDate(d.getDate() + 5);
+      dueDate = d.toISOString().split("T")[0];
+    }
+
+    return { agency, blue, paypal, grand, periodStart, periodEnd, dueDate, count: selected.length };
   }, [commissions, selectedCommissionIds]);
 
   const canSubmit = !!templateId && !!creatorId && totals.count > 0;
@@ -124,7 +130,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
       blue_amount: totals.blue,
       paypal_amount: totals.paypal,
       net_amount: totals.grand,
-      due_date: dueDate || null,
+      due_date: totals.dueDate || null,
       notes: notes || null,
       status: "borrador",
       period_start: totals.periodStart,
@@ -134,7 +140,6 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
     setTemplateId("");
     setCreatorId("");
     setSelectedCommissionIds([]);
-    setDueDate("");
     setNotes("");
     onClose();
   };
@@ -143,7 +148,6 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
     setTemplateId("");
     setCreatorId("");
     setSelectedCommissionIds([]);
-    setDueDate("");
     setNotes("");
     onClose();
   };
@@ -249,19 +253,14 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
               {totals.blue > 0 && <p className="text-muted-foreground">Blue: {fmt(totals.blue)}</p>}
               {totals.paypal > 0 && <p className="text-muted-foreground">PayPal: {fmt(totals.paypal)}</p>}
               <p className="font-semibold text-foreground pt-1 border-t border-border">Total: {fmt(totals.grand)}</p>
+              {totals.dueDate && <p className="text-muted-foreground text-xs">Vencimiento: {new Date(totals.dueDate + "T12:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })}</p>}
             </div>
           )}
 
-          {/* Due date & Notes */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Fecha de Vencimiento</Label>
-              <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
-            </div>
-            <div>
-              <Label>Notas</Label>
-              <Textarea placeholder="Notas opcionales..." value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
-            </div>
+          {/* Notes */}
+          <div>
+            <Label>Notas</Label>
+            <Textarea placeholder="Notas opcionales..." value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
           </div>
         </div>
 

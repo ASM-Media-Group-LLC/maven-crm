@@ -107,9 +107,7 @@ export default function InvoiceA4Preview({ invoice, template, zoom = DEFAULT_ZOO
           <p className="font-semibold text-gray-800">Invoice details</p>
           <p><span className="font-semibold text-gray-800">Invoice no.: </span><span className="text-gray-600">{invoice.invoice_number || "—"}</span></p>
           <p><span className="font-semibold text-gray-800">Invoice date: </span><span className="text-gray-600">{invoiceDate}</span></p>
-          {invoice.due_date && (
-            <p><span className="font-semibold text-gray-800">Due date: </span><span className="text-gray-600">{new Date(invoice.due_date + "T12:00:00").toLocaleDateString("es-ES")}</span></p>
-          )}
+          <p><span className="font-semibold text-gray-800">Due date: </span><span className="text-gray-600">{invoice.due_date ? new Date(invoice.due_date + "T12:00:00").toLocaleDateString("es-ES") : "—"}</span></p>
           {invoice.payment_method && (
             <p><span className="font-semibold text-gray-800">Payment: </span><span className="text-gray-600">{invoice.payment_method}</span></p>
           )}
