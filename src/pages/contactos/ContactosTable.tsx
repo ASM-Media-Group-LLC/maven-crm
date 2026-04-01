@@ -93,13 +93,13 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="creacion" /></TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Registro" col="registro" /></TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] max-w-[180px]"><SortHeader label="Nombre" col="nombre" /></TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ciudad" col="ciudad" /></TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="creadoPor" /></TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Instagram" col="instagram" /></TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">OF URL</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Contacto</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="creadoPor" /></TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="categoria" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ciudad" col="ciudad" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Contacto</TableHead>
             <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -113,26 +113,6 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
                 <TableCell className="text-sm font-medium max-w-[180px] truncate">
                   {c.pais && <span className="mr-1.5">{getCountryFlag(c.pais)}</span>}
                   {c.nombre}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                  {c.pais ? getCountryShortDisplay(c.pais) : "No aplicable"}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{c.city || "No aplicable"}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {c.creadoPor ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="inline-flex h-7 w-7 cursor-default items-center justify-center rounded-full border border-border bg-muted text-[11px] font-semibold text-foreground">
-                          {getAgentInitials(c.creadoPor)}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{c.creadoPor}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    "No asignado"
-                  )}
                 </TableCell>
                 <TableCell>
                   <a
@@ -162,6 +142,31 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
                   )}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
+                  {c.creadoPor ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex h-7 w-7 cursor-default items-center justify-center rounded-full border border-border bg-muted text-[11px] font-semibold text-foreground">
+                          {getAgentInitials(c.creadoPor)}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{c.creadoPor}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    "No asignado"
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="font-normal">
+                    {c.categoria}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                  {c.pais ? getCountryShortDisplay(c.pais) : "No aplicable"}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{c.city || "No aplicable"}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">
                   {c.whatsapp ? (
                     <a href={`https://wa.me/${c.whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 text-primary hover:underline">
@@ -169,11 +174,6 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
                       {maskPhone(c.whatsapp)}
                     </a>
                   ) : c.phone ? maskPhone(`${c.country_code || ""}${c.phone}`) : "No aplicable"}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="font-normal">
-                    {c.categoria}
-                  </Badge>
                 </TableCell>
 
                 <TableCell className="sticky right-0 z-10 bg-card">

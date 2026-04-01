@@ -533,6 +533,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <SortHeader label="# Contactos" sortKey="contact_count" {...sp} />
             <SortHeader label="Último contacto" sortKey="last_contact_date" {...sp} />
             <SortHeader label="Teléfono" sortKey="phone" {...sp} />
+            <TableHead className={stickyBase}>OF URL</TableHead>
             <TableHead className={stickyBase}>Alertas</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
             <TableHead className={stickyAction}>Acciones</TableHead>
@@ -551,6 +552,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead className={stickyBase}>Extras</TableHead>
             <TableHead className={stickyBase}>Plataforma</TableHead>
               <TableHead className={stickyBase}>Revenue</TableHead>
+              <TableHead className={stickyBase}>OF URL</TableHead>
               <TableHead className={stickyBase}>Notas</TableHead>
               <TableHead className={`w-10 ${stickyBase}`}></TableHead>
               <TableHead className={stickyAction}>Acciones</TableHead>
@@ -567,6 +569,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <SortHeader label="% Comisión" sortKey="agency_commission" {...sp} />
             <TableHead className={stickyBase}>Plataformas</TableHead>
             <TableHead className={stickyBase}>Rev. Plat.</TableHead>
+            <TableHead className={stickyBase}>OF URL</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
             <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
@@ -579,6 +582,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
             <SortHeader label="Closer" sortKey="agent_name" {...sp} />
             <SortHeader label="Último contacto" sortKey="last_contact_date" {...sp} />
+            <TableHead className={stickyBase}>OF URL</TableHead>
             <TableHead className={stickyBase}>Motivo rechazo</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
           </TableRow>
@@ -594,6 +598,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <SortHeader label="Categoría" sortKey="category" {...sp} />
             <SortHeader label="Estado" sortKey="stage" {...sp} />
             <SortHeader label="Teléfono" sortKey="phone" {...sp} />
+            <TableHead className={stickyBase}>OF URL</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
             <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
@@ -660,6 +665,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               )}
             </TableCell>
             <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
+            <TableCell className="text-sm">
+              {c.onlyfans_url ? (
+                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
+                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
+                </a>
+              ) : <span className="text-muted-foreground">—</span>}
+            </TableCell>
             <TableCell>
               <div className="flex gap-1">
                 {followUpPending && (
@@ -738,6 +751,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 </Select>
               </TableCell>
               <TableCell className="font-semibold text-sm">${revenue.toLocaleString()}</TableCell>
+              <TableCell className="text-sm">
+                {c.onlyfans_url ? (
+                  <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
+                    className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
+                    <ExternalLink className="h-3 w-3 shrink-0" /> OF
+                  </a>
+                ) : <span className="text-muted-foreground">—</span>}
+              </TableCell>
               <TableCell>
                 <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
               </TableCell>
@@ -803,6 +824,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm font-medium">
               ${(platformSalesByCreator?.[c.id] || []).reduce((s, x) => s + x.price, 0).toLocaleString()}
             </TableCell>
+            <TableCell className="text-sm">
+              {c.onlyfans_url ? (
+                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
+                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
+                </a>
+              ) : <span className="text-muted-foreground">—</span>}
+            </TableCell>
             <TableCell>
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
@@ -842,6 +871,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm text-muted-foreground">
               {c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy hh:mm a") : "—"}
             </TableCell>
+            <TableCell className="text-sm">
+              {c.onlyfans_url ? (
+                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
+                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
+                </a>
+              ) : <span className="text-muted-foreground">—</span>}
+            </TableCell>
             <TableCell>
               <InlineText value={c.rejection_reason} onSave={(v) => onFieldChange(c.id, "rejection_reason", v)} placeholder="Sin motivo" />
             </TableCell>
@@ -868,6 +905,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v)} />
             </TableCell>
             <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
+            <TableCell className="text-sm">
+              {c.onlyfans_url ? (
+                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
+                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
+                </a>
+              ) : <span className="text-muted-foreground">—</span>}
+            </TableCell>
             <TableCell>
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
