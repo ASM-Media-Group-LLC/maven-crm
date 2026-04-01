@@ -253,6 +253,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
               {totals.blue > 0 && <p className="text-muted-foreground">Blue: {fmt(totals.blue)}</p>}
               {totals.paypal > 0 && <p className="text-muted-foreground">PayPal: {fmt(totals.paypal)}</p>}
               <p className="font-semibold text-foreground pt-1 border-t border-border">Total: {fmt(totals.grand)}</p>
+              {totals.dueDate && <p className="text-muted-foreground text-xs">Vencimiento: {new Date(totals.dueDate + "T12:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })}</p>}
             </div>
           )}
 
