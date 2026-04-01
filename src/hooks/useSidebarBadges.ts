@@ -8,6 +8,7 @@ export function useSidebarBadges() {
   const { data } = useQuery({
     queryKey: ["sidebar-badges", user?.id],
     queryFn: async () => {
+      const today = new Date().toISOString().split("T")[0];
       const [promoResult, leadgen, closers] = await Promise.all([
         supabase.from("promolog_entries").select("id, creator_id, date, network, platform, promoted").is("reviewed_by", null).gte("date", new Date().toISOString().split("T")[0]),
         supabase.from("leadgen_entries").select("id", { count: "exact", head: true }).eq("quality", "pending").gte("created_at", today),
