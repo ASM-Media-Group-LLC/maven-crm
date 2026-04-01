@@ -194,6 +194,11 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onDelete }: Prop
                       <DropdownMenuItem onClick={() => onConvert?.(c)}>
                         <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
                       </DropdownMenuItem>
+                      {onDelete && (
+                        <DropdownMenuItem onClick={() => onDelete(c)} className="text-destructive focus:text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

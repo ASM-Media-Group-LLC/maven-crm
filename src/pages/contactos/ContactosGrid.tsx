@@ -153,6 +153,11 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert, onDelete }: Props
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onConvert?.(c); }}>
                         <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
                       </DropdownMenuItem>
+                      {onDelete && (
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(c); }} className="text-destructive focus:text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

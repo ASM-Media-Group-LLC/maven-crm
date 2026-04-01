@@ -399,7 +399,7 @@ const ContactosContent = () => {
               </DataTableShell>
             ) : (
               <div className="flex-1 min-h-0 overflow-auto">
-                <ContactosGrid contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
+                <ContactosGrid contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} onDelete={isAdmin ? (c) => { setSelectedContacto(c); setDeleteOpen(true); } : undefined} />
               </div>
             )}
           </>
