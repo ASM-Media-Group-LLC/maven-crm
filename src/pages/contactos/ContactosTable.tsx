@@ -47,7 +47,7 @@ const getAgentInitials = (name: string) => {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 };
 
-const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
+const ContactosTable = ({ contactos, onView, onEdit, onConvert, onDelete }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("creacion");
   const [sortAsc, setSortAsc] = useState(false);
 
