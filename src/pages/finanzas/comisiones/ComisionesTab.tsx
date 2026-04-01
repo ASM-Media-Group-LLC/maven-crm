@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -39,6 +40,8 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
   const [showCreate, setShowCreate] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewItem, setViewItem] = useState<any>(null);
+  const [editingBlueId, setEditingBlueId] = useState<string | null>(null);
+  const [editBlueValue, setEditBlueValue] = useState("");
 
   const { data: commissions = [], isLoading } = useQuery({
     queryKey: ["commissions"],
@@ -89,6 +92,25 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
       setDeleteId(null);
     },
     onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+  });
+
+  const updateBlueMutation = useMutation({
+    mutationFn: async ({ id, newBlueAmount, baseAmount, config }: { id: string; newBlueAmount: number; baseAmount: number; config: Record<string, any> }) => {
+      const percentage = config.percentage || 0;
+      const newFinal = (baseAmount * percentage / 100) + newBlueAmount;
+      const newConfig = { ...config, blue_amount: newBlueAmount };
+      const { error } = await supabase.from("commissions").update({
+        calculation_config: newConfig as any,
+        final_amount: newFinal,
+      }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["commissions"] });
+      toast({ title: "Blue actualizado" });
+      setEditingBlueId(null);
+    },
+    onError: () => toast({ title: "Error al actualizar Blue", variant: "destructive" }),
   });
 
   const filtered = commissions.filter(c => {
@@ -157,8 +179,38 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
                     </TableCell>
                     <TableCell className="text-sm">{c.period || "—"}</TableCell>
                     <TableCell className="text-sm font-medium">{fmt(Number(c.base_amount) || 0)}</TableCell>
-                    <TableCell className="text-sm text-destructive font-medium">{(() => { const cfg = (c.calculation_config || {}) as Record<string, any>; return cfg.percentage ? `${cfg.percentage}%` : "—"; })()}</TableCell>
-                    <TableCell className="text-sm font-medium">{(() => { const cfg = (c.calculation_config || {}) as Record<string, any>; return cfg.blue_package && cfg.blue_amount > 0 ? fmt(cfg.blue_amount) : "—"; })()}</TableCell>
+                    <TableCell className="text-sm text-foreground font-medium">{(() => { const cfg = (c.calculation_config || {}) as Record<string, any>; return cfg.percentage ? `${cfg.percentage}%` : "—"; })()}</TableCell>
+                    <TableCell className="text-sm font-medium">{(() => {
+                      const cfg = (c.calculation_config || {}) as Record<string, any>;
+                      if (editingBlueId === c.id) {
+                        return (
+                          <Input
+                            type="number"
+                            className="h-7 w-24 text-sm"
+                            value={editBlueValue}
+                            onChange={(e) => setEditBlueValue(e.target.value)}
+                            onBlur={() => {
+                              const val = parseFloat(editBlueValue) || 0;
+                              updateBlueMutation.mutate({ id: c.id, newBlueAmount: val, baseAmount: Number(c.base_amount) || 0, config: cfg });
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { const val = parseFloat(editBlueValue) || 0; updateBlueMutation.mutate({ id: c.id, newBlueAmount: val, baseAmount: Number(c.base_amount) || 0, config: cfg }); }
+                              if (e.key === "Escape") setEditingBlueId(null);
+                            }}
+                            autoFocus
+                          />
+                        );
+                      }
+                      const blueVal = cfg.blue_package && cfg.blue_amount > 0 ? cfg.blue_amount : 0;
+                      return (
+                        <span
+                          className="cursor-pointer hover:underline"
+                          onClick={() => { setEditingBlueId(c.id); setEditBlueValue(String(cfg.blue_amount || 0)); }}
+                        >
+                          {blueVal > 0 ? fmt(blueVal) : "—"}
+                        </span>
+                      );
+                    })()}</TableCell>
                     <TableCell className="text-sm font-medium text-primary">{fmt(Number(c.final_amount) || 0)}</TableCell>
                     <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                       <div className="flex items-center gap-1">
