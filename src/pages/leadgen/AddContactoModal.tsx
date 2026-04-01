@@ -146,6 +146,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         phone: data.telefono || null,
         notes: data.notas || null,
         created_by: user?.id ?? "",
+        record_type: recordType,
       });
 
       if (error) throw error;
