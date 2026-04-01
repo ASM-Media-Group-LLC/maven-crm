@@ -31,9 +31,24 @@ interface Template {
 }
 
 export default function TemplatesPage() {
+  const [deleteTemplate, setDeleteTemplate] = useState<Template | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editTemplate, setEditTemplate] = useState<Template | null>(null);
   const [viewTemplate, setViewTemplate] = useState<Template | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const handleDelete = async () => {
+    if (!deleteTemplate) return;
+    const { error } = await supabase.from("invoice_templates").delete().eq("id", deleteTemplate.id);
+    if (error) {
+      toast({ title: "Error al eliminar", variant: "destructive" });
+    } else {
+      toast({ title: `Template eliminado` });
+      queryClient.invalidateQueries({ queryKey: ["invoice-templates"] });
+    }
+    setDeleteTemplate(null);
+  };
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["invoice-templates"],
