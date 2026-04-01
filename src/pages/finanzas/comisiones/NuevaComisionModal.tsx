@@ -61,7 +61,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
       setPeriodStart(undefined);
       setPeriodEnd(undefined);
       setBaseAmount("");
-      setNotes("");
+      
     }
   }, [open]);
 
