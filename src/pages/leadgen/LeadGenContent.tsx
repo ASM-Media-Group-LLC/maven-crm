@@ -22,6 +22,7 @@ import { useLeadGenByDateRange, useLeadGenProfiles, useLeadGenAgentStats, useLea
 import type { LeadGenEntry } from "./useLeadGen";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { LEADGEN_COMPANIES, QUALITY_OPTIONS } from "./leadgenConstants";
 
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
