@@ -10,8 +10,8 @@ export function useSidebarBadges() {
     queryFn: async () => {
       const [promoResult, leadgen, closers] = await Promise.all([
         supabase.from("promolog_entries").select("id, creator_id, date, network, platform, promoted").is("reviewed_by", null).gte("date", new Date().toISOString().split("T")[0]),
-        supabase.from("leadgen_entries").select("id", { count: "exact", head: true }).eq("quality", "pending"),
-        supabase.from("closer_creators").select("id", { count: "exact", head: true }).eq("stage", "Nuevo"),
+        supabase.from("leadgen_entries").select("id", { count: "exact", head: true }).eq("quality", "pending").gte("created_at", today),
+        supabase.from("closer_creators").select("id", { count: "exact", head: true }).eq("stage", "Nuevo").gte("created_at", today),
       ]);
 
       const promoDeduped = new Set(
