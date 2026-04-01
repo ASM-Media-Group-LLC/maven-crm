@@ -639,12 +639,25 @@ export default function FacturacionPage() {
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{deleteItem?._isPaymentNote ? "¿Eliminar nota de pago?" : "¿Eliminar invoice?"}</AlertDialogTitle>
-            <AlertDialogDescription>{deleteItem?._isPaymentNote ? "Se eliminará esta nota de pago permanentemente." : `Se eliminará el invoice #${deleteItem?.invoice_number}.`}</AlertDialogDescription>
+            <AlertDialogTitle>¿Eliminar nota de pago?</AlertDialogTitle>
+            <AlertDialogDescription>Se eliminará esta nota de pago permanentemente.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { if (!deleteItem) return; deleteItem._isPaymentNote ? deletePaymentNoteMutation.mutate(deleteItem.id) : deleteMutation.mutate(deleteItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+            <AlertDialogAction onClick={() => { if (!deleteItem) return; deletePaymentNoteMutation.mutate(deleteItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!cancelItem} onOpenChange={() => setCancelItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cancelar invoice #{cancelItem?.invoice_number}?</AlertDialogTitle>
+            <AlertDialogDescription>El invoice se marcará como cancelado. Esta acción no elimina el registro.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (!cancelItem) return; cancelMutation.mutate(cancelItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Confirmar Cancelación</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
