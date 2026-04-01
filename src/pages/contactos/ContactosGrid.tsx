@@ -1,4 +1,4 @@
-import { Eye, MoreHorizontal, Pencil, Sparkles } from "lucide-react";
+import { Eye, MoreHorizontal, Pencil, Sparkles, Trash2 } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +32,7 @@ interface Props {
   onView?: (contacto: Contacto) => void;
   onEdit?: (contacto: Contacto) => void;
   onConvert?: (contacto: Contacto) => void;
+  onDelete?: (contacto: Contacto) => void;
 }
 
 const getAgentInitials = (name: string) => {
@@ -42,7 +43,7 @@ const getAgentInitials = (name: string) => {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 };
 
-const ContactosGrid = ({ contactos, onView, onEdit, onConvert }: Props) => {
+const ContactosGrid = ({ contactos, onView, onEdit, onConvert, onDelete }: Props) => {
   return (
     <TooltipProvider>
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -152,6 +153,11 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert }: Props) => {
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onConvert?.(c); }}>
                         <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
                       </DropdownMenuItem>
+                      {onDelete && (
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(c); }} className="text-destructive focus:text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

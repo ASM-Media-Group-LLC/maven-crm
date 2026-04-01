@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone, UserPlus, CheckCircle2, ClipboardCheck, MessageSquare } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone, UserPlus, CheckCircle2, ClipboardCheck, MessageSquare, MoreHorizontal, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,9 @@ import { Button } from "@/components/ui/button";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useUpdateLeadQuality, useUpdateLeadField, useLeadGenQA, useCreateQAReview } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -63,6 +66,7 @@ interface Props {
   leads: LeadGenEntry[];
   onView?: (lead: LeadGenEntry) => void;
   onEdit?: (lead: LeadGenEntry) => void;
+  onDelete?: (lead: LeadGenEntry) => void;
   profiles?: { id: string; full_name: string | null }[];
 }
 
@@ -262,7 +266,7 @@ const QACell = React.memo(({ lead, qaMap, canReview }: { lead: LeadGenEntry; qaM
 QACell.displayName = "QACell";
 
 // Memoized row
-const LeadRow = React.memo(({ lead, onView, profiles, qaMap, canReview }: { lead: LeadGenEntry; onView?: (lead: LeadGenEntry) => void; profiles?: { id: string; full_name: string | null }[]; qaMap: Record<string, any>; canReview: boolean }) => {
+const LeadRow = React.memo(({ lead, onView, onDelete, profiles, qaMap, canReview }: { lead: LeadGenEntry; onView?: (lead: LeadGenEntry) => void; onDelete?: (lead: LeadGenEntry) => void; profiles?: { id: string; full_name: string | null }[]; qaMap: Record<string, any>; canReview: boolean }) => {
   const isOrphan = lead.agent_name === "—" && profiles && profiles.length > 0;
 
   return (
@@ -329,16 +333,34 @@ const LeadRow = React.memo(({ lead, onView, profiles, qaMap, canReview }: { lead
         <QACell lead={lead} qaMap={qaMap} canReview={canReview} />
       </TableCell>
       <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(lead)}>
-          <Eye className="h-4 w-4" />
-        </Button>
+        {onDelete ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onView?.(lead)}>
+                <Eye className="mr-2 h-4 w-4" /> Ver detalle
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDelete(lead)} className="text-destructive focus:text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(lead)}>
+            <Eye className="h-4 w-4" />
+          </Button>
+        )}
       </TableCell>
     </TableRow>
   );
 });
 LeadRow.displayName = "LeadRow";
 
-const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
+const LeadGenTable = ({ leads, onView, onEdit, onDelete, profiles }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("hora");
   const [sortAsc, setSortAsc] = useState(false);
   const { isAdmin, isSupervisor } = useUserRole();
@@ -407,7 +429,7 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
       </TableHeader>
       <TableBody>
         {sorted.map((lead) => (
-          <LeadRow key={lead.id} lead={lead} onView={onView} profiles={profiles} qaMap={qaMap} canReview={canReview} />
+          <LeadRow key={lead.id} lead={lead} onView={onView} onDelete={onDelete} profiles={profiles} qaMap={qaMap} canReview={canReview} />
         ))}
         {sorted.length === 0 && (
           <TableRow>

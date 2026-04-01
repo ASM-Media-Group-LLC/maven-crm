@@ -22,6 +22,7 @@ import { useLeadGenByDateRange, useLeadGenProfiles, useLeadGenAgentStats, useLea
 import type { LeadGenEntry } from "./useLeadGen";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { LEADGEN_COMPANIES, QUALITY_OPTIONS } from "./leadgenConstants";
 
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
@@ -30,6 +31,7 @@ import LeadGenGrid from "./LeadGenGrid";
 import AddLeadModal from "./AddLeadModal";
 import AddContactoModal from "./AddContactoModal";
 import ViewLeadModal from "./ViewLeadModal";
+import DeleteLeadDialog from "./DeleteLeadDialog";
 import AgentDetailView from "./AgentDetailView";
 import AgentHourlyPerformance from "./AgentHourlyPerformance";
 import LeadGenSupervisorView from "./LeadGenSupervisorView";
@@ -51,6 +53,7 @@ const LeadGenContent = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { dataScope, isLoading: permsLoading } = usePermissions();
+  const { isAdmin } = useUserRole();
 
   // Determine viewMode from permissions
   const viewMode: ViewMode = useMemo(() => {
@@ -121,6 +124,8 @@ const LeadGenContent = () => {
   const [addContactoOpen, setAddContactoOpen] = useState(false);
   const [viewLeadOpen, setViewLeadOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<LeadGenEntry | null>(null);
+  const [deleteLeadOpen, setDeleteLeadOpen] = useState(false);
+  const [deleteLead, setDeleteLead] = useState<LeadGenEntry | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<{ id: string; name: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -357,6 +362,7 @@ const LeadGenContent = () => {
                 <LeadGenTable
                   leads={filteredLeads}
                   onView={lead => { setSelectedLead(lead); setViewLeadOpen(true); }}
+                  onDelete={isAdmin ? (lead) => { setDeleteLead(lead); setDeleteLeadOpen(true); } : undefined}
                   profiles={profiles}
                 />
               </DataTableShell>
@@ -498,7 +504,17 @@ const LeadGenContent = () => {
       {/* Modals */}
       <AddLeadModal open={addLeadOpen} onOpenChange={setAddLeadOpen} />
       <AddContactoModal open={addContactoOpen} onOpenChange={setAddContactoOpen} />
-      <ViewLeadModal open={viewLeadOpen} onOpenChange={setViewLeadOpen} lead={selectedLead} />
+      <ViewLeadModal
+        open={viewLeadOpen}
+        onOpenChange={setViewLeadOpen}
+        lead={selectedLead}
+        onDelete={isAdmin ? () => {
+          setViewLeadOpen(false);
+          setDeleteLead(selectedLead);
+          setDeleteLeadOpen(true);
+        } : undefined}
+      />
+      <DeleteLeadDialog open={deleteLeadOpen} onOpenChange={setDeleteLeadOpen} lead={deleteLead} />
     </main>
   );
 };
