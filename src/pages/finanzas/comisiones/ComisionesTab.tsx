@@ -200,7 +200,36 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
                     </TableCell>
                     <TableCell className="text-sm">{c.period || "—"}</TableCell>
                     <TableCell className="text-sm font-medium">{fmt(Number(c.base_amount) || 0)}</TableCell>
-                    <TableCell className="text-sm text-foreground font-medium">{(() => { const cfg = (c.calculation_config || {}) as Record<string, any>; return cfg.percentage ? `${cfg.percentage}%` : "—"; })()}</TableCell>
+                    <TableCell className="text-sm text-foreground font-medium">{(() => {
+                      const cfg = (c.calculation_config || {}) as Record<string, any>;
+                      if (editingCommId === c.id) {
+                        return (
+                          <Input
+                            type="number"
+                            className="h-7 w-24 text-sm"
+                            value={editCommValue}
+                            onChange={(e) => setEditCommValue(e.target.value)}
+                            onBlur={() => {
+                              const val = parseFloat(editCommValue) || 0;
+                              updateCommMutation.mutate({ id: c.id, newPercentage: val, baseAmount: Number(c.base_amount) || 0, config: cfg });
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { const val = parseFloat(editCommValue) || 0; updateCommMutation.mutate({ id: c.id, newPercentage: val, baseAmount: Number(c.base_amount) || 0, config: cfg }); }
+                              if (e.key === "Escape") setEditingCommId(null);
+                            }}
+                            autoFocus
+                          />
+                        );
+                      }
+                      return (
+                        <span
+                          className="cursor-pointer hover:underline"
+                          onClick={() => { setEditingCommId(c.id); setEditCommValue(String(cfg.percentage || 0)); }}
+                        >
+                          {cfg.percentage ? `${cfg.percentage}%` : "—"}
+                        </span>
+                      );
+                    })()}</TableCell>
                     <TableCell className="text-sm font-medium">{(() => {
                       const cfg = (c.calculation_config || {}) as Record<string, any>;
                       if (editingBlueId === c.id) {
