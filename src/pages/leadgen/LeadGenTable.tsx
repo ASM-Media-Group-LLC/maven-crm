@@ -66,6 +66,7 @@ interface Props {
   leads: LeadGenEntry[];
   onView?: (lead: LeadGenEntry) => void;
   onEdit?: (lead: LeadGenEntry) => void;
+  onDelete?: (lead: LeadGenEntry) => void;
   profiles?: { id: string; full_name: string | null }[];
 }
 
