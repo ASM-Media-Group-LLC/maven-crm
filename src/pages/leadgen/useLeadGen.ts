@@ -33,6 +33,7 @@ export type LeadGenEntry = {
   qa_rating?: string | null;
   qa_comment?: string | null;
   qa_supervisor_id?: string | null;
+  record_type?: string | null;
 };
 
 export type LeadGenQA = {

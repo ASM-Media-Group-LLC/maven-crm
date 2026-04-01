@@ -313,6 +313,11 @@ const LeadRow = React.memo(({ lead, onView, onDelete, profiles, qaMap, canReview
         <InlineSourceCell lead={lead} />
       </TableCell>
       <TableCell><QualityCell lead={lead} /></TableCell>
+      <TableCell>
+        <Badge variant={(lead as any).record_type === "reactivado" ? "warning-soft" : "success-soft"} className="font-normal">
+          {(lead as any).record_type === "reactivado" ? "Reactivado" : "Nuevo"}
+        </Badge>
+      </TableCell>
       <TableCell className="text-center text-lg">{countryToFlag(lead.country_code)}</TableCell>
       <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}>
         {lead.phone_raw ? (
@@ -421,6 +426,7 @@ const LeadGenTable = ({ leads, onView, onEdit, onDelete, profiles }: Props) => {
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="agente" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agencia" col="agencia" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="categoria" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Tipo</TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Contacto" col="contacto" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="QA" col="qa" /></TableHead>

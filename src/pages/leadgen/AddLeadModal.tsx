@@ -18,7 +18,7 @@ import { Upload, X, ChevronsUpDown, Check, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
-import { checkCreatorExists, checkRecentLead, checkDuplicateOnlyFans } from "@/lib/lead-validation";
+import { checkCreatorExists, checkPreviousLead, checkDuplicateOnlyFans } from "@/lib/lead-validation";
 import { useQueryClient } from "@tanstack/react-query";
 
 
@@ -111,16 +111,15 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         return;
       }
 
-      // VALIDATION 2: Check if lead was created in last 24h
-      const recentCheck = await checkRecentLead(data.source_link, data.onlyfans_url);
-      if (recentCheck.exists) {
+      // VALIDATION 2: Check if handle previously existed (informational, non-blocking)
+      const previousCheck = await checkPreviousLead(data.source_link, data.onlyfans_url);
+      let recordType = "nuevo";
+      if (previousCheck.existed) {
+        recordType = "reactivado";
         toast({
-          title: "Lead duplicado reciente",
-          description: "Este lead ya fue registrado hace menos de 24 horas. Intenta nuevamente más tarde.",
-          variant: "destructive",
+          title: "Modelo reactivada",
+          description: "Esta modelo ya existía en el sistema. Se registrará como un nuevo lead reactivado.",
         });
-        setIsSubmitting(false);
-        return;
       }
 
       // VALIDATION 3: Check duplicate OnlyFans URL
@@ -147,6 +146,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         onlyfans_url: data.onlyfans_url?.trim() || null,
         lg_user_id: user.id,
         entry_date: getMiamiDateStr(),
+        record_type: recordType,
       } as any).select("id").single();
 
       if (error) throw error;

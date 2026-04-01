@@ -63,49 +63,35 @@ export async function checkCreatorExists(
 }
 
 /**
- * Check if a lead with same handle/OF was created in the last 24 hours.
+ * Check if a handle already has previous records in leads or contacts.
+ * Returns informational data — does NOT block creation.
  */
-export async function checkRecentLead(
+export async function checkPreviousLead(
   handle: string,
   onlyfansUrl?: string
-): Promise<{ exists: boolean; createdAt?: string }> {
+): Promise<{ existed: boolean }> {
   const normalizedHandle = normalizeHandle(handle);
-  const normalizedOf = onlyfansUrl ? normalizeOnlyFansUrl(onlyfansUrl) : "";
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-  // Check by handle
   if (normalizedHandle) {
     const { data } = await supabase
       .from("leadgen_entries")
-      .select("id, created_at")
+      .select("id")
       .eq("model_handle", normalizedHandle)
-      .gte("created_at", twentyFourHoursAgo)
       .limit(1)
       .maybeSingle();
-    if (data) {
-      return { exists: true, createdAt: data.created_at };
-    }
+    if (data) return { existed: true };
+
+    // Also check closers_contacts
+    const { data: contactData } = await supabase
+      .from("closers_contacts")
+      .select("id")
+      .ilike("handle", normalizedHandle)
+      .limit(1)
+      .maybeSingle();
+    if (contactData) return { existed: true };
   }
 
-  // Check by OF URL
-  if (normalizedOf) {
-    const { data } = await supabase
-      .from("leadgen_entries")
-      .select("id, created_at, onlyfans_url" as any)
-      .not("onlyfans_url", "is", null)
-      .gte("created_at", twentyFourHoursAgo)
-      .limit(100);
-    if (data) {
-      const match = (data as any[]).find(
-        (e) => normalizeOnlyFansUrl(e.onlyfans_url || "") === normalizedOf
-      );
-      if (match) {
-        return { exists: true, createdAt: match.created_at };
-      }
-    }
-  }
-
-  return { exists: false };
+  return { existed: false };
 }
 
 /**

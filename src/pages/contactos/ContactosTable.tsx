@@ -98,6 +98,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onDelete }: Prop
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">OF URL</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="creadoPor" /></TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="categoria" /></TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Tipo</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ciudad" col="ciudad" /></TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Contacto</TableHead>
@@ -161,6 +162,11 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onDelete }: Prop
                 <TableCell>
                   <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="font-normal">
                     {c.categoria}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={(c as any).record_type === "reactivado" ? "warning-soft" : "success-soft"} className="font-normal">
+                    {(c as any).record_type === "reactivado" ? "Reactivado" : "Nuevo"}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">

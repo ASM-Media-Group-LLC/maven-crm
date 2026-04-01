@@ -1109,6 +1109,7 @@ export type Database = {
           physical_appearance: string | null
           platform: string
           profile_picture_url: string | null
+          record_type: string
           source: string | null
           status: string | null
           ticket_number: string | null
@@ -1132,6 +1133,7 @@ export type Database = {
           physical_appearance?: string | null
           platform: string
           profile_picture_url?: string | null
+          record_type?: string
           source?: string | null
           status?: string | null
           ticket_number?: string | null
@@ -1155,6 +1157,7 @@ export type Database = {
           physical_appearance?: string | null
           platform?: string
           profile_picture_url?: string | null
+          record_type?: string
           source?: string | null
           status?: string | null
           ticket_number?: string | null
@@ -4174,6 +4177,7 @@ export type Database = {
           phone_raw: string | null
           platform: string
           quality: string
+          record_type: string
           source_link: string | null
           state: string | null
           status: string | null
@@ -4196,6 +4200,7 @@ export type Database = {
           phone_raw?: string | null
           platform: string
           quality?: string
+          record_type?: string
           source_link?: string | null
           state?: string | null
           status?: string | null
@@ -4218,6 +4223,7 @@ export type Database = {
           phone_raw?: string | null
           platform?: string
           quality?: string
+          record_type?: string
           source_link?: string | null
           state?: string | null
           status?: string | null
