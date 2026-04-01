@@ -124,6 +124,8 @@ const LeadGenContent = () => {
   const [addContactoOpen, setAddContactoOpen] = useState(false);
   const [viewLeadOpen, setViewLeadOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<LeadGenEntry | null>(null);
+  const [deleteLeadOpen, setDeleteLeadOpen] = useState(false);
+  const [deleteLead, setDeleteLead] = useState<LeadGenEntry | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<{ id: string; name: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   
