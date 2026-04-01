@@ -552,6 +552,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead className={stickyBase}>Extras</TableHead>
             <TableHead className={stickyBase}>Plataforma</TableHead>
               <TableHead className={stickyBase}>Revenue</TableHead>
+              <TableHead className={stickyBase}>OF URL</TableHead>
               <TableHead className={stickyBase}>Notas</TableHead>
               <TableHead className={`w-10 ${stickyBase}`}></TableHead>
               <TableHead className={stickyAction}>Acciones</TableHead>
