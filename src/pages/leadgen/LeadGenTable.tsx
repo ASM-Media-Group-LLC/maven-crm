@@ -266,7 +266,7 @@ const QACell = React.memo(({ lead, qaMap, canReview }: { lead: LeadGenEntry; qaM
 QACell.displayName = "QACell";
 
 // Memoized row
-const LeadRow = React.memo(({ lead, onView, profiles, qaMap, canReview }: { lead: LeadGenEntry; onView?: (lead: LeadGenEntry) => void; profiles?: { id: string; full_name: string | null }[]; qaMap: Record<string, any>; canReview: boolean }) => {
+const LeadRow = React.memo(({ lead, onView, onDelete, profiles, qaMap, canReview }: { lead: LeadGenEntry; onView?: (lead: LeadGenEntry) => void; onDelete?: (lead: LeadGenEntry) => void; profiles?: { id: string; full_name: string | null }[]; qaMap: Record<string, any>; canReview: boolean }) => {
   const isOrphan = lead.agent_name === "—" && profiles && profiles.length > 0;
 
   return (
