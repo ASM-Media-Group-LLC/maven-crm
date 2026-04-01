@@ -185,6 +185,7 @@ export default function FacturacionPage() {
   const [viewItem, setViewItem] = useState<any>(null);
   const [viewNoteItem, setViewNoteItem] = useState<any>(null);
   const [deleteItem, setDeleteItem] = useState<any>(null);
+  const [cancelItem, setCancelItem] = useState<any>(null);
   const [reverseItem, setReverseItem] = useState<any>(null);
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
 
