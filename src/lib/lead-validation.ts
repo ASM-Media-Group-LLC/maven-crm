@@ -79,23 +79,45 @@ export async function checkCreatorExists(
 
 /**
  * Check if a handle already has previous records in leads.
- * Returns the date of the most recent entry for 24h rule.
+ * Returns the date of the most recent entry and the agent who uploaded it.
  */
 export async function checkPreviousLead(
   handle: string,
   onlyfansUrl?: string
-): Promise<{ existed: boolean; lastEntryDate?: string }> {
+): Promise<{
+  existed: boolean;
+  lastEntryDate?: string;
+  lastAgentId?: string;
+  lastAgentName?: string;
+}> {
   const normalizedHandle = normalizeHandle(handle);
 
   if (normalizedHandle) {
     const { data } = await supabase
       .from("leadgen_entries")
-      .select("id, created_at")
+      .select("id, created_at, lg_user_id")
       .eq("model_handle", normalizedHandle)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (data) return { existed: true, lastEntryDate: data.created_at };
+    if (data) {
+      let agentName: string | undefined;
+      const agentId = (data as any).lg_user_id;
+      if (agentId) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", agentId)
+          .maybeSingle();
+        agentName = profile?.full_name || undefined;
+      }
+      return {
+        existed: true,
+        lastEntryDate: data.created_at,
+        lastAgentId: agentId || undefined,
+        lastAgentName: agentName,
+      };
+    }
   }
 
   return { existed: false };
@@ -103,53 +125,83 @@ export async function checkPreviousLead(
 
 /**
  * Check if a handle already exists in closers_contacts.
- * Informational only — does NOT block.
+ * Returns enriched info: name, created_at, agent name.
  */
 export async function checkExistingContact(
   handle: string
-): Promise<{ exists: boolean; contactName?: string }> {
+): Promise<{
+  exists: boolean;
+  contactName?: string;
+  contactCreatedAt?: string;
+  contactAgentName?: string;
+}> {
   const normalizedHandle = normalizeHandle(handle);
   if (!normalizedHandle) return { exists: false };
 
   const { data } = await supabase
     .from("closers_contacts")
-    .select("id, name")
+    .select("id, name, created_at, created_by")
     .ilike("handle", normalizedHandle)
     .limit(1)
     .maybeSingle();
 
-  if (data) return { exists: true, contactName: data.name };
+  if (data) {
+    let agentName: string | undefined;
+    if (data.created_by) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", data.created_by)
+        .maybeSingle();
+      agentName = profile?.full_name || undefined;
+    }
+    return {
+      exists: true,
+      contactName: data.name,
+      contactCreatedAt: data.created_at || undefined,
+      contactAgentName: agentName,
+    };
+  }
   return { exists: false };
 }
 
 /**
  * Check if an OnlyFans URL already exists in leads or contacts.
+ * Returns the name of the matching record.
  */
 export async function checkDuplicateOnlyFans(
   url: string
-): Promise<{ existsInLeads: boolean; existsInContacts: boolean }> {
+): Promise<{
+  existsInLeads: boolean;
+  existsInContacts: boolean;
+  matchName?: string;
+}> {
   const normalized = normalizeOnlyFansUrl(url);
   if (!normalized) return { existsInLeads: false, existsInContacts: false };
 
   const { data: leads } = await supabase
     .from("leadgen_entries")
-    .select("id, onlyfans_url" as any)
+    .select("id, onlyfans_url, model_handle" as any)
     .not("onlyfans_url", "is", null)
     .limit(200);
 
-  const existsInLeads = !!(leads as any[])?.some(
+  const leadMatch = (leads as any[])?.find(
     (e) => normalizeOnlyFansUrl(e.onlyfans_url || "") === normalized
   );
 
   const { data: contacts } = await supabase
     .from("closers_contacts")
-    .select("id, onlyfans_url" as any)
+    .select("id, onlyfans_url, name" as any)
     .not("onlyfans_url", "is", null)
     .limit(200);
 
-  const existsInContacts = !!(contacts as any[])?.some(
+  const contactMatch = (contacts as any[])?.find(
     (e) => normalizeOnlyFansUrl(e.onlyfans_url || "") === normalized
   );
 
-  return { existsInLeads, existsInContacts };
+  return {
+    existsInLeads: !!leadMatch,
+    existsInContacts: !!contactMatch,
+    matchName: contactMatch?.name || leadMatch?.model_handle || undefined,
+  };
 }

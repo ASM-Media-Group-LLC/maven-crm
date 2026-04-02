@@ -80,18 +80,18 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         if (creatorCheck.exists) {
           if (creatorCheck.isActive) {
             toast({
-              title: "Creadora activa",
-              description: `${creatorCheck.creatorName} ya forma parte de la agencia.`,
+              title: "❌ Creadora activa",
+              description: `${creatorCheck.creatorName} ya forma parte de la agencia con estado "${creatorCheck.creatorStatus}". No se puede registrar.`,
               variant: "destructive",
             });
             setIsSubmitting(false);
             return;
           }
-          // Inactive creator — allow
+          // Inactive creator — allow (warning style)
           recordType = "reactivado";
           toast({
-            title: "Creadora inactiva detectada",
-            description: `${creatorCheck.creatorName} está como ${creatorCheck.creatorStatus}. Se registrará como contacto reactivado.`,
+            title: "⚠️ Creadora inactiva detectada",
+            description: `${creatorCheck.creatorName} tiene estado "${creatorCheck.creatorStatus}". Se registrará como contacto reactivado.`,
           });
         }
       }
@@ -101,9 +101,13 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         const existingContact = await checkExistingContact(normalizedIg);
         if (existingContact.exists) {
           recordType = "reactivado";
+          const agentInfo = existingContact.contactAgentName ? ` por ${existingContact.contactAgentName}` : "";
+          const dateInfo = existingContact.contactCreatedAt
+            ? ` el ${new Date(existingContact.contactCreatedAt).toLocaleDateString("es-CO")}`
+            : "";
           toast({
-            title: "Contacto existente",
-            description: `Esta modelo ya está registrada: ${existingContact.contactName}. Se creará un nuevo registro.`,
+            title: "⚠️ Contacto existente",
+            description: `Esta modelo ya existe como contacto: ${existingContact.contactName} (registrada${agentInfo}${dateInfo}). Se creará nuevo registro.`,
           });
         }
       }
@@ -119,8 +123,8 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
           .maybeSingle();
         if (phoneInContacts) {
           toast({
-            title: "Teléfono ya registrado",
-            description: `Este número ya existe para: ${phoneInContacts.name}. Se guardará de todos modos.`,
+            title: "⚠️ Teléfono ya registrado",
+            description: `Este número ya está registrado para ${phoneInContacts.name}. El contacto se guardará de todos modos.`,
           });
         }
         const { data: phoneInCreators } = await supabase
@@ -130,8 +134,8 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
           .maybeSingle();
         if (phoneInCreators) {
           toast({
-            title: "Teléfono ya registrado",
-            description: `Este número ya existe en creators: ${phoneInCreators.name}. Se guardará de todos modos.`,
+            title: "⚠️ Teléfono en creators",
+            description: `Este número ya existe para la creadora ${phoneInCreators.name}. El contacto se guardará de todos modos.`,
           });
         }
       }
