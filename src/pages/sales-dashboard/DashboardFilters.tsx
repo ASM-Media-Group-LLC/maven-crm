@@ -114,10 +114,17 @@ const DashboardFilters = ({
               )}
             </>
           ) : (
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              <span>{dateLabel}</span>
-            </div>
+            <DateRangePicker
+              from={dateFrom}
+              to={dateTo}
+              onApply={(from, to) => {
+                if (onCustomDateChange) {
+                  onCustomDateChange(from, to);
+                }
+              }}
+              placeholder={dateLabel}
+              className="h-9 text-sm"
+            />
           )}
           <Select value={earningsMode} onValueChange={(v) => onEarningsModeChange(v as EarningsMode)}>
             <SelectTrigger className="h-9 w-[160px] text-sm">
