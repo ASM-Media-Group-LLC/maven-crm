@@ -1,4 +1,4 @@
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
+import MPTopbar from "./components/MPTopbar";
 import MPSidebar from "./components/MPSidebar";
 
 const ProyectoMPLayout = ({ children }: { children: React.ReactNode }) => (
