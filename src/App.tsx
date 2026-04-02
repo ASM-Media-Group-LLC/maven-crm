@@ -285,6 +285,15 @@ const App = () => (
               <Route path="/finanzas/collections" element={<PermissionRoute module="Finanzas"><FinanzasLayout><CollectionsPage /></FinanzasLayout></PermissionRoute>} />
               <Route path="/finanzas/horas-variables" element={<PermissionRoute module="Finanzas"><FinanzasLayout><HorasVariablesPage /></FinanzasLayout></PermissionRoute>} />
               <Route path="/finanzas/configuracion" element={<PermissionRoute module="Finanzas"><FinanzasLayout><ConfiguracionPage /></FinanzasLayout></PermissionRoute>} />
+              {/* Proyecto MP routes */}
+              <Route path="/proyectomp" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPDashboard /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/tareas" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPTareas /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/pipeline" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPPipeline /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/contenido" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPContenido /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/trafico" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPTrafico /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/finanzas" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPFinanzas /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/equipo" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPEquipo /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/milestones" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPMilestones /></ProyectoMPLayout></PermissionRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
               <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />
