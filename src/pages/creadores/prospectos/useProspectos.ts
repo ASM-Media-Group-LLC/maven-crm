@@ -133,10 +133,12 @@ export function useDeleteProspect() {
 export function useStartOnboarding() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   return useMutation({
     mutationFn: async ({ prospect, agency }: { prospect: ProspectRecord; agency: string }) => {
+      if (!user) throw new Error("No se pudo obtener el usuario autenticado");
       // 1. Create creator with status borrador
       const { data: creator, error: creatorError } = await supabase
         .from("creators")
@@ -151,6 +153,7 @@ export function useStartOnboarding() {
           category: prospect.category || null,
           status: "borrador",
           created_at: prospect.created_at,
+          created_by: user.id,
         })
         .select("id")
         .single();

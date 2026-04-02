@@ -206,7 +206,9 @@ export function useAddCreadorWithBusiness() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ creator, business, documents }: AddCreadorFullInput): Promise<string> => {
-      const { data, error } = await supabase.from("creators").insert(creator).select("id").single();
+      const { data: { user } } = await supabase.auth.getUser();
+      const creatorPayload = { ...creator, created_by: creator.created_by || user?.id || null };
+      const { data, error } = await supabase.from("creators").insert(creatorPayload).select("id").single();
       if (error) throw error;
       const creatorId = data.id;
       const { error: bizError } = await supabase
