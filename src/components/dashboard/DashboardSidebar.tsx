@@ -68,6 +68,7 @@ const DashboardSidebar = () => {
     { title: "Dashboard", url: "/sales-overview" },
     { title: "Reportes", url: "/salesdashboard" },
     { title: "IA Ventas", url: "/aisales" },
+    { title: "Auditoría", url: "/sales-audit" },
   ];
 
   const operationsMenuAll = [
