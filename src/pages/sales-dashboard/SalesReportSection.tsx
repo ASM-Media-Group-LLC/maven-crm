@@ -136,6 +136,17 @@ const SalesReportSection = ({ rows, comparedRows, earningsMode, dateFrom, dateTo
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Reporte de Ventas
+        </h3>
+        {dateLabel && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+            <CalendarDays className="h-3 w-3" />
+            Filtro: {dateLabel}
+          </span>
+        )}
+      </div>
       <div className="flex items-center justify-between gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
