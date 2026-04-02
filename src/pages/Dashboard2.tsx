@@ -42,6 +42,7 @@ type SortKey = "name" | "total" | "net" | "subs" | "newSubs" | "recurringSubs" |
 type SortDir = "asc" | "desc";
 
 const Dashboard2 = () => {
+  const navigate = useNavigate();
   const { data: allRows = [], isLoading } = useEarningsData();
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
