@@ -15,7 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Info, TrendingUp, Users, DollarSign, Calendar, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter } from "lucide-react";
+import { Info, TrendingUp, Users, DollarSign, Calendar, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface CreatorSummary {
   creatorId: string;
