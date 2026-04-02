@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
-import { Download, Search } from "lucide-react";
+import { Download, Search, CalendarDays } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
