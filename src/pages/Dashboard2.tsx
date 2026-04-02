@@ -22,8 +22,12 @@ import {
 import {
   Info, TrendingUp, Users, DollarSign, Calendar,
   ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram, PieChart,
+  BarChart3, MessageSquare, Repeat, Heart, Eye,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import {
+  PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
+} from "recharts";
 
 interface CreatorSummary {
   creatorId: string;
