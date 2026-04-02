@@ -6,9 +6,9 @@ const ProyectoMPLayout = ({ children }: { children: React.ReactNode }) => (
     <MPSidebar />
     <div className="flex flex-1 flex-col min-w-0">
       <DashboardTopbar />
-      <div className="flex-1 overflow-auto p-6">
+      <main className="flex-1 overflow-auto p-6">
         {children}
-      </div>
+      </main>
     </div>
   </div>
 );

@@ -2,7 +2,7 @@ import { useLocation, Link } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import {
   LayoutDashboard, KanbanSquare, Users, Camera, TrendingUp,
-  DollarSign, UserCog, Flag, ArrowLeft
+  DollarSign, UserCog, Flag, ArrowLeft, Rocket
 } from "lucide-react";
 
 const items = [
@@ -24,17 +24,29 @@ const MPSidebar = () => {
 
   return (
     <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-card py-4 px-2 gap-1 overflow-y-auto">
+      {/* Branding propio del módulo */}
+      <div className="px-3 pt-1 pb-3 mb-1 border-b border-border">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-primary">
+            <Rocket className="h-4 w-4 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="text-sm font-bold tracking-tight">
+              <span className="bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">Proyecto</span>
+              <span className="text-muted-foreground font-light ml-1">MP</span>
+            </h1>
+            <p className="text-[10px] text-muted-foreground leading-none">Cuentas Propias</p>
+          </div>
+        </div>
+      </div>
+
       <Link
         to="/dashboard"
-        className="flex items-center gap-2 px-3 py-2 mb-2 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent"
+        className="flex items-center gap-2 px-3 py-2 mb-1 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         <span>Volver al CRM</span>
       </Link>
-
-      <h3 className="px-3 mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Proyecto MP
-      </h3>
 
       {items.map((item) => (
         <NavLink
