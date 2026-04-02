@@ -39,6 +39,7 @@ const DashboardSidebar = () => {
 
   const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
+    { title: "Dashboard v2", url: "/dashboard2", icon: BarChart3, module: "Dashboard" },
     { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
     { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare, module: "Tareas" },
