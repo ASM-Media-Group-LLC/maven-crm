@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle, FileDown, Save } from "lucide-react";
+import { CheckCircle, FileDown, Save, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import AuditSummaryCards from "./AuditSummaryCards";
 import AuditEntriesInfo from "./AuditEntriesInfo";
@@ -42,7 +42,9 @@ const AuditComparisonTable = ({ file }: Props) => {
   const [totalSystemEntries, setTotalSystemEntries] = useState(0);
   const [excelDetails, setExcelDetails] = useState<Map<string, EntryDetail[]>>(new Map());
   const [systemDetails, setSystemDetails] = useState<Map<string, EntryDetail[]>>(new Map());
+  const [systemRawRecords, setSystemRawRecords] = useState<Map<string, { id: string; date: string; amount: number }[]>>(new Map());
   const [expanded, setExpanded] = useState<Record<string, "excel" | "system" | null>>({});
+  const [applying, setApplying] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -79,13 +81,14 @@ const AuditComparisonTable = ({ file }: Props) => {
 
       const { data: dbData } = await supabase
         .from("of_gross_earnings")
-        .select("pending_creator, total_earnings_gross, date")
+        .select("id, pending_creator, total_earnings_gross, date")
         .gte("date", minDate)
         .lte("date", maxDate + "T23:59:59");
 
       const systemMap = new Map<string, number>();
       const systemCountMap = new Map<string, number>();
       const systemDetailMap = new Map<string, EntryDetail[]>();
+      const rawRecordsMap = new Map<string, { id: string; date: string; amount: number }[]>();
       for (const r of dbData || []) {
         const creator = (r.pending_creator || "").trim().toLowerCase();
         if (!creator) continue;
@@ -96,6 +99,9 @@ const AuditComparisonTable = ({ file }: Props) => {
         const arr = systemDetailMap.get(creator) || [];
         arr.push({ date: dateStr, amount });
         systemDetailMap.set(creator, arr);
+        const rawArr = rawRecordsMap.get(creator) || [];
+        rawArr.push({ id: r.id, date: r.date, amount });
+        rawRecordsMap.set(creator, rawArr);
       }
 
       const allCreators = new Set([...excelMap.keys(), ...systemMap.keys()]);
@@ -122,6 +128,7 @@ const AuditComparisonTable = ({ file }: Props) => {
       setTotalSystemEntries(totalSystem);
       setExcelDetails(excelDetailMap);
       setSystemDetails(systemDetailMap);
+      setSystemRawRecords(rawRecordsMap);
       setLoading(false);
     };
 
@@ -176,6 +183,102 @@ const AuditComparisonTable = ({ file }: Props) => {
       toast({ title: "Error al guardar", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Auditoría guardada", description: `${entries.length} validaciones registradas.` });
+    }
+  };
+
+  const applyCorrections = async () => {
+    const excelValidations = Object.entries(validations).filter(([, src]) => src === "excel");
+    if (excelValidations.length === 0) {
+      toast({ title: "Sin correcciones", description: "Solo se aplican correcciones cuando seleccionas Excel como fuente correcta.", variant: "destructive" });
+      return;
+    }
+
+    setApplying(true);
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // First save the audit log with status 'applied'
+    const logInserts = excelValidations.map(([creator]) => {
+      const row = rows.find((r) => r.creator === creator);
+      return {
+        creator_name: creator,
+        source_selected: "excel" as const,
+        excel_amount: row?.excelGross || 0,
+        system_amount: row?.systemGross || 0,
+        difference: row?.diff || 0,
+        excel_entries: row?.excelEntries || 0,
+        system_entries: row?.systemEntries || 0,
+        file_name: file.name,
+        period_start: dateRange?.min,
+        period_end: dateRange?.max,
+        created_by: user?.id,
+        status: "applied",
+      };
+    });
+
+    const { data: logData, error: logError } = await supabase
+      .from("sales_audit_log")
+      .insert(logInserts as any)
+      .select("id, creator_name");
+
+    if (logError) {
+      toast({ title: "Error al guardar log", description: logError.message, variant: "destructive" });
+      setApplying(false);
+      return;
+    }
+
+    const logMap = new Map((logData || []).map((l: any) => [l.creator_name, l.id]));
+
+    // For each creator validated as "excel", get the excel daily data and match/update system records
+    let correctionCount = 0;
+    let errorCount = 0;
+
+    for (const [creator] of excelValidations) {
+      const excelEntries = excelDetails.get(creator) || [];
+      const rawRecords = systemRawRecords.get(creator) || [];
+      const auditLogId = logMap.get(creator);
+
+      // Build a map of excel entries by date
+      const excelByDate = new Map<string, number>();
+      for (const e of excelEntries) {
+        excelByDate.set(e.date, (excelByDate.get(e.date) || 0) + e.amount);
+      }
+
+      // Update system records that have matching dates
+      for (const rec of rawRecords) {
+        const dateKey = rec.date.slice(0, 10);
+        const excelAmount = excelByDate.get(dateKey);
+        if (excelAmount !== undefined && Math.abs(excelAmount - rec.amount) > 0.01) {
+          // Backup original value
+          const { error: backupErr } = await supabase.from("sales_audit_corrections").insert({
+            audit_log_id: auditLogId,
+            of_earnings_id: rec.id,
+            creator_name: creator,
+            earnings_date: rec.date,
+            original_value: rec.amount,
+            new_value: excelAmount,
+            source: "excel",
+            applied_by: user?.id,
+          } as any);
+
+          if (backupErr) { errorCount++; continue; }
+
+          // Update the actual record
+          const { error: updateErr } = await supabase
+            .from("of_gross_earnings")
+            .update({ total_earnings_gross: excelAmount } as any)
+            .eq("id", rec.id);
+
+          if (updateErr) { errorCount++; } else { correctionCount++; }
+        }
+      }
+    }
+
+    setApplying(false);
+
+    if (errorCount > 0) {
+      toast({ title: "Correcciones parciales", description: `${correctionCount} aplicadas, ${errorCount} errores.`, variant: "destructive" });
+    } else {
+      toast({ title: "Correcciones aplicadas", description: `${correctionCount} registros actualizados en la base de datos. Los valores originales fueron respaldados.` });
     }
   };
 
@@ -237,6 +340,15 @@ const AuditComparisonTable = ({ file }: Props) => {
       />
 
       <div className="flex justify-end gap-2">
+        <Button
+          variant="default"
+          onClick={applyCorrections}
+          disabled={applying || Object.values(validations).filter(v => v === "excel").length === 0}
+          className="gap-2"
+        >
+          <Zap className="h-4 w-4" />
+          {applying ? "Aplicando..." : "Aplicar Correcciones"}
+        </Button>
         <Button variant="outline" onClick={saveAuditLog} disabled={saving || Object.keys(validations).length === 0} className="gap-2">
           <Save className="h-4 w-4" />
           {saving ? "Guardando..." : "Guardar Auditoría"}
