@@ -23,7 +23,12 @@ const Dashboard2 = () => {
   const lastMonth = useMemo(() => {
     const now = new Date();
     const m = subMonths(now, 1);
-    return { start: startOfMonth(m), end: endOfMonth(m) };
+    const y = m.getFullYear();
+    const mo = m.getMonth(); // 0-indexed
+    const startStr = `${y}-${String(mo + 1).padStart(2, "0")}-01`;
+    const lastDay = new Date(y, mo + 1, 0).getDate();
+    const endStr = `${y}-${String(mo + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    return { startStr, endStr, month: m };
   }, []);
 
   const label = useMemo(
