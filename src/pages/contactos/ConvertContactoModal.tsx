@@ -24,6 +24,8 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
   const convert = useMutation({
     mutationFn: async () => {
       if (!contacto) throw new Error("No contacto");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No se pudo obtener el usuario autenticado");
       const { error: insertError } = await supabase.from("creators").insert({
         name: contacto.name,
         instagram_handle: contacto.handle,
@@ -36,6 +38,7 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
         source: "contacto",
         status: "pendiente",
         internal_notes: contacto.company ? `Compañía: ${contacto.company}` : null,
+        created_by: user.id,
       });
       if (insertError) throw insertError;
 
