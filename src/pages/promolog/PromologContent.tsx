@@ -588,7 +588,7 @@ const PromologContent = () => {
           <DashboardMetricCard label="Total Promos" value={String(filteredEntries.length)} icon={Table2} color="accent" />
           <DashboardMetricCard label="Tasa de éxito" value={filteredEntries.length > 0 ? `${Math.round((filteredEntries.filter(e => e.result === "Sí").length / filteredEntries.length) * 100)}%` : "0%"} icon={TrendingUp} color="primary" />
           <div className="cursor-pointer" onClick={() => setKpiModalType("no_chequeadas")}>
-            <DashboardMetricCard label="Sin revisar" value={String(entries.filter(e => e.result === "Pendiente").length)} icon={AlertTriangle} color="destructive" />
+            <DashboardMetricCard label="Sin revisar" value={String(dedupedEntries.filter(e => e.result === "Pendiente").length)} icon={AlertTriangle} color="destructive" />
           </div>
           <DashboardMetricCard label="Creadoras" value={String(new Set(filteredEntries.map(e => e.creator_id)).size)} icon={Users} color="success" />
         </div>
