@@ -1030,6 +1030,7 @@ const Dashboard2 = () => {
                       <SortableHead col="name" label="Creadora" />
                       <SortableHead col="total" label="Bruto" right />
                       <SortableHead col="net" label="Neto (80%)" right />
+                      <TableHead className="text-right whitespace-nowrap text-xs">vs Ant.</TableHead>
                       <SortableHead col="subs" label="Subs" right />
                       <SortableHead col="newSubs" label="Nuevas" right />
                       <SortableHead col="recurringSubs" label="Recurrentes" right />
