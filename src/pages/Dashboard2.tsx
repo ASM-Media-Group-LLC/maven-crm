@@ -523,10 +523,28 @@ const Dashboard2 = () => {
                   <PieChart className="h-4 w-4" />
                   80/20
                 </Button>
+                <Button
+                  variant={showAlerts ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowAlerts(!showAlerts)}
+                  className="gap-1.5"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Alertas {alerts.length > 0 && <Badge variant="destructive" className="ml-0.5 h-5 px-1.5 text-[10px]">{alerts.length}</Badge>}
+                </Button>
+                <Button
+                  variant={showProjection ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowProjection(!showProjection)}
+                  className="gap-1.5"
+                >
+                  <Target className="h-4 w-4" />
+                  Proyección
+                </Button>
                 {isAdmin && (
                   <Button variant="outline" size="sm" onClick={exportPdf} className="gap-1.5" disabled={isLoading || creators.length === 0}>
                     <DollarSign className="h-4 w-4" />
-                    Descargar PDF
+                    PDF
                   </Button>
                 )}
               </div>
