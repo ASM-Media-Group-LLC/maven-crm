@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, UserPlus, Upload, Save, X, ImageIcon, Film, FileText, Check, ChevronsUpDown, Plus } from "lucide-react";
+import { ArrowLeft, UserPlus, Upload, Save, X, ImageIcon, Film, FileText, Check, ChevronsUpDown, Plus, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
 import { checkCreatorExists, checkExistingContact, checkDuplicateOnlyFans } from "@/lib/lead-validation";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -82,6 +83,10 @@ const NuevoContactoForm = () => {
   const [form, setForm] = useState<FormData>(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [creatorAlert, setCreatorAlert] = useState<{ name: string; id: string } | null>(null);
+  const [existingContactData, setExistingContactData] = useState<{
+    id: string; name: string; phone?: string; email?: string; agentName?: string; createdAt?: string;
+  } | null>(null);
+  const [isUpdatingContact, setIsUpdatingContact] = useState(false);
   const [companies, setCompanies] = useState<string[]>(DEFAULT_COMPANIES);
   const [uploadModal, setUploadModal] = useState<{ open: boolean; category: UploadCategory }>({ open: false, category: "piclink" });
   const [profilePhoto, setProfilePhoto] = useState<UploadedFile | null>(null);
@@ -163,18 +168,19 @@ const NuevoContactoForm = () => {
         });
       }
 
-      // VALIDATION 2: Check existing contact by handle (informational only, NO block)
+      // VALIDATION 2: Check existing contact by handle — show modal for update option
       const existingContact = await checkExistingContact(form.accountLink);
       if (existingContact.exists) {
-        recordType = "reactivado";
-        const agentInfo = existingContact.contactAgentName ? ` por ${existingContact.contactAgentName}` : "";
-        const dateInfo = existingContact.contactCreatedAt
-          ? ` el ${new Date(existingContact.contactCreatedAt).toLocaleDateString("es-CO")}`
-          : "";
-        toast({
-          title: "⚠️ Contacto existente",
-          description: `Esta modelo ya existe como contacto: ${existingContact.contactName} (registrada${agentInfo}${dateInfo}). Se creará nuevo registro.`,
+        setExistingContactData({
+          id: existingContact.contactId!,
+          name: existingContact.contactName!,
+          phone: existingContact.contactPhone,
+          email: existingContact.contactEmail,
+          agentName: existingContact.contactAgentName,
+          createdAt: existingContact.contactCreatedAt,
         });
+        setIsSaving(false);
+        return;
       }
 
       // VALIDATION 3: Check duplicate OnlyFans URL
@@ -243,6 +249,75 @@ const NuevoContactoForm = () => {
 
       if (error) throw error;
 
+      toast({ title: "Contacto guardado exitosamente" });
+      navigate("/contactos");
+    } catch (err: any) {
+      toast({ title: "Error al guardar contacto", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdateExistingContact = async () => {
+    if (!existingContactData) return;
+    setIsUpdatingContact(true);
+    try {
+      const updates: Record<string, any> = {};
+      if (form.phone?.trim()) updates.phone = form.phone.trim();
+      if (form.email?.trim()) updates.email = form.email.trim();
+      if (form.notas?.trim()) updates.notes = form.notas.trim();
+      if (form.countryCode) updates.country_code = form.countryCode;
+      if (form.ciudad?.trim()) updates.city = form.ciudad.trim();
+      if (form.onlyfansUrl?.trim()) updates.onlyfans_url = form.onlyfansUrl.trim();
+
+      if (Object.keys(updates).length === 0) {
+        toast({ title: "No hay datos nuevos para actualizar", variant: "destructive" });
+        setIsUpdatingContact(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("closers_contacts")
+        .update(updates)
+        .eq("id", existingContactData.id);
+
+      if (error) throw error;
+
+      toast({ title: "Contacto actualizado exitosamente" });
+      setExistingContactData(null);
+      navigate("/contactos");
+    } catch (err: any) {
+      toast({ title: "Error al actualizar", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUpdatingContact(false);
+    }
+  };
+
+  const handleCreateNewAnyway = async () => {
+    setExistingContactData(null);
+    // Re-run submit but skip the existing contact check
+    setIsSaving(true);
+    try {
+      const handle = normalizeHandle(form.accountLink.trim());
+      const { error } = await supabase.from("closers_contacts").insert({
+        name: form.nombre.trim(),
+        handle,
+        platform: form.plataforma,
+        physical_appearance: form.categoria || null,
+        company: form.compania || null,
+        email: form.email || null,
+        country_code: form.countryCode,
+        phone: form.phone || null,
+        city: form.ciudad || null,
+        ticket_number: form.ticket || null,
+        notes: form.notas || null,
+        onlyfans_url: form.onlyfansUrl?.trim() || null,
+        profile_picture_url: profilePhoto?.url || null,
+        created_by: user?.id || "",
+        status: "new",
+        record_type: "reactivado",
+      } as any);
+      if (error) throw error;
       toast({ title: "Contacto guardado exitosamente" });
       navigate("/contactos");
     } catch (err: any) {
@@ -412,6 +487,51 @@ const NuevoContactoForm = () => {
           </div>
         </div>
       )}
+
+      {/* Existing contact dialog */}
+      <Dialog open={!!existingContactData} onOpenChange={(open) => { if (!open) setExistingContactData(null); }}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Contacto existente
+            </DialogTitle>
+            <DialogDescription>
+              Esta modelo ya está registrada como contacto. Puedes actualizar sus datos o crear un nuevo registro.
+            </DialogDescription>
+          </DialogHeader>
+          {existingContactData && (
+            <div className="space-y-3 py-2">
+              <div className="rounded-md border border-border p-3 space-y-1 text-sm">
+                <p><span className="text-muted-foreground">Nombre:</span> <strong>{existingContactData.name}</strong></p>
+                {existingContactData.agentName && (
+                  <p><span className="text-muted-foreground">Registrado por:</span> {existingContactData.agentName}</p>
+                )}
+                {existingContactData.createdAt && (
+                  <p><span className="text-muted-foreground">Fecha:</span> {new Date(existingContactData.createdAt).toLocaleDateString("es-CO")}</p>
+                )}
+                {existingContactData.phone && (
+                  <p><span className="text-muted-foreground">Teléfono actual:</span> {existingContactData.phone}</p>
+                )}
+                {existingContactData.email && (
+                  <p><span className="text-muted-foreground">Email actual:</span> {existingContactData.email}</p>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button onClick={handleUpdateExistingContact} disabled={isUpdatingContact} className="w-full">
+              {isUpdatingContact ? "Actualizando..." : "Actualizar contacto"}
+            </Button>
+            <Button variant="outline" onClick={handleCreateNewAnyway} disabled={isSaving} className="w-full">
+              Crear nuevo registro
+            </Button>
+            <Button variant="ghost" onClick={() => setExistingContactData(null)} className="w-full">
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };

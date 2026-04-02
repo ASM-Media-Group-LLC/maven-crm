@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,11 @@ const countryCodes = [
 
 const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingContactData, setExistingContactData] = useState<{
+    id: string; name: string; phone?: string; email?: string; agentName?: string; createdAt?: string;
+  } | null>(null);
+  const [isUpdatingContact, setIsUpdatingContact] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState<ContactoFormValues | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -96,19 +102,21 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         }
       }
 
-      // VALIDATION 2: Check existing contact by handle (informational, NO block)
+      // VALIDATION 2: Check existing contact by handle — show modal
       if (normalizedIg) {
         const existingContact = await checkExistingContact(normalizedIg);
         if (existingContact.exists) {
-          recordType = "reactivado";
-          const agentInfo = existingContact.contactAgentName ? ` por ${existingContact.contactAgentName}` : "";
-          const dateInfo = existingContact.contactCreatedAt
-            ? ` el ${new Date(existingContact.contactCreatedAt).toLocaleDateString("es-CO")}`
-            : "";
-          toast({
-            title: "⚠️ Contacto existente",
-            description: `Esta modelo ya existe como contacto: ${existingContact.contactName} (registrada${agentInfo}${dateInfo}). Se creará nuevo registro.`,
+          setExistingContactData({
+            id: existingContact.contactId!,
+            name: existingContact.contactName!,
+            phone: existingContact.contactPhone,
+            email: existingContact.contactEmail,
+            agentName: existingContact.contactAgentName,
+            createdAt: existingContact.contactCreatedAt,
           });
+          setPendingFormData(data);
+          setIsSubmitting(false);
+          return;
         }
       }
 
@@ -167,7 +175,75 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
     }
   };
 
+  const handleUpdateExistingContact = async () => {
+    if (!existingContactData || !pendingFormData) return;
+    setIsUpdatingContact(true);
+    try {
+      const updates: Record<string, any> = {};
+      if (pendingFormData.telefono?.trim()) updates.phone = pendingFormData.telefono.trim();
+      if (pendingFormData.notas?.trim()) updates.notes = pendingFormData.notas.trim();
+      if (pendingFormData.paisCodigo) updates.country_code = pendingFormData.paisCodigo;
+
+      if (Object.keys(updates).length === 0) {
+        toast({ title: "No hay datos nuevos para actualizar", variant: "destructive" });
+        setIsUpdatingContact(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("closers_contacts")
+        .update(updates)
+        .eq("id", existingContactData.id);
+
+      if (error) throw error;
+
+      toast({ title: "Contacto actualizado exitosamente" });
+      setExistingContactData(null);
+      setPendingFormData(null);
+      queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
+      form.reset();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Error al actualizar", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUpdatingContact(false);
+    }
+  };
+
+  const handleCreateNewAnyway = async () => {
+    if (!pendingFormData) return;
+    setExistingContactData(null);
+    setPendingFormData(null);
+    setIsSubmitting(true);
+    try {
+      const normalizedIg = normalizeHandle(pendingFormData.instagram);
+      const { error } = await supabase.from("closers_contacts").insert({
+        name: pendingFormData.nombre,
+        handle: normalizedIg || pendingFormData.instagram,
+        platform: "Instagram",
+        physical_appearance: pendingFormData.categoriaFisica,
+        company: pendingFormData.compania || null,
+        country_code: pendingFormData.paisCodigo,
+        phone: pendingFormData.telefono || null,
+        notes: pendingFormData.notas || null,
+        created_by: user?.id ?? "",
+        record_type: "reactivado",
+      });
+      if (error) throw error;
+      toast({ title: "Contacto guardado exitosamente" });
+      queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
+      form.reset();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Error al guardar contacto", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader className="pr-8">
@@ -322,6 +398,52 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         </Form>
       </DialogContent>
     </Dialog>
+
+    {/* Existing contact dialog */}
+    <Dialog open={!!existingContactData} onOpenChange={(open) => { if (!open) { setExistingContactData(null); setPendingFormData(null); } }}>
+      <DialogContent className="sm:max-w-[440px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-yellow-500" />
+            Contacto existente
+          </DialogTitle>
+          <DialogDescription>
+            Esta modelo ya está registrada como contacto. Puedes actualizar sus datos o crear un nuevo registro.
+          </DialogDescription>
+        </DialogHeader>
+        {existingContactData && (
+          <div className="space-y-3 py-2">
+            <div className="rounded-md border border-border p-3 space-y-1 text-sm">
+              <p><span className="text-muted-foreground">Nombre:</span> <strong>{existingContactData.name}</strong></p>
+              {existingContactData.agentName && (
+                <p><span className="text-muted-foreground">Registrado por:</span> {existingContactData.agentName}</p>
+              )}
+              {existingContactData.createdAt && (
+                <p><span className="text-muted-foreground">Fecha:</span> {new Date(existingContactData.createdAt).toLocaleDateString("es-CO")}</p>
+              )}
+              {existingContactData.phone && (
+                <p><span className="text-muted-foreground">Teléfono actual:</span> {existingContactData.phone}</p>
+              )}
+              {existingContactData.email && (
+                <p><span className="text-muted-foreground">Email actual:</span> {existingContactData.email}</p>
+              )}
+            </div>
+          </div>
+        )}
+        <DialogFooter className="flex-col gap-2 sm:flex-col">
+          <Button onClick={handleUpdateExistingContact} disabled={isUpdatingContact} className="w-full">
+            {isUpdatingContact ? "Actualizando..." : "Actualizar contacto"}
+          </Button>
+          <Button variant="outline" onClick={handleCreateNewAnyway} disabled={isSubmitting} className="w-full">
+            Crear nuevo registro
+          </Button>
+          <Button variant="ghost" onClick={() => { setExistingContactData(null); setPendingFormData(null); }} className="w-full">
+            Cancelar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
