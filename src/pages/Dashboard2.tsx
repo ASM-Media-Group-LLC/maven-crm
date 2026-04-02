@@ -205,6 +205,31 @@ const Dashboard2 = () => {
     };
   }, [rawCreators]);
 
+  // High-level KPIs
+  const hlKpis = useMemo(() => {
+    const active = rawCreators.filter((c) => c.total > 0);
+    const totalBruto = active.reduce((s, c) => s + c.total, 0);
+    const totalTips = active.reduce((s, c) => s + c.tips, 0);
+    const totalMsgs = active.reduce((s, c) => s + c.messages, 0);
+    const totalSubs = active.reduce((s, c) => s + c.subs, 0);
+    const totalNewSubs = active.reduce((s, c) => s + c.newSubs, 0);
+    const totalRecurring = active.reduce((s, c) => s + c.recurringSubs, 0);
+    const totalFansAll = active.reduce((s, c) => s + c.activeFans, 0);
+    const renewalRate = totalSubs > 0 ? (totalRecurring / totalSubs) * 100 : 0;
+    const tipsPct = totalBruto > 0 ? (totalTips / totalBruto) * 100 : 0;
+    const msgsPct = totalBruto > 0 ? (totalMsgs / totalBruto) * 100 : 0;
+    const subsPct = totalBruto > 0 ? (totalSubs / totalBruto) * 100 : 0;
+    const avgPerFanGlobal = totalFansAll > 0 ? totalBruto / totalFansAll : 0;
+    return { renewalRate, tipsPct, msgsPct, subsPct, avgPerFanGlobal, totalNewSubs, totalRecurring, totalTips, totalMsgs, totalSubs };
+  }, [rawCreators]);
+
+  // Pie chart data for pareto
+  const pieData = useMemo(() => {
+    const items = paretoAnalysis.top.map((c) => ({ name: c.name, value: c.total }));
+    const restTotal = paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue;
+    if (restTotal > 0) items.push({ name: `Resto (${paretoAnalysis.rest.length})`, value: restTotal });
+    return items;
+  }, [paretoAnalysis]);
   // Apply filters
   const filteredCreators = useMemo(() => {
     let list = rawCreators;
