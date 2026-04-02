@@ -148,7 +148,7 @@ const Dashboard2 = () => {
     }
 
     return Array.from(map.values());
-  }, [allRows, lastMonth, platformMap]);
+  }, [allRows, lastMonth, creatorInfoMap]);
 
   // Apply filters
   const filteredCreators = useMemo(() => {
