@@ -199,29 +199,7 @@ const PromologContent = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Deduplicar: mantener la entrada más completa de cada grupo
-      const deduped = (() => {
-        const map = new Map<string, any>();
-        for (const e of data ?? []) {
-          const dayKey = e.date?.split("T")[0] ?? e.date;
-          const key = `${e.creator_id}|${dayKey}|${e.network}|${e.platform}|${e.promoted}`;
-          const existing = map.get(key);
-          if (!existing) {
-            map.set(key, e);
-          } else {
-            const score = (r: any) =>
-              (r.evidence_url ? 1 : 0) +
-              (r.notes ? 1 : 0) +
-              (r.reviewed_by ? 1 : 0) +
-              (r.action_taken ? 1 : 0);
-            if (score(e) > score(existing)) {
-              map.set(key, e);
-            }
-          }
-        }
-        return Array.from(map.values());
-      })();
-      return deduped;
+      return data ?? [];
     },
   });
 
@@ -240,7 +218,7 @@ const PromologContent = () => {
         result: promotedToResult(pe.promoted),
         date: dateObj.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }),
         time: dateObj.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: true }),
-        agent: (pe.reviewed_by && profilesMap[pe.reviewed_by]) || (pe.created_by && profilesMap[pe.created_by]) || "Sin asignar",
+        agent: (pe.created_by && profilesMap[pe.created_by]) || (pe.reviewed_by && profilesMap[pe.reviewed_by]) || "Sin asignar",
         notes: pe.notes || "",
         creator_id: pe.creator_id,
         reviewed_by: pe.reviewed_by || undefined,
