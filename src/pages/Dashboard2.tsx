@@ -15,7 +15,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Info, TrendingUp, Users, DollarSign, Calendar, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Info, TrendingUp, Users, DollarSign, Calendar,
+  ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram, PieChart,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface CreatorSummary {
@@ -41,6 +48,24 @@ interface CreatorSummary {
 type SortKey = "name" | "total" | "net" | "subs" | "newSubs" | "recurringSubs" | "tips" | "messages" | "activeFans" | "newFans" | "daysWithData" | "lastDate" | "avgPerDay" | "avgPerFan";
 type SortDir = "asc" | "desc";
 
+// Generate month options from data range
+const getMonthOptions = () => {
+  const months: { value: string; label: string; startStr: string; endStr: string }[] = [];
+  const now = new Date();
+  // Go back up to 4 months
+  for (let i = 1; i <= 4; i++) {
+    const m = subMonths(now, i);
+    const y = m.getFullYear();
+    const mo = m.getMonth();
+    const startStr = `${y}-${String(mo + 1).padStart(2, "0")}-01`;
+    const lastDay = new Date(y, mo + 1, 0).getDate();
+    const endStr = `${y}-${String(mo + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    const label = format(m, "MMMM yyyy", { locale: es }).replace(/^\w/, (c) => c.toUpperCase());
+    months.push({ value: `${y}-${String(mo + 1).padStart(2, "0")}`, label, startStr, endStr });
+  }
+  return months;
+};
+
 const Dashboard2 = () => {
   const navigate = useNavigate();
   const { data: allRows = [], isLoading } = useEarningsData();
@@ -50,6 +75,14 @@ const Dashboard2 = () => {
   const [showZeros, setShowZeros] = useState(false);
   const [minTotal, setMinTotal] = useState("");
   const [maxTotal, setMaxTotal] = useState("");
+  const [showPareto, setShowPareto] = useState(false);
+
+  const monthOptions = useMemo(getMonthOptions, []);
+  const [selectedMonth, setSelectedMonth] = useState(monthOptions[0]?.value || "");
+
+  const selectedPeriod = useMemo(() => {
+    return monthOptions.find((m) => m.value === selectedMonth) || monthOptions[0];
+  }, [selectedMonth, monthOptions]);
 
   const { data: creatorInfoMap = {} } = useQuery({
     queryKey: ["creator-info-dashboard2"],
@@ -73,29 +106,14 @@ const Dashboard2 = () => {
     },
   });
 
-  const lastMonth = useMemo(() => {
-    const now = new Date();
-    const m = subMonths(now, 1);
-    const y = m.getFullYear();
-    const mo = m.getMonth();
-    const startStr = `${y}-${String(mo + 1).padStart(2, "0")}-01`;
-    const lastDay = new Date(y, mo + 1, 0).getDate();
-    const endStr = `${y}-${String(mo + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-    return { startStr, endStr, month: m, lastDay };
-  }, []);
-
-  const label = useMemo(
-    () => format(lastMonth.month, "MMMM yyyy", { locale: es }).replace(/^\w/, (c) => c.toUpperCase()),
-    [lastMonth]
-  );
-
   // Build creator summaries — OnlyFans only
   const rawCreators = useMemo(() => {
+    if (!selectedPeriod) return [];
     const map = new Map<string, CreatorSummary>();
 
     for (const r of allRows) {
       const d = r.effective_date;
-      if (d < lastMonth.startStr || d > lastMonth.endStr) continue;
+      if (d < selectedPeriod.startStr || d > selectedPeriod.endStr) continue;
 
       const key = r.creator_id || r.pending_creator || r.id;
 
@@ -141,31 +159,58 @@ const Dashboard2 = () => {
       }
     }
 
-    // Compute averages
     for (const c of map.values()) {
       c.avgPerDay = c.daysWithData > 0 ? c.total / c.daysWithData : 0;
       c.avgPerFan = c.activeFans > 0 ? c.total / c.activeFans : 0;
     }
 
     return Array.from(map.values());
-  }, [allRows, lastMonth, creatorInfoMap]);
+  }, [allRows, selectedPeriod, creatorInfoMap]);
+
+  // Pareto (80/20) analysis
+  const paretoAnalysis = useMemo(() => {
+    const sorted = [...rawCreators].filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
+    const total = sorted.reduce((s, c) => s + c.total, 0);
+    if (total === 0) return { top: [], rest: [], topPercent: 0, topRevenue: 0, totalRevenue: 0, topCount: 0, totalCount: sorted.length };
+
+    let cumulative = 0;
+    let cutoff = 0;
+    for (let i = 0; i < sorted.length; i++) {
+      cumulative += sorted[i].total;
+      if (cumulative >= total * 0.8) {
+        cutoff = i + 1;
+        break;
+      }
+    }
+    if (cutoff === 0) cutoff = sorted.length;
+
+    const top = sorted.slice(0, cutoff);
+    const rest = sorted.slice(cutoff);
+    const topRevenue = top.reduce((s, c) => s + c.total, 0);
+
+    return {
+      top,
+      rest,
+      topPercent: sorted.length > 0 ? (cutoff / sorted.length) * 100 : 0,
+      topRevenue,
+      totalRevenue: total,
+      topCount: cutoff,
+      totalCount: sorted.length,
+    };
+  }, [rawCreators]);
 
   // Apply filters
   const filteredCreators = useMemo(() => {
     let list = rawCreators;
-
     if (!showZeros) list = list.filter((c) => c.total > 0);
-
     if (searchText.trim()) {
       const q = searchText.toLowerCase().trim();
       list = list.filter((c) => c.name.toLowerCase().includes(q));
     }
-
     const minV = parseFloat(minTotal);
     if (!isNaN(minV)) list = list.filter((c) => c.total >= minV);
     const maxV = parseFloat(maxTotal);
     if (!isNaN(maxV)) list = list.filter((c) => c.total <= maxV);
-
     return list;
   }, [rawCreators, showZeros, searchText, minTotal, maxTotal]);
 
@@ -217,15 +262,64 @@ const Dashboard2 = () => {
   };
 
   const SortableHead = ({ col, label, right }: { col: SortKey; label: string; right?: boolean }) => (
-    <TableHead
-      className="cursor-pointer select-none whitespace-nowrap"
-      onClick={() => toggleSort(col)}
-    >
+    <TableHead className="cursor-pointer select-none whitespace-nowrap" onClick={() => toggleSort(col)}>
       <span className={`flex items-center gap-1 ${right ? "justify-end" : ""}`}>
         {label} <SortIcon col={col} />
       </span>
     </TableHead>
   );
+
+  const CreatorRow = ({ c, i }: { c: CreatorSummary; i: number }) => {
+    const stopped = dataStoppedEarly(c.lastDate);
+    const isZero = c.total === 0;
+    const isTop = paretoAnalysis.top.some((t) => t.creatorId === c.creatorId);
+    return (
+      <TableRow key={c.creatorId} className={`${isZero ? "opacity-50" : ""} ${showPareto && isTop ? "bg-primary/5" : ""}`}>
+        <TableCell className="text-muted-foreground tabular-nums text-xs">{i + 1}</TableCell>
+        <TableCell className="whitespace-nowrap">
+          <div className="flex items-center gap-1.5">
+            {showPareto && isTop && (
+              <span className="inline-block h-2 w-2 rounded-full bg-primary shrink-0" title="Top 80/20" />
+            )}
+            {c.instagramHandle && (
+              <a
+                href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"
+                title={`@${c.instagramHandle.replace(/^@/, "")}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Instagram className="h-3.5 w-3.5" />
+              </a>
+            )}
+            <button
+              className="font-medium text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left"
+              onClick={() => navigate(`/creadores/${c.creatorId}`)}
+            >
+              {c.name}
+            </button>
+          </div>
+        </TableCell>
+        <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : ""}`}>{fmt(c.total)}</TableCell>
+        <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : "text-emerald-600 dark:text-emerald-400"}`}>{fmt(c.net)}</TableCell>
+        <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
+        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.newSubs)}</TableCell>
+        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.recurringSubs)}</TableCell>
+        <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.tips)}</TableCell>
+        <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.messages)}</TableCell>
+        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.activeFans.toLocaleString()}</TableCell>
+        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.newFans.toLocaleString()}</TableCell>
+        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerDay)}</TableCell>
+        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerFan)}</TableCell>
+        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.daysWithData}</TableCell>
+        <TableCell className={`text-sm tabular-nums whitespace-nowrap ${stopped ? "font-medium" : "text-muted-foreground"}`} style={stopped ? { color: "hsl(25, 95%, 53%)" } : undefined}>
+          {format(new Date(c.lastDate + "T12:00:00"), "dd MMM", { locale: es })}
+          {stopped && " ⚠"}
+        </TableCell>
+      </TableRow>
+    );
+  };
 
   return (
     <SidebarProvider>
@@ -234,15 +328,97 @@ const Dashboard2 = () => {
         <div className="flex flex-1 flex-col min-w-0">
           <DashboardTopbar />
           <main className="flex-1 overflow-auto p-6 space-y-5">
-            {/* Header */}
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Ventas OnlyFans — {label}
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Solo creadoras de OnlyFans · Clic en encabezado para ordenar
-              </p>
+            {/* Header with month selector */}
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">
+                  Ventas OnlyFans — {selectedPeriod?.label}
+                </h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Período: {selectedPeriod?.startStr} → {selectedPeriod?.endStr} · Clic en encabezado para ordenar
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-[180px] h-9">
+                    <SelectValue placeholder="Seleccionar mes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant={showPareto ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowPareto(!showPareto)}
+                  className="gap-1.5"
+                >
+                  <PieChart className="h-4 w-4" />
+                  80/20
+                </Button>
+              </div>
             </div>
+
+            {/* Pareto Analysis Panel */}
+            {showPareto && !isLoading && (
+              <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-5 space-y-4">
+                <div className="flex items-center gap-2">
+                  <PieChart className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-bold text-foreground">Análisis 80/20 (Pareto)</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                    <p className="text-xs text-muted-foreground">Top creadoras (generan el 80%)</p>
+                    <p className="text-2xl font-bold text-primary tabular-nums">{paretoAnalysis.topCount}</p>
+                    <p className="text-xs text-muted-foreground">
+                      de {paretoAnalysis.totalCount} activas ({paretoAnalysis.topPercent.toFixed(1)}%)
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                    <p className="text-xs text-muted-foreground">Ingresos del Top</p>
+                    <p className="text-2xl font-bold tabular-nums">{fmt(paretoAnalysis.topRevenue)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {paretoAnalysis.totalRevenue > 0
+                        ? `${((paretoAnalysis.topRevenue / paretoAnalysis.totalRevenue) * 100).toFixed(1)}% del total`
+                        : "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                    <p className="text-xs text-muted-foreground">Resto de creadoras</p>
+                    <p className="text-2xl font-bold tabular-nums text-muted-foreground">
+                      {fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {paretoAnalysis.rest.length} creadoras generan el {paretoAnalysis.totalRevenue > 0
+                        ? (100 - (paretoAnalysis.topRevenue / paretoAnalysis.totalRevenue) * 100).toFixed(1)
+                        : "0"}% restante
+                    </p>
+                  </div>
+                </div>
+                {/* Top creators list */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+                    Tus creadoras clave ({paretoAnalysis.topCount}):
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {paretoAnalysis.top.map((c) => (
+                      <Badge
+                        key={c.creatorId}
+                        variant="secondary"
+                        className="cursor-pointer hover:bg-primary/20 transition-colors gap-1.5 py-1"
+                        onClick={() => navigate(`/creadores/${c.creatorId}`)}
+                      >
+                        <span className="inline-block h-2 w-2 rounded-full bg-primary shrink-0" />
+                        {c.name}
+                        <span className="text-muted-foreground ml-1 tabular-nums">{fmtShort(c.total)}</span>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* KPI Cards */}
             {!isLoading && (
@@ -273,8 +449,8 @@ const Dashboard2 = () => {
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5" /> Período
                   </div>
-                  <p className="text-sm font-bold tabular-nums">{lastMonth.startStr}</p>
-                  <p className="text-[10px] text-muted-foreground">→ {lastMonth.endStr}</p>
+                  <p className="text-sm font-bold tabular-nums">{selectedPeriod?.startStr}</p>
+                  <p className="text-[10px] text-muted-foreground">→ {selectedPeriod?.endStr}</p>
                 </div>
               </div>
             )}
@@ -326,9 +502,9 @@ const Dashboard2 = () => {
               <div className="flex items-start gap-2 rounded-md border border-border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
                 <Info className="h-4 w-4 mt-0.5 shrink-0" />
                 <span>
-                  <strong>Bruto</strong> = lo que reporta OnlyFans (100%). <strong>Neto</strong> = lo que recibe la agencia (80%, OF se queda el 20%).
-                  Datos de <code className="bg-muted px-1 rounded font-mono">of_gross_earnings</code>. Se excluyen Unlok e Instagram.
-                  <span className="ml-1" style={{ color: "hsl(25, 95%, 53%)" }}>⚠ = data se cortó antes del día 20.</span>
+                  <strong>Bruto</strong> = lo que reporta OF (100%). <strong>Neto</strong> = agencia recibe (80%).
+                  Fuente: <code className="bg-muted px-1 rounded font-mono">of_gross_earnings</code>. Se excluyen Unlok e Instagram.
+                  <span className="ml-1" style={{ color: "hsl(25, 95%, 53%)" }}>⚠ = data cortada antes del día 20.</span>
                 </span>
               </div>
             )}
@@ -368,61 +544,11 @@ const Dashboard2 = () => {
                         <TableCell colSpan={15} className="text-center py-12 text-muted-foreground">
                           {rawCreators.length > 0
                             ? "No hay resultados con los filtros actuales"
-                            : `Sin datos para ${label}`}
+                            : `Sin datos para ${selectedPeriod?.label}`}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      creators.map((c, i) => {
-                        const stopped = dataStoppedEarly(c.lastDate);
-                        const isZero = c.total === 0;
-                        return (
-                          <TableRow key={c.creatorId} className={isZero ? "opacity-50" : ""}>
-                            <TableCell className="text-muted-foreground tabular-nums text-xs">{i + 1}</TableCell>
-                            <TableCell className="whitespace-nowrap">
-                              <div className="flex items-center gap-1.5">
-                                {c.instagramHandle && (
-                                  <a
-                                    href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"
-                                    title={`@${c.instagramHandle.replace(/^@/, "")}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <Instagram className="h-3.5 w-3.5" />
-                                  </a>
-                                )}
-                                <button
-                                  className="font-medium text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left"
-                                  onClick={() => navigate(`/creadores/${c.creatorId}`)}
-                                >
-                                  {c.name}
-                                </button>
-                              </div>
-                            </TableCell>
-                            <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : ""}`}>
-                              {fmt(c.total)}
-                            </TableCell>
-                            <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : "text-emerald-600 dark:text-emerald-400"}`}>
-                              {fmt(c.net)}
-                            </TableCell>
-                            <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.newSubs)}</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.recurringSubs)}</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.tips)}</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.messages)}</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.activeFans.toLocaleString()}</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.newFans.toLocaleString()}</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerDay)}</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerFan)}</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.daysWithData}</TableCell>
-                            <TableCell className={`text-sm tabular-nums whitespace-nowrap ${stopped ? "font-medium" : "text-muted-foreground"}`} style={stopped ? { color: "hsl(25, 95%, 53%)" } : undefined}>
-                              {format(new Date(c.lastDate + "T12:00:00"), "dd MMM", { locale: es })}
-                              {stopped && " ⚠"}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
+                      creators.map((c, i) => <CreatorRow key={c.creatorId} c={c} i={i} />)
                     )}
                   </TableBody>
                 </Table>
