@@ -133,9 +133,20 @@ const AuditComparisonTable = ({ file }: Props) => {
     return <div className="text-center py-8 text-muted-foreground">Procesando archivo y comparando con base de datos...</div>;
   }
 
+  const dateLabel = dateRange
+    ? `${new Date(dateRange.min + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })} — ${new Date(dateRange.max + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}`
+    : "";
+
   return (
     <div className="space-y-6">
       <AuditSummaryCards {...summary} />
+
+      {dateRange && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground border rounded-lg px-4 py-2 bg-card w-fit">
+          <CalendarDays className="h-4 w-4" />
+          <span>Período comparado: <strong className="text-foreground">{dateLabel}</strong></span>
+        </div>
+      )}
 
       <div className="flex justify-end">
         <Button variant="outline" onClick={exportAudit} className="gap-2">
