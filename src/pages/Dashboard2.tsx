@@ -296,6 +296,42 @@ const Dashboard2 = () => {
     return day < 20;
   };
 
+  const exportPdf = () => {
+    if (!selectedPeriod) return;
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    doc.setFontSize(16);
+    doc.text(`Ventas OnlyFans - ${selectedPeriod.label}`, 14, 15);
+    doc.setFontSize(9);
+    doc.text(`Periodo: ${selectedPeriod.startStr} a ${selectedPeriod.endStr} | Generado: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 21);
+    doc.setFontSize(10);
+    const activeCount = creators.filter(c => c.total > 0).length;
+    doc.text(`Total Bruto: ${fmt(grandTotal)}  |  Neto (80%): ${fmt(grandTotal * 0.8)}  |  Creadoras: ${activeCount}  |  Retencion: ${hlKpis.renewalRate.toFixed(1)}%`, 14, 28);
+    const tHead = [["#", "Creadora", "Instagram", "Bruto", "Neto 80%", "Subs", "Nuevas", "Recur.", "Tips", "Msgs", "Fans", "New", "$/Dia", "$/Fan", "Dias", "Ultima"]];
+    const tBody = creators.map((c, i) => [
+      String(i + 1), c.name, c.instagramHandle ? "@" + c.instagramHandle.replace(/^@/, "") : "-",
+      fmt(c.total), fmt(c.net), fmtShort(c.subs), fmtShort(c.newSubs), fmtShort(c.recurringSubs),
+      fmtShort(c.tips), fmtShort(c.messages), String(c.activeFans), String(c.newFans),
+      fmtShort(c.avgPerDay), fmtShort(c.avgPerFan), String(c.daysWithData),
+      format(new Date(c.lastDate + "T12:00:00"), "dd MMM", { locale: es }),
+    ]);
+    autoTable(doc, { startY: 33, head: tHead, body: tBody, styles: { fontSize: 7, cellPadding: 1.5 }, headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 7 }, alternateRowStyles: { fillColor: [245, 245, 250] }, margin: { left: 8, right: 8 } });
+    doc.addPage();
+    doc.setFontSize(14);
+    doc.text("Analisis 80/20 (Pareto)", 14, 15);
+    doc.setFontSize(9);
+    const topPct = paretoAnalysis.totalRevenue > 0 ? ((paretoAnalysis.topRevenue / paretoAnalysis.totalRevenue) * 100).toFixed(1) : "0";
+    doc.text(`Top ${paretoAnalysis.topCount} = ${fmt(paretoAnalysis.topRevenue)} (${topPct}%)  |  Resto ${paretoAnalysis.rest.length} = ${fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}`, 14, 22);
+    const pH = [["#", "Creadora", "Instagram", "Bruto", "% Top", "% Total"]];
+    const pB = paretoAnalysis.top.map((c, i) => [
+      String(i + 1), c.name, c.instagramHandle ? "@" + c.instagramHandle.replace(/^@/, "") : "-",
+      fmt(c.total),
+      (paretoAnalysis.topRevenue > 0 ? (c.total / paretoAnalysis.topRevenue * 100).toFixed(1) : "0") + "%",
+      (paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue * 100).toFixed(1) : "0") + "%",
+    ]);
+    autoTable(doc, { startY: 27, head: pH, body: pB, styles: { fontSize: 8, cellPadding: 2 }, headStyles: { fillColor: [30, 64, 175], textColor: 255 }, alternateRowStyles: { fillColor: [245, 245, 250] }, margin: { left: 14, right: 14 } });
+    doc.save(`Ventas_OnlyFans_${selectedPeriod.value}.pdf`);
+  };
+
   const SortableHead = ({ col, label, right }: { col: SortKey; label: string; right?: boolean }) => (
     <TableHead className="cursor-pointer select-none whitespace-nowrap" onClick={() => toggleSort(col)}>
       <span className={`flex items-center gap-1 ${right ? "justify-end" : ""}`}>
