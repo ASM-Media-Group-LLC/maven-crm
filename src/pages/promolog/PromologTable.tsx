@@ -206,7 +206,11 @@ const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange, onAss
                 {entry.result}
               </Badge>
             </TableCell>
-            <TableCell className="text-sm text-muted-foreground">{entry.agent}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">
+              {entry.agent === "Sin asignar" ? (
+                <span className="italic text-muted-foreground/60">{entry.agent}</span>
+              ) : entry.agent}
+            </TableCell>
             <TableCell onClick={(e) => e.stopPropagation()}>
               <InlineNotes
                 value={entry.notes}
