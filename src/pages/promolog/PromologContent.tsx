@@ -545,7 +545,7 @@ const PromologContent = () => {
       }
       return true;
     });
-  }, [entries, selectedCreatorFilter, selectedStatus, selectedNetwork, selectedCardPlatform, searchEntry]);
+  }, [dedupedEntries, selectedCreatorFilter, selectedStatus, selectedNetwork, selectedCardPlatform, searchEntry]);
 
   const formattedDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
   const shortDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";

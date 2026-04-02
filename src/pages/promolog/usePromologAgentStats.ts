@@ -26,7 +26,7 @@ export const usePromologAgentStats = (profileIds: string[]) => {
       while (hasMore) {
         const { data } = await supabase
           .from("promolog_entries")
-          .select("reviewed_by, created_by, promoted, network")
+          .select("reviewed_by, created_by, promoted, network, creator_id, date")
           .range(offset, offset + PAGE_SIZE - 1);
 
         if (!data || data.length === 0) {
@@ -38,10 +38,27 @@ export const usePromologAgentStats = (profileIds: string[]) => {
         }
       }
 
+      // Deduplicate: group by creator_id + day + network + promoted
+      const dedupGroups = new Map<string, typeof allEntries[0]>();
+      for (const entry of allEntries) {
+        const day = entry.date ? entry.date.split("T")[0] : "";
+        const key = `${entry.creator_id || ""}|${day}|${(entry.network || "").toLowerCase()}|${entry.promoted}`;
+        if (!dedupGroups.has(key)) {
+          dedupGroups.set(key, entry);
+        } else {
+          // Prefer entry with reviewed_by or created_by
+          const existing = dedupGroups.get(key)!;
+          const existingScore = (existing.reviewed_by ? 1 : 0) + (existing.created_by ? 1 : 0);
+          const newScore = (entry.reviewed_by ? 1 : 0) + (entry.created_by ? 1 : 0);
+          if (newScore > existingScore) dedupGroups.set(key, entry);
+        }
+      }
+
+      const dedupedEntries = Array.from(dedupGroups.values());
       const profileSet = new Set(profileIds);
       const agentMap = new Map<string, PromologAgentStat>();
 
-      for (const entry of allEntries) {
+      for (const entry of dedupedEntries) {
         const agentId = entry.reviewed_by || entry.created_by;
         if (!agentId || !profileSet.has(agentId)) continue;
 
