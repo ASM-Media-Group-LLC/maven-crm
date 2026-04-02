@@ -51,6 +51,11 @@ const countryCodes = [
 
 const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingContactData, setExistingContactData] = useState<{
+    id: string; name: string; phone?: string; email?: string; agentName?: string; createdAt?: string;
+  } | null>(null);
+  const [isUpdatingContact, setIsUpdatingContact] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState<ContactoFormValues | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
