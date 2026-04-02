@@ -398,6 +398,52 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         </Form>
       </DialogContent>
     </Dialog>
+
+    {/* Existing contact dialog */}
+    <Dialog open={!!existingContactData} onOpenChange={(open) => { if (!open) { setExistingContactData(null); setPendingFormData(null); } }}>
+      <DialogContent className="sm:max-w-[440px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-yellow-500" />
+            Contacto existente
+          </DialogTitle>
+          <DialogDescription>
+            Esta modelo ya está registrada como contacto. Puedes actualizar sus datos o crear un nuevo registro.
+          </DialogDescription>
+        </DialogHeader>
+        {existingContactData && (
+          <div className="space-y-3 py-2">
+            <div className="rounded-md border border-border p-3 space-y-1 text-sm">
+              <p><span className="text-muted-foreground">Nombre:</span> <strong>{existingContactData.name}</strong></p>
+              {existingContactData.agentName && (
+                <p><span className="text-muted-foreground">Registrado por:</span> {existingContactData.agentName}</p>
+              )}
+              {existingContactData.createdAt && (
+                <p><span className="text-muted-foreground">Fecha:</span> {new Date(existingContactData.createdAt).toLocaleDateString("es-CO")}</p>
+              )}
+              {existingContactData.phone && (
+                <p><span className="text-muted-foreground">Teléfono actual:</span> {existingContactData.phone}</p>
+              )}
+              {existingContactData.email && (
+                <p><span className="text-muted-foreground">Email actual:</span> {existingContactData.email}</p>
+              )}
+            </div>
+          </div>
+        )}
+        <DialogFooter className="flex-col gap-2 sm:flex-col">
+          <Button onClick={handleUpdateExistingContact} disabled={isUpdatingContact} className="w-full">
+            {isUpdatingContact ? "Actualizando..." : "Actualizar contacto"}
+          </Button>
+          <Button variant="outline" onClick={handleCreateNewAnyway} disabled={isSubmitting} className="w-full">
+            Crear nuevo registro
+          </Button>
+          <Button variant="ghost" onClick={() => { setExistingContactData(null); setPendingFormData(null); }} className="w-full">
+            Cancelar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
