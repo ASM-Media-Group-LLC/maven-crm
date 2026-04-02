@@ -260,7 +260,7 @@ const PromologContent = () => {
       { name: "X", value: countByNetwork("x"), icon: <XIcon className="h-6 w-6" />, bg: "bg-slate-500/10" },
       { name: "Telegram", value: countByNetwork("telegram"), icon: <Send className="h-6 w-6" />, bg: "bg-blue-500/10" },
     ];
-  }, [entries]);
+  }, [dedupedEntries]);
 
   const platformCards = useMemo(() => {
     const siEntries = dedupedEntries.filter(e => e.result === "Sí");
