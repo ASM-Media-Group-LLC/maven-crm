@@ -127,6 +127,29 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
 
   const handleSubmit = () => {
     if (!canSubmit) return;
+
+    // Build immutable commission snapshot from selected commissions
+    const selected = commissions.filter(c => selectedCommissionIds.includes(c.id));
+    const commissionSnapshot = selected.map(c => {
+      const config = c.calculation_config as any;
+      return {
+        commission_id: c.id,
+        period: c.period,
+        period_start: c.period_start,
+        period_end: c.period_end,
+        base_amount: Number(c.base_amount) || 0,
+        commission_type: config?.commission_type ?? "fixed",
+        commission_percentage: Number(config?.percentage) || 0,
+        commission_amount: (Number(c.base_amount) || 0) * (Number(config?.percentage) || 0) / 100,
+        earnings_period: Number(config?.earnings_period) || Number(c.base_amount) || 0,
+        tier_from: config?.tier_from ?? null,
+        tier_to: config?.tier_to ?? null,
+        tiers_config: config?.tiers_config ?? null,
+        blue_amount: Number(config?.blue_amount) || 0,
+        paypal_amount: Number(config?.paypal_amount) || 0,
+      };
+    });
+
     onSubmit({
       creator_id: creatorId,
       template_id: templateId,
@@ -140,6 +163,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
       status: "borrador",
       period_start: totals.periodStart,
       period_end: totals.periodEnd,
+      commission_snapshot: commissionSnapshot,
     });
     // Reset
     setTemplateId("");
