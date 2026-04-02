@@ -34,21 +34,6 @@ interface AddContactoModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const countryCodes = [
-  { value: "+1", triggerLabel: "🇺🇸 +1", label: "🇺🇸 Estados Unidos +1" },
-  { value: "+57", triggerLabel: "🇨🇴 +57", label: "🇨🇴 Colombia +57" },
-  { value: "+56", triggerLabel: "🇨🇱 +56", label: "🇨🇱 Chile +56" },
-  { value: "+52", triggerLabel: "🇲🇽 +52", label: "🇲🇽 México +52" },
-  { value: "+54", triggerLabel: "🇦🇷 +54", label: "🇦🇷 Argentina +54" },
-  { value: "+51", triggerLabel: "🇵🇪 +51", label: "🇵🇪 Perú +51" },
-  { value: "+593", triggerLabel: "🇪🇨 +593", label: "🇪🇨 Ecuador +593" },
-  { value: "+58", triggerLabel: "🇻🇪 +58", label: "🇻🇪 Venezuela +58" },
-  { value: "+55", triggerLabel: "🇧🇷 +55", label: "🇧🇷 Brasil +55" },
-  { value: "+34", triggerLabel: "🇪🇸 +34", label: "🇪🇸 España +34" },
-  { value: "+44", triggerLabel: "🇬🇧 +44", label: "🇬🇧 Reino Unido +44" },
-  { value: "+33", triggerLabel: "🇫🇷 +33", label: "🇫🇷 Francia +33" },
-  { value: "+49", triggerLabel: "🇩🇪 +49", label: "🇩🇪 Alemania +49" },
-];
 
 const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
