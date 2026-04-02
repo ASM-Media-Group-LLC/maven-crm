@@ -13,6 +13,8 @@ interface SalesReportSectionProps {
   rows: EarningsRow[];
   comparedRows?: EarningsRow[];
   earningsMode: EarningsMode;
+  dateFrom?: Date;
+  dateTo?: Date;
 }
 
 const SalesReportSection = ({ rows, comparedRows, earningsMode }: SalesReportSectionProps) => {
