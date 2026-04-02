@@ -270,7 +270,7 @@ const PromologContent = () => {
       { name: "Unlok", value: countByPlatform("unlok"), bg: "bg-purple-500/10", icon: <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500 text-white text-[10px] font-bold">U</span> },
       { name: "Otra", value: siEntries.length - countByPlatform("onlyfans") - countByPlatform("unlok"), bg: "bg-muted/50", icon: <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground"><Info className="h-4 w-4" /></span> },
     ];
-  }, [entries]);
+  }, [dedupedEntries]);
 
   const strategyOptions = [
     { value: "incentivo_economico", label: "Incentivo económico" },
