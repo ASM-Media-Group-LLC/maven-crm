@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
-  PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
+  PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { useUserRole } from "@/hooks/useUserRole";
 import jsPDF from "jspdf";
