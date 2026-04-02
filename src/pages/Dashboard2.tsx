@@ -99,8 +99,8 @@ const Dashboard2 = () => {
 
       const key = r.creator_id || r.pending_creator || r.id;
 
-      // Filter: only OnlyFans creators (or unknown platform — they come from OF data anyway)
-      const plat = r.creator_id ? platformMap[r.creator_id] : null;
+      const info = r.creator_id ? creatorInfoMap[r.creator_id] : null;
+      const plat = info?.platform || null;
       const normPlat = (plat || "").toLowerCase();
       if (normPlat === "unlok" || normPlat === "instagram") continue;
 
