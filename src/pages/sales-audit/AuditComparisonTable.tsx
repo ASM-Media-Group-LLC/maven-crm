@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle, FileDown, Save } from "lucide-react";
+import { CheckCircle, FileDown, Save, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import AuditSummaryCards from "./AuditSummaryCards";
 import AuditEntriesInfo from "./AuditEntriesInfo";
