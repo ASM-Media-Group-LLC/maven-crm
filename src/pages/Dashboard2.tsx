@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { subMonths, format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Info, TrendingUp, Users, DollarSign, Calendar } from "lucide-react";
+import { Info, TrendingUp, Users, DollarSign, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 interface CreatorSummary {
   creatorId: string;
@@ -25,7 +25,11 @@ interface CreatorSummary {
   activeFans: number;
   newFans: number;
   daysWithData: number;
+  lastDate: string;
 }
+
+type SortKey = "name" | "platform" | "subs" | "tips" | "messages" | "activeFans" | "daysWithData" | "total" | "lastDate";
+type SortDir = "asc" | "desc";
 
 const PLATFORM_COLORS: Record<string, string> = {
   OnlyFans: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
@@ -36,8 +40,9 @@ const PLATFORM_COLORS: Record<string, string> = {
 
 const Dashboard2 = () => {
   const { data: allRows = [], isLoading } = useEarningsData();
+  const [sortKey, setSortKey] = useState<SortKey>("total");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  // Fetch platform info from creator_business
   const { data: platformMap = {} } = useQuery({
     queryKey: ["creator-platforms"],
     queryFn: async () => {
@@ -60,18 +65,15 @@ const Dashboard2 = () => {
     const startStr = `${y}-${String(mo + 1).padStart(2, "0")}-01`;
     const lastDay = new Date(y, mo + 1, 0).getDate();
     const endStr = `${y}-${String(mo + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-    return { startStr, endStr, month: m };
+    return { startStr, endStr, month: m, lastDay };
   }, []);
 
   const label = useMemo(
-    () =>
-      format(lastMonth.month, "MMMM yyyy", { locale: es }).replace(/^\w/, (c) =>
-        c.toUpperCase()
-      ),
+    () => format(lastMonth.month, "MMMM yyyy", { locale: es }).replace(/^\w/, (c) => c.toUpperCase()),
     [lastMonth]
   );
 
-  const { creators, grandTotal, totalFans, latestDate, totalRows } = useMemo(() => {
+  const { creators: rawCreators, grandTotal, totalFans, latestDate, totalRows } = useMemo(() => {
     const map = new Map<string, CreatorSummary>();
     let latest = "";
     let rowCount = 0;
@@ -93,6 +95,7 @@ const Dashboard2 = () => {
         existing.activeFans = Math.max(existing.activeFans, r.active_fans ?? 0);
         existing.newFans += r.new_fans ?? 0;
         existing.daysWithData++;
+        if (d > existing.lastDate) existing.lastDate = d;
       } else {
         map.set(key, {
           creatorId: key,
@@ -105,25 +108,64 @@ const Dashboard2 = () => {
           activeFans: r.active_fans ?? 0,
           newFans: r.new_fans ?? 0,
           daysWithData: 1,
+          lastDate: d,
         });
       }
     }
 
-    const sorted = Array.from(map.values()).sort((a, b) => b.total - a.total);
     return {
-      creators: sorted,
-      grandTotal: sorted.reduce((s, c) => s + c.total, 0),
-      totalFans: sorted.reduce((s, c) => s + c.activeFans, 0),
+      creators: Array.from(map.values()),
+      grandTotal: Array.from(map.values()).reduce((s, c) => s + c.total, 0),
+      totalFans: Array.from(map.values()).reduce((s, c) => s + c.activeFans, 0),
       latestDate: latest,
       totalRows: rowCount,
     };
   }, [allRows, lastMonth, platformMap]);
+
+  const creators = useMemo(() => {
+    const sorted = [...rawCreators];
+    sorted.sort((a, b) => {
+      let av: string | number, bv: string | number;
+      switch (sortKey) {
+        case "name": av = a.name.toLowerCase(); bv = b.name.toLowerCase(); break;
+        case "platform": av = a.platform.toLowerCase(); bv = b.platform.toLowerCase(); break;
+        case "lastDate": av = a.lastDate; bv = b.lastDate; break;
+        default: av = a[sortKey]; bv = b[sortKey];
+      }
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [rawCreators, sortKey, sortDir]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "name" || key === "platform" ? "asc" : "desc");
+    }
+  };
+
+  const SortIcon = ({ col }: { col: SortKey }) => {
+    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+    return sortDir === "desc"
+      ? <ArrowDown className="h-3 w-3 text-primary" />
+      : <ArrowUp className="h-3 w-3 text-primary" />;
+  };
 
   const fmt = (n: number) =>
     `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const fmtShort = (n: number) =>
     n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmt(n);
+
+  // Flag: if lastDate is before the 20th of the month, data stopped early
+  const dataStoppedEarly = (lastDate: string) => {
+    const day = parseInt(lastDate.split("-")[2], 10);
+    return day < 20;
+  };
 
   return (
     <SidebarProvider>
@@ -138,7 +180,7 @@ const Dashboard2 = () => {
                 Ventas por Creadora — {label}
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Datos extraídos de la tabla <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">of_gross_earnings</code> · Plataforma desde <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">creator_business</code>
+                Fuente: <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">of_gross_earnings</code> · Plataforma: <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">creator_business</code> · Clic en encabezado para ordenar
               </p>
             </div>
 
@@ -166,7 +208,7 @@ const Dashboard2 = () => {
                   <p className="text-xl font-bold tabular-nums">
                     {creators.length > 0 ? fmt(grandTotal / creators.length) : "$0"}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">{totalRows.toLocaleString()} registros procesados</p>
+                  <p className="text-[10px] text-muted-foreground">{totalRows.toLocaleString()} registros</p>
                 </div>
                 <div className="rounded-lg border border-border bg-card p-4 space-y-1">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -175,7 +217,7 @@ const Dashboard2 = () => {
                   <p className="text-xl font-bold tabular-nums">
                     {latestDate ? format(new Date(latestDate + "T12:00:00"), "dd MMM", { locale: es }) : "—"}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">Período: {lastMonth.startStr} → {lastMonth.endStr}</p>
+                  <p className="text-[10px] text-muted-foreground">{lastMonth.startStr} → {lastMonth.endStr}</p>
                 </div>
               </div>
             )}
@@ -185,9 +227,9 @@ const Dashboard2 = () => {
               <div className="flex items-start gap-2 rounded-md border border-border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
                 <Info className="h-4 w-4 mt-0.5 shrink-0" />
                 <div>
-                  <strong>Fuente de datos:</strong> Los montos vienen de los reportes diarios de OnlyFans importados a <code className="bg-muted px-1 rounded font-mono">of_gross_earnings</code>. 
-                  La plataforma (OnlyFans / Unlok) se obtiene del perfil comercial de cada creadora en <code className="bg-muted px-1 rounded font-mono">creator_business.main_platform</code>. 
-                  Los datos se deduplican por creadora + día, tomando el registro más reciente.
+                  <strong>Fuente:</strong> Reportes diarios de OnlyFans importados automáticamente. 
+                  Plataforma (OF/Unlok) del perfil comercial. Datos deduplicados por creadora + día. 
+                  <span className="text-orange-500 dark:text-orange-400 ml-1">⚠ Las filas con "Última data" temprana indican que dejaron de reportar o se fueron.</span>
                 </div>
               </div>
             )}
@@ -205,48 +247,70 @@ const Dashboard2 = () => {
                   <TableHeader className="sticky top-0 z-10 bg-card">
                     <TableRow>
                       <TableHead className="w-10">#</TableHead>
-                      <TableHead>Creadora</TableHead>
-                      <TableHead>Plataforma</TableHead>
-                      <TableHead className="text-right">Suscripciones</TableHead>
-                      <TableHead className="text-right">Tips</TableHead>
-                      <TableHead className="text-right">Mensajes</TableHead>
-                      <TableHead className="text-right">Fans</TableHead>
-                      <TableHead className="text-right">Días</TableHead>
-                      <TableHead className="text-right font-semibold">Total Bruto</TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>
+                        <span className="flex items-center gap-1">Creadora <SortIcon col="name" /></span>
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("platform")}>
+                        <span className="flex items-center gap-1">Plataforma <SortIcon col="platform" /></span>
+                      </TableHead>
+                      <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("subs")}>
+                        <span className="flex items-center gap-1 justify-end">Subs <SortIcon col="subs" /></span>
+                      </TableHead>
+                      <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("tips")}>
+                        <span className="flex items-center gap-1 justify-end">Tips <SortIcon col="tips" /></span>
+                      </TableHead>
+                      <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("messages")}>
+                        <span className="flex items-center gap-1 justify-end">Msgs <SortIcon col="messages" /></span>
+                      </TableHead>
+                      <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("activeFans")}>
+                        <span className="flex items-center gap-1 justify-end">Fans <SortIcon col="activeFans" /></span>
+                      </TableHead>
+                      <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("daysWithData")}>
+                        <span className="flex items-center gap-1 justify-end">Días <SortIcon col="daysWithData" /></span>
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("lastDate")}>
+                        <span className="flex items-center gap-1">Última data <SortIcon col="lastDate" /></span>
+                      </TableHead>
+                      <TableHead className="text-right cursor-pointer select-none font-semibold" onClick={() => toggleSort("total")}>
+                        <span className="flex items-center gap-1 justify-end">Total Bruto <SortIcon col="total" /></span>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {creators.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
                           Sin datos para {label}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      creators.map((c, i) => (
-                        <TableRow key={c.creatorId}>
-                          <TableCell className="text-muted-foreground tabular-nums text-xs">
-                            {i + 1}
-                          </TableCell>
-                          <TableCell className="font-medium">{c.name}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="secondary"
-                              className={`text-[10px] font-medium ${PLATFORM_COLORS[c.platform] || ""}`}
-                            >
-                              {c.platform}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
-                          <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.tips)}</TableCell>
-                          <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.messages)}</TableCell>
-                          <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.activeFans.toLocaleString()}</TableCell>
-                          <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.daysWithData}</TableCell>
-                          <TableCell className="text-right tabular-nums font-semibold">
-                            {fmt(c.total)}
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      creators.map((c, i) => {
+                        const stopped = dataStoppedEarly(c.lastDate);
+                        const isZero = c.total === 0;
+                        return (
+                          <TableRow key={c.creatorId} className={isZero ? "opacity-60" : ""}>
+                            <TableCell className="text-muted-foreground tabular-nums text-xs">{i + 1}</TableCell>
+                            <TableCell className="font-medium">{c.name}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className={`text-[10px] font-medium ${PLATFORM_COLORS[c.platform] || ""}`}>
+                                {c.platform}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.tips)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.messages)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.activeFans.toLocaleString()}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.daysWithData}</TableCell>
+                            <TableCell className={`text-sm tabular-nums ${stopped ? "text-orange-500 dark:text-orange-400 font-medium" : "text-muted-foreground"}`}>
+                              {format(new Date(c.lastDate + "T12:00:00"), "dd MMM", { locale: es })}
+                              {stopped && " ⚠"}
+                            </TableCell>
+                            <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : ""}`}>
+                              {fmt(c.total)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
