@@ -21,6 +21,7 @@ import { useNavigate } from "react-router-dom";
 interface CreatorSummary {
   creatorId: string;
   name: string;
+  instagramHandle: string | null;
   platform: string;
   total: number;
   net: number;
