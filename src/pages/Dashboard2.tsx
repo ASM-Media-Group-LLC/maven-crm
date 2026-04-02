@@ -818,6 +818,102 @@ const Dashboard2 = () => {
               </div>
             )}
 
+            {/* Alerts Panel */}
+            {showAlerts && !isLoading && (
+              <div className="rounded-lg border-2 border-destructive/30 bg-destructive/5 p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  <h2 className="text-lg font-bold text-foreground">Red Flags & Alertas</h2>
+                  <Badge variant="destructive" className="ml-1">{alerts.length}</Badge>
+                </div>
+                {alerts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">✅ No hay alertas este mes. Todo bien.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                    {alerts.map((a, i) => (
+                      <div key={i} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
+                        <span className={`text-sm shrink-0 ${a.type === "zero" ? "text-destructive" : a.type === "drop" ? "text-orange-500" : "text-yellow-500"}`}>
+                          {a.type === "zero" ? "🔴" : a.type === "drop" ? "🟠" : "🟡"}
+                        </span>
+                        {a.creator.instagramHandle && (
+                          <a href={`https://instagram.com/${a.creator.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
+                            <Instagram className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                        <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[100px]" onClick={() => navigate(`/creadores/${a.creator.creatorId}`)}>
+                          {a.creator.name}
+                        </button>
+                        <span className="text-sm text-muted-foreground flex-1">{a.detail}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">🔴 = Pasó a $0 · 🟠 = Cayó {'>'} 30% vs mes anterior · 🟡 = Perdiendo fans</p>
+              </div>
+            )}
+
+            {/* Projection Panel */}
+            {showProjection && !isLoading && (
+              <div className="rounded-lg border-2 border-accent/30 bg-accent/5 p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-accent-foreground" />
+                    <h2 className="text-lg font-bold text-foreground">
+                      Proyección {format(new Date(), "MMMM yyyy", { locale: es }).replace(/^\w/, (c) => c.toUpperCase())}
+                    </h2>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Proyección total bruto</p>
+                    <p className="text-xl font-bold tabular-nums">{fmt(projectionTotal)}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Basado en {new Date().getDate() - 1} días transcurridos. Fórmula: (acumulado / días con data) × días del mes.
+                </p>
+                {projection.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sin datos del mes actual.</p>
+                ) : (
+                  <div className="rounded-lg border border-border bg-card overflow-auto max-h-[350px]">
+                    <Table>
+                      <TableHeader className="sticky top-0 z-10 bg-card">
+                        <TableRow>
+                          <TableHead className="w-8">#</TableHead>
+                          <TableHead>Creadora</TableHead>
+                          <TableHead className="text-right">Acumulado</TableHead>
+                          <TableHead className="text-right">$/Día</TableHead>
+                          <TableHead className="text-right">Días</TableHead>
+                          <TableHead className="text-right font-semibold">Proyectado</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {projection.map((c, i) => (
+                          <TableRow key={c.creatorId}>
+                            <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                {c.ig && (
+                                  <a href={`https://instagram.com/${c.ig.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
+                                    <Instagram className="h-3.5 w-3.5" />
+                                  </a>
+                                )}
+                                <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
+                                  {c.name}
+                                </button>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-sm">{fmt(c.total)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmt(c.dailyAvg)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.days}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm font-semibold">{fmt(c.projected)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* KPI Cards */}
             {!isLoading && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
