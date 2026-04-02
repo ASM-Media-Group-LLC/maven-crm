@@ -699,11 +699,7 @@ const Dashboard2 = () => {
             </Dialog>
 
 
-                  <p className="text-[10px] text-muted-foreground">Recurrentes / Total subs</p>
-                </div>
-                <div className="rounded-lg border border-border bg-card p-3 space-y-0.5">
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
-                    <MessageSquare className="h-3 w-3" /> Msgs del Total
+
                   </div>
                   <p className="text-lg font-bold tabular-nums">{hlKpis.msgsPct.toFixed(1)}%</p>
                   <p className="text-[10px] text-muted-foreground">{fmt(hlKpis.totalMsgs)}</p>
