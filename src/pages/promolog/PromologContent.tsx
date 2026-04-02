@@ -218,7 +218,7 @@ const PromologContent = () => {
         result: promotedToResult(pe.promoted),
         date: dateObj.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }),
         time: dateObj.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: true }),
-        agent: (pe.created_by && profilesMap[pe.created_by]) || (pe.reviewed_by && profilesMap[pe.reviewed_by]) || "Sync externo",
+        agent: (pe.created_by && profilesMap[pe.created_by]) || (pe.reviewed_by && profilesMap[pe.reviewed_by]) || "AI Agent",
         notes: pe.notes || "",
         creator_id: pe.creator_id,
         reviewed_by: pe.reviewed_by || undefined,
@@ -226,9 +226,33 @@ const PromologContent = () => {
     });
   }, [promologEntries, profilesMap]);
 
+  // Deduplicate entries: group by creator_id + day + network + platform + result
+  const dedupedEntries = useMemo(() => {
+    const groups = new Map<string, PromologEntry[]>();
+    for (const entry of entries) {
+      const key = `${entry.creator_id || ""}|${entry.date}|${entry.network}|${entry.platform}|${entry.result}`;
+      const group = groups.get(key);
+      if (group) group.push(entry);
+      else groups.set(key, [entry]);
+    }
+    // From each group, pick the most complete entry
+    const result: PromologEntry[] = [];
+    for (const group of groups.values()) {
+      if (group.length === 1) { result.push(group[0]); continue; }
+      // Score: prefer entries with notes, reviewed_by, human agent
+      const scored = group.map(e => ({
+        entry: e,
+        score: (e.notes ? 2 : 0) + (e.reviewed_by ? 2 : 0) + (e.agent !== "AI Agent" ? 3 : 0),
+      }));
+      scored.sort((a, b) => b.score - a.score);
+      result.push(scored[0].entry);
+    }
+    return result;
+  }, [entries]);
+
   // Dynamic social & platform counts (only "Sí" entries)
   const socialCards = useMemo(() => {
-    const siEntries = entries.filter(e => e.result === "Sí");
+    const siEntries = dedupedEntries.filter(e => e.result === "Sí");
     const countByNetwork = (net: string) => siEntries.filter(e => e.network === net).length;
     return [
       { name: "Instagram", value: countByNetwork("instagram"), icon: <InstagramIcon className="h-6 w-6" />, bg: "bg-pink-500/10" },
@@ -236,17 +260,17 @@ const PromologContent = () => {
       { name: "X", value: countByNetwork("x"), icon: <XIcon className="h-6 w-6" />, bg: "bg-slate-500/10" },
       { name: "Telegram", value: countByNetwork("telegram"), icon: <Send className="h-6 w-6" />, bg: "bg-blue-500/10" },
     ];
-  }, [entries]);
+  }, [dedupedEntries]);
 
   const platformCards = useMemo(() => {
-    const siEntries = entries.filter(e => e.result === "Sí");
+    const siEntries = dedupedEntries.filter(e => e.result === "Sí");
     const countByPlatform = (plat: string) => siEntries.filter(e => (e.platform || "").toLowerCase().includes(plat)).length;
     return [
       { name: "OnlyFans", value: countByPlatform("onlyfans"), bg: "bg-blue-500/10", icon: <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white text-[10px] font-bold">OF</span> },
       { name: "Unlok", value: countByPlatform("unlok"), bg: "bg-purple-500/10", icon: <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500 text-white text-[10px] font-bold">U</span> },
       { name: "Otra", value: siEntries.length - countByPlatform("onlyfans") - countByPlatform("unlok"), bg: "bg-muted/50", icon: <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground"><Info className="h-4 w-4" /></span> },
     ];
-  }, [entries]);
+  }, [dedupedEntries]);
 
   const strategyOptions = [
     { value: "incentivo_economico", label: "Incentivo económico" },
@@ -498,16 +522,16 @@ const PromologContent = () => {
 
   // KPI modal state
   const [kpiModalType, setKpiModalType] = useState<"ingresados" | "no_chequeadas" | "completadas" | null>(null);
-  const kpiModalEntries = useMemo(() => {
+   const kpiModalEntries = useMemo(() => {
     if (!kpiModalType) return [];
-    if (kpiModalType === "no_chequeadas") return entries.filter(e => e.result === "Pendiente");
-    if (kpiModalType === "completadas") return entries.filter(e => e.result === "Sí");
-    return entries;
-  }, [entries, kpiModalType]);
+    if (kpiModalType === "no_chequeadas") return dedupedEntries.filter(e => e.result === "Pendiente");
+    if (kpiModalType === "completadas") return dedupedEntries.filter(e => e.result === "Sí");
+    return dedupedEntries;
+  }, [dedupedEntries, kpiModalType]);
   const kpiModalTitle = kpiModalType === "ingresados" ? "Tickets Ingresados" : kpiModalType === "no_chequeadas" ? "Tickets NO Chequeadas" : "Tickets Completadas Hoy";
 
   const filteredEntries = useMemo(() => {
-    return entries.filter((entry) => {
+    return dedupedEntries.filter((entry) => {
       if (selectedCreatorFilter !== "" && entry.creator_id !== selectedCreatorFilter) return false;
       if (selectedStatus !== "") {
         const statusMap: Record<string, string> = { si_promociono: "Sí", no_promociono: "No", parcial: "Parcial", pendiente: "Pendiente" };
@@ -521,7 +545,7 @@ const PromologContent = () => {
       }
       return true;
     });
-  }, [entries, selectedCreatorFilter, selectedStatus, selectedNetwork, selectedCardPlatform, searchEntry]);
+  }, [dedupedEntries, selectedCreatorFilter, selectedStatus, selectedNetwork, selectedCardPlatform, searchEntry]);
 
   const formattedDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
   const shortDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
@@ -564,7 +588,7 @@ const PromologContent = () => {
           <DashboardMetricCard label="Total Promos" value={String(filteredEntries.length)} icon={Table2} color="accent" />
           <DashboardMetricCard label="Tasa de éxito" value={filteredEntries.length > 0 ? `${Math.round((filteredEntries.filter(e => e.result === "Sí").length / filteredEntries.length) * 100)}%` : "0%"} icon={TrendingUp} color="primary" />
           <div className="cursor-pointer" onClick={() => setKpiModalType("no_chequeadas")}>
-            <DashboardMetricCard label="Sin revisar" value={String(entries.filter(e => e.result === "Pendiente").length)} icon={AlertTriangle} color="destructive" />
+            <DashboardMetricCard label="Sin revisar" value={String(dedupedEntries.filter(e => e.result === "Pendiente").length)} icon={AlertTriangle} color="destructive" />
           </div>
           <DashboardMetricCard label="Creadoras" value={String(new Set(filteredEntries.map(e => e.creator_id)).size)} icon={Users} color="success" />
         </div>
