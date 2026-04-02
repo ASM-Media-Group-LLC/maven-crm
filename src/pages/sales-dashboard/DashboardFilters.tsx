@@ -18,6 +18,7 @@ interface DashboardFiltersProps {
   onPeriodChange: (period: TimePeriod) => void;
   dateFrom?: Date;
   dateTo?: Date;
+  onCustomDateChange?: (from: Date | undefined, to: Date | undefined) => void;
   compareMode?: boolean;
   onToggleCompare?: () => void;
   compareDateFrom?: Date;
