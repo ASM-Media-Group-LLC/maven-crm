@@ -79,7 +79,7 @@ const AuditComparisonTable = ({ file }: Props) => {
 
       const { data: dbData } = await supabase
         .from("of_gross_earnings")
-        .select("pending_creator, total_earnings_gross, date")
+        .select("id, pending_creator, total_earnings_gross, date")
         .gte("date", minDate)
         .lte("date", maxDate + "T23:59:59");
 
