@@ -258,6 +258,75 @@ const NuevoContactoForm = () => {
     }
   };
 
+  const handleUpdateExistingContact = async () => {
+    if (!existingContactData) return;
+    setIsUpdatingContact(true);
+    try {
+      const updates: Record<string, any> = {};
+      if (form.phone?.trim()) updates.phone = form.phone.trim();
+      if (form.email?.trim()) updates.email = form.email.trim();
+      if (form.notas?.trim()) updates.notes = form.notas.trim();
+      if (form.countryCode) updates.country_code = form.countryCode;
+      if (form.ciudad?.trim()) updates.city = form.ciudad.trim();
+      if (form.onlyfansUrl?.trim()) updates.onlyfans_url = form.onlyfansUrl.trim();
+
+      if (Object.keys(updates).length === 0) {
+        toast({ title: "No hay datos nuevos para actualizar", variant: "destructive" });
+        setIsUpdatingContact(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("closers_contacts")
+        .update(updates)
+        .eq("id", existingContactData.id);
+
+      if (error) throw error;
+
+      toast({ title: "Contacto actualizado exitosamente" });
+      setExistingContactData(null);
+      navigate("/contactos");
+    } catch (err: any) {
+      toast({ title: "Error al actualizar", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUpdatingContact(false);
+    }
+  };
+
+  const handleCreateNewAnyway = async () => {
+    setExistingContactData(null);
+    // Re-run submit but skip the existing contact check
+    setIsSaving(true);
+    try {
+      const handle = normalizeHandle(form.accountLink.trim());
+      const { error } = await supabase.from("closers_contacts").insert({
+        name: form.nombre.trim(),
+        handle,
+        platform: form.plataforma,
+        physical_appearance: form.categoria || null,
+        company: form.compania || null,
+        email: form.email || null,
+        country_code: form.countryCode,
+        phone: form.phone || null,
+        city: form.ciudad || null,
+        ticket_number: form.ticket || null,
+        notes: form.notas || null,
+        onlyfans_url: form.onlyfansUrl?.trim() || null,
+        profile_picture_url: profilePhoto?.url || null,
+        created_by: user?.id || "",
+        status: "new",
+        record_type: "reactivado",
+      } as any);
+      if (error) throw error;
+      toast({ title: "Contacto guardado exitosamente" });
+      navigate("/contactos");
+    } catch (err: any) {
+      toast({ title: "Error al guardar contacto", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
