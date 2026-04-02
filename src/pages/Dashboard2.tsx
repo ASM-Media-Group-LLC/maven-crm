@@ -779,14 +779,16 @@ const Dashboard2 = () => {
                           </ResponsiveContainer>
                         </div>
                         <div className="lg:col-span-2 p-4 overflow-y-auto" style={{ maxHeight: 420 }}>
-                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Desglose</p>
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+                            {paretoGroup === "80" ? "Top 80%" : "Bottom 20%"} · {pieData.length} creadoras
+                          </p>
                           <div className="space-y-2">
                             {pieData.map((d, idx) => {
-                              const pct = paretoAnalysis.totalRevenue > 0 ? (d.value / paretoAnalysis.totalRevenue) * 100 : 0;
+                              const pct = pieGroupTotal > 0 ? (d.value / pieGroupTotal) * 100 : 0;
                               return (
                                 <div key={idx} className="flex items-center gap-2.5 py-1 border-b border-border/50 last:border-0">
                                   <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }} />
-                                  <span className="text-sm truncate flex-1 min-w-0">{d.name}</span>
+                                  <span className="text-sm truncate flex-1 min-w-0 text-foreground">{d.name}</span>
                                   <span className="text-xs font-semibold tabular-nums shrink-0">{fmt(d.value)}</span>
                                   <span className="text-[11px] tabular-nums text-muted-foreground shrink-0 w-11 text-right">{pct.toFixed(1)}%</span>
                                 </div>
@@ -797,7 +799,7 @@ const Dashboard2 = () => {
                       </div>
                       <div className="border-t border-border bg-muted/30 px-6 py-2.5">
                         <p className="text-[10px] text-muted-foreground text-center">
-                          Montos <strong>BRUTOS</strong> · "Resto" agrupa {paretoAnalysis.rest.length} creadoras (~20% del revenue)
+                          Montos <strong>BRUTOS</strong> · {paretoGroup === "80" ? `Top genera ${fmt(paretoAnalysis.topRevenue)}` : `Bottom genera ${fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}`} de {fmt(paretoAnalysis.totalRevenue)} total
                         </p>
                       </div>
                     </div>
