@@ -4013,6 +4013,7 @@ export type Database = {
           agency_amount: number | null
           amount: number
           blue_amount: number | null
+          commission_snapshot: Json | null
           created_at: string
           created_by: string | null
           creator_id: string | null
@@ -4037,6 +4038,7 @@ export type Database = {
           agency_amount?: number | null
           amount?: number
           blue_amount?: number | null
+          commission_snapshot?: Json | null
           created_at?: string
           created_by?: string | null
           creator_id?: string | null
@@ -4061,6 +4063,7 @@ export type Database = {
           agency_amount?: number | null
           amount?: number
           blue_amount?: number | null
+          commission_snapshot?: Json | null
           created_at?: string
           created_by?: string | null
           creator_id?: string | null
