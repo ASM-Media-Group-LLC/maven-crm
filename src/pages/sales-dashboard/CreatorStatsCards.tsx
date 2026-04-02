@@ -41,9 +41,13 @@ const calcVariation = (a: number, b: number) => {
   return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
 };
 
-const CreatorStatsCards = ({ rows, comparedRows, earningsMode }: Props) => {
+const CreatorStatsCards = ({ rows, comparedRows, earningsMode, dateFrom, dateTo }: Props) => {
   const current = useMemo(() => calcStats(rows, earningsMode), [rows, earningsMode]);
   const compared = useMemo(() => comparedRows ? calcStats(comparedRows, earningsMode) : null, [comparedRows, earningsMode]);
+
+  const dateLabel = dateFrom && dateTo
+    ? `${format(dateFrom, "d 'de' MMMM", { locale: es })} al ${format(dateTo, "d 'de' MMMM", { locale: es })}`
+    : null;
 
   const stats = [
     { label: "Creadoras", value: String(current.creators), raw: current.creators, compRaw: compared?.creators, icon: Users, color: "text-success" },
@@ -54,13 +58,21 @@ const CreatorStatsCards = ({ rows, comparedRows, earningsMode }: Props) => {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Estadísticas de Creadoras
-        </h3>
-        <p className="text-xs text-muted-foreground mt-1">
-          El cambio porcentual se calcula comparando el valor del período seleccionado contra el período inmediatamente anterior.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Estadísticas de Creadoras
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            El cambio porcentual se calcula comparando el valor del período seleccionado contra el período inmediatamente anterior.
+          </p>
+        </div>
+        {dateLabel && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+            <CalendarDays className="h-3 w-3" />
+            Filtro: {dateLabel}
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

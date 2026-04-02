@@ -157,7 +157,7 @@ const SalesDashboard = () => {
                 <EarningsTrendChart rows={filteredRows} comparedRows={comparedRows} earningsMode={earningsMode} />
                 <EarningsByChannelChart rows={filteredRows} comparedRows={comparedRows} earningsMode={earningsMode} />
                 <ConcentrationChart rows={filteredRows} comparedRows={comparedRows} earningsMode={earningsMode} />
-                <CreatorStatsCards rows={filteredRows} comparedRows={comparedRows} earningsMode={earningsMode} />
+                <CreatorStatsCards rows={filteredRows} comparedRows={comparedRows} earningsMode={earningsMode} dateFrom={dateRange.from} dateTo={dateRange.to} />
                 <SalesReportSection rows={filteredRows} comparedRows={comparedRows} earningsMode={earningsMode} />
               </>
             ) : (
