@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle, FileDown } from "lucide-react";
+import { CalendarDays, CheckCircle, FileDown } from "lucide-react";
 import AuditSummaryCards from "./AuditSummaryCards";
 
 interface AuditRow {
