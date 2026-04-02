@@ -1,5 +1,7 @@
 import { useMemo } from "react";
-import { Users, MessageCircle, DollarSign, RotateCcw } from "lucide-react";
+import { Users, MessageCircle, DollarSign, RotateCcw, CalendarDays } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import type { EarningsRow } from "../sales-performance/types";
 import type { EarningsMode } from "./DashboardFilters";
@@ -8,6 +10,8 @@ interface Props {
   rows: EarningsRow[];
   comparedRows?: EarningsRow[];
   earningsMode: EarningsMode;
+  dateFrom?: Date;
+  dateTo?: Date;
 }
 
 const fmt = (v: number) =>
