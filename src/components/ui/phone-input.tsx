@@ -1,44 +1,79 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const COUNTRY_CODES = [
-  { code: "+57", country: "CO", flag: "🇨🇴" },
-  { code: "+52", country: "MX", flag: "🇲🇽" },
-  { code: "+54", country: "AR", flag: "🇦🇷" },
-  { code: "+56", country: "CL", flag: "🇨🇱" },
-  { code: "+51", country: "PE", flag: "🇵🇪" },
-  { code: "+593", country: "EC", flag: "🇪🇨" },
-  { code: "+58", country: "VE", flag: "🇻🇪" },
-  { code: "+1", country: "US", flag: "🇺🇸" },
-  { code: "+34", country: "ES", flag: "🇪🇸" },
-  { code: "+55", country: "BR", flag: "🇧🇷" },
-  { code: "+507", country: "PA", flag: "🇵🇦" },
-  { code: "+506", country: "CR", flag: "🇨🇷" },
-  { code: "+1809", country: "DO", flag: "🇩🇴" },
-  { code: "+502", country: "GT", flag: "🇬🇹" },
-  { code: "+504", country: "HN", flag: "🇭🇳" },
-  { code: "+503", country: "SV", flag: "🇸🇻" },
-  { code: "+505", country: "NI", flag: "🇳🇮" },
-  { code: "+598", country: "UY", flag: "🇺🇾" },
-  { code: "+591", country: "BO", flag: "🇧🇴" },
-  { code: "+595", country: "PY", flag: "🇵🇾" },
+  { code: "+54", country: "AR", flag: "🇦🇷", name: "Argentina" },
+  { code: "+61", country: "AU", flag: "🇦🇺", name: "Australia" },
+  { code: "+501", country: "BZ", flag: "🇧🇿", name: "Belice" },
+  { code: "+591", country: "BO", flag: "🇧🇴", name: "Bolivia" },
+  { code: "+55", country: "BR", flag: "🇧🇷", name: "Brasil" },
+  { code: "+1", country: "CA", flag: "🇨🇦", name: "Canadá" },
+  { code: "+56", country: "CL", flag: "🇨🇱", name: "Chile" },
+  { code: "+86", country: "CN", flag: "🇨🇳", name: "China" },
+  { code: "+57", country: "CO", flag: "🇨🇴", name: "Colombia" },
+  { code: "+82", country: "KR", flag: "🇰🇷", name: "Corea del Sur" },
+  { code: "+506", country: "CR", flag: "🇨🇷", name: "Costa Rica" },
+  { code: "+53", country: "CU", flag: "🇨🇺", name: "Cuba" },
+  { code: "+20", country: "EG", flag: "🇪🇬", name: "Egipto" },
+  { code: "+503", country: "SV", flag: "🇸🇻", name: "El Salvador" },
+  { code: "+971", country: "AE", flag: "🇦🇪", name: "Emiratos Árabes" },
+  { code: "+593", country: "EC", flag: "🇪🇨", name: "Ecuador" },
+  { code: "+34", country: "ES", flag: "🇪🇸", name: "España" },
+  { code: "+1", country: "US", flag: "🇺🇸", name: "Estados Unidos" },
+  { code: "+63", country: "PH", flag: "🇵🇭", name: "Filipinas" },
+  { code: "+33", country: "FR", flag: "🇫🇷", name: "Francia" },
+  { code: "+502", country: "GT", flag: "🇬🇹", name: "Guatemala" },
+  { code: "+594", country: "GF", flag: "🇬🇫", name: "Guyana Francesa" },
+  { code: "+592", country: "GY", flag: "🇬🇾", name: "Guyana" },
+  { code: "+509", country: "HT", flag: "🇭🇹", name: "Haití" },
+  { code: "+504", country: "HN", flag: "🇭🇳", name: "Honduras" },
+  { code: "+91", country: "IN", flag: "🇮🇳", name: "India" },
+  { code: "+972", country: "IL", flag: "🇮🇱", name: "Israel" },
+  { code: "+39", country: "IT", flag: "🇮🇹", name: "Italia" },
+  { code: "+1876", country: "JM", flag: "🇯🇲", name: "Jamaica" },
+  { code: "+81", country: "JP", flag: "🇯🇵", name: "Japón" },
+  { code: "+212", country: "MA", flag: "🇲🇦", name: "Marruecos" },
+  { code: "+52", country: "MX", flag: "🇲🇽", name: "México" },
+  { code: "+505", country: "NI", flag: "🇳🇮", name: "Nicaragua" },
+  { code: "+234", country: "NG", flag: "🇳🇬", name: "Nigeria" },
+  { code: "+31", country: "NL", flag: "🇳🇱", name: "Países Bajos" },
+  { code: "+507", country: "PA", flag: "🇵🇦", name: "Panamá" },
+  { code: "+595", country: "PY", flag: "🇵🇾", name: "Paraguay" },
+  { code: "+51", country: "PE", flag: "🇵🇪", name: "Perú" },
+  { code: "+351", country: "PT", flag: "🇵🇹", name: "Portugal" },
+  { code: "+1787", country: "PR", flag: "🇵🇷", name: "Puerto Rico" },
+  { code: "+44", country: "GB", flag: "🇬🇧", name: "Reino Unido" },
+  { code: "+1809", country: "DO", flag: "🇩🇴", name: "Rep. Dominicana" },
+  { code: "+7", country: "RU", flag: "🇷🇺", name: "Rusia" },
+  { code: "+966", country: "SA", flag: "🇸🇦", name: "Arabia Saudí" },
+  { code: "+27", country: "ZA", flag: "🇿🇦", name: "Sudáfrica" },
+  { code: "+597", country: "SR", flag: "🇸🇷", name: "Surinam" },
+  { code: "+66", country: "TH", flag: "🇹🇭", name: "Tailandia" },
+  { code: "+1868", country: "TT", flag: "🇹🇹", name: "Trinidad y Tobago" },
+  { code: "+90", country: "TR", flag: "🇹🇷", name: "Turquía" },
+  { code: "+598", country: "UY", flag: "🇺🇾", name: "Uruguay" },
+  { code: "+58", country: "VE", flag: "🇻🇪", name: "Venezuela" },
+  { code: "+49", country: "DE", flag: "🇩🇪", name: "Alemania" },
 ];
 
 // Sort by code length descending so longer codes match first
 const SORTED_CODES = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length);
 
-function parsePhone(value: string): { countryCode: string; number: string } {
+function parsePhone(value: string): { countryCode: string; countryISO: string; number: string } {
   const trimmed = value.trim();
   for (const c of SORTED_CODES) {
     if (trimmed.startsWith(c.code)) {
-      return { countryCode: c.code, number: trimmed.slice(c.code.length).trim() };
+      return { countryCode: c.code, countryISO: c.country, number: trimmed.slice(c.code.length).trim() };
     }
   }
-  return { countryCode: "+57", number: trimmed.replace(/^\+?\d{0,3}\s*/, "") };
+  return { countryCode: "+57", countryISO: "CO", number: trimmed.replace(/^\+?\d{0,3}\s*/, "") };
 }
 
 interface PhoneInputProps {
@@ -56,10 +91,12 @@ export function PhoneInput({
   className,
   disabled = false,
 }: PhoneInputProps) {
-  const { countryCode, number } = parsePhone(value);
+  const [open, setOpen] = React.useState(false);
+  const { countryCode, countryISO, number } = parsePhone(value);
 
-  const handleCodeChange = (newCode: string) => {
-    onChange(`${newCode} ${number}`.trim());
+  const handleSelect = (country: typeof COUNTRY_CODES[0]) => {
+    onChange(`${country.code} ${number}`.trim());
+    setOpen(false);
   };
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,24 +104,51 @@ export function PhoneInput({
     onChange(`${countryCode} ${num}`.trim());
   };
 
-  const selected = COUNTRY_CODES.find((c) => c.code === countryCode) || COUNTRY_CODES[0];
+  const selected = COUNTRY_CODES.find((c) => c.country === countryISO) ||
+    COUNTRY_CODES.find((c) => c.code === countryCode) ||
+    COUNTRY_CODES.find((c) => c.country === "CO")!;
 
   return (
     <div className={cn("flex gap-1", className)}>
-      <Select value={countryCode} onValueChange={handleCodeChange} disabled={disabled}>
-        <SelectTrigger className="w-[100px] shrink-0">
-          <SelectValue>
-            {selected.flag} {selected.code}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {COUNTRY_CODES.map((c) => (
-            <SelectItem key={c.country} value={c.code}>
-              {c.flag} {c.country} {c.code}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            disabled={disabled}
+            className="w-[110px] shrink-0 justify-between px-2 font-normal"
+          >
+            <span className="truncate">{selected.flag} {selected.code}</span>
+            <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[260px] p-0" side="bottom" align="start">
+          <Command>
+            <CommandInput placeholder="Buscar país..." />
+            <CommandList>
+              <CommandEmpty>No encontrado</CommandEmpty>
+              <CommandGroup>
+                {COUNTRY_CODES.map((c) => (
+                  <CommandItem
+                    key={c.country}
+                    value={`${c.name} ${c.country} ${c.code}`}
+                    onSelect={() => handleSelect(c)}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        selected.country === c.country ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {c.flag} {c.name} <span className="ml-auto text-muted-foreground text-xs">{c.code}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
       <Input
         type="tel"
         value={number}

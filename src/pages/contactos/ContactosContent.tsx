@@ -75,7 +75,7 @@ const normalizeHandleKey = (value: string | null | undefined) =>
 const ContactosContent = () => {
   const [activeTab, setActiveTab] = useState<"contactos" | "agencias">("contactos");
   const [filters, setFilters] = useState<ContactoFilters>(emptyFilters);
-  const [view, setView] = useState<"table" | "grid">("grid");
+  const [view, setView] = useState<"table" | "grid">("table");
   const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
