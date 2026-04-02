@@ -91,6 +91,7 @@ const AuditComparisonTable = ({ file }: Props) => {
 
       result.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
       setRows(result);
+      setDateRange({ min: minDate, max: maxDate });
       setLoading(false);
     };
 
