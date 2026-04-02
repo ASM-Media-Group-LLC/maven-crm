@@ -186,6 +186,102 @@ const AuditComparisonTable = ({ file }: Props) => {
     }
   };
 
+  const applyCorrections = async () => {
+    const excelValidations = Object.entries(validations).filter(([, src]) => src === "excel");
+    if (excelValidations.length === 0) {
+      toast({ title: "Sin correcciones", description: "Solo se aplican correcciones cuando seleccionas Excel como fuente correcta.", variant: "destructive" });
+      return;
+    }
+
+    setApplying(true);
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // First save the audit log with status 'applied'
+    const logInserts = excelValidations.map(([creator]) => {
+      const row = rows.find((r) => r.creator === creator);
+      return {
+        creator_name: creator,
+        source_selected: "excel" as const,
+        excel_amount: row?.excelGross || 0,
+        system_amount: row?.systemGross || 0,
+        difference: row?.diff || 0,
+        excel_entries: row?.excelEntries || 0,
+        system_entries: row?.systemEntries || 0,
+        file_name: file.name,
+        period_start: dateRange?.min,
+        period_end: dateRange?.max,
+        created_by: user?.id,
+        status: "applied",
+      };
+    });
+
+    const { data: logData, error: logError } = await supabase
+      .from("sales_audit_log")
+      .insert(logInserts as any)
+      .select("id, creator_name");
+
+    if (logError) {
+      toast({ title: "Error al guardar log", description: logError.message, variant: "destructive" });
+      setApplying(false);
+      return;
+    }
+
+    const logMap = new Map((logData || []).map((l: any) => [l.creator_name, l.id]));
+
+    // For each creator validated as "excel", get the excel daily data and match/update system records
+    let correctionCount = 0;
+    let errorCount = 0;
+
+    for (const [creator] of excelValidations) {
+      const excelEntries = excelDetails.get(creator) || [];
+      const rawRecords = systemRawRecords.get(creator) || [];
+      const auditLogId = logMap.get(creator);
+
+      // Build a map of excel entries by date
+      const excelByDate = new Map<string, number>();
+      for (const e of excelEntries) {
+        excelByDate.set(e.date, (excelByDate.get(e.date) || 0) + e.amount);
+      }
+
+      // Update system records that have matching dates
+      for (const rec of rawRecords) {
+        const dateKey = rec.date.slice(0, 10);
+        const excelAmount = excelByDate.get(dateKey);
+        if (excelAmount !== undefined && Math.abs(excelAmount - rec.amount) > 0.01) {
+          // Backup original value
+          const { error: backupErr } = await supabase.from("sales_audit_corrections").insert({
+            audit_log_id: auditLogId,
+            of_earnings_id: rec.id,
+            creator_name: creator,
+            earnings_date: rec.date,
+            original_value: rec.amount,
+            new_value: excelAmount,
+            source: "excel",
+            applied_by: user?.id,
+          } as any);
+
+          if (backupErr) { errorCount++; continue; }
+
+          // Update the actual record
+          const { error: updateErr } = await supabase
+            .from("of_gross_earnings")
+            .update({ total_earnings_gross: excelAmount } as any)
+            .eq("id", rec.id);
+
+          if (updateErr) { errorCount++; } else { correctionCount++; }
+        }
+      }
+    }
+
+    setApplying(false);
+
+    if (errorCount > 0) {
+      toast({ title: "Correcciones parciales", description: `${correctionCount} aplicadas, ${errorCount} errores.`, variant: "destructive" });
+    } else {
+      toast({ title: "Correcciones aplicadas", description: `${correctionCount} registros actualizados en la base de datos. Los valores originales fueron respaldados.` });
+    }
+  };
+
   const summary = useMemo(() => {
     const totalExcel = rows.reduce((s, r) => s + r.excelGross, 0);
     const totalSystem = rows.reduce((s, r) => s + r.systemGross, 0);
