@@ -1,41 +1,35 @@
 
 
-## Desactivar PWA en modo desarrollo
+## Plan: Mostrar agente correctamente en Promolog
 
-### Problema
-El plugin `vite-plugin-pwa` registra un Service Worker que cachea todos los assets JS/CSS/HTML. En el entorno de preview de Lovable (desarrollo), esto interfiere con Vite HMR y sirve versiones viejas de los módulos, causando que veas una "versión vieja" persistente.
+### Problema identificado
+- El código actual solo revisa `reviewed_by` para mostrar el nombre del agente
+- No usa `created_by` como respaldo
+- 87% de las entradas (27,793 de 31,989) no tienen ni `reviewed_by` ni `created_by` — son importaciones externas sin agente asignado
 
-### Solución
+### Datos actuales
+| Campo | Entradas con valor |
+|---|---|
+| `reviewed_by` | 4,196 |
+| `created_by` | 130 |
+| Sin agente | 27,793 |
 
-**1 archivo a modificar: `vite.config.ts`**
+### Cambios
 
-Mover el plugin `VitePWA(...)` dentro de la condición de modo para que solo se active en producción:
+**1. Fallback a `created_by` en la resolución de agente**
+- **Archivo**: `src/pages/promolog/PromologContent.tsx` (línea 243)
+- Cambiar de: `agent: (pe.reviewed_by && profilesMap[pe.reviewed_by]) || "—"`
+- A: `agent: (pe.reviewed_by && profilesMap[pe.reviewed_by]) || (pe.created_by && profilesMap[pe.created_by]) || "Sin asignar"`
+- Esto corrige las 130 entradas que tienen `created_by` pero no `reviewed_by`
 
-```text
-Antes:
-  plugins: [
-    react(),
-    mode === "development" && componentTagger(),
-    VitePWA({ ... }),
-  ]
+**2. Mejorar indicador visual de "Sin asignar"**
+- En la tabla y cards, mostrar "Sin asignar" con un estilo sutil (texto gris/itálica) en lugar de "—"
+- Facilita identificar visualmente qué promos necesitan asignación
 
-Después:
-  plugins: [
-    react(),
-    mode === "development" && componentTagger(),
-    mode === "production" && VitePWA({ ... }),
-  ]
-```
+**3. Consistencia en stats de agentes**
+- El hook `usePromologAgentStats.ts` ya usa `entry.reviewed_by || entry.created_by` (línea 45), así que las estadísticas ya contemplan ambos campos — solo falta alinear la UI
 
-Esto asegura que:
-- En **desarrollo** (preview de Lovable): sin Service Worker, Vite HMR funciona normalmente, siempre ves la versión actual
-- En **producción** (app publicada): el PWA sigue funcionando con caché offline
-
-### Detalle técnico
-- Cambio de 1 línea en `vite.config.ts` (línea ~19)
-- Sin impacto en producción
-- Sin cambios en la configuración del PWA
-
-### Acción manual requerida (una vez)
-Después del cambio, hacer hard refresh (`Ctrl+Shift+R`) en el preview para desregistrar el SW existente. A partir de ahí no volverá a ocurrir.
+### Alcance
+- Solo cambios frontend (1-2 archivos)
+- No requiere migraciones de base de datos
 
