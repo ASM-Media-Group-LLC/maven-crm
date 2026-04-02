@@ -102,7 +102,18 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
       status: "pendiente",
       
       calculation_method: "fixed_percentage",
-      calculation_config: { percentage: agencyPct, blue_package: hasBlue, blue_amount: blueAmount },
+      calculation_config: {
+        percentage: agencyPct,
+        commission_type: commType,
+        blue_package: hasBlue,
+        blue_amount: blueAmount,
+        earnings_period: base,
+        ...(commType === "tiered" && Array.isArray(commTiers) ? {
+          tiers_config: commTiers,
+          tier_from: commTiers.find(t => base >= t.min_revenue && (t.max_revenue === null || base <= t.max_revenue))?.min_revenue ?? null,
+          tier_to: commTiers.find(t => base >= t.min_revenue && (t.max_revenue === null || base <= t.max_revenue))?.max_revenue ?? null,
+        } : {}),
+      },
     });
   };
 
