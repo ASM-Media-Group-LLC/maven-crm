@@ -15,11 +15,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Info, TrendingUp, Users, DollarSign, Calendar, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter } from "lucide-react";
+import { Info, TrendingUp, Users, DollarSign, Calendar, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface CreatorSummary {
   creatorId: string;
   name: string;
+  instagramHandle: string | null;
   platform: string;
   total: number;
   net: number;
@@ -40,6 +42,7 @@ type SortKey = "name" | "total" | "net" | "subs" | "newSubs" | "recurringSubs" |
 type SortDir = "asc" | "desc";
 
 const Dashboard2 = () => {
+  const navigate = useNavigate();
   const { data: allRows = [], isLoading } = useEarningsData();
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -48,15 +51,23 @@ const Dashboard2 = () => {
   const [minTotal, setMinTotal] = useState("");
   const [maxTotal, setMaxTotal] = useState("");
 
-  const { data: platformMap = {} } = useQuery({
-    queryKey: ["creator-platforms"],
+  const { data: creatorInfoMap = {} } = useQuery({
+    queryKey: ["creator-info-dashboard2"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("creator_business")
-        .select("creator_id, main_platform");
-      const map: Record<string, string> = {};
-      for (const r of data ?? []) {
-        if (r.creator_id && r.main_platform) map[r.creator_id] = r.main_platform;
+      const [{ data: biz }, { data: crs }] = await Promise.all([
+        supabase.from("creator_business").select("creator_id, main_platform"),
+        supabase.from("creators").select("id, instagram_handle"),
+      ]);
+      const map: Record<string, { platform: string; ig: string | null }> = {};
+      for (const r of biz ?? []) {
+        if (r.creator_id) map[r.creator_id] = { platform: r.main_platform || "", ig: null };
+      }
+      for (const c of crs ?? []) {
+        if (map[c.id]) {
+          map[c.id].ig = c.instagram_handle || null;
+        } else {
+          map[c.id] = { platform: "", ig: c.instagram_handle || null };
+        }
       }
       return map;
     },
@@ -88,8 +99,8 @@ const Dashboard2 = () => {
 
       const key = r.creator_id || r.pending_creator || r.id;
 
-      // Filter: only OnlyFans creators (or unknown platform — they come from OF data anyway)
-      const plat = r.creator_id ? platformMap[r.creator_id] : null;
+      const info = r.creator_id ? creatorInfoMap[r.creator_id] : null;
+      const plat = info?.platform || null;
       const normPlat = (plat || "").toLowerCase();
       if (normPlat === "unlok" || normPlat === "instagram") continue;
 
@@ -111,6 +122,7 @@ const Dashboard2 = () => {
         map.set(key, {
           creatorId: key,
           name: r.artistic_name || r.pending_creator || "Sin nombre",
+          instagramHandle: info?.ig || null,
           platform: plat || "OnlyFans",
           total: r.total_earnings_gross ?? 0,
           net: (r.total_earnings_gross ?? 0) * 0.8,
@@ -136,7 +148,7 @@ const Dashboard2 = () => {
     }
 
     return Array.from(map.values());
-  }, [allRows, lastMonth, platformMap]);
+  }, [allRows, lastMonth, creatorInfoMap]);
 
   // Apply filters
   const filteredCreators = useMemo(() => {
@@ -366,7 +378,28 @@ const Dashboard2 = () => {
                         return (
                           <TableRow key={c.creatorId} className={isZero ? "opacity-50" : ""}>
                             <TableCell className="text-muted-foreground tabular-nums text-xs">{i + 1}</TableCell>
-                            <TableCell className="font-medium whitespace-nowrap">{c.name}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                {c.instagramHandle && (
+                                  <a
+                                    href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"
+                                    title={`@${c.instagramHandle.replace(/^@/, "")}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Instagram className="h-3.5 w-3.5" />
+                                  </a>
+                                )}
+                                <button
+                                  className="font-medium text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left"
+                                  onClick={() => navigate(`/creadores/${c.creatorId}`)}
+                                >
+                                  {c.name}
+                                </button>
+                              </div>
+                            </TableCell>
                             <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : ""}`}>
                               {fmt(c.total)}
                             </TableCell>
