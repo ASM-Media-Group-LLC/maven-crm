@@ -199,29 +199,7 @@ const PromologContent = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Deduplicar: mantener la entrada más completa de cada grupo
-      const deduped = (() => {
-        const map = new Map<string, any>();
-        for (const e of data ?? []) {
-          const dayKey = e.date?.split("T")[0] ?? e.date;
-          const key = `${e.creator_id}|${dayKey}|${e.network}|${e.platform}|${e.promoted}`;
-          const existing = map.get(key);
-          if (!existing) {
-            map.set(key, e);
-          } else {
-            const score = (r: any) =>
-              (r.evidence_url ? 1 : 0) +
-              (r.notes ? 1 : 0) +
-              (r.reviewed_by ? 1 : 0) +
-              (r.action_taken ? 1 : 0);
-            if (score(e) > score(existing)) {
-              map.set(key, e);
-            }
-          }
-        }
-        return Array.from(map.values());
-      })();
-      return deduped;
+      return data ?? [];
     },
   });
 
