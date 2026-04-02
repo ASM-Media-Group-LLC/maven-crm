@@ -698,9 +698,7 @@ const Dashboard2 = () => {
               </DialogContent>
             </Dialog>
 
-            {/* REMOVED inline KPI grids — now in Metrics Dialog */}
-                  </div>
-                  <p className="text-lg font-bold tabular-nums">{hlKpis.renewalRate.toFixed(1)}%</p>
+
                   <p className="text-[10px] text-muted-foreground">Recurrentes / Total subs</p>
                 </div>
                 <div className="rounded-lg border border-border bg-card p-3 space-y-0.5">
