@@ -207,21 +207,8 @@ const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange, onAss
               </Badge>
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">
-              {entry.agent === "Sync externo" ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Badge variant="secondary-soft" className="text-[10px] italic">Sync externo</Badge>
-                  {!viewOnly && onAssignAgent && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-primary"
-                      onClick={(e) => { e.stopPropagation(); onAssignAgent(entry); }}
-                      title="Asignar agente"
-                    >
-                      <UserPlus className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                </span>
+              {entry.agent === "AI Agent" ? (
+                <Badge variant="secondary-soft" className="text-[10px] italic">AI Agent</Badge>
               ) : entry.agent}
             </TableCell>
             <TableCell onClick={(e) => e.stopPropagation()}>

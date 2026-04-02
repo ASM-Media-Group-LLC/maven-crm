@@ -226,9 +226,33 @@ const PromologContent = () => {
     });
   }, [promologEntries, profilesMap]);
 
+  // Deduplicate entries: group by creator_id + day + network + platform + result
+  const dedupedEntries = useMemo(() => {
+    const groups = new Map<string, PromologEntry[]>();
+    for (const entry of entries) {
+      const key = `${entry.creator_id || ""}|${entry.date}|${entry.network}|${entry.platform}|${entry.result}`;
+      const group = groups.get(key);
+      if (group) group.push(entry);
+      else groups.set(key, [entry]);
+    }
+    // From each group, pick the most complete entry
+    const result: PromologEntry[] = [];
+    for (const group of groups.values()) {
+      if (group.length === 1) { result.push(group[0]); continue; }
+      // Score: prefer entries with notes, reviewed_by, human agent
+      const scored = group.map(e => ({
+        entry: e,
+        score: (e.notes ? 2 : 0) + (e.reviewed_by ? 2 : 0) + (e.agent !== "AI Agent" ? 3 : 0),
+      }));
+      scored.sort((a, b) => b.score - a.score);
+      result.push(scored[0].entry);
+    }
+    return result;
+  }, [entries]);
+
   // Dynamic social & platform counts (only "Sí" entries)
   const socialCards = useMemo(() => {
-    const siEntries = entries.filter(e => e.result === "Sí");
+    const siEntries = dedupedEntries.filter(e => e.result === "Sí");
     const countByNetwork = (net: string) => siEntries.filter(e => e.network === net).length;
     return [
       { name: "Instagram", value: countByNetwork("instagram"), icon: <InstagramIcon className="h-6 w-6" />, bg: "bg-pink-500/10" },
