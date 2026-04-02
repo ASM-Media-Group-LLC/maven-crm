@@ -534,9 +534,18 @@ const Dashboard2 = () => {
                   </SelectContent>
                 </Select>
                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMetrics(true)}
+                  className="gap-1.5"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Métricas
+                </Button>
+                <Button
                   variant={showPareto ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setShowPareto(!showPareto)}
+                  onClick={() => setShowPareto(true)}
                   className="gap-1.5"
                 >
                   <PieChart className="h-4 w-4" />
