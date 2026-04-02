@@ -22,7 +22,7 @@ import {
 import {
   Info, TrendingUp, Users, DollarSign, Calendar,
   ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram, PieChart,
-  BarChart3, MessageSquare, Repeat, Heart, Eye,
+  BarChart3, MessageSquare, Repeat, Heart, Eye, AlertTriangle, Target, Crown,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
