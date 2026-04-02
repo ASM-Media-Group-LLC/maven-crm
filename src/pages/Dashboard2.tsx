@@ -75,6 +75,7 @@ const getMonthOptions = () => {
 
 const Dashboard2 = () => {
   const navigate = useNavigate();
+  const { isAdmin } = useUserRole();
   const { data: allRows = [], isLoading } = useEarningsData();
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
