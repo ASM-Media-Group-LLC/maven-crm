@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Link2, Search, Plus, UserPlus } from "lucide-react";
+import { Link2, Search, Plus, UserPlus, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -20,22 +21,53 @@ interface LinkCreatorModalProps {
   earningsRowId: string;
 }
 
+interface CreatorWithAccounts {
+  id: string;
+  name: string;
+  artistic_name: string | null;
+  profile_photo_url: string | null;
+  accountCount: number;
+  accounts: string[];
+}
+
 const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }: LinkCreatorModalProps) => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [mode, setMode] = useState<"search" | "create">("search");
+  const [mode, setMode] = useState<"search" | "create" | "confirm">("search");
   const [newName, setNewName] = useState("");
   const [newArtisticName, setNewArtisticName] = useState("");
+  const [selectedCreator, setSelectedCreator] = useState<CreatorWithAccounts | null>(null);
 
+  // Fetch creators with their OF account counts
   const { data: creators = [] } = useQuery({
-    queryKey: ["creators_for_linking"],
+    queryKey: ["creators_for_linking_with_accounts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("creators")
-        .select("id, name, artistic_name, profile_photo_url")
-        .order("name");
-      if (error) throw error;
-      return data;
+      const [creatorsRes, accountsRes] = await Promise.all([
+        supabase
+          .from("creators")
+          .select("id, name, artistic_name, profile_photo_url")
+          .order("name"),
+        supabase
+          .from("creator_of_accounts" as any)
+          .select("creator_id, account_handle"),
+      ]);
+      if (creatorsRes.error) throw creatorsRes.error;
+
+      // Group accounts by creator_id
+      const accountsByCreator = new Map<string, string[]>();
+      if (accountsRes.data) {
+        for (const acc of accountsRes.data as any[]) {
+          const list = accountsByCreator.get(acc.creator_id) || [];
+          list.push(acc.account_handle);
+          accountsByCreator.set(acc.creator_id, list);
+        }
+      }
+
+      return creatorsRes.data.map((c): CreatorWithAccounts => ({
+        ...c,
+        accountCount: accountsByCreator.get(c.id)?.length ?? 0,
+        accounts: accountsByCreator.get(c.id) ?? [],
+      }));
     },
     enabled: open,
   });
@@ -59,17 +91,38 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
         .eq("pending_creator", pendingCreator);
       if (error) throw error;
 
-      // Update the creator's onlyfans_url with the pending_creator name
-      const { error: urlError } = await supabase
-        .from("creators")
-        .update({ onlyfans_url: `https://onlyfans.com/${pendingCreator}` })
-        .eq("id", creatorId);
-      if (urlError) throw urlError;
+      // Register the account in creator_of_accounts
+      const { error: accountError } = await supabase
+        .from("creator_of_accounts" as any)
+        .upsert(
+          {
+            creator_id: creatorId,
+            account_handle: pendingCreator,
+            onlyfans_url: `https://onlyfans.com/${pendingCreator}`,
+          } as any,
+          { onConflict: "account_handle" }
+        );
+      if (accountError) throw accountError;
+
+      // Also keep onlyfans_url on creators table for backwards compat (only if first account)
+      const creator = creators.find(c => c.id === creatorId);
+      if (!creator || creator.accountCount === 0) {
+        await supabase
+          .from("creators")
+          .update({ onlyfans_url: `https://onlyfans.com/${pendingCreator}` })
+          .eq("id", creatorId);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["of_gross_earnings_performance"] });
-      queryClient.invalidateQueries({ queryKey: ["creators_for_linking"] });
-      toast.success(`"${pendingCreator}" vinculado exitosamente`);
+      queryClient.invalidateQueries({ queryKey: ["creators_for_linking_with_accounts"] });
+      const creator = selectedCreator;
+      const isAdditional = creator && creator.accountCount > 0;
+      toast.success(
+        isAdditional
+          ? `"${pendingCreator}" vinculado como cuenta adicional de ${creator.name}`
+          : `"${pendingCreator}" vinculado exitosamente`
+      );
       onOpenChange(false);
     },
     onError: () => toast.error("Error al vincular creador"),
@@ -89,6 +142,15 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
         .single();
       if (createError) throw createError;
 
+      // Register account
+      await supabase
+        .from("creator_of_accounts" as any)
+        .insert({
+          creator_id: newCreator.id,
+          account_handle: pendingCreator,
+          onlyfans_url: `https://onlyfans.com/${pendingCreator}`,
+        } as any);
+
       // Link all earnings rows with this pending_creator
       const { error: linkError } = await supabase
         .from("of_gross_earnings")
@@ -100,12 +162,21 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["of_gross_earnings_performance"] });
-      queryClient.invalidateQueries({ queryKey: ["creators_for_linking"] });
+      queryClient.invalidateQueries({ queryKey: ["creators_for_linking_with_accounts"] });
       toast.success(`Creador creado y vinculado exitosamente`);
       onOpenChange(false);
     },
     onError: () => toast.error("Error al crear y vincular creador"),
   });
+
+  const handleCreatorClick = (creator: CreatorWithAccounts) => {
+    setSelectedCreator(creator);
+    if (creator.accountCount > 0) {
+      setMode("confirm");
+    } else {
+      linkMutation.mutate(creator.id);
+    }
+  };
 
   const handleClose = (o: boolean) => {
     if (!o) {
@@ -113,6 +184,7 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
       setMode("search");
       setNewName("");
       setNewArtisticName("");
+      setSelectedCreator(null);
     }
     onOpenChange(o);
   };
@@ -152,16 +224,28 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
                   <button
                     key={c.id}
                     className="flex items-center gap-3 w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors"
-                    onClick={() => linkMutation.mutate(c.id)}
+                    onClick={() => handleCreatorClick(c)}
                     disabled={linkMutation.isPending}
                   >
                     <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium shrink-0">
                       {c.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{c.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{c.name}</p>
+                        {c.accountCount > 0 && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
+                            {c.accountCount} {c.accountCount === 1 ? "cuenta" : "cuentas"}
+                          </Badge>
+                        )}
+                      </div>
                       {c.artistic_name && (
                         <p className="text-xs text-muted-foreground truncate">{c.artistic_name}</p>
+                      )}
+                      {c.accountCount > 0 && (
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {c.accounts.join(", ")}
+                        </p>
                       )}
                     </div>
                     <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -181,6 +265,44 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
               <UserPlus className="h-4 w-4" />
               Crear nuevo creador
             </Button>
+          </div>
+        ) : mode === "confirm" && selectedCreator ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-900/50 dark:bg-orange-950/30 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span className="text-sm font-medium">Cuenta adicional</span>
+              </div>
+              <p className="text-sm text-orange-600 dark:text-orange-300">
+                <span className="font-medium">{selectedCreator.name}</span> ya tiene{" "}
+                {selectedCreator.accountCount} {selectedCreator.accountCount === 1 ? "cuenta vinculada" : "cuentas vinculadas"}:
+              </p>
+              <ul className="text-xs text-orange-600 dark:text-orange-300 list-disc list-inside">
+                {selectedCreator.accounts.map((a) => (
+                  <li key={a}>{a}</li>
+                ))}
+              </ul>
+              <p className="text-sm text-orange-600 dark:text-orange-300">
+                ¿Vincular <span className="font-medium">"{pendingCreator}"</span> como cuenta adicional?
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => {
+                setSelectedCreator(null);
+                setMode("search");
+              }}>
+                Volver
+              </Button>
+              <Button
+                className="flex-1 gap-2"
+                disabled={linkMutation.isPending}
+                onClick={() => linkMutation.mutate(selectedCreator.id)}
+              >
+                <Plus className="h-4 w-4" />
+                {linkMutation.isPending ? "Vinculando…" : "Vincular como adicional"}
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
