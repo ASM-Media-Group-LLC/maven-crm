@@ -15,6 +15,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,17 +35,6 @@ const DEFAULT_COMPANIES = [
 
 const PLATFORMS = ["Instagram", "TikTok", "Twitter/X", "OnlyFans", "Otra"];
 
-const COUNTRY_CODES = [
-  { code: "+57", label: "🇨🇴 Colombia +57" },
-  { code: "+52", label: "🇲🇽 México +52" },
-  { code: "+54", label: "🇦🇷 Argentina +54" },
-  { code: "+34", label: "🇪🇸 España +34" },
-  { code: "+56", label: "🇨🇱 Chile +56" },
-  { code: "+51", label: "🇵🇪 Perú +51" },
-  { code: "+598", label: "🇺🇾 Uruguay +598" },
-  { code: "+55", label: "🇧🇷 Brasil +55" },
-  { code: "+1", label: "🇺🇸 USA +1" },
-];
 
 interface FormData {
   nombre: string;
@@ -370,13 +360,19 @@ const NuevoContactoForm = () => {
               <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@ejemplo.com" />
             </Field>
             <Field label="Teléfono">
-              <div className="flex gap-2">
-                <Select value={form.countryCode} onValueChange={(v) => set("countryCode", v)}>
-                  <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>{COUNTRY_CODES.map((cc) => <SelectItem key={cc.code} value={cc.code}>{cc.label}</SelectItem>)}</SelectContent>
-                </Select>
-                <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="Número de teléfono" className="flex-1" />
-              </div>
+              <PhoneInput
+                value={`${form.countryCode} ${form.phone}`.trim()}
+                onChange={(val) => {
+                  // Parse combined value back into countryCode + phone
+                  const parts = val.match(/^(\+\d+)\s*(.*)/);
+                  if (parts) {
+                    set("countryCode", parts[1]);
+                    set("phone", parts[2]);
+                  } else {
+                    set("phone", val);
+                  }
+                }}
+              />
             </Field>
           </div>
 
