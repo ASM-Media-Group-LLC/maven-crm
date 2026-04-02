@@ -1,35 +1,24 @@
 
 
-## Plan: Mostrar agente correctamente en Promolog
-
-### Problema identificado
-- El código actual solo revisa `reviewed_by` para mostrar el nombre del agente
-- No usa `created_by` como respaldo
-- 87% de las entradas (27,793 de 31,989) no tienen ni `reviewed_by` ni `created_by` — son importaciones externas sin agente asignado
-
-### Datos actuales
-| Campo | Entradas con valor |
-|---|---|
-| `reviewed_by` | 4,196 |
-| `created_by` | 130 |
-| Sin agente | 27,793 |
+## Plan: Priorizar `created_by` en columna Agente + Mostrar duplicados
 
 ### Cambios
 
-**1. Fallback a `created_by` en la resolución de agente**
+**1. Priorizar `created_by` sobre `reviewed_by` en la columna "Agente"**
 - **Archivo**: `src/pages/promolog/PromologContent.tsx` (línea 243)
-- Cambiar de: `agent: (pe.reviewed_by && profilesMap[pe.reviewed_by]) || "—"`
-- A: `agent: (pe.reviewed_by && profilesMap[pe.reviewed_by]) || (pe.created_by && profilesMap[pe.created_by]) || "Sin asignar"`
-- Esto corrige las 130 entradas que tienen `created_by` pero no `reviewed_by`
+- Cambiar el orden de resolución: primero `created_by` (quien subió), luego `reviewed_by` como fallback
+- La columna sigue llamándose "Agente" — solo cambia qué dato se muestra
+- Antes: `reviewed_by → created_by → "Sin asignar"`
+- Después: `created_by → reviewed_by → "Sin asignar"`
 
-**2. Mejorar indicador visual de "Sin asignar"**
-- En la tabla y cards, mostrar "Sin asignar" con un estilo sutil (texto gris/itálica) en lugar de "—"
-- Facilita identificar visualmente qué promos necesitan asignación
+**2. Eliminar la deduplicación para mostrar todos los registros**
+- **Archivo**: `src/pages/promolog/PromologContent.tsx` (líneas 202-224)
+- Eliminar el bloque de deduplicación que agrupa por `creator_id|día|network|platform|promoted`
+- Devolver `data` directamente en lugar de `deduped`
+- Esto permitirá ver todos los registros tal cual están en la base de datos
 
-**3. Consistencia en stats de agentes**
-- El hook `usePromologAgentStats.ts` ya usa `entry.reviewed_by || entry.created_by` (línea 45), así que las estadísticas ya contemplan ambos campos — solo falta alinear la UI
-
-### Alcance
-- Solo cambios frontend (1-2 archivos)
-- No requiere migraciones de base de datos
+### Resultado
+- La columna "Agente" mostrará quién subió la promo (no quién la revisó)
+- Se verán todos los registros incluyendo duplicados
+- No se cambia nombre de columna ni estructura visual
 
