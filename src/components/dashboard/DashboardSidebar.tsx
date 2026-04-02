@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign,
-  MessageCircle, Contact,
+  MessageCircle, Contact, Rocket,
 } from "lucide-react";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { useSidebarBadges } from "@/hooks/useSidebarBadges";
@@ -576,6 +576,24 @@ const DashboardSidebar = () => {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        )}
+
+        {canAccess("ProyectoMP") && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Proyecto MP</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Proyecto MP">
+                    <NavLink to="/proyectomp" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                      <Rocket className="h-4 w-4 shrink-0" />
+                      <span>Proyecto MP</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         )}
 
         {canAccess("Administración") && (

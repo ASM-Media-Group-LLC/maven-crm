@@ -4466,6 +4466,593 @@ export type Database = {
         }
         Relationships: []
       }
+      mp_candidate_checklist: {
+        Row: {
+          candidate_id: string
+          completed: boolean
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          item_key: string
+        }
+        Insert: {
+          candidate_id: string
+          completed?: boolean
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          item_key: string
+        }
+        Update: {
+          candidate_id?: string
+          completed?: boolean
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          item_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_candidate_checklist_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "mp_candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_candidates: {
+        Row: {
+          city: string | null
+          contact_date: string | null
+          created_at: string
+          created_by: string | null
+          estimated_tier: string | null
+          id: string
+          name: string
+          notes: string | null
+          photo_url: string | null
+          position: number
+          stage: Database["public"]["Enums"]["mp_candidate_stage"]
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          contact_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_tier?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          photo_url?: string | null
+          position?: number
+          stage?: Database["public"]["Enums"]["mp_candidate_stage"]
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          contact_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_tier?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          photo_url?: string | null
+          position?: number
+          stage?: Database["public"]["Enums"]["mp_candidate_stage"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mp_content_entries: {
+        Row: {
+          content_type: Database["public"]["Enums"]["mp_content_type"]
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          model_id: string
+          notes: string | null
+          quantity: number
+          source: Database["public"]["Enums"]["mp_content_source"]
+        }
+        Insert: {
+          content_type: Database["public"]["Enums"]["mp_content_type"]
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          model_id: string
+          notes?: string | null
+          quantity?: number
+          source: Database["public"]["Enums"]["mp_content_source"]
+        }
+        Update: {
+          content_type?: Database["public"]["Enums"]["mp_content_type"]
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          model_id?: string
+          notes?: string | null
+          quantity?: number
+          source?: Database["public"]["Enums"]["mp_content_source"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_content_entries_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "mp_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_content_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          model_id: string
+          notes: string | null
+          scheduled_at: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model_id: string
+          notes?: string | null
+          scheduled_at: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model_id?: string
+          notes?: string | null
+          scheduled_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_content_sessions_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "mp_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_financials: {
+        Row: {
+          cost_chatters: number
+          cost_content: number
+          cost_other: number
+          cost_traffic: number
+          created_at: string
+          id: string
+          model_id: string
+          month: string
+          notes: string | null
+          revenue: number
+          updated_at: string
+        }
+        Insert: {
+          cost_chatters?: number
+          cost_content?: number
+          cost_other?: number
+          cost_traffic?: number
+          created_at?: string
+          id?: string
+          model_id: string
+          month: string
+          notes?: string | null
+          revenue?: number
+          updated_at?: string
+        }
+        Update: {
+          cost_chatters?: number
+          cost_content?: number
+          cost_other?: number
+          cost_traffic?: number
+          created_at?: string
+          id?: string
+          model_id?: string
+          month?: string
+          notes?: string | null
+          revenue?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_financials_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "mp_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_milestones: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          id: string
+          phase_id: string | null
+          position: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          phase_id?: string | null
+          position?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          phase_id?: string | null
+          position?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_milestones_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "mp_phases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_models: {
+        Row: {
+          account_url: string | null
+          candidate_id: string | null
+          created_at: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_url?: string | null
+          candidate_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_url?: string | null
+          candidate_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_models_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "mp_candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_phases: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_date: string | null
+          id: string
+          name: string
+          phase_number: number
+          start_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name: string
+          phase_number: number
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name?: string
+          phase_number?: number
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mp_tasks: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          phase_id: string | null
+          pillar: Database["public"]["Enums"]["mp_task_pillar"]
+          position: number
+          priority: Database["public"]["Enums"]["mp_task_priority"]
+          status: Database["public"]["Enums"]["mp_task_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          phase_id?: string | null
+          pillar?: Database["public"]["Enums"]["mp_task_pillar"]
+          position?: number
+          priority?: Database["public"]["Enums"]["mp_task_priority"]
+          status?: Database["public"]["Enums"]["mp_task_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          phase_id?: string | null
+          pillar?: Database["public"]["Enums"]["mp_task_pillar"]
+          position?: number
+          priority?: Database["public"]["Enums"]["mp_task_priority"]
+          status?: Database["public"]["Enums"]["mp_task_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_tasks_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "mp_phases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_team_members: {
+        Row: {
+          accounts_assigned: string[] | null
+          created_at: string
+          id: string
+          name: string
+          role: string
+          salary: number | null
+          start_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accounts_assigned?: string[] | null
+          created_at?: string
+          id?: string
+          name: string
+          role: string
+          salary?: number | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accounts_assigned?: string[] | null
+          created_at?: string
+          id?: string
+          name?: string
+          role?: string
+          salary?: number | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mp_team_plan: {
+        Row: {
+          created_at: string
+          headcount_target: number
+          id: string
+          month_target: number
+          notes: string | null
+        }
+        Insert: {
+          created_at?: string
+          headcount_target: number
+          id?: string
+          month_target: number
+          notes?: string | null
+        }
+        Update: {
+          created_at?: string
+          headcount_target?: number
+          id?: string
+          month_target?: number
+          notes?: string | null
+        }
+        Relationships: []
+      }
+      mp_traffic_organic: {
+        Row: {
+          clicks: number | null
+          created_at: string
+          created_by: string | null
+          date: string
+          engagement: number | null
+          id: string
+          model_id: string
+          platform: string
+          posts_count: number
+          subs_generated: number | null
+        }
+        Insert: {
+          clicks?: number | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          engagement?: number | null
+          id?: string
+          model_id: string
+          platform: string
+          posts_count?: number
+          subs_generated?: number | null
+        }
+        Update: {
+          clicks?: number | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          engagement?: number | null
+          id?: string
+          model_id?: string
+          platform?: string
+          posts_count?: number
+          subs_generated?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_traffic_organic_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "mp_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_traffic_paid: {
+        Row: {
+          amount_invested: number
+          cpa: number | null
+          created_at: string
+          created_by: string | null
+          creator_contacted: string | null
+          date: string
+          id: string
+          model_id: string
+          notes: string | null
+          subs_obtained: number | null
+        }
+        Insert: {
+          amount_invested?: number
+          cpa?: number | null
+          created_at?: string
+          created_by?: string | null
+          creator_contacted?: string | null
+          date?: string
+          id?: string
+          model_id: string
+          notes?: string | null
+          subs_obtained?: number | null
+        }
+        Update: {
+          amount_invested?: number
+          cpa?: number | null
+          created_at?: string
+          created_by?: string | null
+          creator_contacted?: string | null
+          date?: string
+          id?: string
+          model_id?: string
+          notes?: string | null
+          subs_obtained?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_traffic_paid_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "mp_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_traffic_sfs: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          model_id: string
+          notes: string | null
+          partner_handle: string | null
+          partner_name: string
+          result: string | null
+          status: string
+          subs_generated: number | null
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          model_id: string
+          notes?: string | null
+          partner_handle?: string | null
+          partner_name: string
+          result?: string | null
+          status?: string
+          subs_generated?: number | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          model_id?: string
+          notes?: string | null
+          partner_handle?: string | null
+          partner_name?: string
+          result?: string | null
+          status?: string
+          subs_generated?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_traffic_sfs_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "mp_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_automation_log: {
         Row: {
           automation_type: string
@@ -6415,6 +7002,32 @@ export type Database = {
         | "supervisor"
         | "agent"
         | "closer"
+      mp_candidate_stage:
+        | "candidata"
+        | "contactada"
+        | "entrevista"
+        | "filtro"
+        | "shooting"
+        | "contrato"
+        | "activa"
+        | "inactiva"
+      mp_content_source: "ai" | "modelo"
+      mp_content_type:
+        | "ai_social"
+        | "ai_perfil"
+        | "ai_premium"
+        | "modelo_video"
+        | "modelo_custom"
+        | "modelo_intimo"
+      mp_task_pillar:
+        | "recruiting"
+        | "ai"
+        | "modelo"
+        | "trafico"
+        | "operaciones"
+        | "general"
+      mp_task_priority: "high" | "medium" | "low"
+      mp_task_status: "todo" | "in_progress" | "blocked" | "completed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -6550,6 +7163,35 @@ export const Constants = {
         "agent",
         "closer",
       ],
+      mp_candidate_stage: [
+        "candidata",
+        "contactada",
+        "entrevista",
+        "filtro",
+        "shooting",
+        "contrato",
+        "activa",
+        "inactiva",
+      ],
+      mp_content_source: ["ai", "modelo"],
+      mp_content_type: [
+        "ai_social",
+        "ai_perfil",
+        "ai_premium",
+        "modelo_video",
+        "modelo_custom",
+        "modelo_intimo",
+      ],
+      mp_task_pillar: [
+        "recruiting",
+        "ai",
+        "modelo",
+        "trafico",
+        "operaciones",
+        "general",
+      ],
+      mp_task_priority: ["high", "medium", "low"],
+      mp_task_status: ["todo", "in_progress", "blocked", "completed"],
     },
   },
 } as const

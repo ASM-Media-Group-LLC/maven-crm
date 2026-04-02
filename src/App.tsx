@@ -90,6 +90,17 @@ const NotificacionesSettings = lazy(() => import("./pages/ajustes/Notificaciones
 const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
 const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
 
+// Proyecto MP
+const ProyectoMPLayout = lazy(() => import("./pages/proyectomp/ProyectoMPLayout"));
+const ProyectoMPDashboard = lazy(() => import("./pages/proyectomp/ProyectoMPDashboard"));
+const ProyectoMPTareas = lazy(() => import("./pages/proyectomp/ProyectoMPTareas"));
+const ProyectoMPPipeline = lazy(() => import("./pages/proyectomp/ProyectoMPPipeline"));
+const ProyectoMPContenido = lazy(() => import("./pages/proyectomp/ProyectoMPContenido"));
+const ProyectoMPTrafico = lazy(() => import("./pages/proyectomp/ProyectoMPTrafico"));
+const ProyectoMPFinanzas = lazy(() => import("./pages/proyectomp/ProyectoMPFinanzas"));
+const ProyectoMPEquipo = lazy(() => import("./pages/proyectomp/ProyectoMPEquipo"));
+const ProyectoMPMilestones = lazy(() => import("./pages/proyectomp/ProyectoMPMilestones"));
+
 // HR
 const HRLayout = lazy(() => import("./pages/hr/HRLayout"));
 const HRDashboard = lazy(() => import("./pages/hr/HRDashboard"));
@@ -274,6 +285,15 @@ const App = () => (
               <Route path="/finanzas/collections" element={<PermissionRoute module="Finanzas"><FinanzasLayout><CollectionsPage /></FinanzasLayout></PermissionRoute>} />
               <Route path="/finanzas/horas-variables" element={<PermissionRoute module="Finanzas"><FinanzasLayout><HorasVariablesPage /></FinanzasLayout></PermissionRoute>} />
               <Route path="/finanzas/configuracion" element={<PermissionRoute module="Finanzas"><FinanzasLayout><ConfiguracionPage /></FinanzasLayout></PermissionRoute>} />
+              {/* Proyecto MP routes */}
+              <Route path="/proyectomp" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPDashboard /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/tareas" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPTareas /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/pipeline" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPPipeline /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/contenido" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPContenido /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/trafico" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPTrafico /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/finanzas" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPFinanzas /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/equipo" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPEquipo /></ProyectoMPLayout></PermissionRoute>} />
+              <Route path="/proyectomp/milestones" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPMilestones /></ProyectoMPLayout></PermissionRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
               <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />
