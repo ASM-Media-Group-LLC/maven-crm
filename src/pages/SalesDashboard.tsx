@@ -42,12 +42,18 @@ const getDateRange = (period: TimePeriod): { from: Date; to: Date } => {
 const SalesDashboard = () => {
   const [activeView, setActiveView] = useState<ViewTab>("Vista General");
   const [activePeriod, setActivePeriod] = useState<TimePeriod>("Últimos 7 días");
+  const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [compareMode, setCompareMode] = useState(false);
   const [compareRange, setCompareRange] = useState<{ from?: Date; to?: Date }>({});
   const [earningsMode, setEarningsMode] = useState<EarningsMode>("net");
   const { data: allRows = [], isLoading } = useEarningsData();
 
-  const dateRange = useMemo(() => getDateRange(activePeriod), [activePeriod]);
+  const dateRange = useMemo(() => {
+    if (activePeriod === "Personalizado" && customRange.from && customRange.to) {
+      return { from: customRange.from, to: customRange.to };
+    }
+    return getDateRange(activePeriod as Exclude<TimePeriod, "Personalizado">);
+  }, [activePeriod, customRange]);
 
   const filteredRows = useMemo(() => {
     const from = startOfDay(dateRange.from);
@@ -71,6 +77,13 @@ const SalesDashboard = () => {
   const handleToggleCompare = () => {
     setCompareMode((prev) => !prev);
     if (compareMode) setCompareRange({});
+  };
+
+  const handleCustomDateChange = (from: Date | undefined, to: Date | undefined) => {
+    setCustomRange({ from, to });
+    if (from && to) {
+      setActivePeriod("Personalizado");
+    }
   };
 
   const handleCompareDateChange = (from: Date | undefined, to: Date | undefined) => {
@@ -128,6 +141,7 @@ const SalesDashboard = () => {
               onPeriodChange={setActivePeriod}
               dateFrom={dateRange.from}
               dateTo={dateRange.to}
+              onCustomDateChange={handleCustomDateChange}
               compareMode={compareMode}
               onToggleCompare={handleToggleCompare}
               compareDateFrom={compareRange.from}
