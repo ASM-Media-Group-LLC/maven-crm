@@ -28,6 +28,9 @@ import { useNavigate } from "react-router-dom";
 import {
   PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
+import { useUserRole } from "@/hooks/useUserRole";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface CreatorSummary {
   creatorId: string;
