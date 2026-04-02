@@ -218,7 +218,7 @@ const PromologContent = () => {
         result: promotedToResult(pe.promoted),
         date: dateObj.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }),
         time: dateObj.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: true }),
-        agent: (pe.created_by && profilesMap[pe.created_by]) || (pe.reviewed_by && profilesMap[pe.reviewed_by]) || "Sin asignar",
+        agent: (pe.created_by && profilesMap[pe.created_by]) || (pe.reviewed_by && profilesMap[pe.reviewed_by]) || "Sync externo",
         notes: pe.notes || "",
         creator_id: pe.creator_id,
         reviewed_by: pe.reviewed_by || undefined,
