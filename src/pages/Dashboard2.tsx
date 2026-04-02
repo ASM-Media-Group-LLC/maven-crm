@@ -750,6 +750,7 @@ const Dashboard2 = () => {
                           📊 Bottom 20%
                         </Button>
                       </div>
+                      <div className="grid grid-cols-1 lg:grid-cols-5 divide-y lg:divide-y-0 lg:divide-x divide-border">
                         <div className="lg:col-span-3 p-6 flex items-center justify-center" style={{ minHeight: 400 }}>
                           <ResponsiveContainer width="100%" height={400}>
                             <RechartsPie>
