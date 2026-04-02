@@ -112,6 +112,7 @@ const Dashboard2 = () => {
           name: r.artistic_name || r.pending_creator || "Sin nombre",
           platform: plat || "OnlyFans",
           total: r.total_earnings_gross ?? 0,
+          net: (r.total_earnings_gross ?? 0) * 0.8,
           subs: r.subscription_gross ?? 0,
           newSubs: r.new_subscriptions_sub_gross ?? 0,
           recurringSubs: r.recurring_sub_gross ?? 0,
