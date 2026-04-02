@@ -6020,6 +6020,65 @@ export type Database = {
         }
         Relationships: []
       }
+      sales_audit_corrections: {
+        Row: {
+          applied_at: string
+          applied_by: string | null
+          audit_log_id: string | null
+          created_at: string
+          creator_name: string
+          earnings_date: string
+          field_name: string
+          id: string
+          new_value: number
+          of_earnings_id: string
+          original_value: number
+          reverted_at: string | null
+          reverted_by: string | null
+          source: string
+        }
+        Insert: {
+          applied_at?: string
+          applied_by?: string | null
+          audit_log_id?: string | null
+          created_at?: string
+          creator_name: string
+          earnings_date: string
+          field_name?: string
+          id?: string
+          new_value?: number
+          of_earnings_id: string
+          original_value?: number
+          reverted_at?: string | null
+          reverted_by?: string | null
+          source?: string
+        }
+        Update: {
+          applied_at?: string
+          applied_by?: string | null
+          audit_log_id?: string | null
+          created_at?: string
+          creator_name?: string
+          earnings_date?: string
+          field_name?: string
+          id?: string
+          new_value?: number
+          of_earnings_id?: string
+          original_value?: number
+          reverted_at?: string | null
+          reverted_by?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_audit_corrections_audit_log_id_fkey"
+            columns: ["audit_log_id"]
+            isOneToOne: false
+            referencedRelation: "sales_audit_log"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_audit_log: {
         Row: {
           audit_date: string
@@ -6035,6 +6094,7 @@ export type Database = {
           period_end: string | null
           period_start: string | null
           source_selected: string
+          status: string
           system_amount: number
           system_entries: number
         }
@@ -6052,6 +6112,7 @@ export type Database = {
           period_end?: string | null
           period_start?: string | null
           source_selected: string
+          status?: string
           system_amount?: number
           system_entries?: number
         }
@@ -6069,6 +6130,7 @@ export type Database = {
           period_end?: string | null
           period_start?: string | null
           source_selected?: string
+          status?: string
           system_amount?: number
           system_entries?: number
         }
