@@ -397,25 +397,79 @@ const Dashboard2 = () => {
                     </p>
                   </div>
                 </div>
-                {/* Top creators list */}
+                {/* TOP 80% — detailed breakdown */}
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-                    Tus creadoras clave ({paretoAnalysis.topCount}):
+                  <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
+                    🔥 Top {paretoAnalysis.topCount} creadoras (generan el 80%) — Desglose interno
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {paretoAnalysis.top.map((c) => (
-                      <Badge
-                        key={c.creatorId}
-                        variant="secondary"
-                        className="cursor-pointer hover:bg-primary/20 transition-colors gap-1.5 py-1"
-                        onClick={() => navigate(`/creadores/${c.creatorId}`)}
-                      >
-                        <span className="inline-block h-2 w-2 rounded-full bg-primary shrink-0" />
-                        {c.name}
-                        <span className="text-muted-foreground ml-1 tabular-nums">{fmtShort(c.total)}</span>
-                      </Badge>
-                    ))}
+                  <div className="space-y-1.5">
+                    {paretoAnalysis.top.map((c, i) => {
+                      const pctOfTop = paretoAnalysis.topRevenue > 0 ? (c.total / paretoAnalysis.topRevenue) * 100 : 0;
+                      const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0;
+                      return (
+                        <div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
+                          <span className="text-xs font-bold text-primary w-5 shrink-0 tabular-nums">{i + 1}</span>
+                          <button
+                            className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]"
+                            onClick={() => navigate(`/creadores/${c.creatorId}`)}
+                          >
+                            {c.name}
+                          </button>
+                          <div className="flex-1 mx-2">
+                            <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-primary transition-all"
+                                style={{ width: `${Math.min(pctOfTop, 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                          <span className="text-sm font-bold tabular-nums w-[60px] text-right text-primary">{pctOfTop.toFixed(1)}%</span>
+                          <span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">({pctOfTotal.toFixed(1)}% tot)</span>
+                          <span className="text-sm font-semibold tabular-nums w-[100px] text-right">{fmt(c.total)}</span>
+                        </div>
+                      );
+                    })}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Los % de barra son relativos al grupo Top ({fmt(paretoAnalysis.topRevenue)}). El "% tot" es sobre el total general ({fmt(paretoAnalysis.totalRevenue)}).
+                  </p>
+                </div>
+
+                {/* BOTTOM 20% */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
+                    📉 Resto ({paretoAnalysis.rest.length} creadoras) — generan el {paretoAnalysis.totalRevenue > 0 ? (100 - (paretoAnalysis.topRevenue / paretoAnalysis.totalRevenue) * 100).toFixed(1) : "0"}%
+                  </p>
+                  {paretoAnalysis.rest.length > 0 ? (
+                    <div className="space-y-1">
+                      {paretoAnalysis.rest.map((c, i) => {
+                        const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0;
+                        return (
+                          <div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border/50 bg-muted/30 px-3 py-1.5">
+                            <span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums">{paretoAnalysis.topCount + i + 1}</span>
+                            <button
+                              className="text-sm text-muted-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]"
+                              onClick={() => navigate(`/creadores/${c.creatorId}`)}
+                            >
+                              {c.name}
+                            </button>
+                            <div className="flex-1 mx-2">
+                              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-muted-foreground/40 transition-all"
+                                  style={{ width: `${Math.min(pctOfTotal * 5, 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                            <span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">{pctOfTotal.toFixed(1)}%</span>
+                            <span className="text-sm tabular-nums text-muted-foreground w-[100px] text-right">{fmt(c.total)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No hay creadoras en este grupo.</p>
+                  )}
                 </div>
               </div>
             )}
