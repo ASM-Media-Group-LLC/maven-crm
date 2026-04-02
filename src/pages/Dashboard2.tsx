@@ -429,6 +429,12 @@ const Dashboard2 = () => {
                   <PieChart className="h-4 w-4" />
                   80/20
                 </Button>
+                {isAdmin && (
+                  <Button variant="outline" size="sm" onClick={exportPdf} className="gap-1.5" disabled={isLoading || creators.length === 0}>
+                    <DollarSign className="h-4 w-4" />
+                    Descargar PDF
+                  </Button>
+                )}
               </div>
             </div>
 
