@@ -79,6 +79,13 @@ const SalesDashboard = () => {
     if (compareMode) setCompareRange({});
   };
 
+  const handleCustomDateChange = (from: Date | undefined, to: Date | undefined) => {
+    setCustomRange({ from, to });
+    if (from && to) {
+      setActivePeriod("Personalizado");
+    }
+  };
+
   const handleCompareDateChange = (from: Date | undefined, to: Date | undefined) => {
     setCompareRange({ from, to });
   };
