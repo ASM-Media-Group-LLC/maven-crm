@@ -2073,6 +2073,38 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_of_accounts: {
+        Row: {
+          account_handle: string
+          created_at: string
+          creator_id: string
+          id: string
+          onlyfans_url: string | null
+        }
+        Insert: {
+          account_handle: string
+          created_at?: string
+          creator_id: string
+          id?: string
+          onlyfans_url?: string | null
+        }
+        Update: {
+          account_handle?: string
+          created_at?: string
+          creator_id?: string
+          id?: string
+          onlyfans_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_of_accounts_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_offboarding_approvals: {
         Row: {
           approved: boolean | null
