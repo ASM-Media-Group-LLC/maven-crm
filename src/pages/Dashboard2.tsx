@@ -615,51 +615,74 @@ const Dashboard2 = () => {
                     </div>
                   </div>
                   <div className="h-px bg-border" />
+                  {/* Retención & Fans */}
                   <div>
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Retención & Fans</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="rounded-lg border border-border bg-card p-4 space-y-1">
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Repeat className="h-3.5 w-3.5" /> Retención</div>
-                        <p className="text-2xl font-bold tabular-nums">{hlKpis.renewalRate.toFixed(1)}%</p>
-                      </div>
-                      <div className="rounded-lg border border-border bg-card p-4 space-y-1">
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><DollarSign className="h-3.5 w-3.5" /> $/Fan</div>
-                        <p className="text-2xl font-bold tabular-nums">{fmt(hlKpis.avgPerFanGlobal)}</p>
-                      </div>
-                      <div className="rounded-lg border border-border bg-card p-4 space-y-1">
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Users className="h-3.5 w-3.5" /> Nuevas Subs</div>
-                        <p className="text-2xl font-bold tabular-nums">{hlKpis.totalNewSubs.toLocaleString()}</p>
-                      </div>
-                      <div className="rounded-lg border border-border bg-card p-4 space-y-1">
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Repeat className="h-3.5 w-3.5" /> Recurrentes</div>
-                        <p className="text-2xl font-bold tabular-nums">{hlKpis.totalRecurring.toLocaleString()}</p>
-                      </div>
+                    <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-4">Retención & Fans</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { icon: <Repeat className="h-4 w-4" />, value: `${hlKpis.renewalRate.toFixed(1)}%`, label: "Retención", sub: "tasa de renovación" },
+                        { icon: <DollarSign className="h-4 w-4" />, value: fmt(hlKpis.avgPerFanGlobal), label: "$/Fan", sub: "promedio por fan" },
+                        { icon: <Users className="h-4 w-4" />, value: hlKpis.totalNewSubs.toLocaleString(), label: "Nuevas Subs", sub: "este período" },
+                        { icon: <Repeat className="h-4 w-4" />, value: hlKpis.totalRecurring.toLocaleString(), label: "Recurrentes", sub: "renovaciones" },
+                      ].map((item, idx) => (
+                        <div key={idx} className="rounded-xl border border-border bg-gradient-to-b from-card to-muted/30 p-4 space-y-2 text-center">
+                          <div className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary/10 text-primary mx-auto">
+                            {item.icon}
+                          </div>
+                          <p className="text-2xl font-bold tabular-nums">{item.value}</p>
+                          <p className="text-xs font-medium text-foreground">{item.label}</p>
+                          <p className="text-[10px] text-muted-foreground">{item.sub}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
+
+                  {/* CEO Insights */}
                   {isAdmin && (
-                    <div>
-                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">CEO Insights</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="rounded-lg border-2 border-primary/40 bg-primary/5 p-4 space-y-1">
-                          <div className="flex items-center gap-1.5 text-xs text-primary font-semibold"><Crown className="h-3.5 w-3.5" /> Top Creadora</div>
-                          <p className="text-sm font-bold truncate">{hlKpis.topCreator?.name || "—"}</p>
-                          <p className="text-xl font-bold tabular-nums">{hlKpis.topCreator ? fmt(hlKpis.topCreator.total) : "$0"}</p>
-                        </div>
-                        <div className="rounded-lg border border-border bg-card p-4 space-y-1">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Target className="h-3.5 w-3.5" /> Promedio</div>
-                          <p className="text-xl font-bold tabular-nums">{fmt(hlKpis.avgPerCreator)}</p>
-                          <p className="text-[10px] text-muted-foreground">{hlKpis.activeCount} activas</p>
-                        </div>
-                        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-1">
-                          <div className="flex items-center gap-1.5 text-xs text-destructive font-semibold"><AlertTriangle className="h-3.5 w-3.5" /> Inactivas</div>
-                          <p className="text-xl font-bold tabular-nums">{hlKpis.zeroCreators}</p>
-                        </div>
-                        <div className="rounded-lg border border-border bg-card p-4 space-y-1">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><TrendingUp className="h-3.5 w-3.5" /> Distribución</div>
-                          <p className="text-sm font-bold tabular-nums">{hlKpis.creatorsOver10k} {'>'} $10k · {hlKpis.creatorsUnder1k} {'<'} $1k</p>
+                    <>
+                      <div className="h-px bg-border" />
+                      <div>
+                        <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-4">CEO Insights</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 to-primary/5 p-4 space-y-2 text-center">
+                            <div className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary/20 text-primary mx-auto">
+                              <Crown className="h-4 w-4" />
+                            </div>
+                            <p className="text-sm font-bold truncate">{hlKpis.topCreator?.name || "—"}</p>
+                            <p className="text-xl font-bold tabular-nums text-primary">{hlKpis.topCreator ? fmt(hlKpis.topCreator.total) : "$0"}</p>
+                            <p className="text-[10px] text-muted-foreground">top creadora</p>
+                          </div>
+                          <div className="rounded-xl border border-border bg-gradient-to-b from-card to-muted/30 p-4 space-y-2 text-center">
+                            <div className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-muted text-muted-foreground mx-auto">
+                              <Target className="h-4 w-4" />
+                            </div>
+                            <p className="text-xl font-bold tabular-nums">{fmt(hlKpis.avgPerCreator)}</p>
+                            <p className="text-xs font-medium text-foreground">Promedio</p>
+                            <p className="text-[10px] text-muted-foreground">{hlKpis.activeCount} activas</p>
+                          </div>
+                          <div className="rounded-xl border border-destructive/30 bg-gradient-to-b from-destructive/10 to-destructive/5 p-4 space-y-2 text-center">
+                            <div className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-destructive/20 text-destructive mx-auto">
+                              <AlertTriangle className="h-4 w-4" />
+                            </div>
+                            <p className="text-2xl font-bold tabular-nums">{hlKpis.zeroCreators}</p>
+                            <p className="text-xs font-medium text-foreground">Inactivas</p>
+                            <p className="text-[10px] text-muted-foreground">$0 en ventas</p>
+                          </div>
+                          <div className="rounded-xl border border-border bg-gradient-to-b from-card to-muted/30 p-4 space-y-2 text-center">
+                            <div className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-muted text-muted-foreground mx-auto">
+                              <TrendingUp className="h-4 w-4" />
+                            </div>
+                            <p className="text-sm font-bold tabular-nums">
+                              {hlKpis.creatorsOver10k} <span className="text-muted-foreground font-normal">{'>'} $10k</span>
+                            </p>
+                            <p className="text-sm font-bold tabular-nums">
+                              {hlKpis.creatorsUnder1k} <span className="text-muted-foreground font-normal">{'<'} $1k</span>
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">distribución</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </>
                   )}
                 </div>
               </DialogContent>
@@ -667,228 +690,168 @@ const Dashboard2 = () => {
 
             {/* ── Pareto Dialog ── */}
             <Dialog open={showPareto} onOpenChange={setShowPareto}>
-              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><PieChart className="h-5 w-5 text-primary" /> Análisis 80/20 — {selectedPeriod?.label}</DialogTitle></DialogHeader>
-                <div className="space-y-4 pt-2">
+              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
+                <div className="p-6 pb-0">
+                  <DialogHeader>
+                    <DialogTitle className="text-xl flex items-center gap-2">
+                      <PieChart className="h-5 w-5 text-primary" />
+                      Análisis 80/20 — {selectedPeriod?.label}
+                    </DialogTitle>
+                  </DialogHeader>
+                </div>
+                <div className="p-6 space-y-6">
+                  {/* Summary cards + view toggle */}
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     <div className="grid grid-cols-3 gap-3 flex-1 min-w-0">
-                      <div className="rounded-lg border border-border bg-card p-3 space-y-1">
-                        <p className="text-xs text-muted-foreground">Top (80%)</p>
-                        <p className="text-2xl font-bold text-primary tabular-nums">{paretoAnalysis.topCount}</p>
+                      <div className="rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 to-primary/5 p-4 text-center space-y-1">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Top (80%)</p>
+                        <p className="text-3xl font-bold text-primary tabular-nums">{paretoAnalysis.topCount}</p>
                         <p className="text-xs text-muted-foreground">de {paretoAnalysis.totalCount}</p>
                       </div>
-                      <div className="rounded-lg border border-border bg-card p-3 space-y-1">
-                        <p className="text-xs text-muted-foreground">Revenue Top</p>
+                      <div className="rounded-xl border border-border bg-gradient-to-b from-card to-muted/30 p-4 text-center space-y-1">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Revenue Top</p>
                         <p className="text-2xl font-bold tabular-nums">{fmt(paretoAnalysis.topRevenue)}</p>
+                        <p className="text-xs text-muted-foreground">bruto</p>
                       </div>
-                      <div className="rounded-lg border border-border bg-card p-3 space-y-1">
-                        <p className="text-xs text-muted-foreground">Resto</p>
+                      <div className="rounded-xl border border-border bg-gradient-to-b from-card to-muted/30 p-4 text-center space-y-1">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Resto</p>
                         <p className="text-2xl font-bold tabular-nums text-muted-foreground">{fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}</p>
+                        <p className="text-xs text-muted-foreground">{paretoAnalysis.rest.length} creadoras</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 rounded-md border border-border bg-card p-0.5">
-                      <Button variant={paretoView === "list" ? "default" : "ghost"} size="sm" className="h-7 px-2.5 text-xs" onClick={() => setParetoView("list")}><BarChart3 className="h-3.5 w-3.5 mr-1" /> Lista</Button>
-                      <Button variant={paretoView === "chart" ? "default" : "ghost"} size="sm" className="h-7 px-2.5 text-xs" onClick={() => setParetoView("chart")}><PieChart className="h-3.5 w-3.5 mr-1" /> Gráfica</Button>
+                    <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+                      <Button variant={paretoView === "list" ? "default" : "ghost"} size="sm" className="h-8 px-3 text-xs rounded-md" onClick={() => setParetoView("list")}>
+                        <BarChart3 className="h-3.5 w-3.5 mr-1.5" /> Lista
+                      </Button>
+                      <Button variant={paretoView === "chart" ? "default" : "ghost"} size="sm" className="h-8 px-3 text-xs rounded-md" onClick={() => setParetoView("chart")}>
+                        <PieChart className="h-3.5 w-3.5 mr-1.5" /> Gráfica
+                      </Button>
                     </div>
                   </div>
+
+                  {/* CHART VIEW — clean donut + sidebar legend */}
                   {paretoView === "chart" && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center rounded-lg border border-border bg-card p-4">
-                      <div style={{ minHeight: 380 }}><ResponsiveContainer width="100%" height={380}><RechartsPie><Pie data={pieData} cx="50%" cy="50%" outerRadius="80%" innerRadius="40%" dataKey="value" nameKey="name" label={({ name, percent }) => `${name.length > 14 ? name.slice(0, 13) + "…" : name} ${(percent * 100).toFixed(0)}%`} labelLine={{ strokeWidth: 1 }}>{pieData.map((_, idx) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}</Pie><Tooltip formatter={(value: number) => fmt(value)} /></RechartsPie></ResponsiveContainer></div>
-                      <div className="space-y-1.5 max-h-[380px] overflow-y-auto">{pieData.map((d, idx) => { const pct = paretoAnalysis.totalRevenue > 0 ? (d.value / paretoAnalysis.totalRevenue) * 100 : 0; return (<div key={idx} className="flex items-center gap-2 text-sm"><div className="h-3 w-3 rounded-sm shrink-0" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }} /><span className="truncate flex-1 min-w-0">{d.name}</span><span className="tabular-nums font-medium shrink-0">{fmt(d.value)}</span><span className="tabular-nums text-muted-foreground text-xs shrink-0 w-12 text-right">{pct.toFixed(1)}%</span></div>); })}</div>
+                    <div className="rounded-xl border border-border bg-card overflow-hidden">
+                      <div className="grid grid-cols-1 lg:grid-cols-5 divide-y lg:divide-y-0 lg:divide-x divide-border">
+                        <div className="lg:col-span-3 p-6 flex items-center justify-center" style={{ minHeight: 400 }}>
+                          <ResponsiveContainer width="100%" height={400}>
+                            <RechartsPie>
+                              <Pie
+                                data={pieData}
+                                cx="50%"
+                                cy="50%"
+                                outerRadius="85%"
+                                innerRadius="50%"
+                                dataKey="value"
+                                nameKey="name"
+                                paddingAngle={1}
+                                label={false}
+                              >
+                                {pieData.map((_, idx) => (
+                                  <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} stroke="hsl(var(--background))" strokeWidth={2} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number) => fmt(value)}
+                                contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))' }}
+                              />
+                            </RechartsPie>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="lg:col-span-2 p-4 overflow-y-auto" style={{ maxHeight: 420 }}>
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Desglose</p>
+                          <div className="space-y-2">
+                            {pieData.map((d, idx) => {
+                              const pct = paretoAnalysis.totalRevenue > 0 ? (d.value / paretoAnalysis.totalRevenue) * 100 : 0;
+                              return (
+                                <div key={idx} className="flex items-center gap-2.5 py-1 border-b border-border/50 last:border-0">
+                                  <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }} />
+                                  <span className="text-sm truncate flex-1 min-w-0">{d.name}</span>
+                                  <span className="text-xs font-semibold tabular-nums shrink-0">{fmt(d.value)}</span>
+                                  <span className="text-[11px] tabular-nums text-muted-foreground shrink-0 w-11 text-right">{pct.toFixed(1)}%</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="border-t border-border bg-muted/30 px-6 py-2.5">
+                        <p className="text-[10px] text-muted-foreground text-center">
+                          Montos <strong>BRUTOS</strong> · "Resto" agrupa {paretoAnalysis.rest.length} creadoras (~20% del revenue)
+                        </p>
+                      </div>
                     </div>
                   )}
+
+                  {/* LIST VIEW */}
                   {paretoView === "list" && (
-                    <div className="space-y-4">
+                    <div className="space-y-5">
                       <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">🔥 Top {paretoAnalysis.topCount} — BRUTO</p>
-                        <div className="space-y-1.5 max-h-[350px] overflow-y-auto">{paretoAnalysis.top.map((c, i) => { const pctOfTop = paretoAnalysis.topRevenue > 0 ? (c.total / paretoAnalysis.topRevenue) * 100 : 0; const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0; return (<div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2"><span className="text-xs font-bold text-primary w-5 shrink-0 tabular-nums">{i + 1}</span>{c.instagramHandle && <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"><Instagram className="h-3.5 w-3.5" /></a>}<button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button><div className="flex-1 mx-2"><div className="h-3 w-full rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(pctOfTop, 100)}%` }} /></div></div><span className="text-sm font-bold tabular-nums w-[60px] text-right text-primary">{pctOfTop.toFixed(1)}%</span><span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">({pctOfTotal.toFixed(1)}%)</span><span className="text-sm font-semibold tabular-nums w-[100px] text-right">{fmt(c.total)}</span></div>); })}</div>
+                        <p className="text-[11px] font-semibold text-muted-foreground mb-3 uppercase tracking-widest">🔥 Top {paretoAnalysis.topCount} — BRUTO</p>
+                        <div className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
+                          {paretoAnalysis.top.map((c, i) => {
+                            const pctOfTop = paretoAnalysis.topRevenue > 0 ? (c.total / paretoAnalysis.topRevenue) * 100 : 0;
+                            const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0;
+                            return (
+                              <div key={c.creatorId} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 hover:bg-muted/50 transition-colors">
+                                <span className="text-xs font-bold text-primary w-5 shrink-0 tabular-nums">{i + 1}</span>
+                                {c.instagramHandle && (
+                                  <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
+                                    <Instagram className="h-3.5 w-3.5" />
+                                  </a>
+                                )}
+                                <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
+                                  {c.name}
+                                </button>
+                                <div className="flex-1 mx-2">
+                                  <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(pctOfTop, 100)}%` }} />
+                                  </div>
+                                </div>
+                                <span className="text-sm font-bold tabular-nums w-[60px] text-right text-primary">{pctOfTop.toFixed(1)}%</span>
+                                <span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">({pctOfTotal.toFixed(1)}%)</span>
+                                <span className="text-sm font-semibold tabular-nums w-[100px] text-right">{fmt(c.total)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
+                      <div className="h-px bg-border" />
                       <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">📉 Resto ({paretoAnalysis.rest.length})</p>
-                        {paretoAnalysis.rest.length > 0 ? (<div className="space-y-1 max-h-[200px] overflow-y-auto">{paretoAnalysis.rest.map((c, i) => { const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0; return (<div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border/50 bg-muted/30 px-3 py-1.5"><span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums">{paretoAnalysis.topCount + i + 1}</span>{c.instagramHandle && <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"><Instagram className="h-3.5 w-3.5" /></a>}<button className="text-sm text-muted-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button><div className="flex-1 mx-2"><div className="h-2 w-full rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full bg-muted-foreground/40 transition-all" style={{ width: `${Math.min(pctOfTotal * 5, 100)}%` }} /></div></div><span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">{pctOfTotal.toFixed(1)}%</span><span className="text-sm tabular-nums text-muted-foreground w-[100px] text-right">{fmt(c.total)}</span></div>); })}</div>) : <p className="text-sm text-muted-foreground">Ninguna.</p>}
+                        <p className="text-[11px] font-semibold text-muted-foreground mb-3 uppercase tracking-widest">📉 Resto ({paretoAnalysis.rest.length})</p>
+                        {paretoAnalysis.rest.length > 0 ? (
+                          <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1">
+                            {paretoAnalysis.rest.map((c, i) => {
+                              const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0;
+                              return (
+                                <div key={c.creatorId} className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-1.5 hover:bg-muted/40 transition-colors">
+                                  <span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums">{paretoAnalysis.topCount + i + 1}</span>
+                                  {c.instagramHandle && (
+                                    <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
+                                      <Instagram className="h-3.5 w-3.5" />
+                                    </a>
+                                  )}
+                                  <button className="text-sm text-muted-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
+                                    {c.name}
+                                  </button>
+                                  <div className="flex-1 mx-2">
+                                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                                      <div className="h-full rounded-full bg-muted-foreground/40 transition-all" style={{ width: `${Math.min(pctOfTotal * 5, 100)}%` }} />
+                                    </div>
+                                  </div>
+                                  <span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">{pctOfTotal.toFixed(1)}%</span>
+                                  <span className="text-sm tabular-nums text-muted-foreground w-[100px] text-right">{fmt(c.total)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : <p className="text-sm text-muted-foreground">Ninguna.</p>}
                       </div>
                     </div>
                   )}
                 </div>
               </DialogContent>
             </Dialog>
-
-            {/* Pareto Analysis Panel */}
-            {showPareto && !isLoading && (
-              <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <PieChart className="h-5 w-5 text-primary" />
-                    <h2 className="text-lg font-bold text-foreground">Análisis 80/20 (Pareto)</h2>
-                  </div>
-                  <div className="flex items-center gap-1 rounded-md border border-border bg-card p-0.5">
-                    <Button variant={paretoView === "list" ? "default" : "ghost"} size="sm" className="h-7 px-2.5 text-xs" onClick={() => setParetoView("list")}>
-                      <BarChart3 className="h-3.5 w-3.5 mr-1" /> Lista
-                    </Button>
-                    <Button variant={paretoView === "chart" ? "default" : "ghost"} size="sm" className="h-7 px-2.5 text-xs" onClick={() => setParetoView("chart")}>
-                      <PieChart className="h-3.5 w-3.5 mr-1" /> Gráfica
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="rounded-lg border border-border bg-card p-4 space-y-1">
-                    <p className="text-xs text-muted-foreground">Top creadoras (generan el 80%)</p>
-                    <p className="text-2xl font-bold text-primary tabular-nums">{paretoAnalysis.topCount}</p>
-                    <p className="text-xs text-muted-foreground">
-                      de {paretoAnalysis.totalCount} activas ({paretoAnalysis.topPercent.toFixed(1)}%)
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-border bg-card p-4 space-y-1">
-                    <p className="text-xs text-muted-foreground">Ingresos del Top</p>
-                    <p className="text-2xl font-bold tabular-nums">{fmt(paretoAnalysis.topRevenue)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {paretoAnalysis.totalRevenue > 0
-                        ? `${((paretoAnalysis.topRevenue / paretoAnalysis.totalRevenue) * 100).toFixed(1)}% del total`
-                        : "—"}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-border bg-card p-4 space-y-1">
-                    <p className="text-xs text-muted-foreground">Resto de creadoras</p>
-                    <p className="text-2xl font-bold tabular-nums text-muted-foreground">
-                      {fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {paretoAnalysis.rest.length} creadoras generan el {paretoAnalysis.totalRevenue > 0
-                        ? (100 - (paretoAnalysis.topRevenue / paretoAnalysis.totalRevenue) * 100).toFixed(1)
-                        : "0"}% restante
-                    </p>
-                  </div>
-                </div>
-                {/* PIE CHART VIEW */}
-                {paretoView === "chart" && (
-                  <div className="rounded-lg border border-border bg-card p-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-                      {/* Chart */}
-                      <div className="w-full" style={{ minHeight: 320 }}>
-                        <ResponsiveContainer width="100%" height={320}>
-                          <RechartsPie>
-                            <Pie
-                              data={pieData}
-                              cx="50%"
-                              cy="50%"
-                              outerRadius="80%"
-                              innerRadius="45%"
-                              dataKey="value"
-                              nameKey="name"
-                              label={({ name, percent }) => {
-                                const short = name.length > 12 ? name.slice(0, 11) + "…" : name;
-                                return `${short} ${(percent * 100).toFixed(0)}%`;
-                              }}
-                              labelLine={{ strokeWidth: 1 }}
-                            >
-                              {pieData.map((_, idx) => (
-                                <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(value: number) => fmt(value)} />
-                          </RechartsPie>
-                        </ResponsiveContainer>
-                      </div>
-                      {/* Legend table */}
-                      <div className="space-y-1.5 max-h-[320px] overflow-y-auto">
-                        {pieData.map((d, idx) => {
-                          const pct = paretoAnalysis.totalRevenue > 0 ? (d.value / paretoAnalysis.totalRevenue) * 100 : 0;
-                          return (
-                            <div key={idx} className="flex items-center gap-2 text-sm">
-                              <div className="h-3 w-3 rounded-sm shrink-0" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }} />
-                              <span className="truncate flex-1 min-w-0">{d.name}</span>
-                              <span className="tabular-nums font-medium shrink-0">{fmt(d.value)}</span>
-                              <span className="tabular-nums text-muted-foreground text-xs shrink-0 w-12 text-right">{pct.toFixed(1)}%</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground text-center mt-3">
-                      Montos BRUTOS · "Resto" agrupa {paretoAnalysis.rest.length} creadoras (~20% del revenue)
-                    </p>
-                  </div>
-                )}
-
-                {/* LIST VIEW */}
-                {paretoView === "list" && (
-                  <>
-                    {/* TOP 80% — detailed breakdown */}
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
-                        🔥 Top {paretoAnalysis.topCount} creadoras (generan el 80%) — Montos BRUTOS · Desglose interno
-                      </p>
-                      <div className="space-y-1.5">
-                        {paretoAnalysis.top.map((c, i) => {
-                          const pctOfTop = paretoAnalysis.topRevenue > 0 ? (c.total / paretoAnalysis.topRevenue) * 100 : 0;
-                          const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0;
-                          return (
-                            <div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
-                              <span className="text-xs font-bold text-primary w-5 shrink-0 tabular-nums">{i + 1}</span>
-                              {c.instagramHandle && (
-                                <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0" title={`@${c.instagramHandle.replace(/^@/, "")}`}>
-                                  <Instagram className="h-3.5 w-3.5" />
-                                </a>
-                              )}
-                              <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
-                                {c.name}
-                              </button>
-                              <div className="flex-1 mx-2">
-                                <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
-                                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(pctOfTop, 100)}%` }} />
-                                </div>
-                              </div>
-                              <span className="text-sm font-bold tabular-nums w-[60px] text-right text-primary">{pctOfTop.toFixed(1)}%</span>
-                              <span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">({pctOfTotal.toFixed(1)}% tot)</span>
-                              <span className="text-sm font-semibold tabular-nums w-[100px] text-right">{fmt(c.total)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        💡 Todos los montos son <strong>BRUTOS</strong> (antes del 20% de OF). Los % de barra son relativos al grupo Top ({fmt(paretoAnalysis.topRevenue)}). El "% tot" es sobre el total general ({fmt(paretoAnalysis.totalRevenue)}).
-                      </p>
-                    </div>
-
-                    {/* BOTTOM 20% */}
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
-                        📉 Resto ({paretoAnalysis.rest.length} creadoras) — generan el {paretoAnalysis.totalRevenue > 0 ? (100 - (paretoAnalysis.topRevenue / paretoAnalysis.totalRevenue) * 100).toFixed(1) : "0"}% · BRUTO
-                      </p>
-                      {paretoAnalysis.rest.length > 0 ? (
-                        <div className="space-y-1">
-                          {paretoAnalysis.rest.map((c, i) => {
-                            const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0;
-                            return (
-                              <div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border/50 bg-muted/30 px-3 py-1.5">
-                                <span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums">{paretoAnalysis.topCount + i + 1}</span>
-                                {c.instagramHandle && (
-                                  <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0" title={`@${c.instagramHandle.replace(/^@/, "")}`}>
-                                    <Instagram className="h-3.5 w-3.5" />
-                                  </a>
-                                )}
-                                <button className="text-sm text-muted-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
-                                  {c.name}
-                                </button>
-                                <div className="flex-1 mx-2">
-                                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                                    <div className="h-full rounded-full bg-muted-foreground/40 transition-all" style={{ width: `${Math.min(pctOfTotal * 5, 100)}%` }} />
-                                  </div>
-                                </div>
-                                <span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">{pctOfTotal.toFixed(1)}%</span>
-                                <span className="text-sm tabular-nums text-muted-foreground w-[100px] text-right">{fmt(c.total)}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No hay creadoras en este grupo.</p>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
 
             {/* Alerts Panel */}
             {showAlerts && !isLoading && (() => {
