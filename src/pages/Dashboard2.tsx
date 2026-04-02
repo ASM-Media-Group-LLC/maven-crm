@@ -22,11 +22,11 @@ import {
 import {
   Info, TrendingUp, Users, DollarSign, Calendar,
   ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram, PieChart,
-  BarChart3, MessageSquare, Repeat, Heart, Eye,
+  BarChart3, MessageSquare, Repeat, Heart, Eye, AlertTriangle, Target, Crown,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
-  PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
+  PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { useUserRole } from "@/hooks/useUserRole";
 import jsPDF from "jspdf";
@@ -224,7 +224,13 @@ const Dashboard2 = () => {
     const msgsPct = totalBruto > 0 ? (totalMsgs / totalBruto) * 100 : 0;
     const subsPct = totalBruto > 0 ? (totalSubs / totalBruto) * 100 : 0;
     const avgPerFanGlobal = totalFansAll > 0 ? totalBruto / totalFansAll : 0;
-    return { renewalRate, tipsPct, msgsPct, subsPct, avgPerFanGlobal, totalNewSubs, totalRecurring, totalTips, totalMsgs, totalSubs };
+    // CEO metrics
+    const avgPerCreator = active.length > 0 ? totalBruto / active.length : 0;
+    const topCreator = active.length > 0 ? active.reduce((best, c) => c.total > best.total ? c : best, active[0]) : null;
+    const zeroCreators = rawCreators.filter((c) => c.total === 0).length;
+    const creatorsUnder1k = active.filter((c) => c.total < 1000).length;
+    const creatorsOver10k = active.filter((c) => c.total >= 10000).length;
+    return { renewalRate, tipsPct, msgsPct, subsPct, avgPerFanGlobal, totalNewSubs, totalRecurring, totalTips, totalMsgs, totalSubs, totalBruto, avgPerCreator, topCreator, zeroCreators, creatorsUnder1k, creatorsOver10k, activeCount: active.length };
   }, [rawCreators]);
 
   // Pie chart data for pareto
@@ -486,6 +492,49 @@ const Dashboard2 = () => {
               </div>
             )}
 
+            {/* CEO Insights — Admin Only */}
+            {!isLoading && isAdmin && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-lg border-2 border-primary/40 bg-primary/5 p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-[10px] text-primary uppercase tracking-wider font-semibold">
+                    <Crown className="h-3 w-3" /> Top Creadora
+                  </div>
+                  <p className="text-sm font-bold truncate">{hlKpis.topCreator?.name || "—"}</p>
+                  <p className="text-lg font-bold tabular-nums">{hlKpis.topCreator ? fmt(hlKpis.topCreator.total) : "$0"}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {hlKpis.topCreator && hlKpis.totalBruto > 0
+                      ? `${((hlKpis.topCreator.total / hlKpis.totalBruto) * 100).toFixed(1)}% del total`
+                      : ""}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
+                    <Target className="h-3 w-3" /> Promedio / Creadora
+                  </div>
+                  <p className="text-lg font-bold tabular-nums">{fmt(hlKpis.avgPerCreator)}</p>
+                  <p className="text-[10px] text-muted-foreground">entre {hlKpis.activeCount} activas</p>
+                </div>
+                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-[10px] text-destructive uppercase tracking-wider font-semibold">
+                    <AlertTriangle className="h-3 w-3" /> En $0 / Inactivas
+                  </div>
+                  <p className="text-lg font-bold tabular-nums">{hlKpis.zeroCreators}</p>
+                  <p className="text-[10px] text-muted-foreground">sin ventas este mes</p>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
+                    <TrendingUp className="h-3 w-3" /> Distribución
+                  </div>
+                  <p className="text-sm font-bold tabular-nums">
+                    {hlKpis.creatorsOver10k} <span className="text-muted-foreground font-normal text-xs">{'>'} $10k</span>
+                    <span className="mx-1.5 text-muted-foreground">·</span>
+                    {hlKpis.creatorsUnder1k} <span className="text-muted-foreground font-normal text-xs">{'<'} $1k</span>
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">alto rendimiento vs bajo rendimiento</p>
+                </div>
+              </div>
+            )}
+
             {/* Pareto Analysis Panel */}
             {showPareto && !isLoading && (
               <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-5 space-y-4">
@@ -535,29 +584,50 @@ const Dashboard2 = () => {
                 {/* PIE CHART VIEW */}
                 {paretoView === "chart" && (
                   <div className="rounded-lg border border-border bg-card p-4">
-                    <ResponsiveContainer width="100%" height={400}>
-                      <RechartsPie>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={140}
-                          innerRadius={60}
-                          dataKey="value"
-                          nameKey="name"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
-                          labelLine={{ strokeWidth: 1 }}
-                        >
-                          {pieData.map((_, idx) => (
-                            <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: number) => fmt(value)} />
-                        <Legend />
-                      </RechartsPie>
-                    </ResponsiveContainer>
-                    <p className="text-xs text-muted-foreground text-center mt-2">
-                      Montos BRUTOS · El segmento "Resto" agrupa las {paretoAnalysis.rest.length} creadoras que generan el ~20%
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+                      {/* Chart */}
+                      <div className="w-full" style={{ minHeight: 320 }}>
+                        <ResponsiveContainer width="100%" height={320}>
+                          <RechartsPie>
+                            <Pie
+                              data={pieData}
+                              cx="50%"
+                              cy="50%"
+                              outerRadius="80%"
+                              innerRadius="45%"
+                              dataKey="value"
+                              nameKey="name"
+                              label={({ name, percent }) => {
+                                const short = name.length > 12 ? name.slice(0, 11) + "…" : name;
+                                return `${short} ${(percent * 100).toFixed(0)}%`;
+                              }}
+                              labelLine={{ strokeWidth: 1 }}
+                            >
+                              {pieData.map((_, idx) => (
+                                <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value: number) => fmt(value)} />
+                          </RechartsPie>
+                        </ResponsiveContainer>
+                      </div>
+                      {/* Legend table */}
+                      <div className="space-y-1.5 max-h-[320px] overflow-y-auto">
+                        {pieData.map((d, idx) => {
+                          const pct = paretoAnalysis.totalRevenue > 0 ? (d.value / paretoAnalysis.totalRevenue) * 100 : 0;
+                          return (
+                            <div key={idx} className="flex items-center gap-2 text-sm">
+                              <div className="h-3 w-3 rounded-sm shrink-0" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }} />
+                              <span className="truncate flex-1 min-w-0">{d.name}</span>
+                              <span className="tabular-nums font-medium shrink-0">{fmt(d.value)}</span>
+                              <span className="tabular-nums text-muted-foreground text-xs shrink-0 w-12 text-right">{pct.toFixed(1)}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center mt-3">
+                      Montos BRUTOS · "Resto" agrupa {paretoAnalysis.rest.length} creadoras (~20% del revenue)
                     </p>
                   </div>
                 )}
