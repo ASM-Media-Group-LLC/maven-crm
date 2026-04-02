@@ -141,6 +141,7 @@ const SalesDashboard = () => {
               onPeriodChange={setActivePeriod}
               dateFrom={dateRange.from}
               dateTo={dateRange.to}
+              onCustomDateChange={handleCustomDateChange}
               compareMode={compareMode}
               onToggleCompare={handleToggleCompare}
               compareDateFrom={compareRange.from}
