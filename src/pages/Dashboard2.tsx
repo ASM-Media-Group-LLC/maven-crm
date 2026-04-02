@@ -51,15 +51,23 @@ const Dashboard2 = () => {
   const [minTotal, setMinTotal] = useState("");
   const [maxTotal, setMaxTotal] = useState("");
 
-  const { data: platformMap = {} } = useQuery({
-    queryKey: ["creator-platforms"],
+  const { data: creatorInfoMap = {} } = useQuery({
+    queryKey: ["creator-info-dashboard2"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("creator_business")
-        .select("creator_id, main_platform");
-      const map: Record<string, string> = {};
-      for (const r of data ?? []) {
-        if (r.creator_id && r.main_platform) map[r.creator_id] = r.main_platform;
+      const [{ data: biz }, { data: crs }] = await Promise.all([
+        supabase.from("creator_business").select("creator_id, main_platform"),
+        supabase.from("creators").select("id, instagram_handle"),
+      ]);
+      const map: Record<string, { platform: string; ig: string | null }> = {};
+      for (const r of biz ?? []) {
+        if (r.creator_id) map[r.creator_id] = { platform: r.main_platform || "", ig: null };
+      }
+      for (const c of crs ?? []) {
+        if (map[c.id]) {
+          map[c.id].ig = c.instagram_handle || null;
+        } else {
+          map[c.id] = { platform: "", ig: c.instagram_handle || null };
+        }
       }
       return map;
     },
