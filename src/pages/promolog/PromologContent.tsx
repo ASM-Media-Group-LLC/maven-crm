@@ -522,12 +522,12 @@ const PromologContent = () => {
 
   // KPI modal state
   const [kpiModalType, setKpiModalType] = useState<"ingresados" | "no_chequeadas" | "completadas" | null>(null);
-  const kpiModalEntries = useMemo(() => {
+   const kpiModalEntries = useMemo(() => {
     if (!kpiModalType) return [];
-    if (kpiModalType === "no_chequeadas") return entries.filter(e => e.result === "Pendiente");
-    if (kpiModalType === "completadas") return entries.filter(e => e.result === "Sí");
-    return entries;
-  }, [entries, kpiModalType]);
+    if (kpiModalType === "no_chequeadas") return dedupedEntries.filter(e => e.result === "Pendiente");
+    if (kpiModalType === "completadas") return dedupedEntries.filter(e => e.result === "Sí");
+    return dedupedEntries;
+  }, [dedupedEntries, kpiModalType]);
   const kpiModalTitle = kpiModalType === "ingresados" ? "Tickets Ingresados" : kpiModalType === "no_chequeadas" ? "Tickets NO Chequeadas" : "Tickets Completadas Hoy";
 
   const filteredEntries = useMemo(() => {
