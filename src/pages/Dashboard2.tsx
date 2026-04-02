@@ -335,6 +335,8 @@ const Dashboard2 = () => {
                     <TableRow>
                       <TableHead className="w-10">#</TableHead>
                       <SortableHead col="name" label="Creadora" />
+                      <SortableHead col="total" label="Bruto" right />
+                      <SortableHead col="net" label="Neto (80%)" right />
                       <SortableHead col="subs" label="Subs" right />
                       <SortableHead col="newSubs" label="Nuevas" right />
                       <SortableHead col="recurringSubs" label="Recurrentes" right />
@@ -346,7 +348,6 @@ const Dashboard2 = () => {
                       <SortableHead col="avgPerFan" label="$/Fan" right />
                       <SortableHead col="daysWithData" label="Días" right />
                       <SortableHead col="lastDate" label="Última data" />
-                      <SortableHead col="total" label="Total Bruto" right />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
