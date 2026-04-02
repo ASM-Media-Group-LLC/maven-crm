@@ -122,6 +122,7 @@ const Dashboard2 = () => {
         map.set(key, {
           creatorId: key,
           name: r.artistic_name || r.pending_creator || "Sin nombre",
+          instagramHandle: info?.ig || null,
           platform: plat || "OnlyFans",
           total: r.total_earnings_gross ?? 0,
           net: (r.total_earnings_gross ?? 0) * 0.8,
