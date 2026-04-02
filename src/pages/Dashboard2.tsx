@@ -395,9 +395,19 @@ const Dashboard2 = () => {
             {/* Pareto Analysis Panel */}
             {showPareto && !isLoading && (
               <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-5 space-y-4">
-                <div className="flex items-center gap-2">
-                  <PieChart className="h-5 w-5 text-primary" />
-                  <h2 className="text-lg font-bold text-foreground">Análisis 80/20 (Pareto)</h2>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <PieChart className="h-5 w-5 text-primary" />
+                    <h2 className="text-lg font-bold text-foreground">Análisis 80/20 (Pareto)</h2>
+                  </div>
+                  <div className="flex items-center gap-1 rounded-md border border-border bg-card p-0.5">
+                    <Button variant={paretoView === "list" ? "default" : "ghost"} size="sm" className="h-7 px-2.5 text-xs" onClick={() => setParetoView("list")}>
+                      <BarChart3 className="h-3.5 w-3.5 mr-1" /> Lista
+                    </Button>
+                    <Button variant={paretoView === "chart" ? "default" : "ghost"} size="sm" className="h-7 px-2.5 text-xs" onClick={() => setParetoView("chart")}>
+                      <PieChart className="h-3.5 w-3.5 mr-1" /> Gráfica
+                    </Button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="rounded-lg border border-border bg-card p-4 space-y-1">
