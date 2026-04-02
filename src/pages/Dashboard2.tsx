@@ -833,38 +833,89 @@ const Dashboard2 = () => {
             )}
 
             {/* Alerts Panel */}
-            {showAlerts && !isLoading && (
-              <div className="rounded-lg border-2 border-destructive/30 bg-destructive/5 p-5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-destructive" />
-                  <h2 className="text-lg font-bold text-foreground">Red Flags & Alertas</h2>
-                  <Badge variant="destructive" className="ml-1">{alerts.length}</Badge>
+            {showAlerts && !isLoading && (() => {
+              const zeros = alerts.filter((a) => a.type === "zero");
+              const drops = alerts.filter((a) => a.type === "drop");
+              const fanLoss = alerts.filter((a) => a.type === "fanLoss");
+
+              const AlertRow = ({ a }: { a: typeof alerts[0] }) => (
+                <div className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
+                  {a.creator.instagramHandle && (
+                    <a href={`https://instagram.com/${a.creator.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
+                      <Instagram className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                  <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[100px]" onClick={() => navigate(`/creadores/${a.creator.creatorId}`)}>
+                    {a.creator.name}
+                  </button>
+                  <span className="text-sm text-muted-foreground flex-1">{a.detail}</span>
                 </div>
-                {alerts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">✅ No hay alertas este mes. Todo bien.</p>
-                ) : (
-                  <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
-                    {alerts.map((a, i) => (
-                      <div key={i} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
-                        <span className={`text-sm shrink-0 ${a.type === "zero" ? "text-destructive" : a.type === "drop" ? "text-orange-500" : "text-yellow-500"}`}>
-                          {a.type === "zero" ? "🔴" : a.type === "drop" ? "🟠" : "🟡"}
-                        </span>
-                        {a.creator.instagramHandle && (
-                          <a href={`https://instagram.com/${a.creator.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
-                            <Instagram className="h-3.5 w-3.5" />
-                          </a>
-                        )}
-                        <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[100px]" onClick={() => navigate(`/creadores/${a.creator.creatorId}`)}>
-                          {a.creator.name}
-                        </button>
-                        <span className="text-sm text-muted-foreground flex-1">{a.detail}</span>
-                      </div>
-                    ))}
+              );
+
+              return (
+                <div className="rounded-lg border-2 border-destructive/30 bg-destructive/5 p-5 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                    <h2 className="text-lg font-bold text-foreground">Red Flags & Alertas</h2>
+                    <Badge variant="destructive" className="ml-1">{alerts.length}</Badge>
                   </div>
-                )}
-                <p className="text-xs text-muted-foreground">🔴 = Pasó a $0 · 🟠 = Cayó {'>'} 30% vs mes anterior · 🟡 = Perdiendo fans</p>
-              </div>
-            )}
+
+                  {alerts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">✅ No hay alertas este mes. Todo bien.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      {/* Section: Inactivas ($0) */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 pb-1 border-b border-destructive/20">
+                          <span className="text-base">🔴</span>
+                          <h3 className="text-sm font-semibold text-destructive">Inactivas — $0</h3>
+                          <Badge variant="outline" className="ml-auto text-[10px] border-destructive/30 text-destructive">{zeros.length}</Badge>
+                        </div>
+                        {zeros.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2">Ninguna creadora pasó a $0 ✓</p>
+                        ) : (
+                          <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                            {zeros.map((a, i) => <AlertRow key={i} a={a} />)}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section: Caídas >30% */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 pb-1 border-b border-orange-300/40">
+                          <span className="text-base">🟠</span>
+                          <h3 className="text-sm font-semibold text-orange-600 dark:text-orange-400">Caída {'>'} 30%</h3>
+                          <Badge variant="outline" className="ml-auto text-[10px] border-orange-300/50 text-orange-600 dark:text-orange-400">{drops.length}</Badge>
+                        </div>
+                        {drops.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2">Nadie cayó más del 30% ✓</p>
+                        ) : (
+                          <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                            {drops.map((a, i) => <AlertRow key={i} a={a} />)}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section: Pérdida de fans */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 pb-1 border-b border-yellow-300/40">
+                          <span className="text-base">🟡</span>
+                          <h3 className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">Perdiendo Fans</h3>
+                          <Badge variant="outline" className="ml-auto text-[10px] border-yellow-300/50 text-yellow-600 dark:text-yellow-400">{fanLoss.length}</Badge>
+                        </div>
+                        {fanLoss.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2">Sin pérdida de fans detectada ✓</p>
+                        ) : (
+                          <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                            {fanLoss.map((a, i) => <AlertRow key={i} a={a} />)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Projection Panel */}
             {showProjection && !isLoading && (
