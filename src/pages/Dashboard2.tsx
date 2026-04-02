@@ -22,6 +22,7 @@ interface CreatorSummary {
   name: string;
   platform: string;
   total: number;
+  net: number;
   subs: number;
   newSubs: number;
   recurringSubs: number;
@@ -35,7 +36,7 @@ interface CreatorSummary {
   avgPerFan: number;
 }
 
-type SortKey = "name" | "subs" | "newSubs" | "recurringSubs" | "tips" | "messages" | "activeFans" | "newFans" | "daysWithData" | "total" | "lastDate" | "avgPerDay" | "avgPerFan";
+type SortKey = "name" | "total" | "net" | "subs" | "newSubs" | "recurringSubs" | "tips" | "messages" | "activeFans" | "newFans" | "daysWithData" | "lastDate" | "avgPerDay" | "avgPerFan";
 type SortDir = "asc" | "desc";
 
 const Dashboard2 = () => {
@@ -96,6 +97,7 @@ const Dashboard2 = () => {
 
       if (existing) {
         existing.total += r.total_earnings_gross ?? 0;
+        existing.net += (r.total_earnings_gross ?? 0) * 0.8;
         existing.subs += r.subscription_gross ?? 0;
         existing.newSubs += r.new_subscriptions_sub_gross ?? 0;
         existing.recurringSubs += r.recurring_sub_gross ?? 0;
@@ -111,6 +113,7 @@ const Dashboard2 = () => {
           name: r.artistic_name || r.pending_creator || "Sin nombre",
           platform: plat || "OnlyFans",
           total: r.total_earnings_gross ?? 0,
+          net: (r.total_earnings_gross ?? 0) * 0.8,
           subs: r.subscription_gross ?? 0,
           newSubs: r.new_subscriptions_sub_gross ?? 0,
           recurringSubs: r.recurring_sub_gross ?? 0,
@@ -311,9 +314,9 @@ const Dashboard2 = () => {
               <div className="flex items-start gap-2 rounded-md border border-border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
                 <Info className="h-4 w-4 mt-0.5 shrink-0" />
                 <span>
-                  Datos de <code className="bg-muted px-1 rounded font-mono">of_gross_earnings</code> (OnlyFans). 
-                  Se excluyen Unlok e Instagram. Deduplicados por creadora + día.
-                  <span className="text-orange-500 dark:text-orange-400 ml-1">⚠ = data se cortó antes del día 20.</span>
+                  <strong>Bruto</strong> = lo que reporta OnlyFans (100%). <strong>Neto</strong> = lo que recibe la agencia (80%, OF se queda el 20%).
+                  Datos de <code className="bg-muted px-1 rounded font-mono">of_gross_earnings</code>. Se excluyen Unlok e Instagram.
+                  <span className="ml-1" style={{ color: "hsl(25, 95%, 53%)" }}>⚠ = data se cortó antes del día 20.</span>
                 </span>
               </div>
             )}
@@ -332,6 +335,8 @@ const Dashboard2 = () => {
                     <TableRow>
                       <TableHead className="w-10">#</TableHead>
                       <SortableHead col="name" label="Creadora" />
+                      <SortableHead col="total" label="Bruto" right />
+                      <SortableHead col="net" label="Neto (80%)" right />
                       <SortableHead col="subs" label="Subs" right />
                       <SortableHead col="newSubs" label="Nuevas" right />
                       <SortableHead col="recurringSubs" label="Recurrentes" right />
@@ -343,13 +348,12 @@ const Dashboard2 = () => {
                       <SortableHead col="avgPerFan" label="$/Fan" right />
                       <SortableHead col="daysWithData" label="Días" right />
                       <SortableHead col="lastDate" label="Última data" />
-                      <SortableHead col="total" label="Total Bruto" right />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {creators.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={14} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={15} className="text-center py-12 text-muted-foreground">
                           {rawCreators.length > 0
                             ? "No hay resultados con los filtros actuales"
                             : `Sin datos para ${label}`}
@@ -363,6 +367,12 @@ const Dashboard2 = () => {
                           <TableRow key={c.creatorId} className={isZero ? "opacity-50" : ""}>
                             <TableCell className="text-muted-foreground tabular-nums text-xs">{i + 1}</TableCell>
                             <TableCell className="font-medium whitespace-nowrap">{c.name}</TableCell>
+                            <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : ""}`}>
+                              {fmt(c.total)}
+                            </TableCell>
+                            <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : "text-emerald-600 dark:text-emerald-400"}`}>
+                              {fmt(c.net)}
+                            </TableCell>
                             <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.newSubs)}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.recurringSubs)}</TableCell>
@@ -373,12 +383,9 @@ const Dashboard2 = () => {
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerDay)}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerFan)}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.daysWithData}</TableCell>
-                            <TableCell className={`text-sm tabular-nums whitespace-nowrap ${stopped ? "text-orange-500 dark:text-orange-400 font-medium" : "text-muted-foreground"}`}>
+                            <TableCell className={`text-sm tabular-nums whitespace-nowrap ${stopped ? "font-medium" : "text-muted-foreground"}`} style={stopped ? { color: "hsl(25, 95%, 53%)" } : undefined}>
                               {format(new Date(c.lastDate + "T12:00:00"), "dd MMM", { locale: es })}
                               {stopped && " ⚠"}
-                            </TableCell>
-                            <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : ""}`}>
-                              {fmt(c.total)}
                             </TableCell>
                           </TableRow>
                         );
