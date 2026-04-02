@@ -26,6 +26,7 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const DesignSystem = lazy(() => import("./pages/DesignSystem"));
 const Docs = lazy(() => import("./pages/Docs"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Dashboard2 = lazy(() => import("./pages/Dashboard2"));
 
 // Sales
 const SalesDashboard = lazy(() => import("./pages/SalesDashboard"));
