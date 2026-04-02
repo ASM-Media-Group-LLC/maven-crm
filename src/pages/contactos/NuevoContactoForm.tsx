@@ -83,6 +83,10 @@ const NuevoContactoForm = () => {
   const [form, setForm] = useState<FormData>(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [creatorAlert, setCreatorAlert] = useState<{ name: string; id: string } | null>(null);
+  const [existingContactData, setExistingContactData] = useState<{
+    id: string; name: string; phone?: string; email?: string; agentName?: string; createdAt?: string;
+  } | null>(null);
+  const [isUpdatingContact, setIsUpdatingContact] = useState(false);
   const [companies, setCompanies] = useState<string[]>(DEFAULT_COMPANIES);
   const [uploadModal, setUploadModal] = useState<{ open: boolean; category: UploadCategory }>({ open: false, category: "piclink" });
   const [profilePhoto, setProfilePhoto] = useState<UploadedFile | null>(null);
