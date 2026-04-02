@@ -30,6 +30,7 @@ const Dashboard2 = lazy(() => import("./pages/Dashboard2"));
 
 // Sales
 const SalesDashboard = lazy(() => import("./pages/SalesDashboard"));
+const SalesAudit = lazy(() => import("./pages/SalesAudit"));
 const SalesOverview = lazy(() => import("./pages/SalesOverview"));
 const ComparativasPage = lazy(() => import("./pages/sales-overview/ComparativasPage"));
 const Top10Page = lazy(() => import("./pages/sales-overview/Top10Page"));
