@@ -22,8 +22,11 @@ import {
 import {
   Info, TrendingUp, Users, DollarSign, Calendar,
   ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram, PieChart,
-  BarChart3, MessageSquare, Repeat, Heart, Eye, AlertTriangle, Target, Crown,
+  BarChart3, MessageSquare, Repeat, Heart, Eye, AlertTriangle, Target, Crown, X,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import {
   PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -86,6 +89,7 @@ const Dashboard2 = () => {
   const [showPareto, setShowPareto] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [alertTab, setAlertTab] = useState<"zero" | "drop" | "fanLoss" | null>(null);
+  const [showMetrics, setShowMetrics] = useState(false);
   const [showProjection, setShowProjection] = useState(false);
   const [paretoView, setParetoView] = useState<"list" | "chart">("list");
   const PIE_COLORS = ["hsl(221,83%,53%)","hsl(142,71%,45%)","hsl(25,95%,53%)","hsl(280,67%,55%)","hsl(350,80%,55%)","hsl(190,80%,45%)","hsl(45,93%,47%)","hsl(160,60%,45%)","hsl(320,70%,50%)","hsl(200,70%,50%)","hsl(100,60%,45%)","hsl(0,70%,55%)","hsl(260,50%,55%)","hsl(30,80%,50%)","hsl(170,70%,40%)","hsl(220,50%,60%)","hsl(60,70%,50%)","hsl(310,60%,55%)","hsl(140,50%,50%)","hsl(10,70%,50%)"];
@@ -530,9 +534,18 @@ const Dashboard2 = () => {
                   </SelectContent>
                 </Select>
                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMetrics(true)}
+                  className="gap-1.5"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Métricas
+                </Button>
+                <Button
                   variant={showPareto ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setShowPareto(!showPareto)}
+                  onClick={() => setShowPareto(true)}
                   className="gap-1.5"
                 >
                   <PieChart className="h-4 w-4" />
@@ -565,19 +578,128 @@ const Dashboard2 = () => {
               </div>
             </div>
 
-            {/* High-level Business Indicators */}
-            {!isLoading && (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div className="rounded-lg border border-border bg-card p-3 space-y-0.5">
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
-                    <Repeat className="h-3 w-3" /> Retención Subs
+            {/* ── Metrics Dialog ── */}
+            <Dialog open={showMetrics} onOpenChange={setShowMetrics}>
+              <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader><DialogTitle className="text-xl">Métricas — {selectedPeriod?.label}</DialogTitle></DialogHeader>
+                <div className="space-y-6 pt-2">
+                  <div>
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Revenue Split</h3>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { icon: <MessageSquare className="h-5 w-5 mx-auto text-muted-foreground" />, pct: hlKpis.msgsPct, label: "Mensajería", amount: hlKpis.totalMsgs },
+                        { icon: <Heart className="h-5 w-5 mx-auto text-muted-foreground" />, pct: hlKpis.tipsPct, label: "Tips", amount: hlKpis.totalTips },
+                        { icon: <Eye className="h-5 w-5 mx-auto text-muted-foreground" />, pct: hlKpis.subsPct, label: "Suscripciones", amount: hlKpis.totalSubs },
+                      ].map((item, idx) => (
+                        <div key={idx} className="rounded-lg border border-border bg-card p-4 text-center space-y-1">
+                          {item.icon}
+                          <p className="text-2xl font-bold tabular-nums">{item.pct.toFixed(1)}%</p>
+                          <p className="text-xs text-muted-foreground">{item.label}</p>
+                          <p className="text-sm font-medium tabular-nums">{fmt(item.amount)}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <p className="text-lg font-bold tabular-nums">{hlKpis.renewalRate.toFixed(1)}%</p>
-                  <p className="text-[10px] text-muted-foreground">Recurrentes / Total subs</p>
+                  <div>
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Retención & Fans</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Repeat className="h-3.5 w-3.5" /> Retención</div>
+                        <p className="text-2xl font-bold tabular-nums">{hlKpis.renewalRate.toFixed(1)}%</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><DollarSign className="h-3.5 w-3.5" /> $/Fan</div>
+                        <p className="text-2xl font-bold tabular-nums">{fmt(hlKpis.avgPerFanGlobal)}</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Users className="h-3.5 w-3.5" /> Nuevas Subs</div>
+                        <p className="text-2xl font-bold tabular-nums">{hlKpis.totalNewSubs.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Repeat className="h-3.5 w-3.5" /> Recurrentes</div>
+                        <p className="text-2xl font-bold tabular-nums">{hlKpis.totalRecurring.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <div>
+                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">CEO Insights</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="rounded-lg border-2 border-primary/40 bg-primary/5 p-4 space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs text-primary font-semibold"><Crown className="h-3.5 w-3.5" /> Top Creadora</div>
+                          <p className="text-sm font-bold truncate">{hlKpis.topCreator?.name || "—"}</p>
+                          <p className="text-xl font-bold tabular-nums">{hlKpis.topCreator ? fmt(hlKpis.topCreator.total) : "$0"}</p>
+                        </div>
+                        <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Target className="h-3.5 w-3.5" /> Promedio</div>
+                          <p className="text-xl font-bold tabular-nums">{fmt(hlKpis.avgPerCreator)}</p>
+                          <p className="text-[10px] text-muted-foreground">{hlKpis.activeCount} activas</p>
+                        </div>
+                        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs text-destructive font-semibold"><AlertTriangle className="h-3.5 w-3.5" /> Inactivas</div>
+                          <p className="text-xl font-bold tabular-nums">{hlKpis.zeroCreators}</p>
+                        </div>
+                        <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><TrendingUp className="h-3.5 w-3.5" /> Distribución</div>
+                          <p className="text-sm font-bold tabular-nums">{hlKpis.creatorsOver10k} {'>'} $10k · {hlKpis.creatorsUnder1k} {'<'} $1k</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="rounded-lg border border-border bg-card p-3 space-y-0.5">
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
-                    <MessageSquare className="h-3 w-3" /> Msgs del Total
+              </DialogContent>
+            </Dialog>
+
+            {/* ── Pareto Dialog ── */}
+            <Dialog open={showPareto} onOpenChange={setShowPareto}>
+              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle className="text-xl flex items-center gap-2"><PieChart className="h-5 w-5 text-primary" /> Análisis 80/20 — {selectedPeriod?.label}</DialogTitle></DialogHeader>
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="grid grid-cols-3 gap-3 flex-1 min-w-0">
+                      <div className="rounded-lg border border-border bg-card p-3 space-y-1">
+                        <p className="text-xs text-muted-foreground">Top (80%)</p>
+                        <p className="text-2xl font-bold text-primary tabular-nums">{paretoAnalysis.topCount}</p>
+                        <p className="text-xs text-muted-foreground">de {paretoAnalysis.totalCount}</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-card p-3 space-y-1">
+                        <p className="text-xs text-muted-foreground">Revenue Top</p>
+                        <p className="text-2xl font-bold tabular-nums">{fmt(paretoAnalysis.topRevenue)}</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-card p-3 space-y-1">
+                        <p className="text-xs text-muted-foreground">Resto</p>
+                        <p className="text-2xl font-bold tabular-nums text-muted-foreground">{fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 rounded-md border border-border bg-card p-0.5">
+                      <Button variant={paretoView === "list" ? "default" : "ghost"} size="sm" className="h-7 px-2.5 text-xs" onClick={() => setParetoView("list")}><BarChart3 className="h-3.5 w-3.5 mr-1" /> Lista</Button>
+                      <Button variant={paretoView === "chart" ? "default" : "ghost"} size="sm" className="h-7 px-2.5 text-xs" onClick={() => setParetoView("chart")}><PieChart className="h-3.5 w-3.5 mr-1" /> Gráfica</Button>
+                    </div>
+                  </div>
+                  {paretoView === "chart" && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center rounded-lg border border-border bg-card p-4">
+                      <div style={{ minHeight: 380 }}><ResponsiveContainer width="100%" height={380}><RechartsPie><Pie data={pieData} cx="50%" cy="50%" outerRadius="80%" innerRadius="40%" dataKey="value" nameKey="name" label={({ name, percent }) => `${name.length > 14 ? name.slice(0, 13) + "…" : name} ${(percent * 100).toFixed(0)}%`} labelLine={{ strokeWidth: 1 }}>{pieData.map((_, idx) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}</Pie><Tooltip formatter={(value: number) => fmt(value)} /></RechartsPie></ResponsiveContainer></div>
+                      <div className="space-y-1.5 max-h-[380px] overflow-y-auto">{pieData.map((d, idx) => { const pct = paretoAnalysis.totalRevenue > 0 ? (d.value / paretoAnalysis.totalRevenue) * 100 : 0; return (<div key={idx} className="flex items-center gap-2 text-sm"><div className="h-3 w-3 rounded-sm shrink-0" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }} /><span className="truncate flex-1 min-w-0">{d.name}</span><span className="tabular-nums font-medium shrink-0">{fmt(d.value)}</span><span className="tabular-nums text-muted-foreground text-xs shrink-0 w-12 text-right">{pct.toFixed(1)}%</span></div>); })}</div>
+                    </div>
+                  )}
+                  {paretoView === "list" && (
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">🔥 Top {paretoAnalysis.topCount} — BRUTO</p>
+                        <div className="space-y-1.5 max-h-[350px] overflow-y-auto">{paretoAnalysis.top.map((c, i) => { const pctOfTop = paretoAnalysis.topRevenue > 0 ? (c.total / paretoAnalysis.topRevenue) * 100 : 0; const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0; return (<div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2"><span className="text-xs font-bold text-primary w-5 shrink-0 tabular-nums">{i + 1}</span>{c.instagramHandle && <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"><Instagram className="h-3.5 w-3.5" /></a>}<button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button><div className="flex-1 mx-2"><div className="h-3 w-full rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(pctOfTop, 100)}%` }} /></div></div><span className="text-sm font-bold tabular-nums w-[60px] text-right text-primary">{pctOfTop.toFixed(1)}%</span><span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">({pctOfTotal.toFixed(1)}%)</span><span className="text-sm font-semibold tabular-nums w-[100px] text-right">{fmt(c.total)}</span></div>); })}</div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">📉 Resto ({paretoAnalysis.rest.length})</p>
+                        {paretoAnalysis.rest.length > 0 ? (<div className="space-y-1 max-h-[200px] overflow-y-auto">{paretoAnalysis.rest.map((c, i) => { const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0; return (<div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border/50 bg-muted/30 px-3 py-1.5"><span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums">{paretoAnalysis.topCount + i + 1}</span>{c.instagramHandle && <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"><Instagram className="h-3.5 w-3.5" /></a>}<button className="text-sm text-muted-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button><div className="flex-1 mx-2"><div className="h-2 w-full rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full bg-muted-foreground/40 transition-all" style={{ width: `${Math.min(pctOfTotal * 5, 100)}%` }} /></div></div><span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">{pctOfTotal.toFixed(1)}%</span><span className="text-sm tabular-nums text-muted-foreground w-[100px] text-right">{fmt(c.total)}</span></div>); })}</div>) : <p className="text-sm text-muted-foreground">Ninguna.</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+
+
                   </div>
                   <p className="text-lg font-bold tabular-nums">{hlKpis.msgsPct.toFixed(1)}%</p>
                   <p className="text-[10px] text-muted-foreground">{fmt(hlKpis.totalMsgs)}</p>
