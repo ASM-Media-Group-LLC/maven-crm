@@ -263,7 +263,7 @@ const PromologContent = () => {
   }, [entries]);
 
   const platformCards = useMemo(() => {
-    const siEntries = entries.filter(e => e.result === "Sí");
+    const siEntries = dedupedEntries.filter(e => e.result === "Sí");
     const countByPlatform = (plat: string) => siEntries.filter(e => (e.platform || "").toLowerCase().includes(plat)).length;
     return [
       { name: "OnlyFans", value: countByPlatform("onlyfans"), bg: "bg-blue-500/10", icon: <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white text-[10px] font-bold">OF</span> },
