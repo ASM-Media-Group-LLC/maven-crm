@@ -123,9 +123,22 @@ const AuditComparisonTable = ({ file }: Props) => {
       "Valor Final": validations[r.creator] === "excel" ? "Excel" : validations[r.creator] === "system" ? "Sistema" : "Sin decidir",
       "Monto Final": validations[r.creator] === "excel" ? r.excelGross.toFixed(2) : validations[r.creator] === "system" ? r.systemGross.toFixed(2) : "",
     }));
-    const ws = XLSX.utils.json_to_sheet(exportData);
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Auditoría");
+
+    // Header sheet with date info
+    const infoData = [
+      ["Auditoría de Ventas"],
+      ["Período:", dateRange ? `${dateRange.min} al ${dateRange.max}` : "N/A"],
+      ["Archivo:", file.name],
+      ["Generado:", new Date().toLocaleString("es-MX")],
+      [],
+    ];
+    const wsInfo = XLSX.utils.aoa_to_sheet(infoData);
+
+    // Append data below the header
+    XLSX.utils.sheet_add_json(wsInfo, exportData, { origin: "A6" });
+    XLSX.utils.book_append_sheet(wb, wsInfo, "Auditoría");
     XLSX.writeFile(wb, "auditoria_ventas.xlsx");
   };
 
