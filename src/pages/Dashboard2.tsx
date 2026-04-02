@@ -400,7 +400,7 @@ const Dashboard2 = () => {
                 {/* TOP 80% — detailed breakdown */}
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
-                    🔥 Top {paretoAnalysis.topCount} creadoras (generan el 80%) — Desglose interno
+                    🔥 Top {paretoAnalysis.topCount} creadoras (generan el 80%) — Montos BRUTOS · Desglose interno
                   </p>
                   <div className="space-y-1.5">
                     {paretoAnalysis.top.map((c, i) => {
@@ -409,6 +409,17 @@ const Dashboard2 = () => {
                       return (
                         <div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
                           <span className="text-xs font-bold text-primary w-5 shrink-0 tabular-nums">{i + 1}</span>
+                          {c.instagramHandle && (
+                            <a
+                              href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"
+                              title={`@${c.instagramHandle.replace(/^@/, "")}`}
+                            >
+                              <Instagram className="h-3.5 w-3.5" />
+                            </a>
+                          )}
                           <button
                             className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]"
                             onClick={() => navigate(`/creadores/${c.creatorId}`)}
@@ -431,14 +442,14 @@ const Dashboard2 = () => {
                     })}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Los % de barra son relativos al grupo Top ({fmt(paretoAnalysis.topRevenue)}). El "% tot" es sobre el total general ({fmt(paretoAnalysis.totalRevenue)}).
+                    💡 Todos los montos son <strong>BRUTOS</strong> (antes del 20% de OF). Los % de barra son relativos al grupo Top ({fmt(paretoAnalysis.topRevenue)}). El "% tot" es sobre el total general ({fmt(paretoAnalysis.totalRevenue)}).
                   </p>
                 </div>
 
                 {/* BOTTOM 20% */}
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
-                    📉 Resto ({paretoAnalysis.rest.length} creadoras) — generan el {paretoAnalysis.totalRevenue > 0 ? (100 - (paretoAnalysis.topRevenue / paretoAnalysis.totalRevenue) * 100).toFixed(1) : "0"}%
+                    📉 Resto ({paretoAnalysis.rest.length} creadoras) — generan el {paretoAnalysis.totalRevenue > 0 ? (100 - (paretoAnalysis.topRevenue / paretoAnalysis.totalRevenue) * 100).toFixed(1) : "0"}% · BRUTO
                   </p>
                   {paretoAnalysis.rest.length > 0 ? (
                     <div className="space-y-1">
@@ -447,6 +458,17 @@ const Dashboard2 = () => {
                         return (
                           <div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border/50 bg-muted/30 px-3 py-1.5">
                             <span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums">{paretoAnalysis.topCount + i + 1}</span>
+                            {c.instagramHandle && (
+                              <a
+                                href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"
+                                title={`@${c.instagramHandle.replace(/^@/, "")}`}
+                              >
+                                <Instagram className="h-3.5 w-3.5" />
+                              </a>
+                            )}
                             <button
                               className="text-sm text-muted-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]"
                               onClick={() => navigate(`/creadores/${c.creatorId}`)}
