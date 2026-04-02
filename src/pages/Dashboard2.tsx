@@ -22,6 +22,7 @@ interface CreatorSummary {
   name: string;
   platform: string;
   total: number;
+  net: number;
   subs: number;
   newSubs: number;
   recurringSubs: number;
@@ -35,7 +36,7 @@ interface CreatorSummary {
   avgPerFan: number;
 }
 
-type SortKey = "name" | "subs" | "newSubs" | "recurringSubs" | "tips" | "messages" | "activeFans" | "newFans" | "daysWithData" | "total" | "lastDate" | "avgPerDay" | "avgPerFan";
+type SortKey = "name" | "total" | "net" | "subs" | "newSubs" | "recurringSubs" | "tips" | "messages" | "activeFans" | "newFans" | "daysWithData" | "lastDate" | "avgPerDay" | "avgPerFan";
 type SortDir = "asc" | "desc";
 
 const Dashboard2 = () => {
