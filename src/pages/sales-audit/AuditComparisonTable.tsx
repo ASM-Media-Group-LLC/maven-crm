@@ -128,6 +128,7 @@ const AuditComparisonTable = ({ file }: Props) => {
       setTotalSystemEntries(totalSystem);
       setExcelDetails(excelDetailMap);
       setSystemDetails(systemDetailMap);
+      setSystemRawRecords(rawRecordsMap);
       setLoading(false);
     };
 
