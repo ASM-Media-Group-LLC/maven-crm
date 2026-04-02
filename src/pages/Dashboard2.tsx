@@ -263,17 +263,20 @@ const Dashboard2 = () => {
     return map;
   }, [allRows, selectedMonth, selectedPeriod, monthOptions, creatorInfoMap]);
 
+  const fmtInline = (n: number) =>
+    `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   // Alerts / Red Flags
   const alerts = useMemo(() => {
     const items: { type: "drop" | "zero" | "fanLoss"; creator: CreatorSummary; detail: string }[] = [];
     for (const c of rawCreators) {
       const prev = prevMonthMap.get(c.creatorId);
       if (c.total === 0 && prev && prev > 0) {
-        items.push({ type: "zero", creator: c, detail: `Vendía ${fmt(prev)} → ahora $0` });
+        items.push({ type: "zero", creator: c, detail: `Vendía ${fmtInline(prev)} → ahora $0` });
       } else if (prev && prev > 0 && c.total > 0) {
         const change = ((c.total - prev) / prev) * 100;
         if (change <= -30) {
-          items.push({ type: "drop", creator: c, detail: `Cayó ${Math.abs(change).toFixed(0)}% (${fmt(prev)} → ${fmt(c.total)})` });
+          items.push({ type: "drop", creator: c, detail: `Cayó ${Math.abs(change).toFixed(0)}% (${fmtInline(prev)} → ${fmtInline(c.total)})` });
         }
       }
       if (c.activeFans > 0 && c.newFans < 0) {
