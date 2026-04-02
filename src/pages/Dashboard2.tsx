@@ -378,7 +378,28 @@ const Dashboard2 = () => {
                         return (
                           <TableRow key={c.creatorId} className={isZero ? "opacity-50" : ""}>
                             <TableCell className="text-muted-foreground tabular-nums text-xs">{i + 1}</TableCell>
-                            <TableCell className="font-medium whitespace-nowrap">{c.name}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                {c.instagramHandle && (
+                                  <a
+                                    href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"
+                                    title={`@${c.instagramHandle.replace(/^@/, "")}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Instagram className="h-3.5 w-3.5" />
+                                  </a>
+                                )}
+                                <button
+                                  className="font-medium text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left"
+                                  onClick={() => navigate(`/creadores/${c.creatorId}`)}
+                                >
+                                  {c.name}
+                                </button>
+                              </div>
+                            </TableCell>
                             <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : ""}`}>
                               {fmt(c.total)}
                             </TableCell>
