@@ -1047,7 +1047,7 @@ const Dashboard2 = () => {
                   <TableBody>
                     {creators.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={15} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={16} className="text-center py-12 text-muted-foreground">
                           {rawCreators.length > 0
                             ? "No hay resultados con los filtros actuales"
                             : `Sin datos para ${selectedPeriod?.label}`}
