@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { startOfMonth, subMonths, endOfMonth, format } from "date-fns";
+import { subMonths, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -23,12 +23,17 @@ const Dashboard2 = () => {
   const lastMonth = useMemo(() => {
     const now = new Date();
     const m = subMonths(now, 1);
-    return { start: startOfMonth(m), end: endOfMonth(m) };
+    const y = m.getFullYear();
+    const mo = m.getMonth(); // 0-indexed
+    const startStr = `${y}-${String(mo + 1).padStart(2, "0")}-01`;
+    const lastDay = new Date(y, mo + 1, 0).getDate();
+    const endStr = `${y}-${String(mo + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    return { startStr, endStr, month: m };
   }, []);
 
   const label = useMemo(
     () =>
-      format(lastMonth.start, "MMMM yyyy", { locale: es }).replace(/^\w/, (c) =>
+      format(lastMonth.month, "MMMM yyyy", { locale: es }).replace(/^\w/, (c) =>
         c.toUpperCase()
       ),
     [lastMonth]
@@ -38,8 +43,8 @@ const Dashboard2 = () => {
     const map = new Map<string, CreatorSummary>();
 
     for (const r of allRows) {
-      const d = new Date(r.effective_date);
-      if (d < lastMonth.start || d > lastMonth.end) continue;
+      const d = r.effective_date; // string "YYYY-MM-DD"
+      if (d < lastMonth.startStr || d > lastMonth.endStr) continue;
 
       const key = r.creator_id || r.pending_creator || r.id;
       const existing = map.get(key);
