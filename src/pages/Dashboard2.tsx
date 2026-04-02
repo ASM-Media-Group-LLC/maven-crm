@@ -741,7 +741,15 @@ const Dashboard2 = () => {
                   {/* CHART VIEW — clean donut + sidebar legend */}
                   {paretoView === "chart" && (
                     <div className="rounded-xl border border-border bg-card overflow-hidden">
-                      <div className="grid grid-cols-1 lg:grid-cols-5 divide-y lg:divide-y-0 lg:divide-x divide-border">
+                      {/* 80 vs 20 toggle */}
+                      <div className="flex items-center justify-center gap-2 p-3 border-b border-border bg-muted/30">
+                        <Button variant={paretoGroup === "80" ? "default" : "outline"} size="sm" className="h-8 px-4 text-xs rounded-full" onClick={() => setParetoGroup("80")}>
+                          🔥 Top 80%
+                        </Button>
+                        <Button variant={paretoGroup === "20" ? "default" : "outline"} size="sm" className="h-8 px-4 text-xs rounded-full" onClick={() => setParetoGroup("20")}>
+                          📊 Bottom 20%
+                        </Button>
+                      </div>
                         <div className="lg:col-span-3 p-6 flex items-center justify-center" style={{ minHeight: 400 }}>
                           <ResponsiveContainer width="100%" height={400}>
                             <RechartsPie>
