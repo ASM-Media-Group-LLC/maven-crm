@@ -314,9 +314,9 @@ const Dashboard2 = () => {
               <div className="flex items-start gap-2 rounded-md border border-border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
                 <Info className="h-4 w-4 mt-0.5 shrink-0" />
                 <span>
-                  Datos de <code className="bg-muted px-1 rounded font-mono">of_gross_earnings</code> (OnlyFans). 
-                  Se excluyen Unlok e Instagram. Deduplicados por creadora + día.
-                  <span className="text-orange-500 dark:text-orange-400 ml-1">⚠ = data se cortó antes del día 20.</span>
+                  <strong>Bruto</strong> = lo que reporta OnlyFans (100%). <strong>Neto</strong> = lo que recibe la agencia (80%, OF se queda el 20%).
+                  Datos de <code className="bg-muted px-1 rounded font-mono">of_gross_earnings</code>. Se excluyen Unlok e Instagram.
+                  <span className="ml-1" style={{ color: "hsl(25, 95%, 53%)" }}>⚠ = data se cortó antes del día 20.</span>
                 </span>
               </div>
             )}
