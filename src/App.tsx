@@ -90,6 +90,17 @@ const NotificacionesSettings = lazy(() => import("./pages/ajustes/Notificaciones
 const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
 const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
 
+// Proyecto MP
+const ProyectoMPLayout = lazy(() => import("./pages/proyectomp/ProyectoMPLayout"));
+const ProyectoMPDashboard = lazy(() => import("./pages/proyectomp/ProyectoMPDashboard"));
+const ProyectoMPTareas = lazy(() => import("./pages/proyectomp/ProyectoMPTareas"));
+const ProyectoMPPipeline = lazy(() => import("./pages/proyectomp/ProyectoMPPipeline"));
+const ProyectoMPContenido = lazy(() => import("./pages/proyectomp/ProyectoMPContenido"));
+const ProyectoMPTrafico = lazy(() => import("./pages/proyectomp/ProyectoMPTrafico"));
+const ProyectoMPFinanzas = lazy(() => import("./pages/proyectomp/ProyectoMPFinanzas"));
+const ProyectoMPEquipo = lazy(() => import("./pages/proyectomp/ProyectoMPEquipo"));
+const ProyectoMPMilestones = lazy(() => import("./pages/proyectomp/ProyectoMPMilestones"));
+
 // HR
 const HRLayout = lazy(() => import("./pages/hr/HRLayout"));
 const HRDashboard = lazy(() => import("./pages/hr/HRDashboard"));
