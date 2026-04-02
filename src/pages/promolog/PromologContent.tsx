@@ -531,7 +531,7 @@ const PromologContent = () => {
   const kpiModalTitle = kpiModalType === "ingresados" ? "Tickets Ingresados" : kpiModalType === "no_chequeadas" ? "Tickets NO Chequeadas" : "Tickets Completadas Hoy";
 
   const filteredEntries = useMemo(() => {
-    return entries.filter((entry) => {
+    return dedupedEntries.filter((entry) => {
       if (selectedCreatorFilter !== "" && entry.creator_id !== selectedCreatorFilter) return false;
       if (selectedStatus !== "") {
         const statusMap: Record<string, string> = { si_promociono: "Sí", no_promociono: "No", parcial: "Parcial", pendiente: "Pendiente" };
