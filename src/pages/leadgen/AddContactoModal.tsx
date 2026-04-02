@@ -175,7 +175,75 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
     }
   };
 
+  const handleUpdateExistingContact = async () => {
+    if (!existingContactData || !pendingFormData) return;
+    setIsUpdatingContact(true);
+    try {
+      const updates: Record<string, any> = {};
+      if (pendingFormData.telefono?.trim()) updates.phone = pendingFormData.telefono.trim();
+      if (pendingFormData.notas?.trim()) updates.notes = pendingFormData.notas.trim();
+      if (pendingFormData.paisCodigo) updates.country_code = pendingFormData.paisCodigo;
+
+      if (Object.keys(updates).length === 0) {
+        toast({ title: "No hay datos nuevos para actualizar", variant: "destructive" });
+        setIsUpdatingContact(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("closers_contacts")
+        .update(updates)
+        .eq("id", existingContactData.id);
+
+      if (error) throw error;
+
+      toast({ title: "Contacto actualizado exitosamente" });
+      setExistingContactData(null);
+      setPendingFormData(null);
+      queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
+      form.reset();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Error al actualizar", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUpdatingContact(false);
+    }
+  };
+
+  const handleCreateNewAnyway = async () => {
+    if (!pendingFormData) return;
+    setExistingContactData(null);
+    setPendingFormData(null);
+    setIsSubmitting(true);
+    try {
+      const normalizedIg = normalizeHandle(pendingFormData.instagram);
+      const { error } = await supabase.from("closers_contacts").insert({
+        name: pendingFormData.nombre,
+        handle: normalizedIg || pendingFormData.instagram,
+        platform: "Instagram",
+        physical_appearance: pendingFormData.categoriaFisica,
+        company: pendingFormData.compania || null,
+        country_code: pendingFormData.paisCodigo,
+        phone: pendingFormData.telefono || null,
+        notes: pendingFormData.notas || null,
+        created_by: user?.id ?? "",
+        record_type: "reactivado",
+      });
+      if (error) throw error;
+      toast({ title: "Contacto guardado exitosamente" });
+      queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
+      form.reset();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Error al guardar contacto", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader className="pr-8">
