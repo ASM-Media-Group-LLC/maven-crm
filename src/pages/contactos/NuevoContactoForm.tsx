@@ -158,8 +158,8 @@ const NuevoContactoForm = () => {
       if (creatorCheck.exists && !creatorCheck.isActive) {
         recordType = "reactivado";
         toast({
-          title: "Creadora inactiva detectada",
-          description: `${creatorCheck.creatorName} está como ${creatorCheck.creatorStatus}. Se registrará como contacto reactivado.`,
+          title: "⚠️ Creadora inactiva detectada",
+          description: `${creatorCheck.creatorName} tiene estado "${creatorCheck.creatorStatus}". Se registrará como contacto reactivado.`,
         });
       }
 
@@ -167,9 +167,13 @@ const NuevoContactoForm = () => {
       const existingContact = await checkExistingContact(form.accountLink);
       if (existingContact.exists) {
         recordType = "reactivado";
+        const agentInfo = existingContact.contactAgentName ? ` por ${existingContact.contactAgentName}` : "";
+        const dateInfo = existingContact.contactCreatedAt
+          ? ` el ${new Date(existingContact.contactCreatedAt).toLocaleDateString("es-CO")}`
+          : "";
         toast({
-          title: "Contacto existente",
-          description: `Esta modelo ya está registrada como contacto: ${existingContact.contactName}. Se creará un nuevo registro.`,
+          title: "⚠️ Contacto existente",
+          description: `Esta modelo ya existe como contacto: ${existingContact.contactName} (registrada${agentInfo}${dateInfo}). Se creará nuevo registro.`,
         });
       }
 
@@ -177,9 +181,11 @@ const NuevoContactoForm = () => {
       if (form.onlyfansUrl?.trim()) {
         const ofCheck = await checkDuplicateOnlyFans(form.onlyfansUrl);
         if (ofCheck.existsInLeads || ofCheck.existsInContacts) {
+          const where = ofCheck.existsInLeads ? "leads" : "contactos";
+          const nameInfo = ofCheck.matchName ? ` para "${ofCheck.matchName}"` : "";
           toast({
-            title: "OnlyFans duplicado",
-            description: `Esta URL de OnlyFans ya está registrada en ${ofCheck.existsInLeads ? "leads" : "contactos"}.`,
+            title: "❌ OnlyFans duplicado",
+            description: `Esta URL ya está registrada en ${where}${nameInfo}. No se puede registrar.`,
             variant: "destructive",
           });
           setIsSaving(false);
@@ -198,8 +204,8 @@ const NuevoContactoForm = () => {
           .maybeSingle();
         if (phoneInContacts) {
           toast({
-            title: "Teléfono ya registrado",
-            description: `Este número ya existe para: ${phoneInContacts.name}. Se guardará de todos modos.`,
+            title: "⚠️ Teléfono ya registrado",
+            description: `Este número ya está registrado para ${phoneInContacts.name}. El contacto se guardará de todos modos.`,
           });
         }
         const { data: phoneInCreators } = await supabase
@@ -209,8 +215,8 @@ const NuevoContactoForm = () => {
           .maybeSingle();
         if (phoneInCreators) {
           toast({
-            title: "Teléfono ya registrado",
-            description: `Este número ya existe en creators: ${phoneInCreators.name}. Se guardará de todos modos.`,
+            title: "⚠️ Teléfono en creators",
+            description: `Este número ya existe para la creadora ${phoneInCreators.name}. El contacto se guardará de todos modos.`,
           });
         }
       }

@@ -111,10 +111,10 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
           setIsSubmitting(false);
           return;
         }
-        // Inactive creator — allow as reactivated
+        // Inactive creator — allow as reactivated (warning style, not destructive)
         toast({
-          title: "Creadora inactiva detectada",
-          description: `${creatorCheck.creatorName} está como ${creatorCheck.creatorStatus}. Se registrará como lead reactivado.`,
+          title: "⚠️ Creadora inactiva detectada",
+          description: `${creatorCheck.creatorName} tiene estado "${creatorCheck.creatorStatus}". Se registrará como lead reactivado.`,
         });
       }
 
@@ -125,9 +125,12 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         const lastDate = previousCheck.lastEntryDate ? new Date(previousCheck.lastEntryDate) : null;
         const hoursSince = lastDate ? (Date.now() - lastDate.getTime()) / (1000 * 60 * 60) : Infinity;
         if (hoursSince < 24) {
+          const hoursRemaining = Math.ceil(24 - hoursSince);
+          const agentInfo = previousCheck.lastAgentName ? ` por ${previousCheck.lastAgentName}` : "";
+          const hoursAgo = Math.floor(hoursSince);
           toast({
-            title: "Lead duplicado",
-            description: "Este lead ya fue subido hace menos de 24 horas.",
+            title: "❌ Lead duplicado (bloqueo 24h)",
+            description: `Este lead fue subido hace ${hoursAgo}h${agentInfo}. Podrás resubirlo en ~${hoursRemaining}h.`,
             variant: "destructive",
           });
           setIsSubmitting(false);
@@ -135,8 +138,8 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         }
         recordType = "reactivado";
         toast({
-          title: "Modelo reactivada",
-          description: "Esta modelo ya existía en el sistema. Se registrará como un nuevo lead reactivado.",
+          title: "⚠️ Modelo reactivada",
+          description: `Esta modelo ya existía en el sistema (último registro: ${lastDate ? lastDate.toLocaleDateString("es-CO") : "desconocido"}). Se creará como lead reactivado.`,
         });
       }
 
@@ -144,9 +147,11 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       if (data.onlyfans_url?.trim()) {
         const ofCheck = await checkDuplicateOnlyFans(data.onlyfans_url);
         if (ofCheck.existsInLeads || ofCheck.existsInContacts) {
+          const where = ofCheck.existsInLeads ? "leads" : "contactos";
+          const nameInfo = ofCheck.matchName ? ` para "${ofCheck.matchName}"` : "";
           toast({
-            title: "OnlyFans duplicado",
-            description: `Esta URL de OnlyFans ya está registrada en ${ofCheck.existsInLeads ? "leads" : "contactos"}.`,
+            title: "❌ OnlyFans duplicado",
+            description: `Esta URL ya está registrada en ${where}${nameInfo}. No se puede registrar.`,
             variant: "destructive",
           });
           setIsSubmitting(false);
