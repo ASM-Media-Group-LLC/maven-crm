@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
-import { Download, Search } from "lucide-react";
+import { Download, Search, CalendarDays } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +15,14 @@ interface SalesReportSectionProps {
   rows: EarningsRow[];
   comparedRows?: EarningsRow[];
   earningsMode: EarningsMode;
+  dateFrom?: Date;
+  dateTo?: Date;
 }
 
-const SalesReportSection = ({ rows, comparedRows, earningsMode }: SalesReportSectionProps) => {
+const SalesReportSection = ({ rows, comparedRows, earningsMode, dateFrom, dateTo }: SalesReportSectionProps) => {
+  const dateLabel = dateFrom && dateTo
+    ? `${format(dateFrom, "d 'de' MMMM", { locale: es })} al ${format(dateTo, "d 'de' MMMM", { locale: es })}`
+    : null;
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -129,6 +136,17 @@ const SalesReportSection = ({ rows, comparedRows, earningsMode }: SalesReportSec
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Reporte de Ventas
+        </h3>
+        {dateLabel && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+            <CalendarDays className="h-3 w-3" />
+            Filtro: {dateLabel}
+          </span>
+        )}
+      </div>
       <div className="flex items-center justify-between gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
