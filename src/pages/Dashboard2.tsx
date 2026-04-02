@@ -84,6 +84,8 @@ const Dashboard2 = () => {
   const [minTotal, setMinTotal] = useState("");
   const [maxTotal, setMaxTotal] = useState("");
   const [showPareto, setShowPareto] = useState(false);
+  const [showAlerts, setShowAlerts] = useState(false);
+  const [showProjection, setShowProjection] = useState(false);
   const [paretoView, setParetoView] = useState<"list" | "chart">("list");
   const PIE_COLORS = ["hsl(221,83%,53%)","hsl(142,71%,45%)","hsl(25,95%,53%)","hsl(280,67%,55%)","hsl(350,80%,55%)","hsl(190,80%,45%)","hsl(45,93%,47%)","hsl(160,60%,45%)","hsl(320,70%,50%)","hsl(200,70%,50%)","hsl(100,60%,45%)","hsl(0,70%,55%)","hsl(260,50%,55%)","hsl(30,80%,50%)","hsl(170,70%,40%)","hsl(220,50%,60%)","hsl(60,70%,50%)","hsl(310,60%,55%)","hsl(140,50%,50%)","hsl(10,70%,50%)"];
 
@@ -240,6 +242,92 @@ const Dashboard2 = () => {
     if (restTotal > 0) items.push({ name: `Resto (${paretoAnalysis.rest.length})`, value: restTotal });
     return items;
   }, [paretoAnalysis]);
+
+  // Previous month summaries for comparison
+  const prevMonthMap = useMemo(() => {
+    if (!selectedPeriod || monthOptions.length < 2) return new Map<string, number>();
+    const currentIdx = monthOptions.findIndex((m) => m.value === selectedMonth);
+    const prevPeriod = monthOptions[currentIdx + 1];
+    if (!prevPeriod) return new Map<string, number>();
+
+    const map = new Map<string, number>();
+    for (const r of allRows) {
+      const d = r.effective_date;
+      if (d < prevPeriod.startStr || d > prevPeriod.endStr) continue;
+      const key = r.creator_id || r.pending_creator || r.id;
+      const info = r.creator_id ? creatorInfoMap[r.creator_id] : null;
+      const normPlat = (info?.platform || "").toLowerCase();
+      if (normPlat === "unlok" || normPlat === "instagram") continue;
+      map.set(key, (map.get(key) || 0) + (r.total_earnings_gross ?? 0));
+    }
+    return map;
+  }, [allRows, selectedMonth, selectedPeriod, monthOptions, creatorInfoMap]);
+
+  // Alerts / Red Flags
+  const alerts = useMemo(() => {
+    const items: { type: "drop" | "zero" | "fanLoss"; creator: CreatorSummary; detail: string }[] = [];
+    for (const c of rawCreators) {
+      const prev = prevMonthMap.get(c.creatorId);
+      if (c.total === 0 && prev && prev > 0) {
+        items.push({ type: "zero", creator: c, detail: `Vendía ${fmt(prev)} → ahora $0` });
+      } else if (prev && prev > 0 && c.total > 0) {
+        const change = ((c.total - prev) / prev) * 100;
+        if (change <= -30) {
+          items.push({ type: "drop", creator: c, detail: `Cayó ${Math.abs(change).toFixed(0)}% (${fmt(prev)} → ${fmt(c.total)})` });
+        }
+      }
+      if (c.activeFans > 0 && c.newFans < 0) {
+        items.push({ type: "fanLoss", creator: c, detail: `Perdiendo fans: ${c.newFans} netos` });
+      }
+    }
+    return items.sort((a, b) => {
+      const order = { zero: 0, drop: 1, fanLoss: 2 };
+      return order[a.type] - order[b.type];
+    });
+  }, [rawCreators, prevMonthMap]);
+
+  // Current month projection
+  const projection = useMemo(() => {
+    const now = new Date();
+    const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dayOfMonth = now.getDate();
+    if (dayOfMonth <= 1) return [];
+
+    const map = new Map<string, { name: string; ig: string | null; total: number; days: number; creatorId: string }>();
+    for (const r of allRows) {
+      const d = r.effective_date;
+      if (d < currentMonthStart) continue;
+      const key = r.creator_id || r.pending_creator || r.id;
+      const info = r.creator_id ? creatorInfoMap[r.creator_id] : null;
+      const normPlat = (info?.platform || "").toLowerCase();
+      if (normPlat === "unlok" || normPlat === "instagram") continue;
+      const ex = map.get(key);
+      if (ex) {
+        ex.total += r.total_earnings_gross ?? 0;
+        ex.days++;
+      } else {
+        map.set(key, {
+          name: r.artistic_name || r.pending_creator || "Sin nombre",
+          ig: info?.ig || null,
+          total: r.total_earnings_gross ?? 0,
+          days: 1,
+          creatorId: key,
+        });
+      }
+    }
+    return Array.from(map.values())
+      .filter((c) => c.total > 0)
+      .map((c) => ({
+        ...c,
+        projected: c.days > 0 ? (c.total / c.days) * daysInMonth : 0,
+        dailyAvg: c.days > 0 ? c.total / c.days : 0,
+      }))
+      .sort((a, b) => b.projected - a.projected);
+  }, [allRows, creatorInfoMap]);
+
+  const projectionTotal = useMemo(() => projection.reduce((s, c) => s + c.projected, 0), [projection]);
+
   // Apply filters
   const filteredCreators = useMemo(() => {
     let list = rawCreators;
@@ -380,6 +468,17 @@ const Dashboard2 = () => {
         </TableCell>
         <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : ""}`}>{fmt(c.total)}</TableCell>
         <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : "text-emerald-600 dark:text-emerald-400"}`}>{fmt(c.net)}</TableCell>
+        {(() => {
+          const prev = prevMonthMap.get(c.creatorId);
+          if (!prev || prev === 0) return <TableCell className="text-right tabular-nums text-xs text-muted-foreground">—</TableCell>;
+          const change = ((c.total - prev) / prev) * 100;
+          const color = change > 0 ? "text-emerald-600 dark:text-emerald-400" : change < -10 ? "text-destructive" : "text-muted-foreground";
+          return (
+            <TableCell className={`text-right tabular-nums text-xs font-medium ${color}`}>
+              {change > 0 ? "↑" : "↓"} {Math.abs(change).toFixed(0)}%
+            </TableCell>
+          );
+        })()}
         <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
         <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.newSubs)}</TableCell>
         <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.recurringSubs)}</TableCell>
@@ -435,10 +534,28 @@ const Dashboard2 = () => {
                   <PieChart className="h-4 w-4" />
                   80/20
                 </Button>
+                <Button
+                  variant={showAlerts ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowAlerts(!showAlerts)}
+                  className="gap-1.5"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Alertas {alerts.length > 0 && <Badge variant="destructive" className="ml-0.5 h-5 px-1.5 text-[10px]">{alerts.length}</Badge>}
+                </Button>
+                <Button
+                  variant={showProjection ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowProjection(!showProjection)}
+                  className="gap-1.5"
+                >
+                  <Target className="h-4 w-4" />
+                  Proyección
+                </Button>
                 {isAdmin && (
                   <Button variant="outline" size="sm" onClick={exportPdf} className="gap-1.5" disabled={isLoading || creators.length === 0}>
                     <DollarSign className="h-4 w-4" />
-                    Descargar PDF
+                    PDF
                   </Button>
                 )}
               </div>
@@ -712,6 +829,102 @@ const Dashboard2 = () => {
               </div>
             )}
 
+            {/* Alerts Panel */}
+            {showAlerts && !isLoading && (
+              <div className="rounded-lg border-2 border-destructive/30 bg-destructive/5 p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  <h2 className="text-lg font-bold text-foreground">Red Flags & Alertas</h2>
+                  <Badge variant="destructive" className="ml-1">{alerts.length}</Badge>
+                </div>
+                {alerts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">✅ No hay alertas este mes. Todo bien.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                    {alerts.map((a, i) => (
+                      <div key={i} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
+                        <span className={`text-sm shrink-0 ${a.type === "zero" ? "text-destructive" : a.type === "drop" ? "text-orange-500" : "text-yellow-500"}`}>
+                          {a.type === "zero" ? "🔴" : a.type === "drop" ? "🟠" : "🟡"}
+                        </span>
+                        {a.creator.instagramHandle && (
+                          <a href={`https://instagram.com/${a.creator.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
+                            <Instagram className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                        <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[100px]" onClick={() => navigate(`/creadores/${a.creator.creatorId}`)}>
+                          {a.creator.name}
+                        </button>
+                        <span className="text-sm text-muted-foreground flex-1">{a.detail}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">🔴 = Pasó a $0 · 🟠 = Cayó {'>'} 30% vs mes anterior · 🟡 = Perdiendo fans</p>
+              </div>
+            )}
+
+            {/* Projection Panel */}
+            {showProjection && !isLoading && (
+              <div className="rounded-lg border-2 border-accent/30 bg-accent/5 p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-accent-foreground" />
+                    <h2 className="text-lg font-bold text-foreground">
+                      Proyección {format(new Date(), "MMMM yyyy", { locale: es }).replace(/^\w/, (c) => c.toUpperCase())}
+                    </h2>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Proyección total bruto</p>
+                    <p className="text-xl font-bold tabular-nums">{fmt(projectionTotal)}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Basado en {new Date().getDate() - 1} días transcurridos. Fórmula: (acumulado / días con data) × días del mes.
+                </p>
+                {projection.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sin datos del mes actual.</p>
+                ) : (
+                  <div className="rounded-lg border border-border bg-card overflow-auto max-h-[350px]">
+                    <Table>
+                      <TableHeader className="sticky top-0 z-10 bg-card">
+                        <TableRow>
+                          <TableHead className="w-8">#</TableHead>
+                          <TableHead>Creadora</TableHead>
+                          <TableHead className="text-right">Acumulado</TableHead>
+                          <TableHead className="text-right">$/Día</TableHead>
+                          <TableHead className="text-right">Días</TableHead>
+                          <TableHead className="text-right font-semibold">Proyectado</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {projection.map((c, i) => (
+                          <TableRow key={c.creatorId}>
+                            <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                {c.ig && (
+                                  <a href={`https://instagram.com/${c.ig.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
+                                    <Instagram className="h-3.5 w-3.5" />
+                                  </a>
+                                )}
+                                <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
+                                  {c.name}
+                                </button>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-sm">{fmt(c.total)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmt(c.dailyAvg)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.days}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm font-semibold">{fmt(c.projected)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* KPI Cards */}
             {!isLoading && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -817,6 +1030,7 @@ const Dashboard2 = () => {
                       <SortableHead col="name" label="Creadora" />
                       <SortableHead col="total" label="Bruto" right />
                       <SortableHead col="net" label="Neto (80%)" right />
+                      <TableHead className="text-right whitespace-nowrap text-xs">vs Ant.</TableHead>
                       <SortableHead col="subs" label="Subs" right />
                       <SortableHead col="newSubs" label="Nuevas" right />
                       <SortableHead col="recurringSubs" label="Recurrentes" right />
@@ -833,7 +1047,7 @@ const Dashboard2 = () => {
                   <TableBody>
                     {creators.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={15} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={16} className="text-center py-12 text-muted-foreground">
                           {rawCreators.length > 0
                             ? "No hay resultados con los filtros actuales"
                             : `Sin datos para ${selectedPeriod?.label}`}
