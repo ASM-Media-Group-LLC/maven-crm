@@ -580,26 +580,41 @@ const Dashboard2 = () => {
 
             {/* ── Metrics Dialog ── */}
             <Dialog open={showMetrics} onOpenChange={setShowMetrics}>
-              <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-                <DialogHeader><DialogTitle className="text-xl">Métricas — {selectedPeriod?.label}</DialogTitle></DialogHeader>
-                <div className="space-y-6 pt-2">
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+                <div className="p-6 pb-0">
+                  <DialogHeader>
+                    <DialogTitle className="text-xl flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-primary" />
+                      Métricas — {selectedPeriod?.label}
+                    </DialogTitle>
+                  </DialogHeader>
+                </div>
+                <div className="p-6 space-y-8">
+                  {/* Revenue Split — visual bars */}
                   <div>
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Revenue Split</h3>
-                    <div className="grid grid-cols-3 gap-3">
+                    <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-4">Distribución de Revenue</h3>
+                    <div className="space-y-4">
                       {[
-                        { icon: <MessageSquare className="h-5 w-5 mx-auto text-muted-foreground" />, pct: hlKpis.msgsPct, label: "Mensajería", amount: hlKpis.totalMsgs },
-                        { icon: <Heart className="h-5 w-5 mx-auto text-muted-foreground" />, pct: hlKpis.tipsPct, label: "Tips", amount: hlKpis.totalTips },
-                        { icon: <Eye className="h-5 w-5 mx-auto text-muted-foreground" />, pct: hlKpis.subsPct, label: "Suscripciones", amount: hlKpis.totalSubs },
+                        { icon: <MessageSquare className="h-4 w-4" />, pct: hlKpis.msgsPct, label: "Mensajería", amount: hlKpis.totalMsgs, color: "bg-blue-500" },
+                        { icon: <Heart className="h-4 w-4" />, pct: hlKpis.tipsPct, label: "Tips", amount: hlKpis.totalTips, color: "bg-rose-500" },
+                        { icon: <Eye className="h-4 w-4" />, pct: hlKpis.subsPct, label: "Suscripciones", amount: hlKpis.totalSubs, color: "bg-emerald-500" },
                       ].map((item, idx) => (
-                        <div key={idx} className="rounded-lg border border-border bg-card p-4 text-center space-y-1">
-                          {item.icon}
-                          <p className="text-2xl font-bold tabular-nums">{item.pct.toFixed(1)}%</p>
-                          <p className="text-xs text-muted-foreground">{item.label}</p>
-                          <p className="text-sm font-medium tabular-nums">{fmt(item.amount)}</p>
+                        <div key={idx} className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-sm font-medium text-foreground">{item.icon} {item.label}</div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-semibold tabular-nums">{fmt(item.amount)}</span>
+                              <span className="text-xs font-bold tabular-nums text-muted-foreground w-14 text-right">{item.pct.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                          <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                            <div className={`h-full rounded-full ${item.color} transition-all duration-500`} style={{ width: `${Math.min(item.pct, 100)}%` }} />
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
+                  <div className="h-px bg-border" />
                   <div>
                     <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Retención & Fans</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
