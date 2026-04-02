@@ -224,7 +224,13 @@ const Dashboard2 = () => {
     const msgsPct = totalBruto > 0 ? (totalMsgs / totalBruto) * 100 : 0;
     const subsPct = totalBruto > 0 ? (totalSubs / totalBruto) * 100 : 0;
     const avgPerFanGlobal = totalFansAll > 0 ? totalBruto / totalFansAll : 0;
-    return { renewalRate, tipsPct, msgsPct, subsPct, avgPerFanGlobal, totalNewSubs, totalRecurring, totalTips, totalMsgs, totalSubs };
+    // CEO metrics
+    const avgPerCreator = active.length > 0 ? totalBruto / active.length : 0;
+    const topCreator = active.length > 0 ? active.reduce((best, c) => c.total > best.total ? c : best, active[0]) : null;
+    const zeroCreators = rawCreators.filter((c) => c.total === 0).length;
+    const creatorsUnder1k = active.filter((c) => c.total < 1000).length;
+    const creatorsOver10k = active.filter((c) => c.total >= 10000).length;
+    return { renewalRate, tipsPct, msgsPct, subsPct, avgPerFanGlobal, totalNewSubs, totalRecurring, totalTips, totalMsgs, totalSubs, totalBruto, avgPerCreator, topCreator, zeroCreators, creatorsUnder1k, creatorsOver10k, activeCount: active.length };
   }, [rawCreators]);
 
   // Pie chart data for pareto
