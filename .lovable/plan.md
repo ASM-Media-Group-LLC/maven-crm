@@ -1,25 +1,28 @@
 
+## Plan: Reemplazar inputs de teléfono inline por el componente PhoneInput compartido
 
-## Plan: Vista default tabla + Mejorar PhoneInput
+### Problema
+Los formularios de `/contactos` (NuevoContactoForm) y `/leadgen` (AddContactoModal) **no usan** el componente `PhoneInput` actualizado. Tienen sus propios selectores de país inline con `<Select>` básico (sin buscador, lista corta de países). Por eso no ves los cambios.
 
 ### Cambios
 
-**1. Cambiar vista default de Contactos a "table" (`ContactosContent.tsx`, línea 78)**
-- Cambiar `useState<"table" | "grid">("grid")` → `useState<"table" | "grid">("table")`
+**1. `src/pages/contactos/NuevoContactoForm.tsx`**
+- Importar `PhoneInput` de `@/components/ui/phone-input`
+- Reemplazar el bloque de `<Select>` + `<Input>` de teléfono (líneas 372-379) por `<PhoneInput value={fullPhone} onChange={...} />`
+- Eliminar el campo `countryCode` del estado del formulario — el `PhoneInput` ya lo maneja internamente concatenando código+número
+- Ajustar las referencias a `form.countryCode` y `form.phone` para que usen el valor combinado del PhoneInput
+- Eliminar la constante `COUNTRY_CODES` local si existe
 
-**2. Completar códigos de país en `phone-input.tsx`**
-La lista actual tiene 20 países (LATAM + US/ES/BR). Faltan varios países relevantes. Se agregarán:
-- Cuba (+53), Puerto Rico (+1787), Jamaica (+1876), Trinidad (+1868), Haití (+509), Belice (+501), Guyana (+592), Surinam (+597), Guyana Francesa (+594)
-- Canadá (+1), UK (+44), Francia (+33), Alemania (+49), Italia (+39), Portugal (+351), Países Bajos (+31), Rusia (+7), India (+91), China (+86), Japón (+81), Corea del Sur (+82), Australia (+61), Filipinas (+63), Turquía (+90), Egipto (+20), Sudáfrica (+27), Nigeria (+234), Marruecos (+212), Israel (+972), Emiratos (+971), Arabia Saudí (+966)
+**2. `src/pages/leadgen/AddContactoModal.tsx`**
+- Importar `PhoneInput` de `@/components/ui/phone-input`
+- Reemplazar el bloque de dos FormFields (`paisCodigo` + `telefono`, líneas 339-371) por un solo `<PhoneInput>`
+- Eliminar `paisCodigo` del schema de zod y del defaultValues
+- Ajustar el submit para parsear el valor combinado del PhoneInput (extraer código de país y número)
 
-**3. Reemplazar Select por Popover+Command con buscador (`phone-input.tsx`)**
-- Cambiar el `<Select>` actual por un `<Popover>` + `<Command>` (cmdk) que incluya:
-  - `<CommandInput>` para buscar por nombre de país, código ISO o prefijo
-  - `<CommandList>` con scroll y todos los países
-  - `position="popper"` con `side="bottom"` para que siempre se despliegue hacia abajo
-- Mantener la misma interfaz externa (`value`, `onChange`, etc.)
+### Resultado
+- Ambos formularios usarán el mismo selector con buscador cmdk, 50+ países, y despliegue hacia abajo
+- Un solo componente a mantener para toda la app
 
 ### Archivos a modificar
-1. `src/pages/contactos/ContactosContent.tsx` — línea 78, default `"table"`
-2. `src/components/ui/phone-input.tsx` — lista completa de países + reemplazar Select por Popover+Command con buscador
-
+1. `src/pages/contactos/NuevoContactoForm.tsx`
+2. `src/pages/leadgen/AddContactoModal.tsx`
