@@ -1,24 +1,36 @@
 
 
-## Plan: Eliminar 2 leads de Marielby
+## Plan: Contacto existente — toast persistente + opción de actualizar
 
-### Registros a eliminar
-| ID | Handle | Creado |
-|---|---|---|
-| `1564186d-6b5e-4e32-8013-1aec6df5a332` | @marielby | 10 marzo 2026 |
-| `6280f339-e8fc-4253-be91-2b7142705760` | rojasmarielby1 | 1 abril 2026 |
+### Problema actual
+1. El toast de "Contacto existente" desaparece muy rápido — el usuario no alcanza a leerlo
+2. Cuando el contacto ya existe, no hay opción de actualizar sus datos (ej. agregar otro número)
 
-### Acción
-Ejecutar dos DELETE contra `leadgen_entries` usando el Supabase client:
+### Cambios
 
-```sql
-DELETE FROM leadgen_entries WHERE id IN (
-  '1564186d-6b5e-4e32-8013-1aec6df5a332',
-  '6280f339-e8fc-4253-be91-2b7142705760'
-);
-```
+**1. Reemplazar toast por diálogo modal cuando el contacto ya existe (`NuevoContactoForm.tsx`)**
+- En lugar del toast efímero (línea 174), mostrar un diálogo/modal similar al de "Creadora existente" (línea 399) con:
+  - Nombre del contacto existente, agente que lo registró, fecha
+  - Teléfono actual del contacto (si tiene)
+  - Dos opciones claras:
+    - **"Actualizar contacto"** → abre flujo de actualización (actualiza el teléfono/email/notas del registro existente)
+    - **"Crear nuevo registro"** → continúa con el flujo actual (crea registro nuevo)
+    - **"Cancelar"** → cierra el diálogo
+- Se necesita guardar el `id` del contacto existente para poder hacer el update
 
-### Verificación
-- Confirmar que no quedan registros con esos IDs
-- No se requieren cambios en código ni migraciones
+**2. Enriquecer `checkExistingContact` (`src/lib/lead-validation.ts`)**
+- Agregar al retorno: `contactId`, `contactPhone`, `contactEmail` para mostrar datos actuales y permitir el update
+
+**3. Lógica de actualización (`NuevoContactoForm.tsx`)**
+- Nuevo estado `existingContactData` con id, nombre, teléfono, email, agente, fecha
+- Al elegir "Actualizar contacto": ejecutar `supabase.from("closers_contacts").update(...)` con los campos nuevos del formulario (teléfono, email, notas) sobre el `id` existente
+- Mostrar toast de confirmación y navegar a `/contactos`
+
+**4. Mismo tratamiento en `AddContactoModal.tsx` (leadgen)**
+- Aplicar la misma lógica: diálogo de confirmación con opción de actualizar en vez de toast efímero
+
+### Archivos a modificar
+1. `src/lib/lead-validation.ts` — agregar `contactId`, `contactPhone`, `contactEmail` al retorno
+2. `src/pages/contactos/NuevoContactoForm.tsx` — reemplazar toast por modal con opciones actualizar/crear nuevo
+3. `src/pages/leadgen/AddContactoModal.tsx` — mismo tratamiento
 
