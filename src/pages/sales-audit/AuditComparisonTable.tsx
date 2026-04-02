@@ -42,7 +42,9 @@ const AuditComparisonTable = ({ file }: Props) => {
   const [totalSystemEntries, setTotalSystemEntries] = useState(0);
   const [excelDetails, setExcelDetails] = useState<Map<string, EntryDetail[]>>(new Map());
   const [systemDetails, setSystemDetails] = useState<Map<string, EntryDetail[]>>(new Map());
+  const [systemRawRecords, setSystemRawRecords] = useState<Map<string, { id: string; date: string; amount: number }[]>>(new Map());
   const [expanded, setExpanded] = useState<Record<string, "excel" | "system" | null>>({});
+  const [applying, setApplying] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
