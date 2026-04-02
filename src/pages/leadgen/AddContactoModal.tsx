@@ -324,37 +324,18 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
 
               <div className="space-y-2">
                 <FormLabel>Teléfono</FormLabel>
-                <div className="grid grid-cols-[120px_1fr] gap-2">
-                  <FormField
-                    control={form.control}
-                    name="paisCodigo"
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue>
-                            {countryCodes.find((c) => c.value === field.value)?.triggerLabel}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {countryCodes.map((code) => (
-                            <SelectItem key={code.value} value={code.value}>
-                              {code.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="telefono"
-                    render={({ field }) => (
-                      <FormControl>
-                        <Input placeholder="Número de teléfono" {...field} />
-                      </FormControl>
-                    )}
-                  />
-                </div>
+                <PhoneInput
+                  value={`${form.getValues("paisCodigo")} ${form.getValues("telefono") || ""}`.trim()}
+                  onChange={(val) => {
+                    const parts = val.match(/^(\+\d+)\s*(.*)/);
+                    if (parts) {
+                      form.setValue("paisCodigo", parts[1]);
+                      form.setValue("telefono", parts[2]);
+                    } else {
+                      form.setValue("telefono", val);
+                    }
+                  }}
+                />
               </div>
 
               <FormField

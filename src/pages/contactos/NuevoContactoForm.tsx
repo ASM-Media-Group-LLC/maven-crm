@@ -360,13 +360,19 @@ const NuevoContactoForm = () => {
               <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@ejemplo.com" />
             </Field>
             <Field label="Teléfono">
-              <div className="flex gap-2">
-                <Select value={form.countryCode} onValueChange={(v) => set("countryCode", v)}>
-                  <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>{COUNTRY_CODES.map((cc) => <SelectItem key={cc.code} value={cc.code}>{cc.label}</SelectItem>)}</SelectContent>
-                </Select>
-                <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="Número de teléfono" className="flex-1" />
-              </div>
+              <PhoneInput
+                value={`${form.countryCode} ${form.phone}`.trim()}
+                onChange={(val) => {
+                  // Parse combined value back into countryCode + phone
+                  const parts = val.match(/^(\+\d+)\s*(.*)/);
+                  if (parts) {
+                    set("countryCode", parts[1]);
+                    set("phone", parts[2]);
+                  } else {
+                    set("phone", val);
+                  }
+                }}
+              />
             </Field>
           </div>
 
