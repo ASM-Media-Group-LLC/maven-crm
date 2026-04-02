@@ -367,6 +367,12 @@ const Dashboard2 = () => {
                           <TableRow key={c.creatorId} className={isZero ? "opacity-50" : ""}>
                             <TableCell className="text-muted-foreground tabular-nums text-xs">{i + 1}</TableCell>
                             <TableCell className="font-medium whitespace-nowrap">{c.name}</TableCell>
+                            <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : ""}`}>
+                              {fmt(c.total)}
+                            </TableCell>
+                            <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : "text-emerald-600 dark:text-emerald-400"}`}>
+                              {fmt(c.net)}
+                            </TableCell>
                             <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.newSubs)}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.recurringSubs)}</TableCell>
@@ -377,12 +383,9 @@ const Dashboard2 = () => {
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerDay)}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerFan)}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.daysWithData}</TableCell>
-                            <TableCell className={`text-sm tabular-nums whitespace-nowrap ${stopped ? "text-orange-500 dark:text-orange-400 font-medium" : "text-muted-foreground"}`}>
+                            <TableCell className={`text-sm tabular-nums whitespace-nowrap ${stopped ? "font-medium" : "text-muted-foreground"}`} style={stopped ? { color: "hsl(25, 95%, 53%)" } : undefined}>
                               {format(new Date(c.lastDate + "T12:00:00"), "dd MMM", { locale: es })}
                               {stopped && " ⚠"}
-                            </TableCell>
-                            <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : ""}`}>
-                              {fmt(c.total)}
                             </TableCell>
                           </TableRow>
                         );
