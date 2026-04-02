@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle, FileDown } from "lucide-react";
+import { CalendarDays, CheckCircle, FileDown } from "lucide-react";
 import AuditSummaryCards from "./AuditSummaryCards";
 
 interface AuditRow {
@@ -33,6 +33,7 @@ function parseMoney(val: unknown): number {
 const AuditComparisonTable = ({ file }: Props) => {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<{ min: string; max: string } | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -90,6 +91,7 @@ const AuditComparisonTable = ({ file }: Props) => {
 
       result.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
       setRows(result);
+      setDateRange({ min: minDate, max: maxDate });
       setLoading(false);
     };
 
@@ -121,9 +123,22 @@ const AuditComparisonTable = ({ file }: Props) => {
       "Valor Final": validations[r.creator] === "excel" ? "Excel" : validations[r.creator] === "system" ? "Sistema" : "Sin decidir",
       "Monto Final": validations[r.creator] === "excel" ? r.excelGross.toFixed(2) : validations[r.creator] === "system" ? r.systemGross.toFixed(2) : "",
     }));
-    const ws = XLSX.utils.json_to_sheet(exportData);
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Auditoría");
+
+    // Header sheet with date info
+    const infoData = [
+      ["Auditoría de Ventas"],
+      ["Período:", dateRange ? `${dateRange.min} al ${dateRange.max}` : "N/A"],
+      ["Archivo:", file.name],
+      ["Generado:", new Date().toLocaleString("es-MX")],
+      [],
+    ];
+    const wsInfo = XLSX.utils.aoa_to_sheet(infoData);
+
+    // Append data below the header
+    XLSX.utils.sheet_add_json(wsInfo, exportData, { origin: "A6" });
+    XLSX.utils.book_append_sheet(wb, wsInfo, "Auditoría");
     XLSX.writeFile(wb, "auditoria_ventas.xlsx");
   };
 
@@ -131,9 +146,20 @@ const AuditComparisonTable = ({ file }: Props) => {
     return <div className="text-center py-8 text-muted-foreground">Procesando archivo y comparando con base de datos...</div>;
   }
 
+  const dateLabel = dateRange
+    ? `${new Date(dateRange.min + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })} — ${new Date(dateRange.max + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}`
+    : "";
+
   return (
     <div className="space-y-6">
       <AuditSummaryCards {...summary} />
+
+      {dateRange && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground border rounded-lg px-4 py-2 bg-card w-fit">
+          <CalendarDays className="h-4 w-4" />
+          <span>Período comparado: <strong className="text-foreground">{dateLabel}</strong></span>
+        </div>
+      )}
 
       <div className="flex justify-end">
         <Button variant="outline" onClick={exportAudit} className="gap-2">
