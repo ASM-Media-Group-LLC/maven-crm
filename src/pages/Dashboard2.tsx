@@ -85,6 +85,7 @@ const Dashboard2 = () => {
   const [maxTotal, setMaxTotal] = useState("");
   const [showPareto, setShowPareto] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
+  const [alertTab, setAlertTab] = useState<"zero" | "drop" | "fanLoss" | null>(null);
   const [showProjection, setShowProjection] = useState(false);
   const [paretoView, setParetoView] = useState<"list" | "chart">("list");
   const PIE_COLORS = ["hsl(221,83%,53%)","hsl(142,71%,45%)","hsl(25,95%,53%)","hsl(280,67%,55%)","hsl(350,80%,55%)","hsl(190,80%,45%)","hsl(45,93%,47%)","hsl(160,60%,45%)","hsl(320,70%,50%)","hsl(200,70%,50%)","hsl(100,60%,45%)","hsl(0,70%,55%)","hsl(260,50%,55%)","hsl(30,80%,50%)","hsl(170,70%,40%)","hsl(220,50%,60%)","hsl(60,70%,50%)","hsl(310,60%,55%)","hsl(140,50%,50%)","hsl(10,70%,50%)"];
@@ -838,79 +839,65 @@ const Dashboard2 = () => {
               const drops = alerts.filter((a) => a.type === "drop");
               const fanLoss = alerts.filter((a) => a.type === "fanLoss");
 
-              const AlertRow = ({ a }: { a: typeof alerts[0] }) => (
-                <div className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
-                  {a.creator.instagramHandle && (
-                    <a href={`https://instagram.com/${a.creator.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
-                      <Instagram className="h-3.5 w-3.5" />
-                    </a>
-                  )}
-                  <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[100px]" onClick={() => navigate(`/creadores/${a.creator.creatorId}`)}>
-                    {a.creator.name}
-                  </button>
-                  <span className="text-sm text-muted-foreground flex-1">{a.detail}</span>
-                </div>
-              );
+              const sections = [
+                { key: "zero" as const, emoji: "🔴", label: "Inactivas ($0)", desc: "Vendían el mes pasado, ahora $0", items: zeros, border: "border-destructive/40", bg: "bg-destructive/10", text: "text-destructive" },
+                { key: "drop" as const, emoji: "🟠", label: "Caída > 30%", desc: "Revenue cayó más del 30%", items: drops, border: "border-orange-400/40", bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400" },
+                { key: "fanLoss" as const, emoji: "🟡", label: "Perdiendo Fans", desc: "Fans netos negativos", items: fanLoss, border: "border-yellow-400/40", bg: "bg-yellow-500/10", text: "text-yellow-600 dark:text-yellow-400" },
+              ];
+
+              const activeSection = sections.find((s) => s.key === alertTab);
+              const activeItems = activeSection?.items || [];
 
               return (
-                <div className="rounded-lg border-2 border-destructive/30 bg-destructive/5 p-5 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-destructive" />
-                    <h2 className="text-lg font-bold text-foreground">Red Flags & Alertas</h2>
-                    <Badge variant="destructive" className="ml-1">{alerts.length}</Badge>
+                <div className="space-y-3">
+                  {/* Summary cards — click to expand */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {sections.map((s) => (
+                      <button
+                        key={s.key}
+                        onClick={() => setAlertTab(alertTab === s.key ? null : s.key)}
+                        className={`rounded-lg border-2 p-4 text-left transition-all ${
+                          alertTab === s.key ? `${s.border} ${s.bg} ring-2 ring-offset-1 ring-offset-background ring-primary/20` : "border-border bg-card hover:border-muted-foreground/30"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-lg">{s.emoji}</span>
+                          <span className={`text-2xl font-bold tabular-nums ${s.items.length > 0 ? s.text : "text-muted-foreground"}`}>{s.items.length}</span>
+                        </div>
+                        <p className={`text-sm font-semibold ${s.items.length > 0 ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{s.desc}</p>
+                      </button>
+                    ))}
                   </div>
 
-                  {alerts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">✅ No hay alertas este mes. Todo bien.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                      {/* Section: Inactivas ($0) */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 pb-1 border-b border-destructive/20">
-                          <span className="text-base">🔴</span>
-                          <h3 className="text-sm font-semibold text-destructive">Inactivas — $0</h3>
-                          <Badge variant="outline" className="ml-auto text-[10px] border-destructive/30 text-destructive">{zeros.length}</Badge>
-                        </div>
-                        {zeros.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2">Ninguna creadora pasó a $0 ✓</p>
-                        ) : (
-                          <div className="space-y-1 max-h-[200px] overflow-y-auto">
-                            {zeros.map((a, i) => <AlertRow key={i} a={a} />)}
-                          </div>
-                        )}
+                  {/* Expanded detail list */}
+                  {alertTab && activeSection && (
+                    <div className={`rounded-lg border-2 ${activeSection.border} ${activeSection.bg} p-4 space-y-2`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-base">{activeSection.emoji}</span>
+                        <h3 className={`text-sm font-bold ${activeSection.text}`}>{activeSection.label}</h3>
+                        <span className="text-xs text-muted-foreground">— {activeItems.length} creadora{activeItems.length !== 1 ? "s" : ""}</span>
                       </div>
-
-                      {/* Section: Caídas >30% */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 pb-1 border-b border-orange-300/40">
-                          <span className="text-base">🟠</span>
-                          <h3 className="text-sm font-semibold text-orange-600 dark:text-orange-400">Caída {'>'} 30%</h3>
-                          <Badge variant="outline" className="ml-auto text-[10px] border-orange-300/50 text-orange-600 dark:text-orange-400">{drops.length}</Badge>
+                      {activeItems.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-3">Sin alertas en esta categoría ✓</p>
+                      ) : (
+                        <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
+                          {activeItems.map((a, i) => (
+                            <div key={i} className="flex items-center gap-3 rounded-md border border-border bg-card/80 px-3 py-2.5">
+                              <span className="text-xs text-muted-foreground tabular-nums w-5 shrink-0">{i + 1}</span>
+                              {a.creator.instagramHandle && (
+                                <a href={`https://instagram.com/${a.creator.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
+                                  <Instagram className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+                              <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[110px]" onClick={() => navigate(`/creadores/${a.creator.creatorId}`)}>
+                                {a.creator.name}
+                              </button>
+                              <span className="text-sm text-muted-foreground flex-1">{a.detail}</span>
+                            </div>
+                          ))}
                         </div>
-                        {drops.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2">Nadie cayó más del 30% ✓</p>
-                        ) : (
-                          <div className="space-y-1 max-h-[200px] overflow-y-auto">
-                            {drops.map((a, i) => <AlertRow key={i} a={a} />)}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Section: Pérdida de fans */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 pb-1 border-b border-yellow-300/40">
-                          <span className="text-base">🟡</span>
-                          <h3 className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">Perdiendo Fans</h3>
-                          <Badge variant="outline" className="ml-auto text-[10px] border-yellow-300/50 text-yellow-600 dark:text-yellow-400">{fanLoss.length}</Badge>
-                        </div>
-                        {fanLoss.length === 0 ? (
-                          <p className="text-xs text-muted-foreground py-2">Sin pérdida de fans detectada ✓</p>
-                        ) : (
-                          <div className="space-y-1 max-h-[200px] overflow-y-auto">
-                            {fanLoss.map((a, i) => <AlertRow key={i} a={a} />)}
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
