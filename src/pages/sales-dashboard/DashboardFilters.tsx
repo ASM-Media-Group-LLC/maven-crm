@@ -40,6 +40,7 @@ const DashboardFilters = ({
   onPeriodChange,
   dateFrom,
   dateTo,
+  onCustomDateChange,
   compareMode,
   onToggleCompare,
   compareDateFrom,
