@@ -4,10 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarDays, CheckCircle, FileDown, Save } from "lucide-react";
+import { CheckCircle, FileDown, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import AuditSummaryCards from "./AuditSummaryCards";
 import AuditEntriesInfo from "./AuditEntriesInfo";
+import AuditEntryDetail, { type EntryDetail } from "./AuditEntryDetail";
 
 interface AuditRow {
   creator: string;
@@ -39,6 +40,9 @@ const AuditComparisonTable = ({ file }: Props) => {
   const [dateRange, setDateRange] = useState<{ min: string; max: string } | null>(null);
   const [totalExcelEntries, setTotalExcelEntries] = useState(0);
   const [totalSystemEntries, setTotalSystemEntries] = useState(0);
+  const [excelDetails, setExcelDetails] = useState<Map<string, EntryDetail[]>>(new Map());
+  const [systemDetails, setSystemDetails] = useState<Map<string, EntryDetail[]>>(new Map());
+  const [expanded, setExpanded] = useState<Record<string, "excel" | "system" | null>>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -52,6 +56,7 @@ const AuditComparisonTable = ({ file }: Props) => {
 
       const excelMap = new Map<string, number>();
       const excelCountMap = new Map<string, number>();
+      const excelDetailMap = new Map<string, EntryDetail[]>();
       let minDate = "9999-12-31";
       let maxDate = "0000-01-01";
 
@@ -67,6 +72,9 @@ const AuditComparisonTable = ({ file }: Props) => {
         const gross = parseMoney(row["Total earnings Gross"] || row["Total Earnings Gross"]);
         excelMap.set(creator, (excelMap.get(creator) || 0) + gross);
         excelCountMap.set(creator, (excelCountMap.get(creator) || 0) + 1);
+        const arr = excelDetailMap.get(creator) || [];
+        arr.push({ date: dateStr, amount: gross });
+        excelDetailMap.set(creator, arr);
       }
 
       const { data: dbData } = await supabase
@@ -77,16 +85,21 @@ const AuditComparisonTable = ({ file }: Props) => {
 
       const systemMap = new Map<string, number>();
       const systemCountMap = new Map<string, number>();
+      const systemDetailMap = new Map<string, EntryDetail[]>();
       for (const r of dbData || []) {
         const creator = (r.pending_creator || "").trim().toLowerCase();
         if (!creator) continue;
-        systemMap.set(creator, (systemMap.get(creator) || 0) + (Number(r.total_earnings_gross) || 0));
+        const amount = Number(r.total_earnings_gross) || 0;
+        systemMap.set(creator, (systemMap.get(creator) || 0) + amount);
         systemCountMap.set(creator, (systemCountMap.get(creator) || 0) + 1);
+        const dateStr = typeof r.date === "string" ? r.date.slice(0, 10) : "";
+        const arr = systemDetailMap.get(creator) || [];
+        arr.push({ date: dateStr, amount });
+        systemDetailMap.set(creator, arr);
       }
 
       const allCreators = new Set([...excelMap.keys(), ...systemMap.keys()]);
       const result: AuditRow[] = [];
-
       let totalExcel = 0;
       let totalSystem = 0;
 
@@ -107,6 +120,8 @@ const AuditComparisonTable = ({ file }: Props) => {
       setDateRange({ min: minDate, max: maxDate });
       setTotalExcelEntries(totalExcel);
       setTotalSystemEntries(totalSystem);
+      setExcelDetails(excelDetailMap);
+      setSystemDetails(systemDetailMap);
       setLoading(false);
     };
 
@@ -118,6 +133,13 @@ const AuditComparisonTable = ({ file }: Props) => {
 
   const validate = (creator: string, source: "excel" | "system") => {
     setValidations((prev) => ({ ...prev, [creator]: source }));
+  };
+
+  const toggleExpand = (creator: string, source: "excel" | "system") => {
+    setExpanded((prev) => ({
+      ...prev,
+      [creator]: prev[creator] === source ? null : source,
+    }));
   };
 
   const saveAuditLog = async () => {
@@ -245,56 +267,87 @@ const AuditComparisonTable = ({ file }: Props) => {
               const isOk = Math.abs(r.diff) <= 1;
               const val = validations[r.creator];
               const entriesMismatch = r.excelEntries !== r.systemEntries;
+              const expandedSource = expanded[r.creator];
               return (
-                <TableRow key={r.creator} className={val ? "bg-emerald-500/5" : ""}>
-                  <TableCell className="font-medium capitalize">{r.creator}</TableCell>
-                  <TableCell className={`text-center ${entriesMismatch ? "text-amber-500 font-medium" : ""}`}>
-                    {r.excelEntries}
-                  </TableCell>
-                  <TableCell className={`text-center ${entriesMismatch ? "text-amber-500 font-medium" : ""}`}>
-                    {r.systemEntries}
-                  </TableCell>
-                  <TableCell className={`text-right ${val === "excel" ? "font-bold text-emerald-500" : ""}`}>
-                    ${r.excelGross.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </TableCell>
-                  <TableCell className={`text-right ${val === "system" ? "font-bold text-emerald-500" : ""}`}>
-                    ${r.systemGross.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </TableCell>
-                  <TableCell className={`text-right ${!isOk ? "text-destructive font-medium" : ""}`}>
-                    ${r.diff.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </TableCell>
-                  <TableCell className={`text-right ${!isOk ? "text-destructive" : ""}`}>
-                    {r.diffPct.toFixed(1)}%
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {isOk ? (
-                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30">OK</Badge>
-                    ) : entriesMismatch ? (
-                      <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/30">Faltan datos</Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">Diferencia</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {val ? (
-                      <div className="flex items-center justify-center gap-1">
-                        <CheckCircle className="h-4 w-4 text-emerald-500" />
-                        <span className="text-xs text-emerald-500 capitalize">{val === "excel" ? "Excel" : "Sistema"}</span>
-                      </div>
-                    ) : !isOk ? (
-                      <div className="flex gap-1 justify-center">
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => validate(r.creator, "excel")}>
-                          Excel
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => validate(r.creator, "system")}>
-                          Sistema
-                        </Button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                </TableRow>
+                <>
+                  <TableRow key={r.creator} className={val ? "bg-emerald-500/5" : ""}>
+                    <TableCell className="font-medium capitalize">{r.creator}</TableCell>
+                    <TableCell className={`text-center ${entriesMismatch ? "text-amber-500 font-medium" : ""}`}>
+                      <button
+                        className="underline decoration-dotted underline-offset-4 hover:text-primary transition-colors cursor-pointer"
+                        onClick={() => toggleExpand(r.creator, "excel")}
+                      >
+                        {r.excelEntries}
+                      </button>
+                    </TableCell>
+                    <TableCell className={`text-center ${entriesMismatch ? "text-amber-500 font-medium" : ""}`}>
+                      <button
+                        className="underline decoration-dotted underline-offset-4 hover:text-primary transition-colors cursor-pointer"
+                        onClick={() => toggleExpand(r.creator, "system")}
+                      >
+                        {r.systemEntries}
+                      </button>
+                    </TableCell>
+                    <TableCell className={`text-right ${val === "excel" ? "font-bold text-emerald-500" : ""}`}>
+                      ${r.excelGross.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className={`text-right ${val === "system" ? "font-bold text-emerald-500" : ""}`}>
+                      ${r.systemGross.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className={`text-right ${!isOk ? "text-destructive font-medium" : ""}`}>
+                      ${r.diff.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className={`text-right ${!isOk ? "text-destructive" : ""}`}>
+                      {r.diffPct.toFixed(1)}%
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {isOk ? (
+                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30">OK</Badge>
+                      ) : entriesMismatch ? (
+                        <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/30">Faltan datos</Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">Diferencia</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {val ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <CheckCircle className="h-4 w-4 text-emerald-500" />
+                          <span className="text-xs text-emerald-500 capitalize">{val === "excel" ? "Excel" : "Sistema"}</span>
+                        </div>
+                      ) : !isOk ? (
+                        <div className="flex gap-1 justify-center">
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => validate(r.creator, "excel")}>
+                            Excel
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => validate(r.creator, "system")}>
+                            Sistema
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                  {expandedSource && (
+                    <TableRow key={`${r.creator}-detail`}>
+                      <TableCell colSpan={9} className="p-0 bg-muted/30">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-x">
+                          <AuditEntryDetail
+                            creator={r.creator}
+                            source="excel"
+                            entries={excelDetails.get(r.creator) || []}
+                          />
+                          <AuditEntryDetail
+                            creator={r.creator}
+                            source="system"
+                            entries={systemDetails.get(r.creator) || []}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               );
             })}
           </TableBody>
