@@ -12,7 +12,10 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Info, TrendingUp, Users, DollarSign, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Info, TrendingUp, Users, DollarSign, Calendar, ArrowUpDown, ArrowUp, ArrowDown, Search, Filter } from "lucide-react";
 
 interface CreatorSummary {
   creatorId: string;
@@ -20,28 +23,29 @@ interface CreatorSummary {
   platform: string;
   total: number;
   subs: number;
+  newSubs: number;
+  recurringSubs: number;
   tips: number;
   messages: number;
   activeFans: number;
   newFans: number;
   daysWithData: number;
   lastDate: string;
+  avgPerDay: number;
+  avgPerFan: number;
 }
 
-type SortKey = "name" | "platform" | "subs" | "tips" | "messages" | "activeFans" | "daysWithData" | "total" | "lastDate";
+type SortKey = "name" | "subs" | "newSubs" | "recurringSubs" | "tips" | "messages" | "activeFans" | "newFans" | "daysWithData" | "total" | "lastDate" | "avgPerDay" | "avgPerFan";
 type SortDir = "asc" | "desc";
-
-const PLATFORM_COLORS: Record<string, string> = {
-  OnlyFans: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  Onlyfans: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  Unlok: "bg-purple-500/15 text-purple-700 dark:text-purple-400",
-  Instagram: "bg-pink-500/15 text-pink-700 dark:text-pink-400",
-};
 
 const Dashboard2 = () => {
   const { data: allRows = [], isLoading } = useEarningsData();
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [searchText, setSearchText] = useState("");
+  const [showZeros, setShowZeros] = useState(false);
+  const [minTotal, setMinTotal] = useState("");
+  const [maxTotal, setMaxTotal] = useState("");
 
   const { data: platformMap = {} } = useQuery({
     queryKey: ["creator-platforms"],
@@ -73,23 +77,28 @@ const Dashboard2 = () => {
     [lastMonth]
   );
 
-  const { creators: rawCreators, grandTotal, totalFans, latestDate, totalRows } = useMemo(() => {
+  // Build creator summaries — OnlyFans only
+  const rawCreators = useMemo(() => {
     const map = new Map<string, CreatorSummary>();
-    let latest = "";
-    let rowCount = 0;
 
     for (const r of allRows) {
       const d = r.effective_date;
       if (d < lastMonth.startStr || d > lastMonth.endStr) continue;
-      rowCount++;
-      if (d > latest) latest = d;
 
       const key = r.creator_id || r.pending_creator || r.id;
+
+      // Filter: only OnlyFans creators (or unknown platform — they come from OF data anyway)
+      const plat = r.creator_id ? platformMap[r.creator_id] : null;
+      const normPlat = (plat || "").toLowerCase();
+      if (normPlat === "unlok" || normPlat === "instagram") continue;
+
       const existing = map.get(key);
 
       if (existing) {
         existing.total += r.total_earnings_gross ?? 0;
         existing.subs += r.subscription_gross ?? 0;
+        existing.newSubs += r.new_subscriptions_sub_gross ?? 0;
+        existing.recurringSubs += r.recurring_sub_gross ?? 0;
         existing.tips += r.tips_gross ?? 0;
         existing.messages += r.message_gross ?? 0;
         existing.activeFans = Math.max(existing.activeFans, r.active_fans ?? 0);
@@ -100,35 +109,58 @@ const Dashboard2 = () => {
         map.set(key, {
           creatorId: key,
           name: r.artistic_name || r.pending_creator || "Sin nombre",
-          platform: (r.creator_id ? platformMap[r.creator_id] : null) || "—",
+          platform: plat || "OnlyFans",
           total: r.total_earnings_gross ?? 0,
           subs: r.subscription_gross ?? 0,
+          newSubs: r.new_subscriptions_sub_gross ?? 0,
+          recurringSubs: r.recurring_sub_gross ?? 0,
           tips: r.tips_gross ?? 0,
           messages: r.message_gross ?? 0,
           activeFans: r.active_fans ?? 0,
           newFans: r.new_fans ?? 0,
           daysWithData: 1,
           lastDate: d,
+          avgPerDay: 0,
+          avgPerFan: 0,
         });
       }
     }
 
-    return {
-      creators: Array.from(map.values()),
-      grandTotal: Array.from(map.values()).reduce((s, c) => s + c.total, 0),
-      totalFans: Array.from(map.values()).reduce((s, c) => s + c.activeFans, 0),
-      latestDate: latest,
-      totalRows: rowCount,
-    };
+    // Compute averages
+    for (const c of map.values()) {
+      c.avgPerDay = c.daysWithData > 0 ? c.total / c.daysWithData : 0;
+      c.avgPerFan = c.activeFans > 0 ? c.total / c.activeFans : 0;
+    }
+
+    return Array.from(map.values());
   }, [allRows, lastMonth, platformMap]);
 
+  // Apply filters
+  const filteredCreators = useMemo(() => {
+    let list = rawCreators;
+
+    if (!showZeros) list = list.filter((c) => c.total > 0);
+
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase().trim();
+      list = list.filter((c) => c.name.toLowerCase().includes(q));
+    }
+
+    const minV = parseFloat(minTotal);
+    if (!isNaN(minV)) list = list.filter((c) => c.total >= minV);
+    const maxV = parseFloat(maxTotal);
+    if (!isNaN(maxV)) list = list.filter((c) => c.total <= maxV);
+
+    return list;
+  }, [rawCreators, showZeros, searchText, minTotal, maxTotal]);
+
+  // Sort
   const creators = useMemo(() => {
-    const sorted = [...rawCreators];
+    const sorted = [...filteredCreators];
     sorted.sort((a, b) => {
       let av: string | number, bv: string | number;
       switch (sortKey) {
         case "name": av = a.name.toLowerCase(); bv = b.name.toLowerCase(); break;
-        case "platform": av = a.platform.toLowerCase(); bv = b.platform.toLowerCase(); break;
         case "lastDate": av = a.lastDate; bv = b.lastDate; break;
         default: av = a[sortKey]; bv = b[sortKey];
       }
@@ -137,19 +169,22 @@ const Dashboard2 = () => {
       return 0;
     });
     return sorted;
-  }, [rawCreators, sortKey, sortDir]);
+  }, [filteredCreators, sortKey, sortDir]);
+
+  const grandTotal = filteredCreators.reduce((s, c) => s + c.total, 0);
+  const totalFans = filteredCreators.reduce((s, c) => s + c.activeFans, 0);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDir((d) => (d === "desc" ? "asc" : "desc"));
     } else {
       setSortKey(key);
-      setSortDir(key === "name" || key === "platform" ? "asc" : "desc");
+      setSortDir(key === "name" ? "asc" : "desc");
     }
   };
 
   const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
     return sortDir === "desc"
       ? <ArrowDown className="h-3 w-3 text-primary" />
       : <ArrowUp className="h-3 w-3 text-primary" />;
@@ -161,11 +196,21 @@ const Dashboard2 = () => {
   const fmtShort = (n: number) =>
     n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmt(n);
 
-  // Flag: if lastDate is before the 20th of the month, data stopped early
   const dataStoppedEarly = (lastDate: string) => {
     const day = parseInt(lastDate.split("-")[2], 10);
     return day < 20;
   };
+
+  const SortableHead = ({ col, label, right }: { col: SortKey; label: string; right?: boolean }) => (
+    <TableHead
+      className="cursor-pointer select-none whitespace-nowrap"
+      onClick={() => toggleSort(col)}
+    >
+      <span className={`flex items-center gap-1 ${right ? "justify-end" : ""}`}>
+        {label} <SortIcon col={col} />
+      </span>
+    </TableHead>
+  );
 
   return (
     <SidebarProvider>
@@ -177,10 +222,10 @@ const Dashboard2 = () => {
             {/* Header */}
             <div>
               <h1 className="text-2xl font-bold text-foreground">
-                Ventas por Creadora — {label}
+                Ventas OnlyFans — {label}
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Fuente: <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">of_gross_earnings</code> · Plataforma: <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">creator_business</code> · Clic en encabezado para ordenar
+                Solo creadoras de OnlyFans · Clic en encabezado para ordenar
               </p>
             </div>
 
@@ -196,9 +241,9 @@ const Dashboard2 = () => {
                 </div>
                 <div className="rounded-lg border border-border bg-card p-4 space-y-1">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Users className="h-3.5 w-3.5" /> Creadoras Activas
+                    <Users className="h-3.5 w-3.5" /> Creadoras
                   </div>
-                  <p className="text-xl font-bold tabular-nums">{creators.length}</p>
+                  <p className="text-xl font-bold tabular-nums">{filteredCreators.length}</p>
                   <p className="text-[10px] text-muted-foreground">{totalFans.toLocaleString()} fans activos</p>
                 </div>
                 <div className="rounded-lg border border-border bg-card p-4 space-y-1">
@@ -206,18 +251,57 @@ const Dashboard2 = () => {
                     <TrendingUp className="h-3.5 w-3.5" /> Promedio / Creadora
                   </div>
                   <p className="text-xl font-bold tabular-nums">
-                    {creators.length > 0 ? fmt(grandTotal / creators.length) : "$0"}
+                    {filteredCreators.length > 0 ? fmt(grandTotal / filteredCreators.length) : "$0"}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">{totalRows.toLocaleString()} registros</p>
                 </div>
                 <div className="rounded-lg border border-border bg-card p-4 space-y-1">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Calendar className="h-3.5 w-3.5" /> Última Data
+                    <Calendar className="h-3.5 w-3.5" /> Período
                   </div>
-                  <p className="text-xl font-bold tabular-nums">
-                    {latestDate ? format(new Date(latestDate + "T12:00:00"), "dd MMM", { locale: es }) : "—"}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">{lastMonth.startStr} → {lastMonth.endStr}</p>
+                  <p className="text-sm font-bold tabular-nums">{lastMonth.startStr}</p>
+                  <p className="text-[10px] text-muted-foreground">→ {lastMonth.endStr}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Filters toolbar */}
+            {!isLoading && (
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+                <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="relative flex-1 min-w-[180px] max-w-xs">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar creadora…"
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    className="pl-8 h-8 text-sm"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground whitespace-nowrap">Mín $</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={minTotal}
+                    onChange={(e) => setMinTotal(e.target.value)}
+                    className="h-8 w-20 text-sm tabular-nums"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground whitespace-nowrap">Máx $</Label>
+                  <Input
+                    type="number"
+                    placeholder="∞"
+                    value={maxTotal}
+                    onChange={(e) => setMaxTotal(e.target.value)}
+                    className="h-8 w-20 text-sm tabular-nums"
+                  />
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Switch id="show-zeros" checked={showZeros} onCheckedChange={setShowZeros} />
+                  <Label htmlFor="show-zeros" className="text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+                    Mostrar $0
+                  </Label>
                 </div>
               </div>
             )}
@@ -226,11 +310,11 @@ const Dashboard2 = () => {
             {!isLoading && (
               <div className="flex items-start gap-2 rounded-md border border-border bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
                 <Info className="h-4 w-4 mt-0.5 shrink-0" />
-                <div>
-                  <strong>Fuente:</strong> Reportes diarios de OnlyFans importados automáticamente. 
-                  Plataforma (OF/Unlok) del perfil comercial. Datos deduplicados por creadora + día. 
-                  <span className="text-orange-500 dark:text-orange-400 ml-1">⚠ Las filas con "Última data" temprana indican que dejaron de reportar o se fueron.</span>
-                </div>
+                <span>
+                  Datos de <code className="bg-muted px-1 rounded font-mono">of_gross_earnings</code> (OnlyFans). 
+                  Se excluyen Unlok e Instagram. Deduplicados por creadora + día.
+                  <span className="text-orange-500 dark:text-orange-400 ml-1">⚠ = data se cortó antes del día 20.</span>
+                </span>
               </div>
             )}
 
@@ -242,45 +326,33 @@ const Dashboard2 = () => {
                 ))}
               </div>
             ) : (
-              <div className="rounded-lg border border-border bg-card overflow-auto max-h-[calc(100vh-380px)]">
+              <div className="rounded-lg border border-border bg-card overflow-auto max-h-[calc(100vh-420px)]">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-card">
                     <TableRow>
                       <TableHead className="w-10">#</TableHead>
-                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>
-                        <span className="flex items-center gap-1">Creadora <SortIcon col="name" /></span>
-                      </TableHead>
-                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("platform")}>
-                        <span className="flex items-center gap-1">Plataforma <SortIcon col="platform" /></span>
-                      </TableHead>
-                      <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("subs")}>
-                        <span className="flex items-center gap-1 justify-end">Subs <SortIcon col="subs" /></span>
-                      </TableHead>
-                      <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("tips")}>
-                        <span className="flex items-center gap-1 justify-end">Tips <SortIcon col="tips" /></span>
-                      </TableHead>
-                      <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("messages")}>
-                        <span className="flex items-center gap-1 justify-end">Msgs <SortIcon col="messages" /></span>
-                      </TableHead>
-                      <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("activeFans")}>
-                        <span className="flex items-center gap-1 justify-end">Fans <SortIcon col="activeFans" /></span>
-                      </TableHead>
-                      <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("daysWithData")}>
-                        <span className="flex items-center gap-1 justify-end">Días <SortIcon col="daysWithData" /></span>
-                      </TableHead>
-                      <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("lastDate")}>
-                        <span className="flex items-center gap-1">Última data <SortIcon col="lastDate" /></span>
-                      </TableHead>
-                      <TableHead className="text-right cursor-pointer select-none font-semibold" onClick={() => toggleSort("total")}>
-                        <span className="flex items-center gap-1 justify-end">Total Bruto <SortIcon col="total" /></span>
-                      </TableHead>
+                      <SortableHead col="name" label="Creadora" />
+                      <SortableHead col="subs" label="Subs" right />
+                      <SortableHead col="newSubs" label="Nuevas" right />
+                      <SortableHead col="recurringSubs" label="Recurrentes" right />
+                      <SortableHead col="tips" label="Tips" right />
+                      <SortableHead col="messages" label="Msgs" right />
+                      <SortableHead col="activeFans" label="Fans" right />
+                      <SortableHead col="newFans" label="New Fans" right />
+                      <SortableHead col="avgPerDay" label="$/Día" right />
+                      <SortableHead col="avgPerFan" label="$/Fan" right />
+                      <SortableHead col="daysWithData" label="Días" right />
+                      <SortableHead col="lastDate" label="Última data" />
+                      <SortableHead col="total" label="Total Bruto" right />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {creators.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
-                          Sin datos para {label}
+                        <TableCell colSpan={14} className="text-center py-12 text-muted-foreground">
+                          {rawCreators.length > 0
+                            ? "No hay resultados con los filtros actuales"
+                            : `Sin datos para ${label}`}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -288,20 +360,20 @@ const Dashboard2 = () => {
                         const stopped = dataStoppedEarly(c.lastDate);
                         const isZero = c.total === 0;
                         return (
-                          <TableRow key={c.creatorId} className={isZero ? "opacity-60" : ""}>
+                          <TableRow key={c.creatorId} className={isZero ? "opacity-50" : ""}>
                             <TableCell className="text-muted-foreground tabular-nums text-xs">{i + 1}</TableCell>
-                            <TableCell className="font-medium">{c.name}</TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className={`text-[10px] font-medium ${PLATFORM_COLORS[c.platform] || ""}`}>
-                                {c.platform}
-                              </Badge>
-                            </TableCell>
+                            <TableCell className="font-medium whitespace-nowrap">{c.name}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.newSubs)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.recurringSubs)}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.tips)}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.messages)}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.activeFans.toLocaleString()}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.newFans.toLocaleString()}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerDay)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerFan)}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.daysWithData}</TableCell>
-                            <TableCell className={`text-sm tabular-nums ${stopped ? "text-orange-500 dark:text-orange-400 font-medium" : "text-muted-foreground"}`}>
+                            <TableCell className={`text-sm tabular-nums whitespace-nowrap ${stopped ? "text-orange-500 dark:text-orange-400 font-medium" : "text-muted-foreground"}`}>
                               {format(new Date(c.lastDate + "T12:00:00"), "dd MMM", { locale: es })}
                               {stopped && " ⚠"}
                             </TableCell>
