@@ -20,7 +20,7 @@ export const usePromologAgentStats = (profileIds: string[]) => {
     queryFn: async () => {
       const PAGE_SIZE = 1000;
       let offset = 0;
-      let allEntries: Array<{ reviewed_by: string | null; created_by: string | null; promoted: string | null; network: string | null }> = [];
+      let allEntries: Array<{ reviewed_by: string | null; created_by: string | null; promoted: string | null; network: string | null; creator_id: string | null; date: string | null }> = [];
       let hasMore = true;
 
       while (hasMore) {
