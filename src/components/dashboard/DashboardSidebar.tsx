@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign,
-  MessageCircle, Contact,
+  MessageCircle, Contact, Rocket,
 } from "lucide-react";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { useSidebarBadges } from "@/hooks/useSidebarBadges";
