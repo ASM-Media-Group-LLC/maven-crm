@@ -26,6 +26,7 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const DesignSystem = lazy(() => import("./pages/DesignSystem"));
 const Docs = lazy(() => import("./pages/Docs"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Dashboard2 = lazy(() => import("./pages/Dashboard2"));
 
 // Sales
 const SalesDashboard = lazy(() => import("./pages/SalesDashboard"));
@@ -195,6 +196,7 @@ const App = () => (
               <Route path="/aisales" element={<PermissionRoute module="Creator Sales"><AiSales /></PermissionRoute>} />
               <Route path="/ai-sales-config" element={<PermissionRoute module="Creator Sales"><AiSalesConfig /></PermissionRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/dashboard2" element={<ProtectedRoute><Dashboard2 /></ProtectedRoute>} />
               <Route path="/contactos" element={<PermissionRoute module="Contactos"><Contactos /></PermissionRoute>} />
               <Route path="/contactos/nuevo" element={<PermissionRoute module="Contactos"><NuevoContacto /></PermissionRoute>} />
               <Route path="/creadores/dashboard" element={<PermissionRoute module="Creadores" submodule="Dashboard"><CreadorasDashboardPage /></PermissionRoute>} />
