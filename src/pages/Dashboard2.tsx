@@ -263,6 +263,9 @@ const Dashboard2 = () => {
     return map;
   }, [allRows, selectedMonth, selectedPeriod, monthOptions, creatorInfoMap]);
 
+  const fmtInline = (n: number) =>
+    `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   // Alerts / Red Flags
   const alerts = useMemo(() => {
     const items: { type: "drop" | "zero" | "fanLoss"; creator: CreatorSummary; detail: string }[] = [];
