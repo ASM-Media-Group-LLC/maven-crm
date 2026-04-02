@@ -1,8 +1,8 @@
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import {
-  LayoutDashboard, KanbanSquare, Users, Camera, TrendingUp, 
-  DollarSign, UserCog, Flag
+  LayoutDashboard, KanbanSquare, Users, Camera, TrendingUp,
+  DollarSign, UserCog, Flag, ArrowLeft
 } from "lucide-react";
 
 const items = [
@@ -17,16 +17,25 @@ const items = [
 ];
 
 const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors";
-const ACTIVE_CLASS = "bg-accent text-accent-foreground font-medium";
+const ACTIVE_CLASS = "bg-primary text-primary-foreground font-medium";
 
 const MPSidebar = () => {
   const { pathname } = useLocation();
 
   return (
-    <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-card/50 py-4 px-2 gap-1 overflow-y-auto">
+    <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-card py-4 px-2 gap-1 overflow-y-auto">
+      <Link
+        to="/dashboard"
+        className="flex items-center gap-2 px-3 py-2 mb-2 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        <span>Volver al CRM</span>
+      </Link>
+
       <h3 className="px-3 mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Proyecto MP
       </h3>
+
       {items.map((item) => (
         <NavLink
           key={item.url}
