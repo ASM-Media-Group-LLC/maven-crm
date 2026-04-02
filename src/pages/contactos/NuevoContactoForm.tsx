@@ -168,18 +168,19 @@ const NuevoContactoForm = () => {
         });
       }
 
-      // VALIDATION 2: Check existing contact by handle (informational only, NO block)
+      // VALIDATION 2: Check existing contact by handle — show modal for update option
       const existingContact = await checkExistingContact(form.accountLink);
       if (existingContact.exists) {
-        recordType = "reactivado";
-        const agentInfo = existingContact.contactAgentName ? ` por ${existingContact.contactAgentName}` : "";
-        const dateInfo = existingContact.contactCreatedAt
-          ? ` el ${new Date(existingContact.contactCreatedAt).toLocaleDateString("es-CO")}`
-          : "";
-        toast({
-          title: "⚠️ Contacto existente",
-          description: `Esta modelo ya existe como contacto: ${existingContact.contactName} (registrada${agentInfo}${dateInfo}). Se creará nuevo registro.`,
+        setExistingContactData({
+          id: existingContact.contactId!,
+          name: existingContact.contactName!,
+          phone: existingContact.contactPhone,
+          email: existingContact.contactEmail,
+          agentName: existingContact.contactAgentName,
+          createdAt: existingContact.contactCreatedAt,
         });
+        setIsSaving(false);
+        return;
       }
 
       // VALIDATION 3: Check duplicate OnlyFans URL

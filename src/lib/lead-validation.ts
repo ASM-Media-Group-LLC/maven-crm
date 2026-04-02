@@ -131,7 +131,10 @@ export async function checkExistingContact(
   handle: string
 ): Promise<{
   exists: boolean;
+  contactId?: string;
   contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
   contactCreatedAt?: string;
   contactAgentName?: string;
 }> {
@@ -140,7 +143,7 @@ export async function checkExistingContact(
 
   const { data } = await supabase
     .from("closers_contacts")
-    .select("id, name, created_at, created_by")
+    .select("id, name, phone, email, created_at, created_by")
     .ilike("handle", normalizedHandle)
     .limit(1)
     .maybeSingle();
@@ -157,7 +160,10 @@ export async function checkExistingContact(
     }
     return {
       exists: true,
+      contactId: data.id,
       contactName: data.name,
+      contactPhone: (data as any).phone || undefined,
+      contactEmail: (data as any).email || undefined,
       contactCreatedAt: data.created_at || undefined,
       contactAgentName: agentName,
     };
