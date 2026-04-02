@@ -19,7 +19,10 @@ interface SalesReportSectionProps {
   dateTo?: Date;
 }
 
-const SalesReportSection = ({ rows, comparedRows, earningsMode }: SalesReportSectionProps) => {
+const SalesReportSection = ({ rows, comparedRows, earningsMode, dateFrom, dateTo }: SalesReportSectionProps) => {
+  const dateLabel = dateFrom && dateTo
+    ? `${format(dateFrom, "d 'de' MMMM", { locale: es })} al ${format(dateTo, "d 'de' MMMM", { locale: es })}`
+    : null;
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
