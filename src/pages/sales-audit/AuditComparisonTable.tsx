@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarDays, CheckCircle, FileDown } from "lucide-react";
+import { CalendarDays, CheckCircle, FileDown, Save } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import AuditSummaryCards from "./AuditSummaryCards";
+import AuditEntriesInfo from "./AuditEntriesInfo";
 
 interface AuditRow {
   creator: string;
@@ -13,7 +15,8 @@ interface AuditRow {
   systemGross: number;
   diff: number;
   diffPct: number;
-  validated?: "excel" | "system";
+  excelEntries: number;
+  systemEntries: number;
 }
 
 interface Props {
@@ -34,19 +37,21 @@ const AuditComparisonTable = ({ file }: Props) => {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<{ min: string; max: string } | null>(null);
+  const [totalExcelEntries, setTotalExcelEntries] = useState(0);
+  const [totalSystemEntries, setTotalSystemEntries] = useState(0);
+  const { toast } = useToast();
 
   useEffect(() => {
     const run = async () => {
       setLoading(true);
 
-      // Parse Excel
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
 
-      // Group by creator
       const excelMap = new Map<string, number>();
+      const excelCountMap = new Map<string, number>();
       let minDate = "9999-12-31";
       let maxDate = "0000-01-01";
 
@@ -61,9 +66,9 @@ const AuditComparisonTable = ({ file }: Props) => {
 
         const gross = parseMoney(row["Total earnings Gross"] || row["Total Earnings Gross"]);
         excelMap.set(creator, (excelMap.get(creator) || 0) + gross);
+        excelCountMap.set(creator, (excelCountMap.get(creator) || 0) + 1);
       }
 
-      // Query DB for same date range
       const { data: dbData } = await supabase
         .from("of_gross_earnings")
         .select("pending_creator, total_earnings_gross, date")
@@ -71,27 +76,37 @@ const AuditComparisonTable = ({ file }: Props) => {
         .lte("date", maxDate + "T23:59:59");
 
       const systemMap = new Map<string, number>();
+      const systemCountMap = new Map<string, number>();
       for (const r of dbData || []) {
         const creator = (r.pending_creator || "").trim().toLowerCase();
         if (!creator) continue;
         systemMap.set(creator, (systemMap.get(creator) || 0) + (Number(r.total_earnings_gross) || 0));
+        systemCountMap.set(creator, (systemCountMap.get(creator) || 0) + 1);
       }
 
-      // Merge
       const allCreators = new Set([...excelMap.keys(), ...systemMap.keys()]);
       const result: AuditRow[] = [];
+
+      let totalExcel = 0;
+      let totalSystem = 0;
 
       for (const c of allCreators) {
         const ex = excelMap.get(c) || 0;
         const sys = systemMap.get(c) || 0;
         const diff = ex - sys;
         const diffPct = sys !== 0 ? (diff / sys) * 100 : ex !== 0 ? 100 : 0;
-        result.push({ creator: c, excelGross: ex, systemGross: sys, diff, diffPct });
+        const exEntries = excelCountMap.get(c) || 0;
+        const sysEntries = systemCountMap.get(c) || 0;
+        totalExcel += exEntries;
+        totalSystem += sysEntries;
+        result.push({ creator: c, excelGross: ex, systemGross: sys, diff, diffPct, excelEntries: exEntries, systemEntries: sysEntries });
       }
 
       result.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
       setRows(result);
       setDateRange({ min: minDate, max: maxDate });
+      setTotalExcelEntries(totalExcel);
+      setTotalSystemEntries(totalSystem);
       setLoading(false);
     };
 
@@ -99,9 +114,47 @@ const AuditComparisonTable = ({ file }: Props) => {
   }, [file]);
 
   const [validations, setValidations] = useState<Record<string, "excel" | "system">>({});
+  const [saving, setSaving] = useState(false);
 
   const validate = (creator: string, source: "excel" | "system") => {
     setValidations((prev) => ({ ...prev, [creator]: source }));
+  };
+
+  const saveAuditLog = async () => {
+    const entries = Object.entries(validations);
+    if (entries.length === 0) {
+      toast({ title: "No hay validaciones", description: "Selecciona al menos una fuente antes de guardar.", variant: "destructive" });
+      return;
+    }
+
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const inserts = entries.map(([creator, source]) => {
+      const row = rows.find((r) => r.creator === creator);
+      return {
+        creator_name: creator,
+        source_selected: source,
+        excel_amount: row?.excelGross || 0,
+        system_amount: row?.systemGross || 0,
+        difference: row?.diff || 0,
+        excel_entries: row?.excelEntries || 0,
+        system_entries: row?.systemEntries || 0,
+        file_name: file.name,
+        period_start: dateRange?.min,
+        period_end: dateRange?.max,
+        created_by: user?.id,
+      };
+    });
+
+    const { error } = await supabase.from("sales_audit_log").insert(inserts as any);
+    setSaving(false);
+
+    if (error) {
+      toast({ title: "Error al guardar", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Auditoría guardada", description: `${entries.length} validaciones registradas.` });
+    }
   };
 
   const summary = useMemo(() => {
@@ -115,6 +168,8 @@ const AuditComparisonTable = ({ file }: Props) => {
   const exportAudit = () => {
     const exportData = rows.map((r) => ({
       Creadora: r.creator,
+      "Entradas Excel": r.excelEntries,
+      "Entradas Sistema": r.systemEntries,
       "Total Excel": r.excelGross.toFixed(2),
       "Total Sistema": r.systemGross.toFixed(2),
       "Diferencia ($)": r.diff.toFixed(2),
@@ -124,22 +179,20 @@ const AuditComparisonTable = ({ file }: Props) => {
       "Monto Final": validations[r.creator] === "excel" ? r.excelGross.toFixed(2) : validations[r.creator] === "system" ? r.systemGross.toFixed(2) : "",
     }));
 
-    const wb = XLSX.utils.book_new();
-
-    // Header sheet with date info
+    const wbOut = XLSX.utils.book_new();
     const infoData = [
       ["Auditoría de Ventas"],
       ["Período:", dateRange ? `${dateRange.min} al ${dateRange.max}` : "N/A"],
       ["Archivo:", file.name],
+      ["Entradas Excel:", totalExcelEntries],
+      ["Entradas Sistema:", totalSystemEntries],
       ["Generado:", new Date().toLocaleString("es-MX")],
       [],
     ];
     const wsInfo = XLSX.utils.aoa_to_sheet(infoData);
-
-    // Append data below the header
-    XLSX.utils.sheet_add_json(wsInfo, exportData, { origin: "A6" });
-    XLSX.utils.book_append_sheet(wb, wsInfo, "Auditoría");
-    XLSX.writeFile(wb, "auditoria_ventas.xlsx");
+    XLSX.utils.sheet_add_json(wsInfo, exportData, { origin: "A8" });
+    XLSX.utils.book_append_sheet(wbOut, wsInfo, "Auditoría");
+    XLSX.writeFile(wbOut, "auditoria_ventas.xlsx");
   };
 
   if (loading) {
@@ -154,14 +207,18 @@ const AuditComparisonTable = ({ file }: Props) => {
     <div className="space-y-6">
       <AuditSummaryCards {...summary} />
 
-      {dateRange && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground border rounded-lg px-4 py-2 bg-card w-fit">
-          <CalendarDays className="h-4 w-4" />
-          <span>Período comparado: <strong className="text-foreground">{dateLabel}</strong></span>
-        </div>
-      )}
+      <AuditEntriesInfo
+        totalExcelEntries={totalExcelEntries}
+        totalSystemEntries={totalSystemEntries}
+        dateLabel={dateLabel}
+        dateRange={dateRange}
+      />
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={saveAuditLog} disabled={saving || Object.keys(validations).length === 0} className="gap-2">
+          <Save className="h-4 w-4" />
+          {saving ? "Guardando..." : "Guardar Auditoría"}
+        </Button>
         <Button variant="outline" onClick={exportAudit} className="gap-2">
           <FileDown className="h-4 w-4" />
           Exportar Auditoría
@@ -173,6 +230,8 @@ const AuditComparisonTable = ({ file }: Props) => {
           <TableHeader>
             <TableRow>
               <TableHead>Creadora</TableHead>
+              <TableHead className="text-center">Entradas Excel</TableHead>
+              <TableHead className="text-center">Entradas Sistema</TableHead>
               <TableHead className="text-right">Excel (Gross)</TableHead>
               <TableHead className="text-right">Sistema (Gross)</TableHead>
               <TableHead className="text-right">Diferencia ($)</TableHead>
@@ -185,9 +244,16 @@ const AuditComparisonTable = ({ file }: Props) => {
             {rows.map((r) => {
               const isOk = Math.abs(r.diff) <= 1;
               const val = validations[r.creator];
+              const entriesMismatch = r.excelEntries !== r.systemEntries;
               return (
                 <TableRow key={r.creator} className={val ? "bg-emerald-500/5" : ""}>
                   <TableCell className="font-medium capitalize">{r.creator}</TableCell>
+                  <TableCell className={`text-center ${entriesMismatch ? "text-amber-500 font-medium" : ""}`}>
+                    {r.excelEntries}
+                  </TableCell>
+                  <TableCell className={`text-center ${entriesMismatch ? "text-amber-500 font-medium" : ""}`}>
+                    {r.systemEntries}
+                  </TableCell>
                   <TableCell className={`text-right ${val === "excel" ? "font-bold text-emerald-500" : ""}`}>
                     ${r.excelGross.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
@@ -203,6 +269,8 @@ const AuditComparisonTable = ({ file }: Props) => {
                   <TableCell className="text-center">
                     {isOk ? (
                       <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30">OK</Badge>
+                    ) : entriesMismatch ? (
+                      <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/30">Faltan datos</Badge>
                     ) : (
                       <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">Diferencia</Badge>
                     )}
