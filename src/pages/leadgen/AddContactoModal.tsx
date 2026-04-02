@@ -102,19 +102,21 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         }
       }
 
-      // VALIDATION 2: Check existing contact by handle (informational, NO block)
+      // VALIDATION 2: Check existing contact by handle — show modal
       if (normalizedIg) {
         const existingContact = await checkExistingContact(normalizedIg);
         if (existingContact.exists) {
-          recordType = "reactivado";
-          const agentInfo = existingContact.contactAgentName ? ` por ${existingContact.contactAgentName}` : "";
-          const dateInfo = existingContact.contactCreatedAt
-            ? ` el ${new Date(existingContact.contactCreatedAt).toLocaleDateString("es-CO")}`
-            : "";
-          toast({
-            title: "⚠️ Contacto existente",
-            description: `Esta modelo ya existe como contacto: ${existingContact.contactName} (registrada${agentInfo}${dateInfo}). Se creará nuevo registro.`,
+          setExistingContactData({
+            id: existingContact.contactId!,
+            name: existingContact.contactName!,
+            phone: existingContact.contactPhone,
+            email: existingContact.contactEmail,
+            agentName: existingContact.contactAgentName,
+            createdAt: existingContact.contactCreatedAt,
           });
+          setPendingFormData(data);
+          setIsSubmitting(false);
+          return;
         }
       }
 
