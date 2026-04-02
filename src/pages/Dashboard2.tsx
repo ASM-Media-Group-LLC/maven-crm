@@ -392,6 +392,54 @@ const Dashboard2 = () => {
               </div>
             </div>
 
+            {/* High-level Business Indicators */}
+            {!isLoading && (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="rounded-lg border border-border bg-card p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
+                    <Repeat className="h-3 w-3" /> Retención Subs
+                  </div>
+                  <p className="text-lg font-bold tabular-nums">{hlKpis.renewalRate.toFixed(1)}%</p>
+                  <p className="text-[10px] text-muted-foreground">Recurrentes / Total subs</p>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
+                    <MessageSquare className="h-3 w-3" /> Msgs del Total
+                  </div>
+                  <p className="text-lg font-bold tabular-nums">{hlKpis.msgsPct.toFixed(1)}%</p>
+                  <p className="text-[10px] text-muted-foreground">{fmt(hlKpis.totalMsgs)}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
+                    <Heart className="h-3 w-3" /> Tips del Total
+                  </div>
+                  <p className="text-lg font-bold tabular-nums">{hlKpis.tipsPct.toFixed(1)}%</p>
+                  <p className="text-[10px] text-muted-foreground">{fmt(hlKpis.totalTips)}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
+                    <Eye className="h-3 w-3" /> Subs del Total
+                  </div>
+                  <p className="text-lg font-bold tabular-nums">{hlKpis.subsPct.toFixed(1)}%</p>
+                  <p className="text-[10px] text-muted-foreground">{fmt(hlKpis.totalSubs)}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
+                    <DollarSign className="h-3 w-3" /> $/Fan Global
+                  </div>
+                  <p className="text-lg font-bold tabular-nums">{fmt(hlKpis.avgPerFanGlobal)}</p>
+                  <p className="text-[10px] text-muted-foreground">Promedio por fan activo</p>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
+                    <Users className="h-3 w-3" /> Nuevas Subs
+                  </div>
+                  <p className="text-lg font-bold tabular-nums">{hlKpis.totalNewSubs.toLocaleString()}</p>
+                  <p className="text-[10px] text-muted-foreground">vs {hlKpis.totalRecurring.toLocaleString()} recurrentes</p>
+                </div>
+              </div>
+            )}
+
             {/* Pareto Analysis Panel */}
             {showPareto && !isLoading && (
               <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-5 space-y-4">
