@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { startOfMonth, subMonths, endOfMonth, format } from "date-fns";
+import { subMonths, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
