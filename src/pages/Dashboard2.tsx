@@ -92,6 +92,7 @@ const Dashboard2 = () => {
   const [showMetrics, setShowMetrics] = useState(false);
   const [showProjection, setShowProjection] = useState(false);
   const [paretoView, setParetoView] = useState<"list" | "chart">("list");
+  const [paretoGroup, setParetoGroup] = useState<"80" | "20">("80");
   const PIE_COLORS = ["hsl(221,83%,53%)","hsl(142,71%,45%)","hsl(25,95%,53%)","hsl(280,67%,55%)","hsl(350,80%,55%)","hsl(190,80%,45%)","hsl(45,93%,47%)","hsl(160,60%,45%)","hsl(320,70%,50%)","hsl(200,70%,50%)","hsl(100,60%,45%)","hsl(0,70%,55%)","hsl(260,50%,55%)","hsl(30,80%,50%)","hsl(170,70%,40%)","hsl(220,50%,60%)","hsl(60,70%,50%)","hsl(310,60%,55%)","hsl(140,50%,50%)","hsl(10,70%,50%)"];
 
   const monthOptions = useMemo(getMonthOptions, []);
@@ -240,13 +241,21 @@ const Dashboard2 = () => {
     return { renewalRate, tipsPct, msgsPct, subsPct, avgPerFanGlobal, totalNewSubs, totalRecurring, totalTips, totalMsgs, totalSubs, totalBruto, avgPerCreator, topCreator, zeroCreators, creatorsUnder1k, creatorsOver10k, activeCount: active.length };
   }, [rawCreators]);
 
-  // Pie chart data for pareto
+  // Pie chart data for pareto — switches between 80 and 20 group
   const pieData = useMemo(() => {
-    const items = paretoAnalysis.top.map((c) => ({ name: c.name, value: c.total }));
-    const restTotal = paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue;
-    if (restTotal > 0) items.push({ name: `Resto (${paretoAnalysis.rest.length})`, value: restTotal });
-    return items;
-  }, [paretoAnalysis]);
+    if (paretoGroup === "80") {
+      const items = paretoAnalysis.top.map((c) => ({ name: c.name, value: c.total }));
+      const restTotal = paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue;
+      if (restTotal > 0) items.push({ name: `Resto (${paretoAnalysis.rest.length})`, value: restTotal });
+      return items;
+    } else {
+      return paretoAnalysis.rest.map((c) => ({ name: c.name, value: c.total }));
+    }
+  }, [paretoAnalysis, paretoGroup]);
+
+  const pieGroupTotal = useMemo(() => {
+    return pieData.reduce((s, d) => s + d.value, 0);
+  }, [pieData]);
 
   // Previous month summaries for comparison
   const prevMonthMap = useMemo(() => {
@@ -732,6 +741,15 @@ const Dashboard2 = () => {
                   {/* CHART VIEW — clean donut + sidebar legend */}
                   {paretoView === "chart" && (
                     <div className="rounded-xl border border-border bg-card overflow-hidden">
+                      {/* 80 vs 20 toggle */}
+                      <div className="flex items-center justify-center gap-2 p-3 border-b border-border bg-muted/30">
+                        <Button variant={paretoGroup === "80" ? "default" : "outline"} size="sm" className="h-8 px-4 text-xs rounded-full" onClick={() => setParetoGroup("80")}>
+                          🔥 Top 80%
+                        </Button>
+                        <Button variant={paretoGroup === "20" ? "default" : "outline"} size="sm" className="h-8 px-4 text-xs rounded-full" onClick={() => setParetoGroup("20")}>
+                          📊 Bottom 20%
+                        </Button>
+                      </div>
                       <div className="grid grid-cols-1 lg:grid-cols-5 divide-y lg:divide-y-0 lg:divide-x divide-border">
                         <div className="lg:col-span-3 p-6 flex items-center justify-center" style={{ minHeight: 400 }}>
                           <ResponsiveContainer width="100%" height={400}>
@@ -753,20 +771,24 @@ const Dashboard2 = () => {
                               </Pie>
                               <Tooltip
                                 formatter={(value: number) => fmt(value)}
-                                contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))' }}
+                                labelStyle={{ color: 'hsl(var(--foreground))' }}
+                                itemStyle={{ color: 'hsl(var(--foreground))' }}
+                                contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', color: 'hsl(var(--foreground))' }}
                               />
                             </RechartsPie>
                           </ResponsiveContainer>
                         </div>
                         <div className="lg:col-span-2 p-4 overflow-y-auto" style={{ maxHeight: 420 }}>
-                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Desglose</p>
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+                            {paretoGroup === "80" ? "Top 80%" : "Bottom 20%"} · {pieData.length} creadoras
+                          </p>
                           <div className="space-y-2">
                             {pieData.map((d, idx) => {
-                              const pct = paretoAnalysis.totalRevenue > 0 ? (d.value / paretoAnalysis.totalRevenue) * 100 : 0;
+                              const pct = pieGroupTotal > 0 ? (d.value / pieGroupTotal) * 100 : 0;
                               return (
                                 <div key={idx} className="flex items-center gap-2.5 py-1 border-b border-border/50 last:border-0">
                                   <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }} />
-                                  <span className="text-sm truncate flex-1 min-w-0">{d.name}</span>
+                                  <span className="text-sm truncate flex-1 min-w-0 text-foreground">{d.name}</span>
                                   <span className="text-xs font-semibold tabular-nums shrink-0">{fmt(d.value)}</span>
                                   <span className="text-[11px] tabular-nums text-muted-foreground shrink-0 w-11 text-right">{pct.toFixed(1)}%</span>
                                 </div>
@@ -777,7 +799,7 @@ const Dashboard2 = () => {
                       </div>
                       <div className="border-t border-border bg-muted/30 px-6 py-2.5">
                         <p className="text-[10px] text-muted-foreground text-center">
-                          Montos <strong>BRUTOS</strong> · "Resto" agrupa {paretoAnalysis.rest.length} creadoras (~20% del revenue)
+                          Montos <strong>BRUTOS</strong> · {paretoGroup === "80" ? `Top genera ${fmt(paretoAnalysis.topRevenue)}` : `Bottom genera ${fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}`} de {fmt(paretoAnalysis.totalRevenue)} total
                         </p>
                       </div>
                     </div>
