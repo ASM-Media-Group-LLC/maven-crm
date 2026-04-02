@@ -1,52 +1,28 @@
 
-## Plan: Evitar versiones viejas dentro del preview de Lovable
 
-### Hallazgo
-- El problema sí puede venir del propio preview.
-- En `vite.config.ts` el proyecto activa `VitePWA(...)` en builds de producción.
-- No hay control manual del registro del service worker en `src/main.tsx`; tampoco hay lógica para bloquearlo o limpiarlo en el subdominio de preview.
-- `index.html` tiene meta tags de no-cache, pero eso no invalida un service worker ya instalado.
-- Por eso te puede seguir mostrando una versión vieja “acá mismo” en Lovable: el preview usa un host estable del proyecto y el worker/caché puede quedarse pegado entre cargas.
+## Fix: Error de `virtual:pwa-register` en desarrollo
 
-### Qué se va a construir
-1. **Blindar el preview de Lovable**
-   - Detectar cuando la app corre en el preview (`id-preview--...`) o dentro de un iframe.
-   - En ese caso, desregistrar cualquier service worker previo y limpiar las caches del PWA antes de montar la app.
-   - Si se limpió algo, hacer una recarga única para que el preview entre limpio.
+### Causa
+En `src/main.tsx`, el `import("virtual:pwa-register")` se ejecuta en runtime pero Vite intenta resolver la referencia en tiempo de transformación incluso en desarrollo. Como `VitePWA` solo se activa en `mode === "production"`, el módulo virtual no existe y Vite lanza error.
 
-2. **Quitar el auto-registro implícito**
-   - Ajustar `vite.config.ts` para que el plugin PWA no se auto-registre por detrás.
-   - Pasar a registro manual desde `src/main.tsx`, solo en contextos permitidos.
+### Solución
+Envolver el bloque completo del import en una guarda de `import.meta.env.PROD` para que Vite haga tree-shaking y ni siquiera intente resolver el import en desarrollo:
 
-3. **Registrar PWA solo fuera del preview**
-   - Mantener la PWA solo para el sitio publicado / dominio final.
-   - Nunca registrar service worker dentro del preview de Lovable.
+**Archivo: `src/main.tsx`**
+- Cambiar la condición `isProductionHost && import.meta.env.PROD` a que el `import.meta.env.PROD` sea la guarda **exterior** (primera condición del `if`), y `isProductionHost` sea la segunda
+- Esto es porque Vite solo elimina el import muerto si `import.meta.env.PROD` es la condición directa del bloque, no anidada con `&&`
 
-4. **Reducir la posibilidad de shell viejo**
-   - Revisar la regla actual que cachea `/` en Workbox.
-   - Quitar o endurecer esa caché de HTML para que no se quede pegada una versión vieja del frontend.
+Alternativa más robusta: mover todo el bloque PWA a un archivo separado (ej. `src/pwa.ts`) y hacer el import condicional desde `main.tsx`:
 
-5. **Mejora opcional pero recomendable**
-   - Agregar aviso de “Nueva versión disponible” en producción para que el usuario recargue cuando haya build nueva.
-   - Esto evita la sensación de que el sistema “no actualizó”.
+```typescript
+if (import.meta.env.PROD) {
+  import("./pwa");
+}
+```
 
-### Archivos a tocar
-- `vite.config.ts`
-- `src/main.tsx`
+Y en `src/pwa.ts` poner toda la lógica de registro del service worker. Así Vite descarta el archivo completo en dev.
 
-### Detalles técnicos
-- Detección de preview:
-  - `window.location.hostname.includes("id-preview--")`
-  - `window.self !== window.top` con `try/catch`
-- Limpieza:
-  - `navigator.serviceWorker.getRegistrations()` + `unregister()`
-  - borrar caches tipo `workbox-*`, `html-cache` y similares
-- Registro seguro:
-  - usar `virtual:pwa-register` o equivalente solo cuando **no** sea preview/iframe
-- No hace falta tocar rutas, React Query ni lógica de negocio.
-- El `staleTime` de React Query puede afectar datos por segundos, pero no explica bundles viejos; el problema principal acá es caché de PWA/service worker.
+### Archivos a modificar
+1. `src/main.tsx` — extraer lógica PWA
+2. `src/pwa.ts` — nuevo archivo con el registro del SW (solo se importa en PROD)
 
-### Resultado esperado
-- El preview dentro de Lovable dejará de quedarse mostrando builds viejos.
-- Los cambios nuevos deberían reflejarse en el preview sin depender de hard refresh constantes.
-- La versión publicada seguirá pudiendo tener comportamiento PWA, pero ya sin contaminar el preview.
