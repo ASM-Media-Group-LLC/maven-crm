@@ -241,13 +241,21 @@ const Dashboard2 = () => {
     return { renewalRate, tipsPct, msgsPct, subsPct, avgPerFanGlobal, totalNewSubs, totalRecurring, totalTips, totalMsgs, totalSubs, totalBruto, avgPerCreator, topCreator, zeroCreators, creatorsUnder1k, creatorsOver10k, activeCount: active.length };
   }, [rawCreators]);
 
-  // Pie chart data for pareto
+  // Pie chart data for pareto — switches between 80 and 20 group
   const pieData = useMemo(() => {
-    const items = paretoAnalysis.top.map((c) => ({ name: c.name, value: c.total }));
-    const restTotal = paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue;
-    if (restTotal > 0) items.push({ name: `Resto (${paretoAnalysis.rest.length})`, value: restTotal });
-    return items;
-  }, [paretoAnalysis]);
+    if (paretoGroup === "80") {
+      const items = paretoAnalysis.top.map((c) => ({ name: c.name, value: c.total }));
+      const restTotal = paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue;
+      if (restTotal > 0) items.push({ name: `Resto (${paretoAnalysis.rest.length})`, value: restTotal });
+      return items;
+    } else {
+      return paretoAnalysis.rest.map((c) => ({ name: c.name, value: c.total }));
+    }
+  }, [paretoAnalysis, paretoGroup]);
+
+  const pieGroupTotal = useMemo(() => {
+    return pieData.reduce((s, d) => s + d.value, 0);
+  }, [pieData]);
 
   // Previous month summaries for comparison
   const prevMonthMap = useMemo(() => {
