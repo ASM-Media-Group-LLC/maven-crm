@@ -6020,6 +6020,60 @@ export type Database = {
         }
         Relationships: []
       }
+      sales_audit_log: {
+        Row: {
+          audit_date: string
+          created_at: string
+          created_by: string | null
+          creator_name: string
+          difference: number
+          excel_amount: number
+          excel_entries: number
+          file_name: string | null
+          id: string
+          notes: string | null
+          period_end: string | null
+          period_start: string | null
+          source_selected: string
+          system_amount: number
+          system_entries: number
+        }
+        Insert: {
+          audit_date?: string
+          created_at?: string
+          created_by?: string | null
+          creator_name: string
+          difference?: number
+          excel_amount?: number
+          excel_entries?: number
+          file_name?: string | null
+          id?: string
+          notes?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          source_selected: string
+          system_amount?: number
+          system_entries?: number
+        }
+        Update: {
+          audit_date?: string
+          created_at?: string
+          created_by?: string | null
+          creator_name?: string
+          difference?: number
+          excel_amount?: number
+          excel_entries?: number
+          file_name?: string | null
+          id?: string
+          notes?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          source_selected?: string
+          system_amount?: number
+          system_entries?: number
+        }
+        Relationships: []
+      }
       subtask_assignees: {
         Row: {
           created_at: string | null
