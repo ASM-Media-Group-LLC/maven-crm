@@ -1,24 +1,35 @@
 
 
-## Plan: Priorizar `created_by` en columna Agente + Mostrar duplicados
+## Investigación: ¿Por qué aparecen registros sin agente?
 
-### Cambios
+### Hallazgo
 
-**1. Priorizar `created_by` sobre `reviewed_by` en la columna "Agente"**
-- **Archivo**: `src/pages/promolog/PromologContent.tsx` (línea 243)
-- Cambiar el orden de resolución: primero `created_by` (quien subió), luego `reviewed_by` como fallback
-- La columna sigue llamándose "Agente" — solo cambia qué dato se muestra
-- Antes: `reviewed_by → created_by → "Sin asignar"`
-- Después: `created_by → reviewed_by → "Sin asignar"`
+Los registros de hoy y ayer **vienen de un sistema externo de sincronización automática**. El trigger `notify_promolog_webhook` en la base de datos llama a una edge function externa (`sync-promolog-external`) que inserta registros sin establecer `created_by` ni `reviewed_by`.
 
-**2. Eliminar la deduplicación para mostrar todos los registros**
-- **Archivo**: `src/pages/promolog/PromologContent.tsx` (líneas 202-224)
-- Eliminar el bloque de deduplicación que agrupa por `creator_id|día|network|platform|promoted`
-- Devolver `data` directamente en lugar de `deduped`
-- Esto permitirá ver todos los registros tal cual están en la base de datos
+**Datos de los últimos 2 días:**
+- 130 registros **con** `created_by` (subidos manualmente por agentes)
+- 781 registros **sin** `created_by` ni `reviewed_by` (importación automática externa)
 
-### Resultado
-- La columna "Agente" mostrará quién subió la promo (no quién la revisó)
-- Se verán todos los registros incluyendo duplicados
-- No se cambia nombre de columna ni estructura visual
+Los 6 registros más recientes (de las 17:00 hoy) sí tienen agente (`dd959846...`), porque fueron subidos manualmente. Todo lo demás (09:40, 10:00, etc.) fue importado automáticamente.
+
+### Plan: Identificar origen externo + facilitar asignación
+
+**1. Agregar columna visual "Origen" en la tabla**
+- Si `created_by` existe → mostrar nombre del agente en columna "Agente"
+- Si `created_by` es NULL → mostrar badge "Sync externo" en gris/itálica en lugar de "Sin asignar"
+- Esto aclara que nadie "olvidó" poner su nombre — el sistema externo simplemente no lo incluye
+
+**2. Permitir asignación rápida desde la tabla**
+- En registros con "Sync externo", mostrar un botón `UserPlus` clicable que abra el modal de asignación de agente
+- Ya existe la funcionalidad `onAssignAgent` — solo se expone más directamente
+
+**3. (Opcional) Marcar origen en la base de datos**
+- Agregar columna `source` a `promolog_entries` con default `'manual'`
+- El sistema externo setearía `'external_sync'`
+- Esto permite filtrar por origen en la UI
+
+### Archivos a modificar
+- `src/pages/promolog/PromologContent.tsx` — lógica de mapeo del campo agent
+- `src/pages/promolog/PromologTable.tsx` — badge "Sync externo" + botón de asignación rápida
+- (Opcional) Migración SQL para agregar columna `source`
 
