@@ -22,8 +22,11 @@ import {
 import {
   Info, TrendingUp, Users, DollarSign, Calendar,
   ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram, PieChart,
-  BarChart3, MessageSquare, Repeat, Heart, Eye, AlertTriangle, Target, Crown,
+  BarChart3, MessageSquare, Repeat, Heart, Eye, AlertTriangle, Target, Crown, X,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import {
   PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer,
