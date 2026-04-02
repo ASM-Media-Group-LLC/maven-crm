@@ -340,6 +340,15 @@ const AuditComparisonTable = ({ file }: Props) => {
       />
 
       <div className="flex justify-end gap-2">
+        <Button
+          variant="default"
+          onClick={applyCorrections}
+          disabled={applying || Object.values(validations).filter(v => v === "excel").length === 0}
+          className="gap-2"
+        >
+          <Zap className="h-4 w-4" />
+          {applying ? "Aplicando..." : "Aplicar Correcciones"}
+        </Button>
         <Button variant="outline" onClick={saveAuditLog} disabled={saving || Object.keys(validations).length === 0} className="gap-2">
           <Save className="h-4 w-4" />
           {saving ? "Guardando..." : "Guardar Auditoría"}
