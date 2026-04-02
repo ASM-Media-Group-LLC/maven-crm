@@ -33,6 +33,7 @@ function parseMoney(val: unknown): number {
 const AuditComparisonTable = ({ file }: Props) => {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<{ min: string; max: string } | null>(null);
 
   useEffect(() => {
     const run = async () => {
