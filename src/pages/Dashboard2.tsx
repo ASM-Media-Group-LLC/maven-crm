@@ -541,29 +541,50 @@ const Dashboard2 = () => {
                 {/* PIE CHART VIEW */}
                 {paretoView === "chart" && (
                   <div className="rounded-lg border border-border bg-card p-4">
-                    <ResponsiveContainer width="100%" height={400}>
-                      <RechartsPie>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={140}
-                          innerRadius={60}
-                          dataKey="value"
-                          nameKey="name"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
-                          labelLine={{ strokeWidth: 1 }}
-                        >
-                          {pieData.map((_, idx) => (
-                            <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: number) => fmt(value)} />
-                        <Legend />
-                      </RechartsPie>
-                    </ResponsiveContainer>
-                    <p className="text-xs text-muted-foreground text-center mt-2">
-                      Montos BRUTOS · El segmento "Resto" agrupa las {paretoAnalysis.rest.length} creadoras que generan el ~20%
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+                      {/* Chart */}
+                      <div className="w-full" style={{ minHeight: 320 }}>
+                        <ResponsiveContainer width="100%" height={320}>
+                          <RechartsPie>
+                            <Pie
+                              data={pieData}
+                              cx="50%"
+                              cy="50%"
+                              outerRadius="80%"
+                              innerRadius="45%"
+                              dataKey="value"
+                              nameKey="name"
+                              label={({ name, percent }) => {
+                                const short = name.length > 12 ? name.slice(0, 11) + "…" : name;
+                                return `${short} ${(percent * 100).toFixed(0)}%`;
+                              }}
+                              labelLine={{ strokeWidth: 1 }}
+                            >
+                              {pieData.map((_, idx) => (
+                                <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value: number) => fmt(value)} />
+                          </RechartsPie>
+                        </ResponsiveContainer>
+                      </div>
+                      {/* Legend table */}
+                      <div className="space-y-1.5 max-h-[320px] overflow-y-auto">
+                        {pieData.map((d, idx) => {
+                          const pct = paretoAnalysis.totalRevenue > 0 ? (d.value / paretoAnalysis.totalRevenue) * 100 : 0;
+                          return (
+                            <div key={idx} className="flex items-center gap-2 text-sm">
+                              <div className="h-3 w-3 rounded-sm shrink-0" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }} />
+                              <span className="truncate flex-1 min-w-0">{d.name}</span>
+                              <span className="tabular-nums font-medium shrink-0">{fmt(d.value)}</span>
+                              <span className="tabular-nums text-muted-foreground text-xs shrink-0 w-12 text-right">{pct.toFixed(1)}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center mt-3">
+                      Montos BRUTOS · "Resto" agrupa {paretoAnalysis.rest.length} creadoras (~20% del revenue)
                     </p>
                   </div>
                 )}
