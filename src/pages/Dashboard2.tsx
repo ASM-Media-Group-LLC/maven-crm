@@ -468,6 +468,17 @@ const Dashboard2 = () => {
         </TableCell>
         <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : ""}`}>{fmt(c.total)}</TableCell>
         <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : "text-emerald-600 dark:text-emerald-400"}`}>{fmt(c.net)}</TableCell>
+        {(() => {
+          const prev = prevMonthMap.get(c.creatorId);
+          if (!prev || prev === 0) return <TableCell className="text-right tabular-nums text-xs text-muted-foreground">—</TableCell>;
+          const change = ((c.total - prev) / prev) * 100;
+          const color = change > 0 ? "text-emerald-600 dark:text-emerald-400" : change < -10 ? "text-destructive" : "text-muted-foreground";
+          return (
+            <TableCell className={`text-right tabular-nums text-xs font-medium ${color}`}>
+              {change > 0 ? "↑" : "↓"} {Math.abs(change).toFixed(0)}%
+            </TableCell>
+          );
+        })()}
         <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
         <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.newSubs)}</TableCell>
         <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.recurringSubs)}</TableCell>
