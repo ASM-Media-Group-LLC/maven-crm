@@ -1,35 +1,50 @@
 
 
-## Investigación: ¿Por qué aparecen registros sin agente?
+## Plan: Mejorar feedback de validación al usuario en formularios de Lead y Contacto
 
-### Hallazgo
+### Problema actual
+Los toasts actuales son genéricos y desaparecen rápido. El usuario no recibe suficiente contexto sobre:
+- **Quién** es la creadora duplicada (solo nombre, sin link al perfil)
+- **Cuándo** fue el último registro (en el bloqueo de 24h solo dice "menos de 24 horas")
+- **Qué acción tomar** — no queda claro si debe esperar, buscar al contacto existente, o simplemente continuar
+- Los warnings informativos (teléfono duplicado, contacto existente) se ven igual que errores reales
+- Múltiples toasts pueden apilarse y confundir
 
-Los registros de hoy y ayer **vienen de un sistema externo de sincronización automática**. El trigger `notify_promolog_webhook` en la base de datos llama a una edge function externa (`sync-promolog-external`) que inserta registros sin establecer `created_by` ni `reviewed_by`.
+### Cambios propuestos
 
-**Datos de los últimos 2 días:**
-- 130 registros **con** `created_by` (subidos manualmente por agentes)
-- 781 registros **sin** `created_by` ni `reviewed_by` (importación automática externa)
+**1. Mejorar mensajes de toast con información accionable**
 
-Los 6 registros más recientes (de las 17:00 hoy) sí tienen agente (`dd959846...`), porque fueron subidos manualmente. Todo lo demás (09:40, 10:00, etc.) fue importado automáticamente.
+| Validación | Antes | Después |
+|---|---|---|
+| Lead duplicado 24h | "Este lead ya fue subido hace menos de 24 horas" | "Este lead fue subido hace X horas por [agente]. Podrás resubirlo en Y horas." |
+| Creadora activa (bloqueo) | "Ya forma parte de la agencia" | "Ya forma parte de la agencia con estado: [status]. No se puede registrar." |
+| Creadora inactiva | "Está como [status]. Se registrará como lead reactivado" | Mismo pero con ícono diferenciado (amarillo informativo, no rojo) |
+| Contacto existente | "Esta modelo ya está registrada" | "Esta modelo ya existe como contacto (registrada por [agente] el [fecha]). Se creará nuevo registro." |
+| Teléfono duplicado | "Este número ya existe para: [nombre]" | "Este número ya está registrado para [nombre]. El contacto se guardará de todos modos." |
+| OF URL duplicado | "Ya está registrada en leads/contactos" | "Esta URL de OnlyFans ya está en [leads/contactos] para [nombre]. No se puede registrar." |
 
-### Plan: Identificar origen externo + facilitar asignación
+**2. Diferenciar visualmente warnings vs bloqueos**
+- **Bloqueos** (destructive): Borde rojo, ícono ❌ — Creadora activa, OF duplicado, Lead 24h
+- **Warnings** (default/amarillo): Borde amarillo, ícono ⚠️ — Teléfono duplicado, contacto existente, creadora inactiva
+- **Éxito**: Verde — Guardado exitoso
 
-**1. Agregar columna visual "Origen" en la tabla**
-- Si `created_by` existe → mostrar nombre del agente en columna "Agente"
-- Si `created_by` es NULL → mostrar badge "Sync externo" en gris/itálica en lugar de "Sin asignar"
-- Esto aclara que nadie "olvidó" poner su nombre — el sistema externo simplemente no lo incluye
+**3. Enriquecer datos de validación desde el backend**
+- `checkPreviousLead`: Agregar `lg_user_id` al SELECT para mostrar quién subió el lead anterior
+- `checkExistingContact`: Agregar `created_at` y `created_by` al SELECT para dar contexto temporal
+- `checkCreatorExists`: Ya devuelve `creatorStatus` — se usará mejor en el mensaje
 
-**2. Permitir asignación rápida desde la tabla**
-- En registros con "Sync externo", mostrar un botón `UserPlus` clicable que abra el modal de asignación de agente
-- Ya existe la funcionalidad `onAssignAgent` — solo se expone más directamente
-
-**3. (Opcional) Marcar origen en la base de datos**
-- Agregar columna `source` a `promolog_entries` con default `'manual'`
-- El sistema externo setearía `'external_sync'`
-- Esto permite filtrar por origen en la UI
+**4. Agregar tiempo restante en bloqueo 24h**
+- Calcular horas restantes: `24 - hoursSince` y mostrarlo al usuario
+- Ejemplo: "Podrás resubirlo en 6 horas (a las 3:00 PM)"
 
 ### Archivos a modificar
-- `src/pages/promolog/PromologContent.tsx` — lógica de mapeo del campo agent
-- `src/pages/promolog/PromologTable.tsx` — badge "Sync externo" + botón de asignación rápida
-- (Opcional) Migración SQL para agregar columna `source`
+1. **`src/lib/lead-validation.ts`** — Enriquecer retornos con datos adicionales (agente, fecha)
+2. **`src/pages/leadgen/AddLeadModal.tsx`** — Mejorar mensajes de toast y diferenciar warnings
+3. **`src/pages/leadgen/AddContactoModal.tsx`** — Mismo tratamiento
+4. **`src/pages/contactos/NuevoContactoForm.tsx`** — Mismo tratamiento
+
+### Alcance
+- Solo cambios frontend + queries enriquecidos
+- No requiere migraciones de base de datos
+- Los formularios siguen funcionando igual, solo mejora la información mostrada
 
