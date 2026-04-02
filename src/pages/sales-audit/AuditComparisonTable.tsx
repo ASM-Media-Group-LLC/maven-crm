@@ -88,6 +88,7 @@ const AuditComparisonTable = ({ file }: Props) => {
       const systemMap = new Map<string, number>();
       const systemCountMap = new Map<string, number>();
       const systemDetailMap = new Map<string, EntryDetail[]>();
+      const rawRecordsMap = new Map<string, { id: string; date: string; amount: number }[]>();
       for (const r of dbData || []) {
         const creator = (r.pending_creator || "").trim().toLowerCase();
         if (!creator) continue;
@@ -98,6 +99,9 @@ const AuditComparisonTable = ({ file }: Props) => {
         const arr = systemDetailMap.get(creator) || [];
         arr.push({ date: dateStr, amount });
         systemDetailMap.set(creator, arr);
+        const rawArr = rawRecordsMap.get(creator) || [];
+        rawArr.push({ id: r.id, date: r.date, amount });
+        rawRecordsMap.set(creator, rawArr);
       }
 
       const allCreators = new Set([...excelMap.keys(), ...systemMap.keys()]);
