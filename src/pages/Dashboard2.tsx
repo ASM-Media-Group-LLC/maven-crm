@@ -240,6 +240,92 @@ const Dashboard2 = () => {
     if (restTotal > 0) items.push({ name: `Resto (${paretoAnalysis.rest.length})`, value: restTotal });
     return items;
   }, [paretoAnalysis]);
+
+  // Previous month summaries for comparison
+  const prevMonthMap = useMemo(() => {
+    if (!selectedPeriod || monthOptions.length < 2) return new Map<string, number>();
+    const currentIdx = monthOptions.findIndex((m) => m.value === selectedMonth);
+    const prevPeriod = monthOptions[currentIdx + 1];
+    if (!prevPeriod) return new Map<string, number>();
+
+    const map = new Map<string, number>();
+    for (const r of allRows) {
+      const d = r.effective_date;
+      if (d < prevPeriod.startStr || d > prevPeriod.endStr) continue;
+      const key = r.creator_id || r.pending_creator || r.id;
+      const info = r.creator_id ? creatorInfoMap[r.creator_id] : null;
+      const normPlat = (info?.platform || "").toLowerCase();
+      if (normPlat === "unlok" || normPlat === "instagram") continue;
+      map.set(key, (map.get(key) || 0) + (r.total_earnings_gross ?? 0));
+    }
+    return map;
+  }, [allRows, selectedMonth, selectedPeriod, monthOptions, creatorInfoMap]);
+
+  // Alerts / Red Flags
+  const alerts = useMemo(() => {
+    const items: { type: "drop" | "zero" | "fanLoss"; creator: CreatorSummary; detail: string }[] = [];
+    for (const c of rawCreators) {
+      const prev = prevMonthMap.get(c.creatorId);
+      if (c.total === 0 && prev && prev > 0) {
+        items.push({ type: "zero", creator: c, detail: `Vendía ${fmt(prev)} → ahora $0` });
+      } else if (prev && prev > 0 && c.total > 0) {
+        const change = ((c.total - prev) / prev) * 100;
+        if (change <= -30) {
+          items.push({ type: "drop", creator: c, detail: `Cayó ${Math.abs(change).toFixed(0)}% (${fmt(prev)} → ${fmt(c.total)})` });
+        }
+      }
+      if (c.activeFans > 0 && c.newFans < 0) {
+        items.push({ type: "fanLoss", creator: c, detail: `Perdiendo fans: ${c.newFans} netos` });
+      }
+    }
+    return items.sort((a, b) => {
+      const order = { zero: 0, drop: 1, fanLoss: 2 };
+      return order[a.type] - order[b.type];
+    });
+  }, [rawCreators, prevMonthMap]);
+
+  // Current month projection
+  const projection = useMemo(() => {
+    const now = new Date();
+    const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dayOfMonth = now.getDate();
+    if (dayOfMonth <= 1) return [];
+
+    const map = new Map<string, { name: string; ig: string | null; total: number; days: number; creatorId: string }>();
+    for (const r of allRows) {
+      const d = r.effective_date;
+      if (d < currentMonthStart) continue;
+      const key = r.creator_id || r.pending_creator || r.id;
+      const info = r.creator_id ? creatorInfoMap[r.creator_id] : null;
+      const normPlat = (info?.platform || "").toLowerCase();
+      if (normPlat === "unlok" || normPlat === "instagram") continue;
+      const ex = map.get(key);
+      if (ex) {
+        ex.total += r.total_earnings_gross ?? 0;
+        ex.days++;
+      } else {
+        map.set(key, {
+          name: r.artistic_name || r.pending_creator || "Sin nombre",
+          ig: info?.ig || null,
+          total: r.total_earnings_gross ?? 0,
+          days: 1,
+          creatorId: key,
+        });
+      }
+    }
+    return Array.from(map.values())
+      .filter((c) => c.total > 0)
+      .map((c) => ({
+        ...c,
+        projected: c.days > 0 ? (c.total / c.days) * daysInMonth : 0,
+        dailyAvg: c.days > 0 ? c.total / c.days : 0,
+      }))
+      .sort((a, b) => b.projected - a.projected);
+  }, [allRows, creatorInfoMap]);
+
+  const projectionTotal = useMemo(() => projection.reduce((s, c) => s + c.projected, 0), [projection]);
+
   // Apply filters
   const filteredCreators = useMemo(() => {
     let list = rawCreators;
