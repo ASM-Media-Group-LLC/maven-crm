@@ -30,12 +30,11 @@ if (isPreviewHost || isInIframe) {
       names.forEach((name) => caches.delete(name));
     });
   }
-} else if (isProductionHost) {
-  // Register PWA only on the published production domain
+} else if (isProductionHost && import.meta.env.PROD) {
+  // Register PWA only on the published production domain in production builds
   import("virtual:pwa-register").then(({ registerSW }) => {
     registerSW({
       onNeedRefresh() {
-        // Show a non-blocking banner to the user
         const banner = document.createElement("div");
         banner.id = "pwa-update-banner";
         banner.style.cssText =
@@ -50,11 +49,9 @@ if (isPreviewHost || isInIframe) {
           window.location.reload();
         });
       },
-      onOfflineReady() {
-        // silent
-      },
+      onOfflineReady() {},
     });
-  });
+  }).catch(() => {});
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

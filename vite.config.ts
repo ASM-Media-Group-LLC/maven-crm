@@ -73,4 +73,11 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      ...(mode !== "production" && {
+        external: ["virtual:pwa-register"],
+      }),
+    },
+  },
 }));
