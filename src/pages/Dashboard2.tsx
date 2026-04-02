@@ -97,6 +97,7 @@ const Dashboard2 = () => {
 
       if (existing) {
         existing.total += r.total_earnings_gross ?? 0;
+        existing.net += (r.total_earnings_gross ?? 0) * 0.8;
         existing.subs += r.subscription_gross ?? 0;
         existing.newSubs += r.new_subscriptions_sub_gross ?? 0;
         existing.recurringSubs += r.recurring_sub_gross ?? 0;
