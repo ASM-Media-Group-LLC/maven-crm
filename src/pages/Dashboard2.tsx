@@ -770,7 +770,9 @@ const Dashboard2 = () => {
                               </Pie>
                               <Tooltip
                                 formatter={(value: number) => fmt(value)}
-                                contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))' }}
+                                labelStyle={{ color: 'hsl(var(--foreground))' }}
+                                itemStyle={{ color: 'hsl(var(--foreground))' }}
+                                contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', color: 'hsl(var(--foreground))' }}
                               />
                             </RechartsPie>
                           </ResponsiveContainer>
