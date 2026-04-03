@@ -1398,7 +1398,7 @@ const Dashboard2 = () => {
                     const active = rawCreators.filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
                     return (
                       <div className="space-y-5">
-                        <p className="text-xs text-muted-foreground">Objetivos de escalabilidad por creadora. Se proyecta un crecimiento target del 20% basado en su rendimiento actual y eficiencia de monetización.</p>
+                        <p className="text-xs text-muted-foreground">¿Cuánto más podría generar cada creadora? Target: +20% sobre su actual.</p>
                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
                           <Table>
                             <TableHeader className="sticky top-0 z-10 bg-card">
