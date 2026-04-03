@@ -1203,21 +1203,42 @@ const Dashboard2 = () => {
                       Deep Dive — {selectedPeriod?.label}
                     </DialogTitle>
                   </DialogHeader>
-                  <div className="flex items-center gap-1 mt-3 bg-muted rounded-lg p-1">
+                  <div className="flex flex-wrap items-center gap-1 mt-3 bg-muted rounded-lg p-1">
                     {([
-                      { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM Comparison" },
-                      { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Creator Ranking" },
+                      { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM" },
+                      { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Ranking" },
                       { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: "Escalabilidad" },
+                      { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Canales" },
+                      { key: "opportunities" as const, icon: <Sparkles className="h-3.5 w-3.5" />, label: "Oportunidades" },
                       { key: "alerts" as const, icon: <ShieldAlert className="h-3.5 w-3.5" />, label: `Alertas (${alerts.length})` },
                     ]).map((tab) => (
                       <Button
                         key={tab.key}
                         variant={deepDiveTab === tab.key ? "default" : "ghost"}
                         size="sm"
-                        className="h-7 text-xs px-3 gap-1.5 flex-1"
+                        className="h-7 text-xs px-2.5 gap-1 flex-1 min-w-0"
                         onClick={() => setDeepDiveTab(tab.key)}
                       >
-                        {tab.icon} {tab.label}
+                        {tab.icon} <span className="truncate">{tab.label}</span>
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1 mt-1 bg-muted/50 rounded-lg p-1">
+                    <span className="text-[9px] text-muted-foreground px-2 shrink-0 uppercase tracking-widest font-semibold">Roadmap</span>
+                    {([
+                      { key: "chatter" as const, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Chatters" },
+                      { key: "ltv" as const, icon: <UserCheck className="h-3.5 w-3.5" />, label: "LTV" },
+                      { key: "content_roi" as const, icon: <Layers className="h-3.5 w-3.5" />, label: "Content ROI" },
+                      { key: "cohort" as const, icon: <Brain className="h-3.5 w-3.5" />, label: "Cohortes" },
+                    ]).map((tab) => (
+                      <Button
+                        key={tab.key}
+                        variant={deepDiveTab === tab.key ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-7 text-xs px-2.5 gap-1 flex-1 min-w-0 opacity-70"
+                        onClick={() => setDeepDiveTab(tab.key)}
+                      >
+                        {tab.icon} <span className="truncate">{tab.label}</span>
                       </Button>
                     ))}
                   </div>
