@@ -101,7 +101,7 @@ const Dashboard2 = () => {
   const [paretoView, setParetoView] = useState<"list" | "chart">("list");
   const [paretoGroup, setParetoGroup] = useState<"80" | "20">("80");
   const [showDeepDive, setShowDeepDive] = useState(false);
-  const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts">("mom");
+  const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
 
   const monthOptions = useMemo(getMonthOptions, []);
   const [selectedMonth, setSelectedMonth] = useState(monthOptions[0]?.value || "");
