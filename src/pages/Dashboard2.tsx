@@ -1628,6 +1628,10 @@ const Dashboard2 = () => {
 
                     return (
                       <div className="space-y-5">
+                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                          <p className="text-xs font-semibold text-foreground">🎯 Oportunidades de Crecimiento</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Tres categorías accionables: creadoras en racha de crecimiento, creadoras con muchos fans pero baja monetización, y creadoras con buena monetización pero pocos fans.</p>
+                        </div>
                         <p className="text-xs text-muted-foreground">Creadoras con mayor potencial de crecimiento basado en métricas actuales.</p>
                         
                         <div className="rounded-xl border-2 border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
