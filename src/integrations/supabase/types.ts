@@ -5364,6 +5364,93 @@ export type Database = {
         }
         Relationships: []
       }
+      of_gross_earnings_v2: {
+        Row: {
+          active_fans: number | null
+          avg_earnings_per_fan_gross: number | null
+          avg_spend_per_spender_gross: number | null
+          avg_spend_per_transaction_gross: number | null
+          avg_subscription_length: string | null
+          change_expired_fan_count: number | null
+          contribution: number | null
+          created_at: string | null
+          creator_group: string | null
+          creator_id: string | null
+          date: string
+          document_id: string | null
+          fans_renew_on: number | null
+          following: number | null
+          id: string
+          message_gross: number | null
+          new_fans: number | null
+          new_subscriptions_sub_gross: number | null
+          of_ranking: number | null
+          pending_creator: string | null
+          recurring_sub_gross: number | null
+          renew_on_percentage: number | null
+          subscription_gross: number | null
+          tips_gross: number | null
+          total_earnings_gross: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          active_fans?: number | null
+          avg_earnings_per_fan_gross?: number | null
+          avg_spend_per_spender_gross?: number | null
+          avg_spend_per_transaction_gross?: number | null
+          avg_subscription_length?: string | null
+          change_expired_fan_count?: number | null
+          contribution?: number | null
+          created_at?: string | null
+          creator_group?: string | null
+          creator_id?: string | null
+          date: string
+          document_id?: string | null
+          fans_renew_on?: number | null
+          following?: number | null
+          id?: string
+          message_gross?: number | null
+          new_fans?: number | null
+          new_subscriptions_sub_gross?: number | null
+          of_ranking?: number | null
+          pending_creator?: string | null
+          recurring_sub_gross?: number | null
+          renew_on_percentage?: number | null
+          subscription_gross?: number | null
+          tips_gross?: number | null
+          total_earnings_gross?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          active_fans?: number | null
+          avg_earnings_per_fan_gross?: number | null
+          avg_spend_per_spender_gross?: number | null
+          avg_spend_per_transaction_gross?: number | null
+          avg_subscription_length?: string | null
+          change_expired_fan_count?: number | null
+          contribution?: number | null
+          created_at?: string | null
+          creator_group?: string | null
+          creator_id?: string | null
+          date?: string
+          document_id?: string | null
+          fans_renew_on?: number | null
+          following?: number | null
+          id?: string
+          message_gross?: number | null
+          new_fans?: number | null
+          new_subscriptions_sub_gross?: number | null
+          of_ranking?: number | null
+          pending_creator?: string | null
+          recurring_sub_gross?: number | null
+          renew_on_percentage?: number | null
+          subscription_gross?: number | null
+          tips_gross?: number | null
+          total_earnings_gross?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       overtime: {
         Row: {
           amount_calculated: number | null
@@ -7133,6 +7220,8 @@ export type Database = {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean
       }
+      refresh_of_gross_earnings_daily: { Args: never; Returns: undefined }
+      refresh_of_gross_earnings_v2_daily: { Args: never; Returns: undefined }
       user_has_role_name: {
         Args: { _role_name: string; _user_id: string }
         Returns: boolean
