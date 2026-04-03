@@ -35,6 +35,26 @@ function parseMoney(val: unknown): number {
   return 0;
 }
 
+/**
+ * Deduplicate hourly snapshots: keep only the LAST record per day per creator.
+ * This matches Dashboard2's deduplication logic so audit comparisons are accurate.
+ */
+function deduplicateSystemRecords(
+  records: { id: string; date: string; amount: number; pending_creator: string }[]
+) {
+  const grouped = new Map<string, { id: string; date: string; amount: number; pending_creator: string }>();
+  for (const rec of records) {
+    const creator = rec.pending_creator.trim().toLowerCase();
+    const dateKey = rec.date.slice(0, 10);
+    const key = `${creator}__${dateKey}`;
+    const existing = grouped.get(key);
+    if (!existing || rec.date > existing.date) {
+      grouped.set(key, rec);
+    }
+  }
+  return Array.from(grouped.values());
+}
+
 const AuditComparisonTable = ({ file }: Props) => {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,22 +107,30 @@ const AuditComparisonTable = ({ file }: Props) => {
         .gte("date", minDate)
         .lte("date", maxDate + "T23:59:59");
 
+      // Deduplicate: keep only the last snapshot per day per creator (matching Dashboard2 logic)
+      const allRecords = (dbData || []).map((r: any) => ({
+        id: r.id as string,
+        date: r.date as string,
+        amount: Number(r.total_earnings_gross) || 0,
+        pending_creator: (r.pending_creator || "") as string,
+      }));
+      const dedupedRecords = deduplicateSystemRecords(allRecords);
+
       const systemMap = new Map<string, number>();
       const systemCountMap = new Map<string, number>();
       const systemDetailMap = new Map<string, EntryDetail[]>();
       const rawRecordsMap = new Map<string, { id: string; date: string; amount: number }[]>();
-      for (const r of dbData || []) {
-        const creator = (r.pending_creator || "").trim().toLowerCase();
+      for (const r of dedupedRecords) {
+        const creator = r.pending_creator.trim().toLowerCase();
         if (!creator) continue;
-        const amount = Number(r.total_earnings_gross) || 0;
-        systemMap.set(creator, (systemMap.get(creator) || 0) + amount);
+        systemMap.set(creator, (systemMap.get(creator) || 0) + r.amount);
         systemCountMap.set(creator, (systemCountMap.get(creator) || 0) + 1);
-        const dateStr = typeof r.date === "string" ? r.date.slice(0, 10) : "";
+        const dateStr = r.date.slice(0, 10);
         const arr = systemDetailMap.get(creator) || [];
-        arr.push({ date: dateStr, amount });
+        arr.push({ date: dateStr, amount: r.amount });
         systemDetailMap.set(creator, arr);
         const rawArr = rawRecordsMap.get(creator) || [];
-        rawArr.push({ id: r.id, date: r.date, amount });
+        rawArr.push({ id: r.id, date: r.date, amount: r.amount });
         rawRecordsMap.set(creator, rawArr);
       }
 
@@ -277,8 +305,10 @@ const AuditComparisonTable = ({ file }: Props) => {
 
     setApplying(false);
 
-    // Invalidate all sales-related caches so corrections propagate to all modules
+    // Invalidate ALL sales-related caches so corrections propagate to every module
     queryClient.invalidateQueries({ queryKey: ["of_gross_earnings_performance"] });
+    queryClient.invalidateQueries({ queryKey: ["creator-info-dashboard2"] });
+    queryClient.invalidateQueries({ queryKey: ["sales-overview"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard2"] });
 
     if (errorCount > 0) {
