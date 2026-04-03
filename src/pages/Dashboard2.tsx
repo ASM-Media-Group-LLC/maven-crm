@@ -1228,12 +1228,23 @@ const Dashboard2 = () => {
             <Dialog open={showDeepDive} onOpenChange={setShowDeepDive}>
               <DialogContent className="max-w-6xl max-h-[92vh] overflow-hidden p-0 flex flex-col">
                 <div className="px-6 pt-5 pb-3 border-b border-border shrink-0">
-                  <DialogHeader>
-                    <DialogTitle className="text-lg flex items-center gap-2">
-                      <Telescope className="h-5 w-5 text-primary" />
-                      Deep Dive — {selectedPeriod?.label}
-                    </DialogTitle>
-                  </DialogHeader>
+                   <DialogHeader>
+                     <DialogTitle className="text-lg flex items-center gap-2">
+                       <Telescope className="h-5 w-5 text-primary" />
+                       Deep Dive
+                       <span className="text-muted-foreground">—</span>
+                       <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                         <SelectTrigger className="h-8 w-[160px] text-sm font-medium">
+                           <SelectValue />
+                         </SelectTrigger>
+                         <SelectContent>
+                           {monthOptions.map((m) => (
+                             <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                           ))}
+                         </SelectContent>
+                       </Select>
+                     </DialogTitle>
+                   </DialogHeader>
                   <div className="flex flex-wrap items-center gap-1 mt-3 bg-muted rounded-lg p-1">
                     {([
                       { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM", desc: "Mes vs Mes" },
