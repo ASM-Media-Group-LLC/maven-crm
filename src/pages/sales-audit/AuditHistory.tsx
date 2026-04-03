@@ -42,7 +42,7 @@ const AuditHistory = () => {
   const [loading, setLoading] = useState(true);
   const [reverting, setReverting] = useState<string | null>(null);
   const { toast } = useToast();
-
+  const queryClient = useQueryClient();
   const fetchData = async () => {
     setLoading(true);
     const [logsRes, correctionsRes] = await Promise.all([
