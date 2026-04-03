@@ -1373,31 +1373,37 @@ const Dashboard2 = () => {
 
                   {/* ── Creator Ranking ── */}
                   {deepDiveTab === "compare" && (() => {
-                    const ranked = [...rawCreators].filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
-                    const topTotal = ranked.reduce((s, c) => s + c.total, 0);
-                    return (
-                      <div className="space-y-5">
-                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">🏆 Ranking de Creadoras</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Posición de cada creadora por revenue bruto total. Muestra su participación en el total, eficiencia ($/Día, $/Fan) y tasa de retención de suscriptores.</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Ranking completo por revenue bruto. Muestra participación individual, performance relativa y posición.</p>
-                        <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
-                          <Table>
-                            <TableHeader className="sticky top-0 z-10 bg-card">
-                              <TableRow>
-                                <TableHead className="w-8">#</TableHead>
-                                <TableHead>Creadora</TableHead>
-                                <TableHead className="text-right">Bruto</TableHead>
-                                <TableHead className="text-right">% Total</TableHead>
-                                <TableHead className="w-[180px]">Participación</TableHead>
-                                <TableHead className="text-right">$/Día</TableHead>
-                                <TableHead className="text-right">$/Fan</TableHead>
-                                <TableHead className="text-right">Fans</TableHead>
-                                <TableHead className="text-right">Retención</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                     const base = rawCreators.filter((c) => c.total > 0).map(c => {
+                       const topTotal = rawCreators.filter(x => x.total > 0).reduce((s, x) => s + x.total, 0);
+                       const pct = topTotal > 0 ? (c.total / topTotal) * 100 : 0;
+                       const retention = c.subs > 0 ? (c.recurringSubs / c.subs) * 100 : 0;
+                       return { ...c, pct, retention };
+                     });
+                     const ranked = ddSortedList("compare", base);
+                     const topTotal = base.reduce((s, c) => s + c.total, 0);
+                     return (
+                       <div className="space-y-5">
+                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                           <p className="text-xs font-semibold text-foreground">🏆 Ranking de Creadoras</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">Posición de cada creadora por revenue bruto total. Muestra su participación en el total, eficiencia ($/Día, $/Fan) y tasa de retención de suscriptores.</p>
+                         </div>
+                         <p className="text-xs text-muted-foreground">Ranking completo por revenue bruto. Muestra participación individual, performance relativa y posición.</p>
+                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
+                           <Table>
+                             <TableHeader className="sticky top-0 z-10 bg-card">
+                               <TableRow>
+                                 <TableHead className="w-8">#</TableHead>
+                                 <TableHead>Creadora</TableHead>
+                                 {ddHead("compare", "total", "Bruto")}
+                                 {ddHead("compare", "pct", "% Total")}
+                                 <TableHead className="w-[180px]">Participación</TableHead>
+                                 {ddHead("compare", "avgPerDay", "$/Día")}
+                                 {ddHead("compare", "avgPerFan", "$/Fan")}
+                                 {ddHead("compare", "activeFans", "Fans")}
+                                 {ddHead("compare", "retention", "Retención")}
+                               </TableRow>
+                             </TableHeader>
+                             <TableBody>
                               {ranked.map((c, i) => {
                                 const pct = topTotal > 0 ? (c.total / topTotal) * 100 : 0;
                                 const retention = c.subs > 0 ? (c.recurringSubs / c.subs) * 100 : 0;
