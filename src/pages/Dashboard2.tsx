@@ -1333,26 +1333,10 @@ const Dashboard2 = () => {
                               <TableRow>
                                  <TableHead className="w-8">#</TableHead>
                                  <TableHead>Creadora</TableHead>
-                                 {([
-                                   ["total", "Mes Actual", "text-right"],
-                                   ["prev", "Mes Anterior", "text-right"],
-                                   ["delta", "Δ Absoluto", "text-right"],
-                                   ["change", "Δ %", "text-right"],
-                                 ] as const).map(([key, label, align]) => (
-                                   <TableHead
-                                     key={key}
-                                     className={`${align} cursor-pointer select-none hover:text-foreground transition-colors`}
-                                     onClick={() => {
-                                       if (momSortKey === key) setMomSortDir(d => d === "desc" ? "asc" : "desc");
-                                       else { setMomSortKey(key); setMomSortDir("desc"); }
-                                     }}
-                                   >
-                                     <span className="inline-flex items-center gap-1">
-                                       {label}
-                                       {momSortKey === key ? (momSortDir === "desc" ? " ↓" : " ↑") : ""}
-                                     </span>
-                                   </TableHead>
-                                 ))}
+                                 {ddHead("mom", "total", "Mes Actual")}
+                                 {ddHead("mom", "prev", "Mes Anterior")}
+                                 {ddHead("mom", "delta", "Diferencia")}
+                                 {ddHead("mom", "change", "Cambio %")}
                                  <TableHead className="text-center w-20">Tendencia</TableHead>
                               </TableRow>
                             </TableHeader>
