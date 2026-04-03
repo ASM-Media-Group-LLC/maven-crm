@@ -1118,23 +1118,38 @@ const Dashboard2 = () => {
                   </div>
 
                   {paretoView === "chart" && (
-                    <div className="flex flex-col items-center">
-                      <ResponsiveContainer width="100%" height={400}>
-                        <RechartsPie>
-                          <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={80} outerRadius={160} paddingAngle={1} stroke="hsl(var(--border))">
-                            {pieData.map((_, idx) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }}
-                            itemStyle={{ color: "hsl(var(--foreground))" }}
-                            labelStyle={{ color: "hsl(var(--foreground))" }}
-                            formatter={(value: number) => [fmt(value), ""]}
-                          />
-                        </RechartsPie>
-                      </ResponsiveContainer>
-                      <div className="border-t border-border bg-muted/30 px-6 py-2.5 w-full text-center">
+                    <div className="space-y-4">
+                      <div className="flex flex-col items-center">
+                        <ResponsiveContainer width="100%" height={400}>
+                          <RechartsPie>
+                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={80} outerRadius={160} paddingAngle={1} stroke="hsl(var(--border))"
+                              label={({ name, percent }: { name: string; percent: number }) => percent > 0.03 ? `${name.length > 12 ? name.slice(0, 12) + '…' : name} ${(percent * 100).toFixed(0)}%` : ''}
+                              labelLine={true}
+                            >
+                              {pieData.map((_, idx) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }}
+                              itemStyle={{ color: "hsl(var(--foreground))" }}
+                              labelStyle={{ color: "hsl(var(--foreground))" }}
+                              formatter={(value: number, name: string) => [fmt(value), name]}
+                            />
+                          </RechartsPie>
+                        </ResponsiveContainer>
+                      </div>
+                      {/* Legend with names */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 px-2">
+                        {pieData.map((d, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 text-xs truncate">
+                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[idx % PIE_COLORS.length] }} />
+                            <span className="truncate text-foreground">{d.name}</span>
+                            <span className="text-muted-foreground tabular-nums ml-auto shrink-0">{fmtK(d.value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="border-t border-border bg-muted/30 px-6 py-2.5 w-full text-center rounded-b-lg">
                         <p className="text-[10px] text-muted-foreground">
-                          Montos <strong>BRUTOS</strong> · {paretoGroup === "80" ? `Top genera ${fmt(paretoAnalysis.topRevenue)}` : `Bottom genera ${fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}`} de {fmt(paretoAnalysis.totalRevenue)} total
+                          Montos <strong>BRUTOS</strong> · {paretoGroup === "80" ? `Top ${paretoAnalysis.topCount} creadoras generan ${fmt(paretoAnalysis.topRevenue)}` : `Bottom ${paretoAnalysis.rest.length} generan ${fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}`} de {fmt(paretoAnalysis.totalRevenue)} total
                         </p>
                       </div>
                     </div>
