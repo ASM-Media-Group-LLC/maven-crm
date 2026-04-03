@@ -1493,9 +1493,9 @@ const Dashboard2 = () => {
                                     <TableCell>
                                       <div className="flex items-center gap-2">
                                         <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
-                                          <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(progress, 100)}%` }} />
+                                         <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(c.progress, 100)}%` }} />
                                         </div>
-                                        <span className="text-[10px] text-muted-foreground tabular-nums w-8">{progress.toFixed(0)}%</span>
+                                         <span className="text-[10px] text-muted-foreground tabular-nums w-8">{c.progress.toFixed(0)}%</span>
                                       </div>
                                     </TableCell>
                                     <TableCell className="text-center text-xs">{action}</TableCell>
