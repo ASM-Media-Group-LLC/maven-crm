@@ -81,8 +81,10 @@ const AuditHistory = () => {
     if (revertError) {
       toast({ title: "Error al marcar reversión", description: revertError.message, variant: "destructive" });
     } else {
-      // Invalidate sales caches so all reports reflect the reversion
+      // Invalidate ALL sales caches so all reports reflect the reversion
       queryClient.invalidateQueries({ queryKey: ["of_gross_earnings_performance"] });
+      queryClient.invalidateQueries({ queryKey: ["creator-info-dashboard2"] });
+      queryClient.invalidateQueries({ queryKey: ["sales-overview"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard2"] });
       toast({ title: "Corrección revertida", description: `Se restauró el valor original de ${correction.creator_name}. Los reportes se actualizarán.` });
       fetchData();
