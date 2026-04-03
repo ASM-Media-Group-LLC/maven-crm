@@ -1417,18 +1417,18 @@ const Dashboard2 = () => {
                                       </div>
                                     </TableCell>
                                     <TableCell className="text-right tabular-nums text-sm font-semibold">{fmt(c.total)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{pct.toFixed(1)}%</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.pct.toFixed(1)}%</TableCell>
                                     <TableCell>
-                                      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(pct * 2, 100)}%` }} />
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerDay)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerFan)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.activeFans.toLocaleString()}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm">
-                                      <span className={retention > 50 ? "text-emerald-500" : retention > 30 ? "text-amber-500" : "text-destructive"}>
-                                        {retention.toFixed(0)}%
+                                       <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                                         <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(c.pct * 2, 100)}%` }} />
+                                       </div>
+                                     </TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerDay)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerFan)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.activeFans.toLocaleString()}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm">
+                                       <span className={c.retention > 50 ? "text-emerald-500" : c.retention > 30 ? "text-amber-500" : "text-destructive"}>
+                                         {c.retention.toFixed(0)}%
                                       </span>
                                     </TableCell>
                                   </TableRow>
