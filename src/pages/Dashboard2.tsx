@@ -24,6 +24,7 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram, PieChart,
   BarChart3, MessageSquare, Repeat, Heart, Eye, AlertTriangle, Target, Crown, X,
   Download, Zap, Activity, Lock, Brain, Layers, BarChart, Sparkles, UserCheck, ShieldAlert,
+  Telescope, ArrowRight, ChevronRight, Scale, GitCompare, CheckCircle2,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
