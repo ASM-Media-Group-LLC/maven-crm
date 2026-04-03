@@ -1306,13 +1306,29 @@ const Dashboard2 = () => {
                           <Table>
                             <TableHeader className="sticky top-0 z-10 bg-card">
                               <TableRow>
-                                <TableHead className="w-8">#</TableHead>
-                                <TableHead>Creadora</TableHead>
-                                <TableHead className="text-right">Mes Actual</TableHead>
-                                <TableHead className="text-right">Mes Anterior</TableHead>
-                                <TableHead className="text-right">Δ Absoluto</TableHead>
-                                <TableHead className="text-right">Δ %</TableHead>
-                                <TableHead className="text-center w-20">Tendencia</TableHead>
+                                 <TableHead className="w-8">#</TableHead>
+                                 <TableHead>Creadora</TableHead>
+                                 {([
+                                   ["total", "Mes Actual", "text-right"],
+                                   ["prev", "Mes Anterior", "text-right"],
+                                   ["delta", "Δ Absoluto", "text-right"],
+                                   ["change", "Δ %", "text-right"],
+                                 ] as const).map(([key, label, align]) => (
+                                   <TableHead
+                                     key={key}
+                                     className={`${align} cursor-pointer select-none hover:text-foreground transition-colors`}
+                                     onClick={() => {
+                                       if (momSortKey === key) setMomSortDir(d => d === "desc" ? "asc" : "desc");
+                                       else { setMomSortKey(key); setMomSortDir("desc"); }
+                                     }}
+                                   >
+                                     <span className="inline-flex items-center gap-1">
+                                       {label}
+                                       {momSortKey === key ? (momSortDir === "desc" ? " ↓" : " ↑") : ""}
+                                     </span>
+                                   </TableHead>
+                                 ))}
+                                 <TableHead className="text-center w-20">Tendencia</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
