@@ -1622,11 +1622,8 @@ const Dashboard2 = () => {
                              </TableHeader>
                              <TableBody>
                               {active.map((c, i) => {
-                                const msgPct = c.total > 0 ? (c.messages / c.total) * 100 : 0;
-                                const tipPct = c.total > 0 ? (c.tips / c.total) * 100 : 0;
-                                const subPct = c.total > 0 ? (c.subs / c.total) * 100 : 0;
-                                const dominant = msgPct >= tipPct && msgPct >= subPct ? "💬 Msgs" : tipPct >= subPct ? "💰 Tips" : "🔄 Subs";
-                                const concentrated = Math.max(msgPct, tipPct, subPct) > 70;
+                                const dominant = c.msgPct >= c.tipPct && c.msgPct >= c.subPct ? "💬 Msgs" : c.tipPct >= c.subPct ? "💰 Tips" : "🔄 Subs";
+                                 const concentrated = Math.max(c.msgPct, c.tipPct, c.subPct) > 70;
                                 return (
                                   <TableRow key={c.creatorId}>
                                     <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
