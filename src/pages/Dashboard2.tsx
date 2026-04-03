@@ -89,8 +89,37 @@ const Dashboard2 = () => {
   const { data: allRows = [], isLoading } = useEarningsData();
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [momSortKey, setMomSortKey] = useState<string>("delta");
-  const [momSortDir, setMomSortDir] = useState<"asc" | "desc">("desc");
+  const [ddSort, setDdSort] = useState<Record<string, { key: string; dir: "asc" | "desc" }>>({
+    mom: { key: "delta", dir: "desc" },
+    compare: { key: "total", dir: "desc" },
+    scalability: { key: "total", dir: "desc" },
+    channels: { key: "total", dir: "desc" },
+  });
+  const ddToggleSort = (tab: string, key: string) => {
+    setDdSort(prev => {
+      const cur = prev[tab] ?? { key: "total", dir: "desc" };
+      if (cur.key === key) return { ...prev, [tab]: { key, dir: cur.dir === "desc" ? "asc" : "desc" } };
+      return { ...prev, [tab]: { key, dir: "desc" } };
+    });
+  };
+  const ddSortedList = <T extends Record<string, any>>(tab: string, list: T[]): T[] => {
+    const s = ddSort[tab] ?? { key: "total", dir: "desc" };
+    return [...list].sort((a, b) => {
+      const av = a[s.key] ?? 0, bv = b[s.key] ?? 0;
+      if (typeof av === "string" && typeof bv === "string") return s.dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      return s.dir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
+    });
+  };
+  const ddHead = (tab: string, key: string, label: string, align = "text-right") => (
+    <TableHead
+      className={`${align} cursor-pointer select-none hover:text-foreground transition-colors`}
+      onClick={() => ddToggleSort(tab, key)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}{ddSort[tab]?.key === key ? (ddSort[tab].dir === "desc" ? " ↓" : " ↑") : ""}
+      </span>
+    </TableHead>
+  );
   const [searchText, setSearchText] = useState("");
   const [showZeros, setShowZeros] = useState(false);
   const [minTotal, setMinTotal] = useState("");
