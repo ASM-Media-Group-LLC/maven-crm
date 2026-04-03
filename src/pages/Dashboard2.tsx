@@ -1406,12 +1406,10 @@ const Dashboard2 = () => {
                                 <TableHead className="w-8">#</TableHead>
                                 <TableHead>Creadora</TableHead>
                                 <TableHead className="text-right">Actual</TableHead>
-                                <TableHead className="text-right">Target (+20%)</TableHead>
-                                <TableHead className="text-right">Gap</TableHead>
-                                <TableHead className="text-right">$/Fan Actual</TableHead>
-                                <TableHead className="text-right">$/Fan Target</TableHead>
-                                <TableHead className="w-[120px]">Progreso</TableHead>
-                                <TableHead className="text-center">Acción</TableHead>
+                                <TableHead className="text-right">Target</TableHead>
+                                <TableHead className="text-right">Falta</TableHead>
+                                <TableHead className="w-[140px]">Progreso</TableHead>
+                                <TableHead className="text-center">Sugerencia</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1419,15 +1417,13 @@ const Dashboard2 = () => {
                                 const target = c.total * 1.2;
                                 const gap = target - c.total;
                                 const progress = c.total > 0 ? (c.total / target) * 100 : 0;
-                                const currentPerFan = c.activeFans > 0 ? c.total / c.activeFans : 0;
-                                const targetPerFan = c.activeFans > 0 ? target / c.activeFans : 0;
                                 const action = c.avgPerFan < hlKpis.avgPerFanGlobal * 0.5
-                                  ? "Mejorar monetización"
+                                  ? "💰 Monetizar mejor"
                                   : c.messages / (c.total || 1) < 0.3
-                                  ? "Aumentar mensajería"
+                                  ? "💬 Más mensajería"
                                   : c.newFans <= 0
-                                  ? "Adquirir fans"
-                                  : "Mantener ritmo";
+                                  ? "📣 Adquirir fans"
+                                  : "✅ Mantener";
                                 return (
                                   <TableRow key={c.creatorId}>
                                     <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
@@ -1437,18 +1433,17 @@ const Dashboard2 = () => {
                                       </button>
                                     </TableCell>
                                     <TableCell className="text-right tabular-nums text-sm font-semibold">{fmtShort(c.total)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm font-semibold text-primary">{fmtShort(target)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-primary">{fmtShort(target)}</TableCell>
                                     <TableCell className="text-right tabular-nums text-sm text-emerald-500">+{fmtShort(gap)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">${currentPerFan.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-primary">${targetPerFan.toFixed(2)}</TableCell>
                                     <TableCell>
-                                      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                                        <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(progress, 100)}%` }} />
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
+                                          <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(progress, 100)}%` }} />
+                                        </div>
+                                        <span className="text-[10px] text-muted-foreground tabular-nums w-8">{progress.toFixed(0)}%</span>
                                       </div>
                                     </TableCell>
-                                    <TableCell className="text-center">
-                                      <Badge variant="outline" className="text-[8px] h-5 px-1.5">{action}</Badge>
-                                    </TableCell>
+                                    <TableCell className="text-center text-xs">{action}</TableCell>
                                   </TableRow>
                                 );
                               })}
