@@ -811,12 +811,28 @@ const Dashboard2 = () => {
                       {sections.map((s) => (
                         <button key={s.key} onClick={() => setAlertTab(alertTab === s.key ? null : s.key)}
                           className={`rounded-lg border-2 p-3 text-left transition-all ${alertTab === s.key ? `${s.border} ${s.bg} ring-2 ring-offset-1 ring-offset-background ring-primary/20` : "border-border bg-card hover:border-muted-foreground/30"}`}>
-                          <div className="flex items-center justify-between mb-0.5">
+                          <div className="flex items-center justify-between mb-1">
                             <span className="text-base">{s.emoji}</span>
                             <span className={`text-xl font-bold tabular-nums ${s.items.length > 0 ? s.text : "text-muted-foreground"}`}>{s.items.length}</span>
                           </div>
                           <p className={`text-xs font-semibold ${s.items.length > 0 ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</p>
-                          <p className="text-[9px] text-muted-foreground mt-0.5">{s.desc}</p>
+                          {/* Creator name previews */}
+                          {s.items.length > 0 && (
+                            <div className="mt-1.5 space-y-0.5">
+                              {s.items.slice(0, 3).map((a, idx) => (
+                                <p key={idx} className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
+                                  <ChevronRight className="h-2.5 w-2.5 shrink-0" />
+                                  {a.creator.name}
+                                </p>
+                              ))}
+                              {s.items.length > 3 && (
+                                <p className="text-[9px] text-muted-foreground/60">+{s.items.length - 3} más…</p>
+                              )}
+                            </div>
+                          )}
+                          {s.items.length === 0 && (
+                            <p className="text-[9px] text-muted-foreground mt-0.5">{s.desc}</p>
+                          )}
                         </button>
                       ))}
                     </div>
