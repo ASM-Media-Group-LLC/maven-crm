@@ -1205,41 +1205,49 @@ const Dashboard2 = () => {
                   </DialogHeader>
                   <div className="flex flex-wrap items-center gap-1 mt-3 bg-muted rounded-lg p-1">
                     {([
-                      { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM" },
-                      { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Ranking" },
-                      { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: "Escalabilidad" },
-                      { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Canales" },
-                      { key: "opportunities" as const, icon: <Sparkles className="h-3.5 w-3.5" />, label: "Oportunidades" },
-                      { key: "alerts" as const, icon: <ShieldAlert className="h-3.5 w-3.5" />, label: `Alertas (${alerts.length})` },
+                      { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM", desc: "Mes vs Mes" },
+                      { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Ranking", desc: "Posición por revenue" },
+                      { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: "Escalabilidad", desc: "Potencial de crecimiento" },
+                      { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Canales", desc: "Msgs vs Tips vs Subs" },
+                      { key: "opportunities" as const, icon: <Sparkles className="h-3.5 w-3.5" />, label: "Oportunidades", desc: "Dónde hay potencial" },
+                      { key: "alerts" as const, icon: <ShieldAlert className="h-3.5 w-3.5" />, label: `Alertas (${alerts.length})`, desc: "Riesgos activos" },
                     ]).map((tab) => (
-                      <Button
-                        key={tab.key}
-                        variant={deepDiveTab === tab.key ? "default" : "ghost"}
-                        size="sm"
-                        className="h-7 text-xs px-2.5 gap-1 flex-1 min-w-0"
-                        onClick={() => setDeepDiveTab(tab.key)}
-                      >
-                        {tab.icon} <span className="truncate">{tab.label}</span>
-                      </Button>
+                      <UITooltip key={tab.key}>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant={deepDiveTab === tab.key ? "default" : "ghost"}
+                            size="sm"
+                            className="h-7 text-xs px-2.5 gap-1 flex-1 min-w-0"
+                            onClick={() => setDeepDiveTab(tab.key)}
+                          >
+                            {tab.icon} <span className="truncate">{tab.label}</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="text-xs">{tab.desc}</TooltipContent>
+                      </UITooltip>
                     ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-1 mt-1 bg-muted/50 rounded-lg p-1">
                     <span className="text-[9px] text-muted-foreground px-2 shrink-0 uppercase tracking-widest font-semibold">Roadmap</span>
                     {([
-                      { key: "chatter" as const, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Chatters" },
-                      { key: "ltv" as const, icon: <UserCheck className="h-3.5 w-3.5" />, label: "LTV" },
-                      { key: "content_roi" as const, icon: <Layers className="h-3.5 w-3.5" />, label: "Content ROI" },
-                      { key: "cohort" as const, icon: <Brain className="h-3.5 w-3.5" />, label: "Cohortes" },
+                      { key: "chatter" as const, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Chatters", desc: "Rendimiento por chatter (próximamente)" },
+                      { key: "ltv" as const, icon: <UserCheck className="h-3.5 w-3.5" />, label: "LTV", desc: "Valor de vida del cliente (próximamente)" },
+                      { key: "content_roi" as const, icon: <Layers className="h-3.5 w-3.5" />, label: "Content ROI", desc: "Retorno por tipo de contenido (próximamente)" },
+                      { key: "cohort" as const, icon: <Brain className="h-3.5 w-3.5" />, label: "Cohortes", desc: "Retención por grupo de fans (próximamente)" },
                     ]).map((tab) => (
-                      <Button
-                        key={tab.key}
-                        variant={deepDiveTab === tab.key ? "secondary" : "ghost"}
-                        size="sm"
-                        className="h-7 text-xs px-2.5 gap-1 flex-1 min-w-0 opacity-70"
-                        onClick={() => setDeepDiveTab(tab.key)}
-                      >
-                        {tab.icon} <span className="truncate">{tab.label}</span>
-                      </Button>
+                      <UITooltip key={tab.key}>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant={deepDiveTab === tab.key ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-7 text-xs px-2.5 gap-1 flex-1 min-w-0 opacity-70"
+                            onClick={() => setDeepDiveTab(tab.key)}
+                          >
+                            {tab.icon} <span className="truncate">{tab.label}</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="text-xs">{tab.desc}</TooltipContent>
+                      </UITooltip>
                     ))}
                   </div>
                 </div>
@@ -1260,7 +1268,10 @@ const Dashboard2 = () => {
 
                     return (
                       <div className="space-y-5">
-                        {/* Summary */}
+                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                          <p className="text-xs font-semibold text-foreground">📊 Comparativa Mes vs Mes (MoM)</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Compara el revenue de cada creadora entre el mes seleccionado y el mes anterior. Identifica quién creció, quién cayó y en cuánto.</p>
+                        </div>
                         <div className="grid grid-cols-4 gap-3">
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
                             <p className="text-[10px] text-muted-foreground uppercase">Actual</p>
@@ -1335,6 +1346,10 @@ const Dashboard2 = () => {
                     const topTotal = ranked.reduce((s, c) => s + c.total, 0);
                     return (
                       <div className="space-y-5">
+                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                          <p className="text-xs font-semibold text-foreground">🏆 Ranking de Creadoras</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Posición de cada creadora por revenue bruto total. Muestra su participación en el total, eficiencia ($/Día, $/Fan) y tasa de retención de suscriptores.</p>
+                        </div>
                         <p className="text-xs text-muted-foreground">Ranking completo por revenue bruto. Muestra participación individual, performance relativa y posición.</p>
                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
                           <Table>
@@ -1396,6 +1411,10 @@ const Dashboard2 = () => {
                     const active = rawCreators.filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
                     return (
                       <div className="space-y-5">
+                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                          <p className="text-xs font-semibold text-foreground">📈 Escalabilidad</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">¿Cuánto más podría generar cada creadora? Se calcula un target de +20% sobre su actual y se sugiere la acción más efectiva para alcanzarlo.</p>
+                        </div>
                         <p className="text-xs text-muted-foreground">¿Cuánto más podría generar cada creadora? Target: +20% sobre su actual.</p>
                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
                           <Table>
@@ -1536,6 +1555,10 @@ const Dashboard2 = () => {
                     const active = rawCreators.filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
                     return (
                       <div className="space-y-5">
+                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                          <p className="text-xs font-semibold text-foreground">💬 Análisis por Canal de Monetización</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Desglose de ingresos por canal (Mensajería, Tips, Suscripciones) para cada creadora. Si una creadora tiene &gt;70% en un solo canal, aparece con ⚠ indicando riesgo de dependencia.</p>
+                        </div>
                         <p className="text-xs text-muted-foreground">Desglose detallado por canal de monetización para cada creadora. Identifica dependencias y oportunidades de diversificación.</p>
                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
                           <Table>
@@ -1605,6 +1628,10 @@ const Dashboard2 = () => {
 
                     return (
                       <div className="space-y-5">
+                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                          <p className="text-xs font-semibold text-foreground">🎯 Oportunidades de Crecimiento</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Tres categorías accionables: creadoras en racha de crecimiento, creadoras con muchos fans pero baja monetización, y creadoras con buena monetización pero pocos fans.</p>
+                        </div>
                         <p className="text-xs text-muted-foreground">Creadoras con mayor potencial de crecimiento basado en métricas actuales.</p>
                         
                         <div className="rounded-xl border-2 border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
