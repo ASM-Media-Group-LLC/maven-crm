@@ -1346,6 +1346,10 @@ const Dashboard2 = () => {
                     const topTotal = ranked.reduce((s, c) => s + c.total, 0);
                     return (
                       <div className="space-y-5">
+                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                          <p className="text-xs font-semibold text-foreground">🏆 Ranking de Creadoras</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Posición de cada creadora por revenue bruto total. Muestra su participación en el total, eficiencia ($/Día, $/Fan) y tasa de retención de suscriptores.</p>
+                        </div>
                         <p className="text-xs text-muted-foreground">Ranking completo por revenue bruto. Muestra participación individual, performance relativa y posición.</p>
                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
                           <Table>
