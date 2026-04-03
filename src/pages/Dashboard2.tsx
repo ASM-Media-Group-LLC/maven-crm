@@ -89,6 +89,8 @@ const Dashboard2 = () => {
   const { data: allRows = [], isLoading } = useEarningsData();
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [momSortKey, setMomSortKey] = useState<string>("delta");
+  const [momSortDir, setMomSortDir] = useState<"asc" | "desc">("desc");
   const [searchText, setSearchText] = useState("");
   const [showZeros, setShowZeros] = useState(false);
   const [minTotal, setMinTotal] = useState("");
