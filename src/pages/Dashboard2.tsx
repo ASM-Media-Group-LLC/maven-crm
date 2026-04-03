@@ -1254,17 +1254,21 @@ const Dashboard2 = () => {
                 <div className="flex-1 overflow-y-auto p-6">
                   {/* ── MoM Comparison ── */}
                   {deepDiveTab === "mom" && (() => {
-                    const currentIdx = monthOptions.findIndex((m) => m.value === selectedMonth);
-                    const prevPeriod = monthOptions[currentIdx + 1];
-                    const momCreators = rawCreators
-                      .filter((c) => c.total > 0 || prevMonthMap.has(c.creatorId))
-                      .map((c) => {
-                        const prev = prevMonthMap.get(c.creatorId) ?? 0;
-                        const change = prev > 0 ? ((c.total - prev) / prev) * 100 : (c.total > 0 ? 100 : 0);
-                        const delta = c.total - prev;
-                        return { ...c, prev, change, delta };
-                      })
-                      .sort((a, b) => b.delta - a.delta);
+                     const currentIdx = monthOptions.findIndex((m) => m.value === selectedMonth);
+                     const prevPeriod = monthOptions[currentIdx + 1];
+                     const momBase = rawCreators
+                       .filter((c) => c.total > 0 || prevMonthMap.has(c.creatorId))
+                       .map((c) => {
+                         const prev = prevMonthMap.get(c.creatorId) ?? 0;
+                         const change = prev > 0 ? ((c.total - prev) / prev) * 100 : (c.total > 0 ? 100 : 0);
+                         const delta = c.total - prev;
+                         return { ...c, prev, change, delta };
+                       });
+                     const momCreators = [...momBase].sort((a, b) => {
+                       const av = a[momSortKey as keyof typeof a] as number;
+                       const bv = b[momSortKey as keyof typeof b] as number;
+                       return momSortDir === "desc" ? bv - av : av - bv;
+                     });
 
                     return (
                       <div className="space-y-5">
