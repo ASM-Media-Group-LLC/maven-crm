@@ -89,8 +89,37 @@ const Dashboard2 = () => {
   const { data: allRows = [], isLoading } = useEarningsData();
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [momSortKey, setMomSortKey] = useState<string>("delta");
-  const [momSortDir, setMomSortDir] = useState<"asc" | "desc">("desc");
+  const [ddSort, setDdSort] = useState<Record<string, { key: string; dir: "asc" | "desc" }>>({
+    mom: { key: "delta", dir: "desc" },
+    compare: { key: "total", dir: "desc" },
+    scalability: { key: "total", dir: "desc" },
+    channels: { key: "total", dir: "desc" },
+  });
+  const ddToggleSort = (tab: string, key: string) => {
+    setDdSort(prev => {
+      const cur = prev[tab] ?? { key: "total", dir: "desc" };
+      if (cur.key === key) return { ...prev, [tab]: { key, dir: cur.dir === "desc" ? "asc" : "desc" } };
+      return { ...prev, [tab]: { key, dir: "desc" } };
+    });
+  };
+  const ddSortedList = <T extends Record<string, any>>(tab: string, list: T[]): T[] => {
+    const s = ddSort[tab] ?? { key: "total", dir: "desc" };
+    return [...list].sort((a, b) => {
+      const av = a[s.key] ?? 0, bv = b[s.key] ?? 0;
+      if (typeof av === "string" && typeof bv === "string") return s.dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      return s.dir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
+    });
+  };
+  const ddHead = (tab: string, key: string, label: string, align = "text-right") => (
+    <TableHead
+      className={`${align} cursor-pointer select-none hover:text-foreground transition-colors`}
+      onClick={() => ddToggleSort(tab, key)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}{ddSort[tab]?.key === key ? (ddSort[tab].dir === "desc" ? " ↓" : " ↑") : ""}
+      </span>
+    </TableHead>
+  );
   const [searchText, setSearchText] = useState("");
   const [showZeros, setShowZeros] = useState(false);
   const [minTotal, setMinTotal] = useState("");
@@ -1266,18 +1295,14 @@ const Dashboard2 = () => {
                          const delta = c.total - prev;
                          return { ...c, prev, change, delta };
                        });
-                     const momCreators = [...momBase].sort((a, b) => {
-                       const av = a[momSortKey as keyof typeof a] as number;
-                       const bv = b[momSortKey as keyof typeof b] as number;
-                       return momSortDir === "desc" ? bv - av : av - bv;
-                     });
+                     const momCreators = ddSortedList("mom", momBase);
 
-                    return (
-                      <div className="space-y-5">
-                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">📊 Comparativa Mes vs Mes (MoM)</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Compara el revenue de cada creadora entre el mes seleccionado y el mes anterior. Identifica quién creció, quién cayó y en cuánto.</p>
-                        </div>
+                     return (
+                       <div className="space-y-5">
+                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                           <p className="text-xs font-semibold text-foreground">📊 Comparativa Mes vs Mes (MoM)</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">Compara el revenue de cada creadora entre el mes seleccionado y el mes anterior. Identifica quién creció, quién cayó y en cuánto.</p>
+                         </div>
                         <div className="grid grid-cols-4 gap-3">
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
                             <p className="text-[10px] text-muted-foreground uppercase">Actual</p>
@@ -1308,26 +1333,10 @@ const Dashboard2 = () => {
                               <TableRow>
                                  <TableHead className="w-8">#</TableHead>
                                  <TableHead>Creadora</TableHead>
-                                 {([
-                                   ["total", "Mes Actual", "text-right"],
-                                   ["prev", "Mes Anterior", "text-right"],
-                                   ["delta", "Δ Absoluto", "text-right"],
-                                   ["change", "Δ %", "text-right"],
-                                 ] as const).map(([key, label, align]) => (
-                                   <TableHead
-                                     key={key}
-                                     className={`${align} cursor-pointer select-none hover:text-foreground transition-colors`}
-                                     onClick={() => {
-                                       if (momSortKey === key) setMomSortDir(d => d === "desc" ? "asc" : "desc");
-                                       else { setMomSortKey(key); setMomSortDir("desc"); }
-                                     }}
-                                   >
-                                     <span className="inline-flex items-center gap-1">
-                                       {label}
-                                       {momSortKey === key ? (momSortDir === "desc" ? " ↓" : " ↑") : ""}
-                                     </span>
-                                   </TableHead>
-                                 ))}
+                                 {ddHead("mom", "total", "Mes Actual")}
+                                 {ddHead("mom", "prev", "Mes Anterior")}
+                                 {ddHead("mom", "delta", "Diferencia")}
+                                 {ddHead("mom", "change", "Cambio %")}
                                  <TableHead className="text-center w-20">Tendencia</TableHead>
                               </TableRow>
                             </TableHeader>
@@ -1364,34 +1373,38 @@ const Dashboard2 = () => {
 
                   {/* ── Creator Ranking ── */}
                   {deepDiveTab === "compare" && (() => {
-                    const ranked = [...rawCreators].filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
-                    const topTotal = ranked.reduce((s, c) => s + c.total, 0);
-                    return (
-                      <div className="space-y-5">
-                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">🏆 Ranking de Creadoras</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Posición de cada creadora por revenue bruto total. Muestra su participación en el total, eficiencia ($/Día, $/Fan) y tasa de retención de suscriptores.</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Ranking completo por revenue bruto. Muestra participación individual, performance relativa y posición.</p>
-                        <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
-                          <Table>
-                            <TableHeader className="sticky top-0 z-10 bg-card">
-                              <TableRow>
-                                <TableHead className="w-8">#</TableHead>
-                                <TableHead>Creadora</TableHead>
-                                <TableHead className="text-right">Bruto</TableHead>
-                                <TableHead className="text-right">% Total</TableHead>
-                                <TableHead className="w-[180px]">Participación</TableHead>
-                                <TableHead className="text-right">$/Día</TableHead>
-                                <TableHead className="text-right">$/Fan</TableHead>
-                                <TableHead className="text-right">Fans</TableHead>
-                                <TableHead className="text-right">Retención</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                     const base = rawCreators.filter((c) => c.total > 0).map(c => {
+                       const topTotal = rawCreators.filter(x => x.total > 0).reduce((s, x) => s + x.total, 0);
+                       const pct = topTotal > 0 ? (c.total / topTotal) * 100 : 0;
+                       const retention = c.subs > 0 ? (c.recurringSubs / c.subs) * 100 : 0;
+                       return { ...c, pct, retention };
+                     });
+                     const ranked = ddSortedList("compare", base);
+                     const topTotal = base.reduce((s, c) => s + c.total, 0);
+                     return (
+                       <div className="space-y-5">
+                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                           <p className="text-xs font-semibold text-foreground">🏆 Ranking de Creadoras</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">Posición de cada creadora por revenue bruto total. Muestra su participación en el total, eficiencia ($/Día, $/Fan) y tasa de retención de suscriptores.</p>
+                         </div>
+                         <p className="text-xs text-muted-foreground">Ranking completo por revenue bruto. Muestra participación individual, performance relativa y posición.</p>
+                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
+                           <Table>
+                             <TableHeader className="sticky top-0 z-10 bg-card">
+                               <TableRow>
+                                 <TableHead className="w-8">#</TableHead>
+                                 <TableHead>Creadora</TableHead>
+                                 {ddHead("compare", "total", "Bruto")}
+                                 {ddHead("compare", "pct", "% Total")}
+                                 <TableHead className="w-[180px]">Participación</TableHead>
+                                 {ddHead("compare", "avgPerDay", "$/Día")}
+                                 {ddHead("compare", "avgPerFan", "$/Fan")}
+                                 {ddHead("compare", "activeFans", "Fans")}
+                                 {ddHead("compare", "retention", "Retención")}
+                               </TableRow>
+                             </TableHeader>
+                             <TableBody>
                               {ranked.map((c, i) => {
-                                const pct = topTotal > 0 ? (c.total / topTotal) * 100 : 0;
-                                const retention = c.subs > 0 ? (c.recurringSubs / c.subs) * 100 : 0;
                                 return (
                                   <TableRow key={c.creatorId}>
                                     <TableCell className="text-xs text-muted-foreground tabular-nums font-bold">{i + 1}</TableCell>
@@ -1404,18 +1417,18 @@ const Dashboard2 = () => {
                                       </div>
                                     </TableCell>
                                     <TableCell className="text-right tabular-nums text-sm font-semibold">{fmt(c.total)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{pct.toFixed(1)}%</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.pct.toFixed(1)}%</TableCell>
                                     <TableCell>
-                                      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(pct * 2, 100)}%` }} />
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerDay)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerFan)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.activeFans.toLocaleString()}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm">
-                                      <span className={retention > 50 ? "text-emerald-500" : retention > 30 ? "text-amber-500" : "text-destructive"}>
-                                        {retention.toFixed(0)}%
+                                       <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                                         <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(c.pct * 2, 100)}%` }} />
+                                       </div>
+                                     </TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerDay)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerFan)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.activeFans.toLocaleString()}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm">
+                                       <span className={c.retention > 50 ? "text-emerald-500" : c.retention > 30 ? "text-amber-500" : "text-destructive"}>
+                                         {c.retention.toFixed(0)}%
                                       </span>
                                     </TableCell>
                                   </TableRow>
@@ -1430,56 +1443,59 @@ const Dashboard2 = () => {
 
                   {/* ── Scalability ── */}
                   {deepDiveTab === "scalability" && (() => {
-                    const active = rawCreators.filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
-                    return (
-                      <div className="space-y-5">
-                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">📈 Escalabilidad</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">¿Cuánto más podría generar cada creadora? Se calcula un target de +20% sobre su actual y se sugiere la acción más efectiva para alcanzarlo.</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">¿Cuánto más podría generar cada creadora? Target: +20% sobre su actual.</p>
-                        <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
-                          <Table>
-                            <TableHeader className="sticky top-0 z-10 bg-card">
-                              <TableRow>
-                                <TableHead className="w-8">#</TableHead>
-                                <TableHead>Creadora</TableHead>
-                                <TableHead className="text-right">Actual</TableHead>
-                                <TableHead className="text-right">Target</TableHead>
-                                <TableHead className="text-right">Falta</TableHead>
-                                <TableHead className="w-[140px]">Progreso</TableHead>
-                                <TableHead className="text-center">Sugerencia</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                     const base = rawCreators.filter((c) => c.total > 0).map(c => {
+                       const target = c.total * 1.2;
+                       const gap = target - c.total;
+                       const progress = c.total > 0 ? (c.total / target) * 100 : 0;
+                       return { ...c, target, gap, progress };
+                     });
+                     const active = ddSortedList("scalability", base);
+                     return (
+                       <div className="space-y-5">
+                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                           <p className="text-xs font-semibold text-foreground">📈 Escalabilidad</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">¿Cuánto más podría generar cada creadora? Se calcula un target de +20% sobre su actual y se sugiere la acción más efectiva para alcanzarlo.</p>
+                         </div>
+                         <p className="text-xs text-muted-foreground">¿Cuánto más podría generar cada creadora? Target: +20% sobre su actual.</p>
+                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
+                           <Table>
+                             <TableHeader className="sticky top-0 z-10 bg-card">
+                               <TableRow>
+                                 <TableHead className="w-8">#</TableHead>
+                                 <TableHead>Creadora</TableHead>
+                                 {ddHead("scalability", "total", "Actual")}
+                                 {ddHead("scalability", "target", "Target")}
+                                 {ddHead("scalability", "gap", "Falta")}
+                                 <TableHead className="w-[140px]">Progreso</TableHead>
+                                 <TableHead className="text-center">Sugerencia</TableHead>
+                               </TableRow>
+                             </TableHeader>
+                             <TableBody>
                               {active.map((c, i) => {
-                                const target = c.total * 1.2;
-                                const gap = target - c.total;
-                                const progress = c.total > 0 ? (c.total / target) * 100 : 0;
                                 const action = c.avgPerFan < hlKpis.avgPerFanGlobal * 0.5
-                                  ? "💰 Monetizar mejor"
-                                  : c.messages / (c.total || 1) < 0.3
-                                  ? "💬 Más mensajería"
-                                  : c.newFans <= 0
-                                  ? "📣 Adquirir fans"
-                                  : "✅ Mantener";
-                                return (
-                                  <TableRow key={c.creatorId}>
-                                    <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
-                                    <TableCell>
-                                      <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
-                                        {c.name}
-                                      </button>
-                                    </TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm font-semibold">{fmtShort(c.total)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-primary">{fmtShort(target)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-emerald-500">+{fmtShort(gap)}</TableCell>
+                                   ? "💰 Monetizar mejor"
+                                   : c.messages / (c.total || 1) < 0.3
+                                   ? "💬 Más mensajería"
+                                   : c.newFans <= 0
+                                   ? "📣 Adquirir fans"
+                                   : "✅ Mantener";
+                                 return (
+                                   <TableRow key={c.creatorId}>
+                                     <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
+                                     <TableCell>
+                                       <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
+                                         {c.name}
+                                       </button>
+                                     </TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm font-semibold">{fmtShort(c.total)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-primary">{fmtShort(c.target)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-emerald-500">+{fmtShort(c.gap)}</TableCell>
                                     <TableCell>
                                       <div className="flex items-center gap-2">
                                         <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
-                                          <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(progress, 100)}%` }} />
+                                         <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(c.progress, 100)}%` }} />
                                         </div>
-                                        <span className="text-[10px] text-muted-foreground tabular-nums w-8">{progress.toFixed(0)}%</span>
+                                         <span className="text-[10px] text-muted-foreground tabular-nums w-8">{c.progress.toFixed(0)}%</span>
                                       </div>
                                     </TableCell>
                                     <TableCell className="text-center text-xs">{action}</TableCell>
@@ -1574,37 +1590,40 @@ const Dashboard2 = () => {
 
                   {/* ── Revenue por Canal (Deep) ── */}
                   {deepDiveTab === "channels" && (() => {
-                    const active = rawCreators.filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
-                    return (
-                      <div className="space-y-5">
-                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">💬 Análisis por Canal de Monetización</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Desglose de ingresos por canal (Mensajería, Tips, Suscripciones) para cada creadora. Si una creadora tiene &gt;70% en un solo canal, aparece con ⚠ indicando riesgo de dependencia.</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Desglose detallado por canal de monetización para cada creadora. Identifica dependencias y oportunidades de diversificación.</p>
-                        <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
-                          <Table>
-                            <TableHeader className="sticky top-0 z-10 bg-card">
-                              <TableRow>
-                                <TableHead className="w-8">#</TableHead>
-                                <TableHead>Creadora</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
-                                <TableHead className="text-right">Msgs $</TableHead>
-                                <TableHead className="text-right">Msgs %</TableHead>
-                                <TableHead className="text-right">Tips $</TableHead>
-                                <TableHead className="text-right">Tips %</TableHead>
-                                <TableHead className="text-right">Subs $</TableHead>
-                                <TableHead className="text-right">Subs %</TableHead>
-                                <TableHead className="text-center">Canal Dominante</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                     const base = rawCreators.filter((c) => c.total > 0).map(c => {
+                       const msgPct = c.total > 0 ? (c.messages / c.total) * 100 : 0;
+                       const tipPct = c.total > 0 ? (c.tips / c.total) * 100 : 0;
+                       const subPct = c.total > 0 ? (c.subs / c.total) * 100 : 0;
+                       return { ...c, msgPct, tipPct, subPct };
+                     });
+                     const active = ddSortedList("channels", base);
+                     return (
+                       <div className="space-y-5">
+                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                           <p className="text-xs font-semibold text-foreground">💬 Análisis por Canal de Monetización</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">Desglose de ingresos por canal (Mensajería, Tips, Suscripciones) para cada creadora. Si una creadora tiene &gt;70% en un solo canal, aparece con ⚠ indicando riesgo de dependencia.</p>
+                         </div>
+                         <p className="text-xs text-muted-foreground">Desglose detallado por canal de monetización para cada creadora. Identifica dependencias y oportunidades de diversificación.</p>
+                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
+                           <Table>
+                             <TableHeader className="sticky top-0 z-10 bg-card">
+                               <TableRow>
+                                 <TableHead className="w-8">#</TableHead>
+                                 <TableHead>Creadora</TableHead>
+                                 {ddHead("channels", "total", "Total")}
+                                 {ddHead("channels", "messages", "Msgs $")}
+                                 {ddHead("channels", "msgPct", "Msgs %")}
+                                 {ddHead("channels", "tips", "Tips $")}
+                                 {ddHead("channels", "tipPct", "Tips %")}
+                                 {ddHead("channels", "subs", "Subs $")}
+                                 {ddHead("channels", "subPct", "Subs %")}
+                                 <TableHead className="text-center">Canal Dominante</TableHead>
+                               </TableRow>
+                             </TableHeader>
+                             <TableBody>
                               {active.map((c, i) => {
-                                const msgPct = c.total > 0 ? (c.messages / c.total) * 100 : 0;
-                                const tipPct = c.total > 0 ? (c.tips / c.total) * 100 : 0;
-                                const subPct = c.total > 0 ? (c.subs / c.total) * 100 : 0;
-                                const dominant = msgPct >= tipPct && msgPct >= subPct ? "💬 Msgs" : tipPct >= subPct ? "💰 Tips" : "🔄 Subs";
-                                const concentrated = Math.max(msgPct, tipPct, subPct) > 70;
+                                const dominant = c.msgPct >= c.tipPct && c.msgPct >= c.subPct ? "💬 Msgs" : c.tipPct >= c.subPct ? "💰 Tips" : "🔄 Subs";
+                                 const concentrated = Math.max(c.msgPct, c.tipPct, c.subPct) > 70;
                                 return (
                                   <TableRow key={c.creatorId}>
                                     <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
@@ -1613,11 +1632,11 @@ const Dashboard2 = () => {
                                     </TableCell>
                                     <TableCell className="text-right tabular-nums text-sm font-semibold">{fmtShort(c.total)}</TableCell>
                                     <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.messages)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{msgPct.toFixed(0)}%</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.tips)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{tipPct.toFixed(0)}%</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{subPct.toFixed(0)}%</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.msgPct.toFixed(0)}%</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.tips)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.tipPct.toFixed(0)}%</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.subPct.toFixed(0)}%</TableCell>
                                     <TableCell className="text-center text-xs">
                                       <span className={concentrated ? "text-amber-500 font-semibold" : ""}>{dominant}</span>
                                       {concentrated && <span className="text-[9px] text-amber-500 ml-1">⚠</span>}
