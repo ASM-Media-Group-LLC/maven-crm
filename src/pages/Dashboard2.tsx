@@ -1405,8 +1405,6 @@ const Dashboard2 = () => {
                              </TableHeader>
                              <TableBody>
                               {ranked.map((c, i) => {
-                                const pct = topTotal > 0 ? (c.total / topTotal) * 100 : 0;
-                                const retention = c.subs > 0 ? (c.recurringSubs / c.subs) * 100 : 0;
                                 return (
                                   <TableRow key={c.creatorId}>
                                     <TableCell className="text-xs text-muted-foreground tabular-nums font-bold">{i + 1}</TableCell>
