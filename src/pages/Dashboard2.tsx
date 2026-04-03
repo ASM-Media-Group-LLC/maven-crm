@@ -557,6 +557,16 @@ const Dashboard2 = () => {
                       </TooltipTrigger>
                       <TooltipContent>Proyección del mes</TooltipContent>
                     </UITooltip>
+                    <div className="w-px h-5 bg-border mx-0.5" />
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-semibold px-3" onClick={() => setShowDeepDive(true)}>
+                          <Telescope className="h-3.5 w-3.5" />
+                          Deep Dive
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Análisis ejecutivo completo</TooltipContent>
+                    </UITooltip>
                     {isAdmin && (
                       <UITooltip>
                         <TooltipTrigger asChild>
