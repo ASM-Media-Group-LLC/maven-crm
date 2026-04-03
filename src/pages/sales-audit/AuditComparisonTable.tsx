@@ -305,8 +305,10 @@ const AuditComparisonTable = ({ file }: Props) => {
 
     setApplying(false);
 
-    // Invalidate all sales-related caches so corrections propagate to all modules
+    // Invalidate ALL sales-related caches so corrections propagate to every module
     queryClient.invalidateQueries({ queryKey: ["of_gross_earnings_performance"] });
+    queryClient.invalidateQueries({ queryKey: ["creator-info-dashboard2"] });
+    queryClient.invalidateQueries({ queryKey: ["sales-overview"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard2"] });
 
     if (errorCount > 0) {
