@@ -101,7 +101,7 @@ const Dashboard2 = () => {
   const [paretoView, setParetoView] = useState<"list" | "chart">("list");
   const [paretoGroup, setParetoGroup] = useState<"80" | "20">("80");
   const [showDeepDive, setShowDeepDive] = useState(false);
-  const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts">("mom");
+  const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
 
   const monthOptions = useMemo(getMonthOptions, []);
   const [selectedMonth, setSelectedMonth] = useState(monthOptions[0]?.value || "");
@@ -768,29 +768,6 @@ const Dashboard2 = () => {
                 </div>
               )}
 
-              {/* ══════ FUTURE DATA PLACEHOLDERS ══════ */}
-              {!isLoading && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  {[
-                    { icon: <MessageSquare className="h-4 w-4" />, title: "Chatter Performance", desc: "Revenue por chatter, msgs/hora, tasa de conversión", color: "text-blue-400" },
-                    { icon: <UserCheck className="h-4 w-4" />, title: "Customer LTV", desc: "Lifetime value, churn rate, reactivación de fans", color: "text-emerald-400" },
-                    { icon: <Layers className="h-4 w-4" />, title: "Content ROI", desc: "Revenue por tipo de contenido, engagement rate", color: "text-purple-400" },
-                    { icon: <Brain className="h-4 w-4" />, title: "Cohort Analysis", desc: "Retención por cohorte, comportamiento de fans", color: "text-amber-400" },
-                  ].map((item) => (
-                    <div key={item.title} className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-3.5 space-y-2 opacity-60 hover:opacity-80 transition-opacity cursor-default">
-                      <div className="flex items-center gap-2">
-                        <div className={`${item.color}`}>{item.icon}</div>
-                        <span className="text-xs font-semibold text-foreground">{item.title}</span>
-                        <Badge variant="outline" className="ml-auto text-[8px] h-4 px-1.5 border-dashed">
-                          <Lock className="h-2.5 w-2.5 mr-0.5" />
-                          Soon
-                        </Badge>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground leading-relaxed">{item.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
 
               {/* ══════ ALERTS PANEL ══════ */}
               {showAlerts && !isLoading && (() => {
@@ -1226,21 +1203,42 @@ const Dashboard2 = () => {
                       Deep Dive — {selectedPeriod?.label}
                     </DialogTitle>
                   </DialogHeader>
-                  <div className="flex items-center gap-1 mt-3 bg-muted rounded-lg p-1">
+                  <div className="flex flex-wrap items-center gap-1 mt-3 bg-muted rounded-lg p-1">
                     {([
-                      { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM Comparison" },
-                      { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Creator Ranking" },
+                      { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM" },
+                      { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Ranking" },
                       { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: "Escalabilidad" },
+                      { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Canales" },
+                      { key: "opportunities" as const, icon: <Sparkles className="h-3.5 w-3.5" />, label: "Oportunidades" },
                       { key: "alerts" as const, icon: <ShieldAlert className="h-3.5 w-3.5" />, label: `Alertas (${alerts.length})` },
                     ]).map((tab) => (
                       <Button
                         key={tab.key}
                         variant={deepDiveTab === tab.key ? "default" : "ghost"}
                         size="sm"
-                        className="h-7 text-xs px-3 gap-1.5 flex-1"
+                        className="h-7 text-xs px-2.5 gap-1 flex-1 min-w-0"
                         onClick={() => setDeepDiveTab(tab.key)}
                       >
-                        {tab.icon} {tab.label}
+                        {tab.icon} <span className="truncate">{tab.label}</span>
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1 mt-1 bg-muted/50 rounded-lg p-1">
+                    <span className="text-[9px] text-muted-foreground px-2 shrink-0 uppercase tracking-widest font-semibold">Roadmap</span>
+                    {([
+                      { key: "chatter" as const, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Chatters" },
+                      { key: "ltv" as const, icon: <UserCheck className="h-3.5 w-3.5" />, label: "LTV" },
+                      { key: "content_roi" as const, icon: <Layers className="h-3.5 w-3.5" />, label: "Content ROI" },
+                      { key: "cohort" as const, icon: <Brain className="h-3.5 w-3.5" />, label: "Cohortes" },
+                    ]).map((tab) => (
+                      <Button
+                        key={tab.key}
+                        variant={deepDiveTab === tab.key ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-7 text-xs px-2.5 gap-1 flex-1 min-w-0 opacity-70"
+                        onClick={() => setDeepDiveTab(tab.key)}
+                      >
+                        {tab.icon} <span className="truncate">{tab.label}</span>
                       </Button>
                     ))}
                   </div>
@@ -1532,6 +1530,247 @@ const Dashboard2 = () => {
                       </div>
                     );
                   })()}
+
+                  {/* ── Revenue por Canal (Deep) ── */}
+                  {deepDiveTab === "channels" && (() => {
+                    const active = rawCreators.filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
+                    return (
+                      <div className="space-y-5">
+                        <p className="text-xs text-muted-foreground">Desglose detallado por canal de monetización para cada creadora. Identifica dependencias y oportunidades de diversificación.</p>
+                        <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
+                          <Table>
+                            <TableHeader className="sticky top-0 z-10 bg-card">
+                              <TableRow>
+                                <TableHead className="w-8">#</TableHead>
+                                <TableHead>Creadora</TableHead>
+                                <TableHead className="text-right">Total</TableHead>
+                                <TableHead className="text-right">Msgs $</TableHead>
+                                <TableHead className="text-right">Msgs %</TableHead>
+                                <TableHead className="text-right">Tips $</TableHead>
+                                <TableHead className="text-right">Tips %</TableHead>
+                                <TableHead className="text-right">Subs $</TableHead>
+                                <TableHead className="text-right">Subs %</TableHead>
+                                <TableHead className="text-center">Canal Dominante</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {active.map((c, i) => {
+                                const msgPct = c.total > 0 ? (c.messages / c.total) * 100 : 0;
+                                const tipPct = c.total > 0 ? (c.tips / c.total) * 100 : 0;
+                                const subPct = c.total > 0 ? (c.subs / c.total) * 100 : 0;
+                                const dominant = msgPct >= tipPct && msgPct >= subPct ? "💬 Msgs" : tipPct >= subPct ? "💰 Tips" : "🔄 Subs";
+                                const concentrated = Math.max(msgPct, tipPct, subPct) > 70;
+                                return (
+                                  <TableRow key={c.creatorId}>
+                                    <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
+                                    <TableCell>
+                                      <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm font-semibold">{fmtShort(c.total)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.messages)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{msgPct.toFixed(0)}%</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.tips)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{tipPct.toFixed(0)}%</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{subPct.toFixed(0)}%</TableCell>
+                                    <TableCell className="text-center text-xs">
+                                      <span className={concentrated ? "text-amber-500 font-semibold" : ""}>{dominant}</span>
+                                      {concentrated && <span className="text-[9px] text-amber-500 ml-1">⚠</span>}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-start gap-3">
+                          <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold text-foreground">Insight de Diversificación</p>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                              {active.filter(c => { const max = Math.max(c.total > 0 ? (c.messages / c.total) * 100 : 0, c.total > 0 ? (c.tips / c.total) * 100 : 0, c.total > 0 ? (c.subs / c.total) * 100 : 0); return max > 70; }).length} creadoras tienen &gt;70% concentrado en un solo canal — riesgo de dependencia. Diversificar canales reduce volatilidad.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Top Oportunidades ── */}
+                  {deepDiveTab === "opportunities" && (() => {
+                    const active = rawCreators.filter((c) => c.total > 0);
+                    const lowMonetization = active.filter(c => c.avgPerFan < hlKpis.avgPerFanGlobal * 0.6 && c.activeFans > 50).sort((a, b) => b.activeFans - a.activeFans).slice(0, 10);
+                    const highGrowth = active.filter(c => { const prev = prevMonthMap.get(c.creatorId); return prev && prev > 0 && ((c.total - prev) / prev) > 0.2; }).sort((a, b) => b.total - a.total).slice(0, 10);
+                    const underperforming = active.filter(c => c.avgPerFan > 0 && c.activeFans < 100 && c.total > 500).sort((a, b) => b.avgPerFan - a.avgPerFan).slice(0, 10);
+
+                    return (
+                      <div className="space-y-5">
+                        <p className="text-xs text-muted-foreground">Creadoras con mayor potencial de crecimiento basado en métricas actuales.</p>
+                        
+                        <div className="rounded-xl border-2 border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">🚀</span>
+                            <h3 className="text-sm font-bold text-foreground">Alto Crecimiento</h3>
+                            <span className="text-[10px] text-muted-foreground">Crecieron &gt;20% vs mes anterior — mantener impulso</span>
+                          </div>
+                          {highGrowth.length === 0 ? <p className="text-sm text-muted-foreground">Sin creadoras en esta categoría</p> : (
+                            <div className="space-y-1.5">
+                              {highGrowth.map((c, i) => {
+                                const prev = prevMonthMap.get(c.creatorId) ?? 0;
+                                const pct = prev > 0 ? ((c.total - prev) / prev * 100) : 0;
+                                return (
+                                  <div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border bg-card/80 px-3 py-2">
+                                    <span className="text-xs text-muted-foreground tabular-nums w-5">{i + 1}</span>
+                                    <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
+                                    <span className="text-sm tabular-nums font-semibold">{fmtShort(c.total)}</span>
+                                    <span className="text-xs tabular-nums text-emerald-500 font-bold ml-auto">↑{pct.toFixed(0)}%</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border-2 border-blue-500/30 bg-blue-500/5 p-4 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">💎</span>
+                            <h3 className="text-sm font-bold text-foreground">Sub-monetizadas</h3>
+                            <span className="text-[10px] text-muted-foreground">$/Fan bajo vs promedio ({fmt(hlKpis.avgPerFanGlobal)}) pero +50 fans — oportunidad de monetización</span>
+                          </div>
+                          {lowMonetization.length === 0 ? <p className="text-sm text-muted-foreground">Sin creadoras en esta categoría</p> : (
+                            <div className="space-y-1.5">
+                              {lowMonetization.map((c, i) => (
+                                <div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border bg-card/80 px-3 py-2">
+                                  <span className="text-xs text-muted-foreground tabular-nums w-5">{i + 1}</span>
+                                  <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
+                                  <span className="text-sm tabular-nums">{fmtShort(c.total)}</span>
+                                  <span className="text-xs text-muted-foreground">{c.activeFans} fans</span>
+                                  <span className="text-xs tabular-nums text-blue-500 font-bold ml-auto">{fmt(c.avgPerFan)}/fan</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border-2 border-purple-500/30 bg-purple-500/5 p-4 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">📣</span>
+                            <h3 className="text-sm font-bold text-foreground">Necesitan Audiencia</h3>
+                            <span className="text-[10px] text-muted-foreground">Buen $/Fan pero &lt;100 fans — necesitan adquisición</span>
+                          </div>
+                          {underperforming.length === 0 ? <p className="text-sm text-muted-foreground">Sin creadoras en esta categoría</p> : (
+                            <div className="space-y-1.5">
+                              {underperforming.map((c, i) => (
+                                <div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border bg-card/80 px-3 py-2">
+                                  <span className="text-xs text-muted-foreground tabular-nums w-5">{i + 1}</span>
+                                  <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
+                                  <span className="text-sm tabular-nums">{fmtShort(c.total)}</span>
+                                  <span className="text-xs text-muted-foreground">{c.activeFans} fans</span>
+                                  <span className="text-xs tabular-nums text-purple-500 font-bold ml-auto">{fmt(c.avgPerFan)}/fan</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Chatter Performance (Placeholder) ── */}
+                  {deepDiveTab === "chatter" && (
+                    <div className="space-y-5">
+                      <div className="rounded-xl border-2 border-dashed border-blue-400/40 bg-blue-500/5 p-8 text-center space-y-4">
+                        <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-blue-500/10 mx-auto">
+                          <MessageSquare className="h-8 w-8 text-blue-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-foreground">Chatter Performance</h3>
+                          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">Análisis de rendimiento por chatter: revenue generado, msgs/hora, tasa de conversión, y ranking comparativo.</p>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
+                          {["Revenue por Chatter", "Msgs/Hora", "Conversión Fan→Pago", "Ranking Chatters"].map(m => (
+                            <div key={m} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                              <p className="text-[10px] text-muted-foreground">{m}</p>
+                              <p className="text-lg font-bold text-muted-foreground/40 mt-1">—</p>
+                            </div>
+                          ))}
+                        </div>
+                        <Badge variant="outline" className="text-xs border-dashed"><Lock className="h-3 w-3 mr-1" />Requiere integración de datos de chatters</Badge>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Customer LTV (Placeholder) ── */}
+                  {deepDiveTab === "ltv" && (
+                    <div className="space-y-5">
+                      <div className="rounded-xl border-2 border-dashed border-emerald-400/40 bg-emerald-500/5 p-8 text-center space-y-4">
+                        <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-emerald-500/10 mx-auto">
+                          <UserCheck className="h-8 w-8 text-emerald-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-foreground">Customer Lifetime Value</h3>
+                          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">Valor del ciclo de vida del fan: cuánto gasta en promedio, cuánto tiempo se queda, y tasa de reactivación.</p>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
+                          {["LTV Promedio", "Churn Rate", "Tiempo Promedio", "Reactivación %"].map(m => (
+                            <div key={m} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                              <p className="text-[10px] text-muted-foreground">{m}</p>
+                              <p className="text-lg font-bold text-muted-foreground/40 mt-1">—</p>
+                            </div>
+                          ))}
+                        </div>
+                        <Badge variant="outline" className="text-xs border-dashed"><Lock className="h-3 w-3 mr-1" />Requiere tracking de fans individuales</Badge>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Content ROI (Placeholder) ── */}
+                  {deepDiveTab === "content_roi" && (
+                    <div className="space-y-5">
+                      <div className="rounded-xl border-2 border-dashed border-purple-400/40 bg-purple-500/5 p-8 text-center space-y-4">
+                        <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-purple-500/10 mx-auto">
+                          <Layers className="h-8 w-8 text-purple-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-foreground">Content ROI</h3>
+                          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">Retorno de inversión por tipo de contenido: qué formatos generan más revenue, engagement y conversión.</p>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
+                          {["Revenue/Post", "Engagement Rate", "Conversión Contenido", "Top Formato"].map(m => (
+                            <div key={m} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                              <p className="text-[10px] text-muted-foreground">{m}</p>
+                              <p className="text-lg font-bold text-muted-foreground/40 mt-1">—</p>
+                            </div>
+                          ))}
+                        </div>
+                        <Badge variant="outline" className="text-xs border-dashed"><Lock className="h-3 w-3 mr-1" />Requiere tracking de contenido publicado</Badge>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Cohort Analysis (Placeholder) ── */}
+                  {deepDiveTab === "cohort" && (
+                    <div className="space-y-5">
+                      <div className="rounded-xl border-2 border-dashed border-amber-400/40 bg-amber-500/5 p-8 text-center space-y-4">
+                        <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-amber-500/10 mx-auto">
+                          <Brain className="h-8 w-8 text-amber-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-foreground">Cohort Analysis</h3>
+                          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">Retención por cohorte de fans: qué mes de adquisición retiene mejor, patrones de comportamiento y churn por grupo.</p>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
+                          {["Retención M1", "Retención M3", "Mejor Cohorte", "Churn Rate/Cohorte"].map(m => (
+                            <div key={m} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                              <p className="text-[10px] text-muted-foreground">{m}</p>
+                              <p className="text-lg font-bold text-muted-foreground/40 mt-1">—</p>
+                            </div>
+                          ))}
+                        </div>
+                        <Badge variant="outline" className="text-xs border-dashed"><Lock className="h-3 w-3 mr-1" />Requiere datos históricos de fans por cohorte</Badge>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </DialogContent>
             </Dialog>
