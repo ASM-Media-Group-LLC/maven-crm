@@ -768,29 +768,6 @@ const Dashboard2 = () => {
                 </div>
               )}
 
-              {/* ══════ FUTURE DATA PLACEHOLDERS ══════ */}
-              {!isLoading && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  {[
-                    { icon: <MessageSquare className="h-4 w-4" />, title: "Chatter Performance", desc: "Revenue por chatter, msgs/hora, tasa de conversión", color: "text-blue-400" },
-                    { icon: <UserCheck className="h-4 w-4" />, title: "Customer LTV", desc: "Lifetime value, churn rate, reactivación de fans", color: "text-emerald-400" },
-                    { icon: <Layers className="h-4 w-4" />, title: "Content ROI", desc: "Revenue por tipo de contenido, engagement rate", color: "text-purple-400" },
-                    { icon: <Brain className="h-4 w-4" />, title: "Cohort Analysis", desc: "Retención por cohorte, comportamiento de fans", color: "text-amber-400" },
-                  ].map((item) => (
-                    <div key={item.title} className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-3.5 space-y-2 opacity-60 hover:opacity-80 transition-opacity cursor-default">
-                      <div className="flex items-center gap-2">
-                        <div className={`${item.color}`}>{item.icon}</div>
-                        <span className="text-xs font-semibold text-foreground">{item.title}</span>
-                        <Badge variant="outline" className="ml-auto text-[8px] h-4 px-1.5 border-dashed">
-                          <Lock className="h-2.5 w-2.5 mr-0.5" />
-                          Soon
-                        </Badge>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground leading-relaxed">{item.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
 
               {/* ══════ ALERTS PANEL ══════ */}
               {showAlerts && !isLoading && (() => {
