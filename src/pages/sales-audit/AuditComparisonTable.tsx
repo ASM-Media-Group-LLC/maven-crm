@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -46,6 +47,7 @@ const AuditComparisonTable = ({ file }: Props) => {
   const [expanded, setExpanded] = useState<Record<string, "excel" | "system" | null>>({});
   const [applying, setApplying] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const run = async () => {
@@ -275,10 +277,14 @@ const AuditComparisonTable = ({ file }: Props) => {
 
     setApplying(false);
 
+    // Invalidate all sales-related caches so corrections propagate to all modules
+    queryClient.invalidateQueries({ queryKey: ["of_gross_earnings_performance"] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard2"] });
+
     if (errorCount > 0) {
       toast({ title: "Correcciones parciales", description: `${correctionCount} aplicadas, ${errorCount} errores.`, variant: "destructive" });
     } else {
-      toast({ title: "Correcciones aplicadas", description: `${correctionCount} registros actualizados en la base de datos. Los valores originales fueron respaldados.` });
+      toast({ title: "Correcciones aplicadas", description: `${correctionCount} registros actualizados. Los cambios se reflejarán en todos los reportes de ventas.` });
     }
   };
 

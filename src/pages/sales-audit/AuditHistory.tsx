@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ const AuditHistory = () => {
   const [loading, setLoading] = useState(true);
   const [reverting, setReverting] = useState<string | null>(null);
   const { toast } = useToast();
-
+  const queryClient = useQueryClient();
   const fetchData = async () => {
     setLoading(true);
     const [logsRes, correctionsRes] = await Promise.all([
@@ -80,7 +81,10 @@ const AuditHistory = () => {
     if (revertError) {
       toast({ title: "Error al marcar reversión", description: revertError.message, variant: "destructive" });
     } else {
-      toast({ title: "Corrección revertida", description: `Se restauró el valor original de ${correction.creator_name}` });
+      // Invalidate sales caches so all reports reflect the reversion
+      queryClient.invalidateQueries({ queryKey: ["of_gross_earnings_performance"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard2"] });
+      toast({ title: "Corrección revertida", description: `Se restauró el valor original de ${correction.creator_name}. Los reportes se actualizarán.` });
       fetchData();
     }
     setReverting(null);
