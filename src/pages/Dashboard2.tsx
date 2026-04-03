@@ -1472,27 +1472,24 @@ const Dashboard2 = () => {
                              </TableHeader>
                              <TableBody>
                               {active.map((c, i) => {
-                                const target = c.total * 1.2;
-                                const gap = target - c.total;
-                                const progress = c.total > 0 ? (c.total / target) * 100 : 0;
                                 const action = c.avgPerFan < hlKpis.avgPerFanGlobal * 0.5
-                                  ? "💰 Monetizar mejor"
-                                  : c.messages / (c.total || 1) < 0.3
-                                  ? "💬 Más mensajería"
-                                  : c.newFans <= 0
-                                  ? "📣 Adquirir fans"
-                                  : "✅ Mantener";
-                                return (
-                                  <TableRow key={c.creatorId}>
-                                    <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
-                                    <TableCell>
-                                      <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
-                                        {c.name}
-                                      </button>
-                                    </TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm font-semibold">{fmtShort(c.total)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-primary">{fmtShort(target)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-emerald-500">+{fmtShort(gap)}</TableCell>
+                                   ? "💰 Monetizar mejor"
+                                   : c.messages / (c.total || 1) < 0.3
+                                   ? "💬 Más mensajería"
+                                   : c.newFans <= 0
+                                   ? "📣 Adquirir fans"
+                                   : "✅ Mantener";
+                                 return (
+                                   <TableRow key={c.creatorId}>
+                                     <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
+                                     <TableCell>
+                                       <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
+                                         {c.name}
+                                       </button>
+                                     </TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm font-semibold">{fmtShort(c.total)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-primary">{fmtShort(c.target)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-emerald-500">+{fmtShort(c.gap)}</TableCell>
                                     <TableCell>
                                       <div className="flex items-center gap-2">
                                         <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
