@@ -1443,28 +1443,34 @@ const Dashboard2 = () => {
 
                   {/* ── Scalability ── */}
                   {deepDiveTab === "scalability" && (() => {
-                    const active = rawCreators.filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
-                    return (
-                      <div className="space-y-5">
-                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">📈 Escalabilidad</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">¿Cuánto más podría generar cada creadora? Se calcula un target de +20% sobre su actual y se sugiere la acción más efectiva para alcanzarlo.</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">¿Cuánto más podría generar cada creadora? Target: +20% sobre su actual.</p>
-                        <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
-                          <Table>
-                            <TableHeader className="sticky top-0 z-10 bg-card">
-                              <TableRow>
-                                <TableHead className="w-8">#</TableHead>
-                                <TableHead>Creadora</TableHead>
-                                <TableHead className="text-right">Actual</TableHead>
-                                <TableHead className="text-right">Target</TableHead>
-                                <TableHead className="text-right">Falta</TableHead>
-                                <TableHead className="w-[140px]">Progreso</TableHead>
-                                <TableHead className="text-center">Sugerencia</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                     const base = rawCreators.filter((c) => c.total > 0).map(c => {
+                       const target = c.total * 1.2;
+                       const gap = target - c.total;
+                       const progress = c.total > 0 ? (c.total / target) * 100 : 0;
+                       return { ...c, target, gap, progress };
+                     });
+                     const active = ddSortedList("scalability", base);
+                     return (
+                       <div className="space-y-5">
+                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                           <p className="text-xs font-semibold text-foreground">📈 Escalabilidad</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">¿Cuánto más podría generar cada creadora? Se calcula un target de +20% sobre su actual y se sugiere la acción más efectiva para alcanzarlo.</p>
+                         </div>
+                         <p className="text-xs text-muted-foreground">¿Cuánto más podría generar cada creadora? Target: +20% sobre su actual.</p>
+                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
+                           <Table>
+                             <TableHeader className="sticky top-0 z-10 bg-card">
+                               <TableRow>
+                                 <TableHead className="w-8">#</TableHead>
+                                 <TableHead>Creadora</TableHead>
+                                 {ddHead("scalability", "total", "Actual")}
+                                 {ddHead("scalability", "target", "Target")}
+                                 {ddHead("scalability", "gap", "Falta")}
+                                 <TableHead className="w-[140px]">Progreso</TableHead>
+                                 <TableHead className="text-center">Sugerencia</TableHead>
+                               </TableRow>
+                             </TableHeader>
+                             <TableBody>
                               {active.map((c, i) => {
                                 const target = c.total * 1.2;
                                 const gap = target - c.total;
