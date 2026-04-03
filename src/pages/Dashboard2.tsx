@@ -1295,18 +1295,14 @@ const Dashboard2 = () => {
                          const delta = c.total - prev;
                          return { ...c, prev, change, delta };
                        });
-                     const momCreators = [...momBase].sort((a, b) => {
-                       const av = a[momSortKey as keyof typeof a] as number;
-                       const bv = b[momSortKey as keyof typeof b] as number;
-                       return momSortDir === "desc" ? bv - av : av - bv;
-                     });
+                     const momCreators = ddSortedList("mom", momBase);
 
-                    return (
-                      <div className="space-y-5">
-                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">📊 Comparativa Mes vs Mes (MoM)</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Compara el revenue de cada creadora entre el mes seleccionado y el mes anterior. Identifica quién creció, quién cayó y en cuánto.</p>
-                        </div>
+                     return (
+                       <div className="space-y-5">
+                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                           <p className="text-xs font-semibold text-foreground">📊 Comparativa Mes vs Mes (MoM)</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">Compara el revenue de cada creadora entre el mes seleccionado y el mes anterior. Identifica quién creció, quién cayó y en cuánto.</p>
+                         </div>
                         <div className="grid grid-cols-4 gap-3">
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
                             <p className="text-[10px] text-muted-foreground uppercase">Actual</p>
