@@ -1411,6 +1411,10 @@ const Dashboard2 = () => {
                     const active = rawCreators.filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
                     return (
                       <div className="space-y-5">
+                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                          <p className="text-xs font-semibold text-foreground">📈 Escalabilidad</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">¿Cuánto más podría generar cada creadora? Se calcula un target de +20% sobre su actual y se sugiere la acción más efectiva para alcanzarlo.</p>
+                        </div>
                         <p className="text-xs text-muted-foreground">¿Cuánto más podría generar cada creadora? Target: +20% sobre su actual.</p>
                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
                           <Table>
