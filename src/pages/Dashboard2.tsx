@@ -1590,31 +1590,37 @@ const Dashboard2 = () => {
 
                   {/* ── Revenue por Canal (Deep) ── */}
                   {deepDiveTab === "channels" && (() => {
-                    const active = rawCreators.filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
-                    return (
-                      <div className="space-y-5">
-                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
-                          <p className="text-xs font-semibold text-foreground">💬 Análisis por Canal de Monetización</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Desglose de ingresos por canal (Mensajería, Tips, Suscripciones) para cada creadora. Si una creadora tiene &gt;70% en un solo canal, aparece con ⚠ indicando riesgo de dependencia.</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Desglose detallado por canal de monetización para cada creadora. Identifica dependencias y oportunidades de diversificación.</p>
-                        <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
-                          <Table>
-                            <TableHeader className="sticky top-0 z-10 bg-card">
-                              <TableRow>
-                                <TableHead className="w-8">#</TableHead>
-                                <TableHead>Creadora</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
-                                <TableHead className="text-right">Msgs $</TableHead>
-                                <TableHead className="text-right">Msgs %</TableHead>
-                                <TableHead className="text-right">Tips $</TableHead>
-                                <TableHead className="text-right">Tips %</TableHead>
-                                <TableHead className="text-right">Subs $</TableHead>
-                                <TableHead className="text-right">Subs %</TableHead>
-                                <TableHead className="text-center">Canal Dominante</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                     const base = rawCreators.filter((c) => c.total > 0).map(c => {
+                       const msgPct = c.total > 0 ? (c.messages / c.total) * 100 : 0;
+                       const tipPct = c.total > 0 ? (c.tips / c.total) * 100 : 0;
+                       const subPct = c.total > 0 ? (c.subs / c.total) * 100 : 0;
+                       return { ...c, msgPct, tipPct, subPct };
+                     });
+                     const active = ddSortedList("channels", base);
+                     return (
+                       <div className="space-y-5">
+                         <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                           <p className="text-xs font-semibold text-foreground">💬 Análisis por Canal de Monetización</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">Desglose de ingresos por canal (Mensajería, Tips, Suscripciones) para cada creadora. Si una creadora tiene &gt;70% en un solo canal, aparece con ⚠ indicando riesgo de dependencia.</p>
+                         </div>
+                         <p className="text-xs text-muted-foreground">Desglose detallado por canal de monetización para cada creadora. Identifica dependencias y oportunidades de diversificación.</p>
+                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
+                           <Table>
+                             <TableHeader className="sticky top-0 z-10 bg-card">
+                               <TableRow>
+                                 <TableHead className="w-8">#</TableHead>
+                                 <TableHead>Creadora</TableHead>
+                                 {ddHead("channels", "total", "Total")}
+                                 {ddHead("channels", "messages", "Msgs $")}
+                                 {ddHead("channels", "msgPct", "Msgs %")}
+                                 {ddHead("channels", "tips", "Tips $")}
+                                 {ddHead("channels", "tipPct", "Tips %")}
+                                 {ddHead("channels", "subs", "Subs $")}
+                                 {ddHead("channels", "subPct", "Subs %")}
+                                 <TableHead className="text-center">Canal Dominante</TableHead>
+                               </TableRow>
+                             </TableHeader>
+                             <TableBody>
                               {active.map((c, i) => {
                                 const msgPct = c.total > 0 ? (c.messages / c.total) * 100 : 0;
                                 const tipPct = c.total > 0 ? (c.tips / c.total) * 100 : 0;
