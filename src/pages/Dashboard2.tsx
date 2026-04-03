@@ -560,9 +560,9 @@ const Dashboard2 = () => {
                     <div className="w-px h-5 bg-border mx-0.5" />
                     <UITooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-semibold px-3" onClick={() => setShowDeepDive(true)}>
+                        <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs px-3" onClick={() => setShowDeepDive(true)}>
                           <Telescope className="h-3.5 w-3.5" />
-                          Deep Dive
+                          Más análisis
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Análisis ejecutivo completo</TooltipContent>
