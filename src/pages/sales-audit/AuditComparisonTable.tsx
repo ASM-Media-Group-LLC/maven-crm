@@ -35,6 +35,26 @@ function parseMoney(val: unknown): number {
   return 0;
 }
 
+/**
+ * Deduplicate hourly snapshots: keep only the LAST record per day per creator.
+ * This matches Dashboard2's deduplication logic so audit comparisons are accurate.
+ */
+function deduplicateSystemRecords(
+  records: { id: string; date: string; amount: number; pending_creator: string }[]
+) {
+  const grouped = new Map<string, { id: string; date: string; amount: number; pending_creator: string }>();
+  for (const rec of records) {
+    const creator = rec.pending_creator.trim().toLowerCase();
+    const dateKey = rec.date.slice(0, 10);
+    const key = `${creator}__${dateKey}`;
+    const existing = grouped.get(key);
+    if (!existing || rec.date > existing.date) {
+      grouped.set(key, rec);
+    }
+  }
+  return Array.from(grouped.values());
+}
+
 const AuditComparisonTable = ({ file }: Props) => {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(true);
