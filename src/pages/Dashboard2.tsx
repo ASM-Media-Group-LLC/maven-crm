@@ -1108,8 +1108,8 @@ const Dashboard2 = () => {
                       <Button variant={paretoView === "chart" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoView("chart")}>Gráfico</Button>
                     </div>
                     <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
-                      <Button variant={paretoGroup === "80" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoGroup("80")}>Top 80%</Button>
-                      <Button variant={paretoGroup === "20" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoGroup("20")}>Resto 20%</Button>
+                      <Button variant={paretoGroup === "80" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoGroup("80")}>Top 20% (generan 80%)</Button>
+                      <Button variant={paretoGroup === "20" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoGroup("20")}>Bottom 80% (generan 20%)</Button>
                     </div>
                     <div className="ml-auto text-right">
                       <p className="text-sm font-bold tabular-nums">{paretoAnalysis.topCount} <span className="text-muted-foreground font-normal text-xs">de {paretoAnalysis.totalCount}</span></p>
