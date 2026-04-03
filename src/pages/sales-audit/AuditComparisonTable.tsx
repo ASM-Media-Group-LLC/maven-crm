@@ -47,6 +47,7 @@ const AuditComparisonTable = ({ file }: Props) => {
   const [expanded, setExpanded] = useState<Record<string, "excel" | "system" | null>>({});
   const [applying, setApplying] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const run = async () => {
