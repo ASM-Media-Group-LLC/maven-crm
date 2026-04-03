@@ -24,6 +24,7 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram, PieChart,
   BarChart3, MessageSquare, Repeat, Heart, Eye, AlertTriangle, Target, Crown, X,
   Download, Zap, Activity, Lock, Brain, Layers, BarChart, Sparkles, UserCheck, ShieldAlert,
+  Telescope, ArrowRight, ChevronRight, Scale, GitCompare, CheckCircle2,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -99,6 +100,8 @@ const Dashboard2 = () => {
   const [showProjection, setShowProjection] = useState(false);
   const [paretoView, setParetoView] = useState<"list" | "chart">("list");
   const [paretoGroup, setParetoGroup] = useState<"80" | "20">("80");
+  const [showDeepDive, setShowDeepDive] = useState(false);
+  const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts">("mom");
 
   const monthOptions = useMemo(getMonthOptions, []);
   const [selectedMonth, setSelectedMonth] = useState(monthOptions[0]?.value || "");
@@ -554,6 +557,16 @@ const Dashboard2 = () => {
                       </TooltipTrigger>
                       <TooltipContent>Proyección del mes</TooltipContent>
                     </UITooltip>
+                    <div className="w-px h-5 bg-border mx-0.5" />
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-semibold px-3" onClick={() => setShowDeepDive(true)}>
+                          <Telescope className="h-3.5 w-3.5" />
+                          Deep Dive
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Análisis ejecutivo completo</TooltipContent>
+                    </UITooltip>
                     {isAdmin && (
                       <UITooltip>
                         <TooltipTrigger asChild>
@@ -798,12 +811,28 @@ const Dashboard2 = () => {
                       {sections.map((s) => (
                         <button key={s.key} onClick={() => setAlertTab(alertTab === s.key ? null : s.key)}
                           className={`rounded-lg border-2 p-3 text-left transition-all ${alertTab === s.key ? `${s.border} ${s.bg} ring-2 ring-offset-1 ring-offset-background ring-primary/20` : "border-border bg-card hover:border-muted-foreground/30"}`}>
-                          <div className="flex items-center justify-between mb-0.5">
+                          <div className="flex items-center justify-between mb-1">
                             <span className="text-base">{s.emoji}</span>
                             <span className={`text-xl font-bold tabular-nums ${s.items.length > 0 ? s.text : "text-muted-foreground"}`}>{s.items.length}</span>
                           </div>
                           <p className={`text-xs font-semibold ${s.items.length > 0 ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</p>
-                          <p className="text-[9px] text-muted-foreground mt-0.5">{s.desc}</p>
+                          {/* Creator name previews */}
+                          {s.items.length > 0 && (
+                            <div className="mt-1.5 space-y-0.5">
+                              {s.items.slice(0, 3).map((a, idx) => (
+                                <p key={idx} className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
+                                  <ChevronRight className="h-2.5 w-2.5 shrink-0" />
+                                  {a.creator.name}
+                                </p>
+                              ))}
+                              {s.items.length > 3 && (
+                                <p className="text-[9px] text-muted-foreground/60">+{s.items.length - 3} más…</p>
+                              )}
+                            </div>
+                          )}
+                          {s.items.length === 0 && (
+                            <p className="text-[9px] text-muted-foreground mt-0.5">{s.desc}</p>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -1168,6 +1197,331 @@ const Dashboard2 = () => {
                       </div>
                     </div>
                   )}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* ══════ DEEP DIVE DIALOG ══════ */}
+            <Dialog open={showDeepDive} onOpenChange={setShowDeepDive}>
+              <DialogContent className="max-w-6xl max-h-[92vh] overflow-hidden p-0 flex flex-col">
+                <div className="px-6 pt-5 pb-3 border-b border-border shrink-0">
+                  <DialogHeader>
+                    <DialogTitle className="text-lg flex items-center gap-2">
+                      <Telescope className="h-5 w-5 text-primary" />
+                      Deep Dive — {selectedPeriod?.label}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="flex items-center gap-1 mt-3 bg-muted rounded-lg p-1">
+                    {([
+                      { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM Comparison" },
+                      { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Creator Ranking" },
+                      { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: "Escalabilidad" },
+                      { key: "alerts" as const, icon: <ShieldAlert className="h-3.5 w-3.5" />, label: `Alertas (${alerts.length})` },
+                    ]).map((tab) => (
+                      <Button
+                        key={tab.key}
+                        variant={deepDiveTab === tab.key ? "default" : "ghost"}
+                        size="sm"
+                        className="h-7 text-xs px-3 gap-1.5 flex-1"
+                        onClick={() => setDeepDiveTab(tab.key)}
+                      >
+                        {tab.icon} {tab.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6">
+                  {/* ── MoM Comparison ── */}
+                  {deepDiveTab === "mom" && (() => {
+                    const currentIdx = monthOptions.findIndex((m) => m.value === selectedMonth);
+                    const prevPeriod = monthOptions[currentIdx + 1];
+                    const momCreators = rawCreators
+                      .filter((c) => c.total > 0 || prevMonthMap.has(c.creatorId))
+                      .map((c) => {
+                        const prev = prevMonthMap.get(c.creatorId) ?? 0;
+                        const change = prev > 0 ? ((c.total - prev) / prev) * 100 : (c.total > 0 ? 100 : 0);
+                        const delta = c.total - prev;
+                        return { ...c, prev, change, delta };
+                      })
+                      .sort((a, b) => b.delta - a.delta);
+
+                    return (
+                      <div className="space-y-5">
+                        {/* Summary */}
+                        <div className="grid grid-cols-4 gap-3">
+                          <div className="rounded-xl border border-border bg-card p-3 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase">Actual</p>
+                            <p className="text-lg font-bold tabular-nums">{fmtK(hlKpis.totalBruto)}</p>
+                          </div>
+                          <div className="rounded-xl border border-border bg-card p-3 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase">Anterior</p>
+                            <p className="text-lg font-bold tabular-nums">{fmtK(prevMonthTotal)}</p>
+                          </div>
+                          <div className="rounded-xl border border-border bg-card p-3 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase">Diferencia</p>
+                            <p className={`text-lg font-bold tabular-nums ${totalChangePercent >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                              {totalChangePercent >= 0 ? "+" : ""}{fmtK(hlKpis.totalBruto - prevMonthTotal)}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-border bg-card p-3 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase">Cambio %</p>
+                            <p className={`text-lg font-bold tabular-nums ${totalChangePercent >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                              {totalChangePercent >= 0 ? "↑" : "↓"}{Math.abs(totalChangePercent).toFixed(1)}%
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Creator-by-creator comparison table */}
+                        <div className="rounded-lg border border-border bg-card overflow-auto max-h-[420px]">
+                          <Table>
+                            <TableHeader className="sticky top-0 z-10 bg-card">
+                              <TableRow>
+                                <TableHead className="w-8">#</TableHead>
+                                <TableHead>Creadora</TableHead>
+                                <TableHead className="text-right">Mes Actual</TableHead>
+                                <TableHead className="text-right">Mes Anterior</TableHead>
+                                <TableHead className="text-right">Δ Absoluto</TableHead>
+                                <TableHead className="text-right">Δ %</TableHead>
+                                <TableHead className="text-center w-20">Tendencia</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {momCreators.map((c, i) => (
+                                <TableRow key={c.creatorId}>
+                                  <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
+                                  <TableCell>
+                                    <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
+                                      {c.name}
+                                    </button>
+                                  </TableCell>
+                                  <TableCell className="text-right tabular-nums text-sm font-semibold">{fmt(c.total)}</TableCell>
+                                  <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.prev > 0 ? fmt(c.prev) : "—"}</TableCell>
+                                  <TableCell className={`text-right tabular-nums text-sm font-medium ${c.delta >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                                    {c.delta >= 0 ? "+" : ""}{fmtShort(c.delta)}
+                                  </TableCell>
+                                  <TableCell className={`text-right tabular-nums text-sm font-medium ${c.change >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                                    {c.prev > 0 ? `${c.change >= 0 ? "+" : ""}${c.change.toFixed(0)}%` : "Nueva"}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {c.change > 10 && <Badge variant="outline" className="text-[9px] h-5 border-emerald-500/40 text-emerald-500">↑ Crece</Badge>}
+                                    {c.change <= 10 && c.change >= -10 && <Badge variant="outline" className="text-[9px] h-5 border-muted-foreground/30">= Estable</Badge>}
+                                    {c.change < -10 && <Badge variant="outline" className="text-[9px] h-5 border-destructive/40 text-destructive">↓ Cae</Badge>}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Creator Ranking ── */}
+                  {deepDiveTab === "compare" && (() => {
+                    const ranked = [...rawCreators].filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
+                    const topTotal = ranked.reduce((s, c) => s + c.total, 0);
+                    return (
+                      <div className="space-y-5">
+                        <p className="text-xs text-muted-foreground">Ranking completo por revenue bruto. Muestra participación individual, performance relativa y posición.</p>
+                        <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
+                          <Table>
+                            <TableHeader className="sticky top-0 z-10 bg-card">
+                              <TableRow>
+                                <TableHead className="w-8">#</TableHead>
+                                <TableHead>Creadora</TableHead>
+                                <TableHead className="text-right">Bruto</TableHead>
+                                <TableHead className="text-right">% Total</TableHead>
+                                <TableHead className="w-[180px]">Participación</TableHead>
+                                <TableHead className="text-right">$/Día</TableHead>
+                                <TableHead className="text-right">$/Fan</TableHead>
+                                <TableHead className="text-right">Fans</TableHead>
+                                <TableHead className="text-right">Retención</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {ranked.map((c, i) => {
+                                const pct = topTotal > 0 ? (c.total / topTotal) * 100 : 0;
+                                const retention = c.subs > 0 ? (c.recurringSubs / c.subs) * 100 : 0;
+                                return (
+                                  <TableRow key={c.creatorId}>
+                                    <TableCell className="text-xs text-muted-foreground tabular-nums font-bold">{i + 1}</TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-1.5">
+                                        {i < 3 && <Crown className="h-3 w-3 text-amber-500 shrink-0" />}
+                                        <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
+                                          {c.name}
+                                        </button>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm font-semibold">{fmt(c.total)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{pct.toFixed(1)}%</TableCell>
+                                    <TableCell>
+                                      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(pct * 2, 100)}%` }} />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerDay)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerFan)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.activeFans.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm">
+                                      <span className={retention > 50 ? "text-emerald-500" : retention > 30 ? "text-amber-500" : "text-destructive"}>
+                                        {retention.toFixed(0)}%
+                                      </span>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Scalability ── */}
+                  {deepDiveTab === "scalability" && (() => {
+                    const active = rawCreators.filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
+                    return (
+                      <div className="space-y-5">
+                        <p className="text-xs text-muted-foreground">Objetivos de escalabilidad por creadora. Se proyecta un crecimiento target del 20% basado en su rendimiento actual y eficiencia de monetización.</p>
+                        <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
+                          <Table>
+                            <TableHeader className="sticky top-0 z-10 bg-card">
+                              <TableRow>
+                                <TableHead className="w-8">#</TableHead>
+                                <TableHead>Creadora</TableHead>
+                                <TableHead className="text-right">Actual</TableHead>
+                                <TableHead className="text-right">Target (+20%)</TableHead>
+                                <TableHead className="text-right">Gap</TableHead>
+                                <TableHead className="text-right">$/Fan Actual</TableHead>
+                                <TableHead className="text-right">$/Fan Target</TableHead>
+                                <TableHead className="w-[120px]">Progreso</TableHead>
+                                <TableHead className="text-center">Acción</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {active.map((c, i) => {
+                                const target = c.total * 1.2;
+                                const gap = target - c.total;
+                                const progress = c.total > 0 ? (c.total / target) * 100 : 0;
+                                const currentPerFan = c.activeFans > 0 ? c.total / c.activeFans : 0;
+                                const targetPerFan = c.activeFans > 0 ? target / c.activeFans : 0;
+                                const action = c.avgPerFan < hlKpis.avgPerFanGlobal * 0.5
+                                  ? "Mejorar monetización"
+                                  : c.messages / (c.total || 1) < 0.3
+                                  ? "Aumentar mensajería"
+                                  : c.newFans <= 0
+                                  ? "Adquirir fans"
+                                  : "Mantener ritmo";
+                                return (
+                                  <TableRow key={c.creatorId}>
+                                    <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
+                                    <TableCell>
+                                      <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left" onClick={() => navigate(`/creadores/${c.creatorId}`)}>
+                                        {c.name}
+                                      </button>
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm font-semibold">{fmtShort(c.total)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm font-semibold text-primary">{fmtShort(target)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-emerald-500">+{fmtShort(gap)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">${currentPerFan.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-primary">${targetPerFan.toFixed(2)}</TableCell>
+                                    <TableCell>
+                                      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                                        <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(progress, 100)}%` }} />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <Badge variant="outline" className="text-[8px] h-5 px-1.5">{action}</Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        {/* Summary insight */}
+                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-start gap-3">
+                          <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold text-foreground">Insight de Escalabilidad</p>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                              Si todas las creadoras activas ({active.length}) alcanzan su target +20%, el revenue bruto mensual pasaría de {fmtK(hlKpis.totalBruto)} a <strong className="text-primary">{fmtK(hlKpis.totalBruto * 1.2)}</strong>.
+                              La oportunidad más grande está en creadoras con $/Fan por debajo del promedio ({fmt(hlKpis.avgPerFanGlobal)}/fan) — mejorar su monetización genera mayor impacto.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Alerts Review ── */}
+                  {deepDiveTab === "alerts" && (() => {
+                    const zeros = alerts.filter((a) => a.type === "zero");
+                    const drops = alerts.filter((a) => a.type === "drop");
+                    const fanLoss = alerts.filter((a) => a.type === "fanLoss");
+
+                    const renderSection = (title: string, emoji: string, items: typeof alerts, borderColor: string, bgColor: string) => (
+                      <div className={`rounded-xl border-2 ${borderColor} ${bgColor} p-4 space-y-3`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{emoji}</span>
+                          <h3 className="text-sm font-bold text-foreground">{title}</h3>
+                          <Badge variant="outline" className="text-[9px] h-5 ml-auto">{items.length}</Badge>
+                        </div>
+                        {items.length === 0 ? (
+                          <div className="flex items-center gap-2 py-2">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                            <p className="text-sm text-muted-foreground">Sin alertas en esta categoría</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {items.map((a, i) => (
+                              <div key={i} className="flex items-center gap-3 rounded-md border border-border bg-card/80 px-3 py-2.5">
+                                <span className="text-xs text-muted-foreground tabular-nums w-5 shrink-0 font-bold">{i + 1}</span>
+                                <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${a.creator.creatorId}`)}>
+                                  {a.creator.name}
+                                </button>
+                                <span className="text-sm text-muted-foreground flex-1">{a.detail}</span>
+                                <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                                  {a.creator.activeFans > 0 ? `${a.creator.activeFans} fans` : ""}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-4">
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-foreground">Resumen de Alertas — {selectedPeriod?.label}</p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {alerts.length} alertas activas: {zeros.length} inactivas, {drops.length} caídas severas, {fanLoss.length} perdiendo fans
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <div className="text-center px-3">
+                              <p className="text-lg font-bold tabular-nums text-destructive">{zeros.length}</p>
+                              <p className="text-[9px] text-muted-foreground">Inactivas</p>
+                            </div>
+                            <div className="text-center px-3">
+                              <p className="text-lg font-bold tabular-nums text-orange-500">{drops.length}</p>
+                              <p className="text-[9px] text-muted-foreground">Caída</p>
+                            </div>
+                            <div className="text-center px-3">
+                              <p className="text-lg font-bold tabular-nums text-amber-500">{fanLoss.length}</p>
+                              <p className="text-[9px] text-muted-foreground">Fan Loss</p>
+                            </div>
+                          </div>
+                        </div>
+                        {renderSection("Inactivas — Revenue $0", "🔴", zeros, "border-destructive/30", "bg-destructive/5")}
+                        {renderSection("Caída severa (>30%)", "🟠", drops, "border-orange-400/30", "bg-orange-500/5")}
+                        {renderSection("Pérdida de fans", "🟡", fanLoss, "border-yellow-400/30", "bg-yellow-500/5")}
+                      </div>
+                    );
+                  })()}
                 </div>
               </DialogContent>
             </Dialog>
