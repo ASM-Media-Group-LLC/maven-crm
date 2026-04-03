@@ -560,9 +560,9 @@ const Dashboard2 = () => {
                     <div className="w-px h-5 bg-border mx-0.5" />
                     <UITooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-semibold px-3" onClick={() => setShowDeepDive(true)}>
+                        <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs px-3" onClick={() => setShowDeepDive(true)}>
                           <Telescope className="h-3.5 w-3.5" />
-                          Deep Dive
+                          Más análisis
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Análisis ejecutivo completo</TooltipContent>
@@ -1108,8 +1108,8 @@ const Dashboard2 = () => {
                       <Button variant={paretoView === "chart" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoView("chart")}>Gráfico</Button>
                     </div>
                     <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
-                      <Button variant={paretoGroup === "80" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoGroup("80")}>Top 80%</Button>
-                      <Button variant={paretoGroup === "20" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoGroup("20")}>Resto 20%</Button>
+                      <Button variant={paretoGroup === "80" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoGroup("80")}>Top 20% (generan 80%)</Button>
+                      <Button variant={paretoGroup === "20" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoGroup("20")}>Bottom 80% (generan 20%)</Button>
                     </div>
                     <div className="ml-auto text-right">
                       <p className="text-sm font-bold tabular-nums">{paretoAnalysis.topCount} <span className="text-muted-foreground font-normal text-xs">de {paretoAnalysis.totalCount}</span></p>
@@ -1118,23 +1118,38 @@ const Dashboard2 = () => {
                   </div>
 
                   {paretoView === "chart" && (
-                    <div className="flex flex-col items-center">
-                      <ResponsiveContainer width="100%" height={400}>
-                        <RechartsPie>
-                          <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={80} outerRadius={160} paddingAngle={1} stroke="hsl(var(--border))">
-                            {pieData.map((_, idx) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }}
-                            itemStyle={{ color: "hsl(var(--foreground))" }}
-                            labelStyle={{ color: "hsl(var(--foreground))" }}
-                            formatter={(value: number) => [fmt(value), ""]}
-                          />
-                        </RechartsPie>
-                      </ResponsiveContainer>
-                      <div className="border-t border-border bg-muted/30 px-6 py-2.5 w-full text-center">
+                    <div className="space-y-4">
+                      <div className="flex flex-col items-center">
+                        <ResponsiveContainer width="100%" height={400}>
+                          <RechartsPie>
+                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={80} outerRadius={160} paddingAngle={1} stroke="hsl(var(--border))"
+                              label={({ name, percent }: { name: string; percent: number }) => percent > 0.03 ? `${name.length > 12 ? name.slice(0, 12) + '…' : name} ${(percent * 100).toFixed(0)}%` : ''}
+                              labelLine={true}
+                            >
+                              {pieData.map((_, idx) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }}
+                              itemStyle={{ color: "hsl(var(--foreground))" }}
+                              labelStyle={{ color: "hsl(var(--foreground))" }}
+                              formatter={(value: number, name: string) => [fmt(value), name]}
+                            />
+                          </RechartsPie>
+                        </ResponsiveContainer>
+                      </div>
+                      {/* Legend with names */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 px-2">
+                        {pieData.map((d, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 text-xs truncate">
+                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[idx % PIE_COLORS.length] }} />
+                            <span className="truncate text-foreground">{d.name}</span>
+                            <span className="text-muted-foreground tabular-nums ml-auto shrink-0">{fmtK(d.value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="border-t border-border bg-muted/30 px-6 py-2.5 w-full text-center rounded-b-lg">
                         <p className="text-[10px] text-muted-foreground">
-                          Montos <strong>BRUTOS</strong> · {paretoGroup === "80" ? `Top genera ${fmt(paretoAnalysis.topRevenue)}` : `Bottom genera ${fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}`} de {fmt(paretoAnalysis.totalRevenue)} total
+                          Montos <strong>BRUTOS</strong> · {paretoGroup === "80" ? `Top ${paretoAnalysis.topCount} creadoras generan ${fmt(paretoAnalysis.topRevenue)}` : `Bottom ${paretoAnalysis.rest.length} generan ${fmt(paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue)}`} de {fmt(paretoAnalysis.totalRevenue)} total
                         </p>
                       </div>
                     </div>
@@ -1383,7 +1398,7 @@ const Dashboard2 = () => {
                     const active = rawCreators.filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
                     return (
                       <div className="space-y-5">
-                        <p className="text-xs text-muted-foreground">Objetivos de escalabilidad por creadora. Se proyecta un crecimiento target del 20% basado en su rendimiento actual y eficiencia de monetización.</p>
+                        <p className="text-xs text-muted-foreground">¿Cuánto más podría generar cada creadora? Target: +20% sobre su actual.</p>
                         <div className="rounded-lg border border-border bg-card overflow-auto max-h-[500px]">
                           <Table>
                             <TableHeader className="sticky top-0 z-10 bg-card">
@@ -1391,12 +1406,10 @@ const Dashboard2 = () => {
                                 <TableHead className="w-8">#</TableHead>
                                 <TableHead>Creadora</TableHead>
                                 <TableHead className="text-right">Actual</TableHead>
-                                <TableHead className="text-right">Target (+20%)</TableHead>
-                                <TableHead className="text-right">Gap</TableHead>
-                                <TableHead className="text-right">$/Fan Actual</TableHead>
-                                <TableHead className="text-right">$/Fan Target</TableHead>
-                                <TableHead className="w-[120px]">Progreso</TableHead>
-                                <TableHead className="text-center">Acción</TableHead>
+                                <TableHead className="text-right">Target</TableHead>
+                                <TableHead className="text-right">Falta</TableHead>
+                                <TableHead className="w-[140px]">Progreso</TableHead>
+                                <TableHead className="text-center">Sugerencia</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1404,15 +1417,13 @@ const Dashboard2 = () => {
                                 const target = c.total * 1.2;
                                 const gap = target - c.total;
                                 const progress = c.total > 0 ? (c.total / target) * 100 : 0;
-                                const currentPerFan = c.activeFans > 0 ? c.total / c.activeFans : 0;
-                                const targetPerFan = c.activeFans > 0 ? target / c.activeFans : 0;
                                 const action = c.avgPerFan < hlKpis.avgPerFanGlobal * 0.5
-                                  ? "Mejorar monetización"
+                                  ? "💰 Monetizar mejor"
                                   : c.messages / (c.total || 1) < 0.3
-                                  ? "Aumentar mensajería"
+                                  ? "💬 Más mensajería"
                                   : c.newFans <= 0
-                                  ? "Adquirir fans"
-                                  : "Mantener ritmo";
+                                  ? "📣 Adquirir fans"
+                                  : "✅ Mantener";
                                 return (
                                   <TableRow key={c.creatorId}>
                                     <TableCell className="text-xs text-muted-foreground tabular-nums">{i + 1}</TableCell>
@@ -1422,18 +1433,17 @@ const Dashboard2 = () => {
                                       </button>
                                     </TableCell>
                                     <TableCell className="text-right tabular-nums text-sm font-semibold">{fmtShort(c.total)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm font-semibold text-primary">{fmtShort(target)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-primary">{fmtShort(target)}</TableCell>
                                     <TableCell className="text-right tabular-nums text-sm text-emerald-500">+{fmtShort(gap)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">${currentPerFan.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-primary">${targetPerFan.toFixed(2)}</TableCell>
                                     <TableCell>
-                                      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                                        <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(progress, 100)}%` }} />
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
+                                          <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(progress, 100)}%` }} />
+                                        </div>
+                                        <span className="text-[10px] text-muted-foreground tabular-nums w-8">{progress.toFixed(0)}%</span>
                                       </div>
                                     </TableCell>
-                                    <TableCell className="text-center">
-                                      <Badge variant="outline" className="text-[8px] h-5 px-1.5">{action}</Badge>
-                                    </TableCell>
+                                    <TableCell className="text-center text-xs">{action}</TableCell>
                                   </TableRow>
                                 );
                               })}
