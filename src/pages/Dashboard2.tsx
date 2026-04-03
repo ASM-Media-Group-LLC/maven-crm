@@ -1632,11 +1632,11 @@ const Dashboard2 = () => {
                                     </TableCell>
                                     <TableCell className="text-right tabular-nums text-sm font-semibold">{fmtShort(c.total)}</TableCell>
                                     <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.messages)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{msgPct.toFixed(0)}%</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.tips)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{tipPct.toFixed(0)}%</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{subPct.toFixed(0)}%</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.msgPct.toFixed(0)}%</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.tips)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.tipPct.toFixed(0)}%</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.subPct.toFixed(0)}%</TableCell>
                                     <TableCell className="text-center text-xs">
                                       <span className={concentrated ? "text-amber-500 font-semibold" : ""}>{dominant}</span>
                                       {concentrated && <span className="text-[9px] text-amber-500 ml-1">⚠</span>}
