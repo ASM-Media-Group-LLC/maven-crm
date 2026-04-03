@@ -89,6 +89,8 @@ const Dashboard2 = () => {
   const { data: allRows = [], isLoading } = useEarningsData();
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [momSortKey, setMomSortKey] = useState<string>("delta");
+  const [momSortDir, setMomSortDir] = useState<"asc" | "desc">("desc");
   const [searchText, setSearchText] = useState("");
   const [showZeros, setShowZeros] = useState(false);
   const [minTotal, setMinTotal] = useState("");
@@ -1254,17 +1256,21 @@ const Dashboard2 = () => {
                 <div className="flex-1 overflow-y-auto p-6">
                   {/* ── MoM Comparison ── */}
                   {deepDiveTab === "mom" && (() => {
-                    const currentIdx = monthOptions.findIndex((m) => m.value === selectedMonth);
-                    const prevPeriod = monthOptions[currentIdx + 1];
-                    const momCreators = rawCreators
-                      .filter((c) => c.total > 0 || prevMonthMap.has(c.creatorId))
-                      .map((c) => {
-                        const prev = prevMonthMap.get(c.creatorId) ?? 0;
-                        const change = prev > 0 ? ((c.total - prev) / prev) * 100 : (c.total > 0 ? 100 : 0);
-                        const delta = c.total - prev;
-                        return { ...c, prev, change, delta };
-                      })
-                      .sort((a, b) => b.delta - a.delta);
+                     const currentIdx = monthOptions.findIndex((m) => m.value === selectedMonth);
+                     const prevPeriod = monthOptions[currentIdx + 1];
+                     const momBase = rawCreators
+                       .filter((c) => c.total > 0 || prevMonthMap.has(c.creatorId))
+                       .map((c) => {
+                         const prev = prevMonthMap.get(c.creatorId) ?? 0;
+                         const change = prev > 0 ? ((c.total - prev) / prev) * 100 : (c.total > 0 ? 100 : 0);
+                         const delta = c.total - prev;
+                         return { ...c, prev, change, delta };
+                       });
+                     const momCreators = [...momBase].sort((a, b) => {
+                       const av = a[momSortKey as keyof typeof a] as number;
+                       const bv = b[momSortKey as keyof typeof b] as number;
+                       return momSortDir === "desc" ? bv - av : av - bv;
+                     });
 
                     return (
                       <div className="space-y-5">
@@ -1300,13 +1306,29 @@ const Dashboard2 = () => {
                           <Table>
                             <TableHeader className="sticky top-0 z-10 bg-card">
                               <TableRow>
-                                <TableHead className="w-8">#</TableHead>
-                                <TableHead>Creadora</TableHead>
-                                <TableHead className="text-right">Mes Actual</TableHead>
-                                <TableHead className="text-right">Mes Anterior</TableHead>
-                                <TableHead className="text-right">Δ Absoluto</TableHead>
-                                <TableHead className="text-right">Δ %</TableHead>
-                                <TableHead className="text-center w-20">Tendencia</TableHead>
+                                 <TableHead className="w-8">#</TableHead>
+                                 <TableHead>Creadora</TableHead>
+                                 {([
+                                   ["total", "Mes Actual", "text-right"],
+                                   ["prev", "Mes Anterior", "text-right"],
+                                   ["delta", "Δ Absoluto", "text-right"],
+                                   ["change", "Δ %", "text-right"],
+                                 ] as const).map(([key, label, align]) => (
+                                   <TableHead
+                                     key={key}
+                                     className={`${align} cursor-pointer select-none hover:text-foreground transition-colors`}
+                                     onClick={() => {
+                                       if (momSortKey === key) setMomSortDir(d => d === "desc" ? "asc" : "desc");
+                                       else { setMomSortKey(key); setMomSortDir("desc"); }
+                                     }}
+                                   >
+                                     <span className="inline-flex items-center gap-1">
+                                       {label}
+                                       {momSortKey === key ? (momSortDir === "desc" ? " ↓" : " ↑") : ""}
+                                     </span>
+                                   </TableHead>
+                                 ))}
+                                 <TableHead className="text-center w-20">Tendencia</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
