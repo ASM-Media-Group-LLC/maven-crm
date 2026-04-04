@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify, Play, Pause, Crown, Pencil } from "lucide-react";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify, Play, Pause, Crown, Pencil, Columns, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
