@@ -346,13 +346,20 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             </SelectContent>
           </Select>
           <div className="flex items-center gap-1 ml-auto">
-            <Button variant={viewMode === "clickup" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("clickup")} title="Vista ClickUp">
+            <Button variant={showAnalytics ? "secondary" : "ghost"} size="icon" onClick={() => setShowAnalytics(!showAnalytics)} title="Analíticas">
+              <BarChart3 className="h-4 w-4" />
+            </Button>
+            <div className="w-px h-5 bg-border mx-1" />
+            <Button variant={viewMode === "kanban" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("kanban"); setShowAnalytics(false); }} title="Kanban">
+              <Columns className="h-4 w-4" />
+            </Button>
+            <Button variant={viewMode === "clickup" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("clickup"); setShowAnalytics(false); }} title="Vista ClickUp">
               <AlignJustify className="h-4 w-4" />
             </Button>
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("list")} title="Tabla">
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("list"); setShowAnalytics(false); }} title="Tabla">
               <List className="h-4 w-4" />
             </Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("grid")} title="Grid">
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("grid"); setShowAnalytics(false); }} title="Grid">
               <LayoutGrid className="h-4 w-4" />
             </Button>
           </div>
