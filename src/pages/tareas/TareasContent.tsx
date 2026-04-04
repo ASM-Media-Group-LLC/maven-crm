@@ -418,10 +418,18 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
                 onStatusChange={handleStatusChange}
               />
             )}
-          />
-          />
         )}
       </div>
+
+      <TaskDetailSheet
+        task={detailTask}
+        open={!!detailTask}
+        onOpenChange={(open) => !open && setDetailTask(null)}
+        profiles={companyProfiles}
+        onEdit={(t) => { setDetailTask(null); setEditTarget(t); }}
+        onStatusChange={handleStatusChange}
+      />
+
 
       <CreateTaskModal
         open={createOpen}
