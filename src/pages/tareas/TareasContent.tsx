@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify, Play, Pause, Crown, Pencil } from "lucide-react";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify, Play, Pause, Crown, Pencil, Columns, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,9 @@ import DeleteTaskDialog from "./DeleteTaskDialog";
 import OverdueReasonModal from "./OverdueReasonModal";
 import TasksTable from "./TasksTable";
 import TaskListView from "./TaskListView";
+import TaskKanbanView from "./TaskKanbanView";
+import TaskDetailSheet from "./TaskDetailSheet";
+import TaskAnalyticsTab from "./TaskAnalyticsTab";
 
 interface TareasContentProps {
   projectId: string;
@@ -28,7 +31,9 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = useState<"grid" | "list" | "clickup">("clickup");
+  const [viewMode, setViewMode] = useState<"grid" | "list" | "clickup" | "kanban">("clickup");
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [assignedFilter, setAssignedFilter] = useState<string>("");
@@ -341,22 +346,39 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             </SelectContent>
           </Select>
           <div className="flex items-center gap-1 ml-auto">
-            <Button variant={viewMode === "clickup" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("clickup")} title="Vista ClickUp">
+            <Button variant={showAnalytics ? "secondary" : "ghost"} size="icon" onClick={() => setShowAnalytics(!showAnalytics)} title="Analíticas">
+              <BarChart3 className="h-4 w-4" />
+            </Button>
+            <div className="w-px h-5 bg-border mx-1" />
+            <Button variant={viewMode === "kanban" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("kanban"); setShowAnalytics(false); }} title="Kanban">
+              <Columns className="h-4 w-4" />
+            </Button>
+            <Button variant={viewMode === "clickup" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("clickup"); setShowAnalytics(false); }} title="Vista ClickUp">
               <AlignJustify className="h-4 w-4" />
             </Button>
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("list")} title="Tabla">
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("list"); setShowAnalytics(false); }} title="Tabla">
               <List className="h-4 w-4" />
             </Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("grid")} title="Grid">
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("grid"); setShowAnalytics(false); }} title="Grid">
               <LayoutGrid className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {isLoading ? (
+        {showAnalytics ? (
+          <TaskAnalyticsTab tasks={tasks} profiles={companyProfiles} getTaskStatus={getTaskStatus} />
+        ) : isLoading ? (
           <p className="text-sm text-muted-foreground text-center py-8">Cargando tareas...</p>
         ) : filteredAndSortedTasks.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">No hay tareas aún. Crea la primera.</p>
+        ) : viewMode === "kanban" ? (
+          <TaskKanbanView
+            tasks={filteredAndSortedTasks}
+            profiles={companyProfiles}
+            onStatusChange={handleStatusChange}
+            onTaskClick={setDetailTask}
+            getTaskStatus={getTaskStatus}
+          />
         ) : viewMode === "clickup" ? (
           <TaskListView
             tasks={filteredAndSortedTasks}
@@ -399,6 +421,16 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
           />
         )}
       </div>
+
+      <TaskDetailSheet
+        task={detailTask}
+        open={!!detailTask}
+        onOpenChange={(open) => !open && setDetailTask(null)}
+        profiles={companyProfiles}
+        onEdit={(t) => { setDetailTask(null); setEditTarget(t); }}
+        onStatusChange={handleStatusChange}
+      />
+
 
       <CreateTaskModal
         open={createOpen}
