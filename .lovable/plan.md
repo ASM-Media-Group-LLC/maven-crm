@@ -1,39 +1,104 @@
 
 
-# Update March Earnings from Excel Report
+# Rediseño del Gestor de Tareas — Estilo Microsoft Planner
 
-## What This Does
+## Resumen
 
-Replace all March 2026 data in `of_gross_earnings` with the data from your uploaded Excel file ("Reporte_de_ventas_Marzo_KASH-3.xlsx"). This ensures the database matches the official OF report exactly, including March 25 which is currently missing from the DB.
+Transformar el módulo de Tareas (`/tareas/:projectId`) en un gestor de proyectos completo inspirado en Microsoft Planner, agregando: (1) vista Kanban con drag-and-drop, (2) sistema de comentarios en tareas, y (3) pestaña de analíticas/diagramas del proyecto.
 
-## Data Summary
+---
 
-- **Excel file**: ~2,016 rows covering March 1-31, 2026 with ~65 creators per day
-- **Current DB**: March data exists but is missing March 25 entirely, and may have stale/incorrect values from the old cron job bug
-- **Creator matching**: Excel uses creator names (e.g., "Berenaa", "Franundurraga ELITE 20K 40K") which match the `pending_creator` field in the DB. Existing `creator_id` mappings will be preserved where possible.
+## Estado Actual
 
-## Implementation Steps
+- **Vistas existentes**: Grid (tarjetas), Lista (tabla), ClickUp (agrupado por estado) — ninguna es Kanban con columnas arrastrables
+- **Drag-and-drop**: Solo reordenamiento dentro de la misma vista (DraggableGrid), no entre columnas de estado
+- **Comentarios**: No existen — ni tabla en DB ni UI
+- **Analíticas**: Solo KPIs numéricos (pendientes, en curso, etc.) — sin gráficos ni diagramas
+- **Librería DnD**: `@hello-pangea/dnd` ya instalada (usada en ProyectoMP)
 
-### Step 1: Delete existing March 2026 data
-Remove all rows from `of_gross_earnings` where `date::date` is between 2026-03-01 and 2026-03-31 to avoid duplicates.
+---
 
-### Step 2: Parse and insert Excel data
-Write a Python script that:
-1. Reads the Excel file with pandas
-2. Maps each "Creator" name to an existing `creator_id` (by matching against `pending_creator` in historical data or `artistic_name` in the `creators` table)
-3. Parses monetary values (removes `$` and `,`), percentages, and integers
-4. Inserts all ~2,016 rows into `of_gross_earnings` with:
-   - `date` set to each row's date at `00:00:00` (one clean row per creator per day)
-   - `pending_creator` set to the Excel's "Creator" column
-   - `creator_id` mapped where possible
-   - All financial and metric columns populated
+## Plan de Implementación
 
-### Step 3: Verify
-Query the DB to confirm row counts per day match the Excel and spot-check a few creators' totals.
+### 1. Nueva tabla `task_comments` en Supabase
 
-## Technical Details
+Crear migración SQL con:
+- `id`, `task_id` (FK a tasks), `user_id` (FK a auth.users), `content` (text), `created_at`
+- RLS: los miembros del proyecto pueden ver/crear comentarios
+- Trigger `update_updated_at` estándar
 
-- **Columns mapped from Excel**: `subscription_gross`, `new_subscriptions_sub_gross`, `recurring_sub_gross`, `tips_gross`, `total_earnings_gross`, `contribution`, `of_ranking`, `following`, `fans_renew_on`, `renew_on_percentage`, `new_fans`, `active_fans`, `change_expired_fan_count`, `message_gross`, `creator_group`, `avg_spend_per_spender_gross`, `avg_spend_per_transaction_gross`, `avg_earnings_per_fan_gross`, `avg_subscription_length`
-- **No code changes needed** — the frontend already reads from `of_gross_earnings` with the simplified logic from the previous fix
-- **Database operations**: DELETE (March data) + INSERT (Excel data) via the insert tool
+### 2. Vista Kanban con Drag-and-Drop (nueva vista)
+
+**Archivo**: `src/pages/tareas/TaskKanbanView.tsx`
+
+- Columnas por estado: Pendiente, En curso, Pausada, Vencida, Completada
+- Usa `@hello-pangea/dnd` (ya instalado) con `DragDropContext` + `Droppable` por columna + `Draggable` por tarjeta
+- Al soltar una tarjeta en otra columna, se llama `updateTaskStatus` (ya existe en `useTareas`)
+- Header de columna con conteo de tareas y color por estado
+- Tarjetas compactas mostrando: titulo, prioridad (flag color), assignees (avatares), fecha limite, indicador de comentarios
+- Reordenamiento vertical dentro de la misma columna (usa campo `position`)
+
+**Integración en TareasContent.tsx**:
+- Agregar icono "Columns" al selector de vistas (junto a Grid, List, ClickUp)
+- Nuevo `viewMode: "kanban"` que renderiza `TaskKanbanView`
+
+### 3. Panel de Detalle de Tarea con Comentarios
+
+**Archivo**: `src/pages/tareas/TaskDetailSheet.tsx`
+
+- Sheet (drawer lateral derecho) que se abre al hacer clic en cualquier tarjeta del Kanban
+- Secciones:
+  - Info de la tarea (titulo, descripcion, estado, prioridad, asignados, fechas)
+  - Subtareas (reutiliza `SubtasksPanel` existente)
+  - **Comentarios**: lista cronológica con avatar + nombre + timestamp + contenido, input para nuevo comentario al fondo
+- Hook `useTaskComments(taskId)` con queries de lectura e inserción
+
+### 4. Pestaña de Analíticas del Proyecto
+
+**Archivo**: `src/pages/tareas/TaskAnalyticsTab.tsx`
+
+Agregar un toggle/tab "Analíticas" en la cabecera del proyecto que muestre:
+
+- **Burndown chart**: tareas completadas vs tiempo (línea ideal vs real) usando Recharts (ya instalado)
+- **Distribución por estado**: gráfico de dona (Pendiente/En curso/Pausada/Vencida/Completada)
+- **Distribución por prioridad**: barras horizontales coloreadas
+- **Carga por miembro**: barras por persona mostrando tareas asignadas vs completadas
+- **Tareas vencidas sin justificar**: tabla resumida con alerta
+- **Timeline/Gantt simplificado**: barras horizontales por tarea mostrando duración (start_at → due_at) con color por estado
+
+---
+
+## Detalle Técnico
+
+### Migración SQL
+```sql
+CREATE TABLE public.task_comments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id uuid NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  content text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.task_comments ENABLE ROW LEVEL SECURITY;
+-- Policies para miembros del proyecto
+```
+
+### Archivos nuevos
+| Archivo | Propósito |
+|---------|-----------|
+| `TaskKanbanView.tsx` | Vista Kanban con columnas DnD |
+| `TaskDetailSheet.tsx` | Drawer lateral con detalle + comentarios |
+| `TaskAnalyticsTab.tsx` | Gráficos y diagramas del proyecto |
+| `useTaskComments.ts` | Hook para CRUD de comentarios |
+
+### Archivos modificados
+| Archivo | Cambio |
+|---------|--------|
+| `TareasContent.tsx` | Agregar viewMode "kanban", botón analíticas, renderizar nuevos componentes |
+| `useTareas.ts` | Sin cambios (ya tiene `updateTaskStatus`) |
+
+### Dependencias
+- `@hello-pangea/dnd` — ya instalada
+- `recharts` — ya instalada
+- No se requieren nuevas dependencias
 
