@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 // Progress removed - using circular SVG instead
 import { useTareas, type Task } from "./useTareas";
-import TaskCard from "./TaskCard";
+
 import CreateTaskModal from "./CreateTaskModal";
 import EditTaskModal from "./EditTaskModal";
 import DeleteTaskDialog from "./DeleteTaskDialog";
