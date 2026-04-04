@@ -1,5 +1,4 @@
 // This file is only imported dynamically in production (see main.tsx)
-// The virtual:pwa-register module is provided by vite-plugin-pwa at build time
 
 export async function initPWA() {
   const isInIframe = (() => {
@@ -20,8 +19,11 @@ export async function initPWA() {
   if (!isProductionHost) return;
 
   try {
-    const mod = "virtual:pwa-register";
-    const { registerSW } = await (Function('m', 'return import(m)')(mod) as Promise<any>);
+    // Build the module specifier dynamically to avoid Vite dev-server resolution
+    const parts = ["virtual", ":", "pwa-register"];
+    const mod = parts.join("");
+    const imported = await (new Function('s', 'return import(s)'))(mod);
+    const { registerSW } = imported;
     registerSW({
       onNeedRefresh() {
         const banner = document.createElement("div");
