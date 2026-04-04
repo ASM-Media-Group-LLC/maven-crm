@@ -418,6 +418,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
                 onStatusChange={handleStatusChange}
               />
             )}
+          />
         )}
       </div>
 
