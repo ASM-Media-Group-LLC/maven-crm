@@ -1,5 +1,3 @@
-import { registerSW } from "virtual:pwa-register";
-
 const isInIframe = (() => {
   try {
     return window.self !== window.top;
@@ -16,7 +14,8 @@ const isProductionHost =
   !isPreviewHost && !isInIframe && window.location.hostname !== "localhost";
 
 if (isProductionHost) {
-  registerSW({
+  import("virtual:pwa-register").then(({ registerSW }) => {
+    registerSW({
     onNeedRefresh() {
       const banner = document.createElement("div");
       banner.id = "pwa-update-banner";
