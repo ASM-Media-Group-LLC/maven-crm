@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify, Play, Pause, Crown, Pencil, Columns, BarChart3 } from "lucide-react";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, List, Search, Play, Pause, Crown, Pencil, Columns, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,14 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 // Progress removed - using circular SVG instead
 import { useTareas, type Task } from "./useTareas";
-import TaskCard from "./TaskCard";
-import DraggableGrid from "./DraggableGrid";
+
 import CreateTaskModal from "./CreateTaskModal";
 import EditTaskModal from "./EditTaskModal";
 import DeleteTaskDialog from "./DeleteTaskDialog";
 import OverdueReasonModal from "./OverdueReasonModal";
 import TasksTable from "./TasksTable";
-import TaskListView from "./TaskListView";
+
 import TaskKanbanView from "./TaskKanbanView";
 import TaskDetailSheet from "./TaskDetailSheet";
 import TaskAnalyticsTab from "./TaskAnalyticsTab";
@@ -31,7 +30,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = useState<"grid" | "list" | "clickup" | "kanban">("clickup");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [search, setSearch] = useState("");
@@ -353,14 +352,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             <Button variant={viewMode === "kanban" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("kanban"); setShowAnalytics(false); }} title="Kanban">
               <Columns className="h-4 w-4" />
             </Button>
-            <Button variant={viewMode === "clickup" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("clickup"); setShowAnalytics(false); }} title="Vista ClickUp">
-              <AlignJustify className="h-4 w-4" />
-            </Button>
             <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("list"); setShowAnalytics(false); }} title="Tabla">
               <List className="h-4 w-4" />
-            </Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("grid"); setShowAnalytics(false); }} title="Grid">
-              <LayoutGrid className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -379,19 +372,6 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             onTaskClick={setDetailTask}
             getTaskStatus={getTaskStatus}
           />
-        ) : viewMode === "clickup" ? (
-          <TaskListView
-            tasks={filteredAndSortedTasks}
-            profiles={companyProfiles}
-            onComplete={handleComplete}
-            onJustify={setJustifyTask}
-            onEdit={setEditTarget}
-            onDelete={setDeleteTarget}
-            onCreateNew={() => setCreateOpen(true)}
-            onStatusChange={handleStatusChange}
-            onPatchTask={(id, fields) => patchTask.mutate({ taskId: id, fields })}
-            onUpdateAssignees={(id, ids) => updateTaskAssignees.mutate({ taskId: id, assigneeIds: ids })}
-          />
         ) : viewMode === "list" ? (
           <TasksTable
             tasks={filteredAndSortedTasks}
@@ -404,22 +384,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             onPatchTask={(id, fields) => patchTask.mutate({ taskId: id, fields })}
             onUpdateAssignees={(id, ids) => updateTaskAssignees.mutate({ taskId: id, assigneeIds: ids })}
           />
-        ) : (
-          <DraggableGrid
-            items={filteredAndSortedTasks}
-            onReorder={(ids) => reorderTasks.mutate(ids)}
-            renderItem={(task) => (
-              <TaskCard
-                task={task}
-                onComplete={handleComplete}
-                onJustify={setJustifyTask}
-                onEdit={setEditTarget}
-                onDelete={setDeleteTarget}
-                onStatusChange={handleStatusChange}
-              />
-            )}
-          />
-        )}
+        ) : null}
       </div>
 
       <TaskDetailSheet
