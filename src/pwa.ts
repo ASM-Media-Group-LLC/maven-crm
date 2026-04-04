@@ -1,20 +1,27 @@
-const isInIframe = (() => {
+// This file is only imported dynamically in production (see main.tsx)
+// The virtual:pwa-register module is provided by vite-plugin-pwa at build time
+
+export async function initPWA() {
+  const isInIframe = (() => {
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true;
+    }
+  })();
+
+  const isPreviewHost =
+    window.location.hostname.includes("id-preview--") ||
+    window.location.hostname.includes("lovableproject.com");
+
+  const isProductionHost =
+    !isPreviewHost && !isInIframe && window.location.hostname !== "localhost";
+
+  if (!isProductionHost) return;
+
   try {
-    return window.self !== window.top;
-  } catch {
-    return true;
-  }
-})();
-
-const isPreviewHost =
-  window.location.hostname.includes("id-preview--") ||
-  window.location.hostname.includes("lovableproject.com");
-
-const isProductionHost =
-  !isPreviewHost && !isInIframe && window.location.hostname !== "localhost";
-
-if (isProductionHost) {
-  import("virtual:pwa-register").then(({ registerSW }) => {
+    // @ts-ignore - virtual module provided by vite-plugin-pwa in production builds
+    const { registerSW } = await import("virtual:pwa-register");
     registerSW({
       onNeedRefresh() {
         const banner = document.createElement("div");
@@ -33,5 +40,9 @@ if (isProductionHost) {
       },
       onOfflineReady() {},
     });
-  });
+  } catch {
+    // virtual:pwa-register not available (dev mode)
+  }
 }
+
+initPWA();
