@@ -14,7 +14,7 @@ import EditTaskModal from "./EditTaskModal";
 import DeleteTaskDialog from "./DeleteTaskDialog";
 import OverdueReasonModal from "./OverdueReasonModal";
 import TasksTable from "./TasksTable";
-import TaskListView from "./TaskListView";
+
 import TaskKanbanView from "./TaskKanbanView";
 import TaskDetailSheet from "./TaskDetailSheet";
 import TaskAnalyticsTab from "./TaskAnalyticsTab";
