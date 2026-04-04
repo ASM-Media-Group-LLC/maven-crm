@@ -139,6 +139,11 @@ const TaskDetailSheet = ({ task, open, onOpenChange, profiles, onEdit, onStatusC
 
             <Separator />
 
+            {/* Attachments */}
+            <TaskAttachmentsSection taskId={task.id} />
+
+            <Separator />
+
             {/* Comments */}
             <div className="space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-2">
