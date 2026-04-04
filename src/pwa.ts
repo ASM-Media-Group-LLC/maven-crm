@@ -20,8 +20,8 @@ export async function initPWA() {
   if (!isProductionHost) return;
 
   try {
-    // @ts-ignore - virtual module provided by vite-plugin-pwa in production builds
-    const { registerSW } = await import("virtual:pwa-register");
+    const mod = "virtual:pwa-register";
+    const { registerSW } = await (Function('m', 'return import(m)')(mod) as Promise<any>);
     registerSW({
       onNeedRefresh() {
         const banner = document.createElement("div");
