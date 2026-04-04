@@ -365,10 +365,20 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
           </div>
         </div>
 
-        {isLoading ? (
+        {showAnalytics ? (
+          <TaskAnalyticsTab tasks={tasks} profiles={companyProfiles} getTaskStatus={getTaskStatus} />
+        ) : isLoading ? (
           <p className="text-sm text-muted-foreground text-center py-8">Cargando tareas...</p>
         ) : filteredAndSortedTasks.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">No hay tareas aún. Crea la primera.</p>
+        ) : viewMode === "kanban" ? (
+          <TaskKanbanView
+            tasks={filteredAndSortedTasks}
+            profiles={companyProfiles}
+            onStatusChange={handleStatusChange}
+            onTaskClick={setDetailTask}
+            getTaskStatus={getTaskStatus}
+          />
         ) : viewMode === "clickup" ? (
           <TaskListView
             tasks={filteredAndSortedTasks}
@@ -408,6 +418,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
                 onStatusChange={handleStatusChange}
               />
             )}
+          />
           />
         )}
       </div>
