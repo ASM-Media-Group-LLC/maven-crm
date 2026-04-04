@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTaskComments } from "./useTaskComments";
 import { useAuth } from "@/hooks/useAuth";
 import SubtasksPanel from "./SubtasksPanel";
+import TaskAttachmentsSection from "./TaskAttachmentsSection";
 import { priorityConfig } from "./PrioritySelect";
 import type { Task } from "./useTareas";
 
