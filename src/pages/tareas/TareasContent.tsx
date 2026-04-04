@@ -352,14 +352,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             <Button variant={viewMode === "kanban" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("kanban"); setShowAnalytics(false); }} title="Kanban">
               <Columns className="h-4 w-4" />
             </Button>
-            <Button variant={viewMode === "clickup" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("clickup"); setShowAnalytics(false); }} title="Vista ClickUp">
-              <AlignJustify className="h-4 w-4" />
-            </Button>
             <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("list"); setShowAnalytics(false); }} title="Tabla">
               <List className="h-4 w-4" />
-            </Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("grid"); setShowAnalytics(false); }} title="Grid">
-              <LayoutGrid className="h-4 w-4" />
             </Button>
           </div>
         </div>
