@@ -364,6 +364,17 @@ const ProjectsListContent = () => {
             <p className="text-sm text-muted-foreground">Gestión de tareas y proyectos</p>
           </div>
           <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 border rounded-lg p-1">
+              <Button variant={mainView === "projects" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("projects")} className="gap-1">
+                <FolderOpen className="h-4 w-4" /> Proyectos
+              </Button>
+              <Button variant={mainView === "kanban" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("kanban")} className="gap-1">
+                <Columns className="h-4 w-4" /> Kanban
+              </Button>
+              <Button variant={mainView === "analytics" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("analytics")} className="gap-1">
+                <BarChart3 className="h-4 w-4" /> Analíticas
+              </Button>
+            </div>
             <Button variant="outline" onClick={() => setCreateFolderOpen(true)}>
               <FolderPlus className="h-4 w-4 mr-1" /> Nueva Carpeta
             </Button>
