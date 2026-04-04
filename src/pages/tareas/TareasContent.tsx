@@ -30,7 +30,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = useState<"grid" | "list" | "clickup" | "kanban">("clickup");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [search, setSearch] = useState("");
