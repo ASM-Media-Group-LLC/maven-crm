@@ -303,6 +303,42 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
           ))}
         </div>
 
+        {/* Member tabs */}
+        {(() => {
+          const memberIds = Array.from(new Set(tasks.flatMap((t) => t.assignees || [])));
+          const membersWithTasks = companyProfiles.filter((p) => memberIds.includes(p.id));
+          if (membersWithTasks.length === 0) return null;
+          return (
+            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
+              <Button
+                variant={assignedFilter === "" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setAssignedFilter("")}
+              >
+                Todos
+              </Button>
+              {membersWithTasks.map((p) => {
+                const initials = p.full_name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?";
+                const firstName = p.full_name?.split(" ")[0] || p.id.slice(0, 6);
+                return (
+                  <Button
+                    key={p.id}
+                    variant={assignedFilter === p.id ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setAssignedFilter(assignedFilter === p.id ? "" : p.id)}
+                    className="gap-1.5"
+                  >
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-primary text-[9px] font-bold shrink-0">
+                      {initials}
+                    </span>
+                    {firstName}
+                  </Button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
