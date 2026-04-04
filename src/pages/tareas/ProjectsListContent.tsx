@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { getPublicBaseUrl } from "@/lib/getPublicUrl";
-import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Flag, Crown, ChevronDown, ChevronRight, FolderPlus, FolderInput, X } from "lucide-react";
+import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Flag, Crown, ChevronDown, ChevronRight, FolderPlus, FolderInput, X, Columns, BarChart3 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,12 +27,14 @@ import EditProjectModal from "./EditProjectModal";
 import DeleteProjectDialog from "./DeleteProjectDialog";
 import ProjectsTable from "./ProjectsTable";
 import CreateFolderModal from "./CreateFolderModal";
+import GlobalKanbanView from "./GlobalKanbanView";
+import GlobalAnalyticsTab from "./GlobalAnalyticsTab";
 
 const ProjectsListContent = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { projects, allTasks, isLoading, profile, folders, createProject, updateProject, deleteProject, archiveProject, getProjectTaskCounts, getProjectProgress, reorderProjects, createFolder, renameFolder, deleteFolder, moveProjectToFolder } = useProjects();
+  const { projects, allTasks, isLoading, profile, folders, createProject, updateProject, deleteProject, archiveProject, getProjectTaskCounts, getProjectProgress, reorderProjects, createFolder, renameFolder, deleteFolder, moveProjectToFolder, updateGlobalTaskStatus } = useProjects();
 
   const { data: companyProfiles = [] } = useQuery({
     queryKey: ["company-profiles", profile?.company_id],
@@ -66,6 +68,7 @@ const ProjectsListContent = () => {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [mainView, setMainView] = useState<"projects" | "kanban" | "analytics">("projects");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [editProject, setEditProject] = useState<TaskProject | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskProject | null>(null);
@@ -361,6 +364,17 @@ const ProjectsListContent = () => {
             <p className="text-sm text-muted-foreground">Gestión de tareas y proyectos</p>
           </div>
           <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 border rounded-lg p-1">
+              <Button variant={mainView === "projects" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("projects")} className="gap-1">
+                <FolderOpen className="h-4 w-4" /> Proyectos
+              </Button>
+              <Button variant={mainView === "kanban" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("kanban")} className="gap-1">
+                <Columns className="h-4 w-4" /> Kanban
+              </Button>
+              <Button variant={mainView === "analytics" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("analytics")} className="gap-1">
+                <BarChart3 className="h-4 w-4" /> Analíticas
+              </Button>
+            </div>
             <Button variant="outline" onClick={() => setCreateFolderOpen(true)}>
               <FolderPlus className="h-4 w-4 mr-1" /> Nueva Carpeta
             </Button>
@@ -372,6 +386,22 @@ const ProjectsListContent = () => {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
+        {mainView === "kanban" ? (
+          <GlobalKanbanView
+            tasks={allTasks}
+            profiles={companyProfiles}
+            projects={projects}
+            onStatusChange={(taskId, status) => updateGlobalTaskStatus.mutate({ taskId, status })}
+          />
+        ) : mainView === "analytics" ? (
+          <GlobalAnalyticsTab
+            tasks={allTasks}
+            profiles={companyProfiles}
+            projects={projects}
+          />
+        ) : (
+        <>
+      <div className="space-y-6">
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           {kpis.map((kpi) => (
             <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
@@ -536,6 +566,9 @@ const ProjectsListContent = () => {
             onReorder={(ids) => reorderProjects.mutate(ids)}
             renderItem={renderProjectCard}
           />
+        )}
+      </div>
+        </>
         )}
       </div>
 

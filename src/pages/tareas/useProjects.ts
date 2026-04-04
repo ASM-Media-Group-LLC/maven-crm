@@ -106,10 +106,10 @@ export const useProjects = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tasks" as any)
-        .select("id, status, due_at, project_id, priority")
+        .select("id, title, description, status, due_at, start_at, completed_at, project_id, priority, assignees, created_at, overdue_reason, assigned_to, created_by, company_id, duration_hours, duration_minutes, share_token, updated_at")
         .order("due_at", { ascending: true });
       if (error) throw error;
-      return (data || []) as unknown as { id: string; status: string; due_at: string; project_id: string | null; priority: string }[];
+      return (data || []) as unknown as import("./useTareas").Task[];
     },
     enabled: !!user,
   });
@@ -118,6 +118,20 @@ export const useProjects = () => {
     if (isAdmin) return rawAllTasks;
     return rawAllTasks.filter((t) => t.project_id && visibleProjectIds.has(t.project_id));
   }, [rawAllTasks, visibleProjectIds, isAdmin]);
+
+  const updateGlobalTaskStatus = useMutation({
+    mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => {
+      const payload: any = { status };
+      if (status === "completed") payload.completed_at = new Date().toISOString();
+      else payload.completed_at = null;
+      const { error } = await supabase.from("tasks" as any).update(payload).eq("id", taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+      queryClient.invalidateQueries({ queryKey: ["project-tasks"] });
+    },
+  });
 
   const createProject = useMutation({
     mutationFn: async (project: { name: string; description?: string; memberIds?: string[]; leaderId?: string; folderId?: string }) => {
@@ -439,5 +453,6 @@ export const useProjects = () => {
     renameFolder,
     deleteFolder,
     moveProjectToFolder,
+    updateGlobalTaskStatus,
   };
 };
