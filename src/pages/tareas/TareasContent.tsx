@@ -372,19 +372,6 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             onTaskClick={setDetailTask}
             getTaskStatus={getTaskStatus}
           />
-        ) : viewMode === "clickup" ? (
-          <TaskListView
-            tasks={filteredAndSortedTasks}
-            profiles={companyProfiles}
-            onComplete={handleComplete}
-            onJustify={setJustifyTask}
-            onEdit={setEditTarget}
-            onDelete={setDeleteTarget}
-            onCreateNew={() => setCreateOpen(true)}
-            onStatusChange={handleStatusChange}
-            onPatchTask={(id, fields) => patchTask.mutate({ taskId: id, fields })}
-            onUpdateAssignees={(id, ids) => updateTaskAssignees.mutate({ taskId: id, assigneeIds: ids })}
-          />
         ) : viewMode === "list" ? (
           <TasksTable
             tasks={filteredAndSortedTasks}
@@ -397,22 +384,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             onPatchTask={(id, fields) => patchTask.mutate({ taskId: id, fields })}
             onUpdateAssignees={(id, ids) => updateTaskAssignees.mutate({ taskId: id, assigneeIds: ids })}
           />
-        ) : (
-          <DraggableGrid
-            items={filteredAndSortedTasks}
-            onReorder={(ids) => reorderTasks.mutate(ids)}
-            renderItem={(task) => (
-              <TaskCard
-                task={task}
-                onComplete={handleComplete}
-                onJustify={setJustifyTask}
-                onEdit={setEditTarget}
-                onDelete={setDeleteTarget}
-                onStatusChange={handleStatusChange}
-              />
-            )}
-          />
-        )}
+        ) : null}
       </div>
 
       <TaskDetailSheet
