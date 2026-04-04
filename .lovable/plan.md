@@ -1,64 +1,51 @@
-# Plan: Tabs de Miembros + Adjuntos en Tareas
 
-## 1. Base de datos — Tabla `task_attachments`
 
-Nueva tabla para almacenar archivos adjuntos a tareas/subtareas:
+# Plan: Vista Global Kanban + Analíticas en página principal de Tareas
 
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| `task_id` | uuid FK → tasks | Tarea padre |
-| `file_name` | text | Nombre original |
-| `file_url` | text | Ruta en storage |
-| `file_type` | text | MIME type (image/png, video/mp4, etc.) |
-| `file_size` | bigint | Tamaño en bytes |
-| `uploaded_by` | uuid | Quién subió |
+## Resumen
 
-**RLS**: Miembros del proyecto pueden ver/crear/eliminar adjuntos de tareas en sus proyectos. Admins ven todo.
+Agregar a `ProjectsListContent.tsx` (página `/tareas`) tres modos de vista: **Proyectos** (actual), **Kanban Global** (todas las tareas de todos los proyectos), y **Analíticas Globales**. La vista de proyectos sigue siendo el default.
 
-## 2. Storage — Bucket `task-files`
+## Cambios
 
-- Bucket **privado** (acceso mediante signed URLs, consistente con `creator-files`)
-- Políticas: authenticated puede subir/leer/eliminar archivos bajo su path
+### 1. Nuevo componente: `GlobalKanbanView.tsx`
+- Reutiliza la estructura de `TaskKanbanView.tsx` pero muestra tareas de **todos los proyectos**
+- Columnas por estado: Pendiente, En curso, Pausada, Vencida, Completada
+- Cada card muestra: nombre del proyecto (badge), título de tarea, prioridad, assignees, fecha
+- Drag-and-drop entre columnas para cambiar status (requiere mutación cross-project)
+- Click en card abre `TaskDetailSheet`
 
-## 3. UI — Tabs de miembros dentro del proyecto
+### 2. Nuevo componente: `GlobalAnalyticsTab.tsx`
+- Reutiliza la lógica de `TaskAnalyticsTab.tsx` pero con datos agregados de todos los proyectos
+- Gráficos adicionales:
+  - **Tareas por proyecto** (bar chart horizontal)
+  - **Distribución por estado** (pie chart)
+  - **Distribución por prioridad** (bar chart)
+  - **Carga por miembro** (bar chart con asignadas vs completadas)
+  - **Tendencia de completación** (line chart últimos 30 días)
 
-En `TareasContent.tsx`, agregar una fila de tabs/chips debajo de los filtros:
-- **"Todos"** (default) — muestra todas las tareas
-- Un tab por cada miembro del proyecto con tareas asignadas
-- Al seleccionar un tab, filtra `assignedFilter` automáticamente
-- Estilo: chips/botones pequeños como los tabs de ClickUp (similar a los agency tabs en CreadoresContent)
+### 3. Modificar `ProjectsListContent.tsx`
+- Agregar `mainView` state: `"projects" | "kanban" | "analytics"`
+- Agregar botones de vista en el header (íconos: FolderOpen, Columns, BarChart3)
+- Cuando `mainView === "kanban"`: renderizar `GlobalKanbanView`
+- Cuando `mainView === "analytics"`: renderizar `GlobalAnalyticsTab`
+- Cuando `mainView === "projects"`: comportamiento actual
 
-## 4. UI — Adjuntos en `TaskDetailSheet`
+### 4. Modificar `useProjects.ts`
+- Expandir la query de `allTasks` para incluir campos completos (title, assignees, priority, start_at, completed_at, etc.) necesarios para el kanban global y las analíticas
+- Agregar mutación `updateGlobalTaskStatus` para cambiar status desde el kanban global
 
-Dentro del panel lateral de detalle de tarea:
-- Sección **"Adjuntos"** después de las subtareas
-- Botón para subir archivos (cualquier tipo)
-- Lista de archivos con preview para imágenes/videos, icono para otros
-- Botón eliminar por archivo (solo el que subió o admin)
-- Hook `useTaskAttachments.ts` para CRUD
+### Detalle técnico
 
-## 5. UI — Thumbnails en tarjetas Kanban
-
-En `TaskKanbanView.tsx`:
-- Si la tarea tiene adjuntos de tipo imagen, mostrar thumbnail del primero arriba del título (como en ClickUp)
-- Mostrar icono 📎 + conteo de adjuntos en el footer de la tarjeta
-- Query: traer conteo de adjuntos + primer archivo imagen por tarea (batch query)
-
-## Archivos
-
-### Nuevos
-| Archivo | Descripción |
-|---------|-------------|
-| `useTaskAttachments.ts` | Hook para CRUD de adjuntos + upload a storage |
-| `TaskAttachmentsSection.tsx` | Sección de adjuntos en el panel de detalle |
-
-### Modificados
-| Archivo | Cambio |
+| Archivo | Acción |
 |---------|--------|
-| `TareasContent.tsx` | Agregar fila de tabs/chips por miembro |
-| `TaskDetailSheet.tsx` | Incluir sección de adjuntos |
-| `TaskKanbanView.tsx` | Thumbnail de imagen + conteo de adjuntos en tarjetas |
-| `useTareas.ts` | Incluir attachment_count y first_image_url en la query de tareas |
+| `src/pages/tareas/GlobalKanbanView.tsx` | Crear — tablero kanban con todas las tareas agrupadas por status |
+| `src/pages/tareas/GlobalAnalyticsTab.tsx` | Crear — dashboard analítico con gráficos recharts |
+| `src/pages/tareas/ProjectsListContent.tsx` | Modificar — agregar toggle de vistas (projects/kanban/analytics) |
+| `src/pages/tareas/useProjects.ts` | Modificar — expandir query allTasks + mutación updateGlobalTaskStatus |
 
 ### Dependencias
-- No se requieren nuevas dependencias
+- `@hello-pangea/dnd` — ya instalada
+- `recharts` — ya instalada
+- No se requieren nuevas dependencias ni migraciones DB
+
