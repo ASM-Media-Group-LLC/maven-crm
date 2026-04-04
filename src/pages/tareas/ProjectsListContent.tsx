@@ -27,6 +27,8 @@ import EditProjectModal from "./EditProjectModal";
 import DeleteProjectDialog from "./DeleteProjectDialog";
 import ProjectsTable from "./ProjectsTable";
 import CreateFolderModal from "./CreateFolderModal";
+import GlobalKanbanView from "./GlobalKanbanView";
+import GlobalAnalyticsTab from "./GlobalAnalyticsTab";
 
 const ProjectsListContent = () => {
   const { user } = useAuth();

@@ -453,5 +453,6 @@ export const useProjects = () => {
     renameFolder,
     deleteFolder,
     moveProjectToFolder,
+    updateGlobalTaskStatus,
   };
 };
