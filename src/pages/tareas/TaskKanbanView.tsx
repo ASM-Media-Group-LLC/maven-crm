@@ -1,12 +1,15 @@
 import { useMemo } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
-import { Clock, Play, Pause, AlertTriangle, CheckSquare, MessageSquare } from "lucide-react";
+import { Clock, Play, Pause, AlertTriangle, CheckSquare, Paperclip } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { priorityConfig } from "./PrioritySelect";
+import { useTaskAttachmentSummaries } from "./useTaskAttachments";
 import type { Task } from "./useTareas";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 interface Profile {
   id: string;
@@ -38,6 +41,32 @@ const priorityColors: Record<string, string> = {
 };
 
 const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskStatus }: TaskKanbanViewProps) => {
+  const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
+  const { data: attachmentSummaries = {} } = useTaskAttachmentSummaries(taskIds);
+
+  // Generate signed URLs for first images
+  const imageTaskIds = useMemo(() => {
+    return Object.entries(attachmentSummaries)
+      .filter(([, s]) => s.firstImageUrl)
+      .map(([taskId]) => taskId);
+  }, [attachmentSummaries]);
+
+  const { data: signedThumbnails = {} } = useQuery({
+    queryKey: ["kanban-thumbnails", imageTaskIds.join(",")],
+    queryFn: async () => {
+      const urls: Record<string, string> = {};
+      for (const taskId of imageTaskIds) {
+        const path = attachmentSummaries[taskId]?.firstImageUrl;
+        if (path) {
+          const { data } = await supabase.storage.from("task-files").createSignedUrl(path, 3600);
+          if (data?.signedUrl) urls[taskId] = data.signedUrl;
+        }
+      }
+      return urls;
+    },
+    enabled: imageTaskIds.length > 0,
+  });
+
   const grouped = useMemo(() => {
     const groups: Record<string, Task[]> = { pending: [], in_progress: [], paused: [], overdue: [], completed: [] };
     tasks.forEach((t) => {
@@ -65,7 +94,6 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
     const currentStatus = getTaskStatus(task);
     if (currentStatus === destination.droppableId) return;
 
-    // Map column id to DB status
     const statusMap: Record<string, string> = {
       pending: "active",
       in_progress: "in_progress",
@@ -84,7 +112,6 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
           const Icon = col.icon;
           return (
             <div key={col.id} className={cn("flex flex-col min-w-[280px] w-[280px] bg-muted/30 rounded-lg border-t-4", col.color)}>
-              {/* Column header */}
               <div className={cn("flex items-center gap-2 px-3 py-2.5 rounded-t-lg", col.bgHeader)}>
                 <Icon className="h-4 w-4" />
                 <span className="font-semibold text-sm">{col.label}</span>
@@ -93,7 +120,6 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
                 </Badge>
               </div>
 
-              {/* Droppable area */}
               <Droppable droppableId={col.id}>
                 {(provided, snapshot) => (
                   <div
@@ -105,7 +131,8 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
                     )}
                   >
                     {colTasks.map((task, index) => {
-                      const pri = priorityConfig[task.priority as keyof typeof priorityConfig];
+                      const summary = attachmentSummaries[task.id];
+                      const thumbnailUrl = signedThumbnails[task.id];
                       return (
                         <Draggable key={task.id} draggableId={task.id} index={index}>
                           {(provided, snapshot) => (
@@ -115,28 +142,45 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
                               {...provided.dragHandleProps}
                               onClick={() => onTaskClick(task)}
                               className={cn(
-                                "bg-card border rounded-lg p-3 cursor-pointer hover:border-primary/50 transition-all",
+                                "bg-card border rounded-lg cursor-pointer hover:border-primary/50 transition-all overflow-hidden",
                                 snapshot.isDragging && "shadow-lg rotate-2 scale-105"
                               )}
                             >
-                              {/* Priority indicator */}
-                              <div className="flex items-start gap-2">
-                                <div className={cn("w-1 h-full min-h-[20px] rounded-full shrink-0", priorityColors[task.priority] || "bg-slate-500")} />
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-sm leading-tight line-clamp-2">{task.title}</p>
-                                  {task.description && (
-                                    <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{task.description}</p>
-                                  )}
-                                </div>
-                              </div>
+                              {/* Thumbnail preview */}
+                              {thumbnailUrl && (
+                                <img
+                                  src={thumbnailUrl}
+                                  alt=""
+                                  className="w-full h-32 object-cover"
+                                  loading="lazy"
+                                />
+                              )}
 
-                              {/* Footer: date + assignees */}
-                              <div className="flex items-center justify-between mt-2.5">
-                                <span className="text-[11px] text-muted-foreground">
-                                  {format(new Date(task.due_at), "dd MMM")}
-                                </span>
-                                <div className="flex items-center gap-1">
-                                  {/* Assignee avatars */}
+                              <div className="p-3">
+                                {/* Priority indicator */}
+                                <div className="flex items-start gap-2">
+                                  <div className={cn("w-1 h-full min-h-[20px] rounded-full shrink-0", priorityColors[task.priority] || "bg-slate-500")} />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm leading-tight line-clamp-2">{task.title}</p>
+                                    {task.description && (
+                                      <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{task.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Footer */}
+                                <div className="flex items-center justify-between mt-2.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-muted-foreground">
+                                      {format(new Date(task.due_at), "dd MMM")}
+                                    </span>
+                                    {summary && summary.count > 0 && (
+                                      <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
+                                        <Paperclip className="h-3 w-3" />
+                                        {summary.count}
+                                      </span>
+                                    )}
+                                  </div>
                                   <div className="flex -space-x-1.5">
                                     {(task.assignees || []).slice(0, 3).map((uid) => {
                                       const p = profileMap[uid];
