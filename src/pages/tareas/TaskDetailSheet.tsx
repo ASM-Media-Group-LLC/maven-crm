@@ -78,8 +78,8 @@ const TaskDetailSheet = ({ task, open, onOpenChange, profiles, onEdit, onStatusC
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground flex items-center gap-1"><Flag className="h-3 w-3" /> Prioridad</span>
-                <Badge variant="outline" className="text-xs">
-                  {pri?.emoji} {pri?.label || task.priority}
+                <Badge variant="outline" className={`text-xs ${pri?.badgeClass || ""}`}>
+                  {pri?.label || task.priority}
                 </Badge>
               </div>
               <div className="space-y-1">
