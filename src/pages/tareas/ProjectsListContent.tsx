@@ -568,6 +568,9 @@ const ProjectsListContent = () => {
           />
         )}
       </div>
+        </>
+        )}
+      </div>
 
       <CreateFolderModal
         open={createFolderOpen}
