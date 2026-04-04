@@ -386,6 +386,22 @@ const ProjectsListContent = () => {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
+        {mainView === "kanban" ? (
+          <GlobalKanbanView
+            tasks={allTasks}
+            profiles={companyProfiles}
+            projects={projects}
+            onStatusChange={(taskId, status) => updateGlobalTaskStatus.mutate({ taskId, status })}
+          />
+        ) : mainView === "analytics" ? (
+          <GlobalAnalyticsTab
+            tasks={allTasks}
+            profiles={companyProfiles}
+            projects={projects}
+          />
+        ) : (
+        <>
+      <div className="space-y-6">
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           {kpis.map((kpi) => (
             <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
