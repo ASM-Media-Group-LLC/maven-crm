@@ -3,8 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, X } from "lucide-react";
+import { Upload, FileText, X, AlertTriangle, ExternalLink, Loader2 } from "lucide-react";
 import { useImportSuperContacts } from "./useSuperContacts";
+import { checkWishlistDuplicatesBatch, DuplicateResult } from "./useWishlistDuplicateCheck";
 
 interface Props {
   open: boolean;
@@ -31,7 +32,10 @@ const extractHandles = (text: string): string[] => {
 const ImportModal = ({ open, onOpenChange }: Props) => {
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<string[]>([]);
-  const [step, setStep] = useState<"input" | "preview">("input");
+  const [step, setStep] = useState<"input" | "preview" | "results">("input");
+  const [checking, setChecking] = useState(false);
+  const [duplicates, setDuplicates] = useState<DuplicateResult[]>([]);
+  const [newHandles, setNewHandles] = useState<string[]>([]);
   const importMutation = useImportSuperContacts();
 
   const handleParse = () => {
@@ -51,24 +55,50 @@ const ImportModal = ({ open, onOpenChange }: Props) => {
     reader.readAsText(file);
   }, []);
 
+  const handleCheckDuplicates = async () => {
+    setChecking(true);
+    try {
+      const results = await checkWishlistDuplicatesBatch(parsed);
+      const dupes = results.filter((r) => r.found);
+      const fresh = results.filter((r) => !r.found).map((r) => r.handle);
+      setDuplicates(dupes);
+      setNewHandles(fresh);
+      setStep("results");
+    } finally {
+      setChecking(false);
+    }
+  };
+
   const handleImport = async () => {
-    await importMutation.mutateAsync(parsed);
+    if (newHandles.length === 0) return;
+    await importMutation.mutateAsync(newHandles);
+    resetAndClose();
+  };
+
+  const resetAndClose = () => {
     onOpenChange(false);
     setText("");
     setParsed([]);
     setStep("input");
+    setDuplicates([]);
+    setNewHandles([]);
   };
 
   const removeHandle = (h: string) => setParsed((prev) => prev.filter((x) => x !== h));
+
+  const formatDate = (d?: string) => {
+    if (!d) return "";
+    return new Date(d).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Importar SuperContacts</DialogTitle>
+          <DialogTitle>Importar al Wishlist</DialogTitle>
         </DialogHeader>
 
-        {step === "input" ? (
+        {step === "input" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Pega handles de Instagram (uno por línea, separados por comas, o URLs). También puedes subir un archivo CSV.
@@ -87,16 +117,18 @@ const ImportModal = ({ open, onOpenChange }: Props) => {
               </label>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+              <Button variant="outline" onClick={resetAndClose}>Cancelar</Button>
               <Button onClick={handleParse} disabled={!text.trim()}>
                 <FileText className="h-4 w-4 mr-2" /> Previsualizar
               </Button>
             </DialogFooter>
           </div>
-        ) : (
+        )}
+
+        {step === "preview" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Se encontraron <strong>{parsed.length}</strong> handles únicos. Revisa y confirma.
+              Se encontraron <strong>{parsed.length}</strong> handles únicos. Revisa y verifica duplicados.
             </p>
             <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
               {parsed.map((h) => (
@@ -108,8 +140,75 @@ const ImportModal = ({ open, onOpenChange }: Props) => {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setStep("input")}>Volver</Button>
-              <Button onClick={handleImport} disabled={parsed.length === 0 || importMutation.isPending}>
-                {importMutation.isPending ? "Importando..." : `Importar ${parsed.length}`}
+              <Button onClick={handleCheckDuplicates} disabled={parsed.length === 0 || checking}>
+                {checking ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verificando...</>
+                ) : "Verificar duplicados"}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+
+        {step === "results" && (
+          <div className="space-y-4">
+            {/* Summary */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-center">
+                <p className="text-2xl font-bold text-emerald-600">{newHandles.length}</p>
+                <p className="text-xs text-muted-foreground">Nuevos</p>
+              </div>
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-center">
+                <p className="text-2xl font-bold text-amber-600">{duplicates.length}</p>
+                <p className="text-xs text-muted-foreground">Ya registrados</p>
+              </div>
+            </div>
+
+            {/* Duplicates list */}
+            {duplicates.length > 0 && (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                <p className="text-sm font-medium flex items-center gap-1">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" /> Duplicados encontrados:
+                </p>
+                {duplicates.map((d) => (
+                  <div key={d.handle} className="flex items-center justify-between rounded border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm">
+                    <div>
+                      <span className="font-medium">@{d.handle}</span>
+                      <span className="text-muted-foreground ml-2">— {d.sourceLabel}</span>
+                      {d.createdAt && <span className="text-muted-foreground ml-1">({formatDate(d.createdAt)})</span>}
+                      {d.createdByName && <span className="text-muted-foreground ml-1">por {d.createdByName}</span>}
+                    </div>
+                    <a
+                      href={d.instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* New handles */}
+            {newHandles.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-emerald-600">Se importarán:</p>
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                  {newHandles.map((h) => (
+                    <Badge key={h} variant="secondary" className="text-xs">@{h}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setStep("preview")}>Volver</Button>
+              <Button
+                onClick={handleImport}
+                disabled={newHandles.length === 0 || importMutation.isPending}
+              >
+                {importMutation.isPending ? "Importando..." : `Importar ${newHandles.length} nuevos`}
               </Button>
             </DialogFooter>
           </div>

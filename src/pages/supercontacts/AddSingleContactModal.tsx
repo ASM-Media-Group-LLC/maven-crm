@@ -4,10 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Instagram } from "lucide-react";
+import { Instagram, AlertTriangle, ExternalLink, Loader2 } from "lucide-react";
 import { useCreateSuperContact } from "./useSuperContacts";
 import { getCountryOptions } from "@/lib/country-utils";
 import { getCitiesByCountryCode } from "@/lib/city-data";
+import { normalizeHandle } from "@/lib/handle-utils";
+import { checkWishlistDuplicate, DuplicateResult } from "./useWishlistDuplicateCheck";
+import { toast } from "@/hooks/use-toast";
 
 interface Props {
   open: boolean;
@@ -24,6 +27,8 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
   const [customCity, setCustomCity] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [duplicate, setDuplicate] = useState<DuplicateResult | null>(null);
   const createMutation = useCreateSuperContact();
 
   const cities = getCitiesByCountryCode(country);
@@ -34,9 +39,24 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
     return val.replace(/^@/, "").trim();
   };
 
-  const handleSubmit = async () => {
+  const handleCheck = async () => {
     const cleaned = cleanHandle(handle);
     if (!cleaned) return;
+    setChecking(true);
+    try {
+      const result = await checkWishlistDuplicate(cleaned);
+      if (result.found) {
+        setDuplicate(result);
+      } else {
+        setDuplicate(null);
+        await doSubmit(cleaned);
+      }
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const doSubmit = async (cleaned: string) => {
     const finalCity = city === "__other__" ? customCity.trim() : city;
     await createMutation.mutateAsync({
       instagram_handle: cleaned,
@@ -46,6 +66,18 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
       phone: phone.trim() || null,
       email: email.trim() || null,
     });
+    toast({ title: "Contacto agregado al Wishlist" });
+    resetAndClose();
+  };
+
+  const handleForceAdd = async () => {
+    const cleaned = cleanHandle(handle);
+    if (!cleaned) return;
+    setDuplicate(null);
+    await doSubmit(cleaned);
+  };
+
+  const resetAndClose = () => {
     onOpenChange(false);
     setHandle("");
     setFullName("");
@@ -54,6 +86,12 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
     setCustomCity("");
     setPhone("");
     setEmail("");
+    setDuplicate(null);
+  };
+
+  const formatDate = (d?: string) => {
+    if (!d) return "";
+    return new Date(d).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
   };
 
   return (
@@ -65,12 +103,48 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
           </DialogTitle>
         </DialogHeader>
 
+        {/* Duplicate Warning */}
+        {duplicate && (
+          <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-sm">
+                <p className="font-semibold text-amber-600">¡Este contacto ya existe!</p>
+                <p><strong>Registrado en:</strong> {duplicate.sourceLabel}</p>
+                {duplicate.name && <p><strong>Nombre:</strong> {duplicate.name}</p>}
+                {duplicate.createdAt && <p><strong>Fecha:</strong> {formatDate(duplicate.createdAt)}</p>}
+                {duplicate.createdByName && <p><strong>Agregado por:</strong> {duplicate.createdByName}</p>}
+              </div>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <a
+                href={duplicate.instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <ExternalLink className="h-3 w-3" /> Ver Instagram
+              </a>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setDuplicate(null)}>
+                Cancelar
+              </Button>
+              {duplicate.source !== "wishlist" && (
+                <Button size="sm" variant="default" onClick={handleForceAdd}>
+                  Agregar de todos modos
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label>Handle de Instagram *</Label>
             <Input
               value={handle}
-              onChange={(e) => setHandle(e.target.value)}
+              onChange={(e) => { setHandle(e.target.value); setDuplicate(null); }}
               placeholder="@creadora o https://instagram.com/creadora"
             />
             <p className="text-xs text-muted-foreground">Acepta handle, @handle o URL completa</p>
@@ -136,9 +210,11 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!handle.trim() || createMutation.isPending}>
-            {createMutation.isPending ? "Guardando..." : "Agregar"}
+          <Button variant="outline" onClick={resetAndClose}>Cancelar</Button>
+          <Button onClick={handleCheck} disabled={!handle.trim() || checking || createMutation.isPending}>
+            {checking ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verificando...</>
+            ) : createMutation.isPending ? "Guardando..." : "Agregar"}
           </Button>
         </DialogFooter>
       </DialogContent>
