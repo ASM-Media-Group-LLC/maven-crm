@@ -516,6 +516,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
                 status,
               });
             }}
+            onEdit={setEditTarget}
+            onDelete={setDeleteTarget}
           />
         ) : viewMode === "list" ? (
           <TasksTable
