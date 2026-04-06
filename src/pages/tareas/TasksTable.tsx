@@ -160,6 +160,7 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
             <TableHead><SortHeader label="Título" col="title" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="Tipo" col="task_type" /></TableHead>
             <TableHead className="hidden sm:table-cell"><SortHeader label="Asignado por" col="assigned_by" /></TableHead>
             <TableHead className="hidden sm:table-cell"><SortHeader label="Asignado a" col="assigned" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Prioridad" col="priority" /></TableHead>
