@@ -1,6 +1,9 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, List, Search, Play, Pause, Crown, Pencil, Columns, BarChart3 } from "lucide-react";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, List, Search, Play, Pause, Crown, Pencil, Columns, BarChart3, Users, Check } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
+import { useProjectMembers } from "./useProjectMembers";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";

@@ -181,21 +181,39 @@ const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabPr
         </CardContent>
       </Card>
 
-      {/* Burndown */}
-      {burndownData.length > 1 && (
+      {/* Gantt Chart */}
+      {ganttChartData.data.length > 0 && (
         <Card className="md:col-span-2">
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Burndown</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Diagrama Gantt</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={burndownData}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="ideal" stroke="#64748b" strokeDasharray="5 5" name="Ideal" dot={false} />
-                <Line type="monotone" dataKey="real" stroke="hsl(var(--primary))" name="Real" strokeWidth={2} dot={false} />
-              </LineChart>
+            <ResponsiveContainer width="100%" height={Math.max(250, ganttChartData.data.length * 36)}>
+              <BarChart data={ganttChartData.data} layout="vertical" barSize={16}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.1} horizontal={false} />
+                <XAxis
+                  type="number"
+                  domain={[0, ganttChartData.totalDays]}
+                  allowDecimals={false}
+                  tick={{ fontSize: 10 }}
+                  label={{ value: "Días", position: "insideBottomRight", offset: -5, fontSize: 11 }}
+                />
+                <YAxis type="category" dataKey="title" width={180} tick={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}
+                  itemStyle={{ color: "hsl(var(--foreground))" }}
+                  labelStyle={{ color: "hsl(var(--foreground))" }}
+                  formatter={(value: any, name: string, props: any) => {
+                    const item = props.payload;
+                    if (name === "duration") return [`${value} días (${item.startLabel} → ${item.endLabel})`, "Duración"];
+                    return [value, name];
+                  }}
+                />
+                <Bar dataKey="offset" stackId="gantt" fill="transparent" radius={0} />
+                <Bar dataKey="duration" stackId="gantt" radius={[0, 4, 4, 0]}>
+                  {ganttChartData.data.map((entry, i) => (
+                    <Cell key={i} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
