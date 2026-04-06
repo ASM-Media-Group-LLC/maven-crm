@@ -1,33 +1,28 @@
 
 
-# Plan: Mejorar layout del detalle de tarea
-
-## Problemas identificados
-
-1. **Botón eliminar se cruza con el X de cerrar**: El `DialogContent` tiene un botón X absoluto en `right-4 top-4`, y el header del TaskDetailPage pone el botón de eliminar en la misma zona.
-2. **Inconsistencia en meta grid**: Prioridad y Vencimiento muestran el valor debajo del label, pero Inicio y Duración lo muestran al lado (en la imagen se ve "Inicio02 abr 2026" y "Duración98h 20m" sin espacio).
-3. **Falta de espaciado**: Los campos del meta grid están apretados.
+# Plan: Arreglar placeholder de búsqueda en LeadGen + Badges del sidebar por rol
 
 ## Cambios
 
-### 1. Eliminar X duplicado — `TaskDetailPage.tsx`
-El `DialogContent` ya renderiza un botón X (línea 45 de dialog.tsx). El header del task detail tiene su propio botón de cerrar/eliminar que se superpone. Solución: ocultar el X del DialogContent pasando una clase personalizada, y manejar el cierre desde el header propio del componente, asegurando que eliminar y cerrar estén separados con suficiente gap.
+### 1. Placeholder del buscador — `LeadGenContent.tsx` (línea 273)
+Cambiar `"Buscar lead, agente..."` → `"Buscar lead..."`
 
-### 2. Reorganizar header — `TaskDetailPage.tsx` (líneas 89-117)
-- Mover el botón de eliminar lejos del X de cierre: ponerlo a la izquierda junto al status, o agregar `mr-8` al contenedor de botones para dejar espacio al X del dialog.
+### 2. Badges del sidebar adaptados al rol — `useSidebarBadges.ts`
+Actualmente los badges muestran conteos globales sin respetar el `data_scope` del rol. Un closer con `data_scope: "self"` en Promolog ve 63 promos pendientes que no le corresponden.
 
-### 3. Consistencia en meta grid — `TaskDetailPage.tsx` (líneas 171-217)
-Cambiar TODOS los campos a formato vertical consistente (label arriba, valor abajo):
-```
-Prioridad        Vencimiento         Inicio           Duración          Tipo
-[badge]          10 abr 2026, 19:00  02 abr 2026      98h 20m           [select]
-```
-- Cada campo usa `space-y-1` con label `text-xs` arriba y valor `text-sm` debajo
-- Agregar iconos faltantes a Inicio y Duración
-- Aumentar gap del grid a `gap-5`
+**Solución**: Importar `useUserRole` y `usePermissions` en `useSidebarBadges`. Para cada módulo:
+- Si el usuario **no tiene acceso** al módulo (`canAccess` = false), retornar 0 (no mostrar badge).
+- Si el `data_scope` es `"self"`, filtrar las queries por `reviewed_by = user.id` (promolog) o `created_by = user.id` / `assigned_to = user.id` (leadgen, closers).
+- Si es `"all"` o admin, mantener la query actual sin filtro.
+
+**Detalle por módulo**:
+- **Promolog**: Si scope es `self`, agregar `.or(\`reviewed_by.eq.${userId},created_by.eq.${userId}\`)` a la query.
+- **LeadGen**: Si scope es `self`, agregar `.eq("assigned_to", userId)` o similar.
+- **Closers**: Si scope es `self`, agregar `.eq("assigned_closer", userId)`.
 
 ## Archivos modificados
 | Archivo | Cambio |
 |---------|--------|
-| `TaskDetailPage.tsx` | Separar botón eliminar del X, consistencia vertical en meta grid, mejor espaciado |
+| `LeadGenContent.tsx` | Placeholder: `"Buscar lead..."` |
+| `useSidebarBadges.ts` | Filtrar badges según `canAccess` y `dataScope` del usuario |
 
