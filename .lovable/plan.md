@@ -1,30 +1,27 @@
 
-# Plan: Arreglar configuración de miembros y UX del proyecto
 
-## Problemas identificados
+# Plan: Pasar miembros actuales al EditProjectModal desde TareasContent
 
-1. **Usuario "duplicado"**: Hay dos cuentas distintas con el nombre "Marielby Quijada" (IDs diferentes: `471666b6...` y `41a14900...`). No es un bug de código, sino dos registros reales en `profiles`. Para distinguirlos, se mostrará el email o ID parcial cuando hay nombres repetidos.
+## Problema
+En `TareasContent.tsx`, el `EditProjectModal` no recibe la prop `currentMemberIds`, por lo que siempre muestra "Agregar miembros" vacío en vez de los miembros existentes del proyecto.
 
-2. **Botón "Miembros" dice "Buscar usuario"**: El placeholder del `CommandInput` dentro del Popover de miembros (línea 330) dice "Buscar usuario..." lo cual confunde al usuario. Debe mostrar primero los miembros actuales marcados con check, y el placeholder debería decir "Buscar para agregar...".
+En `ProjectsListContent.tsx` sí se pasa correctamente:
+```tsx
+currentMemberIds={editProject ? allMembers.filter(m => m.project_id === editProject.id).map(m => m.user_id) : []}
+```
 
-3. **Botón "More" (⋯)**: El ícono `MoreHorizontal` (línea 216) no es intuitivo. Cambiarlo por el ícono `Settings` (tuerca) que ya está importado.
+## Cambio
 
-4. **Miembros actuales deben verse al abrir**: Al abrir el popover de miembros, los miembros actuales del proyecto ya deben estar marcados con check (esto ya funciona en línea 337-350), pero deben aparecer primero en la lista (ordenar miembros actuales arriba).
+**Archivo**: `src/pages/tareas/TareasContent.tsx` (línea ~605-630)
 
-## Cambios en `TareasContent.tsx`
+Agregar la prop `currentMemberIds` al `EditProjectModal` usando los `members` que ya están disponibles del hook `useProjectMembers(projectId)` (línea 38):
 
-### A. Botón Settings (línea 215-216)
-- Cambiar `<MoreHorizontal>` por `<Settings>` y agregar Tooltip "Configuración del proyecto"
+```tsx
+currentMemberIds={members.map(m => m.user_id)}
+```
 
-### B. Popover de miembros (líneas 320-358)
-- Cambiar placeholder de CommandInput de "Buscar usuario..." a "Buscar para agregar..."
-- Ordenar la lista: miembros actuales primero, luego el resto, ambos grupos alfabéticos
-- Para nombres duplicados: mostrar "(ID: xxxx)" al lado cuando hay más de un perfil con el mismo `full_name`
+También agregar `folders` si están disponibles, y asegurar que el `onSubmit` maneje los `memberIds` actualizados llamando a `setProjectMembers.mutate`.
 
-### C. Distinguir usuarios duplicados globalmente
-- Crear helper que detecte nombres repetidos en `companyProfiles` y añada sufijo diferenciador (ej: email parcial o últimos 4 chars del ID)
+## Resultado
+Al abrir "Editar Proyecto" desde dentro del proyecto, se verán los miembros actuales con checkmarks y se podrán agregar/quitar.
 
-## Archivo modificado
-| Archivo | Cambio |
-|---------|--------|
-| `TareasContent.tsx` | Ícono Settings, popover de miembros mejorado, manejo de nombres duplicados |
