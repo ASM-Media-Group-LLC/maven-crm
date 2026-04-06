@@ -74,9 +74,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
       const matchesSearch = !search || t.title.toLowerCase().includes(search.toLowerCase());
       const taskStatus = getTaskStatus(t);
       const matchesStatus = !statusFilter || taskStatus === statusFilter;
-      const matchesAssigned = !assignedFilter || (t.assignees || []).includes(assignedFilter);
       const matchesPriority = !priorityFilter || t.priority === priorityFilter;
-      return matchesSearch && matchesStatus && matchesAssigned && matchesPriority;
+      return matchesSearch && matchesStatus && matchesPriority;
     });
 
     return filtered.sort((a, b) => {
@@ -90,7 +89,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
       };
       return getOrder(a) - getOrder(b) || new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
     });
-  }, [tasks, now, search, statusFilter, assignedFilter, priorityFilter]);
+  }, [tasks, now, search, statusFilter, priorityFilter]);
 
   const counts = useMemo(() => {
     let pending = 0, in_progress = 0, paused = 0, overdue = 0, completed = 0;
