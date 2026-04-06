@@ -1,27 +1,19 @@
 
+# Plan: Restringir Dashboard 2 solo a admins
 
-# Plan: Pasar miembros actuales al EditProjectModal desde TareasContent
+## Cambios
 
-## Problema
-En `TareasContent.tsx`, el `EditProjectModal` no recibe la prop `currentMemberIds`, por lo que siempre muestra "Agregar miembros" vacío en vez de los miembros existentes del proyecto.
-
-En `ProjectsListContent.tsx` sí se pasa correctamente:
+### 1. Ruta protegida — `src/App.tsx` (línea 212)
+Envolver `Dashboard2` con `AdminRoute` en vez de `ProtectedRoute`:
 ```tsx
-currentMemberIds={editProject ? allMembers.filter(m => m.project_id === editProject.id).map(m => m.user_id) : []}
+<Route path="/dashboard2" element={<AdminRoute><Dashboard2 /></AdminRoute>} />
 ```
 
-## Cambio
+### 2. Sidebar — `src/components/dashboard/DashboardSidebar.tsx` (línea 42)
+Agregar una propiedad `adminOnly: true` al item de Dashboard v2 y filtrarlo del menú para no-admins. Opción más simple: condicionar directamente con `isAdmin` del hook `useUserRole`.
 
-**Archivo**: `src/pages/tareas/TareasContent.tsx` (línea ~605-630)
-
-Agregar la prop `currentMemberIds` al `EditProjectModal` usando los `members` que ya están disponibles del hook `useProjectMembers(projectId)` (línea 38):
-
-```tsx
-currentMemberIds={members.map(m => m.user_id)}
-```
-
-También agregar `folders` si están disponibles, y asegurar que el `onSubmit` maneje los `memberIds` actualizados llamando a `setProjectMembers.mutate`.
-
-## Resultado
-Al abrir "Editar Proyecto" desde dentro del proyecto, se verán los miembros actuales con checkmarks y se podrán agregar/quitar.
-
+## Archivos modificados
+| Archivo | Cambio |
+|---------|--------|
+| `App.tsx` | `ProtectedRoute` → `AdminRoute` para `/dashboard2` |
+| `DashboardSidebar.tsx` | Ocultar "Dashboard v2" del menú si el usuario no es admin |
