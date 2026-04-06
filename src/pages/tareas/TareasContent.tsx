@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, List, Search, Play, Pause, Crown, Pencil, Columns, BarChart3, Users, Check } from "lucide-react";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, List, Search, Play, Pause, Crown, Pencil, Columns, BarChart3, Users, Check, MoreHorizontal, Settings, Archive, Trash2, Share2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { useProjectMembers } from "./useProjectMembers";
@@ -21,7 +21,11 @@ import OverdueReasonModal from "./OverdueReasonModal";
 import TasksTable from "./TasksTable";
 
 import TaskKanbanView from "./TaskKanbanView";
-import TaskDetailSheet from "./TaskDetailSheet";
+import TaskDetailPage from "./TaskDetailPage";
+import ProjectMiniSidebar from "./ProjectMiniSidebar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import EditProjectModal from "./EditProjectModal";
+import DeleteProjectDialog from "./DeleteProjectDialog";
 import TaskAnalyticsTab from "./TaskAnalyticsTab";
 
 interface TareasContentProps {
@@ -39,6 +43,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [viewMode, setViewMode] = useState<"kanban" | "list" | "analytics">("kanban");
   const [detailTask, setDetailTask] = useState<Task | null>(null);
+  const [editProjectOpen, setEditProjectOpen] = useState(false);
+  const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [assignedFilter, setAssignedFilter] = useState<string>("");
@@ -143,7 +149,9 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   ];
 
   return (
-    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+    <div className="flex-1 flex h-full overflow-hidden min-w-0">
+      <ProjectMiniSidebar currentProjectId={projectId} />
+      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -198,9 +206,39 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
               </h1>
             )}
           </div>
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setEditProjectOpen(true)}>
+                  <Settings className="h-4 w-4 mr-2" /> Configurar proyecto
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  const url = `${window.location.origin}/tareas/shared/${projectId}`;
+                  navigator.clipboard.writeText(url);
+                }}>
+                  <Share2 className="h-4 w-4 mr-2" /> Compartir
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {
+                  updateProjectInline.mutate({ status: "archived" });
+                  navigate("/tareas");
+                }}>
+                  <Archive className="h-4 w-4 mr-2" /> Archivar
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={() => setDeleteProjectOpen(true)}>
+                  <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         {/* Description inline */}
         <div className="ml-11 mt-1">
@@ -478,6 +516,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
                 status,
               });
             }}
+            onEdit={setEditTarget}
+            onDelete={setDeleteTarget}
           />
         ) : viewMode === "list" ? (
           <TasksTable
@@ -494,15 +534,17 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
         ) : null}
       </div>
 
-      <TaskDetailSheet
+      <TaskDetailPage
         task={detailTask}
         open={!!detailTask}
         onOpenChange={(open) => !open && setDetailTask(null)}
         profiles={companyProfiles}
         onEdit={(t) => { setDetailTask(null); setEditTarget(t); }}
         onStatusChange={handleStatusChange}
+        onPatchTask={(id, fields) => patchTask.mutate({ taskId: id, fields })}
+        onUpdateAssignees={(id, ids) => updateTaskAssignees.mutate({ taskId: id, assigneeIds: ids })}
+        onDelete={(t) => { setDetailTask(null); setDeleteTarget(t); }}
       />
-
 
       <CreateTaskModal
         open={createOpen}
@@ -542,7 +584,49 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
         }}
         isLoading={submitOverdueReason.isPending}
       />
+
+      <EditProjectModal
+        open={editProjectOpen}
+        onOpenChange={setEditProjectOpen}
+        project={{
+          id: projectId,
+          name: projectName || "",
+          description: projectDescription || null,
+          leader_id: projectLeaderId || null,
+          status: "active",
+          company_id: null,
+          created_by: "",
+          share_token: null,
+          folder_id: null,
+          created_at: null,
+          updated_at: null,
+        }}
+        profiles={companyProfiles}
+        onSubmit={(data) => {
+          updateProjectInline.mutate({
+            name: data.name,
+            description: data.description || null,
+            leader_id: data.leaderId || null,
+          });
+          setEditProjectOpen(false);
+        }}
+      />
+
+      <DeleteProjectDialog
+        open={deleteProjectOpen}
+        onOpenChange={setDeleteProjectOpen}
+        projectName={projectName || ""}
+        onConfirm={async () => {
+          const { error } = await (await import("@/integrations/supabase/client")).supabase
+            .from("task_projects" as any)
+            .delete()
+            .eq("id", projectId);
+          if (!error) navigate("/tareas");
+        }}
+        isLoading={false}
+      />
     </main>
+    </div>
   );
 };
 

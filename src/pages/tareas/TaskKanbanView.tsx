@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
-import { Clock, Play, Pause, AlertTriangle, CheckSquare, Paperclip, Plus } from "lucide-react";
+import { Clock, Play, Pause, AlertTriangle, CheckSquare, Paperclip, Plus, MessageSquare, GitBranch, Flag, MoreHorizontal, Trash2, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { priorityConfig } from "./PrioritySelect";
 import { useTaskAttachmentSummaries } from "./useTaskAttachments";
@@ -26,6 +28,8 @@ interface TaskKanbanViewProps {
   onTaskClick: (task: Task) => void;
   getTaskStatus: (t: Task) => string;
   onCreateInline?: (title: string, status: string) => void;
+  onEdit?: (task: Task) => void;
+  onDelete?: (task: Task) => void;
 }
 
 const columns = [
@@ -43,11 +47,56 @@ const priorityColors: Record<string, string> = {
   urgent: "bg-red-500",
 };
 
-const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskStatus, onCreateInline }: TaskKanbanViewProps) => {
+const priorityIcons: Record<string, string> = {
+  low: "text-slate-400",
+  medium: "text-blue-400",
+  high: "text-orange-400",
+  urgent: "text-red-400",
+};
+
+const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskStatus, onCreateInline, onEdit, onDelete }: TaskKanbanViewProps) => {
   const [inlineCol, setInlineCol] = useState<string | null>(null);
   const [inlineTitle, setInlineTitle] = useState("");
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
   const { data: attachmentSummaries = {} } = useTaskAttachmentSummaries(taskIds);
+
+  // Fetch subtask counts
+  const { data: subtaskCounts = {} } = useQuery({
+    queryKey: ["kanban-subtask-counts", taskIds.join(",")],
+    queryFn: async () => {
+      if (taskIds.length === 0) return {};
+      const { data } = await supabase
+        .from("subtasks" as any)
+        .select("task_id, status")
+        .in("task_id", taskIds);
+      const counts: Record<string, { total: number; done: number }> = {};
+      (data || []).forEach((s: any) => {
+        if (!counts[s.task_id]) counts[s.task_id] = { total: 0, done: 0 };
+        counts[s.task_id].total++;
+        if (s.status === "completed") counts[s.task_id].done++;
+      });
+      return counts;
+    },
+    enabled: taskIds.length > 0,
+  });
+
+  // Fetch comment counts
+  const { data: commentCounts = {} } = useQuery({
+    queryKey: ["kanban-comment-counts", taskIds.join(",")],
+    queryFn: async () => {
+      if (taskIds.length === 0) return {};
+      const { data } = await supabase
+        .from("task_comments" as any)
+        .select("task_id")
+        .in("task_id", taskIds);
+      const counts: Record<string, number> = {};
+      (data || []).forEach((c: any) => {
+        counts[c.task_id] = (counts[c.task_id] || 0) + 1;
+      });
+      return counts;
+    },
+    enabled: taskIds.length > 0,
+  });
 
   // Generate signed URLs for first images
   const imageTaskIds = useMemo(() => {
@@ -138,6 +187,10 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
                     {colTasks.map((task, index) => {
                       const summary = attachmentSummaries[task.id];
                       const thumbnailUrl = signedThumbnails[task.id];
+                      const subtasks = subtaskCounts[task.id];
+                      const commentCount = commentCounts[task.id] || 0;
+                      const pri = priorityConfig[task.priority as keyof typeof priorityConfig];
+
                       return (
                         <Draggable key={task.id} draggableId={task.id} index={index}>
                           {(provided, snapshot) => (
@@ -147,7 +200,7 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
                               {...provided.dragHandleProps}
                               onClick={() => onTaskClick(task)}
                               className={cn(
-                                "bg-card border rounded-lg cursor-pointer hover:border-primary/50 transition-all overflow-hidden",
+                                "bg-card border rounded-lg cursor-pointer hover:border-primary/50 transition-all overflow-hidden group/card",
                                 snapshot.isDragging && "shadow-lg rotate-2 scale-105"
                               )}
                             >
@@ -162,7 +215,7 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
                               )}
 
                               <div className="p-3">
-                                {/* Priority indicator */}
+                                {/* Title + context menu */}
                                 <div className="flex items-start gap-2">
                                   <div className={cn("w-1 h-full min-h-[20px] rounded-full shrink-0", priorityColors[task.priority] || "bg-slate-500")} />
                                   <div className="flex-1 min-w-0">
@@ -171,31 +224,117 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
                                       <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{task.description}</p>
                                     )}
                                   </div>
+                                  {/* Context menu */}
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                      <button className="opacity-0 group-hover/card:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted shrink-0">
+                                        <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                      {onEdit && (
+                                        <DropdownMenuItem onClick={() => onEdit(task)}>
+                                          <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
+                                        </DropdownMenuItem>
+                                      )}
+                                      <DropdownMenuSeparator />
+                                      {columns.filter(c => c.id !== col.id).map(c => (
+                                        <DropdownMenuItem key={c.id} onClick={() => onStatusChange(task.id, c.dbStatus)}>
+                                          <c.icon className="h-3.5 w-3.5 mr-2" /> {c.label}
+                                        </DropdownMenuItem>
+                                      ))}
+                                      {onDelete && (
+                                        <>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem className="text-destructive" onClick={() => onDelete(task)}>
+                                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Eliminar
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
 
-                                {/* Footer */}
+                                {/* Footer with metadata icons */}
                                 <div className="flex items-center justify-between mt-2.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[11px] text-muted-foreground">
-                                      {format(new Date(task.due_at), "dd MMM")}
-                                    </span>
+                                  <div className="flex items-center gap-2.5">
+                                    {/* Date */}
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
+                                          <Clock className="h-3 w-3" />
+                                          {format(new Date(task.due_at), "dd MMM")}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Fecha límite</TooltipContent>
+                                    </Tooltip>
+
+                                    {/* Priority flag */}
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className={cn("flex items-center", priorityIcons[task.priority])}>
+                                          <Flag className="h-3 w-3" />
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>{pri?.label || task.priority}</TooltipContent>
+                                    </Tooltip>
+
+                                    {/* Subtasks */}
+                                    {subtasks && subtasks.total > 0 && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
+                                            <GitBranch className="h-3 w-3" />
+                                            {subtasks.done}/{subtasks.total}
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{subtasks.done} de {subtasks.total} subtareas</TooltipContent>
+                                      </Tooltip>
+                                    )}
+
+                                    {/* Comments */}
+                                    {commentCount > 0 && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
+                                            <MessageSquare className="h-3 w-3" />
+                                            {commentCount}
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{commentCount} comentarios</TooltipContent>
+                                      </Tooltip>
+                                    )}
+
+                                    {/* Attachments */}
                                     {summary && summary.count > 0 && (
-                                      <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
-                                        <Paperclip className="h-3 w-3" />
-                                        {summary.count}
-                                      </span>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
+                                            <Paperclip className="h-3 w-3" />
+                                            {summary.count}
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{summary.count} adjuntos</TooltipContent>
+                                      </Tooltip>
                                     )}
                                   </div>
+
+                                  {/* Assignees */}
                                   <div className="flex -space-x-1.5">
                                     {(task.assignees || []).slice(0, 3).map((uid) => {
                                       const p = profileMap[uid];
                                       const initials = p?.full_name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?";
                                       return (
-                                        <Avatar key={uid} className="h-5 w-5 border border-card">
-                                          <AvatarFallback className="text-[9px] bg-primary/20 text-primary">
-                                            {initials}
-                                          </AvatarFallback>
-                                        </Avatar>
+                                        <Tooltip key={uid}>
+                                          <TooltipTrigger asChild>
+                                            <Avatar className="h-5 w-5 border border-card">
+                                              <AvatarFallback className="text-[9px] bg-primary/20 text-primary">
+                                                {initials}
+                                              </AvatarFallback>
+                                            </Avatar>
+                                          </TooltipTrigger>
+                                          <TooltipContent>{p?.full_name || "Sin nombre"}</TooltipContent>
+                                        </Tooltip>
                                       );
                                     })}
                                     {(task.assignees || []).length > 3 && (

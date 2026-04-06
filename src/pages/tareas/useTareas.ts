@@ -123,7 +123,7 @@ export const useTareas = (projectId?: string) => {
   };
 
   const updateProjectInline = useMutation({
-    mutationFn: async (fields: { name?: string; description?: string | null; leader_id?: string | null }) => {
+    mutationFn: async (fields: { name?: string; description?: string | null; leader_id?: string | null; status?: string }) => {
       if (!projectId) throw new Error("No project ID");
       if (fields.name) {
         const trimmedName = fields.name.trim();
