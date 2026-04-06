@@ -217,6 +217,122 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_interactions: {
+        Row: {
+          created_at: string | null
+          id_mensaje: string
+          perfil_id: string | null
+          reasoning_message: string | null
+          texto_mensaje: string | null
+          tipo_mensaje: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id_mensaje?: string
+          perfil_id?: string | null
+          reasoning_message?: string | null
+          texto_mensaje?: string | null
+          tipo_mensaje?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id_mensaje?: string
+          perfil_id?: string | null
+          reasoning_message?: string | null
+          texto_mensaje?: string | null
+          tipo_mensaje?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_history_perfil_id_fkey"
+            columns: ["perfil_id"]
+            isOneToOne: false
+            referencedRelation: "ai_leadgenerator"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_leadgenerator: {
+        Row: {
+          active_following: boolean | null
+          bio_completa: string | null
+          category: string | null
+          city: string | null
+          country: string | null
+          created_at: string | null
+          date: string | null
+          exclusive_content: boolean | null
+          followers_num: number | null
+          following_num: number | null
+          has_replied: boolean | null
+          ia_reason: string | null
+          ia_score: number | null
+          ia_status: string | null
+          id: string
+          link_bio: string | null
+          number_followups: number | null
+          posts_num: number | null
+          source_text: string | null
+          update_follow_up_date: string | null
+          updated_at: string | null
+          url_ig: string | null
+          username: string | null
+          username_ocr: string | null
+        }
+        Insert: {
+          active_following?: boolean | null
+          bio_completa?: string | null
+          category?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          date?: string | null
+          exclusive_content?: boolean | null
+          followers_num?: number | null
+          following_num?: number | null
+          has_replied?: boolean | null
+          ia_reason?: string | null
+          ia_score?: number | null
+          ia_status?: string | null
+          id?: string
+          link_bio?: string | null
+          number_followups?: number | null
+          posts_num?: number | null
+          source_text?: string | null
+          update_follow_up_date?: string | null
+          updated_at?: string | null
+          url_ig?: string | null
+          username?: string | null
+          username_ocr?: string | null
+        }
+        Update: {
+          active_following?: boolean | null
+          bio_completa?: string | null
+          category?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string | null
+          date?: string | null
+          exclusive_content?: boolean | null
+          followers_num?: number | null
+          following_num?: number | null
+          has_replied?: boolean | null
+          ia_reason?: string | null
+          ia_score?: number | null
+          ia_status?: string | null
+          id?: string
+          link_bio?: string | null
+          number_followups?: number | null
+          posts_num?: number | null
+          source_text?: string | null
+          update_follow_up_date?: string | null
+          updated_at?: string | null
+          url_ig?: string | null
+          username?: string | null
+          username_ocr?: string | null
+        }
+        Relationships: []
+      }
       ai_messages: {
         Row: {
           content: string
