@@ -56,7 +56,7 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
     queryFn: async () => {
       let query = supabase.from("profiles").select("id, full_name");
       if (myProfile?.company_id) {
-        query = query.eq("company_id", myProfile.company_id);
+        query = query.or(`company_id.eq.${myProfile.company_id},company_id.is.null`);
       }
       const { data } = await query;
       return data || [];

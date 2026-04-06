@@ -106,7 +106,7 @@ export const useTareas = (projectId?: string) => {
     queryFn: async () => {
       let query = supabase.from("profiles").select("id, full_name");
       if (profile?.company_id) {
-        query = query.eq("company_id", profile.company_id);
+        query = query.or(`company_id.eq.${profile.company_id},company_id.is.null`);
       }
       const { data } = await query;
       return data || [];
