@@ -1,0 +1,1 @@
+UPDATE profiles SET company_id = NULL WHERE id = '071de069-206c-4f54-821f-09b0ae3b92ce';
