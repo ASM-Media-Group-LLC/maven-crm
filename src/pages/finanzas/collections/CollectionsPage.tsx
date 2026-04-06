@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   DollarSign, Clock, AlertTriangle, Ban, Plus, Search, X, Download,
   Users, CheckCircle, LayoutGrid, List, TrendingUp, BarChart3,
+  ChevronsUpDown, Check, MoreHorizontal, Eye, Pencil, Printer, Trash2, FileDown, Paperclip, ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -16,11 +17,16 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
@@ -51,6 +57,19 @@ export default function CollectionsPage() {
   const [regCreator, setRegCreator] = useState("");
   const [regAmount, setRegAmount] = useState("");
   const [regNotes, setRegNotes] = useState("");
+  const [regFile, setRegFile] = useState<File | null>(null);
+  const [creatorOpen, setCreatorOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // View/Edit modals
+  const [viewInvoice, setViewInvoice] = useState<any>(null);
+  const [editInvoice, setEditInvoice] = useState<any>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const editFileRef = useRef<HTMLInputElement>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["collections-invoices"],
@@ -70,9 +89,20 @@ export default function CollectionsPage() {
     },
   });
 
+  const uploadEvidence = async (file: File): Promise<string | null> => {
+    const ext = file.name.split(".").pop();
+    const path = `collections/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await supabase.storage.from("custom-request-attachments").upload(path, file);
+    if (error) { console.error("Upload error:", error); return null; }
+    const { data: urlData } = supabase.storage.from("custom-request-attachments").getPublicUrl(path);
+    return urlData.publicUrl;
+  };
+
   const registerPayment = useMutation({
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
+      let evidenceUrl: string | null = null;
+      if (regFile) evidenceUrl = await uploadEvidence(regFile);
       const invNum = `COB-${Date.now().toString(36).toUpperCase()}`;
       const { error } = await supabase.from("invoices").insert({
         creator_id: regCreator,
@@ -85,17 +115,75 @@ export default function CollectionsPage() {
         due_date: new Date().toISOString().split("T")[0],
         created_by: user.user?.id,
         notes: regNotes || null,
-      });
+        evidence_url: evidenceUrl,
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["collections-invoices"] });
       toast({ title: "Cobro registrado exitosamente" });
       setShowRegisterModal(false);
-      setRegCreator(""); setRegAmount(""); setRegNotes("");
+      setRegCreator(""); setRegAmount(""); setRegNotes(""); setRegFile(null);
     },
     onError: () => toast({ title: "Error al registrar cobro", variant: "destructive" }),
   });
+
+  const updateInvoice = useMutation({
+    mutationFn: async () => {
+      if (!editInvoice) return;
+      let evidenceUrl = (editInvoice as any).evidence_url;
+      if (editFile) evidenceUrl = await uploadEvidence(editFile);
+      const { error } = await supabase.from("invoices").update({
+        amount: Number(editAmount),
+        net_amount: Number(editAmount),
+        status: editStatus,
+        notes: editNotes || null,
+        evidence_url: evidenceUrl,
+      } as any).eq("id", editInvoice.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["collections-invoices"] });
+      toast({ title: "Cobro actualizado" });
+      setEditInvoice(null); setEditFile(null);
+    },
+    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+  });
+
+  const deleteInvoice = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("invoices").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["collections-invoices"] });
+      toast({ title: "Cobro eliminado" });
+      setDeleteId(null);
+    },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+  });
+
+  const handlePrint = (inv: any) => {
+    const creatorName = inv.creators?.artistic_name || inv.creators?.name || "—";
+    const w = window.open("", "_blank", "width=600,height=400");
+    if (!w) return;
+    w.document.write(`<html><head><title>Cobro #${inv.invoice_number}</title><style>body{font-family:sans-serif;padding:2rem}table{width:100%;border-collapse:collapse;margin-top:1rem}td,th{border:1px solid #ccc;padding:8px;text-align:left}</style></head><body><h2>Cobro #${inv.invoice_number}</h2><table><tr><th>Creadora</th><td>${creatorName}</td></tr><tr><th>Monto</th><td>${fmt(Number(inv.amount) || 0)}</td></tr><tr><th>Estado</th><td>${inv.status}</td></tr><tr><th>Fecha</th><td>${format(new Date(inv.created_at), "dd/MM/yyyy")}</td></tr><tr><th>Notas</th><td>${inv.notes || "—"}</td></tr></table></body></html>`);
+    w.document.close();
+    w.print();
+  };
+
+  const handleExportRow = (inv: any) => {
+    exportTableToExcel([{
+      Numero: inv.invoice_number,
+      Creador: inv.creators?.artistic_name || inv.creators?.name || "",
+      Monto: inv.amount,
+      Estado: inv.status,
+      Fecha: format(new Date(inv.created_at), "dd/MM/yyyy"),
+      Notas: inv.notes || "",
+    }], `cobro-${inv.invoice_number}`);
+  };
+
+  const selectedCreator = creators.find(c => c.id === regCreator);
 
   const cobrados = invoices.filter(i => i.status === "pagada");
   const pendientes = invoices.filter(i => i.status === "enviada");
@@ -106,13 +194,11 @@ export default function CollectionsPage() {
   const totalPendiente = pendientes.reduce((s, i) => s + (Number(i.amount) || 0), 0);
   const totalVencido = vencidos.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 
-  // Frequency cards data
   const quincenales = invoices.filter(i => i.payment_method === "quincenal");
   const mensuales = invoices.filter(i => i.payment_method !== "quincenal");
   const montoQuincenal = quincenales.reduce((s, i) => s + (Number(i.amount) || 0), 0);
   const montoMensual = mensuales.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 
-  // Financial KPIs
   const now = new Date();
   const lastMonthStart = startOfMonth(subMonths(now, 1));
   const lastMonthEnd = endOfMonth(subMonths(now, 1));
@@ -126,7 +212,6 @@ export default function CollectionsPage() {
   const comisionSocios = invoices.reduce((s, i) => s + (Number(i.fee_amount) || 0), 0);
   const facturacionNeta = invoices.reduce((s, i) => s + (Number(i.net_amount) || 0), 0);
 
-  // Charts data
   const pieStatusData = [
     { name: "Pagadas", value: cobrados.length, color: STATUS_COLORS.pagada },
     { name: "Pendientes", value: pendientes.length, color: STATUS_COLORS.enviada },
@@ -140,7 +225,6 @@ export default function CollectionsPage() {
     { name: "Vencido", value: totalVencido, color: STATUS_COLORS.vencida },
   ].filter(d => d.value > 0);
 
-  // Monthly bar chart (6 months)
   const monthlyData = Array.from({ length: 6 }, (_, i) => {
     const month = subMonths(now, 5 - i);
     const mStart = startOfMonth(month);
@@ -154,7 +238,6 @@ export default function CollectionsPage() {
     };
   });
 
-  // Cobros tab filtering
   const hasFilters = search || statusFilter || dateFrom || dateTo;
   const filteredCobros = invoices.filter(inv => {
     const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "";
@@ -166,6 +249,14 @@ export default function CollectionsPage() {
     const matchTo = !dateTo || d <= dateTo;
     return matchSearch && matchStatus && matchFrom && matchTo;
   });
+
+  const openEdit = (inv: any) => {
+    setEditInvoice(inv);
+    setEditAmount(String(inv.amount || ""));
+    setEditStatus(inv.status);
+    setEditNotes(inv.notes || "");
+    setEditFile(null);
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -182,7 +273,7 @@ export default function CollectionsPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
-        {/* KPIs globales - status cards (5 cols) */}
+        {/* KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {isLoading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
@@ -204,7 +295,6 @@ export default function CollectionsPage() {
 
         {tab === "Dashboard" ? (
           <div className="space-y-6">
-            {/* Frequency cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-lg border border-border bg-card p-5">
                 <div className="flex items-center gap-2 mb-3">
@@ -222,7 +312,6 @@ export default function CollectionsPage() {
               </div>
             </div>
 
-            {/* Financial KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <DashboardMetricCard label="Ventas Último Mes" value={fmt(ventasUltimoMes)} icon={TrendingUp} subtitle="Total invoices" color="accent" />
               <DashboardMetricCard label="Promedio 6 Meses" value={fmt(promedio6)} icon={BarChart3} subtitle="Promedio histórico" color="primary" />
@@ -230,7 +319,6 @@ export default function CollectionsPage() {
               <DashboardMetricCard label="Facturación Neta" value={fmt(facturacionNeta)} icon={DollarSign} subtitle="Neto real" color="accent" />
             </div>
 
-            {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="rounded-lg border border-border p-4 bg-card">
                 <h3 className="text-sm font-medium text-foreground mb-4">Estado de Cobros</h3>
@@ -320,14 +408,16 @@ export default function CollectionsPage() {
                         <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
                         <TableHead className="text-xs font-medium text-muted-foreground">Monto</TableHead>
                         <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground">Evidencia</TableHead>
                         <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+                        <TableRow key={i}>{Array.from({ length: 8 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
                       )) : filteredCobros.length === 0 ? (
-                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">Sin cobros encontrados.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Sin cobros encontrados.</TableCell></TableRow>
                       ) : filteredCobros.map(inv => (
                         <TableRow key={inv.id} className="hover:bg-muted/30">
                           <TableCell className="text-sm font-mono">#{inv.invoice_number}</TableCell>
@@ -339,7 +429,40 @@ export default function CollectionsPage() {
                               {inv.status === "pagada" ? "Pagada" : inv.status === "enviada" ? "Pendiente" : inv.status === "vencida" ? "Vencida" : inv.status}
                             </Badge>
                           </TableCell>
+                          <TableCell>
+                            {(inv as any).evidence_url ? (
+                              <a href={(inv as any).evidence_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                                <Paperclip className="h-3.5 w-3.5" />Ver
+                              </a>
+                            ) : <span className="text-xs text-muted-foreground">—</span>}
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{format(new Date(inv.created_at), "dd/MM/yyyy")}</TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setViewInvoice(inv)}>
+                                  <Eye className="h-4 w-4 mr-2" />Ver detalle
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openEdit(inv)}>
+                                  <Pencil className="h-4 w-4 mr-2" />Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handlePrint(inv)}>
+                                  <Printer className="h-4 w-4 mr-2" />Imprimir
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleExportRow(inv)}>
+                                  <FileDown className="h-4 w-4 mr-2" />Exportar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setDeleteId(inv.id)} className="text-destructive focus:text-destructive">
+                                  <Trash2 className="h-4 w-4 mr-2" />Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -354,9 +477,23 @@ export default function CollectionsPage() {
                   <div key={inv.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-mono text-muted-foreground">#{inv.invoice_number}</span>
-                      <Badge variant={inv.status === "pagada" ? "default" : inv.status === "enviada" ? "secondary" : inv.status === "vencida" ? "destructive" : "outline"} className="text-[10px]">
-                        {inv.status === "pagada" ? "Pagada" : inv.status === "enviada" ? "Pendiente" : inv.status === "vencida" ? "Vencida" : inv.status}
-                      </Badge>
+                      <div className="flex items-center gap-1">
+                        <Badge variant={inv.status === "pagada" ? "default" : inv.status === "enviada" ? "secondary" : inv.status === "vencida" ? "destructive" : "outline"} className="text-[10px]">
+                          {inv.status === "pagada" ? "Pagada" : inv.status === "enviada" ? "Pendiente" : inv.status === "vencida" ? "Vencida" : inv.status}
+                        </Badge>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setViewInvoice(inv)}><Eye className="h-4 w-4 mr-2" />Ver</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEdit(inv)}><Pencil className="h-4 w-4 mr-2" />Editar</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePrint(inv)}><Printer className="h-4 w-4 mr-2" />Imprimir</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExportRow(inv)}><FileDown className="h-4 w-4 mr-2" />Exportar</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setDeleteId(inv.id)} className="text-destructive focus:text-destructive"><Trash2 className="h-4 w-4 mr-2" />Eliminar</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                     <p className="text-sm font-medium truncate">{(inv as any).creators?.artistic_name || (inv as any).creators?.name || "—"}</p>
                     <p className="text-lg font-bold text-foreground mt-1">{fmt(Number(inv.amount) || 0)}</p>
@@ -379,12 +516,34 @@ export default function CollectionsPage() {
           <div className="space-y-4">
             <div>
               <Label>Creadora</Label>
-              <Select value={regCreator || undefined} onValueChange={setRegCreator}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar creadora" /></SelectTrigger>
-                <SelectContent>
-                  {creators.map(c => <SelectItem key={c.id} value={c.id}>{c.artistic_name || c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Popover open={creatorOpen} onOpenChange={setCreatorOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={creatorOpen} className="w-full justify-between font-normal">
+                    {selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "Seleccionar creadora..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start" side="bottom">
+                  <Command>
+                    <CommandInput placeholder="Buscar creadora..." />
+                    <CommandList>
+                      <CommandEmpty>No se encontró creadora.</CommandEmpty>
+                      <CommandGroup className="max-h-60 overflow-y-auto">
+                        {creators.map(c => (
+                          <CommandItem
+                            key={c.id}
+                            value={c.artistic_name || c.name}
+                            onSelect={() => { setRegCreator(c.id); setCreatorOpen(false); }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", regCreator === c.id ? "opacity-100" : "opacity-0")} />
+                            {c.artistic_name || c.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label>Monto ($)</Label>
@@ -393,6 +552,23 @@ export default function CollectionsPage() {
             <div>
               <Label>Detalle / Nota</Label>
               <Textarea placeholder="Descripción del cobro..." value={regNotes} onChange={e => setRegNotes(e.target.value)} rows={3} />
+            </div>
+            <div>
+              <Label>Evidencia (imagen o PDF)</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,.pdf"
+                className="hidden"
+                onChange={e => setRegFile(e.target.files?.[0] || null)}
+              />
+              <div className="flex items-center gap-2 mt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Paperclip className="h-4 w-4 mr-1" />Adjuntar
+                </Button>
+                {regFile && <span className="text-xs text-muted-foreground truncate max-w-[200px]">{regFile.name}</span>}
+                {regFile && <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setRegFile(null)}><X className="h-3.5 w-3.5" /></Button>}
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -403,6 +579,98 @@ export default function CollectionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* View Detail Modal */}
+      <Dialog open={!!viewInvoice} onOpenChange={() => setViewInvoice(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Detalle del Cobro</DialogTitle></DialogHeader>
+          {viewInvoice && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-xs text-muted-foreground">Número</span><p className="font-mono">#{viewInvoice.invoice_number}</p></div>
+                <div><span className="text-xs text-muted-foreground">Estado</span><p><Badge variant={viewInvoice.status === "pagada" ? "default" : viewInvoice.status === "enviada" ? "secondary" : "destructive"}>{viewInvoice.status}</Badge></p></div>
+                <div><span className="text-xs text-muted-foreground">Creadora</span><p>{viewInvoice.creators?.artistic_name || viewInvoice.creators?.name || "—"}</p></div>
+                <div><span className="text-xs text-muted-foreground">Monto</span><p className="font-medium">{fmt(Number(viewInvoice.amount) || 0)}</p></div>
+                <div><span className="text-xs text-muted-foreground">Método</span><p>{viewInvoice.payment_method || "—"}</p></div>
+                <div><span className="text-xs text-muted-foreground">Fecha</span><p>{format(new Date(viewInvoice.created_at), "dd/MM/yyyy HH:mm")}</p></div>
+              </div>
+              {viewInvoice.notes && (
+                <div><span className="text-xs text-muted-foreground">Notas</span><p className="text-sm mt-1">{viewInvoice.notes}</p></div>
+              )}
+              {viewInvoice.evidence_url && (
+                <div>
+                  <span className="text-xs text-muted-foreground">Evidencia</span>
+                  <a href={viewInvoice.evidence_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sm text-primary hover:underline mt-1">
+                    <ExternalLink className="h-3.5 w-3.5" />Ver archivo adjunto
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={!!editInvoice} onOpenChange={() => setEditInvoice(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Editar Cobro</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Monto ($)</Label>
+              <Input type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} />
+            </div>
+            <div>
+              <Label>Estado</Label>
+              <Select value={editStatus} onValueChange={setEditStatus}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="enviada">Pendiente</SelectItem>
+                  <SelectItem value="pagada">Pagada</SelectItem>
+                  <SelectItem value="vencida">Vencida</SelectItem>
+                  <SelectItem value="cancelada">Cancelada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Notas</Label>
+              <Textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={3} />
+            </div>
+            <div>
+              <Label>Evidencia</Label>
+              <input ref={editFileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={e => setEditFile(e.target.files?.[0] || null)} />
+              <div className="flex items-center gap-2 mt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => editFileRef.current?.click()}>
+                  <Paperclip className="h-4 w-4 mr-1" />{(editInvoice as any)?.evidence_url ? "Reemplazar" : "Adjuntar"}
+                </Button>
+                {editFile && <span className="text-xs text-muted-foreground truncate max-w-[200px]">{editFile.name}</span>}
+                {(editInvoice as any)?.evidence_url && !editFile && (
+                  <a href={(editInvoice as any).evidence_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">Ver actual</a>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditInvoice(null)}>Cancelar</Button>
+            <Button onClick={() => updateInvoice.mutate()} disabled={updateInvoice.isPending}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este cobro?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción no se puede deshacer. El registro será eliminado permanentemente.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteId && deleteInvoice.mutate(deleteId)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
