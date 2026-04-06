@@ -21,7 +21,11 @@ import OverdueReasonModal from "./OverdueReasonModal";
 import TasksTable from "./TasksTable";
 
 import TaskKanbanView from "./TaskKanbanView";
-import TaskDetailSheet from "./TaskDetailSheet";
+import TaskDetailPage from "./TaskDetailPage";
+import ProjectMiniSidebar from "./ProjectMiniSidebar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import EditProjectModal from "./EditProjectModal";
+import DeleteProjectDialog from "./DeleteProjectDialog";
 import TaskAnalyticsTab from "./TaskAnalyticsTab";
 
 interface TareasContentProps {
