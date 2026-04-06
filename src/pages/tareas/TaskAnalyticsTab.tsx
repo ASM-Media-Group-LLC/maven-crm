@@ -82,34 +82,38 @@ const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabPr
     return Object.values(assigned).sort((a, b) => b.asignadas - a.asignadas);
   }, [tasks, profiles, getTaskStatus]);
 
-  // Burndown chart
-  const burndownData = useMemo(() => {
-    if (tasks.length === 0) return [];
-    const dates = tasks.map((t) => new Date(t.due_at).getTime());
-    const startDates = tasks.filter((t) => t.start_at).map((t) => new Date(t.start_at!).getTime());
-    const earliest = Math.min(...dates, ...startDates, ...tasks.map((t) => t.created_at ? new Date(t.created_at).getTime() : Infinity));
-    const latest = Math.max(...dates);
-    const start = startOfDay(new Date(earliest));
-    const end = startOfDay(new Date(latest));
-    const totalDays = differenceInDays(end, start) || 1;
-    const total = tasks.length;
+  // Gantt chart data (replaces burndown)
+  const ganttChartData = useMemo(() => {
+    const withDates = tasks.filter((t) => t.start_at);
+    if (withDates.length === 0) return { data: [], minDate: new Date(), totalDays: 0 };
 
-    const points: { date: string; ideal: number; real: number }[] = [];
-    for (let i = 0; i <= totalDays; i++) {
-      const d = addDays(start, i);
-      const completedByDate = tasks.filter(
-        (t) => t.completed_at && !isAfter(startOfDay(parseISO(t.completed_at)), d)
-      ).length;
-      const remaining = total - completedByDate;
-      const idealRemaining = Math.max(0, total - Math.round((total / totalDays) * i));
-      points.push({
-        date: format(d, "dd/MM"),
-        ideal: idealRemaining,
-        real: remaining,
+    const allStarts = withDates.map((t) => new Date(t.start_at!).getTime());
+    const allEnds = withDates.map((t) => new Date(t.due_at).getTime());
+    const minDate = startOfDay(new Date(Math.min(...allStarts)));
+    const maxDate = startOfDay(new Date(Math.max(...allEnds)));
+    const totalDays = Math.max(1, differenceInDays(maxDate, minDate) + 1);
+
+    const data = withDates
+      .sort((a, b) => new Date(a.start_at!).getTime() - new Date(b.start_at!).getTime())
+      .slice(0, 20)
+      .map((t) => {
+        const start = startOfDay(new Date(t.start_at!));
+        const end = startOfDay(new Date(t.due_at));
+        const offset = differenceInDays(start, minDate);
+        const duration = Math.max(1, differenceInDays(end, start));
+        const status = getTaskStatus(t);
+        return {
+          title: t.title.length > 30 ? t.title.slice(0, 30) + "…" : t.title,
+          offset,
+          duration,
+          fill: STATUS_COLORS[status] || "#888",
+          startLabel: format(start, "dd MMM", { locale: es }),
+          endLabel: format(end, "dd MMM", { locale: es }),
+        };
       });
-    }
-    return points;
-  }, [tasks]);
+
+    return { data, minDate, totalDays };
+  }, [tasks, getTaskStatus]);
 
   // Overdue tasks without reason
   const overdueTasks = useMemo(() => {
