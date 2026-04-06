@@ -84,7 +84,7 @@ const TaskDetailPage = ({ task, open, onOpenChange, profiles, onEdit, onStatusCh
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[95vw] h-[90vh] p-0 flex flex-col overflow-hidden">
+      <DialogContent className="max-w-5xl w-[95vw] h-[90vh] p-0 flex flex-col overflow-hidden [&>button.absolute]:hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3 border-b shrink-0">
           <div className="flex items-center gap-3">
