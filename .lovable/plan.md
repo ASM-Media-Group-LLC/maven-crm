@@ -1,57 +1,33 @@
 
-# Plan: Mejoras avanzadas al módulo de Tareas (estilo ClickUp)
+# Plan: Fix layout en página principal de Tareas
 
-## 1. Botón Settings/More del proyecto dentro del proyecto
+## Problemas detectados
 
-Agregar un `DropdownMenu` al lado de "Nueva Tarea" en `TareasContent.tsx` con las mismas opciones que existen en la página principal de proyectos:
-- Editar proyecto (abre `EditProjectModal`)
-- Compartir proyecto
-- Archivar proyecto
-- Eliminar proyecto
+1. **Stats cards** están dentro del bloque condicional `mainView === "projects"` (línea 462), por lo que desaparecen al cambiar a Kanban o Analíticas.
+2. **Filtros** (Carpeta, Estado) se ocultan con `mainView === "projects"` (línea 379), dejando al usuario sin forma de volver a la vista de proyectos.
+3. **No hay botón "Proyectos"** en la barra de tabs para regresar a la vista base.
 
-**Archivo**: `TareasContent.tsx` — agregar DropdownMenu con `MoreHorizontal` o `Settings` icon.
+## Cambios en `ProjectsListContent.tsx`
 
-## 2. Task Detail en página/dialog completo (no Sheet lateral)
+1. **Mover KPI cards fuera del condicional** — Sacarlas del bloque `mainView === "projects"` y colocarlas justo después del header, antes de la barra de filtros. Siempre visibles.
 
-Reemplazar el `Sheet` lateral por un `Dialog` de pantalla completa (como ClickUp: layout de 2 columnas — detalles a la izquierda, actividad/comentarios a la derecha).
+2. **Agregar tab "Proyectos"** al grupo de botones (líneas 407-445) para que el usuario pueda volver a la vista de proyectos desde Kanban o Analíticas.
 
-**Archivos**:
-- Crear `TaskDetailPage.tsx` — Dialog fullscreen con layout tipo ClickUp:
-  - **Izquierda**: título editable inline, descripción, estado, prioridad, asignados, fechas, subtareas, adjuntos
-  - **Derecha**: panel de actividad/comentarios (como en la referencia)
-- `TareasContent.tsx` — cambiar `TaskDetailSheet` por `TaskDetailPage`
-- Eliminar `TaskDetailSheet.tsx` (ya no se usa)
+3. **Mostrar filtros siempre** — Quitar el `mainView === "projects"` guard de los selects de Carpeta y Estado (línea 379). Así están disponibles en todas las vistas.
 
-## 3. Kanban cards más completas con edición inline
+## Estructura resultante
 
-Enriquecer las tarjetas del Kanban en `TaskKanbanView.tsx` para mostrar más metadata y permitir edición inline (como ClickUp):
-- Mostrar iconos de: subtareas (count), comentarios (count), adjuntos, fecha, prioridad (flag icon), asignados
-- Agregar menú contextual (click derecho o botón `...`) en cada card con: cambiar estado, cambiar prioridad, editar, eliminar
-- Iconos de acción rápida inline en el footer de la card
+```text
+Header (título + botones crear)
+─────────────────────────────────
+KPI Stats Cards (siempre visibles)
+─────────────────────────────────
+Buscador + Filtros + [Proyectos | Kanban | Analíticas] + [Grid/List]
+─────────────────────────────────
+Contenido de la vista activa
+```
 
-**Archivos**: `TaskKanbanView.tsx` — enriquecer cards con más metadata e inline actions.
-
-## 4. Mini panel lateral de navegación entre proyectos
-
-Agregar un panel colapsable a la izquierda dentro de `TareasContent.tsx` que muestre la lista de proyectos con:
-- Nombre del proyecto con indicador visual (dot de color)
-- Proyecto actual resaltado
-- Click para navegar a otro proyecto
-- Botón de estrella para marcar favoritos (guardado en localStorage por ahora)
-- Colapsable con un botón toggle
-
-**Archivos**:
-- Crear `ProjectMiniSidebar.tsx` — componente del mini panel
-- `TareasContent.tsx` — integrar el sidebar a la izquierda del contenido
-
-## Archivos a modificar/crear
-
+## Archivo modificado
 | Archivo | Cambio |
 |---------|--------|
-| `TareasContent.tsx` | Agregar settings dropdown, integrar mini sidebar, cambiar Sheet por Dialog |
-| `TaskDetailPage.tsx` (nuevo) | Dialog fullscreen para detalle de tarea |
-| `TaskKanbanView.tsx` | Cards más ricas con metadata e inline actions |
-| `ProjectMiniSidebar.tsx` (nuevo) | Mini panel lateral de proyectos con favoritos |
-| `TaskDetailSheet.tsx` | Eliminar (reemplazado) |
-
-## Sin migraciones ni dependencias nuevas
+| `ProjectsListContent.tsx` | Reordenar layout: KPIs arriba, filtros siempre visibles, agregar tab "Proyectos" |
