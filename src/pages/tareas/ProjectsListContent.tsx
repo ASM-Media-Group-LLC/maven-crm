@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { getPublicBaseUrl } from "@/lib/getPublicUrl";
-import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Crown, ChevronDown, ChevronRight, FolderPlus, FolderInput, X, Columns, BarChart3 } from "lucide-react";
+import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Crown, ChevronDown, ChevronRight, FolderPlus, FolderInput, X, BarChart3 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,7 +27,6 @@ import EditProjectModal from "./EditProjectModal";
 import DeleteProjectDialog from "./DeleteProjectDialog";
 import ProjectsTable from "./ProjectsTable";
 import CreateFolderModal from "./CreateFolderModal";
-import GlobalKanbanView from "./GlobalKanbanView";
 import GlobalAnalyticsTab from "./GlobalAnalyticsTab";
 
 const ProjectsListContent = () => {
@@ -68,7 +67,7 @@ const ProjectsListContent = () => {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
-  const [mainView, setMainView] = useState<"projects" | "kanban" | "analytics">("projects");
+  const [mainView, setMainView] = useState<"projects" | "analytics">("projects");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [editProject, setEditProject] = useState<TaskProject | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskProject | null>(null);
@@ -427,14 +426,6 @@ const ProjectsListContent = () => {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant={mainView === "kanban" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("kanban")} className="gap-1">
-                  <Columns className="h-4 w-4" /> Kanban
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Kanban global de todas las tareas</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
                 <Button variant={mainView === "analytics" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("analytics")} className="gap-1">
                   <BarChart3 className="h-4 w-4" /> Analíticas
                 </Button>
@@ -465,14 +456,7 @@ const ProjectsListContent = () => {
           </div>
         </div>
 
-        {mainView === "kanban" ? (
-          <GlobalKanbanView
-            tasks={allTasks}
-            profiles={companyProfiles}
-            projects={projects}
-            onStatusChange={(taskId, status) => updateGlobalTaskStatus.mutate({ taskId, status })}
-          />
-        ) : mainView === "analytics" ? (
+        {mainView === "analytics" ? (
           <GlobalAnalyticsTab
             tasks={allTasks}
             profiles={companyProfiles}
