@@ -1,38 +1,58 @@
 
+# Plan: 4 mejoras al módulo de Tareas
 
-# Plan: Reestructurar página principal de Tareas
+## 1. Stats cards siempre arriba (fix de regresión)
 
-## Problema actual
+Las KPI cards (progreso + contadores) en `TareasContent.tsx` deben estar siempre visibles independientemente de la vista activa (kanban/lista/analíticas). Actualmente ya están arriba del viewMode conditional, así que esto parece correcto. **Verificar** que no se movieron accidentalmente — si están dentro del bloque condicional, sacarlas.
 
-En el header hay un toggle de 3 botones (Proyectos / Kanban / Analíticas) arriba a la derecha. El tab "Proyectos" es redundante porque es el contenido base de la página. Además, el patrón es inconsistente con la vista interna de proyecto donde Kanban/Lista/Analíticas están en la barra de filtros (abajo, junto al toggle de vista).
+**Archivo**: `TareasContent.tsx` — confirmar que las cards (líneas 280-311) están FUERA del bloque `viewMode === "analytics"` (línea 388).
 
-## Cambios propuestos
+## 2. Reemplazar Burndown por Gantt en Analíticas
 
-### `ProjectsListContent.tsx`
+En `TaskAnalyticsTab.tsx`, eliminar el chart de Burndown (líneas 85-112 data + líneas 175-195 JSX) y reemplazarlo con un diagrama Gantt real usando Recharts `BarChart` horizontal con barras posicionadas por fechas.
 
-1. **Eliminar el toggle de 3 botones del header** (líneas 363-388) — quitar los botones Proyectos/Kanban/Analíticas del área superior derecha.
+**Archivo**: `TaskAnalyticsTab.tsx`
+- Eliminar `burndownData` useMemo y su renderizado
+- Crear `ganttChartData` que calcule para cada tarea: offset desde la fecha más temprana (como posición X) y duración en días (como largo de barra)
+- Renderizar como `BarChart` horizontal con `XAxis` como línea temporal (días) y `YAxis` como nombres de tareas
+- Usar colores de status para las barras
+- Mantener el timeline simplificado existente (líneas 197-224) o reemplazarlo por este nuevo Gantt más completo
 
-2. **Eliminar el tab "Proyectos"** — la lista de proyectos es siempre visible como contenido base. Kanban y Analíticas se convierten en vistas alternativas.
+## 3. Creación inline de tareas en Kanban
 
-3. **Mover Kanban y Analíticas a la barra de filtros** — en la fila donde está el buscador + filtros + toggle grid/list (línea 430-466), agregar un `TabsList` con Kanban y Analíticas al lado del toggle grid/list, usando el mismo patrón que `TareasContent.tsx`:
+Agregar un botón "+" al final de cada columna del Kanban que al clickear muestre un input inline para crear tareas rápidamente con título y asignación directa al status de esa columna.
 
-```text
-[Buscar...] [Carpeta ▼] [Estado ▼]         [Kanban] [Analíticas] | [≡] [⊞]
-```
+**Archivo**: `TaskKanbanView.tsx`
+- Agregar props: `onCreateTask` callback y `profiles` ya está
+- Después de `{provided.placeholder}`, agregar un mini-form inline: input de título + botón crear
+- Al crear, se pasa el status de la columna automáticamente (ej: si está en "En curso", se crea con status `in_progress`)
+- El form es minimal: solo título, el resto usa defaults (prioridad medium, duración 1h, due date +24h)
 
-- Cuando se selecciona Kanban o Analíticas, se muestra esa vista en vez de la lista de proyectos.
-- Cuando no hay ningún tab seleccionado (default), se muestra la lista de proyectos con el toggle grid/list.
-- El toggle grid/list solo se muestra cuando estamos en la vista de proyectos (no en kanban/analíticas).
+**Archivo**: `TareasContent.tsx`
+- Pasar `onCreateInline` al `TaskKanbanView` que llame a `createTask.mutate` con el status apropiado
 
-4. **Estado `mainView`** cambia de `"projects" | "kanban" | "analytics"` a seguir funcionando igual pero con UI diferente (tabs en la barra de filtros en vez de botones en el header).
+**Archivo**: `useTareas.ts`
+- Ajustar `createTask` mutation para aceptar un `status` opcional en los params
 
-### Resultado visual
+## 4. Gestión de miembros del proyecto en el header
 
-El header queda más limpio con solo título + botones "Nueva Carpeta" y "Nuevo Proyecto". La barra de filtros absorbe la navegación entre vistas, consistente con la vista interna de proyecto.
+Agregar en el header de `TareasContent.tsx` la capacidad de gestionar miembros del proyecto (agregar/quitar) usando un Popover con el patrón estándar de Command/Combobox.
 
-## Archivos modificados
+**Archivo**: `TareasContent.tsx`
+- Importar `useProjectMembers`
+- Agregar un botón/icono `Users` junto al líder del proyecto
+- Al clickear, abrir un Popover con la lista de profiles, checkbox para agregar/quitar miembros
+- Usar `setProjectMembers` mutation del hook existente
+- Mostrar avatares de los miembros actuales como chips debajo del líder
+
+## Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `ProjectsListContent.tsx` | Mover toggle de vistas del header a la barra de filtros, eliminar tab "Proyectos" |
+| `TaskAnalyticsTab.tsx` | Reemplazar Burndown por Gantt chart con Recharts |
+| `TaskKanbanView.tsx` | Agregar inline task creation por columna |
+| `TareasContent.tsx` | Pasar onCreateInline al kanban + agregar gestión de miembros en header |
+| `useTareas.ts` | Aceptar status opcional en createTask |
 
+## Sin migraciones DB ni dependencias nuevas
+Todo usa componentes y hooks existentes.
