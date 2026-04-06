@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Send, Trash2, Clock, Flag, Users, MessageSquare, X, CalendarIcon, Pencil, ChevronDown } from "lucide-react";
+import { Send, Trash2, Clock, Flag, Users, MessageSquare, X, CalendarIcon, Pencil, ChevronDown, Diamond, Link2, Unplug } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

@@ -159,6 +159,21 @@ const TaskListRow = ({ task, profiles, onComplete, onJustify, onEdit, onDelete, 
             <span className={`text-sm font-medium truncate ${isCompleted ? "line-through text-muted-foreground" : ""}`}>
               {task.title}
             </span>
+            {task.task_type === "milestone" && (
+              <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-[10px] px-1 py-0 gap-0.5 shrink-0">
+                <Diamond className="h-2.5 w-2.5" /> Hito
+              </Badge>
+            )}
+            {task.task_type === "prerequisite" && (
+              <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-[10px] px-1 py-0 gap-0.5 shrink-0">
+                <Link2 className="h-2.5 w-2.5" /> Pre-req
+              </Badge>
+            )}
+            {task.task_type === "independent" && (
+              <Badge variant="secondary" className="text-[10px] px-1 py-0 gap-0.5 shrink-0">
+                <Unplug className="h-2.5 w-2.5" /> Indep.
+              </Badge>
+            )}
           </div>
 
           {/* Assigned by column */}
