@@ -1,35 +1,26 @@
 
 
-# Plan: Cambiar default de task_type a `task`
-
-## Valores válidos (4 tipos)
-- `task` — Tarea común (nuevo default)
-- `milestone` — Hito
-- `prerequisite` — Pre-requisito
-- `independent` — Tarea independiente
+# Plan: Filtro y columna de Tipo de Tarea
 
 ## Cambios
 
-### 1. Migración DB
-```sql
-ALTER TABLE tasks ALTER COLUMN task_type SET DEFAULT 'task';
-UPDATE tasks SET task_type = 'task' WHERE task_type = 'independent';
-```
-Solo cambia el default. `independent` sigue siendo un valor válido.
+### 1. Filtro en barra de filtros — `TareasContent.tsx`
+- Agregar estado `taskTypeFilter` (línea ~52)
+- Agregar `Select` de tipo de tarea junto a los filtros de Estado y Prioridad (después de línea 500)
+- Opciones: Todos, Tarea, Hito, Pre-requisito, Independiente
+- Incluir el filtro en `filteredAndSortedTasks` (línea ~91)
 
-### 2. Código — actualizar defaults y labels
+### 2. Columna "Tipo" en tabla — `TasksTable.tsx`
+- Agregar columna "Tipo" al `TableHeader` (entre Título y Asignado por)
+- Renderizar badge visual (diamante morado para Hito, enlace naranja para Pre-req, gris para Independiente, sin badge para Tarea estándar)
+- Agregar soporte de ordenamiento por `task_type`
 
+### 3. Vista Lista (TaskListRow) — ya tiene badges
+Los badges ya están implementados en `TaskListRow.tsx`. No requiere cambios.
+
+## Archivos modificados
 | Archivo | Cambio |
 |---------|--------|
-| `useTareas.ts` | Default en createTask: `'task'` |
-| `CreateTaskDialog.tsx` | Default del select: `'task'`, agregar opción "Independiente" al selector |
-| `TaskKanbanCard.tsx` | No mostrar badge para `task`, mostrar badge gris para `independent` |
-| `TaskListRow.tsx` | Mismo criterio de badges |
-| `TaskDetailPage.tsx` | Default y labels con las 4 opciones |
-
-### Badges visuales
-- **Hito**: diamante, badge morado
-- **Pre-requisito**: enlace, badge naranja
-- **Independiente**: badge gris
-- **Tarea**: sin badge (default, no necesita distinguirse)
+| `TareasContent.tsx` | Agregar filtro `taskTypeFilter` + Select en barra de filtros |
+| `TasksTable.tsx` | Agregar columna "Tipo" con badges y ordenamiento |
 
