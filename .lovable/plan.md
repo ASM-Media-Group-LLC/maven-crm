@@ -1,51 +1,42 @@
 
 
-# Plan: Vista Global Kanban + Analíticas en página principal de Tareas
+# Plan: Reestructurar vistas de proyecto y mejorar UX
 
 ## Resumen
 
-Agregar a `ProjectsListContent.tsx` (página `/tareas`) tres modos de vista: **Proyectos** (actual), **Kanban Global** (todas las tareas de todos los proyectos), y **Analíticas Globales**. La vista de proyectos sigue siendo el default.
+Tres cambios: (1) Kanban como vista default dentro de cada proyecto, (2) tooltips en todos los icon buttons, (3) mover analíticas a una pestaña/tab dedicada más visible en vez de un toggle escondido.
 
 ## Cambios
 
-### 1. Nuevo componente: `GlobalKanbanView.tsx`
-- Reutiliza la estructura de `TaskKanbanView.tsx` pero muestra tareas de **todos los proyectos**
-- Columnas por estado: Pendiente, En curso, Pausada, Vencida, Completada
-- Cada card muestra: nombre del proyecto (badge), título de tarea, prioridad, assignees, fecha
-- Drag-and-drop entre columnas para cambiar status (requiere mutación cross-project)
-- Click en card abre `TaskDetailSheet`
+### 1. `TareasContent.tsx` — Vista de proyecto individual
 
-### 2. Nuevo componente: `GlobalAnalyticsTab.tsx`
-- Reutiliza la lógica de `TaskAnalyticsTab.tsx` pero con datos agregados de todos los proyectos
-- Gráficos adicionales:
-  - **Tareas por proyecto** (bar chart horizontal)
-  - **Distribución por estado** (pie chart)
-  - **Distribución por prioridad** (bar chart)
-  - **Carga por miembro** (bar chart con asignadas vs completadas)
-  - **Tendencia de completación** (line chart últimos 30 días)
+**Kanban como default** — ya está como default (`useState("kanban")`), confirmado. Sin cambio necesario.
 
-### 3. Modificar `ProjectsListContent.tsx`
-- Agregar `mainView` state: `"projects" | "kanban" | "analytics"`
-- Agregar botones de vista en el header (íconos: FolderOpen, Columns, BarChart3)
-- Cuando `mainView === "kanban"`: renderizar `GlobalKanbanView`
-- Cuando `mainView === "analytics"`: renderizar `GlobalAnalyticsTab`
-- Cuando `mainView === "projects"`: comportamiento actual
+**Tooltips en icon buttons** — Envolver los botones de vista (Kanban, Lista, Analíticas) y el botón de volver con `Tooltip` + `TooltipContent`:
+- Botón ArrowLeft → "Volver a proyectos"
+- Botón Kanban (Columns) → "Vista Kanban"
+- Botón Lista (List) → "Vista Lista"
+- Botón Analíticas (BarChart3) → "Analíticas"
 
-### 4. Modificar `useProjects.ts`
-- Expandir la query de `allTasks` para incluir campos completos (title, assignees, priority, start_at, completed_at, etc.) necesarios para el kanban global y las analíticas
-- Agregar mutación `updateGlobalTaskStatus` para cambiar status desde el kanban global
+**Reestructurar analíticas** — En vez del toggle icon que alterna `showAnalytics`, convertirlo en una tercera pestaña visible junto a Kanban y Lista. Usar un grupo de tabs con labels de texto (no solo iconos) similar al de `ProjectsListContent`:
 
-### Detalle técnico
+```text
+[ 📊 Kanban ] [ 📋 Lista ] [ 📈 Analíticas ]
+```
 
-| Archivo | Acción |
+Esto reemplaza los icon buttons actuales por un grupo de tabs con texto + icono, haciéndolo más descubrible. Se elimina el estado `showAnalytics` y se agrega `"analytics"` al type de `viewMode`.
+
+### 2. `ProjectsListContent.tsx` — Vista global
+
+**Tooltips** — Agregar tooltips a los icon buttons de la toolbar (grid/list toggle, acciones de proyectos).
+
+## Archivos modificados
+
+| Archivo | Cambio |
 |---------|--------|
-| `src/pages/tareas/GlobalKanbanView.tsx` | Crear — tablero kanban con todas las tareas agrupadas por status |
-| `src/pages/tareas/GlobalAnalyticsTab.tsx` | Crear — dashboard analítico con gráficos recharts |
-| `src/pages/tareas/ProjectsListContent.tsx` | Modificar — agregar toggle de vistas (projects/kanban/analytics) |
-| `src/pages/tareas/useProjects.ts` | Modificar — expandir query allTasks + mutación updateGlobalTaskStatus |
+| `TareasContent.tsx` | Cambiar icon buttons por tabs con texto, agregar tooltips, integrar analíticas como tab |
+| `ProjectsListContent.tsx` | Agregar tooltips a icon buttons |
 
-### Dependencias
-- `@hello-pangea/dnd` — ya instalada
-- `recharts` — ya instalada
-- No se requieren nuevas dependencias ni migraciones DB
+## Sin dependencias nuevas
+Todo usa componentes existentes (`Tooltip`, `TooltipProvider` de shadcn).
 
