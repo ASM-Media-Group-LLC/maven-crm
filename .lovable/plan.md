@@ -1,42 +1,25 @@
 
+# Plan: Limpiar filtros duplicados
 
-# Plan: Reestructurar vistas de proyecto y mejorar UX
+## Dentro del proyecto (TareasContent.tsx)
+- **Quitar**: Select "Asignado" (líneas 366-376) — ya existe el tab bar de miembros con avatares que hace lo mismo
+- **Mantener**: Search, Estado, Prioridad — estos son útiles y no están duplicados
 
-## Resumen
+## Página principal (ProjectsListContent.tsx)
+Filtros actuales: Search, Carpeta, Estado, Miembro, Prioridad, toggle Grid/List.
 
-Tres cambios: (1) Kanban como vista default dentro de cada proyecto, (2) tooltips en todos los icon buttons, (3) mover analíticas a una pestaña/tab dedicada más visible en vez de un toggle escondido.
+**Recomendación**:
+- **Mantener**: Search (esencial), Estado (activo/archivado — útil para filtrar archivados), Carpeta (si hay carpetas), toggle Grid/List
+- **Quitar**: "Miembro" — en la página principal filtra proyectos donde alguien es miembro, pero es poco usado y agrega ruido visual
+- **Quitar**: "Prioridad" — filtra proyectos que tienen tareas con cierta prioridad, lo cual es confuso a nivel de proyecto (la prioridad es de tareas, no de proyectos)
 
-## Cambios
+## Resultado final
 
-### 1. `TareasContent.tsx` — Vista de proyecto individual
-
-**Kanban como default** — ya está como default (`useState("kanban")`), confirmado. Sin cambio necesario.
-
-**Tooltips en icon buttons** — Envolver los botones de vista (Kanban, Lista, Analíticas) y el botón de volver con `Tooltip` + `TooltipContent`:
-- Botón ArrowLeft → "Volver a proyectos"
-- Botón Kanban (Columns) → "Vista Kanban"
-- Botón Lista (List) → "Vista Lista"
-- Botón Analíticas (BarChart3) → "Analíticas"
-
-**Reestructurar analíticas** — En vez del toggle icon que alterna `showAnalytics`, convertirlo en una tercera pestaña visible junto a Kanban y Lista. Usar un grupo de tabs con labels de texto (no solo iconos) similar al de `ProjectsListContent`:
-
-```text
-[ 📊 Kanban ] [ 📋 Lista ] [ 📈 Analíticas ]
-```
-
-Esto reemplaza los icon buttons actuales por un grupo de tabs con texto + icono, haciéndolo más descubrible. Se elimina el estado `showAnalytics` y se agrega `"analytics"` al type de `viewMode`.
-
-### 2. `ProjectsListContent.tsx` — Vista global
-
-**Tooltips** — Agregar tooltips a los icon buttons de la toolbar (grid/list toggle, acciones de proyectos).
+| Vista | Filtros que quedan |
+|-------|-------------------|
+| Dentro del proyecto | Search, Estado, Prioridad + avatar tabs para miembros |
+| Página principal | Search, Carpeta (condicional), Estado, toggle Grid/List |
 
 ## Archivos modificados
-
-| Archivo | Cambio |
-|---------|--------|
-| `TareasContent.tsx` | Cambiar icon buttons por tabs con texto, agregar tooltips, integrar analíticas como tab |
-| `ProjectsListContent.tsx` | Agregar tooltips a icon buttons |
-
-## Sin dependencias nuevas
-Todo usa componentes existentes (`Tooltip`, `TooltipProvider` de shadcn).
-
+- `TareasContent.tsx` — eliminar select "Asignado" y su estado `assignedFilter` (ya lo maneja el tab bar)
+- `ProjectsListContent.tsx` — eliminar selects "Miembro" y "Prioridad" y sus estados
