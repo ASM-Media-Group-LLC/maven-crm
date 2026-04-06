@@ -29,6 +29,7 @@ const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles 
   const [leaderId, setLeaderId] = useState<string>("");
   const [folderId, setFolderId] = useState<string>("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [leaderComboboxOpen, setLeaderComboboxOpen] = useState(false);
 
   const toggleMember = (id: string) => {
     setSelectedMembers(prev =>
@@ -95,17 +96,43 @@ const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles 
           {profiles.length > 0 && (
             <div>
               <Label>Líder del proyecto</Label>
-              <Select value={leaderId} onValueChange={setLeaderId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccionar líder (opcional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Sin líder</SelectItem>
-                  {profiles.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.full_name || "Sin nombre"}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={leaderComboboxOpen} onOpenChange={setLeaderComboboxOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                    {leaderId && leaderId !== "__none__"
+                      ? (profiles.find(p => p.id === leaderId)?.full_name || "Sin nombre")
+                      : "Seleccionar líder (opcional)"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" side="bottom">
+                  <Command>
+                    <CommandInput placeholder="Buscar usuario..." />
+                    <CommandList>
+                      <CommandEmpty>No se encontraron usuarios</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="Sin líder"
+                          onSelect={() => { setLeaderId("__none__"); setLeaderComboboxOpen(false); }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", leaderId === "__none__" ? "opacity-100" : "opacity-0")} />
+                          Sin líder
+                        </CommandItem>
+                        {profiles.slice().sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "")).map((p) => (
+                          <CommandItem
+                            key={p.id}
+                            value={p.full_name || "Sin nombre"}
+                            onSelect={() => { setLeaderId(p.id); setLeaderComboboxOpen(false); }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", leaderId === p.id ? "opacity-100" : "opacity-0")} />
+                            {p.full_name || "Sin nombre"}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           )}
 
