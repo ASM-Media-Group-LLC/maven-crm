@@ -37,6 +37,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [assignedFilter, setAssignedFilter] = useState<string>("");
+  
   const [priorityFilter, setPriorityFilter] = useState<string>("");
 
   // Inline editing states
@@ -361,17 +362,6 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
               <SelectItem value="paused">Pausada</SelectItem>
               <SelectItem value="overdue">Vencida</SelectItem>
               <SelectItem value="completed">Completada</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={assignedFilter || undefined} onValueChange={(v) => setAssignedFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Asignado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {companyProfiles.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.full_name || p.id}</SelectItem>
-              ))}
             </SelectContent>
           </Select>
           <Select value={priorityFilter || undefined} onValueChange={(v) => setPriorityFilter(v === "__all__" ? "" : v)}>

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { getPublicBaseUrl } from "@/lib/getPublicUrl";
-import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Flag, Crown, ChevronDown, ChevronRight, FolderPlus, FolderInput, X, Columns, BarChart3 } from "lucide-react";
+import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Crown, ChevronDown, ChevronRight, FolderPlus, FolderInput, X, Columns, BarChart3 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -74,8 +74,6 @@ const ProjectsListContent = () => {
   const [deleteTarget, setDeleteTarget] = useState<TaskProject | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
-  const [memberFilter, setMemberFilter] = useState<string>("");
-  const [priorityFilter, setPriorityFilter] = useState<string>("");
   const [folderFilter, setFolderFilter] = useState<string>("");
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -118,12 +116,10 @@ const ProjectsListContent = () => {
     return projects.filter((p) => {
       const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = !statusFilter || p.status === statusFilter;
-      const matchesMember = !memberFilter || allMembers.some(m => m.project_id === p.id && m.user_id === memberFilter);
-      const matchesPriority = !priorityFilter || allTasks.some(t => t.project_id === p.id && t.priority === priorityFilter);
       const matchesFolder = !folderFilter || (folderFilter === "__none__" ? !p.folder_id : p.folder_id === folderFilter);
-      return matchesSearch && matchesStatus && matchesMember && matchesPriority && matchesFolder;
+      return matchesSearch && matchesStatus && matchesFolder;
     });
-  }, [projects, search, statusFilter, memberFilter, priorityFilter, folderFilter, allMembers, allTasks]);
+  }, [projects, search, statusFilter, folderFilter]);
 
   const toggleSelectAll = useCallback(() => {
     setSelectedIds(prev => {
@@ -458,33 +454,6 @@ const ProjectsListContent = () => {
               <SelectItem value="__all__">Todos</SelectItem>
               <SelectItem value="active">Activo</SelectItem>
               <SelectItem value="archived">Archivado</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={memberFilter || undefined} onValueChange={(v) => setMemberFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Miembro" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {companyProfiles.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.full_name || "Sin nombre"}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={priorityFilter || undefined} onValueChange={(v) => setPriorityFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Prioridad" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              {Object.entries(priorityConfig).map(([key, config]) => (
-                <SelectItem key={key} value={key}>
-                  <span className="flex items-center gap-2">
-                    <Flag className={`h-3 w-3 ${config.color}`} />
-                    {config.label}
-                  </span>
-                </SelectItem>
-              ))}
             </SelectContent>
           </Select>
           <div className="flex items-center gap-1 ml-auto">
