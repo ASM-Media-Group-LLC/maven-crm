@@ -48,7 +48,7 @@ export function useSidebarBadges() {
           .gte("created_at", today);
 
         if (scope === "self") {
-          leadQuery = leadQuery.eq("assigned_to", userId);
+          leadQuery = leadQuery.eq("lg_user_id", userId);
         }
 
         const { count } = await leadQuery;
