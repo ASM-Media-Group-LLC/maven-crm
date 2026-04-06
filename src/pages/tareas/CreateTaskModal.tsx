@@ -53,6 +53,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
   const [endTime, setEndTime] = useState("");
   const [startCalOpen, setStartCalOpen] = useState(false);
   const [endCalOpen, setEndCalOpen] = useState(false);
+  const [taskType, setTaskType] = useState("task");
 
   const toggleUser = (userId: string) => {
     setAssignedUsers((prev) =>
