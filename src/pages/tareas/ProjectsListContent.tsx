@@ -456,33 +456,6 @@ const ProjectsListContent = () => {
               <SelectItem value="archived">Archivado</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={memberFilter || undefined} onValueChange={(v) => setMemberFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Miembro" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {companyProfiles.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.full_name || "Sin nombre"}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={priorityFilter || undefined} onValueChange={(v) => setPriorityFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Prioridad" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              {Object.entries(priorityConfig).map(([key, config]) => (
-                <SelectItem key={key} value={key}>
-                  <span className="flex items-center gap-2">
-                    <Flag className={`h-3 w-3 ${config.color}`} />
-                    {config.label}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <div className="flex items-center gap-1 ml-auto">
             <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("list")}>
               <List className="h-4 w-4" />
