@@ -465,6 +465,19 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             onStatusChange={handleStatusChange}
             onTaskClick={setDetailTask}
             getTaskStatus={getTaskStatus}
+            onCreateInline={(title, status) => {
+              const dueAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+              createTask.mutate({
+                title,
+                assignee_ids: [],
+                due_at: dueAt,
+                duration_hours: 1,
+                duration_minutes: 0,
+                project_id: projectId,
+                priority: "medium",
+                status,
+              });
+            }}
           />
         ) : viewMode === "list" ? (
           <TasksTable
