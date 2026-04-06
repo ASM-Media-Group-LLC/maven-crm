@@ -25,6 +25,7 @@ interface TaskKanbanViewProps {
   onStatusChange: (taskId: string, status: string) => void;
   onTaskClick: (task: Task) => void;
   getTaskStatus: (t: Task) => string;
+  onCreateInline?: (title: string, status: string) => void;
 }
 
 const columns = [
