@@ -214,13 +214,13 @@ const SubtaskItem = ({ subtask, profiles, onStatusChange, onDelete, onUpdate, on
                   <span className="truncate">{editAssignedUsers.length > 0 ? "+Asignar" : "Asignar"}</span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[200px] p-0" align="start">
+              <PopoverContent className="w-[200px] p-0" align="start" side="bottom">
                 <Command>
                   <CommandInput placeholder="Buscar usuario..." className="h-8 text-xs" />
                   <CommandList>
                     <CommandEmpty className="text-xs p-2">No encontrado</CommandEmpty>
                     <CommandGroup>
-                      {profiles.map((p) => (
+                      {profiles.slice().sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "")).map((p) => (
                         <CommandItem
                           key={p.id}
                           value={p.full_name || p.id}

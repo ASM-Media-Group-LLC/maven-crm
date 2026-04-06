@@ -130,13 +130,13 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, pr
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" side="bottom">
                   <Command>
                     <CommandInput placeholder="Buscar usuario..." />
                     <CommandList>
                       <CommandEmpty>No se encontraron usuarios</CommandEmpty>
                       <CommandGroup>
-                        {profiles.map((p) => (
+                        {profiles.slice().sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "")).map((p) => (
                           <CommandItem
                             key={p.id}
                             value={p.full_name || "Sin nombre"}
