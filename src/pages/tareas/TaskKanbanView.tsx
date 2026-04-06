@@ -43,7 +43,9 @@ const priorityColors: Record<string, string> = {
   urgent: "bg-red-500",
 };
 
-const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskStatus }: TaskKanbanViewProps) => {
+const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskStatus, onCreateInline }: TaskKanbanViewProps) => {
+  const [inlineCol, setInlineCol] = useState<string | null>(null);
+  const [inlineTitle, setInlineTitle] = useState("");
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
   const { data: attachmentSummaries = {} } = useTaskAttachmentSummaries(taskIds);
 
