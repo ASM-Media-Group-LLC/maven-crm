@@ -145,6 +145,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
       project_id: projectId,
       priority,
       start_at: startAtIso,
+      task_type: taskType,
     });
     resetForm();
     onOpenChange(false);
