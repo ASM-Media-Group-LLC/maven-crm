@@ -1,27 +1,50 @@
 
 
-# Plan: Eliminar company_id de José Ignacio Vera
+# Plan: Clasificación de tareas (Hito / Pre-requisito / Tarea independiente)
 
-## Contexto
+## Resumen
+Agregar un campo `task_type` a la tabla `tasks` que permita clasificar cada tarea como **Hito**, **Pre-requisito** o **Tarea independiente**. Este campo será editable desde la creación, edición inline y el detalle de tarea.
 
-El campo `company_id` en la tabla `profiles` se asigna durante el registro cuando un usuario crea o se une a una empresa (en `Register.tsx`). José Ignacio Vera tiene `company_id = 10261fa0-...` mientras que los demás 36 usuarios tienen `NULL`. Esto causa que cuando él busca miembros, el filtro `.eq("company_id", ...)` solo lo retorna a él mismo.
+## Cambios en Base de Datos
 
-## Cambio
-
-### 1. Actualizar dato en la DB
-Usar el insert tool para ejecutar:
+### Migración SQL
 ```sql
-UPDATE profiles SET company_id = NULL WHERE id = '071de069-206c-4f54-821f-09b0ae3b92ce';
+ALTER TABLE tasks ADD COLUMN task_type text NOT NULL DEFAULT 'independent';
 ```
+Valores válidos: `milestone` (Hito), `prerequisite` (Pre-requisito), `independent` (Tarea independiente).
 
-### 2. Mantener el fix de código (ya aprobado previamente)
-Igualmente aplicar el cambio `.or()` en los 3 archivos (`useTareas.ts`, `ProjectsListContent.tsx`, `SubtasksPanel.tsx`) para que en el futuro, si algún usuario tiene `company_id`, igual vea a los usuarios sin empresa asignada. Este fix ya fue aprobado en el plan anterior.
+## Cambios en Código
 
-## Archivos modificados
-| Recurso | Cambio |
+### 1. Modelo de datos — `useTareas.ts`
+- Agregar `task_type: string` a la interfaz `Task`
+- Incluir `task_type` en el `createTask` y `patchTask`
+
+### 2. Creación de tarea — `CreateTaskDialog.tsx`
+- Agregar un selector de tipo de tarea (Select con las 3 opciones) en el formulario de creación
+- Default: "Tarea independiente"
+
+### 3. Vista Kanban — Tarjetas
+- Mostrar un badge/ícono visual que indique el tipo:
+  - **Hito**: ícono de diamante/bandera, badge morado
+  - **Pre-requisito**: ícono de enlace/cadena, badge naranja
+  - **Independiente**: sin badge (default)
+
+### 4. Vista Lista — `TaskListRow.tsx`
+- Mostrar el tipo como un badge pequeño junto al nombre de la tarea
+
+### 5. Detalle de tarea — `TaskDetailPage.tsx`
+- Agregar campo editable de tipo de tarea en los metadatos (columna izquierda)
+
+### 6. Edición inline
+- Permitir cambiar el tipo desde el menú contextual de la tarea (tanto en Kanban como en Lista)
+
+## Archivos a modificar
+| Archivo | Cambio |
 |---------|--------|
-| DB: `profiles` | SET company_id = NULL para José Ignacio Vera |
-| `useTareas.ts` | `.eq()` → `.or()` en filtro de perfiles |
-| `ProjectsListContent.tsx` | Mismo cambio |
-| `SubtasksPanel.tsx` | Mismo cambio |
+| DB migration | `ALTER TABLE tasks ADD COLUMN task_type` |
+| `useTareas.ts` | Agregar campo a interfaz y mutaciones |
+| `CreateTaskDialog.tsx` | Selector de tipo en formulario |
+| `TaskListRow.tsx` | Badge de tipo en vista lista |
+| `TaskKanbanCard.tsx` | Badge de tipo en tarjeta kanban |
+| `TaskDetailPage.tsx` | Campo editable de tipo |
 
