@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
-import { Clock, Play, Pause, AlertTriangle, CheckSquare, Paperclip } from "lucide-react";
+import { Clock, Play, Pause, AlertTriangle, CheckSquare, Paperclip, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -23,6 +25,7 @@ interface TaskKanbanViewProps {
   onStatusChange: (taskId: string, status: string) => void;
   onTaskClick: (task: Task) => void;
   getTaskStatus: (t: Task) => string;
+  onCreateInline?: (title: string, status: string) => void;
 }
 
 const columns = [
@@ -40,7 +43,9 @@ const priorityColors: Record<string, string> = {
   urgent: "bg-red-500",
 };
 
-const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskStatus }: TaskKanbanViewProps) => {
+const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskStatus, onCreateInline }: TaskKanbanViewProps) => {
+  const [inlineCol, setInlineCol] = useState<string | null>(null);
+  const [inlineTitle, setInlineTitle] = useState("");
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
   const { data: attachmentSummaries = {} } = useTaskAttachmentSummaries(taskIds);
 
@@ -207,6 +212,37 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
                       );
                     })}
                     {provided.placeholder}
+
+                    {/* Inline creation */}
+                    {onCreateInline && inlineCol === col.id ? (
+                      <div className="flex gap-1.5 mt-1">
+                        <Input
+                          value={inlineTitle}
+                          onChange={(e) => setInlineTitle(e.target.value)}
+                          placeholder="Título de la tarea..."
+                          className="h-8 text-sm"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && inlineTitle.trim()) {
+                              onCreateInline(inlineTitle.trim(), col.dbStatus);
+                              setInlineTitle("");
+                              setInlineCol(null);
+                            }
+                            if (e.key === "Escape") { setInlineCol(null); setInlineTitle(""); }
+                          }}
+                          onBlur={() => { setInlineCol(null); setInlineTitle(""); }}
+                        />
+                      </div>
+                    ) : onCreateInline ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full mt-1 text-muted-foreground hover:text-foreground gap-1"
+                        onClick={() => { setInlineCol(col.id); setInlineTitle(""); }}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Agregar
+                      </Button>
+                    ) : null}
                   </div>
                 )}
               </Droppable>

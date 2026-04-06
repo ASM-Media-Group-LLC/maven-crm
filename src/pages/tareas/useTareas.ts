@@ -165,6 +165,7 @@ export const useTareas = (projectId?: string) => {
       project_id?: string;
       priority?: string;
       start_at?: string;
+      status?: string;
     }) => {
       if (!user || !profile) throw new Error("Not authenticated");
       const primaryAssignee = task.assignee_ids[0] || user.id;
@@ -183,6 +184,7 @@ export const useTareas = (projectId?: string) => {
           due_at: task.due_at,
           priority: task.priority || "medium",
           start_at: task.start_at || null,
+          status: task.status || "active",
         } as any)
         .select("id")
         .single();
