@@ -360,32 +360,6 @@ const ProjectsListContent = () => {
             <p className="text-sm text-muted-foreground">Gestión de tareas y proyectos</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 border rounded-lg p-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant={mainView === "projects" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("projects")} className="gap-1">
-                    <FolderOpen className="h-4 w-4" /> Proyectos
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Ver lista de proyectos</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant={mainView === "kanban" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("kanban")} className="gap-1">
-                    <Columns className="h-4 w-4" /> Kanban
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Kanban global de todas las tareas</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant={mainView === "analytics" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("analytics")} className="gap-1">
-                    <BarChart3 className="h-4 w-4" /> Analíticas
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Analíticas globales de tareas</TooltipContent>
-              </Tooltip>
-            </div>
             <Button variant="outline" onClick={() => setCreateFolderOpen(true)}>
               <FolderPlus className="h-4 w-4 mr-1" /> Nueva Carpeta
             </Button>
@@ -397,6 +371,80 @@ const ProjectsListContent = () => {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar proyecto..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
+          </div>
+          {mainView === "projects" && (
+            <>
+              {hasFolders && (
+                <Select value={folderFilter || undefined} onValueChange={(v) => setFolderFilter(v === "__all__" ? "" : v)}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Carpeta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Todas</SelectItem>
+                    <SelectItem value="__none__">Sin carpeta</SelectItem>
+                    {folders.map(f => (
+                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  <SelectItem value="active">Activo</SelectItem>
+                  <SelectItem value="archived">Archivado</SelectItem>
+                </SelectContent>
+              </Select>
+            </>
+          )}
+          <div className="flex items-center gap-1 ml-auto border rounded-lg p-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant={mainView === "kanban" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("kanban")} className="gap-1">
+                  <Columns className="h-4 w-4" /> Kanban
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Kanban global de todas las tareas</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant={mainView === "analytics" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("analytics")} className="gap-1">
+                  <BarChart3 className="h-4 w-4" /> Analíticas
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Analíticas globales de tareas</TooltipContent>
+            </Tooltip>
+            {mainView === "projects" && (
+              <>
+                <div className="w-px h-5 bg-border mx-1" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("list")}>
+                      <List className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Vista lista</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("grid")}>
+                      <LayoutGrid className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Vista cuadrícula</TooltipContent>
+                </Tooltip>
+              </>
+            )}
+          </div>
+        </div>
+
         {mainView === "kanban" ? (
           <GlobalKanbanView
             tasks={allTasks}
@@ -411,148 +459,81 @@ const ProjectsListContent = () => {
             projects={projects}
           />
         ) : (
-        <>
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-          {kpis.map((kpi) => (
-            <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
-              <CardContent className="flex items-center gap-3 p-4">
-                <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
-                <div>
-                  <p className="text-2xl font-bold">{kpi.value}</p>
-                  <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar proyecto..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
-          </div>
-          {hasFolders && (
-            <Select value={folderFilter || undefined} onValueChange={(v) => setFolderFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Carpeta" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todas</SelectItem>
-                <SelectItem value="__none__">Sin carpeta</SelectItem>
-                {folders.map(f => (
-                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              <SelectItem value="active">Activo</SelectItem>
-              <SelectItem value="archived">Archivado</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="flex items-center gap-1 ml-auto">
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("list")}>
-              <List className="h-4 w-4" />
-            </Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("grid")}>
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground text-center py-8">Cargando proyectos...</p>
-        ) : filteredProjects.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">No hay proyectos aún. Crea el primero.</p>
-        ) : viewMode === "list" ? (
-          <ProjectsTable
-            projects={filteredProjects}
-            getProjectTaskCounts={getProjectTaskCounts}
-            getProjectProgress={getProjectProgress}
-            profiles={companyProfiles}
-            getMembersForProject={getMembersForProject}
-            onEdit={setEditProject}
-            onDelete={setDeleteTarget}
-            onShare={handleShare}
-            onArchive={handleArchive}
-            folders={folders}
-            onMoveToFolder={(projectId, folderId) => moveProjectToFolder.mutate({ projectId, folderId })}
-            selectedIds={selectedIds}
-            onToggleSelect={toggleSelect}
-            onToggleAll={toggleSelectAll}
-          />
-        ) : hasFolders ? (
-          // Grouped grid view with collapsible folders
-          <div className="space-y-4">
-            {groupedProjects.map(group => {
-              if (group.projects.length === 0 && group.folderId) return null;
-              const isCollapsed = group.folderId ? collapsedFolders.has(group.folderId) : false;
-              const groupKey = group.folderId || "__none__";
-              return (
-                <Collapsible key={groupKey} open={!isCollapsed} onOpenChange={() => group.folderId && toggleFolderCollapse(group.folderId)}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="sm" className="gap-1 px-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
-                        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        <FolderOpen className="h-4 w-4" />
-                        {group.folderName}
-                        <span className="text-xs font-normal ml-1">({group.projects.length})</span>
-                      </Button>
-                    </CollapsibleTrigger>
-                    {group.folderId && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6">
-                            <MoreHorizontal className="h-3.5 w-3.5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
-                          <DropdownMenuItem onClick={() => {
-                            const newName = prompt("Nuevo nombre:", group.folderName);
-                            if (newName?.trim() && group.folderId) renameFolder.mutate({ id: group.folderId, name: newName.trim() });
-                          }}>
-                            <Pencil className="mr-2 h-4 w-4" /> Renombrar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => {
-                            if (group.folderId && confirm(`¿Eliminar la carpeta "${group.folderName}"? Los proyectos no se eliminarán.`)) {
-                              deleteFolder.mutate(group.folderId);
-                            }
-                          }}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar carpeta
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            {kpis.map((kpi) => (
+              <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
+                <CardContent className="flex items-center gap-3 p-4">
+                  <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
+                  <div>
+                    <p className="text-2xl font-bold">{kpi.value}</p>
+                    <p className="text-xs text-muted-foreground">{kpi.label}</p>
                   </div>
-                  <CollapsibleContent>
-                    {group.projects.length === 0 ? (
-                      <p className="text-xs text-muted-foreground pl-8 pb-2">Sin proyectos en esta carpeta</p>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {group.projects.map(renderProjectCard)}
-                      </div>
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
-              );
-            })}
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        ) : (
-          // No folders: use draggable grid as before
-          <DraggableGrid
-            items={filteredProjects}
-            onReorder={(ids) => reorderProjects.mutate(ids)}
-            renderItem={renderProjectCard}
-          />
-        )}
-      </div>
-        </>
+
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Cargando proyectos...</p>
+          ) : filteredProjects.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No hay proyectos aún. Crea el primero.</p>
+          ) : viewMode === "list" ? (
+            <ProjectsTable
+              projects={filteredProjects}
+              getProjectTaskCounts={getProjectTaskCounts}
+              getProjectProgress={getProjectProgress}
+              profiles={companyProfiles}
+              getMembersForProject={getMembersForProject}
+              onEdit={setEditProject}
+              onDelete={setDeleteTarget}
+              onShare={handleShare}
+              onArchive={handleArchive}
+              folders={folders}
+              onMoveToFolder={(projectId, folderId) => moveProjectToFolder.mutate({ projectId, folderId })}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onToggleAll={toggleSelectAll}
+            />
+          ) : hasFolders ? (
+            <div className="space-y-4">
+              {groupedProjects.map(group => {
+                if (group.projects.length === 0 && group.folderId) return null;
+                const isCollapsed = group.folderId ? collapsedFolders.has(group.folderId) : false;
+                const groupKey = group.folderId || "__none__";
+                return (
+                  <Collapsible key={groupKey} open={!isCollapsed} onOpenChange={() => group.folderId && toggleFolderCollapse(group.folderId)}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="gap-1 px-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
+                          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          <FolderOpen className="h-4 w-4" />
+                          {group.folderName}
+                          <span className="text-xs font-normal ml-1">({group.projects.length})</span>
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent>
+                      {group.projects.length === 0 ? (
+                        <p className="text-xs text-muted-foreground pl-8 pb-2">Sin proyectos en esta carpeta</p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {group.projects.map(renderProjectCard)}
+                        </div>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
+            </div>
+          ) : (
+            <DraggableGrid
+              items={filteredProjects}
+              onReorder={(ids) => reorderProjects.mutate(ids)}
+              renderItem={renderProjectCard}
+            />
+          )}
+        </div>
         )}
       </div>
 
