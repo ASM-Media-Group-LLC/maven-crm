@@ -50,6 +50,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [assignedFilter, setAssignedFilter] = useState<string>("");
   
   const [priorityFilter, setPriorityFilter] = useState<string>("");
+  const [taskTypeFilter, setTaskTypeFilter] = useState<string>("");
 
   // Inline editing states
   const [editingName, setEditingName] = useState(false);
@@ -88,7 +89,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
       const matchesStatus = !statusFilter || taskStatus === statusFilter;
       const matchesAssigned = !assignedFilter || (t.assignees || []).includes(assignedFilter);
       const matchesPriority = !priorityFilter || t.priority === priorityFilter;
-      return matchesSearch && matchesStatus && matchesAssigned && matchesPriority;
+      const matchesType = !taskTypeFilter || t.task_type === taskTypeFilter;
+      return matchesSearch && matchesStatus && matchesAssigned && matchesPriority && matchesType;
     });
 
     return filtered.sort((a, b) => {
@@ -496,6 +498,18 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
               <SelectItem value="medium">Media</SelectItem>
               <SelectItem value="high">Alta</SelectItem>
               <SelectItem value="urgent">Urgente</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={taskTypeFilter || undefined} onValueChange={(v) => setTaskTypeFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos</SelectItem>
+              <SelectItem value="task">Tarea</SelectItem>
+              <SelectItem value="milestone">Hito</SelectItem>
+              <SelectItem value="prerequisite">Pre-requisito</SelectItem>
+              <SelectItem value="independent">Independiente</SelectItem>
             </SelectContent>
           </Select>
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "kanban" | "list" | "analytics")} className="ml-auto">

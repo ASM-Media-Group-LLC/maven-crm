@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Play, Pause, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Play, Pause, CheckCircle2, AlertTriangle, Diamond, Link, Unplug } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import type { Task } from "./useTareas";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
-type SortKey = "title" | "assigned" | "due" | "status" | "priority" | "start" | "assigned_by" | "due_date";
+type SortKey = "title" | "assigned" | "due" | "status" | "priority" | "start" | "assigned_by" | "due_date" | "task_type";
 
 interface TasksTableProps {
   tasks: Task[];
@@ -143,6 +143,7 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
     else if (sortKey === "due_date") diff = new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
     else if (sortKey === "start") diff = (a.start_at ? new Date(a.start_at).getTime() : 0) - (b.start_at ? new Date(b.start_at).getTime() : 0);
     else if (sortKey === "priority") diff = (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
+    else if (sortKey === "task_type") diff = (a.task_type || "task").localeCompare(b.task_type || "task");
     else diff = a.status.localeCompare(b.status);
     return sortAsc ? diff : -diff;
   });
@@ -159,6 +160,7 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
             <TableHead><SortHeader label="Título" col="title" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="Tipo" col="task_type" /></TableHead>
             <TableHead className="hidden sm:table-cell"><SortHeader label="Asignado por" col="assigned_by" /></TableHead>
             <TableHead className="hidden sm:table-cell"><SortHeader label="Asignado a" col="assigned" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Prioridad" col="priority" /></TableHead>
@@ -175,6 +177,17 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
               <TableCell>
                 <div className="font-medium text-sm">{task.title}</div>
                 {task.description && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{task.description}</div>}
+              </TableCell>
+              <TableCell className="text-center">
+                {task.task_type === "milestone" ? (
+                  <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 gap-1"><Diamond className="h-3 w-3" />Hito</Badge>
+                ) : task.task_type === "prerequisite" ? (
+                  <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 gap-1"><Link className="h-3 w-3" />Pre-req</Badge>
+                ) : task.task_type === "independent" ? (
+                  <Badge className="bg-muted text-muted-foreground border-border gap-1"><Unplug className="h-3 w-3" />Indep.</Badge>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
               </TableCell>
               <TableCell className="hidden sm:table-cell">
                 <span className="text-xs text-muted-foreground">{profileMap.get(task.created_by) || "—"}</span>
