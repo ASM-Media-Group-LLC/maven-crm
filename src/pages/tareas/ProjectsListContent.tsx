@@ -74,8 +74,6 @@ const ProjectsListContent = () => {
   const [deleteTarget, setDeleteTarget] = useState<TaskProject | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
-  const [memberFilter, setMemberFilter] = useState<string>("");
-  const [priorityFilter, setPriorityFilter] = useState<string>("");
   const [folderFilter, setFolderFilter] = useState<string>("");
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
