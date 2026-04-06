@@ -1,58 +1,57 @@
 
-# Plan: 4 mejoras al módulo de Tareas
+# Plan: Mejoras avanzadas al módulo de Tareas (estilo ClickUp)
 
-## 1. Stats cards siempre arriba (fix de regresión)
+## 1. Botón Settings/More del proyecto dentro del proyecto
 
-Las KPI cards (progreso + contadores) en `TareasContent.tsx` deben estar siempre visibles independientemente de la vista activa (kanban/lista/analíticas). Actualmente ya están arriba del viewMode conditional, así que esto parece correcto. **Verificar** que no se movieron accidentalmente — si están dentro del bloque condicional, sacarlas.
+Agregar un `DropdownMenu` al lado de "Nueva Tarea" en `TareasContent.tsx` con las mismas opciones que existen en la página principal de proyectos:
+- Editar proyecto (abre `EditProjectModal`)
+- Compartir proyecto
+- Archivar proyecto
+- Eliminar proyecto
 
-**Archivo**: `TareasContent.tsx` — confirmar que las cards (líneas 280-311) están FUERA del bloque `viewMode === "analytics"` (línea 388).
+**Archivo**: `TareasContent.tsx` — agregar DropdownMenu con `MoreHorizontal` o `Settings` icon.
 
-## 2. Reemplazar Burndown por Gantt en Analíticas
+## 2. Task Detail en página/dialog completo (no Sheet lateral)
 
-En `TaskAnalyticsTab.tsx`, eliminar el chart de Burndown (líneas 85-112 data + líneas 175-195 JSX) y reemplazarlo con un diagrama Gantt real usando Recharts `BarChart` horizontal con barras posicionadas por fechas.
+Reemplazar el `Sheet` lateral por un `Dialog` de pantalla completa (como ClickUp: layout de 2 columnas — detalles a la izquierda, actividad/comentarios a la derecha).
 
-**Archivo**: `TaskAnalyticsTab.tsx`
-- Eliminar `burndownData` useMemo y su renderizado
-- Crear `ganttChartData` que calcule para cada tarea: offset desde la fecha más temprana (como posición X) y duración en días (como largo de barra)
-- Renderizar como `BarChart` horizontal con `XAxis` como línea temporal (días) y `YAxis` como nombres de tareas
-- Usar colores de status para las barras
-- Mantener el timeline simplificado existente (líneas 197-224) o reemplazarlo por este nuevo Gantt más completo
+**Archivos**:
+- Crear `TaskDetailPage.tsx` — Dialog fullscreen con layout tipo ClickUp:
+  - **Izquierda**: título editable inline, descripción, estado, prioridad, asignados, fechas, subtareas, adjuntos
+  - **Derecha**: panel de actividad/comentarios (como en la referencia)
+- `TareasContent.tsx` — cambiar `TaskDetailSheet` por `TaskDetailPage`
+- Eliminar `TaskDetailSheet.tsx` (ya no se usa)
 
-## 3. Creación inline de tareas en Kanban
+## 3. Kanban cards más completas con edición inline
 
-Agregar un botón "+" al final de cada columna del Kanban que al clickear muestre un input inline para crear tareas rápidamente con título y asignación directa al status de esa columna.
+Enriquecer las tarjetas del Kanban en `TaskKanbanView.tsx` para mostrar más metadata y permitir edición inline (como ClickUp):
+- Mostrar iconos de: subtareas (count), comentarios (count), adjuntos, fecha, prioridad (flag icon), asignados
+- Agregar menú contextual (click derecho o botón `...`) en cada card con: cambiar estado, cambiar prioridad, editar, eliminar
+- Iconos de acción rápida inline en el footer de la card
 
-**Archivo**: `TaskKanbanView.tsx`
-- Agregar props: `onCreateTask` callback y `profiles` ya está
-- Después de `{provided.placeholder}`, agregar un mini-form inline: input de título + botón crear
-- Al crear, se pasa el status de la columna automáticamente (ej: si está en "En curso", se crea con status `in_progress`)
-- El form es minimal: solo título, el resto usa defaults (prioridad medium, duración 1h, due date +24h)
+**Archivos**: `TaskKanbanView.tsx` — enriquecer cards con más metadata e inline actions.
 
-**Archivo**: `TareasContent.tsx`
-- Pasar `onCreateInline` al `TaskKanbanView` que llame a `createTask.mutate` con el status apropiado
+## 4. Mini panel lateral de navegación entre proyectos
 
-**Archivo**: `useTareas.ts`
-- Ajustar `createTask` mutation para aceptar un `status` opcional en los params
+Agregar un panel colapsable a la izquierda dentro de `TareasContent.tsx` que muestre la lista de proyectos con:
+- Nombre del proyecto con indicador visual (dot de color)
+- Proyecto actual resaltado
+- Click para navegar a otro proyecto
+- Botón de estrella para marcar favoritos (guardado en localStorage por ahora)
+- Colapsable con un botón toggle
 
-## 4. Gestión de miembros del proyecto en el header
+**Archivos**:
+- Crear `ProjectMiniSidebar.tsx` — componente del mini panel
+- `TareasContent.tsx` — integrar el sidebar a la izquierda del contenido
 
-Agregar en el header de `TareasContent.tsx` la capacidad de gestionar miembros del proyecto (agregar/quitar) usando un Popover con el patrón estándar de Command/Combobox.
-
-**Archivo**: `TareasContent.tsx`
-- Importar `useProjectMembers`
-- Agregar un botón/icono `Users` junto al líder del proyecto
-- Al clickear, abrir un Popover con la lista de profiles, checkbox para agregar/quitar miembros
-- Usar `setProjectMembers` mutation del hook existente
-- Mostrar avatares de los miembros actuales como chips debajo del líder
-
-## Archivos a modificar
+## Archivos a modificar/crear
 
 | Archivo | Cambio |
 |---------|--------|
-| `TaskAnalyticsTab.tsx` | Reemplazar Burndown por Gantt chart con Recharts |
-| `TaskKanbanView.tsx` | Agregar inline task creation por columna |
-| `TareasContent.tsx` | Pasar onCreateInline al kanban + agregar gestión de miembros en header |
-| `useTareas.ts` | Aceptar status opcional en createTask |
+| `TareasContent.tsx` | Agregar settings dropdown, integrar mini sidebar, cambiar Sheet por Dialog |
+| `TaskDetailPage.tsx` (nuevo) | Dialog fullscreen para detalle de tarea |
+| `TaskKanbanView.tsx` | Cards más ricas con metadata e inline actions |
+| `ProjectMiniSidebar.tsx` (nuevo) | Mini panel lateral de proyectos con favoritos |
+| `TaskDetailSheet.tsx` | Eliminar (reemplazado) |
 
-## Sin migraciones DB ni dependencias nuevas
-Todo usa componentes y hooks existentes.
+## Sin migraciones ni dependencias nuevas
