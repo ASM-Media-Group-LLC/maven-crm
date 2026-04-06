@@ -4166,6 +4166,7 @@ export type Database = {
           created_by: string | null
           creator_id: string | null
           due_date: string | null
+          evidence_url: string | null
           fee_amount: number | null
           fee_type: string | null
           id: string
@@ -4191,6 +4192,7 @@ export type Database = {
           created_by?: string | null
           creator_id?: string | null
           due_date?: string | null
+          evidence_url?: string | null
           fee_amount?: number | null
           fee_type?: string | null
           id?: string
@@ -4216,6 +4218,7 @@ export type Database = {
           created_by?: string | null
           creator_id?: string | null
           due_date?: string | null
+          evidence_url?: string | null
           fee_amount?: number | null
           fee_type?: string | null
           id?: string
@@ -7199,6 +7202,12 @@ export type Database = {
       get_cowork_user_room: {
         Args: { _session_id: string; _user_id: string }
         Returns: string
+      }
+      get_distinct_promolog_agents: {
+        Args: never
+        Returns: {
+          agent_id: string
+        }[]
       }
       get_project_by_share_token: {
         Args: { _token: string }
