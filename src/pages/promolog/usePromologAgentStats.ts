@@ -2,47 +2,40 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Lightweight hook: fetches distinct active agent IDs from promolog_entries
- * using a single query instead of downloading all 34K+ entries.
+ * Lightweight hook: fetches distinct active agent IDs from promolog_entries.
+ * Uses two small queries filtered by the known profile IDs to avoid downloading all rows.
  */
 export const usePromologActiveAgents = (profileIds: string[]) => {
   return useQuery({
     queryKey: ["promolog-active-agents", profileIds],
     queryFn: async () => {
-      // Fetch distinct reviewed_by values
+      if (profileIds.length === 0) return [];
+
+      const agentSet = new Set<string>();
+
+      // Query reviewed_by filtered to known profiles only
       const { data: reviewers } = await supabase
         .from("promolog_entries")
         .select("reviewed_by")
-        .not("reviewed_by", "is", null);
+        .in("reviewed_by", profileIds)
+        .limit(1000);
 
-      // Fetch distinct created_by values
+      if (reviewers) {
+        for (const r of reviewers) {
+          if (r.reviewed_by) agentSet.add(r.reviewed_by);
+        }
+      }
+
+      // Query created_by filtered to known profiles only
       const { data: creators } = await supabase
         .from("promolog_entries")
         .select("created_by")
-        .not("created_by", "is", null);
+        .in("created_by", profileIds)
+        .limit(1000);
 
-      const agentSet = new Set<string>();
-      const profileSet = new Set(profileIds);
-
-      // We need distinct values - supabase JS doesn't support DISTINCT directly,
-      // so we collect unique IDs client-side from the smaller result sets
-      // But these could still be large. Let's use a smarter approach with RPC or just
-      // get unique agent IDs by scanning reviewed_by and created_by columns.
-      
-      // Actually, let's just query the profiles that have entries
-      // Use a different approach: query promolog_entries grouped
-      if (reviewers) {
-        for (const r of reviewers) {
-          if (r.reviewed_by && profileSet.has(r.reviewed_by)) {
-            agentSet.add(r.reviewed_by);
-          }
-        }
-      }
       if (creators) {
         for (const c of creators) {
-          if (c.created_by && profileSet.has(c.created_by)) {
-            agentSet.add(c.created_by);
-          }
+          if (c.created_by) agentSet.add(c.created_by);
         }
       }
 
