@@ -12,7 +12,7 @@ import type { Task } from "./useTareas";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
-type SortKey = "title" | "assigned" | "due" | "status" | "priority" | "start" | "assigned_by" | "due_date";
+type SortKey = "title" | "assigned" | "due" | "status" | "priority" | "start" | "assigned_by" | "due_date" | "task_type";
 
 interface TasksTableProps {
   tasks: Task[];
