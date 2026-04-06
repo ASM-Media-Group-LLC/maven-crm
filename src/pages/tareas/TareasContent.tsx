@@ -601,7 +601,11 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
         }}
         profiles={companyProfiles}
         onSubmit={(data) => {
-          updateProjectInline.mutate(data);
+          updateProjectInline.mutate({
+            name: data.name,
+            description: data.description || null,
+            leader_id: data.leaderId || null,
+          });
           setEditProjectOpen(false);
         }}
       />
@@ -610,9 +614,12 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
         open={deleteProjectOpen}
         onOpenChange={setDeleteProjectOpen}
         projectName={projectName || ""}
-        onConfirm={() => {
-          deleteTask.mutate(projectId);
-          navigate("/tareas");
+        onConfirm={async () => {
+          const { error } = await (await import("@/integrations/supabase/client")).supabase
+            .from("task_projects" as any)
+            .delete()
+            .eq("id", projectId);
+          if (!error) navigate("/tareas");
         }}
         isLoading={false}
       />
