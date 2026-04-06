@@ -50,6 +50,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [assignedFilter, setAssignedFilter] = useState<string>("");
   
   const [priorityFilter, setPriorityFilter] = useState<string>("");
+  const [taskTypeFilter, setTaskTypeFilter] = useState<string>("");
 
   // Inline editing states
   const [editingName, setEditingName] = useState(false);
