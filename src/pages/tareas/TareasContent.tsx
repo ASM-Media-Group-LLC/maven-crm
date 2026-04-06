@@ -142,9 +142,14 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/tareas")}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={() => navigate("/tareas")}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Volver a proyectos</TooltipContent>
+            </Tooltip>
             {editingName ? (
               <Input
                 ref={nameInputRef}
