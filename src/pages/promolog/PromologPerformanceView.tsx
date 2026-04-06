@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
-import { usePromologAgentStats, usePromologAgentEntries } from "./usePromologAgentStats";
+import { usePromologActiveAgents, usePromologAgentEntries } from "./usePromologAgentStats";
 
 interface Props {
   profiles: Array<{ id: string; full_name: string | null }>;
@@ -33,27 +33,27 @@ const PromologPerformanceView = ({ profiles }: Props) => {
 
   const effectiveAgent = isOperational ? user?.id ?? null : selectedAgent;
 
-  // Get profile IDs for the shared hook
+  // Get profile IDs for the active agents hook
   const profileIds = useMemo(() => profiles.filter(p => p.full_name).map(p => p.id), [profiles]);
 
-  // Use shared hook for agent stats (batched, all entries)
-  const { data: agentStats = [], isLoading: statsLoading } = usePromologAgentStats(profileIds);
+  // Lightweight query: just get distinct active agent IDs
+  const { data: activeAgentIds = [], isLoading: agentsLoading } = usePromologActiveAgents(profileIds);
 
-  // Build agents list from stats
+  // Build agents list from active IDs + profiles
   const agents = useMemo(() => {
-    return agentStats
-      .map(stat => {
-        const p = profiles.find(pr => pr.id === stat.id);
-        return p?.full_name ? { id: stat.id, name: p.full_name } : null;
+    return activeAgentIds
+      .map(id => {
+        const p = profiles.find(pr => pr.id === id);
+        return p?.full_name ? { id, name: p.full_name } : null;
       })
       .filter((a): a is { id: string; name: string } => a !== null)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [agentStats, profiles]);
+  }, [activeAgentIds, profiles]);
 
-  // Use shared hook for agent entries (batched, all entries)
+  // Fetch entries only for the selected agent
   const { data: agentEntries = [], isLoading: entriesLoading } = usePromologAgentEntries(effectiveAgent);
 
-  const isLoading = statsLoading || entriesLoading;
+  const isLoading = agentsLoading || entriesLoading;
 
   const selectedName = !effectiveAgent
     ? "Seleccionar agente"
@@ -111,7 +111,6 @@ const PromologPerformanceView = ({ profiles }: Props) => {
   return (
     <Card>
       <CardContent className="pt-6">
-        {/* Simple header with selector — no banner */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-base font-semibold">Rendimiento por Agente</h3>
@@ -158,7 +157,6 @@ const PromologPerformanceView = ({ profiles }: Props) => {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Total header */}
             <div className="rounded-lg border border-primary/30 bg-gradient-to-r from-primary/15 to-primary/5 p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -169,7 +167,6 @@ const PromologPerformanceView = ({ profiles }: Props) => {
               </div>
             </div>
 
-            {/* Result distribution */}
             <Card>
               <CardContent className="pt-6">
                 <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
@@ -190,7 +187,6 @@ const PromologPerformanceView = ({ profiles }: Props) => {
               </CardContent>
             </Card>
 
-            {/* Charts */}
             {[
               { title: "Promos por Hora del Día", icon: Clock, iconColor: "text-primary", data: hourlyData, dataKey: "hour", type: "bar", color: "hsl(var(--primary))" },
               { title: "Promos por Día (Última Semana)", icon: BarChart3, iconColor: "text-emerald-500", data: weeklyData, dataKey: "label", type: "bar", color: "#10b981" },
