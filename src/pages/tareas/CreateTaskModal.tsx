@@ -33,6 +33,7 @@ interface CreateTaskModalProps {
     project_id?: string;
     priority?: string;
     start_at?: string;
+    task_type?: string;
   }) => void;
   isLoading?: boolean;
 }
