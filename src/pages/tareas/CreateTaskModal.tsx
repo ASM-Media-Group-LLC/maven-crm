@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import PrioritySelect from "./PrioritySelect";
 import { TIME_OPTIONS } from "./timeOptions";
+import { Diamond, Link, Unplug } from "lucide-react";
 
 interface CreateTaskModalProps {
   open: boolean;
@@ -32,6 +33,7 @@ interface CreateTaskModalProps {
     project_id?: string;
     priority?: string;
     start_at?: string;
+    task_type?: string;
   }) => void;
   isLoading?: boolean;
 }
@@ -52,6 +54,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
   const [endTime, setEndTime] = useState("");
   const [startCalOpen, setStartCalOpen] = useState(false);
   const [endCalOpen, setEndCalOpen] = useState(false);
+  const [taskType, setTaskType] = useState("task");
 
   const toggleUser = (userId: string) => {
     setAssignedUsers((prev) =>
@@ -71,6 +74,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
     setStartTime("");
     setEndTime("");
     setPriority("medium");
+    setTaskType("task");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -142,6 +146,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
       project_id: projectId,
       priority,
       start_at: startAtIso,
+      task_type: taskType,
     });
     resetForm();
     onOpenChange(false);
@@ -165,6 +170,22 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
             </div>
 
             <PrioritySelect value={priority} onChange={setPriority} />
+
+            {/* Task type selector */}
+            <div>
+              <Label>Tipo de tarea</Label>
+              <Select value={taskType} onValueChange={setTaskType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="task">Tarea</SelectItem>
+                  <SelectItem value="milestone">Hito</SelectItem>
+                  <SelectItem value="prerequisite">Pre-requisito</SelectItem>
+                  <SelectItem value="independent">Independiente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Multi-select de usuarios */}
             <div>

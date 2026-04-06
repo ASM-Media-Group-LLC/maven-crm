@@ -14,6 +14,7 @@ export interface Task {
   project_id: string | null;
   status: string;
   priority: string;
+  task_type: string;
   duration_hours: number;
   duration_minutes: number;
   start_at: string | null;
@@ -166,6 +167,7 @@ export const useTareas = (projectId?: string) => {
       priority?: string;
       start_at?: string;
       status?: string;
+      task_type?: string;
     }) => {
       if (!user || !profile) throw new Error("Not authenticated");
       const primaryAssignee = task.assignee_ids[0] || user.id;
@@ -185,6 +187,7 @@ export const useTareas = (projectId?: string) => {
           priority: task.priority || "medium",
           start_at: task.start_at || null,
           status: task.status || "active",
+          task_type: task.task_type || "task",
         } as any)
         .select("id")
         .single();

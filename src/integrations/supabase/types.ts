@@ -6685,6 +6685,7 @@ export type Database = {
           share_token: string | null
           start_at: string | null
           status: string
+          task_type: string
           title: string
           updated_at: string | null
         }
@@ -6706,6 +6707,7 @@ export type Database = {
           share_token?: string | null
           start_at?: string | null
           status?: string
+          task_type?: string
           title: string
           updated_at?: string | null
         }
@@ -6727,6 +6729,7 @@ export type Database = {
           share_token?: string | null
           start_at?: string | null
           status?: string
+          task_type?: string
           title?: string
           updated_at?: string | null
         }
@@ -7240,6 +7243,7 @@ export type Database = {
           share_token: string | null
           start_at: string | null
           status: string
+          task_type: string
           title: string
           updated_at: string | null
         }[]
@@ -7270,6 +7274,7 @@ export type Database = {
           share_token: string | null
           start_at: string | null
           status: string
+          task_type: string
           title: string
           updated_at: string | null
         }[]

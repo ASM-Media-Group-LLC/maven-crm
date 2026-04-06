@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Send, Trash2, Clock, Flag, Users, MessageSquare, X, CalendarIcon, Pencil, ChevronDown } from "lucide-react";
+import { Send, Trash2, Clock, Flag, Users, MessageSquare, X, CalendarIcon, Pencil, ChevronDown, Diamond, Link2, Unplug } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -194,6 +194,25 @@ const TaskDetailPage = ({ task, open, onOpenChange, profiles, onEdit, onStatusCh
                   <span className="text-sm">
                     {task.duration_hours}h {task.duration_minutes}m
                   </span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Diamond className="h-3 w-3" /> Tipo
+                  </span>
+                  <Select
+                    value={task.task_type || "task"}
+                    onValueChange={(v) => onPatchTask?.(task.id, { task_type: v })}
+                  >
+                    <SelectTrigger className="h-7 w-auto text-xs border-0 p-0 px-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="task">Tarea</SelectItem>
+                      <SelectItem value="milestone">Hito</SelectItem>
+                      <SelectItem value="prerequisite">Pre-requisito</SelectItem>
+                      <SelectItem value="independent">Independiente</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
