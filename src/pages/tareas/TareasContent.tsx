@@ -213,8 +213,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                   <Settings className="h-4 w-4" />
+                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setEditProjectOpen(true)}>
