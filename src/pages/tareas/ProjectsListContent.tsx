@@ -430,13 +430,44 @@ const ProjectsListContent = () => {
               <SelectItem value="archived">Archivado</SelectItem>
             </SelectContent>
           </Select>
-          <div className="flex items-center gap-1 ml-auto">
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("list")}>
-              <List className="h-4 w-4" />
-            </Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("grid")}>
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
+          <div className="flex items-center gap-1 ml-auto border rounded-lg p-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant={mainView === "kanban" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("kanban")} className="gap-1">
+                  <Columns className="h-4 w-4" /> Kanban
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Kanban global de todas las tareas</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant={mainView === "analytics" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("analytics")} className="gap-1">
+                  <BarChart3 className="h-4 w-4" /> Analíticas
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Analíticas globales de tareas</TooltipContent>
+            </Tooltip>
+            {mainView === "projects" && (
+              <>
+                <div className="w-px h-5 bg-border mx-1" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("list")}>
+                      <List className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Vista lista</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("grid")}>
+                      <LayoutGrid className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Vista cuadrícula</TooltipContent>
+                </Tooltip>
+              </>
+            )}
           </div>
         </div>
 
