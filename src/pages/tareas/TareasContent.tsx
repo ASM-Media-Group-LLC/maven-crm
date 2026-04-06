@@ -36,6 +36,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [assignedFilter, setAssignedFilter] = useState<string>("");
   
   const [priorityFilter, setPriorityFilter] = useState<string>("");
 
