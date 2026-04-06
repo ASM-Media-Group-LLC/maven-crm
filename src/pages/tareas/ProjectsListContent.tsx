@@ -371,40 +371,60 @@ const ProjectsListContent = () => {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
+        {/* KPI Stats Cards — always visible */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+          {kpis.map((kpi) => (
+            <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
+              <CardContent className="flex items-center gap-3 p-4">
+                <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
+                <div>
+                  <p className="text-2xl font-bold">{kpi.value}</p>
+                  <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Filters + view tabs */}
         <div className="flex items-center gap-3">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar proyecto..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
           </div>
-          {mainView === "projects" && (
-            <>
-              {hasFolders && (
-                <Select value={folderFilter || undefined} onValueChange={(v) => setFolderFilter(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Carpeta" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todas</SelectItem>
-                    <SelectItem value="__none__">Sin carpeta</SelectItem>
-                    {folders.map(f => (
-                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
-                  <SelectItem value="active">Activo</SelectItem>
-                  <SelectItem value="archived">Archivado</SelectItem>
-                </SelectContent>
-              </Select>
-            </>
+          {hasFolders && (
+            <Select value={folderFilter || undefined} onValueChange={(v) => setFolderFilter(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Carpeta" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todas</SelectItem>
+                <SelectItem value="__none__">Sin carpeta</SelectItem>
+                {folders.map(f => (
+                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
+          <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos</SelectItem>
+              <SelectItem value="active">Activo</SelectItem>
+              <SelectItem value="archived">Archivado</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="flex items-center gap-1 ml-auto border rounded-lg p-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant={mainView === "projects" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("projects")} className="gap-1">
+                  <FolderOpen className="h-4 w-4" /> Proyectos
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Vista de proyectos</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant={mainView === "kanban" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("kanban")} className="gap-1">
@@ -460,20 +480,6 @@ const ProjectsListContent = () => {
           />
         ) : (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-            {kpis.map((kpi) => (
-              <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
-                <CardContent className="flex items-center gap-3 p-4">
-                  <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
-                  <div>
-                    <p className="text-2xl font-bold">{kpi.value}</p>
-                    <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
           {isLoading ? (
             <p className="text-sm text-muted-foreground text-center py-8">Cargando proyectos...</p>
           ) : filteredProjects.length === 0 ? (
