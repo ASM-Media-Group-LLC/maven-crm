@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import PrioritySelect from "./PrioritySelect";
 import { TIME_OPTIONS } from "./timeOptions";
+import { Diamond, Link, Unplug } from "lucide-react";
 
 interface CreateTaskModalProps {
   open: boolean;
