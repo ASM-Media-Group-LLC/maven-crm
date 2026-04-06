@@ -518,6 +518,7 @@ const ProjectsListContent = () => {
           )}
         </div>
         )}
+        </div>
       </div>
 
       <CreateFolderModal
