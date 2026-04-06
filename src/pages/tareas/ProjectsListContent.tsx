@@ -360,32 +360,6 @@ const ProjectsListContent = () => {
             <p className="text-sm text-muted-foreground">Gestión de tareas y proyectos</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 border rounded-lg p-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant={mainView === "projects" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("projects")} className="gap-1">
-                    <FolderOpen className="h-4 w-4" /> Proyectos
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Ver lista de proyectos</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant={mainView === "kanban" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("kanban")} className="gap-1">
-                    <Columns className="h-4 w-4" /> Kanban
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Kanban global de todas las tareas</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant={mainView === "analytics" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("analytics")} className="gap-1">
-                    <BarChart3 className="h-4 w-4" /> Analíticas
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Analíticas globales de tareas</TooltipContent>
-              </Tooltip>
-            </div>
             <Button variant="outline" onClick={() => setCreateFolderOpen(true)}>
               <FolderPlus className="h-4 w-4 mr-1" /> Nueva Carpeta
             </Button>
