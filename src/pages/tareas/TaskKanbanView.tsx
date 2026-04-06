@@ -279,6 +279,38 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
                                       <TooltipContent>{pri?.label || task.priority}</TooltipContent>
                                     </Tooltip>
 
+                                    {/* Task type badge */}
+                                    {task.task_type === "milestone" && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-[10px] px-1 py-0 gap-0.5">
+                                            <Diamond className="h-2.5 w-2.5" /> Hito
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Hito</TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                    {task.task_type === "prerequisite" && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-[10px] px-1 py-0 gap-0.5">
+                                            <Link2 className="h-2.5 w-2.5" /> Pre-req
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Pre-requisito</TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                    {task.task_type === "independent" && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="secondary" className="text-[10px] px-1 py-0 gap-0.5">
+                                            <Unplug className="h-2.5 w-2.5" /> Indep.
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Tarea independiente</TooltipContent>
+                                      </Tooltip>
+                                    )}
+
                                     {/* Subtasks */}
                                     {subtasks && subtasks.total > 0 && (
                                       <Tooltip>
