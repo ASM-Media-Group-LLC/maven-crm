@@ -369,92 +369,85 @@ const ProjectsListContent = () => {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* KPI Stats Cards — always visible */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-          {kpis.map((kpi) => (
-            <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
-              <CardContent className="flex items-center gap-3 p-4">
-                <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
-                <div>
-                  <p className="text-2xl font-bold">{kpi.value}</p>
-                  <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Filters + view tabs */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar proyecto..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
+      <div className="flex-1 overflow-auto">
+        {/* Sticky KPIs + Filters */}
+        <div className="sticky top-0 z-10 bg-background px-6 pt-6 pb-4 space-y-4 border-b border-border">
+          {/* KPI Stats Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            {kpis.map((kpi) => (
+              <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
+                <CardContent className="flex items-center gap-3 p-4">
+                  <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
+                  <div>
+                    <p className="text-2xl font-bold">{kpi.value}</p>
+                    <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-          {hasFolders && (
-            <Select value={folderFilter || undefined} onValueChange={(v) => setFolderFilter(v === "__all__" ? "" : v)}>
+
+          {/* Filters + view tabs */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar proyecto..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
+            </div>
+            {hasFolders && (
+              <Select value={folderFilter || undefined} onValueChange={(v) => setFolderFilter(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Carpeta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  <SelectItem value="__none__">Sin carpeta</SelectItem>
+                  {folders.map(f => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
               <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Carpeta" />
+                <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">Todas</SelectItem>
-                <SelectItem value="__none__">Sin carpeta</SelectItem>
-                {folders.map(f => (
-                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                ))}
+                <SelectItem value="__all__">Todos</SelectItem>
+                <SelectItem value="active">Activo</SelectItem>
+                <SelectItem value="archived">Archivado</SelectItem>
               </SelectContent>
             </Select>
-          )}
-          <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              <SelectItem value="active">Activo</SelectItem>
-              <SelectItem value="archived">Archivado</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="flex items-center gap-1 ml-auto border rounded-lg p-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant={mainView === "projects" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("projects")} className="gap-1">
-                  <FolderOpen className="h-4 w-4" /> Proyectos
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Vista de proyectos</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant={mainView === "analytics" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("analytics")} className="gap-1">
-                  <BarChart3 className="h-4 w-4" /> Analíticas
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Analíticas globales de tareas</TooltipContent>
-            </Tooltip>
-            {mainView === "projects" && (
-              <>
-                <div className="w-px h-5 bg-border mx-1" />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("list")}>
-                      <List className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Vista lista</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("grid")}>
-                      <LayoutGrid className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Vista cuadrícula</TooltipContent>
-                </Tooltip>
-              </>
-            )}
+            <div className="flex items-center gap-1 ml-auto border rounded-lg p-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={mainView === "analytics" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView(mainView === "analytics" ? "projects" : "analytics")} className="gap-1">
+                    <BarChart3 className="h-4 w-4" /> Analíticas
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Analíticas globales de tareas</TooltipContent>
+              </Tooltip>
+              <div className="w-px h-5 bg-border mx-1" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={mainView === "projects" && viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => { setMainView("projects"); setViewMode("list"); }}>
+                    <List className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Vista lista</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={mainView === "projects" && viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => { setMainView("projects"); setViewMode("grid"); }}>
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Vista cuadrícula</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         </div>
+
+        <div className="p-6 space-y-6">
 
         {mainView === "analytics" ? (
           <GlobalAnalyticsTab
@@ -525,6 +518,7 @@ const ProjectsListContent = () => {
           )}
         </div>
         )}
+        </div>
       </div>
 
       <CreateFolderModal
