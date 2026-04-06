@@ -119,7 +119,7 @@ const ProjectsListContent = () => {
       const matchesFolder = !folderFilter || (folderFilter === "__none__" ? !p.folder_id : p.folder_id === folderFilter);
       return matchesSearch && matchesStatus && matchesFolder;
     });
-  }, [projects, search, statusFilter, memberFilter, priorityFilter, folderFilter, allMembers, allTasks]);
+  }, [projects, search, statusFilter, folderFilter]);
 
   const toggleSelectAll = useCallback(() => {
     setSelectedIds(prev => {
