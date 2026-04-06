@@ -187,6 +187,7 @@ export const useTareas = (projectId?: string) => {
           priority: task.priority || "medium",
           start_at: task.start_at || null,
           status: task.status || "active",
+          task_type: task.task_type || "task",
         } as any)
         .select("id")
         .single();
