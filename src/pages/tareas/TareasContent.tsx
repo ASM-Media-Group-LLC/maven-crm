@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, List, Search, Play, Pause, Crown, Pencil, Columns, BarChart3, Users, Check, MoreHorizontal, Settings, Archive, Trash2, Share2 } from "lucide-react";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, List, Search, Play, Pause, Crown, Pencil, Columns, BarChart3, Users, Check, Settings, Archive, Trash2, Share2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { useProjectMembers } from "./useProjectMembers";
@@ -213,8 +213,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                   <Settings className="h-4 w-4" />
+                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setEditProjectOpen(true)}>
@@ -327,33 +327,50 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             </PopoverTrigger>
             <PopoverContent className="w-[280px] p-0" side="bottom" align="start">
               <Command>
-                <CommandInput placeholder="Buscar usuario..." />
-                <CommandList>
-                  <CommandEmpty>No encontrado</CommandEmpty>
-                  {companyProfiles
-                    .slice()
-                    .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""))
-                    .map((p) => {
-                      const isMember = members.some((m) => m.user_id === p.id);
-                      return (
-                        <CommandItem
-                          key={p.id}
-                          value={p.full_name || p.id}
-                          onSelect={() => {
-                            const currentIds = members.map((m) => m.user_id);
-                            const newIds = isMember
-                              ? currentIds.filter((id) => id !== p.id)
-                              : [...currentIds, p.id];
-                            setProjectMembers.mutate({ projectId, userIds: newIds });
-                          }}
-                        >
-                          <Check className={cn("h-4 w-4 mr-2", isMember ? "opacity-100" : "opacity-0")} />
-                          {p.full_name || p.id}
-                        </CommandItem>
-                      );
-                    })}
-                </CommandList>
-              </Command>
+                 <CommandInput placeholder="Buscar para agregar..." />
+                 <CommandList>
+                   <CommandEmpty>No encontrado</CommandEmpty>
+                   {(() => {
+                     const memberIds = new Set(members.map((m) => m.user_id));
+                     const nameCounts = new Map<string, number>();
+                     companyProfiles.forEach((p) => {
+                       const name = p.full_name || "";
+                       nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+                     });
+                     const getLabel = (p: { id: string; full_name: string | null }) => {
+                       const name = p.full_name || "Sin nombre";
+                       return (nameCounts.get(p.full_name || "") || 0) > 1
+                         ? `${name} (${p.id.slice(0, 4)})`
+                         : name;
+                     };
+                     const sorted = companyProfiles.slice().sort((a, b) => {
+                       const aM = memberIds.has(a.id) ? 0 : 1;
+                       const bM = memberIds.has(b.id) ? 0 : 1;
+                       if (aM !== bM) return aM - bM;
+                       return (a.full_name || "").localeCompare(b.full_name || "");
+                     });
+                     return sorted.map((p) => {
+                       const isMember = memberIds.has(p.id);
+                       return (
+                         <CommandItem
+                           key={p.id}
+                           value={getLabel(p)}
+                           onSelect={() => {
+                             const currentIds = members.map((m) => m.user_id);
+                             const newIds = isMember
+                               ? currentIds.filter((id) => id !== p.id)
+                               : [...currentIds, p.id];
+                             setProjectMembers.mutate({ projectId, userIds: newIds });
+                           }}
+                         >
+                           <Check className={cn("h-4 w-4 mr-2", isMember ? "opacity-100" : "opacity-0")} />
+                           {getLabel(p)}
+                         </CommandItem>
+                       );
+                     });
+                   })()}
+                 </CommandList>
+               </Command>
             </PopoverContent>
           </Popover>
           {members.length > 0 && (
