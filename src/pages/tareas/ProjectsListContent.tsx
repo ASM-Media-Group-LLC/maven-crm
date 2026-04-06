@@ -427,14 +427,6 @@ const ProjectsListContent = () => {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant={mainView === "kanban" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("kanban")} className="gap-1">
-                  <Columns className="h-4 w-4" /> Kanban
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Kanban global de todas las tareas</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
                 <Button variant={mainView === "analytics" ? "secondary" : "ghost"} size="sm" onClick={() => setMainView("analytics")} className="gap-1">
                   <BarChart3 className="h-4 w-4" /> Analíticas
                 </Button>
@@ -465,14 +457,7 @@ const ProjectsListContent = () => {
           </div>
         </div>
 
-        {mainView === "kanban" ? (
-          <GlobalKanbanView
-            tasks={allTasks}
-            profiles={companyProfiles}
-            projects={projects}
-            onStatusChange={(taskId, status) => updateGlobalTaskStatus.mutate({ taskId, status })}
-          />
-        ) : mainView === "analytics" ? (
+        {mainView === "analytics" ? (
           <GlobalAnalyticsTab
             tasks={allTasks}
             profiles={companyProfiles}

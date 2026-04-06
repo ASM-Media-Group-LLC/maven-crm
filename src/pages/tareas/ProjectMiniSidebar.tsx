@@ -37,12 +37,12 @@ const ProjectMiniSidebar = ({ currentProjectId }: ProjectMiniSidebarProps) => {
         .single();
       if (!profile?.company_id) return [];
       const { data } = await supabase
-        .from("task_projects")
+        .from("task_projects" as any)
         .select("id, name, status")
         .eq("company_id", profile.company_id)
         .eq("status", "active")
         .order("name");
-      return data || [];
+      return (data || []) as { id: string; name: string; status: string }[];
     },
     enabled: !!user,
   });
