@@ -84,7 +84,7 @@ const TaskDetailPage = ({ task, open, onOpenChange, profiles, onEdit, onStatusCh
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[95vw] h-[90vh] p-0 flex flex-col overflow-hidden">
+      <DialogContent className="max-w-5xl w-[95vw] h-[90vh] p-0 flex flex-col overflow-hidden [&>button.absolute]:hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3 border-b shrink-0">
           <div className="flex items-center gap-3">
@@ -113,6 +113,9 @@ const TaskDetailPage = ({ task, open, onOpenChange, profiles, onEdit, onStatusCh
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
+            <Button variant="ghost" size="icon" className="h-7 w-7 ml-1" onClick={() => onOpenChange(false)}>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
@@ -168,34 +171,32 @@ const TaskDetailPage = ({ task, open, onOpenChange, profiles, onEdit, onStatusCh
               )}
 
               {/* Meta grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-muted/30 rounded-lg p-4">
-                <div className="space-y-1">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-5 bg-muted/30 rounded-lg p-4">
+                <div className="space-y-1.5">
                   <span className="text-xs text-muted-foreground flex items-center gap-1"><Flag className="h-3 w-3" /> Prioridad</span>
                   <Badge variant="outline" className={`text-xs ${pri?.badgeClass || ""}`}>
                     {pri?.label || task.priority}
                   </Badge>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Vencimiento</span>
-                  <span className={`text-sm font-medium ${isOverdue ? "text-destructive" : ""}`}>
+                  <span className={`text-sm font-medium block ${isOverdue ? "text-destructive" : ""}`}>
                     {format(new Date(task.due_at), "dd MMM yyyy, HH:mm", { locale: es })}
                   </span>
                 </div>
-                {task.start_at && (
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">Inicio</span>
-                    <span className="text-sm">
-                      {format(new Date(task.start_at), "dd MMM yyyy", { locale: es })}
-                    </span>
-                  </div>
-                )}
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Duración</span>
-                  <span className="text-sm">
+                <div className="space-y-1.5">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1"><CalendarIcon className="h-3 w-3" /> Inicio</span>
+                  <span className="text-sm block">
+                    {task.start_at ? format(new Date(task.start_at), "dd MMM yyyy", { locale: es }) : "—"}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Duración</span>
+                  <span className="text-sm block">
                     {task.duration_hours}h {task.duration_minutes}m
                   </span>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                     <Diamond className="h-3 w-3" /> Tipo
                   </span>
