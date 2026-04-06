@@ -30,16 +30,18 @@ const ProjectMiniSidebar = ({ currentProjectId }: ProjectMiniSidebarProps) => {
   const { data: projects = [] } = useQuery({
     queryKey: ["mini-sidebar-projects", user?.id],
     queryFn: async () => {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .eq("id", user!.id)
-        .single();
-      if (!profile?.company_id) return [];
+      // Get project IDs where user is a member
+      const { data: memberships } = await supabase
+        .from("project_members" as any)
+        .select("project_id")
+        .eq("user_id", user!.id);
+      const projectIds = (memberships || []).map((m: any) => m.project_id);
+      if (projectIds.length === 0) return [];
+      // Fetch active projects
       const { data } = await supabase
         .from("task_projects" as any)
         .select("id, name, status")
-        .eq("company_id", profile.company_id)
+        .in("id", projectIds)
         .eq("status", "active")
         .order("name");
       return (data || []) as unknown as { id: string; name: string; status: string }[];
