@@ -1,6 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, List, Search, Play, Pause, Crown, Pencil, Columns, BarChart3 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,8 +32,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
-  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [viewMode, setViewMode] = useState<"kanban" | "list" | "analytics">("kanban");
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -140,9 +141,14 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/tareas")}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={() => navigate("/tareas")}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Volver a proyectos</TooltipContent>
+            </Tooltip>
             {editingName ? (
               <Input
                 ref={nameInputRef}
@@ -380,21 +386,16 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
               <SelectItem value="urgent">Urgente</SelectItem>
             </SelectContent>
           </Select>
-          <div className="flex items-center gap-1 ml-auto">
-            <Button variant={showAnalytics ? "secondary" : "ghost"} size="icon" onClick={() => setShowAnalytics(!showAnalytics)} title="Analíticas">
-              <BarChart3 className="h-4 w-4" />
-            </Button>
-            <div className="w-px h-5 bg-border mx-1" />
-            <Button variant={viewMode === "kanban" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("kanban"); setShowAnalytics(false); }} title="Kanban">
-              <Columns className="h-4 w-4" />
-            </Button>
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("list"); setShowAnalytics(false); }} title="Tabla">
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "kanban" | "list" | "analytics")} className="ml-auto">
+            <TabsList>
+              <TabsTrigger value="kanban" className="gap-1.5"><Columns className="h-3.5 w-3.5" /> Kanban</TabsTrigger>
+              <TabsTrigger value="list" className="gap-1.5"><List className="h-3.5 w-3.5" /> Lista</TabsTrigger>
+              <TabsTrigger value="analytics" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" /> Analíticas</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
-        {showAnalytics ? (
+        {viewMode === "analytics" ? (
           <TaskAnalyticsTab tasks={tasks} profiles={companyProfiles} getTaskStatus={getTaskStatus} />
         ) : isLoading ? (
           <p className="text-sm text-muted-foreground text-center py-8">Cargando tareas...</p>
