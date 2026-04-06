@@ -206,9 +206,39 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
               </h1>
             )}
           </div>
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setEditProjectOpen(true)}>
+                  <Settings className="h-4 w-4 mr-2" /> Configurar proyecto
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  const url = `${window.location.origin}/tareas/shared/${projectId}`;
+                  navigator.clipboard.writeText(url);
+                }}>
+                  <Share2 className="h-4 w-4 mr-2" /> Compartir
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {
+                  updateProjectInline.mutate({ status: "archived" });
+                  navigate("/tareas");
+                }}>
+                  <Archive className="h-4 w-4 mr-2" /> Archivar
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={() => setDeleteProjectOpen(true)}>
+                  <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         {/* Description inline */}
         <div className="ml-11 mt-1">
