@@ -43,6 +43,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [viewMode, setViewMode] = useState<"kanban" | "list" | "analytics">("kanban");
   const [detailTask, setDetailTask] = useState<Task | null>(null);
+  const [editProjectOpen, setEditProjectOpen] = useState(false);
+  const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [assignedFilter, setAssignedFilter] = useState<string>("");
