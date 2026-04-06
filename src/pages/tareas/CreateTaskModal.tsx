@@ -73,6 +73,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
     setStartTime("");
     setEndTime("");
     setPriority("medium");
+    setTaskType("task");
   };
 
   const handleSubmit = (e: React.FormEvent) => {

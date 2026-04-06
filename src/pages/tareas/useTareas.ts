@@ -14,6 +14,7 @@ export interface Task {
   project_id: string | null;
   status: string;
   priority: string;
+  task_type: string;
   duration_hours: number;
   duration_minutes: number;
   start_at: string | null;
