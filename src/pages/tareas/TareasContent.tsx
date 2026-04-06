@@ -278,6 +278,68 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             </span>
           )}
         </div>
+        {/* Members management */}
+        <div className="flex items-center gap-2 mt-2 ml-11">
+          <Popover open={membersOpen} onOpenChange={setMembersOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs">
+                <Users className="h-3.5 w-3.5" />
+                Miembros ({members.length})
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[280px] p-0" side="bottom" align="start">
+              <Command>
+                <CommandInput placeholder="Buscar usuario..." />
+                <CommandList>
+                  <CommandEmpty>No encontrado</CommandEmpty>
+                  {companyProfiles
+                    .slice()
+                    .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""))
+                    .map((p) => {
+                      const isMember = members.some((m) => m.user_id === p.id);
+                      return (
+                        <CommandItem
+                          key={p.id}
+                          value={p.full_name || p.id}
+                          onSelect={() => {
+                            const currentIds = members.map((m) => m.user_id);
+                            const newIds = isMember
+                              ? currentIds.filter((id) => id !== p.id)
+                              : [...currentIds, p.id];
+                            setProjectMembers.mutate({ projectId, userIds: newIds });
+                          }}
+                        >
+                          <Check className={cn("h-4 w-4 mr-2", isMember ? "opacity-100" : "opacity-0")} />
+                          {p.full_name || p.id}
+                        </CommandItem>
+                      );
+                    })}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          {members.length > 0 && (
+            <div className="flex -space-x-1.5">
+              {members.slice(0, 5).map((m) => {
+                const p = companyProfiles.find((cp) => cp.id === m.user_id);
+                const initials = p?.full_name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?";
+                return (
+                  <Tooltip key={m.id}>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-primary text-[9px] font-bold border border-background">
+                        {initials}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{p?.full_name || "Sin nombre"}</TooltipContent>
+                  </Tooltip>
+                );
+              })}
+              {members.length > 5 && (
+                <span className="text-[10px] text-muted-foreground ml-2">+{members.length - 5}</span>
+              )}
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
