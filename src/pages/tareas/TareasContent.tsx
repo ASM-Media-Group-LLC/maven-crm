@@ -500,6 +500,18 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
               <SelectItem value="urgent">Urgente</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={taskTypeFilter || undefined} onValueChange={(v) => setTaskTypeFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos</SelectItem>
+              <SelectItem value="task">Tarea</SelectItem>
+              <SelectItem value="milestone">Hito</SelectItem>
+              <SelectItem value="prerequisite">Pre-requisito</SelectItem>
+              <SelectItem value="independent">Independiente</SelectItem>
+            </SelectContent>
+          </Select>
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "kanban" | "list" | "analytics")} className="ml-auto">
             <TabsList>
               <TabsTrigger value="kanban" className="gap-1.5"><Columns className="h-3.5 w-3.5" /> Kanban</TabsTrigger>

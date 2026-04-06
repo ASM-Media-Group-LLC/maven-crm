@@ -178,6 +178,17 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
                 <div className="font-medium text-sm">{task.title}</div>
                 {task.description && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{task.description}</div>}
               </TableCell>
+              <TableCell className="text-center">
+                {task.task_type === "milestone" ? (
+                  <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 gap-1"><Diamond className="h-3 w-3" />Hito</Badge>
+                ) : task.task_type === "prerequisite" ? (
+                  <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 gap-1"><Link className="h-3 w-3" />Pre-req</Badge>
+                ) : task.task_type === "independent" ? (
+                  <Badge className="bg-muted text-muted-foreground border-border gap-1"><Unplug className="h-3 w-3" />Indep.</Badge>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
+              </TableCell>
               <TableCell className="hidden sm:table-cell">
                 <span className="text-xs text-muted-foreground">{profileMap.get(task.created_by) || "—"}</span>
               </TableCell>
