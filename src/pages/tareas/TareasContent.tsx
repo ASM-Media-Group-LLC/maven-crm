@@ -91,7 +91,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
       };
       return getOrder(a) - getOrder(b) || new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
     });
-  }, [tasks, now, search, statusFilter, priorityFilter]);
+  }, [tasks, now, search, statusFilter, assignedFilter, priorityFilter]);
 
   const counts = useMemo(() => {
     let pending = 0, in_progress = 0, paused = 0, overdue = 0, completed = 0;
