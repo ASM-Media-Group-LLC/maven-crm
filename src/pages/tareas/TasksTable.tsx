@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Play, Pause, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Play, Pause, CheckCircle2, AlertTriangle, Diamond, Link, Unplug } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
