@@ -1,19 +1,27 @@
 
-# Plan: Restringir Dashboard 2 solo a admins
 
-## Cambios
+# Plan: Eliminar company_id de José Ignacio Vera
 
-### 1. Ruta protegida — `src/App.tsx` (línea 212)
-Envolver `Dashboard2` con `AdminRoute` en vez de `ProtectedRoute`:
-```tsx
-<Route path="/dashboard2" element={<AdminRoute><Dashboard2 /></AdminRoute>} />
+## Contexto
+
+El campo `company_id` en la tabla `profiles` se asigna durante el registro cuando un usuario crea o se une a una empresa (en `Register.tsx`). José Ignacio Vera tiene `company_id = 10261fa0-...` mientras que los demás 36 usuarios tienen `NULL`. Esto causa que cuando él busca miembros, el filtro `.eq("company_id", ...)` solo lo retorna a él mismo.
+
+## Cambio
+
+### 1. Actualizar dato en la DB
+Usar el insert tool para ejecutar:
+```sql
+UPDATE profiles SET company_id = NULL WHERE id = '071de069-206c-4f54-821f-09b0ae3b92ce';
 ```
 
-### 2. Sidebar — `src/components/dashboard/DashboardSidebar.tsx` (línea 42)
-Agregar una propiedad `adminOnly: true` al item de Dashboard v2 y filtrarlo del menú para no-admins. Opción más simple: condicionar directamente con `isAdmin` del hook `useUserRole`.
+### 2. Mantener el fix de código (ya aprobado previamente)
+Igualmente aplicar el cambio `.or()` en los 3 archivos (`useTareas.ts`, `ProjectsListContent.tsx`, `SubtasksPanel.tsx`) para que en el futuro, si algún usuario tiene `company_id`, igual vea a los usuarios sin empresa asignada. Este fix ya fue aprobado en el plan anterior.
 
 ## Archivos modificados
-| Archivo | Cambio |
+| Recurso | Cambio |
 |---------|--------|
-| `App.tsx` | `ProtectedRoute` → `AdminRoute` para `/dashboard2` |
-| `DashboardSidebar.tsx` | Ocultar "Dashboard v2" del menú si el usuario no es admin |
+| DB: `profiles` | SET company_id = NULL para José Ignacio Vera |
+| `useTareas.ts` | `.eq()` → `.or()` en filtro de perfiles |
+| `ProjectsListContent.tsx` | Mismo cambio |
+| `SubtasksPanel.tsx` | Mismo cambio |
+
