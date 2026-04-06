@@ -1,25 +1,17 @@
 
-# Plan: Limpiar filtros duplicados
 
-## Dentro del proyecto (TareasContent.tsx)
-- **Quitar**: Select "Asignado" (líneas 366-376) — ya existe el tab bar de miembros con avatares que hace lo mismo
-- **Mantener**: Search, Estado, Prioridad — estos son útiles y no están duplicados
+# Plan: Reducir ancho de buscador y agregar espacio antes del tab bar
 
-## Página principal (ProjectsListContent.tsx)
-Filtros actuales: Search, Carpeta, Estado, Miembro, Prioridad, toggle Grid/List.
+## Cambio
 
-**Recomendación**:
-- **Mantener**: Search (esencial), Estado (activo/archivado — útil para filtrar archivados), Carpeta (si hay carpetas), toggle Grid/List
-- **Quitar**: "Miembro" — en la página principal filtra proyectos donde alguien es miembro, pero es poco usado y agrega ruido visual
-- **Quitar**: "Prioridad" — filtra proyectos que tienen tareas con cierta prioridad, lo cual es confuso a nivel de proyecto (la prioridad es de tareas, no de proyectos)
+En `TareasContent.tsx` línea 350-352, cambiar el `div` del input de `flex-1` a un ancho fijo más pequeño (e.g. `w-64`), y agregar separación visual (`gap-4` o un spacer) entre los filtros y el tab bar de vistas.
 
-## Resultado final
+### Detalle
 
-| Vista | Filtros que quedan |
-|-------|-------------------|
-| Dentro del proyecto | Search, Estado, Prioridad + avatar tabs para miembros |
-| Página principal | Search, Carpeta (condicional), Estado, toggle Grid/List |
+**Archivo**: `src/pages/tareas/TareasContent.tsx`
 
-## Archivos modificados
-- `TareasContent.tsx` — eliminar select "Asignado" y su estado `assignedFilter` (ya lo maneja el tab bar)
-- `ProjectsListContent.tsx` — eliminar selects "Miembro" y "Prioridad" y sus estados
+- Línea 350: Cambiar `className="relative flex-1"` → `className="relative w-64 shrink-0"`
+- Línea 349: Cambiar `gap-3` → `gap-3` se mantiene entre filtros, pero el `Tabs` ya tiene `ml-auto` que crea espacio. Con el input más pequeño, el espacio visual aparece naturalmente.
+
+Resultado: el buscador ocupa ~256px fijos en vez de expandirse, dejando espacio visible entre los filtros y las pestañas Kanban/Lista/Analíticas.
+
