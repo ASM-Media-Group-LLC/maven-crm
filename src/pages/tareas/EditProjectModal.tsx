@@ -32,6 +32,7 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, pr
   const [leaderId, setLeaderId] = useState<string>("");
   const [folderId, setFolderId] = useState<string>("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [leaderComboboxOpen, setLeaderComboboxOpen] = useState(false);
 
   useEffect(() => {
     if (project) {

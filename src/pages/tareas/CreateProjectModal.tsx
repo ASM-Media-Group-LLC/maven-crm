@@ -29,6 +29,7 @@ const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles 
   const [leaderId, setLeaderId] = useState<string>("");
   const [folderId, setFolderId] = useState<string>("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [leaderComboboxOpen, setLeaderComboboxOpen] = useState(false);
 
   const toggleMember = (id: string) => {
     setSelectedMembers(prev =>
