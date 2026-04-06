@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Lightweight hook: fetches distinct active agent IDs from promolog_entries.
- * Uses two small queries filtered by the known profile IDs to avoid downloading all rows.
+ * Lightweight hook: fetches distinct active agent IDs via server-side RPC.
+ * Returns only agents that exist in the provided profileIds list.
  */
 export const usePromologActiveAgents = (profileIds: string[]) => {
   return useQuery({
@@ -11,35 +11,20 @@ export const usePromologActiveAgents = (profileIds: string[]) => {
     queryFn: async () => {
       if (profileIds.length === 0) return [];
 
-      const agentSet = new Set<string>();
+      const { data, error } = await supabase.rpc("get_distinct_promolog_agents");
 
-      // Query reviewed_by filtered to known profiles only
-      const { data: reviewers } = await supabase
-        .from("promolog_entries")
-        .select("reviewed_by")
-        .in("reviewed_by", profileIds)
-        .limit(1000);
-
-      if (reviewers) {
-        for (const r of reviewers) {
-          if (r.reviewed_by) agentSet.add(r.reviewed_by);
-        }
+      if (error) {
+        console.error("Error fetching distinct agents:", error);
+        return [];
       }
 
-      // Query created_by filtered to known profiles only
-      const { data: creators } = await supabase
-        .from("promolog_entries")
-        .select("created_by")
-        .in("created_by", profileIds)
-        .limit(1000);
+      if (!data) return [];
 
-      if (creators) {
-        for (const c of creators) {
-          if (c.created_by) agentSet.add(c.created_by);
-        }
-      }
-
-      return Array.from(agentSet);
+      // Filter to only agents that have a profile
+      const profileSet = new Set(profileIds);
+      return (data as Array<{ agent_id: string }>)
+        .map(r => r.agent_id)
+        .filter(id => profileSet.has(id));
     },
     enabled: profileIds.length > 0,
     staleTime: 5 * 60 * 1000,
