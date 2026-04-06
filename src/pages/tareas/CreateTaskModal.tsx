@@ -170,6 +170,22 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
 
             <PrioritySelect value={priority} onChange={setPriority} />
 
+            {/* Task type selector */}
+            <div>
+              <Label>Tipo de tarea</Label>
+              <Select value={taskType} onValueChange={setTaskType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="task">Tarea</SelectItem>
+                  <SelectItem value="milestone">Hito</SelectItem>
+                  <SelectItem value="prerequisite">Pre-requisito</SelectItem>
+                  <SelectItem value="independent">Independiente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Multi-select de usuarios */}
             <div>
               <Label>Asignar a</Label>
