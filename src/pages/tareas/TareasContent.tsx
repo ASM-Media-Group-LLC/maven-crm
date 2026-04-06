@@ -532,15 +532,17 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
         ) : null}
       </div>
 
-      <TaskDetailSheet
+      <TaskDetailPage
         task={detailTask}
         open={!!detailTask}
         onOpenChange={(open) => !open && setDetailTask(null)}
         profiles={companyProfiles}
         onEdit={(t) => { setDetailTask(null); setEditTarget(t); }}
         onStatusChange={handleStatusChange}
+        onPatchTask={(id, fields) => patchTask.mutate({ taskId: id, fields })}
+        onUpdateAssignees={(id, ids) => updateTaskAssignees.mutate({ taskId: id, assigneeIds: ids })}
+        onDelete={(t) => { setDetailTask(null); setDeleteTarget(t); }}
       />
-
 
       <CreateTaskModal
         open={createOpen}
@@ -580,7 +582,42 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
         }}
         isLoading={submitOverdueReason.isPending}
       />
+
+      <EditProjectModal
+        open={editProjectOpen}
+        onOpenChange={setEditProjectOpen}
+        project={{
+          id: projectId,
+          name: projectName || "",
+          description: projectDescription || null,
+          leader_id: projectLeaderId || null,
+          status: "active",
+          company_id: null,
+          created_by: "",
+          share_token: null,
+          folder_id: null,
+          created_at: null,
+          updated_at: null,
+        }}
+        profiles={companyProfiles}
+        onSubmit={(data) => {
+          updateProjectInline.mutate(data);
+          setEditProjectOpen(false);
+        }}
+      />
+
+      <DeleteProjectDialog
+        open={deleteProjectOpen}
+        onOpenChange={setDeleteProjectOpen}
+        projectName={projectName || ""}
+        onConfirm={() => {
+          deleteTask.mutate(projectId);
+          navigate("/tareas");
+        }}
+        isLoading={false}
+      />
     </main>
+    </div>
   );
 };
 
