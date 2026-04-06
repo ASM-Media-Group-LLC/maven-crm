@@ -40,13 +40,13 @@ const InlineAssigneeSelect = ({ taskId, currentAssignees, profiles, onUpdateAssi
           </div>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-0" align="start">
+      <PopoverContent className="w-56 p-0" align="start" side="bottom">
         <Command>
           <CommandInput placeholder="Buscar usuario..." />
           <CommandList>
             <CommandEmpty>Sin resultados</CommandEmpty>
             <CommandGroup>
-              {profiles.map((p) => (
+              {profiles.slice().sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "")).map((p) => (
                 <CommandItem
                   key={p.id}
                   value={p.full_name || "Sin nombre"}
