@@ -46,7 +46,7 @@ const DashboardSidebar = () => {
     { title: t("nav.events"), url: "/eventos", icon: CalendarDays, module: "Eventos" },
     { title: "Wishlist", url: "/wishlist", icon: Contact, module: "SuperContacts" },
   ];
-  const mainMenu = mainMenuAll.filter((item) => canAccess(item.module));
+  const mainMenu = mainMenuAll.filter((item) => canAccess(item.module) && (item.url !== "/dashboard2" || isAdmin));
 
   const creadoresSubItems = [
     { title: "Dashboard", url: "/creadores/dashboard", submodule: "Dashboard" },
