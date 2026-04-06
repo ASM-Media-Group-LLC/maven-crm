@@ -619,12 +619,16 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
           updated_at: null,
         }}
         profiles={companyProfiles}
+        currentMemberIds={members.map(m => m.user_id)}
         onSubmit={(data) => {
           updateProjectInline.mutate({
             name: data.name,
             description: data.description || null,
             leader_id: data.leaderId || null,
           });
+          if (data.memberIds) {
+            setProjectMembers.mutate({ projectId, userIds: data.memberIds });
+          }
           setEditProjectOpen(false);
         }}
       />
