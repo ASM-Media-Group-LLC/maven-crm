@@ -474,6 +474,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
         isLoading={submitOverdueReason.isPending}
       />
     </main>
+    </TooltipProvider>
   );
 };
 
