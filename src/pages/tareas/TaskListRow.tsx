@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, MoreHorizontal, Pencil, Trash2, Share2, AlertTriangle, Play, Pause, CheckCircle2 } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreHorizontal, Pencil, Trash2, Share2, AlertTriangle, Play, Pause, CheckCircle2, Diamond, Link2, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
