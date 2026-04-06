@@ -1,50 +1,105 @@
 
 
-# Plan: Fix Promolog agents + Upgrade Collections
+# Plan: Preparar UI de Monitoreo para integración Hubstaff
 
-## 1. Promolog — Solo muestra 1 agente activo
+## Resumen
 
-**Causa raíz**: El hook `usePromologActiveAgents` hace `SELECT reviewed_by FROM promolog_entries ... LIMIT 1000`. Con 34K filas y sin `DISTINCT`, las 1000 filas devueltas probablemente son todas del mismo agente (Lorena, que tiene 292+ entradas como revisora pero miles como reviewed_by). La DB confirma que hay 13 reviewed_by distintos y 4 created_by distintos, con 4 agentes con perfil.
+Si, es totalmente posible. La idea es crear las tablas en la base de datos que almacenarán los datos de Hubstaff, y refactorizar la UI actual para que lea de esas tablas en vez de los datos mock. Mientras no haya datos reales, la UI mostrará estados vacíos. Cuando se conecte la API, los datos aparecerán automáticamente.
 
-**Solución**: Crear una función RPC `get_distinct_promolog_agents()` que retorne `SELECT DISTINCT` de ambos campos en una sola query server-side eficiente:
+## 1. Tablas en Base de Datos (migración SQL)
 
-```sql
-CREATE FUNCTION public.get_distinct_promolog_agents()
-RETURNS TABLE(agent_id uuid)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-AS $$
-  SELECT DISTINCT reviewed_by FROM promolog_entries WHERE reviewed_by IS NOT NULL
-  UNION
-  SELECT DISTINCT created_by FROM promolog_entries WHERE created_by IS NOT NULL
-$$;
-```
+### `hubstaff_members`
+Mapeo entre usuarios de Hubstaff y perfiles de la plataforma.
 
-Luego en `usePromologAgentStats.ts`, reemplazar las dos queries con `.limit(1000)` por una sola llamada `.rpc("get_distinct_promolog_agents")` y filtrar por `profileIds` en el cliente.
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| id | uuid PK | ID interno |
+| profile_id | uuid FK profiles | Vínculo al perfil local |
+| hubstaff_user_id | text | ID del usuario en Hubstaff |
+| hubstaff_org_id | text | Organization ID |
+| is_active | boolean | Activo en monitoreo |
+| created_at | timestamptz | Fecha de creación |
 
-## 2. Collections — Buscador en select de Creadora
+### `hubstaff_activities`
+Registros de actividad por intervalos (lo que Hubstaff envía cada 10 min).
 
-Reemplazar el `<Select>` de creadora en el modal de registro (línea 382-387) con el patrón `Popover + Command` (combobox con búsqueda interna), igual que el estándar del proyecto para selectores de miembros.
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| id | uuid PK | ID interno |
+| member_id | uuid FK hubstaff_members | Miembro vinculado |
+| starts_at | timestamptz | Inicio del intervalo |
+| tracked_seconds | int | Segundos trackeados |
+| mouse_events | int | Eventos de mouse |
+| keyboard_events | int | Eventos de teclado |
+| overall_activity | int | % actividad general (0-100) |
+| mouse_activity | int | % actividad mouse |
+| keyboard_activity | int | % actividad teclado |
+| project_name | text | Proyecto Hubstaff (opcional) |
+| task_name | text | Tarea Hubstaff (opcional) |
 
-## 3. Collections — Adjuntar evidencia
+### `hubstaff_screenshots`
+Capturas de pantalla periódicas.
 
-- Agregar campo `evidence_url` a la tabla `invoices` (text, nullable) via migración
-- En el modal de registro, agregar un input de archivo (imagen/PDF) debajo de "Detalle/Nota"
-- Subir al bucket `custom-request-attachments` (ya existe, público) y guardar la URL en `evidence_url`
-- Mostrar link/icono de evidencia en la tabla cuando existe
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| id | uuid PK | ID interno |
+| member_id | uuid FK hubstaff_members | Miembro vinculado |
+| captured_at | timestamptz | Momento de captura |
+| screenshot_url | text | URL de la imagen |
+| activity_percent | int | % actividad al momento |
 
-## 4. Collections — Acciones en tabla
+### `hubstaff_config`
+Configuración de la integración (API token, org ID, estado de conexión).
 
-Agregar columna "Acciones" con `DropdownMenu` conteniendo:
-- **Ver**: Modal de detalle con toda la info del cobro + evidencia
-- **Editar**: Modal para modificar monto, estado, notas, evidencia
-- **Imprimir**: `window.print()` con formato del cobro
-- **Eliminar**: Confirmación + delete de la fila
-- **Exportar**: Exportar fila individual a Excel/CSV
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| id | uuid PK | Singleton row |
+| api_token_set | boolean | Si el token está configurado (el token real va en secrets) |
+| org_id | text | Organization ID |
+| sync_enabled | boolean | Sincronización activa |
+| last_sync_at | timestamptz | Última sincronización |
+| sync_interval_minutes | int default 10 | Intervalo de sync |
+
+## 2. Hook `useHubstaffData`
+Nuevo hook que reemplaza los datos mock:
+- Consulta `hubstaff_members` + join con `profiles` para lista de agentes
+- Consulta `hubstaff_activities` del día actual para KPIs en tiempo real
+- Calcula status (activo/inactivo/desconectado) basado en `last_activity` timestamp
+- Si no hay datos, retorna arrays vacíos (la UI muestra estado vacío)
+
+## 3. Hook `useHubstaffAgentDetail`
+Para la vista de detalle del agente:
+- Consulta `hubstaff_activities` filtrado por miembro y periodo (diario/semanal/mensual)
+- Consulta `hubstaff_screenshots` del día
+- Genera timeline real desde los intervalos de actividad
+
+## 4. Refactorizar `HRMonitoring.tsx`
+- Reemplazar `MOCK_AGENTS` con datos del hook `useHubstaffData`
+- Mantener la misma UI (tabla, grid, calendario, filtros)
+- Agregar estado vacío: "No hay datos de monitoreo. Configura la integración con Hubstaff para comenzar."
+- El modal de "Configurar API" guardará `org_id` en `hubstaff_config` y mostrará instrucciones para agregar el token como secret
+
+## 5. Refactorizar `AgentDetailSheet.tsx`
+- Reemplazar generadores mock con datos del hook `useHubstaffAgentDetail`
+- Screenshots: mostrar imágenes reales desde `hubstaff_screenshots` (o placeholder si no hay)
+- Timeline: construir desde intervalos reales de `hubstaff_activities`
+- Charts: datos reales de actividad por hora/día
+
+## 6. Modal de Configuración mejorado
+- Guardar org_id en tabla `hubstaff_config`
+- Botón "Probar Conexión" que validará cuando exista el edge function
+- Estado de conexión visible: "Conectado" / "Desconectado" / "Pendiente de configuración"
+- Fecha de última sincronización
 
 ## Archivos modificados
 | Recurso | Cambio |
 |---------|--------|
-| DB migration | Función RPC `get_distinct_promolog_agents` + columna `evidence_url` en invoices |
-| `usePromologAgentStats.ts` | Usar `.rpc()` en vez de queries con limit |
-| `CollectionsPage.tsx` | Combobox creadora, upload evidencia, columna acciones con view/edit/print/delete/export |
+| DB migration | Crear 4 tablas: hubstaff_members, hubstaff_activities, hubstaff_screenshots, hubstaff_config + RLS |
+| `src/hooks/useHubstaffData.ts` | Nuevo hook: lista de agentes y KPIs desde DB |
+| `src/hooks/useHubstaffAgentDetail.ts` | Nuevo hook: detalle de agente desde DB |
+| `HRMonitoring.tsx` | Reemplazar mock con hooks reales + estados vacíos |
+| `AgentDetailSheet.tsx` | Reemplazar generadores mock con datos de DB |
+
+## Resultado
+La UI quedará 100% conectada a la base de datos. Actualmente mostrará estados vacíos con mensajes guía. Cuando se implemente el edge function de sincronización con Hubstaff, los datos fluirán automáticamente sin tocar la UI.
 
