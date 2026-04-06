@@ -143,6 +143,7 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
     else if (sortKey === "due_date") diff = new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
     else if (sortKey === "start") diff = (a.start_at ? new Date(a.start_at).getTime() : 0) - (b.start_at ? new Date(b.start_at).getTime() : 0);
     else if (sortKey === "priority") diff = (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
+    else if (sortKey === "task_type") diff = (a.task_type || "task").localeCompare(b.task_type || "task");
     else diff = a.status.localeCompare(b.status);
     return sortAsc ? diff : -diff;
   });
