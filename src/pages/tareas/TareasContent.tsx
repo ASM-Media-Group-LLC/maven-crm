@@ -387,21 +387,16 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
               <SelectItem value="urgent">Urgente</SelectItem>
             </SelectContent>
           </Select>
-          <div className="flex items-center gap-1 ml-auto">
-            <Button variant={showAnalytics ? "secondary" : "ghost"} size="icon" onClick={() => setShowAnalytics(!showAnalytics)} title="Analíticas">
-              <BarChart3 className="h-4 w-4" />
-            </Button>
-            <div className="w-px h-5 bg-border mx-1" />
-            <Button variant={viewMode === "kanban" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("kanban"); setShowAnalytics(false); }} title="Kanban">
-              <Columns className="h-4 w-4" />
-            </Button>
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => { setViewMode("list"); setShowAnalytics(false); }} title="Tabla">
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "kanban" | "list" | "analytics")} className="ml-auto">
+            <TabsList>
+              <TabsTrigger value="kanban" className="gap-1.5"><Columns className="h-3.5 w-3.5" /> Kanban</TabsTrigger>
+              <TabsTrigger value="list" className="gap-1.5"><List className="h-3.5 w-3.5" /> Lista</TabsTrigger>
+              <TabsTrigger value="analytics" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" /> Analíticas</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
-        {showAnalytics ? (
+        {viewMode === "analytics" ? (
           <TaskAnalyticsTab tasks={tasks} profiles={companyProfiles} getTaskStatus={getTaskStatus} />
         ) : isLoading ? (
           <p className="text-sm text-muted-foreground text-center py-8">Cargando tareas...</p>
