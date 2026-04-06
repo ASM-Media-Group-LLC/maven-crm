@@ -68,7 +68,7 @@ const ProjectsListContent = () => {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
-  const [mainView, setMainView] = useState<"projects" | "kanban" | "analytics">("projects");
+  const [mainView, setMainView] = useState<"projects" | "analytics">("projects");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [editProject, setEditProject] = useState<TaskProject | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskProject | null>(null);

@@ -42,7 +42,7 @@ const ProjectMiniSidebar = ({ currentProjectId }: ProjectMiniSidebarProps) => {
         .eq("company_id", profile.company_id)
         .eq("status", "active")
         .order("name");
-      return (data || []) as { id: string; name: string; status: string }[];
+      return (data || []) as unknown as { id: string; name: string; status: string }[];
     },
     enabled: !!user,
   });
