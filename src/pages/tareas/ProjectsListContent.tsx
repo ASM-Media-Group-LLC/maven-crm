@@ -116,10 +116,8 @@ const ProjectsListContent = () => {
     return projects.filter((p) => {
       const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = !statusFilter || p.status === statusFilter;
-      const matchesMember = !memberFilter || allMembers.some(m => m.project_id === p.id && m.user_id === memberFilter);
-      const matchesPriority = !priorityFilter || allTasks.some(t => t.project_id === p.id && t.priority === priorityFilter);
       const matchesFolder = !folderFilter || (folderFilter === "__none__" ? !p.folder_id : p.folder_id === folderFilter);
-      return matchesSearch && matchesStatus && matchesMember && matchesPriority && matchesFolder;
+      return matchesSearch && matchesStatus && matchesFolder;
     });
   }, [projects, search, statusFilter, memberFilter, priorityFilter, folderFilter, allMembers, allTasks]);
 
