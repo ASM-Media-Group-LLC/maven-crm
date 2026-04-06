@@ -113,6 +113,9 @@ const TaskDetailPage = ({ task, open, onOpenChange, profiles, onEdit, onStatusCh
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
+            <Button variant="ghost" size="icon" className="h-7 w-7 ml-1" onClick={() => onOpenChange(false)}>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
