@@ -31,6 +31,8 @@ interface TareasContentProps {
 const TareasContent = ({ projectId }: TareasContentProps) => {
   const navigate = useNavigate();
   const { tasks, isLoading, companyProfiles, projectName, projectDescription, projectLeaderId, createTask, completeTask, updateTaskStatus, submitOverdueReason, updateTask, deleteTask, reorderTasks, patchTask, updateTaskAssignees, updateProjectInline } = useTareas(projectId);
+  const { members, setProjectMembers } = useProjectMembers(projectId);
+  const [membersOpen, setMembersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
