@@ -4036,6 +4036,156 @@ export type Database = {
           },
         ]
       }
+      hubstaff_activities: {
+        Row: {
+          id: string
+          keyboard_activity: number | null
+          keyboard_events: number | null
+          member_id: string
+          mouse_activity: number | null
+          mouse_events: number | null
+          overall_activity: number | null
+          project_name: string | null
+          starts_at: string
+          task_name: string | null
+          tracked_seconds: number
+        }
+        Insert: {
+          id?: string
+          keyboard_activity?: number | null
+          keyboard_events?: number | null
+          member_id: string
+          mouse_activity?: number | null
+          mouse_events?: number | null
+          overall_activity?: number | null
+          project_name?: string | null
+          starts_at: string
+          task_name?: string | null
+          tracked_seconds?: number
+        }
+        Update: {
+          id?: string
+          keyboard_activity?: number | null
+          keyboard_events?: number | null
+          member_id?: string
+          mouse_activity?: number | null
+          mouse_events?: number | null
+          overall_activity?: number | null
+          project_name?: string | null
+          starts_at?: string
+          task_name?: string | null
+          tracked_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hubstaff_activities_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "hubstaff_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hubstaff_config: {
+        Row: {
+          api_token_set: boolean
+          created_at: string
+          id: string
+          last_sync_at: string | null
+          org_id: string | null
+          sync_enabled: boolean
+          sync_interval_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          api_token_set?: boolean
+          created_at?: string
+          id?: string
+          last_sync_at?: string | null
+          org_id?: string | null
+          sync_enabled?: boolean
+          sync_interval_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          api_token_set?: boolean
+          created_at?: string
+          id?: string
+          last_sync_at?: string | null
+          org_id?: string | null
+          sync_enabled?: boolean
+          sync_interval_minutes?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hubstaff_members: {
+        Row: {
+          created_at: string
+          hubstaff_org_id: string | null
+          hubstaff_user_id: string | null
+          id: string
+          is_active: boolean
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          hubstaff_org_id?: string | null
+          hubstaff_user_id?: string | null
+          id?: string
+          is_active?: boolean
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          hubstaff_org_id?: string | null
+          hubstaff_user_id?: string | null
+          id?: string
+          is_active?: boolean
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hubstaff_members_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hubstaff_screenshots: {
+        Row: {
+          activity_percent: number | null
+          captured_at: string
+          id: string
+          member_id: string
+          screenshot_url: string
+        }
+        Insert: {
+          activity_percent?: number | null
+          captured_at: string
+          id?: string
+          member_id: string
+          screenshot_url: string
+        }
+        Update: {
+          activity_percent?: number | null
+          captured_at?: string
+          id?: string
+          member_id?: string
+          screenshot_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hubstaff_screenshots_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "hubstaff_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       internal_announcements: {
         Row: {
           announcement_type: string
