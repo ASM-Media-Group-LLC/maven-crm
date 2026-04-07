@@ -2,8 +2,9 @@ import { useState, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Users, Pencil, Upload, X,
-  User, Phone, Share2, Image, Settings, FileText, DollarSign, Camera, StickyNote,
+  ArrowLeft, Users, Pencil, Upload, X, Check,
+  User, Phone, Share2, Image, Settings, FileText, DollarSign, StickyNote,
+  ChevronLeft, ChevronRight, Plus, Trash2, Package,
 } from "lucide-react";
 import FileUploadModal, { type UploadCategory, type UploadedFile } from "@/components/FileUploadModal";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { DateInput } from "@/components/ui/date-input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -36,7 +39,6 @@ const CATEGORIES = [
   { value: "B", label: "B (Media)" },
   { value: "C", label: "C (Básica)" },
 ];
-const PLATFORMS = ["Onlyfans", "Unlok", "Fansly", "Patreon", "Otra"];
 const PAYMENT_METHODS = ["PayPal", "Crypto", "Zelle", "Pagomundo", "Directa24", "Paxom", "Cuenta Bancaria Colombia", "Cuenta Bancaria Estados Unidos", "Otro"];
 const COUNTRIES = [
   "Afganistán", "Albania", "Alemania", "Andorra", "Angola", "Arabia Saudita", "Argelia", "Argentina",
@@ -56,6 +58,22 @@ const COUNTRIES = [
   "Venezuela", "Vietnam", "Otro",
 ];
 
+const AVAILABLE_PLATFORMS = ["Leak Hunter", "Blu", "PickLink", "ORA", "Lumina"];
+const PLATFORM_FREQUENCIES = [
+  { value: "mensual", label: "Mensual" },
+  { value: "quincenal", label: "Quincenal" },
+  { value: "semanal", label: "Semanal" },
+  { value: "anual", label: "Anual" },
+];
+
+interface PlatformEntry {
+  id: string;
+  name: string;
+  customName: string;
+  amount: number;
+  frequency: string;
+}
+
 interface FormData {
   assigned_agency: string;
   status: string;
@@ -74,14 +92,10 @@ interface FormData {
   youtube_handle: string;
   linkedin_handle: string;
   onlyfans_url: string;
-  piclink_url: string;
-  piclink_monthly_payment: number;
-  piclink_env_confirmed: boolean;
   profile_photo_url: string;
   bio: string;
   category: string;
   start_date: string;
-  has_piclink: boolean;
   agency_percentage: number;
   commission_type: "fixed" | "tiered";
   commission_tiers: CommissionTier[];
@@ -89,12 +103,8 @@ interface FormData {
   billing_start_date: string;
   billing_frequency: string;
   billing_address: string;
-  blue_package: boolean;
-  blue_package_amount: number;
-  main_platform: string;
-  secondary_platform: string;
-  platform_username: string;
   internal_notes: string;
+  platforms: PlatformEntry[];
 }
 
 const defaultForm: FormData = {
@@ -115,14 +125,10 @@ const defaultForm: FormData = {
   youtube_handle: "",
   linkedin_handle: "",
   onlyfans_url: "",
-  piclink_url: "",
-  piclink_monthly_payment: 0,
-  piclink_env_confirmed: false,
   profile_photo_url: "",
   bio: "",
   category: "",
   start_date: "",
-  has_piclink: false,
   agency_percentage: 15,
   commission_type: "fixed",
   commission_tiers: [],
@@ -130,70 +136,33 @@ const defaultForm: FormData = {
   billing_start_date: "",
   billing_frequency: "",
   billing_address: "",
-  blue_package: false,
-  blue_package_amount: 0,
-  main_platform: "",
-  secondary_platform: "",
-  platform_username: "",
   internal_notes: "",
+  platforms: [],
 };
 
-const testData: FormData = {
-  assigned_agency: "Agency Alpha",
-  status: "onboarding",
-  name: "María García López",
-  artistic_name: "MariGar",
-  age: 24,
-  birth_date: "2002-03-15",
-  country: "Colombia",
-  city: "Medellín",
-  languages: ["Español", "English"],
-  email: "maria.garcia@email.com",
-  phone: "+573001234567",
-  instagram_handle: "https://instagram.com/marigar",
-  twitter_handle: "https://x.com/marigar",
-  tiktok_handle: "https://tiktok.com/@marigar",
-  youtube_handle: "https://youtube.com/@marigar",
-  linkedin_handle: "",
-  onlyfans_url: "https://onlyfans.com/marigar",
-  piclink_url: "https://piclink.com/marigar",
-  piclink_monthly_payment: 75,
-  piclink_env_confirmed: true,
-  profile_photo_url: "https://i.pravatar.cc/300?u=marigar",
-  bio: "Creadora de contenido especializada en lifestyle y fitness. 3 años de experiencia en plataformas digitales.",
-  category: "A",
-  start_date: "2026-02-01",
-  has_piclink: true,
-  agency_percentage: 20,
-  commission_type: "fixed",
-  commission_tiers: [],
-  payment_method: "Transferencia",
-  billing_start_date: "2026-03-01",
-  billing_frequency: "mensual",
-  billing_address: "Calle 45 #12-34, Medellín, Colombia",
-  blue_package: true,
-  blue_package_amount: 500,
-  main_platform: "Onlyfans",
-  secondary_platform: "Fansly",
-  platform_username: "@marigar",
-  internal_notes: "Referida por closer Juan. Alta motivación, excelente contenido fotográfico.",
-};
+const STEPS = [
+  { id: 1, label: "Datos Personales", icon: User },
+  { id: 2, label: "Contacto y Redes", icon: Share2 },
+  { id: 3, label: "Operación", icon: Settings },
+  { id: 4, label: "Plataformas Activas", icon: Package },
+  { id: 5, label: "Condiciones Comerciales", icon: DollarSign },
+];
 
 const NuevoCreadorForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [form, setForm] = useState<FormData>(defaultForm);
+  const [step, setStep] = useState(1);
   const mutation = useAddCreadorWithBusiness();
   const tempId = useMemo(() => crypto.randomUUID(), []);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [uploadModal, setUploadModal] = useState<{ open: boolean; category: UploadCategory }>({ open: false, category: "contracts" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const openUpload = (category: UploadCategory) => setUploadModal({ open: true, category });
   const handleFilesUploaded = (files: UploadedFile[]) => setUploadedFiles((prev) => [...prev, ...files]);
   const removeUploadedFile = (url: string) => setUploadedFiles((prev) => prev.filter((f) => f.url !== url));
   const filesByCategory = (cat: UploadCategory) => uploadedFiles.filter((f) => f.category === cat);
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -210,28 +179,74 @@ const NuevoCreadorForm = () => {
     if (errors.languages) setErrors((prev) => { const next = { ...prev }; delete next.languages; return next; });
   };
 
-  const validate = useCallback((): Record<string, string> => {
+  // Platform helpers
+  const addPlatform = () => {
+    set("platforms", [...form.platforms, { id: crypto.randomUUID(), name: "", customName: "", amount: 0, frequency: "mensual" }]);
+  };
+  const updatePlatform = (id: string, field: keyof PlatformEntry, value: string | number) => {
+    set("platforms", form.platforms.map((p) => p.id === id ? { ...p, [field]: value } : p));
+  };
+  const removePlatform = (id: string) => {
+    set("platforms", form.platforms.filter((p) => p.id !== id));
+  };
+  const usedPlatformNames = form.platforms.map((p) => p.name).filter((n) => n && n !== "Otra");
+
+  const validateStep = useCallback((s: number): Record<string, string> => {
     const e: Record<string, string> = {};
-    if (!form.assigned_agency) e.assigned_agency = "La agencia es obligatoria";
-    if (!form.name.trim()) e.name = "El nombre es obligatorio";
-    if (!form.age || form.age < 18) e.age = "La edad mínima es 18 años";
-    if (!form.birth_date) e.birth_date = "La fecha de nacimiento es obligatoria";
-    if (!form.country) e.country = "El país es obligatorio";
-    if (!form.city.trim()) e.city = "La ciudad es obligatoria";
-    if (form.languages.length === 0) e.languages = "Selecciona al menos un idioma";
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "El email no es válido";
-    if (!form.payment_method) e.payment_method = "El método de pago es obligatorio";
-    if (!form.main_platform) e.main_platform = "La plataforma principal es obligatoria";
+    if (s === 1) {
+      if (!form.assigned_agency) e.assigned_agency = "La agencia es obligatoria";
+      if (!form.name.trim()) e.name = "El nombre es obligatorio";
+      if (!form.age || form.age < 18) e.age = "La edad mínima es 18 años";
+      if (!form.birth_date) e.birth_date = "La fecha de nacimiento es obligatoria";
+      if (!form.country) e.country = "El país es obligatorio";
+      if (!form.city.trim()) e.city = "La ciudad es obligatoria";
+      if (form.languages.length === 0) e.languages = "Selecciona al menos un idioma";
+    }
+    if (s === 2) {
+      if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "El email no es válido";
+    }
+    if (s === 5) {
+      if (!form.payment_method) e.payment_method = "El método de pago es obligatorio";
+    }
     return e;
   }, [form]);
 
-  const handleSubmit = async () => {
-    const validationErrors = validate();
+  const goNext = () => {
+    const validationErrors = validateStep(step);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      const firstKey = Object.keys(validationErrors)[0];
-      const el = document.querySelector(`[data-field="${firstKey}"]`);
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast({ title: "Revisa los campos marcados", variant: "destructive" });
+      return;
+    }
+    setErrors({});
+    setStep((s) => Math.min(s + 1, STEPS.length));
+  };
+
+  const goPrev = () => setStep((s) => Math.max(s - 1, 1));
+
+  const goToStep = (s: number) => {
+    if (s < step) {
+      setStep(s);
+      return;
+    }
+    // Validate all steps up to current before jumping forward
+    for (let i = step; i < s; i++) {
+      const validationErrors = validateStep(i);
+      if (Object.keys(validationErrors).length > 0) {
+        setErrors(validationErrors);
+        setStep(i);
+        toast({ title: "Revisa los campos marcados", variant: "destructive" });
+        return;
+      }
+    }
+    setErrors({});
+    setStep(s);
+  };
+
+  const handleSubmit = async () => {
+    const validationErrors = validateStep(5);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
       toast({ title: "Revisa los campos marcados", variant: "destructive" });
       return;
     }
@@ -243,6 +258,15 @@ const NuevoCreadorForm = () => {
         file_type: f.type,
         description: f.category,
       }));
+
+      // Build platforms JSON for storage
+      const platformsData = form.platforms
+        .filter((p) => p.name)
+        .map((p) => ({
+          name: p.name === "Otra" ? p.customName : p.name,
+          amount: p.amount,
+          frequency: p.frequency,
+        }));
 
       await mutation.mutateAsync({
         creator: {
@@ -263,7 +287,6 @@ const NuevoCreadorForm = () => {
           youtube_handle: form.youtube_handle || null,
           linkedin_handle: form.linkedin_handle || null,
           onlyfans_url: form.onlyfans_url || null,
-          piclink_url: form.piclink_url || null,
           profile_photo_url: form.profile_photo_url || null,
           bio: form.bio || null,
           internal_notes: form.internal_notes || null,
@@ -274,14 +297,6 @@ const NuevoCreadorForm = () => {
           commission_type: form.commission_type,
           commission_tiers: form.commission_type === "tiered" ? (form.commission_tiers as any) : [],
           payment_method: form.payment_method || null,
-          blue_package: form.blue_package,
-          li_payment_amount: form.blue_package ? form.blue_package_amount : null,
-          has_piclink: form.has_piclink,
-          piclink_monthly_payment: form.piclink_monthly_payment || null,
-          piclink_env_confirmed: form.piclink_env_confirmed,
-          main_platform: form.main_platform || null,
-          secondary_platform: form.secondary_platform || null,
-          platform_username: form.platform_username || null,
           start_date: form.start_date || null,
           billing_start_date: form.billing_start_date || null,
           billing_frequency: form.billing_frequency || null,
@@ -298,353 +313,395 @@ const NuevoCreadorForm = () => {
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => navigate("/creadores")}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" /> Volver a Creadores
-          </button>
-          <Button variant="outline" size="sm" onClick={() => setForm(testData)}>
-            <Pencil className="mr-2 h-4 w-4" /> Llenar datos de prueba
-          </Button>
-        </div>
-        <div className="mt-4">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="h-6 w-6" /> Nuevo Creador
+      {/* Header */}
+      <div className="shrink-0 border-b bg-background px-6 py-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-2 -ml-2 text-muted-foreground hover:text-foreground"
+          onClick={() => navigate("/creadores")}
+        >
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Volver a Creadores
+        </Button>
+        <div>
+          <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
+            <Users className="h-5 w-5" /> Nuevo Creador
           </h1>
-          <p className="text-sm text-muted-foreground">Completa los detalles del nuevo creador</p>
-        </div>
-      </header>
-
-      <div className="flex-1 overflow-auto p-6">
-        <div className="space-y-6">
-
-        {/* Seccion 1 - Información Básica */}
-        <Section icon={<User className="h-5 w-5" />} title="Información Básica">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Agencia Asignada *" error={errors.assigned_agency} fieldKey="assigned_agency">
-              <Select value={form.assigned_agency} onValueChange={(v) => set("assigned_agency", v)}>
-                <SelectTrigger className={errors.assigned_agency ? "border-destructive focus-visible:ring-destructive" : ""}><SelectValue placeholder="Seleccionar agencia" /></SelectTrigger>
-                <SelectContent>
-                  {AGENCIES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Estado">
-              <Select value={form.status} onValueChange={(v) => set("status", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Nombre Completo *" error={errors.name} fieldKey="name">
-              <Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Nombre completo" className={errors.name ? "border-destructive focus-visible:ring-destructive" : ""} />
-            </Field>
-            <Field label="Nombre Artístico">
-              <Input value={form.artistic_name} onChange={(e) => set("artistic_name", e.target.value)} placeholder="Nombre artístico" />
-            </Field>
-            <Field label="Edad *" error={errors.age} fieldKey="age">
-              <Input type="number" value={form.age || ""} onChange={(e) => set("age", Number(e.target.value))} min={18} className={errors.age ? "border-destructive focus-visible:ring-destructive" : ""} />
-            </Field>
-            <Field label="Fecha de Nacimiento *" error={errors.birth_date} fieldKey="birth_date">
-              <DateInput value={form.birth_date} onChange={(v) => set("birth_date", v)} toYear={new Date().getFullYear()} className={errors.birth_date ? "[&_input]:border-destructive" : ""} />
-            </Field>
-            <Field label="País *" error={errors.country} fieldKey="country">
-              <Select value={form.country} onValueChange={(v) => set("country", v)}>
-                <SelectTrigger className={errors.country ? "border-destructive focus-visible:ring-destructive" : ""}><SelectValue placeholder="Seleccionar país" /></SelectTrigger>
-                <SelectContent>
-                  {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Ciudad *" error={errors.city} fieldKey="city">
-              <Input value={form.city} onChange={(e) => set("city", e.target.value)} placeholder="Ciudad" className={errors.city ? "border-destructive focus-visible:ring-destructive" : ""} />
-            </Field>
-          </div>
-          <div className="space-y-2 pt-2" data-field="languages">
-            <Label className={cn("text-sm font-medium", errors.languages && "text-destructive")}>Idiomas *</Label>
-            <div className="flex flex-wrap gap-4">
-              {LANGUAGES.map((lang) => (
-                <label key={lang} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <Checkbox
-                    checked={form.languages.includes(lang)}
-                    onCheckedChange={() => toggleLanguage(lang)}
-                  />
-                  {lang}
-                </label>
-              ))}
-            </div>
-            {errors.languages && <p className="text-xs text-destructive">{errors.languages}</p>}
-          </div>
-        </Section>
-
-        {/* Seccion 2 - Contacto */}
-        <Section icon={<Phone className="h-5 w-5" />} title="Información de Contacto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Email" error={errors.email} fieldKey="email">
-              <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@ejemplo.com" className={errors.email ? "border-destructive focus-visible:ring-destructive" : ""} />
-            </Field>
-            <Field label="Teléfono">
-              <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
-            </Field>
-          </div>
-        </Section>
-
-        {/* Seccion 3 - Redes Sociales */}
-        <Section icon={<Share2 className="h-5 w-5" />} title="Redes Sociales">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Instagram URL">
-              <Input value={form.instagram_handle} onChange={(e) => set("instagram_handle", e.target.value)} placeholder="https://instagram.com/username" />
-            </Field>
-            <Field label="Twitter/X URL">
-              <Input value={form.twitter_handle} onChange={(e) => set("twitter_handle", e.target.value)} placeholder="https://x.com/username" />
-            </Field>
-            <Field label="TikTok URL">
-              <Input value={form.tiktok_handle} onChange={(e) => set("tiktok_handle", e.target.value)} placeholder="https://tiktok.com/@username" />
-            </Field>
-            <Field label="YouTube URL">
-              <Input value={form.youtube_handle} onChange={(e) => set("youtube_handle", e.target.value)} placeholder="https://youtube.com/@channel" />
-            </Field>
-            <Field label="LinkedIn URL">
-              <Input value={form.linkedin_handle} onChange={(e) => set("linkedin_handle", e.target.value)} placeholder="https://linkedin.com/in/..." />
-            </Field>
-            <Field label="OnlyFans URL">
-              <Input value={form.onlyfans_url} onChange={(e) => set("onlyfans_url", e.target.value)} placeholder="https://onlyfans.com/..." />
-            </Field>
-          </div>
-        </Section>
-
-        {/* Seccion 4 - Perfil y Biografía */}
-        <Section icon={<Image className="h-5 w-5" />} title="Perfil y Biografía">
-          <Field label="URL de Foto de Perfil">
-            <Input value={form.profile_photo_url} onChange={(e) => set("profile_photo_url", e.target.value)} placeholder="https://..." />
-          </Field>
-          <Field label="Biografía">
-            <Textarea value={form.bio} onChange={(e) => set("bio", e.target.value)} placeholder="Descripción del creador..." rows={4} />
-          </Field>
-        </Section>
-
-        {/* Seccion 5 - Operación */}
-        <Section icon={<Settings className="h-5 w-5" />} title="Operación & Categorización">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Categoría de Modelo">
-              <Select value={form.category} onValueChange={(v) => set("category", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Fecha de Inicio Oficial">
-              <DateInput value={form.start_date} onChange={(v) => set("start_date", v)} />
-            </Field>
-          </div>
-        </Section>
-
-        {/* Seccion 6 - Documentación */}
-        <Section icon={<FileText className="h-5 w-5" />} title="Documentación">
-          <div className="space-y-4">
-            {/* Contrato Firmado */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-sm font-medium">Contrato Firmado & Documentos</p>
-                <Button variant="outline" size="sm" onClick={() => openUpload("contracts")}>
-                  <Upload className="mr-2 h-4 w-4" /> Subir Archivos
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">Formatos: PDF, Word (.doc, .docx) e Imágenes. Máximo 10MB por archivo, 10 archivos.</p>
-              <UploadedFilesList files={filesByCategory("contracts")} onRemove={removeUploadedFile} />
-            </div>
-
-            {/* PickLink Confirmado Card */}
-            <div className="rounded-lg border p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Tiene PickLink Confirmado?</p>
-                <p className="text-xs text-muted-foreground">Marcar si el creador tiene PickLink activo</p>
-              </div>
-              <Checkbox checked={form.has_piclink} onCheckedChange={(v) => set("has_piclink", !!v)} />
-            </div>
-
-            {/* Campos condicionales PickLink */}
-            {form.has_piclink && (
-              <div className="border-l-2 border-primary pl-4 space-y-4 ml-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Dirección de PickLink">
-                    <Input value={form.piclink_url} onChange={(e) => set("piclink_url", e.target.value)} placeholder="https://piclink.com/username" />
-                  </Field>
-                  <Field label="Pago Mensual PickLink">
-                    <Input type="number" value={form.piclink_monthly_payment} onChange={(e) => set("piclink_monthly_payment", Number(e.target.value))} placeholder="50.00" min={0} />
-                  </Field>
-                </div>
-                <div>
-                  <div className="mb-1">
-                    <p className="text-sm font-medium">Fotos de PickLink (Comprobante)</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Formatos: Imágenes (JPG, PNG, GIF, WebP). Máximo 10MB por archivo.</p>
-                  <UploadedFilesList files={filesByCategory("piclink")} onRemove={removeUploadedFile} />
-                </div>
-              </div>
-            )}
-
-            {/* Fotos y Videos Extras */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-sm font-medium">Fotos y Videos Extras</p>
-                <Button variant="outline" size="sm" onClick={() => openUpload("extras")}>
-                  <Upload className="mr-2 h-4 w-4" /> Subir Archivos
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">Formatos: Imágenes (JPG, PNG, GIF) y Videos (MP4, MOV). Máximo 20MB por archivo.</p>
-              <UploadedFilesList files={filesByCategory("extras")} onRemove={removeUploadedFile} />
-            </div>
-
-            {/* PickLink ENV Confirmado Card */}
-            <div className="rounded-lg border p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">PickLink ENV Confirmado</p>
-                <p className="text-xs text-muted-foreground">Tag "ENV" configurado en Bios</p>
-              </div>
-              <Checkbox checked={form.piclink_env_confirmed} onCheckedChange={(v) => set("piclink_env_confirmed", !!v)} />
-            </div>
-          </div>
-
-          <FileUploadModal
-            open={uploadModal.open}
-            onClose={() => setUploadModal((p) => ({ ...p, open: false }))}
-            category={uploadModal.category}
-            tempId={tempId}
-            onFilesUploaded={handleFilesUploaded}
-          />
-        </Section>
-
-        {/* Seccion 7 - Condiciones Comerciales */}
-        <Section icon={<DollarSign className="h-5 w-5" />} title="Condiciones Comerciales">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <CommissionTiersEditor
-                commissionType={form.commission_type}
-                fixedPercentage={form.agency_percentage}
-                tiers={form.commission_tiers}
-                onTypeChange={(t) => set("commission_type", t)}
-                onFixedPercentageChange={(v) => set("agency_percentage", v)}
-                onTiersChange={(t) => set("commission_tiers", t)}
-              />
-            </div>
-            <Field label="Método de Pago *" error={errors.payment_method} fieldKey="payment_method">
-              <Select value={form.payment_method} onValueChange={(v) => set("payment_method", v)}>
-                <SelectTrigger className={errors.payment_method ? "border-destructive focus-visible:ring-destructive" : ""}><SelectValue placeholder="Seleccionar método" /></SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Fecha en la que inicia a cobrar">
-              <DateInput value={form.billing_start_date} onChange={(v) => set("billing_start_date", v)} />
-            </Field>
-            <Field label="Periodicidad de Cobro">
-              <Select value={form.billing_frequency} onValueChange={(v) => set("billing_frequency", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar periodicidad" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="semanal">Semanal</SelectItem>
-                  <SelectItem value="quincenal">Quincenal</SelectItem>
-                  <SelectItem value="mensual">Mensual</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Dirección de Facturación">
-              <Input
-                value={form.billing_address}
-                onChange={(e) => set("billing_address", e.target.value)}
-                placeholder="Dirección completa para facturación"
-              />
-            </Field>
-          </div>
-          <div className="rounded-lg border p-4 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Blue Package</p>
-              <p className="text-xs text-muted-foreground">¿Tiene paquete Blue?</p>
-            </div>
-            <Checkbox checked={form.blue_package} onCheckedChange={(v) => set("blue_package", !!v)} />
-          </div>
-          {form.blue_package && (
-            <div className="border-l-2 border-primary pl-4 ml-2">
-              <Field label="Monto de Pago">
-                <Input type="number" value={form.blue_package_amount} onChange={(e) => set("blue_package_amount", Number(e.target.value))} placeholder="1000.00" min={0} />
-              </Field>
-            </div>
-          )}
-        </Section>
-
-        {/* Seccion 8 - Captura y Monetización */}
-        <Section icon={<Camera className="h-5 w-5" />} title="Captura y Monetización">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-sm font-medium">Capturas de Monetización</p>
-              <Button variant="outline" size="sm" onClick={() => openUpload("extras")}>
-                <Upload className="mr-2 h-4 w-4" /> Subir Archivos
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Plataforma Principal *" error={errors.main_platform} fieldKey="main_platform">
-                <Select value={form.main_platform} onValueChange={(v) => set("main_platform", v)}>
-                  <SelectTrigger className={errors.main_platform ? "border-destructive focus-visible:ring-destructive" : ""}><SelectValue placeholder="Seleccionar plataforma" /></SelectTrigger>
-                  <SelectContent>
-                    {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Plataforma Secundaria">
-                <Select value={form.secondary_platform} onValueChange={(v) => set("secondary_platform", v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar plataforma" /></SelectTrigger>
-                  <SelectContent>
-                    {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Usuario en Plataforma">
-                <Input value={form.platform_username} onChange={(e) => set("platform_username", e.target.value)} placeholder="@username" />
-              </Field>
-            </div>
-          </div>
-        </Section>
-
-        {/* Seccion 9 - Notas Internas */}
-        <Section icon={<StickyNote className="h-5 w-5" />} title="Notas Internas">
-          <Field label="Notas Internas">
-            <Textarea
-              value={form.internal_notes}
-              onChange={(e) => set("internal_notes", e.target.value)}
-              placeholder="Observaciones del equipo, comentarios del closer, etc..."
-              rows={6}
-            />
-          </Field>
-        </Section>
+          <p className="text-sm text-muted-foreground mt-0.5">Completa los detalles del nuevo creador</p>
         </div>
       </div>
 
-      <footer className="bg-background border-t border-border px-6 py-4 flex justify-end gap-3 shrink-0">
-        <Button variant="outline" onClick={() => navigate("/creadores")}>Cancelar</Button>
-        <Button onClick={handleSubmit} disabled={mutation.isPending}>
-          {mutation.isPending ? "Agregando…" : "Agregar creador"}
+      {/* Stepper */}
+      <div className="shrink-0 border-b bg-background px-6 py-3 space-y-3">
+        <div className="flex items-center gap-0">
+          {STEPS.map((s, i) => (
+            <div key={s.id} className="flex items-center flex-1 last:flex-none">
+              <button
+                type="button"
+                onClick={() => goToStep(s.id)}
+                className={cn(
+                  "flex items-center gap-2 text-sm font-medium transition-colors",
+                  step === s.id ? "text-foreground" : step > s.id ? "text-foreground/70" : "text-muted-foreground"
+                )}
+              >
+                <span className={cn(
+                  "flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold transition-all",
+                  step === s.id
+                    ? "border-transparent bg-gradient-to-r from-accent to-primary text-white ring-2 ring-accent/30"
+                    : step > s.id
+                    ? "border-transparent bg-gradient-to-r from-accent to-primary text-white"
+                    : "border-muted-foreground/30 text-muted-foreground"
+                )}>
+                  {step > s.id ? <Check className="h-3.5 w-3.5" /> : s.id}
+                </span>
+                <span className="hidden sm:inline">{s.label}</span>
+              </button>
+              {i < STEPS.length - 1 && (
+                <div className={cn("h-px flex-1 mx-2 transition-colors", step > s.id ? "bg-gradient-to-r from-accent to-primary" : "bg-border")} />
+              )}
+            </div>
+          ))}
+        </div>
+        <Progress value={(step / STEPS.length) * 100} className="h-1.5" indicatorClassName="bg-gradient-to-r from-accent to-primary" />
+      </div>
+
+      {/* Step Content */}
+      <div className="flex-1 overflow-auto px-6 py-6">
+        <div className="max-w-4xl mx-auto">
+          {/* Step 1: Datos Personales */}
+          {step === 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <User className="h-4 w-4" /> Datos Personales
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Agencia Asignada *" error={errors.assigned_agency} fieldKey="assigned_agency">
+                  <Select value={form.assigned_agency} onValueChange={(v) => set("assigned_agency", v)}>
+                    <SelectTrigger className={errors.assigned_agency ? "border-destructive" : ""}><SelectValue placeholder="Seleccionar agencia" /></SelectTrigger>
+                    <SelectContent>
+                      {AGENCIES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Estado">
+                  <Select value={form.status} onValueChange={(v) => set("status", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Nombre Completo *" error={errors.name} fieldKey="name">
+                  <Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Nombre completo" className={errors.name ? "border-destructive" : ""} />
+                </Field>
+                <Field label="Nombre Artístico">
+                  <Input value={form.artistic_name} onChange={(e) => set("artistic_name", e.target.value)} placeholder="Nombre artístico" />
+                </Field>
+                <Field label="Edad *" error={errors.age} fieldKey="age">
+                  <Input type="number" value={form.age || ""} onChange={(e) => set("age", Number(e.target.value))} min={18} className={errors.age ? "border-destructive" : ""} />
+                </Field>
+                <Field label="Fecha de Nacimiento *" error={errors.birth_date} fieldKey="birth_date">
+                  <DateInput value={form.birth_date} onChange={(v) => set("birth_date", v)} toYear={new Date().getFullYear()} className={errors.birth_date ? "[&_input]:border-destructive" : ""} />
+                </Field>
+                <Field label="País *" error={errors.country} fieldKey="country">
+                  <Select value={form.country} onValueChange={(v) => set("country", v)}>
+                    <SelectTrigger className={errors.country ? "border-destructive" : ""}><SelectValue placeholder="Seleccionar país" /></SelectTrigger>
+                    <SelectContent>
+                      {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Ciudad *" error={errors.city} fieldKey="city">
+                  <Input value={form.city} onChange={(e) => set("city", e.target.value)} placeholder="Ciudad" className={errors.city ? "border-destructive" : ""} />
+                </Field>
+                <div className="sm:col-span-2 space-y-2" data-field="languages">
+                  <Label className={cn("text-sm font-medium", errors.languages && "text-destructive")}>Idiomas *</Label>
+                  <div className="flex flex-wrap gap-4">
+                    {LANGUAGES.map((lang) => (
+                      <label key={lang} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox checked={form.languages.includes(lang)} onCheckedChange={() => toggleLanguage(lang)} />
+                        {lang}
+                      </label>
+                    ))}
+                  </div>
+                  {errors.languages && <p className="text-xs text-destructive">{errors.languages}</p>}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 2: Contacto y Redes */}
+          {step === 2 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Share2 className="h-4 w-4" /> Contacto y Redes Sociales
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Email" error={errors.email} fieldKey="email">
+                    <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@ejemplo.com" className={errors.email ? "border-destructive" : ""} />
+                  </Field>
+                  <Field label="Teléfono">
+                    <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
+                  </Field>
+                  <Field label="Instagram URL">
+                    <Input value={form.instagram_handle} onChange={(e) => set("instagram_handle", e.target.value)} placeholder="https://instagram.com/username" />
+                  </Field>
+                  <Field label="Twitter/X URL">
+                    <Input value={form.twitter_handle} onChange={(e) => set("twitter_handle", e.target.value)} placeholder="https://x.com/username" />
+                  </Field>
+                  <Field label="TikTok URL">
+                    <Input value={form.tiktok_handle} onChange={(e) => set("tiktok_handle", e.target.value)} placeholder="https://tiktok.com/@username" />
+                  </Field>
+                  <Field label="YouTube URL">
+                    <Input value={form.youtube_handle} onChange={(e) => set("youtube_handle", e.target.value)} placeholder="https://youtube.com/@channel" />
+                  </Field>
+                  <Field label="LinkedIn URL">
+                    <Input value={form.linkedin_handle} onChange={(e) => set("linkedin_handle", e.target.value)} placeholder="https://linkedin.com/in/..." />
+                  </Field>
+                  <Field label="OnlyFans URL">
+                    <Input value={form.onlyfans_url} onChange={(e) => set("onlyfans_url", e.target.value)} placeholder="https://onlyfans.com/..." />
+                  </Field>
+                </div>
+                <div className="space-y-4">
+                  <Field label="URL de Foto de Perfil">
+                    <Input value={form.profile_photo_url} onChange={(e) => set("profile_photo_url", e.target.value)} placeholder="https://..." />
+                  </Field>
+                  <Field label="Biografía">
+                    <Textarea value={form.bio} onChange={(e) => set("bio", e.target.value)} placeholder="Descripción del creador..." rows={4} />
+                  </Field>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 3: Operación */}
+          {step === 3 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Settings className="h-4 w-4" /> Operación y Documentación
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Categoría de Modelo">
+                    <Select value={form.category} onValueChange={(v) => set("category", v)}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Fecha de Inicio Oficial">
+                    <DateInput value={form.start_date} onChange={(v) => set("start_date", v)} />
+                  </Field>
+                </div>
+
+                {/* Documentation */}
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-medium">Contrato Firmado & Documentos</p>
+                      <Button variant="outline" size="sm" onClick={() => openUpload("contracts")}>
+                        <Upload className="mr-2 h-4 w-4" /> Subir Archivos
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Formatos: PDF, Word (.doc, .docx) e Imágenes. Máximo 10MB por archivo.</p>
+                    <UploadedFilesList files={filesByCategory("contracts")} onRemove={removeUploadedFile} />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-medium">Fotos y Videos Extras</p>
+                      <Button variant="outline" size="sm" onClick={() => openUpload("extras")}>
+                        <Upload className="mr-2 h-4 w-4" /> Subir Archivos
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Formatos: Imágenes y Videos. Máximo 20MB por archivo.</p>
+                    <UploadedFilesList files={filesByCategory("extras")} onRemove={removeUploadedFile} />
+                  </div>
+                </div>
+
+                <FileUploadModal
+                  open={uploadModal.open}
+                  onClose={() => setUploadModal((p) => ({ ...p, open: false }))}
+                  category={uploadModal.category}
+                  tempId={tempId}
+                  onFilesUploaded={handleFilesUploaded}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 4: Plataformas Activas */}
+          {step === 4 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="h-4 w-4" /> Plataformas Activas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Agrega las plataformas que tiene activas la creadora con su monto y periodicidad de pago.
+                </p>
+
+                {form.platforms.length === 0 && (
+                  <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+                    <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No hay plataformas agregadas aún</p>
+                  </div>
+                )}
+
+                {form.platforms.map((platform) => (
+                  <div key={platform.id} className="rounded-lg border p-4 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                      <div className="space-y-1.5">
+                        <Label className="text-sm">Plataforma</Label>
+                        <Select value={platform.name} onValueChange={(v) => updatePlatform(platform.id, "name", v)}>
+                          <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                          <SelectContent>
+                            {AVAILABLE_PLATFORMS.filter((p) => !usedPlatformNames.includes(p) || p === platform.name).map((p) => (
+                              <SelectItem key={p} value={p}>{p}</SelectItem>
+                            ))}
+                            <SelectItem value="Otra">Otra (personalizada)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {platform.name === "Otra" && (
+                        <div className="space-y-1.5">
+                          <Label className="text-sm">Nombre</Label>
+                          <Input
+                            value={platform.customName}
+                            onChange={(e) => updatePlatform(platform.id, "customName", e.target.value)}
+                            placeholder="Nombre de la plataforma"
+                          />
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <Label className="text-sm">Monto ($)</Label>
+                        <Input
+                          type="number"
+                          value={platform.amount || ""}
+                          onChange={(e) => updatePlatform(platform.id, "amount", Number(e.target.value))}
+                          placeholder="0.00"
+                          min={0}
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-sm">Frecuencia</Label>
+                        <Select value={platform.frequency} onValueChange={(v) => updatePlatform(platform.id, "frequency", v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {PLATFORM_FREQUENCIES.map((f) => (
+                              <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex items-end">
+                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => removePlatform(platform.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <Button variant="outline" size="sm" onClick={addPlatform} className="w-full">
+                  <Plus className="mr-2 h-4 w-4" /> Agregar plataforma
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 5: Condiciones Comerciales */}
+          {step === 5 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" /> Condiciones Comerciales
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <CommissionTiersEditor
+                  commissionType={form.commission_type}
+                  fixedPercentage={form.agency_percentage}
+                  tiers={form.commission_tiers}
+                  onTypeChange={(t) => set("commission_type", t)}
+                  onFixedPercentageChange={(v) => set("agency_percentage", v)}
+                  onTiersChange={(t) => set("commission_tiers", t)}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Método de Pago *" error={errors.payment_method} fieldKey="payment_method">
+                    <Select value={form.payment_method} onValueChange={(v) => set("payment_method", v)}>
+                      <SelectTrigger className={errors.payment_method ? "border-destructive" : ""}><SelectValue placeholder="Seleccionar método" /></SelectTrigger>
+                      <SelectContent>
+                        {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Fecha en la que inicia a cobrar">
+                    <DateInput value={form.billing_start_date} onChange={(v) => set("billing_start_date", v)} />
+                  </Field>
+                  <Field label="Periodicidad de Cobro">
+                    <Select value={form.billing_frequency} onValueChange={(v) => set("billing_frequency", v)}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar periodicidad" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="semanal">Semanal</SelectItem>
+                        <SelectItem value="quincenal">Quincenal</SelectItem>
+                        <SelectItem value="mensual">Mensual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Dirección de Facturación">
+                    <Input value={form.billing_address} onChange={(e) => set("billing_address", e.target.value)} placeholder="Dirección completa" />
+                  </Field>
+                </div>
+
+                <Field label="Notas Internas">
+                  <Textarea
+                    value={form.internal_notes}
+                    onChange={(e) => set("internal_notes", e.target.value)}
+                    placeholder="Observaciones del equipo, comentarios del closer, etc..."
+                    rows={4}
+                  />
+                </Field>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* Footer Navigation */}
+      <footer className="bg-background border-t border-border px-6 py-4 flex items-center justify-between shrink-0">
+        <Button variant="outline" onClick={goPrev} disabled={step === 1}>
+          <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
         </Button>
+        <span className="text-sm text-muted-foreground">Paso {step} de {STEPS.length}</span>
+        {step < STEPS.length ? (
+          <Button onClick={goNext}>
+            Siguiente <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        ) : (
+          <Button onClick={handleSubmit} disabled={mutation.isPending}>
+            {mutation.isPending ? "Guardando…" : "Guardar Creador"}
+          </Button>
+        )}
       </footer>
     </main>
   );
 };
-
-function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border bg-card p-6 space-y-4">
-      <h3 className="text-lg font-semibold flex items-center gap-2">
-        {icon} {title}
-      </h3>
-      {children}
-    </div>
-  );
-}
 
 function Field({ label, error, fieldKey, children }: { label: string; error?: string; fieldKey?: string; children: React.ReactNode }) {
   return (
