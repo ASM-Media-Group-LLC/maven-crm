@@ -212,12 +212,6 @@ const NuevoCreadorForm = () => {
   }, [form]);
 
   const goNext = () => {
-    const validationErrors = validateStep(step);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      toast({ title: "Revisa los campos marcados", variant: "destructive" });
-      return;
-    }
     setErrors({});
     setStep((s) => Math.min(s + 1, STEPS.length));
   };
@@ -225,20 +219,6 @@ const NuevoCreadorForm = () => {
   const goPrev = () => setStep((s) => Math.max(s - 1, 1));
 
   const goToStep = (s: number) => {
-    if (s < step) {
-      setStep(s);
-      return;
-    }
-    // Validate all steps up to current before jumping forward
-    for (let i = step; i < s; i++) {
-      const validationErrors = validateStep(i);
-      if (Object.keys(validationErrors).length > 0) {
-        setErrors(validationErrors);
-        setStep(i);
-        toast({ title: "Revisa los campos marcados", variant: "destructive" });
-        return;
-      }
-    }
     setErrors({});
     setStep(s);
   };
@@ -368,7 +348,7 @@ const NuevoCreadorForm = () => {
 
       {/* Step Content */}
       <div className="flex-1 overflow-auto px-6 py-6">
-        <div className="max-w-4xl mx-auto">
+        <div>
           {/* Step 1: Datos Personales */}
           {step === 1 && (
             <Card>
