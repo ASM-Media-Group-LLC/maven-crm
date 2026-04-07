@@ -37,10 +37,10 @@ const EventosContent = () => {
   const { toast } = useToast();
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    if (e.currentTarget.scrollTop > 40) {
+    if (!statsCollapsed && e.currentTarget.scrollTop > 40) {
       setStatsCollapsed(true);
     }
-  }, []);
+  }, [statsCollapsed]);
 
   const { events, allEvents, isLoading } = useEventos(filters);
 
