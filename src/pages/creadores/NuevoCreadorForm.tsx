@@ -212,12 +212,6 @@ const NuevoCreadorForm = () => {
   }, [form]);
 
   const goNext = () => {
-    const validationErrors = validateStep(step);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      toast({ title: "Revisa los campos marcados", variant: "destructive" });
-      return;
-    }
     setErrors({});
     setStep((s) => Math.min(s + 1, STEPS.length));
   };
