@@ -219,20 +219,6 @@ const NuevoCreadorForm = () => {
   const goPrev = () => setStep((s) => Math.max(s - 1, 1));
 
   const goToStep = (s: number) => {
-    if (s < step) {
-      setStep(s);
-      return;
-    }
-    // Validate all steps up to current before jumping forward
-    for (let i = step; i < s; i++) {
-      const validationErrors = validateStep(i);
-      if (Object.keys(validationErrors).length > 0) {
-        setErrors(validationErrors);
-        setStep(i);
-        toast({ title: "Revisa los campos marcados", variant: "destructive" });
-        return;
-      }
-    }
     setErrors({});
     setStep(s);
   };
