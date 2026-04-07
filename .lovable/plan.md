@@ -1,3 +1,4 @@
+
 # Plan: Stepper para Nuevo Creador
 
 ## Resumen
@@ -19,19 +20,19 @@ Reescribir `NuevoCreadorForm.tsx` con un stepper de 5 pasos (mismo patrón de `E
 
 ## Plataformas Activas (Paso 4)
 - Lista predefinida: **Leak Hunter**, **Blu**, **PickLink**, **ORA**, **Lumina**
-- Opción "Otra" que permite escribir nombre personalizado
-- Cada fila: Select plataforma + Input monto ($) + Select frecuencia (Mensual/Anual/Semanal/Quincenal) + botón eliminar
-- Botón "Agregar plataforma"
+- Opcion "Otra" que permite escribir nombre personalizado
+- Cada fila: Select plataforma + Input monto ($) + Select frecuencia (Mensual/Anual/Semanal/Quincenal) + boton eliminar
+- Boton "Agregar plataforma"
 - Plataformas ya seleccionadas se filtran del dropdown
 - Se almacenan como parte de los datos de negocio del creador
 
 ## Stepper UI
-- Barra de pasos clickeable con números/checks y barra de progreso (patrón exacto de EmployeeNew)
-- Validación por paso
-- Navegación libre entre pasos visitados
+- Barra de pasos clickeable con numeros/checks y barra de progreso (patron exacto de EmployeeNew)
+- Validacion por paso
+- Navegacion libre entre pasos visitados
 - Botones Anterior / Siguiente / Guardar
 
 ## Archivo modificado
 | Archivo | Cambio |
 |---------|--------|
-| `NuevoCreadorForm.tsx` | Reescribir completo con stepper 5 pasos, eliminar campos obsoletos, agregar plataformas dinámicas |
+| `NuevoCreadorForm.tsx` | Reescribir completo con stepper 5 pasos, eliminar campos obsoletos, agregar plataformas dinamicas |
