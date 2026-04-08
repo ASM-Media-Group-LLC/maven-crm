@@ -1,36 +1,21 @@
 
 
-# Plan: Corregir filtros Top 20% y Bottom 80% en Análisis de Concentración
+# Plan: Corregir filtro Top 20% / Bottom 80% en vista Lista del Pareto Dialog
 
 ## Problema
-
-Los filtros "Top 20%" y "Bottom 80%" simplemente cortan los puntos de la curva de Lorenz, pero esos puntos tienen valores **acumulados** del dataset completo. El resultado es que:
-- Los labels del eje X no empiezan en 0% para el segmento filtrado
-- Los valores de revenue son acumulados del total, no del segmento
-- El insight no cambia según el filtro activo
-- No hay información útil sobre el segmento (cuántas creadoras, cuánto generan)
+En el diálogo de Análisis 80/20 de Dashboard2, el toggle "Top 20% / Bottom 80%" (`paretoGroup`) solo afecta la vista **Gráfico** (cambia los datos del pie chart via `pieData`). En la vista **Lista**, siempre se muestran ambas secciones (Top y Resto) sin importar qué grupo esté seleccionado.
 
 ## Solución
+Aplicar el filtro `paretoGroup` también a la vista Lista:
 
-Reescribir `buildLorenz` para que retorne también los datos agrupados por creadora (sorted), y construir curvas de Lorenz **independientes** para cada segmento:
+### Cambios en `Dashboard2.tsx` (líneas 1166-1222)
 
-### Cambios en `ConcentrationChart.tsx`
-
-1. **`buildLorenz` retorna datos crudos además de la curva**: Devolver el array `sorted` (ingresos por creadora ordenados desc) y el `total` para poder recalcular segmentos.
-
-2. **Nuevas funciones de segmentación**:
-   - `buildSegmentCurve(sorted, "top20")`: toma el top 20% de creadoras, construye una curva de Lorenz **interna** al segmento (eje X = % dentro del segmento, eje Y = % del revenue del segmento)
-   - `buildSegmentCurve(sorted, "bottom80")`: igual para el 80% inferior
-
-3. **Insight dinámico según filtro**:
-   - **All**: "El 20% de las creadoras genera el X% de los ingresos"
-   - **Top 20%**: "N creadoras (top 20%) generan $X total — la #1 aporta Y% del segmento"
-   - **Bottom 80%**: "N creadoras (bottom 80%) generan $X total — distribución más uniforme"
-
-4. **KPI cards del segmento**: Mostrar debajo del insight: cantidad de creadoras en el segmento, revenue total del segmento, y % que representan del total.
+- **Cuando `paretoGroup === "80"`**: Mostrar solo la sección Top (🔥 Top N) con barras de progreso relativas al segmento top
+- **Cuando `paretoGroup === "20"`**: Mostrar solo la sección Bottom/Resto (📉 Resto) con barras de progreso relativas al segmento rest
+- Mantener el mismo formato visual de cada sección, solo condicionar cuál se muestra según el grupo seleccionado
 
 ## Archivo modificado
 | Archivo | Cambio |
 |---------|--------|
-| `ConcentrationChart.tsx` | Reescribir lógica de filtros para generar curvas independientes por segmento, insight dinámico, KPIs de segmento |
+| `Dashboard2.tsx` | Condicionar vista Lista según `paretoGroup` para mostrar solo el segmento seleccionado |
 
