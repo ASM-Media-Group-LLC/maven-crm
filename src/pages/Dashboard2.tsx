@@ -557,7 +557,7 @@ const Dashboard2 = () => {
                           <BarChart3 className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Métricas detalladas</TooltipContent>
+                      <TooltipContent side="bottom" className="z-50">Métricas detalladas</TooltipContent>
                     </UITooltip>
                     <UITooltip>
                       <TooltipTrigger asChild>
@@ -565,7 +565,7 @@ const Dashboard2 = () => {
                           <PieChart className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Análisis 80/20</TooltipContent>
+                      <TooltipContent side="bottom" className="z-50">Análisis 80/20</TooltipContent>
                     </UITooltip>
                     <UITooltip>
                       <TooltipTrigger asChild>
@@ -578,7 +578,7 @@ const Dashboard2 = () => {
                           )}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Red Flags</TooltipContent>
+                      <TooltipContent side="bottom" className="z-50">Red Flags</TooltipContent>
                     </UITooltip>
                     <UITooltip>
                       <TooltipTrigger asChild>
@@ -586,7 +586,7 @@ const Dashboard2 = () => {
                           <Target className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Proyección del mes</TooltipContent>
+                      <TooltipContent side="bottom" className="z-50">Proyección del mes</TooltipContent>
                     </UITooltip>
                     <div className="w-px h-5 bg-border mx-0.5" />
                     <UITooltip>
@@ -596,7 +596,7 @@ const Dashboard2 = () => {
                           Más análisis
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Análisis ejecutivo completo</TooltipContent>
+                      <TooltipContent side="bottom" className="z-50">Análisis ejecutivo completo</TooltipContent>
                     </UITooltip>
                     {isAdmin && (
                       <UITooltip>
@@ -605,7 +605,7 @@ const Dashboard2 = () => {
                             <Download className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Exportar PDF</TooltipContent>
+                        <TooltipContent side="bottom" className="z-50">Exportar PDF</TooltipContent>
                       </UITooltip>
                     )}
                   </TooltipProvider>
