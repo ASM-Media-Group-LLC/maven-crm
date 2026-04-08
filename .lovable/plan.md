@@ -1,21 +1,28 @@
 
 
-# Plan: Corregir filtro Top 20% / Bottom 80% en vista Lista del Pareto Dialog
+# Plan: Corregir envío en IA Ventas + Tooltips ocultos en Dashboard2
 
-## Problema
-En el diálogo de Análisis 80/20 de Dashboard2, el toggle "Top 20% / Bottom 80%" (`paretoGroup`) solo afecta la vista **Gráfico** (cambia los datos del pie chart via `pieData`). En la vista **Lista**, siempre se muestran ambas secciones (Top y Resto) sin importar qué grupo esté seleccionado.
+## Problema 1: Mensajes no se envían en IA Ventas
 
-## Solución
-Aplicar el filtro `paretoGroup` también a la vista Lista:
+El botón Send tiene `disabled={!input.trim() || isLoading || !canChat}`, y `canChat = isPanel || !!conversationId`. En modo full (no panel), si no hay conversación seleccionada, `canChat` es `false` y el botón queda deshabilitado. Aunque el plan anterior mencionaba auto-crear chat al escribir, el textarea no está disabled pero **el botón sí lo está**, así que el usuario escribe pero no puede enviar.
 
-### Cambios en `Dashboard2.tsx` (líneas 1166-1222)
+**Solución**: Cuando el usuario intente enviar sin `conversationId` (modo full), auto-crear una conversación primero y luego enviar el mensaje. Esto requiere:
 
-- **Cuando `paretoGroup === "80"`**: Mostrar solo la sección Top (🔥 Top N) con barras de progreso relativas al segmento top
-- **Cuando `paretoGroup === "20"`**: Mostrar solo la sección Bottom/Resto (📉 Resto) con barras de progreso relativas al segmento rest
-- Mantener el mismo formato visual de cada sección, solo condicionar cuál se muestra según el grupo seleccionado
+- Pasar un callback `onAutoCreate` desde `AiSales.tsx` a `ClariAiChat`
+- En `ClariAiChat.send()`, si `!conversationId` y hay un `onAutoCreate`, llamarlo primero, obtener el nuevo ID, y proceder con el envío
+- Eliminar la condición `!canChat` del disabled del botón Send (mantener solo `!input.trim() || isLoading`)
 
-## Archivo modificado
+## Problema 2: Tooltips ocultos bajo el topbar en Dashboard2
+
+Los tooltips en la barra de herramientas (líneas 538-611) usan `side="bottom"` o el default (top). Como están cerca del topbar sticky, los tooltips con `side` default (top) pueden quedar tapados por el header.
+
+**Solución**: Agregar `side="bottom"` a todos los `TooltipContent` en esa zona de toolbar para que aparezcan debajo de los botones en vez de arriba (donde colisionan con el topbar). También agregar `className="z-50"` para asegurar que queden por encima de otros elementos.
+
+## Archivos modificados
+
 | Archivo | Cambio |
 |---------|--------|
-| `Dashboard2.tsx` | Condicionar vista Lista según `paretoGroup` para mostrar solo el segmento seleccionado |
+| `ClariAiChat.tsx` | Aceptar prop `onAutoCreate`, auto-crear conversación al enviar sin ID activo, quitar `!canChat` del disabled |
+| `AiSales.tsx` | Pasar callback `onAutoCreate` que crea conversación y retorna el ID |
+| `Dashboard2.tsx` | Agregar `side="bottom"` a todos los TooltipContent de la toolbar |
 
