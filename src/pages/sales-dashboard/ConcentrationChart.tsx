@@ -31,7 +31,7 @@ type FilterKey = (typeof filterTabs)[number]["key"];
 
 const NET_FACTOR = 0.80;
 
-const buildLorenz = (rows: EarningsRow[], mode: EarningsMode) => {
+const groupByCreator = (rows: EarningsRow[], mode: EarningsMode) => {
   const factor = mode === "net" ? NET_FACTOR : 1;
   const grouped = new Map<string, number>();
   let total = 0;
@@ -41,68 +41,83 @@ const buildLorenz = (rows: EarningsRow[], mode: EarningsMode) => {
     grouped.set(key, (grouped.get(key) ?? 0) + val);
     total += val;
   }
-  if (total === 0 || grouped.size === 0) return { points: [] as { percent: string; revenue: number }[], top20Pct: 0 };
-
   const sorted = Array.from(grouped.values()).sort((a, b) => b - a);
-  const n = sorted.length;
-  let cumulative = 0;
-  const points = sorted.map((earnings, i) => {
-    cumulative += earnings;
-    return { percent: `${Math.round(((i + 1) / n) * 100)}%`, revenue: Math.round((cumulative / total) * 100) };
-  });
+  return { sorted, total, creatorCount: grouped.size };
+};
 
-  const top20Count = Math.max(1, Math.ceil(n * 0.2));
-  const top20Revenue = sorted.slice(0, top20Count).reduce((sum, v) => sum + v, 0);
-  return { points, top20Pct: Math.round((top20Revenue / total) * 100) };
+const buildCurve = (values: number[]) => {
+  if (values.length === 0) return [];
+  const total = values.reduce((s, v) => s + v, 0);
+  if (total === 0) return [];
+  let cum = 0;
+  return values.map((v, i) => {
+    cum += v;
+    return {
+      percent: `${Math.round(((i + 1) / values.length) * 100)}%`,
+      revenue: Math.round((cum / total) * 100),
+    };
+  });
+};
+
+const formatCurrency = (v: number) => {
+  if (v >= 1000) return `$${(v / 1000).toFixed(1)}k`;
+  return `$${Math.round(v)}`;
 };
 
 const ConcentrationChart = ({ rows, comparedRows, earningsMode }: Props) => {
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
 
-  const currentLorenz = useMemo(() => buildLorenz(rows, earningsMode), [rows, earningsMode]);
-  const compLorenz = useMemo(() => comparedRows ? buildLorenz(comparedRows, earningsMode) : null, [comparedRows, earningsMode]);
+  const currentData = useMemo(() => groupByCreator(rows, earningsMode), [rows, earningsMode]);
+  const compData = useMemo(() => comparedRows ? groupByCreator(comparedRows, earningsMode) : null, [comparedRows, earningsMode]);
 
-  const hasComparison = compLorenz && compLorenz.points.length > 0;
+  const getSegment = (sorted: number[], filter: FilterKey) => {
+    const cutoff = Math.max(1, Math.ceil(sorted.length * 0.2));
+    if (filter === "top20") return sorted.slice(0, cutoff);
+    if (filter === "bottom80") return sorted.slice(cutoff);
+    return sorted;
+  };
 
-  // Merge points for dual display
+  const segmentA = useMemo(() => getSegment(currentData.sorted, activeFilter), [currentData.sorted, activeFilter]);
+  const segmentB = useMemo(() => compData ? getSegment(compData.sorted, activeFilter) : null, [compData, activeFilter]);
+
+  const curveA = useMemo(() => buildCurve(segmentA), [segmentA]);
+  const curveB = useMemo(() => segmentB ? buildCurve(segmentB) : null, [segmentB]);
+
+  const hasComparison = curveB && curveB.length > 0;
+
   const mergedPoints = useMemo(() => {
-    let points = currentLorenz.points;
-
-    // Apply filter: top20 shows first 20% of creators, bottom80 shows last 80%
-    if (activeFilter === "top20") {
-      const cutoff = Math.max(1, Math.ceil(points.length * 0.2));
-      points = points.slice(0, cutoff);
-    } else if (activeFilter === "bottom80") {
-      const cutoff = Math.max(1, Math.ceil(points.length * 0.2));
-      points = points.slice(cutoff);
-    }
-
-    if (!hasComparison) return points.map((p) => ({ ...p, revenueB: undefined as number | undefined }));
-
-    let compPoints = compLorenz.points;
-    if (activeFilter === "top20") {
-      const cutoff = Math.max(1, Math.ceil(compPoints.length * 0.2));
-      compPoints = compPoints.slice(0, cutoff);
-    } else if (activeFilter === "bottom80") {
-      const cutoff = Math.max(1, Math.ceil(compPoints.length * 0.2));
-      compPoints = compPoints.slice(cutoff);
-    }
-
-    const maxLen = Math.max(points.length, compPoints.length);
+    if (!hasComparison) return curveA.map(p => ({ ...p, revenueB: undefined as number | undefined }));
+    const maxLen = Math.max(curveA.length, curveB!.length);
     const merged = [];
     for (let i = 0; i < maxLen; i++) {
       merged.push({
-        percent: points[i]?.percent ?? compPoints[i]?.percent ?? `${i}%`,
-        revenue: points[i]?.revenue ?? 0,
-        revenueB: compPoints[i]?.revenue ?? 0,
+        percent: curveA[i]?.percent ?? curveB![i]?.percent ?? `${i}%`,
+        revenue: curveA[i]?.revenue ?? 0,
+        revenueB: curveB![i]?.revenue ?? 0,
       });
     }
     return merged;
-  }, [currentLorenz, compLorenz, hasComparison, activeFilter]);
+  }, [curveA, curveB, hasComparison]);
 
-  const insight = currentLorenz.points.length > 0
-    ? `El 20% de las creadoras genera el ${currentLorenz.top20Pct}% de los ingresos`
-    : "Sin datos disponibles";
+  // Segment stats
+  const segmentTotal = segmentA.reduce((s, v) => s + v, 0);
+  const segmentPct = currentData.total > 0 ? Math.round((segmentTotal / currentData.total) * 100) : 0;
+  const top20Count = Math.max(1, Math.ceil(currentData.sorted.length * 0.2));
+  const top20Revenue = currentData.sorted.slice(0, top20Count).reduce((s, v) => s + v, 0);
+  const top20Pct = currentData.total > 0 ? Math.round((top20Revenue / currentData.total) * 100) : 0;
+
+  const insight = (() => {
+    if (currentData.sorted.length === 0) return "Sin datos disponibles";
+    if (activeFilter === "all") {
+      return `El 20% de las creadoras genera el ${top20Pct}% de los ingresos`;
+    }
+    if (activeFilter === "top20") {
+      const topCreator = segmentA[0] ?? 0;
+      const topPct = segmentTotal > 0 ? Math.round((topCreator / segmentTotal) * 100) : 0;
+      return `${segmentA.length} creadoras (top 20%) generan ${formatCurrency(segmentTotal)} — la #1 aporta ${topPct}% del segmento`;
+    }
+    return `${segmentA.length} creadoras (bottom 80%) generan ${formatCurrency(segmentTotal)} — distribución más uniforme`;
+  })();
 
   return (
     <div className="rounded-lg border border-border bg-card p-6 space-y-4">
@@ -140,6 +155,24 @@ const ConcentrationChart = ({ rows, comparedRows, earningsMode }: Props) => {
       {/* Insight */}
       <div className="rounded-lg bg-muted px-4 py-2.5 text-sm text-foreground">{insight}</div>
 
+      {/* KPI cards */}
+      {activeFilter !== "all" && segmentA.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-lg border border-border bg-background p-3 text-center">
+            <p className="text-xs text-muted-foreground">Creadoras</p>
+            <p className="text-lg font-semibold text-foreground">{segmentA.length}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-background p-3 text-center">
+            <p className="text-xs text-muted-foreground">Revenue Total</p>
+            <p className="text-lg font-semibold text-foreground">{formatCurrency(segmentTotal)}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-background p-3 text-center">
+            <p className="text-xs text-muted-foreground">% del Total</p>
+            <p className="text-lg font-semibold text-foreground">{segmentPct}%</p>
+          </div>
+        </div>
+      )}
+
       {/* Chart */}
       <div className="h-72">
         {mergedPoints.length === 0 ? (
@@ -155,14 +188,14 @@ const ConcentrationChart = ({ rows, comparedRows, earningsMode }: Props) => {
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                label={{ value: "% Creators", position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                label={{ value: activeFilter === "all" ? "% Creators" : `% Creators (${activeFilter === "top20" ? "Top 20%" : "Bottom 80%"})`, position: "insideBottom", offset: -5, fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
               />
               <YAxis
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => `${v}%`}
-                label={{ value: "% Revenue", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                label={{ value: "% Revenue (segmento)", angle: -90, position: "insideLeft", fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
               />
               <Tooltip
                 contentStyle={{
@@ -175,8 +208,12 @@ const ConcentrationChart = ({ rows, comparedRows, earningsMode }: Props) => {
                 formatter={(value: number, name: string) => [`${value}%`, name === "revenueB" ? "Periodo B" : "Periodo A"]}
               />
               {hasComparison && <Legend formatter={(v) => (v === "revenueB" ? "Periodo B" : "Periodo A")} />}
-              <ReferenceLine y={currentLorenz.top20Pct} stroke="hsl(var(--destructive))" strokeDasharray="6 6" strokeWidth={1.5} />
-              <ReferenceLine x="20%" stroke="hsl(var(--primary))" strokeDasharray="6 6" strokeWidth={1.5} />
+              {activeFilter === "all" && (
+                <>
+                  <ReferenceLine y={top20Pct} stroke="hsl(var(--destructive))" strokeDasharray="6 6" strokeWidth={1.5} />
+                  <ReferenceLine x="20%" stroke="hsl(var(--primary))" strokeDasharray="6 6" strokeWidth={1.5} />
+                </>
+              )}
               <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fill="hsl(var(--primary) / 0.1)" name="revenue" />
               {hasComparison && (
                 <Area type="monotone" dataKey="revenueB" stroke="hsl(var(--muted-foreground))" strokeWidth={2} fill="hsl(var(--muted-foreground) / 0.08)" strokeDasharray="5 5" name="revenueB" />
