@@ -118,26 +118,20 @@ const ClariAiChat = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  // When conversationId changes, load messages from DB or reset
+  // Unified sync: load messages from DB or reset
   useEffect(() => {
-    setTitleSet(false);
     if (!conversationId) {
+      setTitleSet(false);
       setLocalMessages([WELCOME]);
       return;
     }
     if (dbMessages.length > 0) {
-      setLocalMessages(dbMessages.map((m) => ({ role: m.role, content: m.content })));
+      setLocalMessages(dbMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })));
     } else {
+      setTitleSet(false);
       setLocalMessages([WELCOME]);
     }
-  }, [conversationId, dbMessages.length]);
-
-  // Update local messages when DB messages load
-  useEffect(() => {
-    if (conversationId && dbMessages.length > 0) {
-      setLocalMessages(dbMessages.map((m) => ({ role: m.role, content: m.content })));
-    }
-  }, [dbMessages, conversationId]);
+  }, [conversationId, dbMessages]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -268,7 +262,7 @@ const ClariAiChat = ({
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Chat wallpaper area */}
-      <ScrollArea className="flex-1 px-3 py-5" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto px-3 py-5" ref={scrollRef}>
         <div className={`space-y-3 ${isPanel ? "" : "mx-auto max-w-3xl"}`}>
           {localMessages.map((m, i) => {
             const isUser = m.role === "user";
@@ -332,7 +326,7 @@ const ClariAiChat = ({
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Input bar */}
       <div className="border-t border-border bg-card/80 backdrop-blur-sm p-3">
@@ -349,8 +343,7 @@ const ClariAiChat = ({
                 : "Escribe tu pregunta…"
             }
             rows={1}
-            disabled={!canChat}
-            className={`flex-1 resize-none rounded-2xl border bg-background px-4 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`flex-1 resize-none rounded-2xl border bg-background px-4 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all ${
               isRecording ? "border-destructive ring-2 ring-destructive/30" : "border-input"
             }`}
           />
