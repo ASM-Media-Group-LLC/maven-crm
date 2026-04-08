@@ -1,30 +1,26 @@
 
 
-# Plan: Corregir bloqueo de cursor en IA Ventas Chat
+# Plan: Corregir Dashboard2 sin data
 
-## Problemas identificados
+## Problema raíz
 
-### 1. ScrollArea ref apunta al elemento incorrecto
-`ClariAiChat` pasa `ref={scrollRef}` al componente `ScrollArea`, pero este ref apunta al `Root` de Radix (un div contenedor), **no al Viewport** (el elemento que realmente tiene scroll). Cuando se llama `scrollRef.current?.scrollTo()`, no tiene efecto real porque Root no es scrollable. Esto causa que el chat no haga auto-scroll y puede generar comportamientos extraños con la interacción del mouse.
+Hay **2 problemas**:
 
-### 2. Doble useEffect causa re-renders innecesarios
-Los dos `useEffect` en líneas 123-134 y 137-141 **ambos** actualizan `localMessages` cuando `dbMessages` cambia. Esto provoca renders duplicados cada vez que se selecciona un chat, haciendo que la UI se sienta trabada momentáneamente.
+1. **`useEarningsData` tiene `.limit(5000)`** pero la tabla tiene **12,650 filas**. Ordenado por fecha DESC, solo llegan las filas más recientes (abril + marzo + parte de febrero). Los meses anteriores quedan incompletos o vacíos.
 
-### 3. Textarea disabled con cursor-not-allowed
-Cuando no hay conversación activa, el textarea muestra `cursor-not-allowed` que da sensación de "bloqueado". Mejor UX: al hacer clic en el textarea sin chat activo, crear automáticamente uno nuevo.
+2. **`getMonthOptions` empieza en `i=1`** (salta el mes actual). El selector por defecto muestra Marzo 2026, que tiene solo 465 filas de 12,650. Además no incluye el mes actual (Abril) que tiene 1,596 filas.
 
 ## Cambios
 
-### `ClariAiChat.tsx`
-- **Eliminar el doble useEffect**: Unificar en un solo efecto que sincroniza `localMessages` con `dbMessages`
-- **Corregir auto-scroll**: Usar un ref interno al Viewport del ScrollArea en lugar del Root. Cambiar de `ScrollArea` a un div con `overflow-y-auto` y ref directo, o exponer el Viewport ref
-- **Auto-crear chat**: Cuando el usuario escribe sin conversación activa (en modo full), disparar la creación automática del chat en vez de mostrar textarea disabled
+### 1. `useEarningsData.ts` — Paginar para traer TODOS los registros
+Reemplazar el `.limit(5000)` con un loop de paginación que traiga todas las filas en bloques de 5000 hasta que no queden más. Así Dashboard2, Sales Performance y Audit tienen datos completos.
 
-### `scroll-area.tsx` (opcional)
-- Exponer el `Viewport` ref como prop para casos donde se necesita scroll programático
+### 2. `Dashboard2.tsx` — Incluir el mes actual en el selector
+Cambiar el loop de `i = 1..4` a `i = 0..4` para que el mes actual (Abril 2026) aparezca como primera opción en el dropdown.
 
-## Resultado esperado
-- El cursor no se bloquea al entrar a un chat
-- Auto-scroll funciona correctamente al cargar mensajes
-- El usuario puede empezar a escribir directamente sin tener que crear un chat primero
+## Archivos modificados
+| Archivo | Cambio |
+|---------|--------|
+| `useEarningsData.ts` | Paginar query para traer todos los registros |
+| `Dashboard2.tsx` | Incluir mes actual en selector (`i = 0..4`) |
 
