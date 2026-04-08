@@ -1165,7 +1165,7 @@ const Dashboard2 = () => {
 
                   {paretoView === "list" && (
                     <div className="space-y-5">
-                      {(paretoGroup === "80" || paretoGroup === "all") && (
+                      {paretoGroup === "80" && (
                       <div>
                         <p className="text-[11px] font-semibold text-muted-foreground mb-3 uppercase tracking-widest">🔥 Top {paretoAnalysis.topCount} — BRUTO</p>
                         <div className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
@@ -1193,8 +1193,7 @@ const Dashboard2 = () => {
                         </div>
                       </div>
                       )}
-                      {(paretoGroup === "80" || paretoGroup === "all") && (paretoGroup === "20" || paretoGroup === "all") && <div className="h-px bg-border" />}
-                      {(paretoGroup === "20" || paretoGroup === "all") && (
+                      {paretoGroup === "20" && (
                       <div>
                         <p className="text-[11px] font-semibold text-muted-foreground mb-3 uppercase tracking-widest">📉 Resto ({paretoAnalysis.rest.length})</p>
                         {paretoAnalysis.rest.length > 0 ? (
