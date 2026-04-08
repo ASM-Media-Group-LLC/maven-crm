@@ -101,6 +101,7 @@ interface ClariAiChatProps {
   conversationId?: string | null;
   onMessageSaved?: () => void;
   onConversationTitleSet?: (title: string) => void;
+  onAutoCreate?: () => Promise<string | null>;
 }
 
 const ClariAiChat = ({
@@ -108,6 +109,7 @@ const ClariAiChat = ({
   conversationId,
   onMessageSaved,
   onConversationTitleSet,
+  onAutoCreate,
 }: ClariAiChatProps) => {
   const { messages: dbMessages, saveMessage, updateConversationTitle } = useAiMessages(conversationId ?? null);
   const [localMessages, setLocalMessages] = useState<Msg[]>([WELCOME]);
@@ -180,6 +182,13 @@ const ClariAiChat = ({
     if (isRecording) recognitionRef.current?.stop();
     setInput("");
 
+    // Auto-create conversation if needed
+    let activeConvId = conversationId;
+    if (!activeConvId && onAutoCreate) {
+      activeConvId = await onAutoCreate();
+      if (!activeConvId) return; // creation failed
+    }
+
     const userMsg: Msg = { role: "user", content: text };
     const contextMsgs = localMessages.filter((m) => m !== WELCOME);
     const allMsgs = [...contextMsgs, userMsg];
@@ -188,13 +197,13 @@ const ClariAiChat = ({
     setIsLoading(true);
 
     // Persist user message
-    if (conversationId) {
+    if (activeConvId) {
       try {
-        await saveMessage(conversationId, "user", text);
+        await saveMessage(activeConvId, "user", text);
         // Auto-title from first user message
         if (!titleSet && contextMsgs.length === 0) {
           const autoTitle = text.slice(0, 40) + (text.length > 40 ? "…" : "");
-          await updateConversationTitle(conversationId, autoTitle);
+          await updateConversationTitle(activeConvId, autoTitle);
           onConversationTitleSet?.(autoTitle);
           setTitleSet(true);
         }
@@ -224,9 +233,9 @@ const ClariAiChat = ({
         onDone: async () => {
           setIsLoading(false);
           // Persist assistant message
-          if (conversationId && assistantSoFar) {
+          if (activeConvId && assistantSoFar) {
             try {
-              await saveMessage(conversationId, "assistant", assistantSoFar);
+              await saveMessage(activeConvId, "assistant", assistantSoFar);
               onMessageSaved?.();
             } catch (e) {
               console.error("Error saving assistant message:", e);
@@ -247,7 +256,7 @@ const ClariAiChat = ({
       toast.error("Error de conexión");
       setIsLoading(false);
     }
-  }, [input, isLoading, isRecording, localMessages, conversationId, titleSet, saveMessage, updateConversationTitle, onMessageSaved, onConversationTitleSet]);
+  }, [input, isLoading, isRecording, localMessages, conversationId, titleSet, saveMessage, updateConversationTitle, onMessageSaved, onConversationTitleSet, onAutoCreate]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -257,7 +266,7 @@ const ClariAiChat = ({
   };
 
   const isPanel = mode === "panel";
-  const canChat = isPanel || !!conversationId;
+  const canChat = isPanel || !!conversationId || !!onAutoCreate;
 
   return (
     <div className="flex flex-col h-full bg-background">

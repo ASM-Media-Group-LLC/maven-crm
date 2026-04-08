@@ -106,6 +106,16 @@ const AiSales = () => {
                 conversationId={activeId}
                 onMessageSaved={handleMessageSaved}
                 onConversationTitleSet={handleTitleSet}
+                onAutoCreate={async () => {
+                  try {
+                    const conv = await createConversation.mutateAsync(undefined);
+                    setActiveId(conv.id);
+                    return conv.id;
+                  } catch {
+                    toast.error("Error al crear conversación");
+                    return null;
+                  }
+                }}
               />
             </div>
           </main>
