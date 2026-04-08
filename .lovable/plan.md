@@ -1,26 +1,36 @@
 
 
-# Plan: Corregir Dashboard2 sin data
+# Plan: Corregir filtros Top 20% y Bottom 80% en Análisis de Concentración
 
-## Problema raíz
+## Problema
 
-Hay **2 problemas**:
+Los filtros "Top 20%" y "Bottom 80%" simplemente cortan los puntos de la curva de Lorenz, pero esos puntos tienen valores **acumulados** del dataset completo. El resultado es que:
+- Los labels del eje X no empiezan en 0% para el segmento filtrado
+- Los valores de revenue son acumulados del total, no del segmento
+- El insight no cambia según el filtro activo
+- No hay información útil sobre el segmento (cuántas creadoras, cuánto generan)
 
-1. **`useEarningsData` tiene `.limit(5000)`** pero la tabla tiene **12,650 filas**. Ordenado por fecha DESC, solo llegan las filas más recientes (abril + marzo + parte de febrero). Los meses anteriores quedan incompletos o vacíos.
+## Solución
 
-2. **`getMonthOptions` empieza en `i=1`** (salta el mes actual). El selector por defecto muestra Marzo 2026, que tiene solo 465 filas de 12,650. Además no incluye el mes actual (Abril) que tiene 1,596 filas.
+Reescribir `buildLorenz` para que retorne también los datos agrupados por creadora (sorted), y construir curvas de Lorenz **independientes** para cada segmento:
 
-## Cambios
+### Cambios en `ConcentrationChart.tsx`
 
-### 1. `useEarningsData.ts` — Paginar para traer TODOS los registros
-Reemplazar el `.limit(5000)` con un loop de paginación que traiga todas las filas en bloques de 5000 hasta que no queden más. Así Dashboard2, Sales Performance y Audit tienen datos completos.
+1. **`buildLorenz` retorna datos crudos además de la curva**: Devolver el array `sorted` (ingresos por creadora ordenados desc) y el `total` para poder recalcular segmentos.
 
-### 2. `Dashboard2.tsx` — Incluir el mes actual en el selector
-Cambiar el loop de `i = 1..4` a `i = 0..4` para que el mes actual (Abril 2026) aparezca como primera opción en el dropdown.
+2. **Nuevas funciones de segmentación**:
+   - `buildSegmentCurve(sorted, "top20")`: toma el top 20% de creadoras, construye una curva de Lorenz **interna** al segmento (eje X = % dentro del segmento, eje Y = % del revenue del segmento)
+   - `buildSegmentCurve(sorted, "bottom80")`: igual para el 80% inferior
 
-## Archivos modificados
+3. **Insight dinámico según filtro**:
+   - **All**: "El 20% de las creadoras genera el X% de los ingresos"
+   - **Top 20%**: "N creadoras (top 20%) generan $X total — la #1 aporta Y% del segmento"
+   - **Bottom 80%**: "N creadoras (bottom 80%) generan $X total — distribución más uniforme"
+
+4. **KPI cards del segmento**: Mostrar debajo del insight: cantidad de creadoras en el segmento, revenue total del segmento, y % que representan del total.
+
+## Archivo modificado
 | Archivo | Cambio |
 |---------|--------|
-| `useEarningsData.ts` | Paginar query para traer todos los registros |
-| `Dashboard2.tsx` | Incluir mes actual en selector (`i = 0..4`) |
+| `ConcentrationChart.tsx` | Reescribir lógica de filtros para generar curvas independientes por segmento, insight dinámico, KPIs de segmento |
 
