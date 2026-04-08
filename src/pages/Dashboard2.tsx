@@ -67,7 +67,7 @@ type SortDir = "asc" | "desc";
 const getMonthOptions = () => {
   const months: { value: string; label: string; startStr: string; endStr: string }[] = [];
   const now = new Date();
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 0; i <= 4; i++) {
     const m = subMonths(now, i);
     const y = m.getFullYear();
     const mo = m.getMonth();
