@@ -1165,6 +1165,7 @@ const Dashboard2 = () => {
 
                   {paretoView === "list" && (
                     <div className="space-y-5">
+                      {(paretoGroup === "80" || paretoGroup === "all") && (
                       <div>
                         <p className="text-[11px] font-semibold text-muted-foreground mb-3 uppercase tracking-widest">🔥 Top {paretoAnalysis.topCount} — BRUTO</p>
                         <div className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
@@ -1191,12 +1192,16 @@ const Dashboard2 = () => {
                           })}
                         </div>
                       </div>
-                      <div className="h-px bg-border" />
+                      )}
+                      {(paretoGroup === "80" || paretoGroup === "all") && (paretoGroup === "20" || paretoGroup === "all") && <div className="h-px bg-border" />}
+                      {(paretoGroup === "20" || paretoGroup === "all") && (
                       <div>
                         <p className="text-[11px] font-semibold text-muted-foreground mb-3 uppercase tracking-widest">📉 Resto ({paretoAnalysis.rest.length})</p>
                         {paretoAnalysis.rest.length > 0 ? (
-                          <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1">
+                          <div className="space-y-1 max-h-[350px] overflow-y-auto pr-1">
                             {paretoAnalysis.rest.map((c, i) => {
+                              const restRevenue = paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue;
+                              const pctOfRest = restRevenue > 0 ? (c.total / restRevenue) * 100 : 0;
                               const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0;
                               return (
                                 <div key={c.creatorId} className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-1.5 hover:bg-muted/40 transition-colors">
@@ -1206,11 +1211,12 @@ const Dashboard2 = () => {
                                   )}
                                   <button className="text-sm text-muted-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
                                   <div className="flex-1 mx-2">
-                                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                                      <div className="h-full rounded-full bg-muted-foreground/40 transition-all" style={{ width: `${Math.min(pctOfTotal * 5, 100)}%` }} />
+                                    <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                                      <div className="h-full rounded-full bg-muted-foreground/40 transition-all" style={{ width: `${Math.min(pctOfRest, 100)}%` }} />
                                     </div>
                                   </div>
-                                  <span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">{pctOfTotal.toFixed(1)}%</span>
+                                  <span className="text-sm font-bold tabular-nums w-[60px] text-right text-muted-foreground">{pctOfRest.toFixed(1)}%</span>
+                                  <span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">({pctOfTotal.toFixed(1)}%)</span>
                                   <span className="text-sm tabular-nums text-muted-foreground w-[100px] text-right">{fmt(c.total)}</span>
                                 </div>
                               );
@@ -1218,6 +1224,7 @@ const Dashboard2 = () => {
                           </div>
                         ) : <p className="text-sm text-muted-foreground">Ninguna.</p>}
                       </div>
+                      )}
                     </div>
                   )}
                 </div>
