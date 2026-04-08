@@ -3,14 +3,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import type { EarningsRow } from "./types";
 
-const fetchEarnings = async (): Promise<EarningsRow[]> => {
-  const { data: earnings, error } = await supabase
-    .from("of_gross_earnings")
-    .select("id, date, total_earnings_gross, subscription_gross, new_subscriptions_sub_gross, recurring_sub_gross, message_gross, tips_gross, active_fans, new_fans, following, of_ranking, contribution, fans_renew_on, renew_on_percentage, change_expired_fan_count, avg_spend_per_spender_gross, avg_spend_per_transaction_gross, avg_earnings_per_fan_gross, document_id, pending_creator, creator_id")
-    .order("date", { ascending: false })
-    .limit(5000);
+const FIELDS = "id, date, total_earnings_gross, subscription_gross, new_subscriptions_sub_gross, recurring_sub_gross, message_gross, tips_gross, active_fans, new_fans, following, of_ranking, contribution, fans_renew_on, renew_on_percentage, change_expired_fan_count, avg_spend_per_spender_gross, avg_spend_per_transaction_gross, avg_earnings_per_fan_gross, document_id, pending_creator, creator_id";
+const PAGE_SIZE = 5000;
 
-  if (error) throw error;
+const fetchEarnings = async (): Promise<EarningsRow[]> => {
+  // Paginate to fetch ALL rows (table has 12k+ rows)
+  let allEarnings: any[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("of_gross_earnings")
+      .select(FIELDS)
+      .order("date", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allEarnings = allEarnings.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  const earnings = allEarnings;
 
   const creatorIds = [
     ...new Set(
