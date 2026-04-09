@@ -166,19 +166,27 @@ export const useCloserLeads = () => {
 
         const rawRows = (data || []) as any[];
 
-        // Fetch created_by profiles for "nuevo" tab
+        // Fetch created_by profiles and source contacts in parallel
+        const createdByIds = [...new Set(rawRows.map((c) => c.created_by).filter(Boolean))] as string[];
+        const sourceContactIds = [...new Set(rawRows.map((c: any) => c.source_contact_id).filter(Boolean))] as string[];
+
+        const [profilesRes, sourceContactsRes] = await Promise.all([
+          createdByIds.length > 0
+            ? supabase.from("profiles").select("id, full_name").in("id", createdByIds)
+            : Promise.resolve({ data: [] }),
+          sourceContactIds.length > 0
+            ? supabase.from("closers_contacts").select("id, country_code, phone").in("id", sourceContactIds)
+            : Promise.resolve({ data: [] }),
+        ]);
+
         let createdByMap: Record<string, string> = {};
-        if (activeTab === "nuevo") {
-          const createdByIds = [...new Set(rawRows.map((c) => c.created_by).filter(Boolean))] as string[];
-          if (createdByIds.length > 0) {
-            const { data: profiles } = await supabase
-              .from("profiles")
-              .select("id, full_name")
-              .in("id", createdByIds);
-            for (const p of profiles || []) {
-              createdByMap[p.id] = p.full_name || "Sin nombre";
-            }
-          }
+        for (const p of profilesRes.data || []) {
+          createdByMap[(p as any).id] = (p as any).full_name || "Sin nombre";
+        }
+
+        const sourceContactMap: Record<string, { country_code: string | null; phone: string | null }> = {};
+        for (const sc of sourceContactsRes.data || []) {
+          sourceContactMap[(sc as any).id] = { country_code: (sc as any).country_code, phone: (sc as any).phone };
         }
 
         const rows: CloserCreatorRow[] = rawRows.map((c: any) => ({
@@ -190,6 +198,8 @@ export const useCloserLeads = () => {
           main_platform: c.main_platform ?? null,
           agent_name: c.created_by ? (createdByMap[c.created_by] || null) : null,
           contact_count: 0,
+          source_contact_id: c.source_contact_id ?? null,
+          resolved_whatsapp_phone: resolveWhatsAppPhone(c.phone, c.source_contact_id, sourceContactMap),
           _source: "closer" as const,
           _lg_status: null,
         }));
