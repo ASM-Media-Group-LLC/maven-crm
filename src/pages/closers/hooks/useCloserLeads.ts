@@ -29,9 +29,12 @@ export interface CloserCreatorRow {
   created_at: string;
   updated_at: string;
   leadgen_entry_id: string | null;
+  source_contact_id: string | null;
   // Joined fields
   agent_name: string | null;
   contact_count: number;
+  // Resolved WhatsApp phone (with country code)
+  resolved_whatsapp_phone: string | null;
   // Source indicator
   _source: "closer" | "leadgen";
   _lg_status: string | null;
