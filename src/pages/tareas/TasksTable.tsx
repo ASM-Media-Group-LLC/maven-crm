@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Play, Pause, CheckCircle2, AlertTriangle, Diamond, Link, Unplug } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useCountdown } from "./useCountdown";
 import InlineAssigneeSelect from "./InlineAssigneeSelect";
 import InlinePrioritySelect from "./InlinePrioritySelect";
-import InlineDateTimeEdit from "./InlineDateTimeEdit";
+import TaskBlockerBadge from "./TaskBlockerBadge";
+import { useTaskBlockerCounts } from "./useTaskBlockers";
 import type { Task } from "./useTareas";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -24,6 +25,7 @@ interface TasksTableProps {
   onStatusChange?: (taskId: string, status: string) => void;
   onPatchTask: (taskId: string, fields: Record<string, any>) => void;
   onUpdateAssignees: (taskId: string, assigneeIds: string[]) => void;
+  onTaskClick?: (task: Task) => void;
 }
 
 const statusConfig: Record<string, { label: string; badgeClass: string }> = {
@@ -121,9 +123,12 @@ const formatDate = (dateStr: string | null | undefined) => {
   }
 };
 
-const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, onStatusChange, onPatchTask, onUpdateAssignees }: TasksTableProps) => {
+const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, onStatusChange, onPatchTask, onUpdateAssignees, onTaskClick }: TasksTableProps) => {
   const [sortKey, setSortKey] = useState<SortKey>("due");
   const [sortAsc, setSortAsc] = useState(true);
+
+  const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
+  const { data: blockerCounts = {} } = useTaskBlockerCounts(taskIds);
 
   const profileMap = new Map(profiles.map((p) => [p.id, p.full_name || "Sin nombre"]));
 
@@ -154,29 +159,58 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
     </Button>
   );
 
+  const handleRowClick = (task: Task, e: React.MouseEvent) => {
+    if (!onTaskClick) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("button, [role='menuitem'], [data-radix-collection-item], [cmdk-item]")) return;
+    onTaskClick(task);
+  };
+
   return (
     <div className="rounded-md border max-h-[calc(100vh-24rem)] overflow-auto">
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
             <TableHead><SortHeader label="Título" col="title" /></TableHead>
-            <TableHead className="text-center"><SortHeader label="Tipo" col="task_type" /></TableHead>
-            <TableHead className="hidden sm:table-cell"><SortHeader label="Asignado por" col="assigned_by" /></TableHead>
-            <TableHead className="hidden sm:table-cell"><SortHeader label="Asignado a" col="assigned" /></TableHead>
-            <TableHead className="text-center"><SortHeader label="Prioridad" col="priority" /></TableHead>
+            <TableHead className="hidden sm:table-cell"><SortHeader label="Responsable" col="assigned" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Fecha inicio" col="start" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Fecha fin" col="due_date" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="Tipo" col="task_type" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Countdown" col="due" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="Prioridad" col="priority" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Estado" col="status" /></TableHead>
             <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {sorted.map((task) => (
-            <TableRow key={task.id}>
+            <TableRow
+              key={task.id}
+              className={onTaskClick ? "cursor-pointer hover:bg-muted/50" : undefined}
+              onClick={(e) => handleRowClick(task, e)}
+            >
               <TableCell>
-                <div className="font-medium text-sm">{task.title}</div>
-                {task.description && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{task.description}</div>}
+                <div className="flex items-center gap-2">
+                  <div>
+                    <div className="font-medium text-sm">{task.title}</div>
+                    {task.description && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{task.description}</div>}
+                  </div>
+                  <TaskBlockerBadge count={blockerCounts[task.id] || 0} />
+                </div>
+              </TableCell>
+              <TableCell className="hidden sm:table-cell">
+                <InlineAssigneeSelect
+                  taskId={task.id}
+                  currentAssignees={task.assignees || []}
+                  profiles={profiles}
+                  onUpdateAssignees={onUpdateAssignees}
+                />
+              </TableCell>
+              <TableCell className="text-center">
+                <span className="text-xs text-muted-foreground">{formatDate(task.start_at)}</span>
+              </TableCell>
+              <TableCell className="text-center">
+                <span className="text-xs text-muted-foreground">{formatDate(task.due_at)}</span>
               </TableCell>
               <TableCell className="text-center">
                 {task.task_type === "milestone" ? (
@@ -189,17 +223,7 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
                   <span className="text-xs text-muted-foreground">—</span>
                 )}
               </TableCell>
-              <TableCell className="hidden sm:table-cell">
-                <span className="text-xs text-muted-foreground">{profileMap.get(task.created_by) || "—"}</span>
-              </TableCell>
-              <TableCell className="hidden sm:table-cell">
-                <InlineAssigneeSelect
-                  taskId={task.id}
-                  currentAssignees={task.assignees || []}
-                  profiles={profiles}
-                  onUpdateAssignees={onUpdateAssignees}
-                />
-              </TableCell>
+              <TableCell className="text-center"><CountdownCell dueAt={task.due_at} status={task.status} /></TableCell>
               <TableCell className="text-center">
                 <InlinePrioritySelect
                   taskId={task.id}
@@ -207,13 +231,6 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
                   onPatch={onPatchTask}
                 />
               </TableCell>
-              <TableCell className="text-center">
-                <span className="text-xs text-muted-foreground">{formatDate(task.start_at)}</span>
-              </TableCell>
-              <TableCell className="text-center">
-                <span className="text-xs text-muted-foreground">{formatDate(task.due_at)}</span>
-              </TableCell>
-              <TableCell className="text-center"><CountdownCell dueAt={task.due_at} status={task.status} /></TableCell>
               <TableCell className="text-center">
                 <StatusCell task={task} onComplete={onComplete} onJustify={onJustify} onStatusChange={onStatusChange} />
               </TableCell>

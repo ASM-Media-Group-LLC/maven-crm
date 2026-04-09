@@ -6727,6 +6727,47 @@ export type Database = {
           },
         ]
       }
+      task_blockers: {
+        Row: {
+          blocked_by_user_id: string | null
+          created_at: string
+          id: string
+          reason: string
+          reported_by: string
+          resolved: boolean
+          resolved_at: string | null
+          task_id: string
+        }
+        Insert: {
+          blocked_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          reason: string
+          reported_by: string
+          resolved?: boolean
+          resolved_at?: string | null
+          task_id: string
+        }
+        Update: {
+          blocked_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          reason?: string
+          reported_by?: string
+          resolved?: boolean
+          resolved_at?: string | null
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_blockers_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_comments: {
         Row: {
           content: string
