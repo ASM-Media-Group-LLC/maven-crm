@@ -27,6 +27,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import EditProjectModal from "./EditProjectModal";
 import DeleteProjectDialog from "./DeleteProjectDialog";
 import TaskAnalyticsTab from "./TaskAnalyticsTab";
+import ProjectDocumentationTab from "./ProjectDocumentationTab";
 
 interface TareasContentProps {
   projectId: string;
