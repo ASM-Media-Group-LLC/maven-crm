@@ -514,8 +514,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
           </Select>
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "kanban" | "list" | "analytics")} className="ml-auto">
             <TabsList>
-              <TabsTrigger value="kanban" className="gap-1.5"><Columns className="h-3.5 w-3.5" /> Kanban</TabsTrigger>
               <TabsTrigger value="list" className="gap-1.5"><List className="h-3.5 w-3.5" /> Lista</TabsTrigger>
+              <TabsTrigger value="kanban" className="gap-1.5"><Columns className="h-3.5 w-3.5" /> Kanban</TabsTrigger>
               <TabsTrigger value="analytics" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" /> Analíticas</TabsTrigger>
             </TabsList>
           </Tabs>
