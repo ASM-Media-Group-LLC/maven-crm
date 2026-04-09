@@ -489,12 +489,17 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                         <AlertTriangle className="h-3 w-3" /> Follow-up
                       </Badge>
                     )}
-                    {c.phone && (
-                      <a href={`https://wa.me/${cleanPhoneForWhatsApp(c.phone)}`} target="_blank" rel="noopener noreferrer">
+                    {c.phone && c.resolved_whatsapp_phone && (
+                      <a href={`https://wa.me/${cleanPhoneForWhatsApp(c.resolved_whatsapp_phone)}`} target="_blank" rel="noopener noreferrer">
                         <Badge variant="outline" className="text-[10px] h-5 gap-0.5 cursor-pointer">
                           <Phone className="h-3 w-3" /> WhatsApp
                         </Badge>
                       </a>
+                    )}
+                    {c.phone && !c.resolved_whatsapp_phone && (
+                      <Badge variant="outline" className="text-[10px] h-5 gap-0.5">
+                        <Phone className="h-3 w-3" /> {c.phone}
+                      </Badge>
                     )}
                   </div>
                 </div>
