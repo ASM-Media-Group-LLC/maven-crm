@@ -14,6 +14,8 @@ import { useTaskAttachmentSummaries } from "./useTaskAttachments";
 import type { Task } from "./useTareas";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import TaskBlockerBadge from "./TaskBlockerBadge";
+import { useTaskBlockerCounts } from "./useTaskBlockers";
 
 interface Profile {
   id: string;
