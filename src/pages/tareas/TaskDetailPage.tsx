@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useTaskComments } from "./useTaskComments";
 import { useAuth } from "@/hooks/useAuth";
 import SubtasksPanel from "./SubtasksPanel";
-import TaskAttachmentsSection from "./TaskAttachmentsSection";
+import TaskBlockerSection from "./TaskBlockerSection";
 import { priorityConfig } from "./PrioritySelect";
 import InlineAssigneeSelect from "./InlineAssigneeSelect";
 import type { Task } from "./useTareas";
@@ -253,6 +253,11 @@ const TaskDetailPage = ({ task, open, onOpenChange, profiles, onEdit, onStatusCh
 
               {/* Attachments */}
               <TaskAttachmentsSection taskId={task.id} />
+
+              <Separator />
+
+              {/* Blockers */}
+              <TaskBlockerSection taskId={task.id} profiles={profiles} />
             </div>
           </ScrollArea>
 
