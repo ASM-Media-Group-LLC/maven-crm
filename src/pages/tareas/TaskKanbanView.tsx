@@ -61,6 +61,7 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
   const [inlineTitle, setInlineTitle] = useState("");
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
   const { data: attachmentSummaries = {} } = useTaskAttachmentSummaries(taskIds);
+  const { data: blockerCounts = {} } = useTaskBlockerCounts(taskIds);
 
   // Fetch subtask counts
   const { data: subtaskCounts = {} } = useQuery({
@@ -222,6 +223,9 @@ const TaskKanbanView = ({ tasks, profiles, onStatusChange, onTaskClick, getTaskS
                                   <div className={cn("w-1 h-full min-h-[20px] rounded-full shrink-0", priorityColors[task.priority] || "bg-slate-500")} />
                                   <div className="flex-1 min-w-0">
                                     <p className="font-medium text-sm leading-tight line-clamp-2">{task.title}</p>
+                                    {(blockerCounts[task.id] || 0) > 0 && (
+                                      <TaskBlockerBadge count={blockerCounts[task.id]} />
+                                    )}
                                     {task.description && (
                                       <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{task.description}</p>
                                     )}
