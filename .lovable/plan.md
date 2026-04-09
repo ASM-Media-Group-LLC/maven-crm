@@ -1,66 +1,89 @@
 
-Objetivo: corregir de verdad los enlaces de WhatsApp en `/closers`, porque el problema no está solo en el input actual sino en cómo se construye el link con datos incompletos.
 
-Diagnóstico confirmado:
-- En `/contactos` sí funciona porque el enlace se arma con `whatsapp = country_code + phone` en `ContactosContent.tsx`.
-- En `/closers` el enlace se arma solo con `c.phone` en `LeadTable.tsx`.
-- La tabla `closer_creators` no tiene columna `country_code` en los tipos de Supabase, así que muchos registros quedan guardados sin prefijo internacional.
-- Resultado: aunque el número sea “clickeable”, `wa.me/...` falla para registros antiguos o convertidos desde otros flujos.
+# Plan: Mejoras al Gestor de Tareas
 
-Archivos revisados:
-- `src/pages/closers/components/LeadTable.tsx`
-- `src/pages/contactos/ContactosContent.tsx`
-- `src/pages/contactos/ContactosTable.tsx`
-- `src/pages/contactos/ContactosGrid.tsx`
-- `src/pages/contactos/ConvertContactoModal.tsx`
-- `src/pages/leadgen/ConvertLeadModal.tsx`
-- `src/integrations/supabase/types.ts`
+## Resumen
+Tres cambios: (1) vista lista como default con columnas reordenadas, (2) click en fila abre detalle de tarea, (3) nuevo sistema de bloqueos.
 
-Plan de corrección:
+---
 
-1. Corregir la fuente de datos en Closers
-- Extender la query de `/closers` para traer también el contacto origen cuando exista usando `source_contact_id`.
-- Obtener desde `closers_contacts` el `country_code` y `phone` del contacto vinculado.
-- Construir un campo derivado tipo `whatsapp_phone` o `resolved_whatsapp_phone` para usarlo en la UI.
+## 1. Vista Lista como predeterminada + Reordenar columnas
 
-2. Cambiar la lógica del enlace en `LeadTable.tsx`
-- Dejar de generar `wa.me` directamente desde `c.phone`.
-- Crear una función de resolución:
-  - si existe teléfono internacional completo en `c.phone`, usarlo
-  - si no, y existe contacto origen, usar `country_code + phone` del contacto
-  - si no hay suficiente info, no renderizar link clickeable
-- Aplicar esto tanto en vista lista como en vista grid.
+**`TareasContent.tsx`**: Cambiar default de `viewMode` de `"kanban"` a `"list"`.
 
-3. Mantener compatibilidad con datos viejos
-- No depender solo de los registros nuevos creados con `PhoneInput`.
-- Hacer que los registros históricos también funcionen cuando tengan `source_contact_id`.
+**`TasksTable.tsx`**: Reordenar columnas del `<TableHeader>` a:
+1. Título
+2. Responsable (renombrar "Asignado a")
+3. Fecha inicio
+4. Fecha fin
+5. Tipo (se mantiene)
+6. Countdown (se mantiene)
+7. Prioridad
+8. Estado
+9. Acciones
 
-4. Ajustar el fallback visual
-- Si no se puede construir un número válido para WhatsApp, mostrar el número como texto no clickeable o `—`, en vez de abrir un link roto.
-- Esto evita errores aparentes para el usuario.
+Se renombra "Asignado a" → "Responsable". Se mantienen Tipo, Countdown y todas las columnas existentes.
 
-5. Revisión adicional de conversiones
-- Verificar si conviene también normalizar mejor los datos al convertir desde:
-  - `ConvertContactoModal.tsx`
-  - `ConvertLeadModal.tsx`
-- Si aprobás la implementación, además de corregir la UI puedo dejar esos flujos más consistentes para que futuros registros entren mejor formateados.
+## 2. Detalle de tarea desde vista Lista
 
-Resultado esperado:
-- En `/closers` los números clickeables usarán un teléfono realmente resoluble para WhatsApp.
-- Los registros provenientes de `/contactos` volverán a comportarse igual que allá.
-- Si un registro no tiene suficiente información, ya no abrirá un `wa.me` inválido.
+Actualmente el Kanban pasa `onTaskClick={setDetailTask}` pero `TasksTable` no tiene esta prop.
 
-Detalle técnico:
-```text
-/contactos:
-  country_code + phone -> wa.me correcto
+**Cambios:**
+- Agregar prop `onTaskClick` a `TasksTable`
+- Hacer click en la fila (`<TableRow>`) abra el detalle, con `onClick` en el row (excluyendo clicks en dropdowns/controles inline)
+- En `TareasContent.tsx`, pasar `onTaskClick={setDetailTask}` a `TasksTable`
 
-/closers hoy:
-  phone solo -> wa.me incorrecto en varios casos
+## 3. Funcionalidad de Bloqueos
 
-/closers corregido:
-  resolved_whatsapp_phone =
-    phone internacional propio
-    o (country_code + phone del contacto origen)
-    o null
+### Base de datos — nueva tabla `task_blockers`
+```sql
+CREATE TABLE public.task_blockers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  reason TEXT NOT NULL,
+  blocked_by_user_id UUID REFERENCES auth.users(id),
+  reported_by UUID NOT NULL REFERENCES auth.users(id),
+  resolved BOOLEAN NOT NULL DEFAULT false,
+  resolved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.task_blockers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Project members can manage blockers"
+  ON public.task_blockers FOR ALL TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM tasks t
+    JOIN project_members pm ON pm.project_id = t.project_id
+    WHERE t.id = task_blockers.task_id AND pm.user_id = auth.uid()
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM tasks t
+    JOIN project_members pm ON pm.project_id = t.project_id
+    WHERE t.id = task_blockers.task_id AND pm.user_id = auth.uid()
+  ));
 ```
+
+### Nuevos archivos
+- **`useTaskBlockers.ts`**: Hook CRUD — obtener bloqueos activos, crear bloqueo (razón + persona asignada), resolver bloqueo
+- **`TaskBlockerBadge.tsx`**: Icono/badge rojo junto al título en tabla y kanban cuando hay bloqueos activos
+- **`TaskBlockerSection.tsx`**: Sección en `TaskDetailPage` para ver bloqueos activos, crear nuevos (textarea razón + selector de persona que desbloquea), y marcar como resueltos
+
+### Integración
+- **TasksTable**: Badge de bloqueo junto al título
+- **TaskKanbanView**: Indicador en tarjetas
+- **TaskDetailPage**: Nueva sección "Bloqueos" con lista de activos, botón para reportar bloqueo, y botón resolver
+
+---
+
+## Archivos a modificar/crear
+
+| Archivo | Cambio |
+|---------|--------|
+| `TareasContent.tsx` | Default `"list"`, pasar `onTaskClick` a TasksTable |
+| `TasksTable.tsx` | Reordenar columnas, renombrar a "Responsable", agregar `onTaskClick`, badge bloqueo |
+| `TaskKanbanView.tsx` | Badge de bloqueo en tarjetas |
+| `TaskDetailPage.tsx` | Sección de bloqueos |
+| `useTaskBlockers.ts` (nuevo) | Hook CRUD bloqueos |
+| `TaskBlockerSection.tsx` (nuevo) | UI gestión de bloqueos |
+| `TaskBlockerBadge.tsx` (nuevo) | Indicador visual |
+| Migración SQL | Tabla `task_blockers` con RLS |
+
