@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { NewCreatorData } from "../useCloserCreators";
 
 interface Props {
@@ -49,7 +50,7 @@ const NewCreatorModal = ({ open, onOpenChange, onSubmit, isLoading }: Props) => 
             </div>
             <div>
               <Label>Teléfono</Label>
-              <Input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              <PhoneInput value={form.phone || ""} onChange={(v) => setForm({ ...form, phone: v })} />
             </div>
             <div>
               <Label>OnlyFans URL</Label>
