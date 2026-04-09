@@ -29,9 +29,12 @@ export interface CloserCreatorRow {
   created_at: string;
   updated_at: string;
   leadgen_entry_id: string | null;
+  source_contact_id: string | null;
   // Joined fields
   agent_name: string | null;
   contact_count: number;
+  // Resolved WhatsApp phone (with country code)
+  resolved_whatsapp_phone: string | null;
   // Source indicator
   _source: "closer" | "leadgen";
   _lg_status: string | null;
@@ -85,6 +88,24 @@ export const isFollowUpPending = (lastContactDate: string | null): boolean => {
 };
 
 export type DateFieldType = "passed_date" | "lg_entry_date";
+
+/** Resolve a WhatsApp-ready phone number: prefer E.164 from phone field, fallback to source contact */
+const resolveWhatsAppPhone = (
+  phone: string | null,
+  sourceContactId: string | null,
+  sourceContactMap: Record<string, { country_code: string | null; phone: string | null }>
+): string | null => {
+  // If phone already starts with '+', it's international
+  if (phone && phone.startsWith("+")) return phone;
+  // Try source contact
+  if (sourceContactId && sourceContactMap[sourceContactId]) {
+    const sc = sourceContactMap[sourceContactId];
+    if (sc.country_code && sc.phone) return `${sc.country_code}${sc.phone}`;
+    if (sc.phone && sc.phone.startsWith("+")) return sc.phone;
+  }
+  // Raw phone without '+' — can't guarantee it works for wa.me
+  return null;
+};
 
 const PAGE_SIZE = 50;
 
@@ -145,19 +166,27 @@ export const useCloserLeads = () => {
 
         const rawRows = (data || []) as any[];
 
-        // Fetch created_by profiles for "nuevo" tab
+        // Fetch created_by profiles and source contacts in parallel
+        const createdByIds = [...new Set(rawRows.map((c) => c.created_by).filter(Boolean))] as string[];
+        const sourceContactIds = [...new Set(rawRows.map((c: any) => c.source_contact_id).filter(Boolean))] as string[];
+
+        const [profilesRes, sourceContactsRes] = await Promise.all([
+          createdByIds.length > 0
+            ? supabase.from("profiles").select("id, full_name").in("id", createdByIds)
+            : Promise.resolve({ data: [] }),
+          sourceContactIds.length > 0
+            ? supabase.from("closers_contacts").select("id, country_code, phone").in("id", sourceContactIds)
+            : Promise.resolve({ data: [] }),
+        ]);
+
         let createdByMap: Record<string, string> = {};
-        if (activeTab === "nuevo") {
-          const createdByIds = [...new Set(rawRows.map((c) => c.created_by).filter(Boolean))] as string[];
-          if (createdByIds.length > 0) {
-            const { data: profiles } = await supabase
-              .from("profiles")
-              .select("id, full_name")
-              .in("id", createdByIds);
-            for (const p of profiles || []) {
-              createdByMap[p.id] = p.full_name || "Sin nombre";
-            }
-          }
+        for (const p of profilesRes.data || []) {
+          createdByMap[(p as any).id] = (p as any).full_name || "Sin nombre";
+        }
+
+        const sourceContactMap: Record<string, { country_code: string | null; phone: string | null }> = {};
+        for (const sc of sourceContactsRes.data || []) {
+          sourceContactMap[(sc as any).id] = { country_code: (sc as any).country_code, phone: (sc as any).phone };
         }
 
         const rows: CloserCreatorRow[] = rawRows.map((c: any) => ({
@@ -169,6 +198,8 @@ export const useCloserLeads = () => {
           main_platform: c.main_platform ?? null,
           agent_name: c.created_by ? (createdByMap[c.created_by] || null) : null,
           contact_count: 0,
+          source_contact_id: c.source_contact_id ?? null,
+          resolved_whatsapp_phone: resolveWhatsAppPhone(c.phone, c.source_contact_id, sourceContactMap),
           _source: "closer" as const,
           _lg_status: null,
         }));
@@ -225,16 +256,20 @@ export const useCloserLeads = () => {
 
       const closerRows = (data || []) as any[];
 
-      // Fetch profiles and contact counts in parallel
+      // Fetch profiles, contact counts, and source contacts in parallel
       const agentIds = [...new Set(closerRows.map((c) => c.assigned_to).filter(Boolean))] as string[];
       const creatorIds = closerRows.map((c) => c.id);
+      const sourceContactIds = [...new Set(closerRows.map((c: any) => c.source_contact_id).filter(Boolean))] as string[];
 
-      const [profilesResult, contactsResult] = await Promise.all([
+      const [profilesResult, contactsResult, sourceContactsResult] = await Promise.all([
         agentIds.length > 0
           ? supabase.from("profiles").select("id, full_name").in("id", agentIds)
           : Promise.resolve({ data: [] }),
         creatorIds.length > 0
           ? supabase.from("closer_contact_history").select("creator_id").in("creator_id", creatorIds)
+          : Promise.resolve({ data: [] }),
+        sourceContactIds.length > 0
+          ? supabase.from("closers_contacts").select("id, country_code, phone").in("id", sourceContactIds)
           : Promise.resolve({ data: [] }),
       ]);
 
@@ -248,6 +283,11 @@ export const useCloserLeads = () => {
         contactCountMap[(c as any).creator_id] = (contactCountMap[(c as any).creator_id] || 0) + 1;
       }
 
+      const sourceContactMap: Record<string, { country_code: string | null; phone: string | null }> = {};
+      for (const sc of sourceContactsResult.data || []) {
+        sourceContactMap[(sc as any).id] = { country_code: (sc as any).country_code, phone: (sc as any).phone };
+      }
+
       const enriched: CloserCreatorRow[] = closerRows.map((c) => ({
         ...c,
         leadgen_entry_id: c.leadgen_entry_id ?? null,
@@ -257,6 +297,8 @@ export const useCloserLeads = () => {
         main_platform: c.main_platform ?? null,
         agent_name: c.assigned_to ? (profilesMap[c.assigned_to] || null) : null,
         contact_count: contactCountMap[c.id] || 0,
+        source_contact_id: c.source_contact_id ?? null,
+        resolved_whatsapp_phone: resolveWhatsAppPhone(c.phone, c.source_contact_id, sourceContactMap),
         _source: "closer" as const,
         _lg_status: null,
       }));

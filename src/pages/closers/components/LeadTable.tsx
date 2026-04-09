@@ -353,10 +353,14 @@ const ContactCountCell = ({ creatorId, count }: { creatorId: string; count: numb
   );
 };
 
-const PhoneWhatsApp = ({ phone }: { phone: string | null }) => {
+const PhoneWhatsApp = ({ phone, resolvedPhone }: { phone: string | null; resolvedPhone: string | null }) => {
   if (!phone) return <span className="text-muted-foreground">—</span>;
+  if (!resolvedPhone) {
+    // Show phone as non-clickable text (no valid international format)
+    return <span className="text-muted-foreground text-sm">{phone}</span>;
+  }
   return (
-    <a href={`https://wa.me/${cleanPhoneForWhatsApp(phone)}`} target="_blank" rel="noopener noreferrer"
+    <a href={`https://wa.me/${cleanPhoneForWhatsApp(resolvedPhone)}`} target="_blank" rel="noopener noreferrer"
       className="flex items-center gap-1 text-primary hover:underline">
       <Phone className="h-3 w-3" />
       <span className="truncate max-w-[100px]">{phone}</span>
@@ -485,12 +489,17 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                         <AlertTriangle className="h-3 w-3" /> Follow-up
                       </Badge>
                     )}
-                    {c.phone && (
-                      <a href={`https://wa.me/${cleanPhoneForWhatsApp(c.phone)}`} target="_blank" rel="noopener noreferrer">
+                    {c.phone && c.resolved_whatsapp_phone && (
+                      <a href={`https://wa.me/${cleanPhoneForWhatsApp(c.resolved_whatsapp_phone)}`} target="_blank" rel="noopener noreferrer">
                         <Badge variant="outline" className="text-[10px] h-5 gap-0.5 cursor-pointer">
                           <Phone className="h-3 w-3" /> WhatsApp
                         </Badge>
                       </a>
+                    )}
+                    {c.phone && !c.resolved_whatsapp_phone && (
+                      <Badge variant="outline" className="text-[10px] h-5 gap-0.5">
+                        <Phone className="h-3 w-3" /> {c.phone}
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -664,7 +673,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 </p>
               )}
             </TableCell>
-            <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
+            <TableCell><PhoneWhatsApp phone={c.phone} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
             <TableCell className="text-sm">
               {c.onlyfans_url ? (
                 <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
@@ -730,7 +739,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
               <TableCell>{igLink}</TableCell>
               <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
-              <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
+              <TableCell><PhoneWhatsApp phone={c.phone} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
               <TableCell>
                 <InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} />
               </TableCell>
@@ -904,7 +913,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>
               <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v)} />
             </TableCell>
-            <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
+            <TableCell><PhoneWhatsApp phone={c.phone} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
             <TableCell className="text-sm">
               {c.onlyfans_url ? (
                 <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
@@ -956,7 +965,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>
               <ContactCountCell creatorId={c.id} count={c.contact_count} />
             </TableCell>
-            <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
+            <TableCell><PhoneWhatsApp phone={c.phone} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
             <TableCell className="text-sm">
               {c.onlyfans_url ? (
                 <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
