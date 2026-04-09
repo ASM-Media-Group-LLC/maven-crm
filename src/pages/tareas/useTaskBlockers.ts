@@ -28,7 +28,7 @@ export const useTaskBlockers = (taskId: string | null) => {
         .eq("task_id", taskId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data || []) as TaskBlocker[];
+      return (data || []) as unknown as TaskBlocker[];
     },
     enabled: !!taskId,
   });
