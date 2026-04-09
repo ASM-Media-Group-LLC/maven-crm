@@ -41,7 +41,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = useState<"kanban" | "list" | "analytics">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "list" | "analytics">("list");
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [editProjectOpen, setEditProjectOpen] = useState(false);
   const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
@@ -561,6 +561,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             onStatusChange={handleStatusChange}
             onPatchTask={(id, fields) => patchTask.mutate({ taskId: id, fields })}
             onUpdateAssignees={(id, ids) => updateTaskAssignees.mutate({ taskId: id, assigneeIds: ids })}
+            onTaskClick={setDetailTask}
           />
         ) : null}
       </div>
