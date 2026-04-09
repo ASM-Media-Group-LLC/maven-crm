@@ -89,6 +89,24 @@ export const isFollowUpPending = (lastContactDate: string | null): boolean => {
 
 export type DateFieldType = "passed_date" | "lg_entry_date";
 
+/** Resolve a WhatsApp-ready phone number: prefer E.164 from phone field, fallback to source contact */
+const resolveWhatsAppPhone = (
+  phone: string | null,
+  sourceContactId: string | null,
+  sourceContactMap: Record<string, { country_code: string | null; phone: string | null }>
+): string | null => {
+  // If phone already starts with '+', it's international
+  if (phone && phone.startsWith("+")) return phone;
+  // Try source contact
+  if (sourceContactId && sourceContactMap[sourceContactId]) {
+    const sc = sourceContactMap[sourceContactId];
+    if (sc.country_code && sc.phone) return `${sc.country_code}${sc.phone}`;
+    if (sc.phone && sc.phone.startsWith("+")) return sc.phone;
+  }
+  // Raw phone without '+' — can't guarantee it works for wa.me
+  return null;
+};
+
 const PAGE_SIZE = 50;
 
 export const useCloserLeads = () => {
