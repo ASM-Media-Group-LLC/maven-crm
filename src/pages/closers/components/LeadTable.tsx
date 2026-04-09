@@ -353,10 +353,14 @@ const ContactCountCell = ({ creatorId, count }: { creatorId: string; count: numb
   );
 };
 
-const PhoneWhatsApp = ({ phone }: { phone: string | null }) => {
+const PhoneWhatsApp = ({ phone, resolvedPhone }: { phone: string | null; resolvedPhone: string | null }) => {
   if (!phone) return <span className="text-muted-foreground">—</span>;
+  if (!resolvedPhone) {
+    // Show phone as non-clickable text (no valid international format)
+    return <span className="text-muted-foreground text-sm">{phone}</span>;
+  }
   return (
-    <a href={`https://wa.me/${cleanPhoneForWhatsApp(phone)}`} target="_blank" rel="noopener noreferrer"
+    <a href={`https://wa.me/${cleanPhoneForWhatsApp(resolvedPhone)}`} target="_blank" rel="noopener noreferrer"
       className="flex items-center gap-1 text-primary hover:underline">
       <Phone className="h-3 w-3" />
       <span className="truncate max-w-[100px]">{phone}</span>
