@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useTaskComments } from "./useTaskComments";
 import { useAuth } from "@/hooks/useAuth";
 import SubtasksPanel from "./SubtasksPanel";
+import TaskAttachmentsSection from "./TaskAttachmentsSection";
 import TaskBlockerSection from "./TaskBlockerSection";
 import { priorityConfig } from "./PrioritySelect";
 import InlineAssigneeSelect from "./InlineAssigneeSelect";
