@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, List, Search, Play, Pause, Crown, Pencil, Columns, BarChart3, Users, Check, Settings, Archive, Trash2, Share2 } from "lucide-react";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, List, Search, Play, Pause, Crown, Pencil, Columns, BarChart3, Users, Check, Settings, Archive, Trash2, Share2, FileText } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { useProjectMembers } from "./useProjectMembers";
@@ -27,6 +27,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import EditProjectModal from "./EditProjectModal";
 import DeleteProjectDialog from "./DeleteProjectDialog";
 import TaskAnalyticsTab from "./TaskAnalyticsTab";
+import ProjectDocumentationTab from "./ProjectDocumentationTab";
 
 interface TareasContentProps {
   projectId: string;
@@ -41,7 +42,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = useState<"kanban" | "list" | "analytics">("list");
+  const [viewMode, setViewMode] = useState<"kanban" | "list" | "analytics" | "docs">("list");
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [editProjectOpen, setEditProjectOpen] = useState(false);
   const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
@@ -512,16 +513,19 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
               <SelectItem value="independent">Independiente</SelectItem>
             </SelectContent>
           </Select>
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "kanban" | "list" | "analytics")} className="ml-auto">
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "kanban" | "list" | "analytics" | "docs")} className="ml-auto">
             <TabsList>
               <TabsTrigger value="list" className="gap-1.5"><List className="h-3.5 w-3.5" /> Lista</TabsTrigger>
               <TabsTrigger value="kanban" className="gap-1.5"><Columns className="h-3.5 w-3.5" /> Kanban</TabsTrigger>
               <TabsTrigger value="analytics" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" /> Analíticas</TabsTrigger>
+              <TabsTrigger value="docs" className="gap-1.5"><FileText className="h-3.5 w-3.5" /> Docs</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
 
-        {viewMode === "analytics" ? (
+        {viewMode === "docs" ? (
+          <ProjectDocumentationTab projectId={projectId} />
+        ) : viewMode === "analytics" ? (
           <TaskAnalyticsTab tasks={tasks} profiles={companyProfiles} getTaskStatus={getTaskStatus} />
         ) : isLoading ? (
           <p className="text-sm text-muted-foreground text-center py-8">Cargando tareas...</p>
