@@ -256,16 +256,20 @@ export const useCloserLeads = () => {
 
       const closerRows = (data || []) as any[];
 
-      // Fetch profiles and contact counts in parallel
+      // Fetch profiles, contact counts, and source contacts in parallel
       const agentIds = [...new Set(closerRows.map((c) => c.assigned_to).filter(Boolean))] as string[];
       const creatorIds = closerRows.map((c) => c.id);
+      const sourceContactIds = [...new Set(closerRows.map((c: any) => c.source_contact_id).filter(Boolean))] as string[];
 
-      const [profilesResult, contactsResult] = await Promise.all([
+      const [profilesResult, contactsResult, sourceContactsResult] = await Promise.all([
         agentIds.length > 0
           ? supabase.from("profiles").select("id, full_name").in("id", agentIds)
           : Promise.resolve({ data: [] }),
         creatorIds.length > 0
           ? supabase.from("closer_contact_history").select("creator_id").in("creator_id", creatorIds)
+          : Promise.resolve({ data: [] }),
+        sourceContactIds.length > 0
+          ? supabase.from("closers_contacts").select("id, country_code, phone").in("id", sourceContactIds)
           : Promise.resolve({ data: [] }),
       ]);
 
@@ -279,6 +283,11 @@ export const useCloserLeads = () => {
         contactCountMap[(c as any).creator_id] = (contactCountMap[(c as any).creator_id] || 0) + 1;
       }
 
+      const sourceContactMap: Record<string, { country_code: string | null; phone: string | null }> = {};
+      for (const sc of sourceContactsResult.data || []) {
+        sourceContactMap[(sc as any).id] = { country_code: (sc as any).country_code, phone: (sc as any).phone };
+      }
+
       const enriched: CloserCreatorRow[] = closerRows.map((c) => ({
         ...c,
         leadgen_entry_id: c.leadgen_entry_id ?? null,
@@ -288,6 +297,8 @@ export const useCloserLeads = () => {
         main_platform: c.main_platform ?? null,
         agent_name: c.assigned_to ? (profilesMap[c.assigned_to] || null) : null,
         contact_count: contactCountMap[c.id] || 0,
+        source_contact_id: c.source_contact_id ?? null,
+        resolved_whatsapp_phone: resolveWhatsAppPhone(c.phone, c.source_contact_id, sourceContactMap),
         _source: "closer" as const,
         _lg_status: null,
       }));
