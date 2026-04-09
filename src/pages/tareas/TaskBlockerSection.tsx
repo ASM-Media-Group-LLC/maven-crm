@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Ban, CheckCircle2, Plus, User } from "lucide-react";
+import { Ban, CheckCircle2, Plus, User, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { useTaskBlockers } from "./useTaskBlockers";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -24,6 +26,7 @@ const TaskBlockerSection = ({ taskId, profiles }: TaskBlockerSectionProps) => {
   const [showForm, setShowForm] = useState(false);
   const [reason, setReason] = useState("");
   const [selectedUser, setSelectedUser] = useState<string>("");
+  const [userSelectOpen, setUserSelectOpen] = useState(false);
 
   const profileMap = Object.fromEntries(profiles.map((p) => [p.id, p]));
 
@@ -62,18 +65,37 @@ const TaskBlockerSection = ({ taskId, profiles }: TaskBlockerSectionProps) => {
             placeholder="Describe qué te bloquea..."
             className="min-h-[60px] text-sm resize-none"
           />
-          <Select value={selectedUser} onValueChange={setSelectedUser}>
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="¿Quién puede desbloquear?" />
-            </SelectTrigger>
-            <SelectContent>
-              {profiles.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.full_name || "Sin nombre"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={userSelectOpen} onOpenChange={setUserSelectOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" role="combobox" aria-expanded={userSelectOpen} className="h-8 text-xs w-full justify-between font-normal">
+                {selectedUser
+                  ? profiles.find((p) => p.id === selectedUser)?.full_name || "Sin nombre"
+                  : "¿Quién puede desbloquear?"}
+                <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+              <Command>
+                <CommandInput placeholder="Buscar usuario..." className="h-8 text-xs" />
+                <CommandList>
+                  <CommandEmpty className="text-xs p-2">No encontrado</CommandEmpty>
+                  {profiles.map((p) => (
+                    <CommandItem
+                      key={p.id}
+                      value={p.full_name || p.id}
+                      onSelect={() => {
+                        setSelectedUser(p.id === selectedUser ? "" : p.id);
+                        setUserSelectOpen(false);
+                      }}
+                    >
+                      <Check className={cn("h-3.5 w-3.5 mr-2", selectedUser === p.id ? "opacity-100" : "opacity-0")} />
+                      {p.full_name || "Sin nombre"}
+                    </CommandItem>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
           <div className="flex gap-2 justify-end">
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setShowForm(false); setReason(""); setSelectedUser(""); }}>
               Cancelar
