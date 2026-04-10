@@ -337,25 +337,65 @@ const PromologContent = () => {
   const [editCampGoalWeekly, setEditCampGoalWeekly] = useState("");
   const [editCampStatus, setEditCampStatus] = useState("");
 
-  // Dynamic agents data
+  // Fetch all agent IDs via RPC to avoid limit(200) bias
+  const { data: allAgentIds = [] } = useQuery({
+    queryKey: ["promolog-distinct-agents"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_distinct_promolog_agents");
+      if (error) throw error;
+      return (data || []).map((r: any) => r.agent_id as string);
+    },
+  });
+
+  // Fetch agent stats separately without limit
+  const { data: agentEntries = [] } = useQuery({
+    queryKey: ["promolog-agent-entries", agentDateFrom?.toISOString(), agentDateTo?.toISOString()],
+    queryFn: async () => {
+      let query = supabase
+        .from("promolog_entries")
+        .select("reviewed_by, created_by, promoted, network, date")
+        .order("date", { ascending: false });
+
+      if (agentDateFrom) {
+        query = query.gte("date", agentDateFrom.toISOString().split("T")[0]);
+      }
+      if (agentDateTo) {
+        const toEnd = new Date(agentDateTo);
+        toEnd.setDate(toEnd.getDate() + 1);
+        query = query.lt("date", toEnd.toISOString().split("T")[0]);
+      }
+
+      // Fetch all pages
+      const allData: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data, error } = await query.range(from, from + pageSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allData.push(...data);
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      return allData;
+    },
+    enabled: allAgentIds.length > 0,
+  });
+
+  // Dynamic agents data from full dataset
   const agentsData = useMemo(() => {
     const agentMap = new Map<string, { id: string; tickets: number; si: number; parcial: number; no: number; networks: Record<string, number> }>();
 
-    for (const pe of promologEntries) {
+    // Initialize all known agents
+    for (const agentId of allAgentIds) {
+      if (profilesMap[agentId]) {
+        agentMap.set(agentId, { id: agentId, tickets: 0, si: 0, parcial: 0, no: 0, networks: {} });
+      }
+    }
+
+    for (const pe of agentEntries) {
       const agentId = pe.reviewed_by || pe.created_by;
       if (!agentId || !profilesMap[agentId]) continue;
-
-      // Date filter for agents tab
-      if (agentDateFrom) {
-        const entryDate = new Date(pe.date);
-        if (entryDate < agentDateFrom) continue;
-      }
-      if (agentDateTo) {
-        const entryDate = new Date(pe.date);
-        const toEnd = new Date(agentDateTo);
-        toEnd.setDate(toEnd.getDate() + 1);
-        if (entryDate >= toEnd) continue;
-      }
 
       let agent = agentMap.get(agentId);
       if (!agent) agent = { id: agentId, tickets: 0, si: 0, parcial: 0, no: 0, networks: {} };
@@ -378,7 +418,7 @@ const PromologContent = () => {
       no: d.no,
       badges: Object.entries(d.networks).map(([label, value]) => ({ label, value })),
     }));
-  }, [promologEntries, profilesMap, agentDateFrom, agentDateTo]);
+  }, [allAgentIds, agentEntries, profilesMap]);
 
   const handleViewEntry = (entry: PromologEntry) => {
     setSelectedEntry(entry);

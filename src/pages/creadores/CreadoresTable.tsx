@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe, LogOut } from "lucide-react";
+import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe, LogOut, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
