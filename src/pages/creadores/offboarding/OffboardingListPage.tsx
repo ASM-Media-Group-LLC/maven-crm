@@ -22,9 +22,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LogOut, Search, ExternalLink, Plus, List, LayoutGrid } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { LogOut, Search, ExternalLink, Plus, List, LayoutGrid, Trash2 } from "lucide-react";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useAllOffboardings } from "../useOffboarding";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import InitiateOffboardingDialog from "./InitiateOffboardingDialog";
 
 const STATUS_LABELS: Record<string, { label: string; variant: string }> = {

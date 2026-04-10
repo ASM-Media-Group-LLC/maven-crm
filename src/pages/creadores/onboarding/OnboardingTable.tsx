@@ -1,12 +1,27 @@
+import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CheckCircle2, Clock, Loader2, Settings2, ShieldAlert } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, Settings2, ShieldAlert, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { toast } from "sonner";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { OnboardingCreator } from "./useOnboarding";
 
 interface Props {
@@ -21,6 +36,25 @@ const statusConfig = {
 };
 
 const OnboardingTable = ({ data, onManage }: Props) => {
+  const { isAdmin } = useUserRole();
+  const queryClient = useQueryClient();
+  const [deletingItem, setDeletingItem] = useState<OnboardingCreator | null>(null);
+
+  const deleteOnboarding = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("creator_onboardings" as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["onboarding"] });
+      toast.success("Registro de onboarding eliminado");
+      setDeletingItem(null);
+    },
+    onError: (err: any) => {
+      toast.error("Error al eliminar", { description: err.message });
+    },
+  });
+
   const isPendingVerification = (item: OnboardingCreator) => item.dbStatus === "pendiente_verificacion";
 
   return (
@@ -95,9 +129,26 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="secondary" size="icon" className="h-8 w-8" onClick={() => onManage?.(item)}>
-                      <Settings2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="secondary" size="icon" className="h-8 w-8" onClick={() => onManage?.(item)}>
+                        <Settings2 className="h-4 w-4" />
+                      </Button>
+                      {isAdmin && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => setDeletingItem(item)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Eliminar</TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -112,6 +163,27 @@ const OnboardingTable = ({ data, onManage }: Props) => {
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog open={!!deletingItem} onOpenChange={(open) => { if (!open) setDeletingItem(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar registro de onboarding?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará el registro de onboarding de <strong>{deletingItem?.name}</strong>. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deletingItem && deleteOnboarding.mutate(deletingItem.id)}
+              disabled={deleteOnboarding.isPending}
+            >
+              {deleteOnboarding.isPending ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   );
 };
