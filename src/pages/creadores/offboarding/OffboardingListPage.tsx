@@ -117,6 +117,7 @@ const OffboardingListPage = () => {
   };
 
   return (
+    <>
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <DashboardSidebar />
