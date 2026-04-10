@@ -444,6 +444,27 @@ const CreadoresTable = ({ creators }: Props) => {
         }}
       />
     )}
+
+    <AlertDialog open={!!deletingCreator} onOpenChange={(open) => { if (!open) setDeletingCreator(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar creator?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Estás a punto de eliminar a <strong>{deletingCreator?.name}</strong>. Esta acción no se puede deshacer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => deletingCreator && deleteCreator.mutate(deletingCreator.id)}
+            disabled={deleteCreator.isPending}
+          >
+            {deleteCreator.isPending ? "Eliminando..." : "Eliminar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </>
   );
 };
