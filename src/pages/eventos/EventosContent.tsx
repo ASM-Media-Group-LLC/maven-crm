@@ -176,13 +176,51 @@ const EventosContent = () => {
             onClear={() => setFilters(emptyFilters)}
           />
 
-          <p className="text-sm text-muted-foreground">{events.length} eventos</p>
+          {(() => {
+            const today = new Date().toISOString().split("T")[0];
+            const upcoming = events.filter(e => e.date >= today && e.status !== "completed" && e.status !== "cancelled");
+            const past = events.filter(e => e.date < today || e.status === "completed" || e.status === "cancelled");
+            const showSections = !filters.status;
 
-          {view === "table" ? (
-            <EventosTable events={events} />
-          ) : (
-            <EventosGrid events={events} />
-          )}
+            if (!showSections) {
+              return (
+                <>
+                  <p className="text-sm text-muted-foreground">{events.length} eventos</p>
+                  {view === "table" ? <EventosTable events={events} /> : <EventosGrid events={events} />}
+                </>
+              );
+            }
+
+            return (
+              <div className="space-y-6">
+                {/* Upcoming */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                    Próximos
+                    <span className="text-xs font-normal text-muted-foreground">({upcoming.length})</span>
+                  </h3>
+                  {upcoming.length > 0 ? (
+                    view === "table" ? <EventosTable events={upcoming} /> : <EventosGrid events={upcoming} />
+                  ) : (
+                    <p className="text-xs text-muted-foreground py-4 text-center">No hay eventos próximos.</p>
+                  )}
+                </div>
+
+                {/* Past */}
+                {past.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2 text-muted-foreground">
+                      Pasados
+                      <span className="text-xs font-normal">({past.length})</span>
+                    </h3>
+                    <div className="opacity-75">
+                      {view === "table" ? <EventosTable events={past} /> : <EventosGrid events={past} />}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           </div>
         </>
       )}

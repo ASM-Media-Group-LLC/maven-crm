@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from "recharts";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle } from "lucide-react";
-import { format, differenceInDays, startOfDay, addDays, parseISO, isAfter, isBefore } from "date-fns";
+import { AlertTriangle, CheckCircle2, Clock, TrendingUp, ListTodo } from "lucide-react";
+import { format, differenceInDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Task } from "./useTareas";
 
@@ -47,7 +47,23 @@ const PRIORITY_LABELS: Record<string, string> = {
   urgent: "Urgente",
 };
 
+const EmptyState = ({ message }: { message: string }) => (
+  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+    <ListTodo className="h-8 w-8 mb-2 opacity-40" />
+    <p className="text-xs">{message}</p>
+  </div>
+);
+
 const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabProps) => {
+  // KPI calculations
+  const kpis = useMemo(() => {
+    const total = tasks.length;
+    const completed = tasks.filter((t) => getTaskStatus(t) === "completed").length;
+    const overdue = tasks.filter((t) => getTaskStatus(t) === "overdue").length;
+    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { total, completed, overdue, progress };
+  }, [tasks, getTaskStatus]);
+
   // Status distribution
   const statusData = useMemo(() => {
     const counts: Record<string, number> = { pending: 0, in_progress: 0, paused: 0, overdue: 0, completed: 0 };
@@ -82,7 +98,7 @@ const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabPr
     return Object.values(assigned).sort((a, b) => b.asignadas - a.asignadas);
   }, [tasks, profiles, getTaskStatus]);
 
-  // Gantt chart data (replaces burndown)
+  // Gantt chart data
   const ganttChartData = useMemo(() => {
     const withDates = tasks.filter((t) => t.start_at);
     if (withDates.length === 0) return { data: [], minDate: new Date(), totalDays: 0 };
@@ -143,149 +159,209 @@ const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabPr
   }, [tasks, getTaskStatus]);
 
   if (tasks.length === 0) {
-    return <p className="text-center text-muted-foreground py-12">No hay tareas para analizar.</p>;
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+        <ListTodo className="h-12 w-12 mb-3 opacity-30" />
+        <p className="text-sm font-medium">No hay tareas para analizar</p>
+        <p className="text-xs mt-1">Crea tareas en este proyecto para ver las analíticas.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Status pie */}
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Distribución por Estado</CardTitle></CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={statusData} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3}>
-                {statusData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <ListTodo className="h-4 w-4" />
+              <span className="text-xs">Total Tareas</span>
+            </div>
+            <p className="text-2xl font-bold">{kpis.total}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center gap-2 text-emerald-500 mb-1">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="text-xs">Completadas</span>
+            </div>
+            <p className="text-2xl font-bold text-emerald-500">{kpis.completed}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center gap-2 text-destructive mb-1">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-xs">Vencidas</span>
+            </div>
+            <p className="text-2xl font-bold text-destructive">{kpis.overdue}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center gap-2 text-primary mb-1">
+              <TrendingUp className="h-4 w-4" />
+              <span className="text-xs">Progreso</span>
+            </div>
+            <p className="text-2xl font-bold text-primary">{kpis.progress}%</p>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Priority bars */}
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Distribución por Prioridad</CardTitle></CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={priorityData} layout="vertical">
-              <XAxis type="number" allowDecimals={false} />
-              <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {priorityData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Status pie */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Distribución por Estado</CardTitle></CardHeader>
+          <CardContent>
+            {statusData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={statusData} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3}>
+                    {statusData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState message="Sin datos de estado disponibles" />
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Gantt Chart */}
-      {ganttChartData.data.length > 0 && (
+        {/* Priority bars */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Distribución por Prioridad</CardTitle></CardHeader>
+          <CardContent>
+            {priorityData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={priorityData} layout="vertical">
+                  <XAxis type="number" allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                    {priorityData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState message="Sin datos de prioridad disponibles" />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Gantt Chart */}
         <Card className="md:col-span-2">
           <CardHeader className="pb-2"><CardTitle className="text-sm">Diagrama Gantt</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={Math.max(250, ganttChartData.data.length * 36)}>
-              <BarChart data={ganttChartData.data} layout="vertical" barSize={16}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.1} horizontal={false} />
-                <XAxis
-                  type="number"
-                  domain={[0, ganttChartData.totalDays]}
-                  allowDecimals={false}
-                  tick={{ fontSize: 10 }}
-                  label={{ value: "Días", position: "insideBottomRight", offset: -5, fontSize: 11 }}
-                />
-                <YAxis type="category" dataKey="title" width={180} tick={{ fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}
-                  itemStyle={{ color: "hsl(var(--foreground))" }}
-                  labelStyle={{ color: "hsl(var(--foreground))" }}
-                  formatter={(value: any, name: string, props: any) => {
-                    const item = props.payload;
-                    if (name === "duration") return [`${value} días (${item.startLabel} → ${item.endLabel})`, "Duración"];
-                    return [value, name];
-                  }}
-                />
-                <Bar dataKey="offset" stackId="gantt" fill="transparent" radius={0} />
-                <Bar dataKey="duration" stackId="gantt" radius={[0, 4, 4, 0]}>
-                  {ganttChartData.data.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {ganttChartData.data.length > 0 ? (
+              <ResponsiveContainer width="100%" height={Math.max(250, ganttChartData.data.length * 36)}>
+                <BarChart data={ganttChartData.data} layout="vertical" barSize={16}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.1} horizontal={false} />
+                  <XAxis
+                    type="number"
+                    domain={[0, ganttChartData.totalDays]}
+                    allowDecimals={false}
+                    tick={{ fontSize: 10 }}
+                    label={{ value: "Días", position: "insideBottomRight", offset: -5, fontSize: 11 }}
+                  />
+                  <YAxis type="category" dataKey="title" width={180} tick={{ fontSize: 11 }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" }}
+                    itemStyle={{ color: "hsl(var(--foreground))" }}
+                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                    formatter={(value: any, name: string, props: any) => {
+                      const item = props.payload;
+                      if (name === "duration") return [`${value} días (${item.startLabel} → ${item.endLabel})`, "Duración"];
+                      return [value, name];
+                    }}
+                  />
+                  <Bar dataKey="offset" stackId="gantt" fill="transparent" radius={0} />
+                  <Bar dataKey="duration" stackId="gantt" radius={[0, 4, 4, 0]}>
+                    {ganttChartData.data.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState message="No hay tareas con fecha de inicio para el diagrama Gantt. Asigna fechas de inicio a las tareas." />
+            )}
           </CardContent>
         </Card>
-      )}
 
-      {/* Workload */}
-      {workloadData.length > 0 && (
+        {/* Workload */}
         <Card className={workloadData.length > 3 ? "md:col-span-2" : ""}>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Carga por Miembro</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={Math.max(200, workloadData.length * 40)}>
-              <BarChart data={workloadData} layout="vertical">
-                <XAxis type="number" allowDecimals={false} />
-                <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="asignadas" fill="#6366f1" name="Asignadas" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="completadas" fill="#10b981" name="Completadas" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {workloadData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={Math.max(200, workloadData.length * 40)}>
+                <BarChart data={workloadData} layout="vertical">
+                  <XAxis type="number" allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="asignadas" fill="#6366f1" name="Asignadas" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="completadas" fill="#10b981" name="Completadas" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState message="No hay tareas asignadas a miembros del equipo." />
+            )}
           </CardContent>
         </Card>
-      )}
 
-      {/* Gantt simplified */}
-      {ganttData.length > 0 && (
-        <Card className="md:col-span-2">
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Timeline</CardTitle></CardHeader>
-          <CardContent className="space-y-1.5">
-            {ganttData.map((item, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground w-[160px] truncate">{item.title}</span>
-                <div className="flex-1 relative h-5 bg-muted/50 rounded-full overflow-hidden">
-                  <div
-                    className="absolute inset-y-0 left-0 rounded-full"
-                    style={{
-                      width: `${Math.min(100, Math.max(8, (item.days / 30) * 100))}%`,
-                      backgroundColor: STATUS_COLORS[item.status] || "#888",
-                    }}
-                  />
-                </div>
-                <span className="text-[10px] text-muted-foreground w-[100px] text-right">
-                  {item.startLabel} → {item.endLabel}
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Overdue without reason */}
-      {overdueTasks.length > 0 && (
-        <Card className="md:col-span-2 border-destructive/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-4 w-4" /> Vencidas sin Justificación ({overdueTasks.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1.5">
-              {overdueTasks.slice(0, 10).map((t) => (
-                <div key={t.id} className="flex items-center justify-between text-sm">
-                  <span className="truncate max-w-[300px]">{t.title}</span>
-                  <span className="text-xs text-muted-foreground">
-                    Venció {format(new Date(t.due_at), "dd MMM", { locale: es })}
+        {/* Gantt simplified */}
+        {ganttData.length > 0 && (
+          <Card className="md:col-span-2">
+            <CardHeader className="pb-2"><CardTitle className="text-sm">Timeline</CardTitle></CardHeader>
+            <CardContent className="space-y-1.5">
+              {ganttData.map((item, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground w-[160px] truncate">{item.title}</span>
+                  <div className="flex-1 relative h-5 bg-muted/50 rounded-full overflow-hidden">
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-full"
+                      style={{
+                        width: `${Math.min(100, Math.max(8, (item.days / 30) * 100))}%`,
+                        backgroundColor: STATUS_COLORS[item.status] || "#888",
+                      }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground w-[100px] text-right">
+                    {item.startLabel} → {item.endLabel}
                   </span>
                 </div>
               ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Overdue without reason */}
+        {overdueTasks.length > 0 && (
+          <Card className="md:col-span-2 border-destructive/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-4 w-4" /> Vencidas sin Justificación ({overdueTasks.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1.5">
+                {overdueTasks.slice(0, 10).map((t) => (
+                  <div key={t.id} className="flex items-center justify-between text-sm">
+                    <span className="truncate max-w-[300px]">{t.title}</span>
+                    <span className="text-xs text-muted-foreground">
+                      Venció {format(new Date(t.due_at), "dd MMM", { locale: es })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };

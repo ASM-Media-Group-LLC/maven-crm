@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface ProjectLink {
   id: string;
@@ -24,11 +24,10 @@ interface ProjectDocumentation {
 
 export const useProjectLinks = (projectId: string) => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const qc = useQueryClient();
   const key = ["project-links", projectId];
 
-  const { data: links = [], isLoading } = useQuery({
+  const { data: links = [], isLoading, isError } = useQuery({
     queryKey: key,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
@@ -51,7 +50,10 @@ export const useProjectLinks = (projectId: string) => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: key });
-      toast({ title: "Enlace agregado" });
+      toast.success("Enlace agregado");
+    },
+    onError: (err: any) => {
+      toast.error("Error al agregar enlace", { description: err.message });
     },
   });
 
@@ -63,7 +65,13 @@ export const useProjectLinks = (projectId: string) => {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key });
+      toast.success("Enlace actualizado");
+    },
+    onError: (err: any) => {
+      toast.error("Error al actualizar enlace", { description: err.message });
+    },
   });
 
   const deleteLink = useMutation({
@@ -76,20 +84,22 @@ export const useProjectLinks = (projectId: string) => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: key });
-      toast({ title: "Enlace eliminado" });
+      toast.success("Enlace eliminado");
+    },
+    onError: (err: any) => {
+      toast.error("Error al eliminar enlace", { description: err.message });
     },
   });
 
-  return { links, isLoading, addLink, updateLink, deleteLink };
+  return { links, isLoading, isError, addLink, updateLink, deleteLink };
 };
 
 export const useProjectDocumentation = (projectId: string) => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const qc = useQueryClient();
   const key = ["project-documentation", projectId];
 
-  const { data: doc, isLoading } = useQuery({
+  const { data: doc, isLoading, isError } = useQuery({
     queryKey: key,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
@@ -120,9 +130,12 @@ export const useProjectDocumentation = (projectId: string) => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: key });
-      toast({ title: "Documentación guardada" });
+      toast.success("Documentación guardada");
+    },
+    onError: (err: any) => {
+      toast.error("Error al guardar documentación", { description: err.message });
     },
   });
 
-  return { doc, isLoading, saveDoc };
+  return { doc, isLoading, isError, saveDoc };
 };

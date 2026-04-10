@@ -135,7 +135,12 @@ const EventosTable = ({ events }: Props) => {
                   )}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {formatDistanceToNow(new Date(e.date), { addSuffix: true, locale: es })}
+                  <div className="flex items-center gap-1.5">
+                    {format(new Date(e.date), "d MMM yyyy", { locale: es })}
+                    {new Date(e.date) < new Date(new Date().toDateString()) && e.status !== "completed" && e.status !== "cancelled" && (
+                      <Badge variant="secondary-soft" className="text-[9px] px-1 py-0">Pasado</Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{e.location || "—"}</TableCell>
                 <TableCell>
