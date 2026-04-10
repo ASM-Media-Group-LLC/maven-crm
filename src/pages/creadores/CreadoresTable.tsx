@@ -402,6 +402,7 @@ const CreadoresTable = ({ creators }: Props) => {
                       </Tooltip>
                     </TooltipProvider>
                   )}
+                </div>
               </TableCell>
             </TableRow>
           );
