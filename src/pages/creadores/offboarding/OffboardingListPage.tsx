@@ -359,6 +359,27 @@ const OffboardingListPage = () => {
         </div>
       </div>
     </SidebarProvider>
+
+    <AlertDialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar registro de offboarding?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Se eliminará el registro de offboarding de <strong>{deletingId?.name}</strong>. Esta acción no se puede deshacer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => deletingId && deleteOffboarding.mutate(deletingId.id)}
+            disabled={deleteOffboarding.isPending}
+          >
+            {deleteOffboarding.isPending ? "Eliminando..." : "Eliminar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 };
 
