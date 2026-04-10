@@ -32,6 +32,16 @@ import EditCreadorModal from "./EditCreadorModal";
 import ViewCreadorModal from "./ViewCreadorModal";
 import ChangeStatusModal from "./ChangeStatusModal";
 import { useUserRole } from "@/hooks/useUserRole";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
