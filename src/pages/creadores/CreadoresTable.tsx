@@ -92,11 +92,28 @@ const CreadoresTable = ({ creators }: Props) => {
   const [editingCreator, setEditingCreator] = useState<CreatorWithBusiness | null>(null);
   const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
   const [statusChangeCreator, setStatusChangeCreator] = useState<CreatorWithBusiness | null>(null);
+  const [deletingCreator, setDeletingCreator] = useState<CreatorWithBusiness | null>(null);
   const updateCreador = useUpdateCreador();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isAgent, isAdmin, isManager, role } = useUserRole();
   const isCloser = role === "closer";
   const canSeeAllData = isAdmin || isManager || !isAgent;
+
+  const deleteCreator = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("creators").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["creadores"] });
+      toast.success("Creator eliminado correctamente");
+      setDeletingCreator(null);
+    },
+    onError: (err: any) => {
+      toast.error("Error al eliminar creator", { description: err.message });
+    },
+  });
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
