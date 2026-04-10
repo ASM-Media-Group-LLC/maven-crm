@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe, LogOut } from "lucide-react";
+import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe, LogOut, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -31,6 +32,16 @@ import EditCreadorModal from "./EditCreadorModal";
 import ViewCreadorModal from "./ViewCreadorModal";
 import ChangeStatusModal from "./ChangeStatusModal";
 import { useUserRole } from "@/hooks/useUserRole";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -81,11 +92,28 @@ const CreadoresTable = ({ creators }: Props) => {
   const [editingCreator, setEditingCreator] = useState<CreatorWithBusiness | null>(null);
   const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
   const [statusChangeCreator, setStatusChangeCreator] = useState<CreatorWithBusiness | null>(null);
+  const [deletingCreator, setDeletingCreator] = useState<CreatorWithBusiness | null>(null);
   const updateCreador = useUpdateCreador();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isAgent, isAdmin, isManager, role } = useUserRole();
   const isCloser = role === "closer";
   const canSeeAllData = isAdmin || isManager || !isAgent;
+
+  const deleteCreator = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("creators").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["creadores"] });
+      toast.success("Creator eliminado correctamente");
+      setDeletingCreator(null);
+    },
+    onError: (err: any) => {
+      toast.error("Error al eliminar creator", { description: err.message });
+    },
+  });
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -356,6 +384,23 @@ const CreadoresTable = ({ creators }: Props) => {
                         <TooltipContent>Ver Offboarding</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
+                   )}
+                  {isAdmin && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => setDeletingCreator(c)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Eliminar</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
                 </div>
               </TableCell>
@@ -399,6 +444,27 @@ const CreadoresTable = ({ creators }: Props) => {
         }}
       />
     )}
+
+    <AlertDialog open={!!deletingCreator} onOpenChange={(open) => { if (!open) setDeletingCreator(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar creator?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Estás a punto de eliminar a <strong>{deletingCreator?.name}</strong>. Esta acción no se puede deshacer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => deletingCreator && deleteCreator.mutate(deletingCreator.id)}
+            disabled={deleteCreator.isPending}
+          >
+            {deleteCreator.isPending ? "Eliminando..." : "Eliminar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </>
   );
 };

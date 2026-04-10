@@ -22,9 +22,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LogOut, Search, ExternalLink, Plus, List, LayoutGrid } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { LogOut, Search, ExternalLink, Plus, List, LayoutGrid, Trash2 } from "lucide-react";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useAllOffboardings } from "../useOffboarding";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import InitiateOffboardingDialog from "./InitiateOffboardingDialog";
 
 const STATUS_LABELS: Record<string, { label: string; variant: string }> = {
@@ -45,6 +59,8 @@ const CATEGORIAS = [
 const OffboardingListPage = () => {
   const navigate = useNavigate();
   const { data: offboardings, isLoading, refetch } = useAllOffboardings();
+  const { isAdmin } = useUserRole();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
@@ -52,6 +68,22 @@ const OffboardingListPage = () => {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [deletingId, setDeletingId] = useState<{ id: string; name: string } | null>(null);
+
+  const deleteOffboarding = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("creator_offboardings").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-offboardings"] });
+      toast.success("Registro de offboarding eliminado");
+      setDeletingId(null);
+    },
+    onError: (err: any) => {
+      toast.error("Error al eliminar", { description: err.message });
+    },
+  });
 
   const filtered = (offboardings ?? []).filter((o) => {
     if (statusFilter && o.status !== statusFilter) return false;
@@ -85,6 +117,7 @@ const OffboardingListPage = () => {
   };
 
   return (
+    <>
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <DashboardSidebar />
@@ -239,17 +272,32 @@ const OffboardingListPage = () => {
                                 : "—"}
                             </TableCell>
                             <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/creadores/${o.creator_id}`);
-                                }}
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/creadores/${o.creator_id}`);
+                                  }}
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </Button>
+                                {isAdmin && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeletingId({ id: o.id, name: o.creator_name ?? "—" });
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -312,6 +360,28 @@ const OffboardingListPage = () => {
         </div>
       </div>
     </SidebarProvider>
+
+    <AlertDialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar registro de offboarding?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Se eliminará el registro de offboarding de <strong>{deletingId?.name}</strong>. Esta acción no se puede deshacer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => deletingId && deleteOffboarding.mutate(deletingId.id)}
+            disabled={deleteOffboarding.isPending}
+          >
+            {deleteOffboarding.isPending ? "Eliminando..." : "Eliminar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 };
 
