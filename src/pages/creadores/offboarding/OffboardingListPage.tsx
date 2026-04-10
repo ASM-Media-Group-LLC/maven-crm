@@ -59,6 +59,8 @@ const CATEGORIAS = [
 const OffboardingListPage = () => {
   const navigate = useNavigate();
   const { data: offboardings, isLoading, refetch } = useAllOffboardings();
+  const { isAdmin } = useUserRole();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
@@ -66,6 +68,22 @@ const OffboardingListPage = () => {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [deletingId, setDeletingId] = useState<{ id: string; name: string } | null>(null);
+
+  const deleteOffboarding = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("creator_offboardings").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-offboardings"] });
+      toast.success("Registro de offboarding eliminado");
+      setDeletingId(null);
+    },
+    onError: (err: any) => {
+      toast.error("Error al eliminar", { description: err.message });
+    },
+  });
 
   const filtered = (offboardings ?? []).filter((o) => {
     if (statusFilter && o.status !== statusFilter) return false;
