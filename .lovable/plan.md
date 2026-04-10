@@ -1,89 +1,103 @@
 
 
-# Plan: Mejoras al Gestor de Tareas
+# Plan: Mejoras Multi-Módulo
 
 ## Resumen
-Tres cambios: (1) vista lista como default con columnas reordenadas, (2) click en fila abre detalle de tarea, (3) nuevo sistema de bloqueos.
+Correcciones y mejoras en 5 módulos: Tareas (analíticas, sidebar, docs), Eventos (mostrar pasados), Promolog (agentes), y Creators (eliminar registros admin).
 
 ---
 
-## 1. Vista Lista como predeterminada + Reordenar columnas
+## 1. TAREAS — Analíticas
 
-**`TareasContent.tsx`**: Cambiar default de `viewMode` de `"kanban"` a `"list"`.
+**Problema**: Las analíticas reciben `tasks` y `getTaskStatus` como props y funcionan correctamente si hay tareas. No hay bug evidente en el código — posible que el proyecto no tenga tareas con `start_at` (necesario para Gantt) o que la tab no se renderice por falta de datos.
 
-**`TasksTable.tsx`**: Reordenar columnas del `<TableHeader>` a:
-1. Título
-2. Responsable (renombrar "Asignado a")
-3. Fecha inicio
-4. Fecha fin
-5. Tipo (se mantiene)
-6. Countdown (se mantiene)
-7. Prioridad
-8. Estado
-9. Acciones
+**Cambios en `TaskAnalyticsTab.tsx`**:
+- Agregar estados explícitos de loading y empty para cada sección (pie, bars, gantt, workload)
+- Si no hay datos para una sección específica, mostrar empty state descriptivo en lugar de no renderizar nada
+- Agregar KPI cards resumen al inicio (total tareas, completadas, vencidas, progreso %)
 
-Se renombra "Asignado a" → "Responsable". Se mantienen Tipo, Countdown y todas las columnas existentes.
+## 2. TAREAS — Sidebar de proyectos
 
-## 2. Detalle de tarea desde vista Lista
+**Problema**: El `ProjectMiniSidebar` usa `as any` para las queries y filtra solo proyectos `active`. La query puede fallar silenciosamente.
 
-Actualmente el Kanban pasa `onTaskClick={setDetailTask}` pero `TasksTable` no tiene esta prop.
+**Cambios en `ProjectMiniSidebar.tsx`**:
+- Agregar manejo de errores y loading state (skeleton items)
+- Agregar empty state si no hay proyectos
+- Mejorar el highlight del proyecto activo con una barra lateral (left border accent)
+- Incluir enlace a `/tareas` para volver a la lista general
+- Mostrar estado de carga con shimmer/skeleton en los items
 
-**Cambios:**
-- Agregar prop `onTaskClick` a `TasksTable`
-- Hacer click en la fila (`<TableRow>`) abra el detalle, con `onClick` en el row (excluyendo clicks en dropdowns/controles inline)
-- En `TareasContent.tsx`, pasar `onTaskClick={setDetailTask}` a `TasksTable`
+## 3. TAREAS — Documentación de proyectos
 
-## 3. Funcionalidad de Bloqueos
+**Problema**: La sección funciona pero tiene UX débil — sin validación de URL, sin loading states, sin feedback de errores.
 
-### Base de datos — nueva tabla `task_blockers`
-```sql
-CREATE TABLE public.task_blockers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  task_id UUID NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
-  reason TEXT NOT NULL,
-  blocked_by_user_id UUID REFERENCES auth.users(id),
-  reported_by UUID NOT NULL REFERENCES auth.users(id),
-  resolved BOOLEAN NOT NULL DEFAULT false,
-  resolved_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-ALTER TABLE public.task_blockers ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Project members can manage blockers"
-  ON public.task_blockers FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM tasks t
-    JOIN project_members pm ON pm.project_id = t.project_id
-    WHERE t.id = task_blockers.task_id AND pm.user_id = auth.uid()
-  ))
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM tasks t
-    JOIN project_members pm ON pm.project_id = t.project_id
-    WHERE t.id = task_blockers.task_id AND pm.user_id = auth.uid()
-  ));
-```
+**Cambios en `ProjectDocumentationTab.tsx`**:
+- Agregar validación de URL (verificar que empiece con `http://` o `https://`)
+- Agregar loading states (skeleton) mientras cargan links y doc
+- Agregar error states si fallan las queries
+- Mostrar favicon/icono por dominio si es posible (o al menos un icono genérico de link)
+- Mejorar UX del formulario de edición inline de links
 
-### Nuevos archivos
-- **`useTaskBlockers.ts`**: Hook CRUD — obtener bloqueos activos, crear bloqueo (razón + persona asignada), resolver bloqueo
-- **`TaskBlockerBadge.tsx`**: Icono/badge rojo junto al título en tabla y kanban cuando hay bloqueos activos
-- **`TaskBlockerSection.tsx`**: Sección en `TaskDetailPage` para ver bloqueos activos, crear nuevos (textarea razón + selector de persona que desbloquea), y marcar como resueltos
+**Cambios en `useProjectDocumentation.ts`**:
+- Agregar `onError` handlers con toast de error
 
-### Integración
-- **TasksTable**: Badge de bloqueo junto al título
-- **TaskKanbanView**: Indicador en tarjetas
-- **TaskDetailPage**: Nueva sección "Bloqueos" con lista de activos, botón para reportar bloqueo, y botón resolver
+## 4. EVENTOS — Mostrar eventos pasados
+
+**Problema**: Los eventos se cargan todos (`fetchEventos` no filtra por fecha), pero la UI no separa visualmente entre próximos y pasados. Los status tabs ya incluyen "Completados".
+
+**Cambios en `EventosContent.tsx`**:
+- Agregar separación visual: sección "Próximos" y "Pasados" cuando no hay filtro de status activo
+- Determinar "pasado" por `date < today` y/o `status === "completed"`
+- Agregar badge o indicador visual de estado temporal (pasado/activo/próximo)
+
+**Cambios en `EventosTable.tsx`**:
+- Agregar indicador visual de evento pasado (opacidad reducida o badge "Pasado")
+
+## 5. PROMOLOG — Agentes
+
+**Problema**: En el tab de Agentes de `PromologContent.tsx`, los `agentsData` se construyen desde `promologEntries` que tiene `.limit(200)`. Si los últimos 200 registros son todos de Lorena, solo ella aparece.
+
+**Cambios en `PromologContent.tsx`**:
+- Para el tab de agentes, usar la RPC `get_distinct_promolog_agents` (ya existe) en lugar de depender de los 200 entries limitados
+- Hacer una query separada sin limit para el cálculo de estadísticas de agentes, o usar paginación completa
+- Agregar loading y empty states al listado de agentes
+
+## 6. CREATORS — Eliminar registros (admin only)
+
+**Problema**: No existe acción de eliminar en onboarding, offboarding ni en el listado general de creators.
+
+### 6a. Listado de Creators (`CreadoresTable.tsx`)
+- Agregar botón de eliminar (Trash2 icon) en la columna de acciones, visible solo si `isAdmin`
+- Agregar modal de confirmación (`AlertDialog`) antes de eliminar
+- Implementar mutación de eliminación contra tabla `creators`
+- Toast de éxito/error
+
+### 6b. Onboarding (`OnboardingContent.tsx` / `OnboardingTable.tsx`)
+- Agregar acción de eliminar registro de onboarding, visible solo para admin
+- Modal de confirmación
+- Eliminar de tabla `creator_onboardings` o cambiar status
+
+### 6c. Offboarding (`OffboardingListPage.tsx`)
+- Agregar acción de eliminar registro de offboarding, visible solo para admin
+- Modal de confirmación
+- Eliminar de tabla `creator_offboardings`
 
 ---
 
-## Archivos a modificar/crear
+## Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `TareasContent.tsx` | Default `"list"`, pasar `onTaskClick` a TasksTable |
-| `TasksTable.tsx` | Reordenar columnas, renombrar a "Responsable", agregar `onTaskClick`, badge bloqueo |
-| `TaskKanbanView.tsx` | Badge de bloqueo en tarjetas |
-| `TaskDetailPage.tsx` | Sección de bloqueos |
-| `useTaskBlockers.ts` (nuevo) | Hook CRUD bloqueos |
-| `TaskBlockerSection.tsx` (nuevo) | UI gestión de bloqueos |
-| `TaskBlockerBadge.tsx` (nuevo) | Indicador visual |
-| Migración SQL | Tabla `task_blockers` con RLS |
+| `TaskAnalyticsTab.tsx` | Empty states, KPIs, loading |
+| `ProjectMiniSidebar.tsx` | Loading, error, empty states, highlight mejorado |
+| `ProjectDocumentationTab.tsx` | Validación URL, loading/error states |
+| `useProjectDocumentation.ts` | Error handlers |
+| `EventosContent.tsx` | Separación próximos/pasados |
+| `EventosTable.tsx` | Indicador visual de pasado |
+| `PromologContent.tsx` | Query de agentes sin limit(200) |
+| `CreadoresTable.tsx` | Botón eliminar admin + modal confirmación |
+| `OnboardingTable.tsx` o `OnboardingContent.tsx` | Botón eliminar admin |
+| `OffboardingListPage.tsx` | Botón eliminar admin |
+
+No se requieren cambios de base de datos — las tablas ya existen y las operaciones DELETE están cubiertas por RLS existente.
 
