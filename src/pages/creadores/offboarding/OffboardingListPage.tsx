@@ -381,6 +381,7 @@ const OffboardingListPage = () => {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    </>
   );
 };
 
