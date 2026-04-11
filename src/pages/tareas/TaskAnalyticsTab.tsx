@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle2, Clock, TrendingUp, ListTodo } from "lucide-react";
+import { AlertTriangle, ListTodo } from "lucide-react";
 import { format, differenceInDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Task } from "./useTareas";
