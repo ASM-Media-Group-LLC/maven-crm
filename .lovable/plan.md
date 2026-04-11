@@ -1,41 +1,76 @@
 
 
-# Plan: Fix Analytics Duplicates + Global Analytics
+# Plan: Fix Sidebar, Analytics, Blockers & Comments
 
-## Problems Found
+## Root Causes Found
 
-### Per-project analytics (TaskAnalyticsTab.tsx)
-The KPI stats cards (Total, Completadas, Vencidas, Progreso) are rendered TWICE:
-- Once in `TareasContent.tsx` (lines 405-436) — always visible regardless of tab
-- Again inside `TaskAnalyticsTab.tsx` (lines 174-211)
+### 1. Global Analytics Error: `column tasks.assignees does not exist`
+In `useProjects.ts` line 109, the query explicitly selects `assignees` — but the `tasks` table has no such column. This causes the entire query to fail, breaking global analytics.
 
-Additionally, there are TWO Gantt/timeline visualizations rendering the same data:
-- Full Gantt chart (`ganttChartData`, lines 256-293)
-- Simplified timeline (`ganttData`, lines 317-340)
+### 2. Sidebar Shows "No hay proyectos"
+`ProjectMiniSidebar.tsx` first queries `project_members WHERE user_id = current_user`, then fetches projects matching those IDs. The "Test Admin" user has **0 rows** in `project_members`, so the sidebar returns empty. Unlike `useProjects.ts` (which checks `isAdmin` and shows all), the sidebar has no admin bypass.
 
-### Global analytics (GlobalAnalyticsTab.tsx)
-The `allTasks` query in `useProjects.ts` (line 104-115) uses `as any` casting on the `tasks` table. If RLS blocks the query, the error is swallowed and returns an empty array, showing "No hay tareas para analizar." The component itself is correct — the issue is the data source.
+### 3. Blockers RLS Blocks Admins
+The `task_blockers` RLS policy requires the user to exist in `project_members` for the task's project. Since admin isn't a member, INSERT/SELECT/UPDATE all fail silently.
+
+### 4. Comments RLS Blocks Admins
+Same pattern — `task_comments` INSERT and SELECT policies use `is_project_member()`, which checks `project_members`. Admin with no membership = denied.
 
 ---
 
 ## Changes
 
-### 1. TaskAnalyticsTab.tsx — Remove duplicate content
-- Remove the KPI cards section (lines 174-211) since TareasContent already displays them
-- Remove the duplicate simplified timeline section (`ganttData` variable + its render block, lines 143-159 and 317-340)
-- Keep: status pie, priority bars, full Gantt chart, workload chart, overdue list
+### A. Fix `useProjects.ts` — Remove `assignees` from query
+- Line 109: remove `assignees` from the select list (column doesn't exist)
+- Use `select("*")` or list only valid columns
 
-### 2. GlobalAnalyticsTab.tsx — Fix data loading + error handling
-- Add error state handling: catch and display errors from the `allTasks` query
-- Add a console.log or debug indicator when `tasks` array is empty despite `isLoading=false`
+### B. Fix `ProjectMiniSidebar.tsx` — Admin bypass
+- Import `useUserRole` and check `isAdmin`
+- If admin: query all active projects directly from `task_projects` (skip `project_members` filter)
+- If non-admin: keep current membership-based query
 
-### 3. useProjects.ts — Add error visibility to allTasks query
-- Expose `isError` and `error` from the `rawAllTasks` query so `ProjectsListContent` can pass it to `GlobalAnalyticsTab`
-- Add `onError` toast notification so failures are visible to the user
-- Remove `as any` from the tasks query if the type is available, or add explicit error logging
+### C. Fix `task_blockers` RLS — Add admin access (DB migration)
+Update the single ALL policy to include admin check:
+```sql
+DROP POLICY "Project members can manage blockers" ON task_blockers;
 
-### 4. ProjectsListContent.tsx — Pass error state
-- Pass error state from `useProjects` to `GlobalAnalyticsTab`
+CREATE POLICY "Project members can manage blockers" ON task_blockers
+FOR ALL USING (
+  has_role(auth.uid(), 'admin') OR
+  EXISTS (
+    SELECT 1 FROM tasks t
+    JOIN project_members pm ON pm.project_id = t.project_id
+    WHERE t.id = task_blockers.task_id AND pm.user_id = auth.uid()
+  )
+) WITH CHECK (
+  has_role(auth.uid(), 'admin') OR
+  EXISTS (
+    SELECT 1 FROM tasks t
+    JOIN project_members pm ON pm.project_id = t.project_id
+    WHERE t.id = task_blockers.task_id AND pm.user_id = auth.uid()
+  )
+);
+```
+
+### D. Fix `task_comments` RLS — Add admin access (DB migration)
+Update both SELECT and INSERT policies:
+```sql
+DROP POLICY "Members can view task comments" ON task_comments;
+CREATE POLICY "Members can view task comments" ON task_comments
+FOR SELECT USING (
+  has_role(auth.uid(), 'admin') OR
+  EXISTS (SELECT 1 FROM tasks t WHERE t.id = task_comments.task_id AND is_project_member(auth.uid(), t.project_id))
+);
+
+DROP POLICY "Members can create task comments" ON task_comments;
+CREATE POLICY "Members can create task comments" ON task_comments
+FOR INSERT WITH CHECK (
+  auth.uid() = user_id AND (
+    has_role(auth.uid(), 'admin') OR
+    EXISTS (SELECT 1 FROM tasks t WHERE t.id = task_comments.task_id AND is_project_member(auth.uid(), t.project_id))
+  )
+);
+```
 
 ---
 
@@ -43,10 +78,7 @@ The `allTasks` query in `useProjects.ts` (line 104-115) uses `as any` casting on
 
 | File | Change |
 |------|--------|
-| `TaskAnalyticsTab.tsx` | Remove KPI cards + remove duplicate timeline |
-| `GlobalAnalyticsTab.tsx` | Add error state UI |
-| `useProjects.ts` | Expose allTasks error, add error logging |
-| `ProjectsListContent.tsx` | Pass error to GlobalAnalyticsTab |
-
-No database changes needed.
+| `useProjects.ts` | Remove `assignees` from select |
+| `ProjectMiniSidebar.tsx` | Add admin bypass to show all projects |
+| DB migration | Update `task_blockers` + `task_comments` RLS policies |
 
