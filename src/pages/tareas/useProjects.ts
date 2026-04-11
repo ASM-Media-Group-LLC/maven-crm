@@ -106,7 +106,7 @@ export const useProjects = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tasks" as any)
-        .select("id, title, description, status, due_at, start_at, completed_at, project_id, priority, assignees, created_at, overdue_reason, assigned_to, created_by, company_id, duration_hours, duration_minutes, share_token, updated_at")
+        .select("id, title, description, status, due_at, start_at, completed_at, project_id, priority, created_at, overdue_reason, assigned_to, created_by, company_id, duration_hours, duration_minutes, share_token, updated_at")
         .order("due_at", { ascending: true });
       if (error) {
         console.error("[useProjects] Failed to fetch tasks:", error);

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface ProjectMiniSidebarProps {
   currentProjectId: string;
@@ -19,6 +20,7 @@ const FAVORITES_KEY = "tareas-project-favorites";
 const ProjectMiniSidebar = ({ currentProjectId }: ProjectMiniSidebarProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const [collapsed, setCollapsed] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || "[]"); } catch { return []; }
