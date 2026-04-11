@@ -1,86 +1,64 @@
 
 
-# Plan: Mejoras Multi-Módulo
+# Plan: Correcciones UX/UI Multi-Módulo
 
-## Resumen
-Correcciones y mejoras en 5 módulos: Tareas (analíticas, sidebar, docs), Eventos (mostrar pasados), Promolog (agentes), y Creators (eliminar registros admin).
+## 1. Analíticas Generales de Proyectos (no muestran datos)
 
----
+**Problema**: `GlobalAnalyticsTab` recibe `allTasks` desde `useProjects()`. Si `allTasks` está vacío o no se carga correctamente, no se muestra nada. Necesito verificar `useProjects` para entender cómo se obtiene `allTasks`.
 
-## 1. TAREAS — Analíticas
+**Cambios en `ProjectsListContent.tsx`**:
+- Agregar estado de loading mientras `allTasks` carga
+- Pasar `isLoading` a `GlobalAnalyticsTab`
 
-**Problema**: Las analíticas reciben `tasks` y `getTaskStatus` como props y funcionan correctamente si hay tareas. No hay bug evidente en el código — posible que el proyecto no tenga tareas con `start_at` (necesario para Gantt) o que la tab no se renderice por falta de datos.
+**Cambios en `GlobalAnalyticsTab.tsx`**:
+- Agregar KPI cards resumen al inicio (Total tareas, Completadas, Vencidas, Progreso %)
+- Agregar loading state (skeletons)
+- Agregar empty state más descriptivo
+- Verificar que `allTasks` realmente contenga datos (debug query en `useProjects`)
 
-**Cambios en `TaskAnalyticsTab.tsx`**:
-- Agregar estados explícitos de loading y empty para cada sección (pie, bars, gantt, workload)
-- Si no hay datos para una sección específica, mostrar empty state descriptivo en lugar de no renderizar nada
-- Agregar KPI cards resumen al inicio (total tareas, completadas, vencidas, progreso %)
+**Investigar `useProjects.ts`**: Revisar cómo se obtiene `allTasks` — puede haber un problema de paginación o de query que limite los resultados.
 
-## 2. TAREAS — Sidebar de proyectos
+## 2. Docs — Layout no se adapta al ancho
 
-**Problema**: El `ProjectMiniSidebar` usa `as any` para las queries y filtra solo proyectos `active`. La query puede fallar silenciosamente.
+**Problema**: `ProjectDocumentationTab` tiene `max-w-4xl mx-auto` que limita el ancho artificialmente.
 
-**Cambios en `ProjectMiniSidebar.tsx`**:
-- Agregar manejo de errores y loading state (skeleton items)
-- Agregar empty state si no hay proyectos
-- Mejorar el highlight del proyecto activo con una barra lateral (left border accent)
-- Incluir enlace a `/tareas` para volver a la lista general
-- Mostrar estado de carga con shimmer/skeleton en los items
+**Cambio en `ProjectDocumentationTab.tsx`**:
+- Remover `max-w-4xl mx-auto` del wrapper principal, dejando que ocupe el ancho completo del contenedor padre (como hacen las otras tabs: Lista, Kanban, Analíticas)
 
-## 3. TAREAS — Documentación de proyectos
+## 3. Eventos — Revertir separación Próximos/Pasados
 
-**Problema**: La sección funciona pero tiene UX débil — sin validación de URL, sin loading states, sin feedback de errores.
-
-**Cambios en `ProjectDocumentationTab.tsx`**:
-- Agregar validación de URL (verificar que empiece con `http://` o `https://`)
-- Agregar loading states (skeleton) mientras cargan links y doc
-- Agregar error states si fallan las queries
-- Mostrar favicon/icono por dominio si es posible (o al menos un icono genérico de link)
-- Mejorar UX del formulario de edición inline de links
-
-**Cambios en `useProjectDocumentation.ts`**:
-- Agregar `onError` handlers con toast de error
-
-## 4. EVENTOS — Mostrar eventos pasados
-
-**Problema**: Los eventos se cargan todos (`fetchEventos` no filtra por fecha), pero la UI no separa visualmente entre próximos y pasados. Los status tabs ya incluyen "Completados".
+**Problema**: El usuario no quiere la separación visual en `/eventos`. Los eventos deben mostrarse como antes (lista unificada). Pero al compartir la agenda, debe mostrar todos los eventos (pasados + próximos).
 
 **Cambios en `EventosContent.tsx`**:
-- Agregar separación visual: sección "Próximos" y "Pasados" cuando no hay filtro de status activo
-- Determinar "pasado" por `date < today` y/o `status === "completed"`
-- Agregar badge o indicador visual de estado temporal (pasado/activo/próximo)
+- Eliminar la lógica de separación Próximos/Pasados (líneas 179-223)
+- Volver al render simple: mostrar `events` directamente sin secciones
 
-**Cambios en `EventosTable.tsx`**:
-- Agregar indicador visual de evento pasado (opacidad reducida o badge "Pasado")
+**Cambios en `SharedAgendaPage.tsx`**:
+- Actualmente solo muestra `upcomingEvents` (filtra `date >= today`)
+- Agregar toggle o tab para ver "Todos" vs "Próximos" vs "Pasados"
+- O mostrar todos por defecto, agrupados por fecha, incluyendo pasados
 
-## 5. PROMOLOG — Agentes
+## 4. Creadores — Mover eliminar al perfil/detalle
 
-**Problema**: En el tab de Agentes de `PromologContent.tsx`, los `agentsData` se construyen desde `promologEntries` que tiene `.limit(200)`. Si los últimos 200 registros son todos de Lorena, solo ella aparece.
+**Cambios en `CreadoresTable.tsx`**:
+- Remover el botón de eliminar (Trash2) de la columna de acciones
+- Remover la mutación `deleteCreator` y el `AlertDialog` de confirmación de este archivo
 
-**Cambios en `PromologContent.tsx`**:
-- Para el tab de agentes, usar la RPC `get_distinct_promolog_agents` (ya existe) en lugar de depender de los 200 entries limitados
-- Hacer una query separada sin limit para el cálculo de estadísticas de agentes, o usar paginación completa
-- Agregar loading y empty states al listado de agentes
+**Cambios en `ViewCreadorModal.tsx`**:
+- Agregar botón de eliminar (solo visible para admin) en el footer/header del modal de detalle
+- Agregar `AlertDialog` de confirmación
+- Implementar mutación de eliminación
 
-## 6. CREATORS — Eliminar registros (admin only)
+## 5. Closers — Columna Categoría en Completadas
 
-**Problema**: No existe acción de eliminar en onboarding, offboarding ni en el listado general de creators.
+**Problema**: En la pestaña "Completadas" de `/closers` no hay columna de categoría con selector inline.
 
-### 6a. Listado de Creators (`CreadoresTable.tsx`)
-- Agregar botón de eliminar (Trash2 icon) en la columna de acciones, visible solo si `isAdmin`
-- Agregar modal de confirmación (`AlertDialog`) antes de eliminar
-- Implementar mutación de eliminación contra tabla `creators`
-- Toast de éxito/error
+**Cambios en `LeadTable.tsx`**:
+- En el header de "completadas" (línea 570-584): agregar columna "Categoría" después de "Instagram"
+- En el row de "completadas" (línea 805-870): agregar celda con `Select` inline para categoría con opciones: Elite, A+, A, B+, B
+- El `onFieldChange` ya existe y soporta actualizar `category`
 
-### 6b. Onboarding (`OnboardingContent.tsx` / `OnboardingTable.tsx`)
-- Agregar acción de eliminar registro de onboarding, visible solo para admin
-- Modal de confirmación
-- Eliminar de tabla `creator_onboardings` o cambiar status
-
-### 6c. Offboarding (`OffboardingListPage.tsx`)
-- Agregar acción de eliminar registro de offboarding, visible solo para admin
-- Modal de confirmación
-- Eliminar de tabla `creator_offboardings`
+La columna `category` ya existe en `closer_creators`, no se necesita migración.
 
 ---
 
@@ -88,16 +66,15 @@ Correcciones y mejoras en 5 módulos: Tareas (analíticas, sidebar, docs), Event
 
 | Archivo | Cambio |
 |---------|--------|
-| `TaskAnalyticsTab.tsx` | Empty states, KPIs, loading |
-| `ProjectMiniSidebar.tsx` | Loading, error, empty states, highlight mejorado |
-| `ProjectDocumentationTab.tsx` | Validación URL, loading/error states |
-| `useProjectDocumentation.ts` | Error handlers |
-| `EventosContent.tsx` | Separación próximos/pasados |
-| `EventosTable.tsx` | Indicador visual de pasado |
-| `PromologContent.tsx` | Query de agentes sin limit(200) |
-| `CreadoresTable.tsx` | Botón eliminar admin + modal confirmación |
-| `OnboardingTable.tsx` o `OnboardingContent.tsx` | Botón eliminar admin |
-| `OffboardingListPage.tsx` | Botón eliminar admin |
+| `GlobalAnalyticsTab.tsx` | KPIs, loading/empty states, debug data |
+| `ProjectsListContent.tsx` | Pasar isLoading a analytics |
+| `useProjects.ts` | Investigar/fix allTasks query |
+| `ProjectDocumentationTab.tsx` | Remover max-w-4xl mx-auto |
+| `EventosContent.tsx` | Revertir separación próximos/pasados |
+| `SharedAgendaPage.tsx` | Mostrar todos los eventos (pasados + próximos) |
+| `CreadoresTable.tsx` | Remover botón eliminar de acciones |
+| `ViewCreadorModal.tsx` | Agregar eliminar en detalle (admin only) |
+| `LeadTable.tsx` | Agregar columna categoría inline en completadas |
 
-No se requieren cambios de base de datos — las tablas ya existen y las operaciones DELETE están cubiertas por RLS existente.
+No se requieren migraciones de base de datos.
 
