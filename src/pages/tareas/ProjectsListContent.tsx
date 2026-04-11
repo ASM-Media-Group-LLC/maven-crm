@@ -454,6 +454,7 @@ const ProjectsListContent = () => {
             tasks={allTasks}
             profiles={companyProfiles}
             projects={projects}
+            isLoading={isLoading}
           />
         ) : (
         <div className="space-y-6">

@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Globe, MessageCircle } from "lucide-react";
+import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Globe, MessageCircle, Trash2 } from "lucide-react";
 import { useWhaticketLink } from "@/hooks/useWhaticketLink";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -12,6 +16,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import type { CreatorWithBusiness } from "./useCreadores";
 import { cleanHandle, buildSocialUrl, displayHandle } from "@/lib/utils";
 
@@ -96,13 +111,33 @@ const SocialLink = ({ icon, handle, url, rawHandle }: { icon: React.ReactNode; h
 
 const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { isAdmin } = useUserRole();
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const c = creator;
   const { data: whaticketUrl } = useWhaticketLink(c.id);
   const initials = c.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
   const regDate = c.registration_date ? format(new Date(c.registration_date), "dd MMM yyyy", { locale: es }) : null;
 
+  const deleteCreator = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("creators").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["creadores"] });
+      toast.success("Creator eliminado correctamente");
+      setDeleteOpen(false);
+      onOpenChange(false);
+    },
+    onError: (err: any) => {
+      toast.error("Error al eliminar creator", { description: err.message });
+    },
+  });
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
@@ -196,11 +231,38 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           </ScrollArea>
         </Tabs>
 
-        <DialogFooter>
+        <DialogFooter className="flex items-center justify-between sm:justify-between">
+          {isAdmin && (
+            <Button variant="ghost" size="sm" className="text-destructive gap-1.5" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="h-4 w-4" /> Eliminar
+            </Button>
+          )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar creator?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Estás a punto de eliminar a <strong>{c.name}</strong>. Esta acción no se puede deshacer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => deleteCreator.mutate(c.id)}
+            disabled={deleteCreator.isPending}
+          >
+            {deleteCreator.isPending ? "Eliminando..." : "Eliminar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 };
 

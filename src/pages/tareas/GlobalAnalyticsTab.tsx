@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { subDays, startOfDay, format, isAfter } from "date-fns";
-import { es } from "date-fns/locale";
+import { Skeleton } from "@/components/ui/skeleton";
+import { subDays, startOfDay, format } from "date-fns";
+import { CheckSquare, ListTodo, AlertTriangle, TrendingUp } from "lucide-react";
 import type { Task } from "./useTareas";
 
 interface Profile {
@@ -19,6 +20,7 @@ interface GlobalAnalyticsTabProps {
   tasks: Task[];
   profiles: Profile[];
   projects: ProjectInfo[];
+  isLoading?: boolean;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -46,8 +48,17 @@ const getStatus = (t: Task): string => {
   return "pending";
 };
 
-const GlobalAnalyticsTab = ({ tasks, profiles, projects }: GlobalAnalyticsTabProps) => {
+const GlobalAnalyticsTab = ({ tasks, profiles, projects, isLoading }: GlobalAnalyticsTabProps) => {
   const projectMap = useMemo(() => Object.fromEntries(projects.map(p => [p.id, p.name])), [projects]);
+
+  // KPIs
+  const kpis = useMemo(() => {
+    const total = tasks.length;
+    const completed = tasks.filter(t => getStatus(t) === "completed").length;
+    const overdue = tasks.filter(t => getStatus(t) === "overdue").length;
+    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { total, completed, overdue, progress };
+  }, [tasks]);
 
   // Tasks per project
   const projectData = useMemo(() => {
@@ -109,94 +120,147 @@ const GlobalAnalyticsTab = ({ tasks, profiles, projects }: GlobalAnalyticsTabPro
     return points;
   }, [tasks]);
 
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
+        </div>
+        <Skeleton className="h-64 rounded-lg" />
+      </div>
+    );
+  }
+
   if (tasks.length === 0) {
-    return <p className="text-center text-muted-foreground py-12">No hay tareas para analizar.</p>;
+    return <p className="text-center text-muted-foreground py-12">No hay tareas para analizar. Crea tareas dentro de tus proyectos para ver las analíticas globales.</p>;
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Tasks by project */}
-      <Card className="md:col-span-2">
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Tareas por Proyecto</CardTitle></CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={Math.max(200, projectData.length * 32)}>
-            <BarChart data={projectData} layout="vertical">
-              <XAxis type="number" allowDecimals={false} />
-              <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name="Tareas" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <ListTodo className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-2xl font-bold">{kpis.total}</p>
+              <p className="text-xs text-muted-foreground">Total Tareas</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <CheckSquare className="h-5 w-5 text-emerald-500" />
+            <div>
+              <p className="text-2xl font-bold">{kpis.completed}</p>
+              <p className="text-xs text-muted-foreground">Completadas</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <div>
+              <p className="text-2xl font-bold">{kpis.overdue}</p>
+              <p className="text-xs text-muted-foreground">Vencidas</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-2xl font-bold">{kpis.progress}%</p>
+              <p className="text-xs text-muted-foreground">Progreso</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Status pie */}
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Distribución por Estado</CardTitle></CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={statusData} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3}>
-                {statusData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Priority bars */}
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Distribución por Prioridad</CardTitle></CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={priorityData} layout="vertical">
-              <XAxis type="number" allowDecimals={false} />
-              <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                {priorityData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Workload */}
-      {workloadData.length > 0 && (
-        <Card className={workloadData.length > 3 ? "md:col-span-2" : ""}>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Carga por Miembro</CardTitle></CardHeader>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Tasks by project */}
+        <Card className="md:col-span-2">
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Tareas por Proyecto</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={Math.max(200, workloadData.length * 40)}>
-              <BarChart data={workloadData} layout="vertical">
+            <ResponsiveContainer width="100%" height={Math.max(200, projectData.length * 32)}>
+              <BarChart data={projectData} layout="vertical">
                 <XAxis type="number" allowDecimals={false} />
-                <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
                 <Tooltip />
-                <Legend />
-                <Bar dataKey="asignadas" fill="#6366f1" name="Asignadas" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="completadas" fill="#10b981" name="Completadas" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name="Tareas" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
-      )}
 
-      {/* 30-day trend */}
-      <Card className="md:col-span-2">
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Tendencia de Completación (30 días)</CardTitle></CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={trendData}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={2} />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Line type="monotone" dataKey="completadas" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Completadas" />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        {/* Status pie */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Distribución por Estado</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={statusData} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3}>
+                  {statusData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Priority bars */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Distribución por Prioridad</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={priorityData} layout="vertical">
+                <XAxis type="number" allowDecimals={false} />
+                <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {priorityData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Workload */}
+        {workloadData.length > 0 && (
+          <Card className={workloadData.length > 3 ? "md:col-span-2" : ""}>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">Carga por Miembro</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={Math.max(200, workloadData.length * 40)}>
+                <BarChart data={workloadData} layout="vertical">
+                  <XAxis type="number" allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="asignadas" fill="#6366f1" name="Asignadas" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="completadas" fill="#10b981" name="Completadas" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 30-day trend */}
+        <Card className="md:col-span-2">
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Tendencia de Completación (30 días)</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={2} />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Line type="monotone" dataKey="completadas" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Completadas" />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
