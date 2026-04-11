@@ -117,29 +117,26 @@ const SharedAgendaPage = () => {
     return map;
   }, [filteredEvents]);
 
-  const upcomingEvents = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
-    return filteredEvents
-      .filter((e) => e.date >= today)
-      .sort((a, b) => a.date.localeCompare(b.date) || (a.start_time ?? "").localeCompare(b.start_time ?? ""));
+  const allSortedEvents = useMemo(() => {
+    return [...filteredEvents].sort((a, b) => a.date.localeCompare(b.date) || (a.start_time ?? "").localeCompare(b.start_time ?? ""));
   }, [filteredEvents]);
 
   const selectedDayEvents = selectedDate
     ? filteredEvents.filter((e) => isSameDay(new Date(e.date), selectedDate))
     : [];
 
-  const groupedUpcoming = useMemo(() => {
+  const groupedAll = useMemo(() => {
     const map = new Map<string, AgendaEvent[]>();
-    upcomingEvents.forEach((ev) => {
+    allSortedEvents.forEach((ev) => {
       if (!map.has(ev.date)) map.set(ev.date, []);
       map.get(ev.date)!.push(ev);
     });
     return Array.from(map.entries());
-  }, [upcomingEvents]);
+  }, [allSortedEvents]);
 
   const eventsToDisplay = selectedDate
     ? [{ date: format(selectedDate, "yyyy-MM-dd"), events: selectedDayEvents }]
-    : groupedUpcoming.map(([date, evs]) => ({ date, events: evs }));
+    : groupedAll.map(([date, evs]) => ({ date, events: evs }));
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -266,7 +263,7 @@ const SharedAgendaPage = () => {
               <div className="flex items-center gap-2.5">
                 <Sparkles className="h-4.5 w-4.5 text-primary" />
                 <h3 className="text-lg font-bold tracking-tight">
-                  {selectedDate ? format(selectedDate, "EEEE d 'de' MMMM", { locale: es }) : "Próximos Eventos"}
+                  {selectedDate ? format(selectedDate, "EEEE d 'de' MMMM", { locale: es }) : "Todos los Eventos"}
                 </h3>
                 {selectedDate && (
                   <Button variant="ghost" size="sm" className="h-7 px-3 text-[11px] ml-auto"

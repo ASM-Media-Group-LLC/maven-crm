@@ -37,7 +37,7 @@ interface Props {
   platformSalesByCreator?: Record<string, PlatformSaleSummary[]>;
 }
 
-const CATEGORY_OPTIONS = ["A+", "A", "B+", "B", "C"];
+const CATEGORY_OPTIONS = ["Elite", "A+", "A", "B+", "B"];
 
 const stageVariant = (s: string): "primary-soft" | "secondary-soft" | "success-soft" | "success" | "destructive-soft" | "warning-soft" => {
   const normalized = s === "Pendiente LG" ? "Nuevo" : s;
@@ -130,11 +130,11 @@ InlineText.displayName = "InlineText";
 
 // ─── Category variant map ───
 const CATEGORY_VARIANT: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
+  "Elite": "success-soft",
   "A+": "success-soft",
   "A": "primary-soft",
   "B+": "warning-soft",
   "B": "secondary-soft",
-  "C": "destructive-soft",
 };
 
 // ─── InlineCategorySelect ───
@@ -573,6 +573,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
             <SortHeader label="Creación" sortKey="created_at" {...sp} />
             <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
+            <SortHeader label="Categoría" sortKey="category" {...sp} />
             <SortHeader label="Agente" sortKey="agent_name" {...sp} />
             <SortHeader label="Monetización" sortKey="estimated_monetization" {...sp} />
             <SortHeader label="% Comisión" sortKey="agency_commission" {...sp} />
@@ -808,6 +809,9 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
             <TableCell>{igLink}</TableCell>
+            <TableCell>
+              <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
+            </TableCell>
             <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
             <TableCell><InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} /></TableCell>
             <TableCell><InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} /></TableCell>
