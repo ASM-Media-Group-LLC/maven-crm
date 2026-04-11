@@ -1,80 +1,52 @@
 
 
-# Plan: Correcciones UX/UI Multi-Módulo
+# Plan: Fix Analytics Duplicates + Global Analytics
 
-## 1. Analíticas Generales de Proyectos (no muestran datos)
+## Problems Found
 
-**Problema**: `GlobalAnalyticsTab` recibe `allTasks` desde `useProjects()`. Si `allTasks` está vacío o no se carga correctamente, no se muestra nada. Necesito verificar `useProjects` para entender cómo se obtiene `allTasks`.
+### Per-project analytics (TaskAnalyticsTab.tsx)
+The KPI stats cards (Total, Completadas, Vencidas, Progreso) are rendered TWICE:
+- Once in `TareasContent.tsx` (lines 405-436) — always visible regardless of tab
+- Again inside `TaskAnalyticsTab.tsx` (lines 174-211)
 
-**Cambios en `ProjectsListContent.tsx`**:
-- Agregar estado de loading mientras `allTasks` carga
-- Pasar `isLoading` a `GlobalAnalyticsTab`
+Additionally, there are TWO Gantt/timeline visualizations rendering the same data:
+- Full Gantt chart (`ganttChartData`, lines 256-293)
+- Simplified timeline (`ganttData`, lines 317-340)
 
-**Cambios en `GlobalAnalyticsTab.tsx`**:
-- Agregar KPI cards resumen al inicio (Total tareas, Completadas, Vencidas, Progreso %)
-- Agregar loading state (skeletons)
-- Agregar empty state más descriptivo
-- Verificar que `allTasks` realmente contenga datos (debug query en `useProjects`)
-
-**Investigar `useProjects.ts`**: Revisar cómo se obtiene `allTasks` — puede haber un problema de paginación o de query que limite los resultados.
-
-## 2. Docs — Layout no se adapta al ancho
-
-**Problema**: `ProjectDocumentationTab` tiene `max-w-4xl mx-auto` que limita el ancho artificialmente.
-
-**Cambio en `ProjectDocumentationTab.tsx`**:
-- Remover `max-w-4xl mx-auto` del wrapper principal, dejando que ocupe el ancho completo del contenedor padre (como hacen las otras tabs: Lista, Kanban, Analíticas)
-
-## 3. Eventos — Revertir separación Próximos/Pasados
-
-**Problema**: El usuario no quiere la separación visual en `/eventos`. Los eventos deben mostrarse como antes (lista unificada). Pero al compartir la agenda, debe mostrar todos los eventos (pasados + próximos).
-
-**Cambios en `EventosContent.tsx`**:
-- Eliminar la lógica de separación Próximos/Pasados (líneas 179-223)
-- Volver al render simple: mostrar `events` directamente sin secciones
-
-**Cambios en `SharedAgendaPage.tsx`**:
-- Actualmente solo muestra `upcomingEvents` (filtra `date >= today`)
-- Agregar toggle o tab para ver "Todos" vs "Próximos" vs "Pasados"
-- O mostrar todos por defecto, agrupados por fecha, incluyendo pasados
-
-## 4. Creadores — Mover eliminar al perfil/detalle
-
-**Cambios en `CreadoresTable.tsx`**:
-- Remover el botón de eliminar (Trash2) de la columna de acciones
-- Remover la mutación `deleteCreator` y el `AlertDialog` de confirmación de este archivo
-
-**Cambios en `ViewCreadorModal.tsx`**:
-- Agregar botón de eliminar (solo visible para admin) en el footer/header del modal de detalle
-- Agregar `AlertDialog` de confirmación
-- Implementar mutación de eliminación
-
-## 5. Closers — Columna Categoría en Completadas
-
-**Problema**: En la pestaña "Completadas" de `/closers` no hay columna de categoría con selector inline.
-
-**Cambios en `LeadTable.tsx`**:
-- En el header de "completadas" (línea 570-584): agregar columna "Categoría" después de "Instagram"
-- En el row de "completadas" (línea 805-870): agregar celda con `Select` inline para categoría con opciones: Elite, A+, A, B+, B
-- El `onFieldChange` ya existe y soporta actualizar `category`
-
-La columna `category` ya existe en `closer_creators`, no se necesita migración.
+### Global analytics (GlobalAnalyticsTab.tsx)
+The `allTasks` query in `useProjects.ts` (line 104-115) uses `as any` casting on the `tasks` table. If RLS blocks the query, the error is swallowed and returns an empty array, showing "No hay tareas para analizar." The component itself is correct — the issue is the data source.
 
 ---
 
-## Archivos a modificar
+## Changes
 
-| Archivo | Cambio |
-|---------|--------|
-| `GlobalAnalyticsTab.tsx` | KPIs, loading/empty states, debug data |
-| `ProjectsListContent.tsx` | Pasar isLoading a analytics |
-| `useProjects.ts` | Investigar/fix allTasks query |
-| `ProjectDocumentationTab.tsx` | Remover max-w-4xl mx-auto |
-| `EventosContent.tsx` | Revertir separación próximos/pasados |
-| `SharedAgendaPage.tsx` | Mostrar todos los eventos (pasados + próximos) |
-| `CreadoresTable.tsx` | Remover botón eliminar de acciones |
-| `ViewCreadorModal.tsx` | Agregar eliminar en detalle (admin only) |
-| `LeadTable.tsx` | Agregar columna categoría inline en completadas |
+### 1. TaskAnalyticsTab.tsx — Remove duplicate content
+- Remove the KPI cards section (lines 174-211) since TareasContent already displays them
+- Remove the duplicate simplified timeline section (`ganttData` variable + its render block, lines 143-159 and 317-340)
+- Keep: status pie, priority bars, full Gantt chart, workload chart, overdue list
 
-No se requieren migraciones de base de datos.
+### 2. GlobalAnalyticsTab.tsx — Fix data loading + error handling
+- Add error state handling: catch and display errors from the `allTasks` query
+- Add a console.log or debug indicator when `tasks` array is empty despite `isLoading=false`
+
+### 3. useProjects.ts — Add error visibility to allTasks query
+- Expose `isError` and `error` from the `rawAllTasks` query so `ProjectsListContent` can pass it to `GlobalAnalyticsTab`
+- Add `onError` toast notification so failures are visible to the user
+- Remove `as any` from the tasks query if the type is available, or add explicit error logging
+
+### 4. ProjectsListContent.tsx — Pass error state
+- Pass error state from `useProjects` to `GlobalAnalyticsTab`
+
+---
+
+## Files to modify
+
+| File | Change |
+|------|--------|
+| `TaskAnalyticsTab.tsx` | Remove KPI cards + remove duplicate timeline |
+| `GlobalAnalyticsTab.tsx` | Add error state UI |
+| `useProjects.ts` | Expose allTasks error, add error logging |
+| `ProjectsListContent.tsx` | Pass error to GlobalAnalyticsTab |
+
+No database changes needed.
 
