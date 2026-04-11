@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface ProjectMiniSidebarProps {
   currentProjectId: string;
@@ -19,6 +20,7 @@ const FAVORITES_KEY = "tareas-project-favorites";
 const ProjectMiniSidebar = ({ currentProjectId }: ProjectMiniSidebarProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const [collapsed, setCollapsed] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || "[]"); } catch { return []; }
@@ -29,8 +31,17 @@ const ProjectMiniSidebar = ({ currentProjectId }: ProjectMiniSidebarProps) => {
   }, [favorites]);
 
   const { data: projects = [], isLoading, isError } = useQuery({
-    queryKey: ["mini-sidebar-projects", user?.id],
+    queryKey: ["mini-sidebar-projects", user?.id, isAdmin],
     queryFn: async () => {
+      if (isAdmin) {
+        const { data, error } = await supabase
+          .from("task_projects" as any)
+          .select("id, name, status")
+          .eq("status", "active")
+          .order("name");
+        if (error) throw error;
+        return (data || []) as unknown as { id: string; name: string; status: string }[];
+      }
       const { data: memberships, error: memError } = await supabase
         .from("project_members" as any)
         .select("project_id")
