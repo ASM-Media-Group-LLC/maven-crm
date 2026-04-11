@@ -101,14 +101,17 @@ export const useProjects = () => {
 
   const visibleProjectIds = useMemo(() => new Set(projects.map((p) => p.id)), [projects]);
 
-  const { data: rawAllTasks = [] } = useQuery({
+  const { data: rawAllTasks = [], isLoading: isLoadingTasks, isError: isTasksError, error: tasksError } = useQuery({
     queryKey: ["all-tasks-for-projects", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tasks" as any)
         .select("id, title, description, status, due_at, start_at, completed_at, project_id, priority, assignees, created_at, overdue_reason, assigned_to, created_by, company_id, duration_hours, duration_minutes, share_token, updated_at")
         .order("due_at", { ascending: true });
-      if (error) throw error;
+      if (error) {
+        console.error("[useProjects] Failed to fetch tasks:", error);
+        throw error;
+      }
       return (data || []) as unknown as import("./useTareas").Task[];
     },
     enabled: !!user,
@@ -439,6 +442,9 @@ export const useProjects = () => {
     projects,
     allTasks,
     isLoading,
+    isLoadingTasks,
+    isTasksError,
+    tasksError,
     profile,
     folders,
     foldersLoading,

@@ -33,7 +33,7 @@ const ProjectsListContent = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { projects, allTasks, isLoading, profile, folders, createProject, updateProject, deleteProject, archiveProject, getProjectTaskCounts, getProjectProgress, reorderProjects, createFolder, renameFolder, deleteFolder, moveProjectToFolder, updateGlobalTaskStatus } = useProjects();
+  const { projects, allTasks, isLoading, isLoadingTasks, isTasksError, tasksError, profile, folders, createProject, updateProject, deleteProject, archiveProject, getProjectTaskCounts, getProjectProgress, reorderProjects, createFolder, renameFolder, deleteFolder, moveProjectToFolder, updateGlobalTaskStatus } = useProjects();
 
   const { data: companyProfiles = [] } = useQuery({
     queryKey: ["company-profiles", profile?.company_id],
@@ -454,7 +454,9 @@ const ProjectsListContent = () => {
             tasks={allTasks}
             profiles={companyProfiles}
             projects={projects}
-            isLoading={isLoading}
+            isLoading={isLoadingTasks}
+            isError={isTasksError}
+            errorMessage={tasksError?.message}
           />
         ) : (
         <div className="space-y-6">

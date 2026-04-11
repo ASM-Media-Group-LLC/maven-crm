@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle2, Clock, TrendingUp, ListTodo } from "lucide-react";
+import { AlertTriangle, ListTodo } from "lucide-react";
 import { format, differenceInDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Task } from "./useTareas";
@@ -139,24 +139,6 @@ const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabPr
     });
   }, [tasks, getTaskStatus]);
 
-  // Gantt/timeline data
-  const ganttData = useMemo(() => {
-    return tasks
-      .filter((t) => t.start_at)
-      .map((t) => {
-        const start = new Date(t.start_at!);
-        const end = new Date(t.due_at);
-        const days = Math.max(1, differenceInDays(end, start));
-        return {
-          title: t.title.length > 25 ? t.title.slice(0, 25) + "…" : t.title,
-          days,
-          status: getTaskStatus(t),
-          startLabel: format(start, "dd MMM", { locale: es }),
-          endLabel: format(end, "dd MMM", { locale: es }),
-        };
-      })
-      .slice(0, 15);
-  }, [tasks, getTaskStatus]);
 
   if (tasks.length === 0) {
     return (
@@ -170,46 +152,6 @@ const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabPr
 
   return (
     <div className="space-y-4">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <ListTodo className="h-4 w-4" />
-              <span className="text-xs">Total Tareas</span>
-            </div>
-            <p className="text-2xl font-bold">{kpis.total}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center gap-2 text-emerald-500 mb-1">
-              <CheckCircle2 className="h-4 w-4" />
-              <span className="text-xs">Completadas</span>
-            </div>
-            <p className="text-2xl font-bold text-emerald-500">{kpis.completed}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center gap-2 text-destructive mb-1">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-xs">Vencidas</span>
-            </div>
-            <p className="text-2xl font-bold text-destructive">{kpis.overdue}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center gap-2 text-primary mb-1">
-              <TrendingUp className="h-4 w-4" />
-              <span className="text-xs">Progreso</span>
-            </div>
-            <p className="text-2xl font-bold text-primary">{kpis.progress}%</p>
-          </CardContent>
-        </Card>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Status pie */}
         <Card>
@@ -313,31 +255,6 @@ const TaskAnalyticsTab = ({ tasks, profiles, getTaskStatus }: TaskAnalyticsTabPr
           </CardContent>
         </Card>
 
-        {/* Gantt simplified */}
-        {ganttData.length > 0 && (
-          <Card className="md:col-span-2">
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Timeline</CardTitle></CardHeader>
-            <CardContent className="space-y-1.5">
-              {ganttData.map((item, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground w-[160px] truncate">{item.title}</span>
-                  <div className="flex-1 relative h-5 bg-muted/50 rounded-full overflow-hidden">
-                    <div
-                      className="absolute inset-y-0 left-0 rounded-full"
-                      style={{
-                        width: `${Math.min(100, Math.max(8, (item.days / 30) * 100))}%`,
-                        backgroundColor: STATUS_COLORS[item.status] || "#888",
-                      }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-muted-foreground w-[100px] text-right">
-                    {item.startLabel} → {item.endLabel}
-                  </span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
 
         {/* Overdue without reason */}
         {overdueTasks.length > 0 && (
