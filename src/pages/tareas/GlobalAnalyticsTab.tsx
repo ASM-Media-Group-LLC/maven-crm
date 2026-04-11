@@ -21,6 +21,8 @@ interface GlobalAnalyticsTabProps {
   profiles: Profile[];
   projects: ProjectInfo[];
   isLoading?: boolean;
+  isError?: boolean;
+  errorMessage?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -48,7 +50,7 @@ const getStatus = (t: Task): string => {
   return "pending";
 };
 
-const GlobalAnalyticsTab = ({ tasks, profiles, projects, isLoading }: GlobalAnalyticsTabProps) => {
+const GlobalAnalyticsTab = ({ tasks, profiles, projects, isLoading, isError, errorMessage }: GlobalAnalyticsTabProps) => {
   const projectMap = useMemo(() => Object.fromEntries(projects.map(p => [p.id, p.name])), [projects]);
 
   // KPIs
@@ -127,6 +129,16 @@ const GlobalAnalyticsTab = ({ tasks, profiles, projects, isLoading }: GlobalAnal
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
         </div>
         <Skeleton className="h-64 rounded-lg" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-destructive">
+        <AlertTriangle className="h-8 w-8 mb-2" />
+        <p className="text-sm font-medium">Error al cargar las tareas</p>
+        <p className="text-xs text-muted-foreground mt-1">{errorMessage || "No se pudieron obtener los datos. Verifica tus permisos."}</p>
       </div>
     );
   }
