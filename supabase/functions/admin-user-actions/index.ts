@@ -194,17 +194,67 @@ Deno.serve(async (req) => {
     }
 
     if (action === "delete_user") {
-      await adminClient.from("user_roles").delete().eq("user_id", user_id);
-      await adminClient.from("profiles").delete().eq("id", user_id);
-      const { error: deleteError } = await adminClient.auth.admin.deleteUser(user_id);
+      console.log(`[delete_user] Starting deletion for user_id=${user_id}`);
 
-      if (deleteError) {
-        return new Response(JSON.stringify({ error: deleteError.message }), {
+      // 1. Unlink employees referencing this profile
+      const { error: unlinkEmpErr } = await adminClient
+        .from("employees")
+        .update({ profile_id: null })
+        .eq("profile_id", user_id);
+      if (unlinkEmpErr) console.warn("[delete_user] unlink employees:", unlinkEmpErr.message);
+
+      // 2. Delete project memberships
+      const { error: pmErr } = await adminClient
+        .from("project_members")
+        .delete()
+        .eq("user_id", user_id);
+      if (pmErr) console.warn("[delete_user] delete project_members:", pmErr.message);
+
+      // 3. Delete chat participations
+      const { error: cpErr } = await adminClient
+        .from("chat_participants")
+        .delete()
+        .eq("user_id", user_id);
+      if (cpErr) console.warn("[delete_user] delete chat_participants:", cpErr.message);
+
+      // 4. Delete user roles
+      const { error: rolesErr } = await adminClient
+        .from("user_roles")
+        .delete()
+        .eq("user_id", user_id);
+      if (rolesErr) console.warn("[delete_user] delete user_roles:", rolesErr.message);
+
+      // 5. Delete notifications
+      const { error: notifErr } = await adminClient
+        .from("notifications")
+        .delete()
+        .eq("user_id", user_id);
+      if (notifErr) console.warn("[delete_user] delete notifications:", notifErr.message);
+
+      // 6. Delete profile
+      const { error: profileErr } = await adminClient
+        .from("profiles")
+        .delete()
+        .eq("id", user_id);
+      if (profileErr) {
+        console.error("[delete_user] delete profile failed:", profileErr.message);
+        return new Response(JSON.stringify({ error: `Error eliminando perfil: ${profileErr.message}` }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
+      // 7. Delete auth user
+      const { error: deleteError } = await adminClient.auth.admin.deleteUser(user_id);
+      if (deleteError) {
+        console.error("[delete_user] delete auth user failed:", deleteError.message);
+        return new Response(JSON.stringify({ error: `Error eliminando usuario: ${deleteError.message}` }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      console.log(`[delete_user] Successfully deleted user_id=${user_id}`);
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
