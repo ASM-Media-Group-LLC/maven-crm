@@ -122,7 +122,7 @@ const SharedAgendaPage = () => {
   }, [filteredEvents]);
 
   const selectedDayEvents = selectedDate
-    ? filteredEvents.filter((e) => isSameDay(new Date(e.date), selectedDate))
+    ? filteredEvents.filter((e) => isSameDay(new Date(e.date + "T12:00:00"), selectedDate))
     : [];
 
   const groupedAll = useMemo(() => {

@@ -58,7 +58,7 @@ function shareEvent(e: EventRow, toast: ReturnType<typeof useToast>["toast"]) {
   const text = [
     `📅 Evento: ${e.name}`,
     `Tipo: ${e.event_type}`,
-    `Fecha: ${format(new Date(e.date), "d MMM yyyy", { locale: es })}`,
+    `Fecha: ${format(new Date(e.date + "T12:00:00"), "d MMM yyyy", { locale: es })}`,
     e.start_time ? `Hora: ${e.start_time.slice(0, 5)}` : null,
     e.location ? `📍 Ubicación: ${e.location}` : null,
     `Estado: ${statusLabel[e.status] ?? e.status}`,
@@ -144,7 +144,7 @@ const ViewEventoModal = ({ open, onOpenChange, event, onEdit }: Props) => {
               <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm">
                   <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span>{format(new Date(event.date), "EEEE d 'de' MMMM, yyyy", { locale: es })}</span>
+                  <span>{format(new Date(event.date + "T12:00:00"), "EEEE d 'de' MMMM, yyyy", { locale: es })}</span>
                   {event.start_time && (
                     <span className="text-muted-foreground">· {event.start_time.slice(0, 5)}{event.end_time ? ` - ${event.end_time.slice(0, 5)}` : ""}</span>
                   )}
@@ -157,7 +157,7 @@ const ViewEventoModal = ({ open, onOpenChange, event, onEdit }: Props) => {
                 )}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4 shrink-0" />
-                  <span>{formatDistanceToNow(new Date(event.date), { addSuffix: true, locale: es })}</span>
+                  <span>{formatDistanceToNow(new Date(event.date + "T12:00:00"), { addSuffix: true, locale: es })}</span>
                 </div>
               </div>
 

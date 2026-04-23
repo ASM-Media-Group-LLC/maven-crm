@@ -38,13 +38,13 @@ const EventosCalendar = ({ events }: Props) => {
   const today = startOfToday();
 
   const eventDates = events
-    .filter((e) => isSameMonth(new Date(e.date), month))
-    .map((e) => new Date(e.date));
+    .filter((e) => isSameMonth(new Date(e.date + "T12:00:00"), month))
+    .map((e) => new Date(e.date + "T12:00:00"));
 
-  const eventsThisMonth = events.filter((e) => isSameMonth(new Date(e.date), month)).length;
+  const eventsThisMonth = events.filter((e) => isSameMonth(new Date(e.date + "T12:00:00"), month)).length;
 
   const upcoming = events
-    .filter((e) => isAfter(new Date(e.date), today) || isSameDay(new Date(e.date), today))
+    .filter((e) => isAfter(new Date(e.date + "T12:00:00"), today) || isSameDay(new Date(e.date + "T12:00:00"), today))
     .slice(0, 3);
 
   const goToToday = () => setMonth(new Date());
@@ -130,7 +130,7 @@ const EventosCalendar = ({ events }: Props) => {
             <div className="space-y-3">
               {upcoming.map((e) => {
                 const Icon = typeIcons[e.event_type] ?? CalendarDays;
-                const eventDate = new Date(e.date);
+                const eventDate = new Date(e.date + "T12:00:00");
                 const eventIsToday = isSameDay(eventDate, today);
                 const relativeTime = formatDistanceToNow(eventDate, { locale: es, addSuffix: true });
                 const style = getEventTypeStyle(e.event_type);
