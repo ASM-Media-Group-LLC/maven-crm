@@ -37,7 +37,7 @@ function copyResumen(e: EventRow, toast: ReturnType<typeof useToast>["toast"]) {
   const text = [
     `📅 Evento: ${e.name}`,
     `Tipo: ${e.event_type}`,
-    `Fecha: ${format(new Date(e.date), "d MMM yyyy", { locale: es })}`,
+    `Fecha: ${format(new Date(e.date + "T12:00:00"), "d MMM yyyy", { locale: es })}`,
     e.location ? `📍 Ubicación: ${e.location}` : null,
     `Estado: ${statusLabel[e.status] ?? e.status}`,
   ].filter(Boolean).join("\n");
@@ -121,7 +121,7 @@ const EventosGrid = ({ events }: Props) => {
 
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">
-                    {format(new Date(e.date), "d MMM yyyy", { locale: es })}
+                    {format(new Date(e.date + "T12:00:00"), "d MMM yyyy", { locale: es })}
                     {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
                   </p>
                   {e.location && (

@@ -45,7 +45,7 @@ function copyResumen(e: EventRow, toast: ReturnType<typeof useToast>["toast"]) {
   const text = [
     `📅 Evento: ${e.name}`,
     `Tipo: ${e.event_type}`,
-    `Fecha: ${format(new Date(e.date), "d MMM yyyy", { locale: es })}`,
+    `Fecha: ${format(new Date(e.date + "T12:00:00"), "d MMM yyyy", { locale: es })}`,
     e.location ? `📍 Ubicación: ${e.location}` : null,
     `Estado: ${statusLabel[e.status] ?? e.status}`,
   ].filter(Boolean).join("\n");
@@ -136,8 +136,8 @@ const EventosTable = ({ events }: Props) => {
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   <div className="flex items-center gap-1.5">
-                    {format(new Date(e.date), "d MMM yyyy", { locale: es })}
-                    {new Date(e.date) < new Date(new Date().toDateString()) && e.status !== "completed" && e.status !== "cancelled" && (
+                    {format(new Date(e.date + "T12:00:00"), "d MMM yyyy", { locale: es })}
+                    {new Date(e.date + "T12:00:00") < new Date(new Date().toDateString()) && e.status !== "completed" && e.status !== "cancelled" && (
                       <Badge variant="secondary-soft" className="text-[9px] px-1 py-0">Pasado</Badge>
                     )}
                   </div>

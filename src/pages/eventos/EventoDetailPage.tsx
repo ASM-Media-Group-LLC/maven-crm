@@ -76,7 +76,7 @@ const EventoDetailPage = () => {
             <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <CalendarDays className="h-3.5 w-3.5" />
-                {format(new Date(event.date), "d MMM yyyy", { locale: es })}
+                {format(new Date(event.date + "T12:00:00"), "d MMM yyyy", { locale: es })}
               </span>
               {event.start_time && (
                 <span className="flex items-center gap-1">
