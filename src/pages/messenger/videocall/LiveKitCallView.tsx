@@ -33,6 +33,10 @@ interface LiveKitCallViewProps {
   hideShareLink?: boolean;
   hideScreenShare?: boolean;
   hideLeaveButton?: boolean;
+  /** Custom label for the leave button (e.g. "Regresar a la sala"). When set, the button shows icon + text */
+  leaveLabel?: string;
+  /** Custom icon for the leave button (defaults to PhoneOff) */
+  leaveIcon?: import("lucide-react").LucideIcon;
   /** When true, skip the generic "Llamada finalizada" toast on leave */
   suppressLeaveToast?: boolean;
   compact?: boolean;
@@ -44,7 +48,7 @@ interface LiveKitCallViewProps {
   onMediaStateChange?: (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => void;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
@@ -256,6 +260,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onOpenMetrics={() => setMetricsOpen(true)}
         hideScreenShare={hideScreenShare}
         hideLeaveButton={hideLeaveButton}
+        leaveLabel={leaveLabel}
+        leaveIcon={leaveIcon}
         compact={compact}
         backgroundEffect={bgEffect}
         onToggleBlurBackground={() => handleBgChange(bgEffect === "blur" ? "none" : "blur")}

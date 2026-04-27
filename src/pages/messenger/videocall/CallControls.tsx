@@ -3,6 +3,7 @@ import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
   PhoneOff, Hand, MessageSquare, Smile, Users,
   ChevronUp, Info, Volume2, ChevronDown, Check, Cloud, Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,8 @@ interface CallControlsProps {
   onOpenMetrics: () => void;
   hideScreenShare?: boolean;
   hideLeaveButton?: boolean;
+  leaveLabel?: string;
+  leaveIcon?: LucideIcon;
   compact?: boolean;
   isNoiseCancellationOn?: boolean;
   onToggleNoiseCancellation?: () => void;
@@ -173,7 +176,7 @@ export default function CallControls({
   onToggleChat, onToggleParticipants,
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
-  onOpenVideoSettings, onOpenMetrics, hideScreenShare, hideLeaveButton, compact,
+  onOpenVideoSettings, onOpenMetrics, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, compact,
   backgroundEffect, onToggleBlurBackground,
 }: CallControlsProps) {
   const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
@@ -341,17 +344,21 @@ export default function CallControls({
         <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label="Levantar mano" badge={isHandRaised} compact={compact} />
 
         {/* Leave */}
-        {!hideLeaveButton && (
-          <button
-            onClick={onLeave}
-            className={cn(
-              "rounded-full bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)] transition-colors flex items-center gap-2 font-medium",
-              compact ? "h-8 px-3 text-xs" : "h-11 px-5 text-sm"
-            )}
-          >
-            <PhoneOff className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
-          </button>
-        )}
+        {!hideLeaveButton && (() => {
+          const LeaveIcon = leaveIcon ?? PhoneOff;
+          return (
+            <button
+              onClick={onLeave}
+              className={cn(
+                "rounded-full bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)] transition-colors flex items-center gap-2 font-medium",
+                compact ? "h-8 px-3 text-xs" : "h-11 px-5 text-sm"
+              )}
+            >
+              <LeaveIcon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+              {leaveLabel && <span>{leaveLabel}</span>}
+            </button>
+          );
+        })()}
 
         {/* Panel toggles — inline in compact, right-aligned otherwise */}
         {compact && (

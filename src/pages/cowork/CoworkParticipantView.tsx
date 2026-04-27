@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Hand, Monitor, Loader2, Crown, Phone, PhoneCall, MoreVertical } from "lucide-react";
+import { Hand, Monitor, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
@@ -177,7 +177,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     if (req?.status === "resolved" || !req) {
       dismissedRequestRef.current = null;
       reconnectToMainRoom();
-      toast.info("Llamada privada con host finalizada");
+      toast.info("Llamada privada con coordinador finalizada");
     }
   }, [cowork.hostRequests, oneOnOneRequestId, reconnectToMainRoom]);
 
@@ -221,7 +221,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       <div className="flex flex-col items-center justify-center h-screen gap-4 p-4">
         <div className="flex flex-col items-center gap-3 bg-primary/5 rounded-3xl px-6 md:px-10 py-8 md:py-10 max-w-sm w-full">
           <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
-          <p className="text-muted-foreground text-sm text-center">Esperando asignación de sala por el host...</p>
+          <p className="text-muted-foreground text-sm text-center">Esperando asignación de sala por el coordinador...</p>
           <p className="text-xs text-muted-foreground/70">{cowork.session?.name}</p>
         </div>
       </div>
@@ -235,7 +235,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     dismissedRequestRef.current = null;
     try {
       await cowork.requestHost(myAssignment.room_id, "Necesito ayuda");
-      toast.success("Solicitud enviada al host");
+      toast.success("Solicitud enviada al coordinador");
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -245,7 +245,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     pendingOneOnOneRef.current = true;
     try {
       const result = await cowork.requestHost(myAssignment.room_id, "Llamada privada", true);
-      toast.success("Solicitud de llamada privada enviada al host");
+      toast.success("Solicitud de llamada privada enviada al coordinador");
       const roomName = result?.oneone_livekit_room || result?.request?.oneone_livekit_room;
       const reqId = result?.request?.id;
       if (roomName && reqId) {
@@ -285,7 +285,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           {isInOneOnOne ? (
             <>
               <Crown className="h-4 w-4 text-amber-500 shrink-0" />
-              <span className="text-amber-500 text-sm font-medium truncate">Llamada privada con host</span>
+              <span className="text-amber-500 text-sm font-medium truncate">Llamada privada con coordinador</span>
             </>
           ) : (
             <>
@@ -303,7 +303,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             </Button>
           )}
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={isInOneOnOne} onClick={handleRequestHost}>
-            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir host"}
+            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir coordinador"}
           </Button>
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={!!myOpenRequest || isInOneOnOne} onClick={handleRequestOneOnOne}>
             <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada privada..." : "Llamada privada"}
@@ -332,11 +332,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             <DropdownMenuContent align="end" className="rounded-xl">
               <DropdownMenuItem onClick={handleRequestHost} disabled={isInOneOnOne}>
                 <Hand className="h-4 w-4 mr-2" />
-                {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir host"}
+                {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir coordinador"}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleRequestOneOnOne} disabled={!!myOpenRequest || isInOneOnOne}>
                 <Phone className="h-4 w-4 mr-2" />
-                {isInOneOnOne ? "En llamada privada..." : "Llamada privada con host"}
+                {isInOneOnOne ? "En llamada privada..." : "Llamada privada con coordinador"}
               </DropdownMenuItem>
               {!hasScreenShareAccess && (
                 <DropdownMenuItem onClick={handleRequestScreenShare} disabled={!!mySSReq}>
@@ -356,7 +356,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             key={`oneOnOne-${oneOnOneRoom}`}
             roomName={oneOnOneRoom}
             displayName={displayName}
-            callDisplayName="Llamada privada con host"
+            callDisplayName="Llamada privada con coordinador"
             isAdmin={false}
             onLeave={() => {
               dismissedRequestRef.current = oneOnOneRequestId;
@@ -368,6 +368,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             initialMicOn={false}
             initialCamOn={false}
             getToken={getOneOnOneToken}
+            leaveLabel="Regresar a la sala"
+            leaveIcon={ArrowLeft}
           />
         ) : connectedLkRoom ? (
           <LiveKitCallView
