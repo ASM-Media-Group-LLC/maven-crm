@@ -332,7 +332,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             <DropdownMenuContent align="end" className="rounded-xl">
               <DropdownMenuItem onClick={handleRequestHost} disabled={isInOneOnOne}>
                 <Hand className="h-4 w-4 mr-2" />
-                {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir host"}
+                {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir coordinador"}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleRequestOneOnOne} disabled={!!myOpenRequest || isInOneOnOne}>
                 <Phone className="h-4 w-4 mr-2" />
