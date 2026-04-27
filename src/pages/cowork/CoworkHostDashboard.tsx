@@ -553,6 +553,41 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           </div>
         </div>
       )}
+
+      <AlertDialog open={!!removingParticipant} onOpenChange={(open) => { if (!open) setRemovingParticipant(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar participante</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Seguro que quieres eliminar a <strong>{removingParticipant?.name}</strong> de la sala "{removingParticipant?.roomName}"? El participante quedará sin asignación en la sesión.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removingBusy}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={removingBusy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!removingParticipant) return;
+                setRemovingBusy(true);
+                try {
+                  await cowork.removeFromRoom(removingParticipant.userId, removingParticipant.roomId);
+                  toast.success(`${removingParticipant.name} eliminado de la sala`);
+                  setRemovingParticipant(null);
+                } catch (err: any) {
+                  toast.error(err?.message || "No se pudo eliminar al participante");
+                } finally {
+                  setRemovingBusy(false);
+                }
+              }}
+            >
+              {removingBusy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
