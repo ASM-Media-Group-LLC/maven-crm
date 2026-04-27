@@ -43,6 +43,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [oneOnOneRequestId, setOneOnOneRequestId] = useState<string | null>(null);
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
   const oneOnOneSeenInListRef = useRef(false);
+  const [removingParticipant, setRemovingParticipant] = useState<{ userId: string; name: string; roomId: string; roomName: string } | null>(null);
+  const [removingBusy, setRemovingBusy] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
