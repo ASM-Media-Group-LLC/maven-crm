@@ -409,7 +409,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             const initials = fullName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
                             const online = isOnline(a.user_id);
                             return (
-                              <div key={a.user_id} className="flex flex-col items-center gap-1 rounded-xl border border-border bg-primary/5 p-2 text-center">
+                              <div key={a.user_id} className="relative group flex flex-col items-center gap-1 rounded-xl border border-border bg-primary/5 p-2 text-center">
+                                <button
+                                  type="button"
+                                  className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive/10 text-destructive opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-destructive/20 z-10"
+                                  title="Eliminar de la sala"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRemovingParticipant({ userId: a.user_id, name: fullName, roomId: room.id, roomName: room.name });
+                                  }}
+                                >
+                                  <UserX className="h-3 w-3" />
+                                </button>
                                 <div className="relative">
                                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-[10px] font-medium text-primary-foreground">
                                     {initials}
