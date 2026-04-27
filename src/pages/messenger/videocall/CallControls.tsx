@@ -42,6 +42,8 @@ interface CallControlsProps {
   compact?: boolean;
   isNoiseCancellationOn?: boolean;
   onToggleNoiseCancellation?: () => void;
+  backgroundEffect?: BackgroundEffect;
+  onToggleBlurBackground?: () => void;
 }
 
 const REACTIONS = ["👍", "👏", "❤️", "🎉", "😂", "😮", "🤔", "👋"];
