@@ -318,28 +318,6 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // REMOVE FROM ROOM (kick participant from a room)
-    // ═══════════════════════════════════════════════════════════════
-    if (action === "removeFromRoom") {
-      const { sessionId, targetUserId, roomId } = body;
-      if (!sessionId || !targetUserId || !roomId) return err("sessionId, targetUserId, roomId required");
-
-      // Verify caller is host
-      const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err("Only hosts can remove participants", 403);
-
-      const { error: updErr } = await admin.from("cowork_room_assignments")
-        .update({ is_active: false })
-        .eq("session_id", sessionId)
-        .eq("user_id", targetUserId)
-        .eq("room_id", roomId)
-        .eq("is_active", true);
-      if (updErr) return err(updErr.message, 500);
-
-      return json({ removed: true });
-    }
-
-    // ═══════════════════════════════════════════════════════════════
     // REQUEST HOST
     // ═══════════════════════════════════════════════════════════════
     if (action === "requestHost") {

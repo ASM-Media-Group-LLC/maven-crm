@@ -1,38 +1,38 @@
-## Eliminar participante de una sala (Coordinador)
+## Objetivo
 
-Agregar al Coordinador la capacidad de expulsar a un participante de una sala desde la vista "Seleccione sala para ingresar" (las cards de salas en `CoworkHostDashboard`).
+En el Coordinador Dashboard, las solicitudes de "Pedir Host" deben:
+1. **No mostrar el botón "Resolver"** (se elimina de la UI).
+2. **Desaparecer automáticamente** una vez que el coordinador presiona **"Atender"**.
 
-### UX
+## Estado actual
 
-En cada tarjeta de participante dentro de una sala (las mini‑cards con avatar/iniciales y nombre), al hacer hover se mostrará un botón pequeño con icono `UserX` en la esquina superior derecha. Al pulsarlo se abre un `AlertDialog` de confirmación:
+Archivo: `src/pages/cowork/CoworkHostDashboard.tsx`
 
-- Título: "Eliminar participante"
-- Descripción: "¿Seguro que quieres eliminar a {nombre} de la sala {room.name}?"
-- Acciones: Cancelar / Eliminar (variante destructiva)
+- Línea 122: `openHostRequests = hostRequests.filter(r => r.status !== "resolved")` — muestra tanto `open` como `acknowledged`.
+- Línea 280-294: botón **Atender** llama `ackHostRequest` (status pasa a `acknowledged`, sigue visible) y luego `enterRoom` (o flujo 1-on-1).
+- Línea 296-307: botón **Unirse a llamada privada** (visible solo para 1-on-1 ya atendidas).
+- Línea 308-316: botón **Resolver** llama `resolveHostRequest` (status pasa a `resolved`, desaparece).
 
-Tras confirmar:
-- Se desactiva la asignación en la base de datos (queda "sin asignar" en la sesión, no se le saca de la sesión completa).
-- Se cierra el dialog y aparece toast: "{nombre} eliminado de la sala".
-- Realtime ya refresca el listado automáticamente vía la suscripción a `cowork_room_assignments`.
+## Cambios propuestos
 
-Solo se muestra para participantes (no para el propio coordinador).
+En `CoworkHostDashboard.tsx`, dentro del bloque de Host Requests (líneas 278-317):
 
-### Cambios técnicos
+1. **Eliminar el botón "Resolver"** (líneas 308-316) por completo.
 
-1. **`supabase/functions/cowork-session/index.ts`** — Nueva acción `removeFromRoom`:
-   - Input: `{ sessionId, targetUserId, roomId }`.
-   - Verifica que el caller sea `host` de la sesión (mismo patrón que `assignToRoom` / `moveParticipant`).
-   - `update cowork_room_assignments set is_active = false where session_id = ? and user_id = ? and room_id = ? and is_active = true`.
+2. **Reemplazar `ackHostRequest` por `resolveHostRequest`** en el handler de "Atender":
+   - Para solicitudes normales: tras entrar a la sala con `enterRoom(req.room_id)`, llamar `resolveHostRequest(req.id)` para que la tarjeta desaparezca de inmediato.
+   - Para solicitudes 1-on-1: mantener `ackHostRequest` (no resolver todavía), porque la sala privada se cierra con `leaveOneOnOne` que ya invoca `resolveHostRequest` (línea 92). Eso conserva la tarjeta como "Unirse a llamada privada" durante la llamada activa.
 
-2. **`src/hooks/useCoworkSession.ts`** — Exponer `removeFromRoom(targetUserId, roomId)` que invoca la edge function y devolverlo en el return del hook.
+3. **Eliminar la condición `req.status === "open"`** del botón Atender para solicitudes normales — al ya no haber estado intermedio para no-1on1, el render queda más limpio. (Para 1-on-1 la condición se mantiene para ocultar Atender una vez que pasa a `acknowledged` y mostrar "Unirse a llamada privada".)
 
-3. **`src/pages/cowork/CoworkHostDashboard.tsx`**:
-   - Importar `UserX` de lucide-react y `AlertDialog*` de `@/components/ui/alert-dialog`.
-   - Estado local `removingParticipant: { userId: string; name: string; roomId: string; roomName: string } | null`.
-   - En la mini‑card del participante (líneas ~406‑426) añadir un botón flotante absoluto (top‑right) con `UserX`, visible en hover (`opacity-0 group-hover:opacity-100`), que abre el dialog. El contenedor de la card recibirá `relative group`.
-   - Render del `AlertDialog` al final del componente, con handler que llama `cowork.removeFromRoom(...)`, muestra toast y limpia el estado.
+### Comportamiento resultante
 
-### Notas
+- **Solicitud normal**: Coordinador ve "Atender" → click → entra a la sala + tarjeta desaparece. ✅
+- **Solicitud 1-on-1**: Coordinador ve "Atender" → click → entra a sala privada + tarjeta cambia a "Unirse a llamada privada" (por si se sale y quiere reincorporarse) → al colgar/salir se resuelve y desaparece. ✅
+- **Botón Resolver**: ya no existe en la UI. ✅
 
-- LiveKit no requiere acción extra: el participante se queda en la sesión sin asignación; el `CoworkParticipantView` ya reacciona a `myAssignment` y lo sacará automáticamente de la sala LiveKit cuando la suscripción realtime detecte `is_active=false`.
-- No se elimina la membresía de la sesión, solo la asignación a la sala (consistente con el resto del módulo, donde "sin asignar" es un estado válido visible en el sidebar).
+## Archivos modificados
+
+- `src/pages/cowork/CoworkHostDashboard.tsx` (~10 líneas dentro del bloque de Host Requests).
+
+No hay cambios en hooks, edge functions ni base de datos.
