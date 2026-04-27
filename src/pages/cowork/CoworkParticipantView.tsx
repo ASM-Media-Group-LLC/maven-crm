@@ -78,6 +78,50 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     });
   }, []);
 
+  // Best-effort: release the room assignment when the tab/browser is closing,
+  // so the host dashboard removes the participant immediately. We use `pagehide`
+  // (more reliable than `beforeunload` on mobile/iOS) and `fetch` with
+  // `keepalive: true` so the request completes even if the page is unloading.
+  useEffect(() => {
+    const sessionId = cowork.session?.id;
+    if (!sessionId) return;
+
+    const sendLeaveBeacon = () => {
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cowork-session`;
+        supabase.auth.getSession().then(({ data }) => {
+          const token = data.session?.access_token;
+          if (!token) return;
+          void fetch(url, {
+            method: "POST",
+            keepalive: true,
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ action: "leaveRoom", sessionId }),
+          }).catch(() => {});
+        });
+      } catch {
+        // best-effort; ignore
+      }
+    };
+
+    const handlePageHide = (e: PageTransitionEvent) => {
+      // Skip when the page is being stored in the bfcache (it may resume later).
+      if (e.persisted) return;
+      sendLeaveBeacon();
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      // SPA navigation away → release the slot too.
+      sendLeaveBeacon();
+    };
+  }, [cowork.session?.id]);
+
   useEffect(() => {
     if (myAssignment?.room_id && prevRoomIdRef.current && myAssignment.room_id !== prevRoomIdRef.current) {
       setManuallyLeft(false);
