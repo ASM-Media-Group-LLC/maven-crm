@@ -303,7 +303,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             </Button>
           )}
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={isInOneOnOne} onClick={handleRequestHost}>
-            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir host"}
+            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir coordinador"}
           </Button>
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={!!myOpenRequest || isInOneOnOne} onClick={handleRequestOneOnOne}>
             <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada privada..." : "Llamada privada"}
