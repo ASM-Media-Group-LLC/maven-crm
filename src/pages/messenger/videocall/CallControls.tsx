@@ -269,11 +269,25 @@ export default function CallControls({
                 <div className="flex items-center gap-2">
                   <DevicePill icon={VideoIcon} devices={devices.videoInputs} selectedId={currentVideoInputId || ""} onSelect={onVideoInputChange} />
                   <button
-                    onClick={() => { setVideoPopoverOpen(false); onOpenVideoSettings(); }}
-                    title="Configuración de vídeo"
-                    className="h-8 w-8 rounded-full flex items-center justify-center text-[hsl(220_3%_65%)] hover:text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_25%)] transition-colors"
+                    onClick={() => { setVideoPopoverOpen(false); onToggleBlurBackground?.(); }}
+                    title="Difuminar fondo"
+                    className={cn(
+                      "h-8 px-3 rounded-full flex items-center gap-1.5 text-xs transition-colors",
+                      backgroundEffect === "blur"
+                        ? "bg-[hsl(214_82%_51%/0.18)] text-[hsl(214_82%_70%)] hover:bg-[hsl(214_82%_51%/0.25)]"
+                        : "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
+                    )}
                   >
-                    <Settings className="h-4 w-4" />
+                    <Cloud className="h-3.5 w-3.5" />
+                    <span>Fondo difuminado</span>
+                  </button>
+                  <button
+                    onClick={() => { setVideoPopoverOpen(false); onOpenVideoSettings(); }}
+                    title="Fondos y efectos"
+                    className="h-8 px-3 rounded-full flex items-center gap-1.5 text-xs bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)] transition-colors"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>Fondos y efectos</span>
                   </button>
                 </div>
               </PopoverContent>
