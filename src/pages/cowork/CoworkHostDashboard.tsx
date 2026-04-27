@@ -157,7 +157,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-amber-500 hover:text-amber-400"
+                className="h-7 w-7 text-blue-500 hover:text-blue-400"
                 title="Copiar enlace de host"
                 onClick={() => {
                   const code = hostInviteCode || "";
@@ -166,7 +166,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   toast.success("Enlace de host copiado");
                 }}
               >
-                <Headphones className="h-3.5 w-3.5" />
+                <Share2 className="h-3.5 w-3.5" />
               </Button>
               <Button
                 variant="ghost"
