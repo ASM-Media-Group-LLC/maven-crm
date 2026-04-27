@@ -203,7 +203,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Radio className={`h-3 w-3 ${hubConnected ? "text-emerald-500" : "text-muted-foreground/50"}`} />
               <span>Coordinador Hub</span>
-              {hubConnected && (
+              {activeRoomLk ? (
+                <span className="text-[10px] text-amber-500/80 italic">en pausa (en sala)</span>
+              ) : hubConnected ? (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -212,8 +214,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 >
                   {hubMinimized ? "Mostrar" : "Minimizar"}
                 </Button>
-              )}
-              {!hubConnected && cowork.session?.host_hub_livekit_room && (
+              ) : cowork.session?.host_hub_livekit_room ? (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -222,7 +223,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 >
                   Reconectar
                 </Button>
-              )}
+              ) : null}
             </div>
           </div>
 
