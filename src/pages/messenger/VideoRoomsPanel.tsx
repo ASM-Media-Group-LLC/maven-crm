@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Video, Plus, Copy, Link2, Users, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Video, Plus, Copy, Link2, Users, X, Users2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -20,6 +21,7 @@ interface VideoRoomsPanelProps {
 
 export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClose }: VideoRoomsPanelProps) {
   const [joinLink, setJoinLink] = useState("");
+  const navigate = useNavigate();
 
   const handleCreate = () => {
     const autoName = `Sala ${new Date().toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`;
@@ -104,7 +106,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
 
       <div className="shrink-0 p-4 space-y-3">
         {/* Quick actions */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <Button onClick={handleCreate} className="h-auto py-3 flex-col gap-1 rounded-2xl">
             <Plus className="h-5 w-5" />
             <span className="text-xs">Nueva sala</span>
@@ -112,6 +114,10 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
           <Button variant="outline" onClick={() => document.getElementById("join-link-input")?.focus()} className="h-auto py-3 flex-col gap-1 rounded-2xl">
             <Link2 className="h-5 w-5" />
             <span className="text-xs">Unirse</span>
+          </Button>
+          <Button variant="secondary" onClick={() => navigate("/cowork")} className="h-auto py-3 flex-col gap-1 rounded-2xl">
+            <Users2 className="h-5 w-5" />
+            <span className="text-xs">Cowork</span>
           </Button>
         </div>
 
