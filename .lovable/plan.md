@@ -1,30 +1,36 @@
-## Eliminar lógica de asignación manual de salas
+## Cambios UI/UX en llamada privada con coordinador
 
-La función "Sin asignar" del sidebar del coordinador y las acciones backend asociadas ya no se usan: los participantes se auto-unen vía URL (`?room=X`) y, con el cambio anterior de `pagehide`/`leaveRoom`, la asignación se gestiona como presencia en vivo. Eliminar este código muerto evita confusión y reduce superficie.
+### 1. Renombrar textos "host" → "coordinador" (vista participante)
 
-### Cambios
+En `src/pages/cowork/CoworkParticipantView.tsx`:
+- Topbar (línea 288): `"Llamada privada con host"` → `"Llamada privada con coordinador"`.
+- `callDisplayName` del `LiveKitCallView` 1:1 (línea 359): `"Llamada privada con host"` → `"Llamada privada con coordinador"`.
+- Toast finalizada (línea 180): `"Llamada privada con host finalizada"` → `"Llamada privada con coordinador finalizada"`.
+- Toast solicitud enviada (línea 248): `"Solicitud de llamada privada enviada al host"` → `"… enviada al coordinador"`.
+- Botones desktop / dropdown mobile:
+  - `"Pedir host"` → `"Pedir coordinador"` (líneas 306 y 335).
+  - `"Llamada privada con host"` (item dropdown línea 339) → `"Llamada privada con coordinador"`.
+  - Botón reconectar (línea 302): `"Reconectar a llamada privada"` se mantiene (ya no menciona host).
+- Estado de espera (línea 224): `"Esperando asignación de sala por el host..."` → `"… por el coordinador..."`.
 
-**1. `supabase/functions/cowork-session/index.ts`**
-- Eliminar bloque `if (action === "assignToRoom") { ... }` (líneas 218-240).
-- Eliminar bloque `if (action === "moveParticipant") { ... }` (líneas 315-337).
-- Conservar todo lo demás (incluida la auto-asignación dentro de `joinSession` cuando llega `?room=X`, que es la única forma de entrar a una sala hoy).
+No se cambian nombres de variables/handlers (`requestHost`, `hostRequests`, etc.) para no tocar el hook ni el edge function — solo strings visibles.
 
-**2. `src/hooks/useCoworkSession.ts`**
-- Eliminar las funciones `assignToRoom` y `moveParticipant` (líneas 181-187).
-- Quitarlas del `return { ... }` (línea 233).
+### 2. Botón "Regresar a la sala" mientras se está en llamada 1:1
 
-**3. `src/pages/cowork/CoworkHostDashboard.tsx`**
-- Eliminar todo el bloque IIFE "Unassigned members" que renderiza la sección "Sin asignar" con el `<Select>` "Asignar..." (líneas 230-265, dentro del `<ScrollArea>`).
-- Esto elimina el único consumidor en la UI de `cowork.assignToRoom`.
+Hoy `CallControls` siempre muestra un botón rojo redondo con `PhoneOff`. Para la llamada privada queremos un botón ancho con icono + texto "Regresar a la sala".
 
-### Resultado
+Cambios en `src/pages/messenger/videocall/CallControls.tsx`:
+- Añadir prop opcional `leaveLabel?: string` y `leaveIcon?: LucideIcon` (default `PhoneOff`) en `CallControlsProps`.
+- En el render del botón leave (líneas 343–354): si `leaveLabel` está definido, renderizar el icono + `<span>{leaveLabel}</span>` y mantener estilos rojos. Si no, comportamiento actual (solo icono).
 
-- El sidebar del coordinador ya no muestra la sección "SIN ASIGNAR".
-- Si un usuario entra al lobby sin `?room=X` (caso raro), simplemente queda como `membership` sin asignación, esperando que use un link directo a sala. Si esto se vuelve un problema visible más adelante, se puede mostrar un mensaje informativo, pero no se incluye ahora para mantener el cambio acotado.
-- El backend rechaza con "Unknown action" cualquier llamada vieja a `assignToRoom`/`moveParticipant` (no hay clientes que las llamen, ya verificado con `rg`).
+Cambios en `src/pages/messenger/videocall/LiveKitCallView.tsx`:
+- Añadir props `leaveLabel?: string` y `leaveIcon?` y pasarlas a `CallControls`.
 
-### Archivos a modificar
+Cambios en `src/pages/cowork/CoworkParticipantView.tsx`:
+- En el `LiveKitCallView` del bloque `isInOneOnOne` (línea ~352), pasar `leaveLabel="Regresar a la sala"` y `leaveIcon={ArrowLeft}` (importar de `lucide-react`). El `onLeave` existente ya devuelve al participante a la sala principal, así que no se requiere lógica adicional.
+- En el `LiveKitCallView` de la sala normal NO se pasa `leaveLabel` → mantiene el icono rojo de colgar actual.
 
-- `supabase/functions/cowork-session/index.ts` (eliminar ~46 líneas)
-- `src/hooks/useCoworkSession.ts` (eliminar ~8 líneas)
-- `src/pages/cowork/CoworkHostDashboard.tsx` (eliminar ~36 líneas)
+### Archivos modificados
+- `src/pages/cowork/CoworkParticipantView.tsx`
+- `src/pages/messenger/videocall/CallControls.tsx`
+- `src/pages/messenger/videocall/LiveKitCallView.tsx`

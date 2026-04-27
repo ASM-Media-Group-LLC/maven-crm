@@ -3,6 +3,7 @@ import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
   PhoneOff, Hand, MessageSquare, Smile, Users,
   ChevronUp, Info, Volume2, ChevronDown, Check, Cloud, Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
