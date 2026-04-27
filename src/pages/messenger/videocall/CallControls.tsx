@@ -176,7 +176,7 @@ export default function CallControls({
   onToggleChat, onToggleParticipants,
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
-  onOpenVideoSettings, onOpenMetrics, hideScreenShare, hideLeaveButton, compact,
+  onOpenVideoSettings, onOpenMetrics, hideScreenShare, hideLeaveButton, leaveLabel, leaveIcon, compact,
   backgroundEffect, onToggleBlurBackground,
 }: CallControlsProps) {
   const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
