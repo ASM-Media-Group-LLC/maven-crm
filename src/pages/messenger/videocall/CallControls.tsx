@@ -40,6 +40,8 @@ interface CallControlsProps {
   onOpenMetrics: () => void;
   hideScreenShare?: boolean;
   hideLeaveButton?: boolean;
+  leaveLabel?: string;
+  leaveIcon?: LucideIcon;
   compact?: boolean;
   isNoiseCancellationOn?: boolean;
   onToggleNoiseCancellation?: () => void;
