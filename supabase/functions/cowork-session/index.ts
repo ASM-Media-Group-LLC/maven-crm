@@ -215,28 +215,7 @@ serve(async (req) => {
       return json({ membership, alreadyJoined: false });
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // ASSIGN PARTICIPANT TO ROOM
-    // ═══════════════════════════════════════════════════════════════
-    if (action === "assignToRoom") {
-      const { sessionId, targetUserId, roomId } = body;
-      if (!sessionId || !targetUserId || !roomId) return err("sessionId, targetUserId, roomId required");
-
-      // Verify caller is host
-      const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err("Only hosts can assign rooms", 403);
-
-      // Deactivate current assignment
-      await admin.from("cowork_room_assignments").update({ is_active: false }).eq("session_id", sessionId).eq("user_id", targetUserId).eq("is_active", true);
-
-      // Create new assignment
-      const { data: assignment, error: assErr } = await admin.from("cowork_room_assignments").insert({
-        session_id: sessionId, user_id: targetUserId, room_id: roomId, assigned_by: userId,
-      }).select().single();
-      if (assErr) return err(assErr.message, 500);
-
-      return json({ assignment });
-    }
+    // (assignToRoom removed — participants self-join via URL ?room=X)
 
     // ═══════════════════════════════════════════════════════════════
     // LEAVE ROOM (deactivate caller's active assignment)
@@ -312,28 +291,7 @@ serve(async (req) => {
       return err("Invalid purpose");
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // MOVE PARTICIPANT
-    // ═══════════════════════════════════════════════════════════════
-    if (action === "moveParticipant") {
-      const { sessionId, targetUserId, targetRoomId } = body;
-      if (!sessionId || !targetUserId || !targetRoomId) return err("sessionId, targetUserId, targetRoomId required");
-
-      // Verify host
-      const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
-      if (hostCheck?.role !== "host") return err("Only hosts can move participants", 403);
-
-      // Deactivate old
-      await admin.from("cowork_room_assignments").update({ is_active: false }).eq("session_id", sessionId).eq("user_id", targetUserId).eq("is_active", true);
-
-      // Create new
-      const { data: assignment, error: assErr } = await admin.from("cowork_room_assignments").insert({
-        session_id: sessionId, user_id: targetUserId, room_id: targetRoomId, assigned_by: userId,
-      }).select().single();
-      if (assErr) return err(assErr.message, 500);
-
-      return json({ assignment, moved: true });
-    }
+    // (moveParticipant removed — participants self-join via URL ?room=X)
 
     // ═══════════════════════════════════════════════════════════════
     // REQUEST HOST
