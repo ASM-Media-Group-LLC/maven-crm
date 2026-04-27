@@ -128,7 +128,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const getRoomParticipants = (roomId: string) =>
     cowork.assignments.filter(a => a.room_id === roomId && a.is_active);
 
-  const openHostRequests = cowork.hostRequests.filter(r => r.status !== "resolved");
+  const openHostRequests = cowork.hostRequests.filter(
+    r => r.status !== "resolved" && r.id !== oneOnOneRequestId
+  );
   const pendingSSRequests = cowork.screenShareRequests.filter(r => r.status === "pending");
 
   return (
