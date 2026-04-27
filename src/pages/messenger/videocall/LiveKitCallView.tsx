@@ -257,6 +257,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         hideScreenShare={hideScreenShare}
         hideLeaveButton={hideLeaveButton}
         compact={compact}
+        backgroundEffect={bgEffect}
+        onToggleBlurBackground={() => handleBgChange(bgEffect === "blur" ? "none" : "blur")}
       />
 
       <AdjustViewDialog open={adjustViewOpen} onClose={() => setAdjustViewOpen(false)} settings={viewSettings} onSettingsChange={handleViewSettingsChange} />
