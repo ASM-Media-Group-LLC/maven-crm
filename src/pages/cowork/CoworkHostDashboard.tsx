@@ -227,7 +227,42 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             </div>
           </div>
 
-          {/* Unassigned members section removed — participants self-join via URL ?room=X */}
+          {/* Unassigned members */}
+          {(() => {
+            const assignedUserIds = new Set(cowork.assignments.filter(a => a.is_active).map(a => a.user_id));
+            const unassigned = cowork.memberships.filter(m => m.role === "participant" && !assignedUserIds.has(m.user_id));
+            if (!unassigned.length) return null;
+            return (
+              <div className="p-3 border-t border-border/50 space-y-2">
+                <h3 className="text-xs font-medium text-amber-500/80 uppercase tracking-wider">Sin asignar</h3>
+                {unassigned.map((m) => (
+                  <div key={m.user_id} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`h-2 w-2 rounded-full flex-shrink-0 ${isOnline(m.user_id) ? "bg-emerald-500" : "bg-muted-foreground/30"}`} />
+                      <span className="text-muted-foreground">{cowork.profiles[m.user_id] || "User"}</span>
+                    </div>
+                    <Select onValueChange={async (roomId) => {
+                      try {
+                        await cowork.assignToRoom(m.user_id, roomId);
+                        toast.success("Participante asignado");
+                      } catch (e: any) {
+                        toast.error(e.message);
+                      }
+                    }}>
+                      <SelectTrigger className="h-6 w-24 text-[10px] bg-transparent border-border text-muted-foreground">
+                        <SelectValue placeholder="Asignar..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cowork.rooms.map(r => (
+                          <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Host Requests */}
           <div className="p-3 border-t border-border/50 space-y-2">

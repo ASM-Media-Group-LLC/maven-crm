@@ -178,8 +178,13 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("getHostCode", { sessionId });
   }, [sessionId]);
 
-  // assignToRoom and moveParticipant removed — participants self-join via URL ?room=X
+  const assignToRoom = useCallback(async (targetUserId: string, roomId: string) => {
+    return invokeCowork("assignToRoom", { sessionId, targetUserId, roomId });
+  }, [sessionId]);
 
+  const moveParticipant = useCallback(async (targetUserId: string, targetRoomId: string) => {
+    return invokeCowork("moveParticipant", { sessionId, targetUserId, targetRoomId });
+  }, [sessionId]);
 
   const issueLiveKitToken = useCallback(async (purpose: string, roomId?: string) => {
     return invokeCowork("issueLiveKitToken", { sessionId, purpose, roomId });
@@ -225,7 +230,7 @@ export function useCoworkSession(sessionId: string | null) {
   return {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests,
     myMembership, myAssignment, isHost, loading, profiles,
-    createSession, joinSession,
+    createSession, joinSession, assignToRoom, moveParticipant,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
     requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, refetch: fetchData,
   };
