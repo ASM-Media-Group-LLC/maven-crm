@@ -7,9 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
   Check, X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
-  Mic, MicOff, Video, VideoOff,
+  Mic, MicOff, Video, VideoOff, UserX,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { supabase } from "@/integrations/supabase/client";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
@@ -39,6 +43,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [oneOnOneRequestId, setOneOnOneRequestId] = useState<string | null>(null);
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
   const oneOnOneSeenInListRef = useRef(false);
+  const [removingParticipant, setRemovingParticipant] = useState<{ userId: string; name: string; roomId: string; roomName: string } | null>(null);
+  const [removingBusy, setRemovingBusy] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -403,7 +409,18 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             const initials = fullName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
                             const online = isOnline(a.user_id);
                             return (
-                              <div key={a.user_id} className="flex flex-col items-center gap-1 rounded-xl border border-border bg-primary/5 p-2 text-center">
+                              <div key={a.user_id} className="relative group flex flex-col items-center gap-1 rounded-xl border border-border bg-primary/5 p-2 text-center">
+                                <button
+                                  type="button"
+                                  className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive/10 text-destructive opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-destructive/20 z-10"
+                                  title="Eliminar de la sala"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRemovingParticipant({ userId: a.user_id, name: fullName, roomId: room.id, roomName: room.name });
+                                  }}
+                                >
+                                  <UserX className="h-3 w-3" />
+                                </button>
                                 <div className="relative">
                                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-[10px] font-medium text-primary-foreground">
                                     {initials}
@@ -536,6 +553,41 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           </div>
         </div>
       )}
+
+      <AlertDialog open={!!removingParticipant} onOpenChange={(open) => { if (!open) setRemovingParticipant(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar participante</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Seguro que quieres eliminar a <strong>{removingParticipant?.name}</strong> de la sala "{removingParticipant?.roomName}"? El participante quedará sin asignación en la sesión.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removingBusy}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={removingBusy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!removingParticipant) return;
+                setRemovingBusy(true);
+                try {
+                  await cowork.removeFromRoom(removingParticipant.userId, removingParticipant.roomId);
+                  toast.success(`${removingParticipant.name} eliminado de la sala`);
+                  setRemovingParticipant(null);
+                } catch (err: any) {
+                  toast.error(err?.message || "No se pudo eliminar al participante");
+                } finally {
+                  setRemovingBusy(false);
+                }
+              }}
+            >
+              {removingBusy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
