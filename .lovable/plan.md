@@ -1,38 +1,52 @@
-## Objetivo
+# Plan: Revocar acceso a compartir pantalla automáticamente
 
-En el Coordinador Dashboard, las solicitudes de "Pedir Host" deben:
-1. **No mostrar el botón "Resolver"** (se elimina de la UI).
-2. **Desaparecer automáticamente** una vez que el coordinador presiona **"Atender"**.
+## Problema
+Cuando el coordinador aprueba una solicitud de "Compartir pantalla", el participante recibe un nuevo token de LiveKit con permisos para publicar pantalla. Actualmente este acceso queda activo de forma indefinida: el flag local `hasScreenShareAccess` solo se resetea al cambiar de sala o salir manualmente, por lo que el participante puede iniciar y detener la pantalla múltiples veces sin volver a pedir permiso.
 
-## Estado actual
+## Solución
+Hacer que el permiso sea de **un solo uso por sesión activa**: cuando el participante deja de compartir pantalla (o se desconecta), el acceso se revoca automáticamente y debe volver a solicitarlo.
 
-Archivo: `src/pages/cowork/CoworkHostDashboard.tsx`
+## Cambios
 
-- Línea 122: `openHostRequests = hostRequests.filter(r => r.status !== "resolved")` — muestra tanto `open` como `acknowledged`.
-- Línea 280-294: botón **Atender** llama `ackHostRequest` (status pasa a `acknowledged`, sigue visible) y luego `enterRoom` (o flujo 1-on-1).
-- Línea 296-307: botón **Unirse a llamada privada** (visible solo para 1-on-1 ya atendidas).
-- Línea 308-316: botón **Resolver** llama `resolveHostRequest` (status pasa a `resolved`, desaparece).
+### 1. `CoworkParticipantView.tsx` — revocar al detener el share
+Detectar la transición `screenShareOn: true → false` dentro de `handleMediaStateChange`. Cuando ocurra y el participante tenga `hasScreenShareAccess = true`:
+- Limpiar `hasScreenShareAccess` y `screenShareTokenRef.current`.
+- Forzar reconexión a la sala usando el token estándar (sin permiso de pantalla) — mismo patrón ya usado al aprobar: `setConnectedLkRoom(null)` y luego restaurar la sala con un pequeño timeout.
+- Mostrar toast informativo: "Permiso de pantalla finalizado. Solicítalo de nuevo si lo necesitas."
 
-## Cambios propuestos
+También revocar el flag cuando el participante presiona "Salir" (ya se hace) y cuando es removido de la sala.
 
-En `CoworkHostDashboard.tsx`, dentro del bloque de Host Requests (líneas 278-317):
+### 2. `useCoworkMediaPresence` — sin cambios
+El hook ya emite el estado `screenShareOn` en cada cambio. Solo lo consumiremos para detectar la transición.
 
-1. **Eliminar el botón "Resolver"** (líneas 308-316) por completo.
+### 3. (Opcional, defensa en backend) `cowork-session/index.ts`
+El token emitido en `claimScreenShareToken` ya tiene TTL de 10 min, lo cual limita el abuso. No se requieren cambios adicionales en el edge function ya que la revocación es client-side mediante reconexión con un token sin permisos elevados (el backend solo otorga `canPublish` con permiso de screen share cuando se reclama una solicitud aprobada; el token base de `join_room` no incluye eso).
 
-2. **Reemplazar `ackHostRequest` por `resolveHostRequest`** en el handler de "Atender":
-   - Para solicitudes normales: tras entrar a la sala con `enterRoom(req.room_id)`, llamar `resolveHostRequest(req.id)` para que la tarjeta desaparezca de inmediato.
-   - Para solicitudes 1-on-1: mantener `ackHostRequest` (no resolver todavía), porque la sala privada se cierra con `leaveOneOnOne` que ya invoca `resolveHostRequest` (línea 92). Eso conserva la tarjeta como "Unirse a llamada privada" durante la llamada activa.
+## Detalles técnicos
 
-3. **Eliminar la condición `req.status === "open"`** del botón Atender para solicitudes normales — al ya no haber estado intermedio para no-1on1, el render queda más limpio. (Para 1-on-1 la condición se mantiene para ocultar Atender una vez que pasa a `acknowledged` y mostrar "Unirse a llamada privada".)
+```ts
+// CoworkParticipantView.tsx
+const prevScreenShareRef = useRef(false);
 
-### Comportamiento resultante
+const handleMediaStateChange = useCallback((state) => {
+  trackMediaState(state);
+  // Detectar fin del screen share
+  if (prevScreenShareRef.current && !state.screenShareOn && hasScreenShareAccess) {
+    setHasScreenShareAccess(false);
+    screenShareTokenRef.current = null;
+    toast.info("Permiso de pantalla finalizado");
+    // Reconectar con token estándar
+    if (myRoom?.livekit_room_name) {
+      setConnectedLkRoom(null);
+      setTimeout(() => setConnectedLkRoom(myRoom.livekit_room_name), 300);
+    }
+  }
+  prevScreenShareRef.current = state.screenShareOn;
+}, [trackMediaState, hasScreenShareAccess, myRoom?.livekit_room_name]);
+```
 
-- **Solicitud normal**: Coordinador ve "Atender" → click → entra a la sala + tarjeta desaparece. ✅
-- **Solicitud 1-on-1**: Coordinador ve "Atender" → click → entra a sala privada + tarjeta cambia a "Unirse a llamada privada" (por si se sale y quiere reincorporarse) → al colgar/salir se resuelve y desaparece. ✅
-- **Botón Resolver**: ya no existe en la UI. ✅
+## Archivos a modificar
+- `src/pages/cowork/CoworkParticipantView.tsx`
 
-## Archivos modificados
-
-- `src/pages/cowork/CoworkHostDashboard.tsx` (~10 líneas dentro del bloque de Host Requests).
-
-No hay cambios en hooks, edge functions ni base de datos.
+## Resultado esperado
+El botón "Compartir pantalla" volverá a aparecer en la barra superior del participante apenas detenga el share, obligándolo a solicitar nuevamente la aprobación del coordinador para futuras transmisiones.
