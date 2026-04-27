@@ -245,7 +245,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     pendingOneOnOneRef.current = true;
     try {
       const result = await cowork.requestHost(myAssignment.room_id, "Llamada privada", true);
-      toast.success("Solicitud de llamada privada enviada al host");
+      toast.success("Solicitud de llamada privada enviada al coordinador");
       const roomName = result?.oneone_livekit_room || result?.request?.oneone_livekit_room;
       const reqId = result?.request?.id;
       if (roomName && reqId) {
