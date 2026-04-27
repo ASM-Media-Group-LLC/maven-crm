@@ -9,6 +9,7 @@ import AdjustViewDialog, { type ViewSettings } from "./AdjustViewDialog";
 import VideoSettingsDialog from "./VideoSettingsDialog";
 import MetricsDialog from "./MetricsDialog";
 import ParticipantTile from "./ParticipantTile";
+import RoomAudioSink from "./RoomAudioSink";
 
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
