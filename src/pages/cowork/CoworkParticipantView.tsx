@@ -235,7 +235,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     dismissedRequestRef.current = null;
     try {
       await cowork.requestHost(myAssignment.room_id, "Necesito ayuda");
-      toast.success("Solicitud enviada al host");
+      toast.success("Solicitud enviada al coordinador");
     } catch (e: any) {
       toast.error(e.message);
     }
