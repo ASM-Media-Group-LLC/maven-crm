@@ -344,17 +344,21 @@ export default function CallControls({
         <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label="Levantar mano" badge={isHandRaised} compact={compact} />
 
         {/* Leave */}
-        {!hideLeaveButton && (
-          <button
-            onClick={onLeave}
-            className={cn(
-              "rounded-full bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)] transition-colors flex items-center gap-2 font-medium",
-              compact ? "h-8 px-3 text-xs" : "h-11 px-5 text-sm"
-            )}
-          >
-            <PhoneOff className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
-          </button>
-        )}
+        {!hideLeaveButton && (() => {
+          const LeaveIcon = leaveIcon ?? PhoneOff;
+          return (
+            <button
+              onClick={onLeave}
+              className={cn(
+                "rounded-full bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)] transition-colors flex items-center gap-2 font-medium",
+                compact ? "h-8 px-3 text-xs" : "h-11 px-5 text-sm"
+              )}
+            >
+              <LeaveIcon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+              {leaveLabel && <span>{leaveLabel}</span>}
+            </button>
+          );
+        })()}
 
         {/* Panel toggles — inline in compact, right-aligned otherwise */}
         {compact && (
