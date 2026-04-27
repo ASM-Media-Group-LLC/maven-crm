@@ -227,6 +227,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         {participantsOpen && <CallParticipantsSidebar participants={lk.participants} isAdmin={isAdmin} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onClose={() => setParticipantsOpen(false)} />}
       </div>
 
+      {/* Safety-net: ensures every remote mic is audible even if its tile isn't mounted */}
+      <RoomAudioSink room={room} preferredAudioOutputDeviceId={audioOutputId} />
+
       <CallControls
         isMicOn={lk.isMicOn}
         isCamOn={lk.isCamOn}
