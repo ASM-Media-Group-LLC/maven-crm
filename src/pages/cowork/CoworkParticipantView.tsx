@@ -381,6 +381,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               setManuallyLeft(true);
               setHasScreenShareAccess(false);
               screenShareTokenRef.current = null;
+              // Release the assignment server-side so the host dashboard updates.
+              cowork.leaveRoom?.().catch(() => {});
             }}
             hideShareLink
             suppressLeaveToast
