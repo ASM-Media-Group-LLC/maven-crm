@@ -336,7 +336,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleRequestOneOnOne} disabled={!!myOpenRequest || isInOneOnOne}>
                 <Phone className="h-4 w-4 mr-2" />
-                {isInOneOnOne ? "En llamada privada..." : "Llamada privada con host"}
+                {isInOneOnOne ? "En llamada privada..." : "Llamada privada con coordinador"}
               </DropdownMenuItem>
               {!hasScreenShareAccess && (
                 <DropdownMenuItem onClick={handleRequestScreenShare} disabled={!!mySSReq}>
