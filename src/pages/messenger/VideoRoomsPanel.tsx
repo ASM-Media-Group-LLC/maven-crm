@@ -21,6 +21,7 @@ interface VideoRoomsPanelProps {
 
 export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClose }: VideoRoomsPanelProps) {
   const [joinLink, setJoinLink] = useState("");
+  const navigate = useNavigate();
 
   const handleCreate = () => {
     const autoName = `Sala ${new Date().toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`;
