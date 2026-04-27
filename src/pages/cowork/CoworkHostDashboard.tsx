@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Users2, Headphones, Hand, Monitor, DoorOpen,
+  Users2, Headphones, Hand, Monitor, DoorOpen, Share2,
   Check, X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff,
 } from "lucide-react";
@@ -157,7 +157,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-amber-500 hover:text-amber-400"
+                className="h-7 w-7 text-blue-500 hover:text-blue-400"
                 title="Copiar enlace de host"
                 onClick={() => {
                   const code = hostInviteCode || "";
@@ -166,7 +166,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   toast.success("Enlace de host copiado");
                 }}
               >
-                <Headphones className="h-3.5 w-3.5" />
+                <Share2 className="h-3.5 w-3.5" />
               </Button>
               <Button
                 variant="ghost"
