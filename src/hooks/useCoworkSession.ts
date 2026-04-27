@@ -222,11 +222,16 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("endSession", { sessionId });
   }, [sessionId]);
 
+  const leaveRoom = useCallback(async () => {
+    if (!sessionId) return;
+    return invokeCowork("leaveRoom", { sessionId });
+  }, [sessionId]);
+
   return {
     session, rooms, memberships, assignments, hostRequests, screenShareRequests,
     myMembership, myAssignment, isHost, loading, profiles,
     createSession, joinSession, assignToRoom, moveParticipant,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
-    requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, refetch: fetchData,
+    requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, leaveRoom, refetch: fetchData,
   };
 }

@@ -239,6 +239,24 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // LEAVE ROOM (deactivate caller's active assignment)
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "leaveRoom") {
+      const { sessionId } = body;
+      if (!sessionId) return err("sessionId required");
+
+      // Idempotent: just deactivate any active assignment for this user in this session.
+      // No-op if there isn't one.
+      await admin.from("cowork_room_assignments")
+        .update({ is_active: false })
+        .eq("session_id", sessionId)
+        .eq("user_id", userId)
+        .eq("is_active", true);
+
+      return json({ ok: true });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // ISSUE LIVEKIT TOKEN
     // ═══════════════════════════════════════════════════════════════
     if (action === "issueLiveKitToken") {
