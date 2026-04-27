@@ -1,29 +1,38 @@
-# Atender solicitudes con ingreso directo a la sala
+## Objetivo
 
-## Problema
-En el Coordinador Dashboard, las solicitudes de ayuda (botón "Pedir Host" desde el participante) tienen dos variantes:
+En el Coordinador Dashboard, las solicitudes de "Pedir Host" deben:
+1. **No mostrar el botón "Resolver"** (se elimina de la UI).
+2. **Desaparecer automáticamente** una vez que el coordinador presiona **"Atender"**.
 
-- **Llamada privada (1-on-1)**: al presionar "Atender" el coordinador ya entra automáticamente a una sala privada con el participante. ✅
-- **Solicitud normal**: al presionar "Atender" solo se marca como "acknowledged", pero el coordinador no entra a ninguna sala. El coordinador tiene que ubicar manualmente la sala del participante y entrar. ❌
+## Estado actual
 
-El usuario quiere que al presionar "Atender" en cualquier solicitud, el coordinador **entre directamente** a la sala del participante.
+Archivo: `src/pages/cowork/CoworkHostDashboard.tsx`
 
-## Cambio propuesto
+- Línea 122: `openHostRequests = hostRequests.filter(r => r.status !== "resolved")` — muestra tanto `open` como `acknowledged`.
+- Línea 280-294: botón **Atender** llama `ackHostRequest` (status pasa a `acknowledged`, sigue visible) y luego `enterRoom` (o flujo 1-on-1).
+- Línea 296-307: botón **Unirse a llamada privada** (visible solo para 1-on-1 ya atendidas).
+- Línea 308-316: botón **Resolver** llama `resolveHostRequest` (status pasa a `resolved`, desaparece).
 
-En `src/pages/cowork/CoworkHostDashboard.tsx`, en el handler del botón **"Atender"** (línea ~280), extender el comportamiento:
+## Cambios propuestos
 
-- Si `is1on1` (llamada privada) → mantener el comportamiento actual (entra a la sala privada).
-- Si **NO** es 1-on-1 → tras llamar `ackHostRequest`, ejecutar `enterRoom(req.room_id)` para que el coordinador ingrese de forma inmediata a la sala donde está el participante que pidió ayuda.
+En `CoworkHostDashboard.tsx`, dentro del bloque de Host Requests (líneas 278-317):
 
-`enterRoom` ya existe en el archivo (línea 65) y resuelve la sala de LiveKit a partir del `room_id`, fija el nombre y minimiza el Hub — exactamente la misma experiencia que cuando el coordinador hace clic manualmente en una tarjeta de sala.
+1. **Eliminar el botón "Resolver"** (líneas 308-316) por completo.
 
-## Resultado esperado
+2. **Reemplazar `ackHostRequest` por `resolveHostRequest`** en el handler de "Atender":
+   - Para solicitudes normales: tras entrar a la sala con `enterRoom(req.room_id)`, llamar `resolveHostRequest(req.id)` para que la tarjeta desaparezca de inmediato.
+   - Para solicitudes 1-on-1: mantener `ackHostRequest` (no resolver todavía), porque la sala privada se cierra con `leaveOneOnOne` que ya invoca `resolveHostRequest` (línea 92). Eso conserva la tarjeta como "Unirse a llamada privada" durante la llamada activa.
 
-1. Participante en "Sala 1" presiona "Pedir Host" → aparece tarjeta "Solicitudes (1)" en el dashboard.
-2. Coordinador presiona **Atender** → la solicitud queda marcada como atendida **y** el coordinador entra directamente a Sala 1 (vista LiveKit, Hub minimizado).
-3. El botón **Resolver** sigue funcionando igual para cerrar la solicitud sin entrar.
+3. **Eliminar la condición `req.status === "open"`** del botón Atender para solicitudes normales — al ya no haber estado intermedio para no-1on1, el render queda más limpio. (Para 1-on-1 la condición se mantiene para ocultar Atender una vez que pasa a `acknowledged` y mostrar "Unirse a llamada privada".)
 
-## Archivos afectados
-- `src/pages/cowork/CoworkHostDashboard.tsx` (un solo handler, ~5 líneas modificadas)
+### Comportamiento resultante
 
-No se requieren cambios en hooks, edge functions ni base de datos.
+- **Solicitud normal**: Coordinador ve "Atender" → click → entra a la sala + tarjeta desaparece. ✅
+- **Solicitud 1-on-1**: Coordinador ve "Atender" → click → entra a sala privada + tarjeta cambia a "Unirse a llamada privada" (por si se sale y quiere reincorporarse) → al colgar/salir se resuelve y desaparece. ✅
+- **Botón Resolver**: ya no existe en la UI. ✅
+
+## Archivos modificados
+
+- `src/pages/cowork/CoworkHostDashboard.tsx` (~10 líneas dentro del bloque de Host Requests).
+
+No hay cambios en hooks, edge functions ni base de datos.
