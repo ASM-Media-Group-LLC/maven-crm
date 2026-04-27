@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Video, Plus, Copy, Link2, Users, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Video, Plus, Copy, Link2, Users, X, Users2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";

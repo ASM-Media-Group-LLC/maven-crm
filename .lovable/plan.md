@@ -1,52 +1,23 @@
+# Plan: Agregar acceso al módulo Cowork desde Video Rooms (Messenger)
 
+## Objetivo
+Añadir un nuevo botón en el panel **Video Rooms** del Messenger que abra el módulo **Cowork** (`/cowork`), manteniendo coherencia visual con los botones existentes ("Nueva sala" y "Unirse").
 
-# Plan: Fix Timezone Shift in Event Dates Display
+## Cambios
 
-## Problem
-The database correctly stores `date: 2026-04-24`, but all display code uses `new Date(e.date)` which parses `"2026-04-24"` as **UTC midnight**. In Miami timezone (UTC-4), this becomes **April 23 at 8:00 PM**, causing dates to appear one day earlier.
+### `src/pages/messenger/VideoRoomsPanel.tsx`
+1. Importar `useNavigate` de `react-router-dom` y el icono `Users2` (o `Briefcase`/`MonitorPlay`) de `lucide-react`.
+2. Cambiar la grilla de acciones rápidas de `grid-cols-2` a `grid-cols-3` para acomodar el tercer botón.
+3. Insertar nuevo botón "Cowork" con el mismo estilo (`h-auto py-3 flex-col gap-1 rounded-2xl`, variante `outline` o `secondary` para diferenciarlo) que ejecuta `navigate("/cowork")`.
 
-This is the exact pattern documented in our project memory: **append `T12:00:00` to DB ISO date strings before parsing**.
+### Resultado visual
+```text
+[ + Nueva sala ]  [ 🔗 Unirse ]  [ 👥 Cowork ]
+```
 
-Only `EventoSharePage.tsx` already does this correctly. All other files are affected.
+## Archivos modificados
+| Archivo | Cambio |
+|---|---|
+| `src/pages/messenger/VideoRoomsPanel.tsx` | Añadir botón Cowork + navegación a `/cowork` |
 
-## Changes
-
-Apply `new Date(e.date + "T12:00:00")` everywhere `new Date(e.date)` is used:
-
-### 1. `src/pages/eventos/EventosTable.tsx`
-- Line 139: `new Date(e.date)` → `new Date(e.date + "T12:00:00")`
-- Line 140: `new Date(e.date)` → `new Date(e.date + "T12:00:00")`
-- Line 48: clipboard format date
-
-### 2. `src/pages/eventos/EventosGrid.tsx`
-- Line 40: clipboard format
-- Line 124: display date
-
-### 3. `src/pages/eventos/EventosCalendar.tsx`
-- Lines 41, 42, 44, 47, 47, 133: all `new Date(e.date)` calls
-
-### 4. `src/pages/eventos/ViewEventoModal.tsx`
-- Lines 61, 147, 160: all `new Date(event.date)` calls
-
-### 5. `src/pages/eventos/EventoDetailPage.tsx`
-- Line 79: `new Date(event.date)` call
-
-### 6. `src/pages/eventos/SharedAgendaPage.tsx`
-- Line 125: `new Date(e.date)` in filter
-
-### 7. `src/pages/eventos/NuevoEventoForm.tsx` (edit mode load)
-- Line 69: `parse(event.date, "yyyy-MM-dd", new Date())` — this uses `date-fns` parse which is local-timezone safe, so no change needed here.
-
-## Summary
-
-| File | Lines affected |
-|------|---------------|
-| `EventosTable.tsx` | 3 occurrences |
-| `EventosGrid.tsx` | 2 occurrences |
-| `EventosCalendar.tsx` | ~6 occurrences |
-| `ViewEventoModal.tsx` | 3 occurrences |
-| `EventoDetailPage.tsx` | 1 occurrence |
-| `SharedAgendaPage.tsx` | 1 occurrence |
-
-No database changes. Pure string concatenation fix: `e.date` → `e.date + "T12:00:00"`.
-
+Sin cambios en BD ni en otros módulos.
