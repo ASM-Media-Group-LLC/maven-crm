@@ -177,7 +177,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     if (req?.status === "resolved" || !req) {
       dismissedRequestRef.current = null;
       reconnectToMainRoom();
-      toast.info("Llamada privada con host finalizada");
+      toast.info("Llamada privada con coordinador finalizada");
     }
   }, [cowork.hostRequests, oneOnOneRequestId, reconnectToMainRoom]);
 
