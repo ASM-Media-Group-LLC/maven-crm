@@ -41,11 +41,25 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const myRoom = cowork.rooms.find(r => r.id === myAssignment?.room_id);
 
   const { trackMediaState } = useCoworkMediaPresence(cowork.session?.id, userId);
+  const prevScreenShareRef = useRef(false);
   const handleMediaStateChange = useCallback(
     (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => {
       trackMediaState(state);
+      // Auto-revoke screen share permission when participant stops sharing.
+      // Forces them to request approval again from the host for next share.
+      if (prevScreenShareRef.current && !state.screenShareOn && hasScreenShareAccess) {
+        setHasScreenShareAccess(false);
+        screenShareTokenRef.current = null;
+        toast.info("Permiso de pantalla finalizado. Solicítalo nuevamente si lo necesitas.");
+        if (myRoom?.livekit_room_name) {
+          const roomName = myRoom.livekit_room_name;
+          setConnectedLkRoom(null);
+          setTimeout(() => setConnectedLkRoom(roomName), 300);
+        }
+      }
+      prevScreenShareRef.current = state.screenShareOn;
     },
-    [trackMediaState]
+    [trackMediaState, hasScreenShareAccess, myRoom?.livekit_room_name]
   );
 
   const reconnectToMainRoom = useCallback(() => {
