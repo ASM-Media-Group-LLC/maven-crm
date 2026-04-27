@@ -186,6 +186,10 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("moveParticipant", { sessionId, targetUserId, targetRoomId });
   }, [sessionId]);
 
+  const removeFromRoom = useCallback(async (targetUserId: string, roomId: string) => {
+    return invokeCowork("removeFromRoom", { sessionId, targetUserId, roomId });
+  }, [sessionId]);
+
   const issueLiveKitToken = useCallback(async (purpose: string, roomId?: string) => {
     return invokeCowork("issueLiveKitToken", { sessionId, purpose, roomId });
   }, [sessionId]);
