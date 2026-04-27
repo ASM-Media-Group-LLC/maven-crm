@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Users2, Crown, Hand, Monitor, LogIn,
+  Users2, Crown, Hand, Monitor, DoorOpen,
   Check, X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone,
   Mic, MicOff, Video, VideoOff,
 } from "lucide-react";
@@ -443,7 +443,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           className="flex-1 h-8 text-xs gap-1 rounded-xl"
                           onClick={() => enterRoom(room.id)}
                         >
-                          <LogIn className="h-3 w-3" /> Entrar
+                          <DoorOpen className="h-3 w-3" /> Entrar
                         </Button>
                         <Button
                           variant="ghost"
