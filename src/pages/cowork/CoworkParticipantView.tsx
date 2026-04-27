@@ -368,6 +368,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             initialMicOn={false}
             initialCamOn={false}
             getToken={getOneOnOneToken}
+            leaveLabel="Regresar a la sala"
+            leaveIcon={ArrowLeft}
           />
         ) : connectedLkRoom ? (
           <LiveKitCallView
