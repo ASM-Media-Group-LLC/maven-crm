@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Users2, Crown, Hand, Monitor, DoorOpen,
+  Users2, Headphones, Hand, Monitor, DoorOpen,
   Check, X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
   Mic, MicOff, Video, VideoOff,
 } from "lucide-react";
@@ -166,7 +166,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   toast.success("Enlace de host copiado");
                 }}
               >
-                <Crown className="h-3.5 w-3.5" />
+                <Headphones className="h-3.5 w-3.5" />
               </Button>
               <Button
                 variant="ghost"
@@ -478,7 +478,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               className="gap-1.5 shadow-lg border border-border bg-card hover:bg-muted text-amber-500 rounded-full"
               onClick={() => setHubMinimized(false)}
             >
-              <Crown className="h-3.5 w-3.5" />
+              <Headphones className="h-3.5 w-3.5" />
               Hub
             </Button>
           )}
@@ -492,7 +492,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           >
             <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
               <div className="flex items-center gap-1.5 text-xs text-amber-500 font-medium">
-                <Crown className="h-3 w-3" />
+                <Headphones className="h-3 w-3" />
                 Coordinador Hub
               </div>
               <div className="flex gap-0.5">
