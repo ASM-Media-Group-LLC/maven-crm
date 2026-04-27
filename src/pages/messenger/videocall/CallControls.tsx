@@ -37,6 +37,7 @@ interface CallControlsProps {
   onOpenVideoSettings: () => void;
   onOpenMetrics: () => void;
   hideScreenShare?: boolean;
+  hideLeaveButton?: boolean;
   compact?: boolean;
   isNoiseCancellationOn?: boolean;
   onToggleNoiseCancellation?: () => void;
@@ -169,7 +170,7 @@ export default function CallControls({
   onToggleChat, onToggleParticipants,
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
-  onOpenVideoSettings, onOpenMetrics, hideScreenShare, compact,
+  onOpenVideoSettings, onOpenMetrics, hideScreenShare, hideLeaveButton, compact,
 }: CallControlsProps) {
   const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
   const [videoPopoverOpen, setVideoPopoverOpen] = useState(false);
@@ -322,15 +323,17 @@ export default function CallControls({
         <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label="Levantar mano" badge={isHandRaised} compact={compact} />
 
         {/* Leave */}
-        <button
-          onClick={onLeave}
-          className={cn(
-            "rounded-full bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)] transition-colors flex items-center gap-2 font-medium",
-            compact ? "h-8 px-3 text-xs" : "h-11 px-5 text-sm"
-          )}
-        >
-          <PhoneOff className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
-        </button>
+        {!hideLeaveButton && (
+          <button
+            onClick={onLeave}
+            className={cn(
+              "rounded-full bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)] transition-colors flex items-center gap-2 font-medium",
+              compact ? "h-8 px-3 text-xs" : "h-11 px-5 text-sm"
+            )}
+          >
+            <PhoneOff className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+          </button>
+        )}
 
         {/* Panel toggles — inline in compact, right-aligned otherwise */}
         {compact && (

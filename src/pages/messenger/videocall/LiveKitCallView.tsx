@@ -31,6 +31,7 @@ interface LiveKitCallViewProps {
   initialBackgroundEffect?: BackgroundEffect;
   hideShareLink?: boolean;
   hideScreenShare?: boolean;
+  hideLeaveButton?: boolean;
   /** When true, skip the generic "Llamada finalizada" toast on leave */
   suppressLeaveToast?: boolean;
   compact?: boolean;
@@ -42,7 +43,7 @@ interface LiveKitCallViewProps {
   onMediaStateChange?: (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => void;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, hideLeaveButton, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
@@ -250,6 +251,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onOpenVideoSettings={() => setVideoSettingsOpen(true)}
         onOpenMetrics={() => setMetricsOpen(true)}
         hideScreenShare={hideScreenShare}
+        hideLeaveButton={hideLeaveButton}
         compact={compact}
       />
 

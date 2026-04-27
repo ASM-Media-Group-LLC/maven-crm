@@ -531,6 +531,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 isAdmin={true}
                 onLeave={() => { setHubConnected(false); setHubMaximized(false); }}
                 hideShareLink
+                hideLeaveButton
                 suppressLeaveToast
                 initialMicOn={false}
                 initialCamOn={false}
