@@ -278,16 +278,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     <div className="flex gap-1">
                       {req.status === "open" && (
                         <Button size="sm" variant="ghost" className={`h-5 text-[10px] rounded-full ${is1on1 ? "text-primary" : "text-amber-500"}`} onClick={async () => {
-                          await cowork.ackHostRequest(req.id);
                           if (is1on1) {
+                            await cowork.ackHostRequest(req.id);
                             setOneOnOneRequestId(req.id);
                             setOneOnOneRoom(req.oneone_livekit_room!);
                             setActiveRoomLk(req.oneone_livekit_room!);
                             setActiveRoomId(null);
                             setActiveRoomName(`Llamada privada con ${cowork.profiles[req.user_id] || "User"}`);
                             setHubMinimized(true);
-                          } else if (req.room_id) {
-                            enterRoom(req.room_id);
+                          } else {
+                            if (req.room_id) enterRoom(req.room_id);
+                            await cowork.resolveHostRequest(req.id);
                           }
                         }}>
                           Atender
@@ -305,15 +306,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           Unirse a llamada privada
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" className="h-5 text-[10px] text-emerald-500 rounded-full" onClick={async () => {
-                        await cowork.resolveHostRequest(req.id);
-                        if (oneOnOneRequestId === req.id) {
-                          leaveOneOnOne();
-                          leaveActiveRoom();
-                        }
-                      }}>
-                        Resolver
-                      </Button>
                     </div>
                   </div>
                 );
