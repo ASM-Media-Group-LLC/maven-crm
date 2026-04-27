@@ -1217,6 +1217,11 @@ export function useLiveKit() {
         shouldEnable,
         shouldEnable ? getDeviceConstraint(preferredDevicesRef.current.audioDeviceId) : undefined,
       );
+      // Ensure remote audio playback is unblocked (browsers require a user gesture).
+      // toggleMic is always invoked by a user gesture, so this is the right moment.
+      if (!room.canPlaybackAudio) {
+        room.startAudio().catch(() => {});
+      }
       setIsMicOn(room.localParticipant.isMicrophoneEnabled);
       refreshParticipants();
       setTimeout(() => refreshParticipants(), 180);
