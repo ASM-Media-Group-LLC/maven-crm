@@ -260,6 +260,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onOpenMetrics={() => setMetricsOpen(true)}
         hideScreenShare={hideScreenShare}
         hideLeaveButton={hideLeaveButton}
+        leaveLabel={leaveLabel}
+        leaveIcon={leaveIcon}
         compact={compact}
         backgroundEffect={bgEffect}
         onToggleBlurBackground={() => handleBgChange(bgEffect === "blur" ? "none" : "blur")}
