@@ -356,7 +356,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             key={`oneOnOne-${oneOnOneRoom}`}
             roomName={oneOnOneRoom}
             displayName={displayName}
-            callDisplayName="Llamada privada con host"
+            callDisplayName="Llamada privada con coordinador"
             isAdmin={false}
             onLeave={() => {
               dismissedRequestRef.current = oneOnOneRequestId;
