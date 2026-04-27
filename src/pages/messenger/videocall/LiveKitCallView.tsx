@@ -9,6 +9,7 @@ import AdjustViewDialog, { type ViewSettings } from "./AdjustViewDialog";
 import VideoSettingsDialog from "./VideoSettingsDialog";
 import MetricsDialog from "./MetricsDialog";
 import ParticipantTile from "./ParticipantTile";
+import RoomAudioSink from "./RoomAudioSink";
 
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -225,6 +226,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         {chatOpen && <CallChatSidebar messages={lk.chatMessages} onSend={lk.sendChatMessage} onClose={() => setChatOpen(false)} localIdentity={room?.localParticipant.identity || ""} />}
         {participantsOpen && <CallParticipantsSidebar participants={lk.participants} isAdmin={isAdmin} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onClose={() => setParticipantsOpen(false)} />}
       </div>
+
+      {/* Safety-net: ensures every remote mic is audible even if its tile isn't mounted */}
+      <RoomAudioSink room={room} preferredAudioOutputDeviceId={audioOutputId} />
 
       <CallControls
         isMicOn={lk.isMicOn}

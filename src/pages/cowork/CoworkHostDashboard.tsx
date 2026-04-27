@@ -65,10 +65,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const enterRoom = useCallback((roomId: string) => {
     const room = cowork.rooms.find(r => r.id === roomId);
     if (!room) return;
+    // Disconnect Hub to free the microphone — the browser tab can only reliably
+    // publish a single mic track to a single LiveKit room at a time.
+    setHubConnected(false);
+    setHubMaximized(false);
     setActiveRoomLk(room.livekit_room_name);
     setActiveRoomId(roomId);
     setActiveRoomName(room.name);
-    setHubMinimized(true);
   }, [cowork.rooms]);
 
   const getHubToken = useCallback(async () => {
@@ -85,7 +88,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setActiveRoomLk(null);
     setActiveRoomId(null);
     setActiveRoomName(null);
-  }, []);
+    // Reconnect to the Coordinator Hub when leaving a room
+    if (cowork.session?.host_hub_livekit_room) {
+      setHubConnected(true);
+      setHubMinimized(false);
+      toast.info("Volviendo al Coordinador Hub");
+    }
+  }, [cowork.session?.host_hub_livekit_room]);
 
   const leaveOneOnOne = useCallback(async () => {
     if (oneOnOneRequestId) {
@@ -194,7 +203,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Radio className={`h-3 w-3 ${hubConnected ? "text-emerald-500" : "text-muted-foreground/50"}`} />
               <span>Coordinador Hub</span>
-              {hubConnected && (
+              {activeRoomLk ? (
+                <span className="text-[10px] text-amber-500/80 italic">en pausa (en sala)</span>
+              ) : hubConnected ? (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -203,8 +214,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 >
                   {hubMinimized ? "Mostrar" : "Minimizar"}
                 </Button>
-              )}
-              {!hubConnected && cowork.session?.host_hub_livekit_room && (
+              ) : cowork.session?.host_hub_livekit_room ? (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -213,7 +223,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 >
                   Reconectar
                 </Button>
-              )}
+              ) : null}
             </div>
           </div>
 

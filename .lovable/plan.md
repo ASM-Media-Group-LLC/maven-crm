@@ -1,52 +1,56 @@
-# Plan: Revocar acceso a compartir pantalla automáticamente
+## Problema detectado
 
-## Problema
-Cuando el coordinador aprueba una solicitud de "Compartir pantalla", el participante recibe un nuevo token de LiveKit con permisos para publicar pantalla. Actualmente este acceso queda activo de forma indefinida: el flag local `hasScreenShareAccess` solo se resetea al cambiar de sala o salir manualmente, por lo que el participante puede iniciar y detener la pantalla múltiples veces sin volver a pedir permiso.
+En `CoworkHostDashboard.tsx`, cuando el coordinador entra a una sala (`enterRoom`), el componente `<LiveKitCallView>` del **Coordinador Hub** (`cowork_hub_<sessionId>`) **se minimiza pero permanece montado y conectado** a LiveKit. Esto provoca:
 
-## Solución
-Hacer que el permiso sea de **un solo uso por sesión activa**: cuando el participante deja de compartir pantalla (o se desconecta), el acceso se revoca automáticamente y debe volver a solicitarlo.
+1. **Dos conexiones LiveKit simultáneas en una sola pestaña** del coordinador (Hub + sala activa). Ambas instancias llaman a `setMicrophoneEnabled(true)` sobre el mismo dispositivo físico → la segunda toma el control del track y la primera queda en silencio (o viceversa). Resultado: **al activar el mic, no se publica audio en la sala donde están los participantes**.
 
-## Cambios
+2. **Aislamiento por diseño en LiveKit**: el Hub (`cowork_hub_*`) y las salas (`cowork_<id>_<i>`) son rooms LiveKit **distintos**. Aunque el mic publique en el Hub, ningún participante de una sala lo oirá — sólo otros coordinadores en el Hub.
 
-### 1. `CoworkParticipantView.tsx` — revocar al detener el share
-Detectar la transición `screenShareOn: true → false` dentro de `handleMediaStateChange`. Cuando ocurra y el participante tenga `hasScreenShareAccess = true`:
-- Limpiar `hasScreenShareAccess` y `screenShareTokenRef.current`.
-- Forzar reconexión a la sala usando el token estándar (sin permiso de pantalla) — mismo patrón ya usado al aprobar: `setConnectedLkRoom(null)` y luego restaurar la sala con un pequeño timeout.
-- Mostrar toast informativo: "Permiso de pantalla finalizado. Solicítalo de nuevo si lo necesitas."
+3. Para los **participantes**: si tienen `hideNoVideo` activado en "Ajustar vista" y un par está sin cámara, su tile no se monta → el `<audio>` no se adjunta → no se escucha. Es un caso secundario pero conviene blindar.
 
-También revocar el flag cuando el participante presiona "Salir" (ya se hace) y cuando es removido de la sala.
+Además, no hay un único elemento de audio global por sala que sirva como "red de seguridad" si un tile no se monta a tiempo.
 
-### 2. `useCoworkMediaPresence` — sin cambios
-El hook ya emite el estado `screenShareOn` en cada cambio. Solo lo consumiremos para detectar la transición.
+## Cambios propuestos
 
-### 3. (Opcional, defensa en backend) `cowork-session/index.ts`
-El token emitido en `claimScreenShareToken` ya tiene TTL de 10 min, lo cual limita el abuso. No se requieren cambios adicionales en el edge function ya que la revocación es client-side mediante reconexión con un token sin permisos elevados (el backend solo otorga `canPublish` con permiso de screen share cuando se reclama una solicitud aprobada; el token base de `join_room` no incluye eso).
+### 1. `CoworkHostDashboard.tsx` — desconectar el Hub al entrar a una sala (y reconectarlo al salir)
+
+- En `enterRoom()`: además de minimizar, **`setHubConnected(false)`** para desmontar el Hub y liberar el micrófono.
+- En `leaveActiveRoom()`: **reconectar el Hub** (`setHubConnected(true)` y `setHubMinimized(false)`) para que el coordinador vuelva al canal de coordinación.
+- Razonamiento: una pestaña sólo puede publicar un track de micrófono confiablemente en una sala LiveKit a la vez. El coordinador alterna entre Hub ↔ Sala.
+
+### 2. `CoworkHostDashboard.tsx` — UX visible del estado
+
+- Mientras el coordinador está dentro de una sala, mostrar un pequeño indicador en el sidebar ("Hub en pausa — saldrás de la sala para regresar al Hub") en lugar del botón "Hub".
+- Al pulsar "Salir" de la sala, mostrar toast: "Volviendo al Coordinador Hub".
+
+### 3. `LiveKitCallView.tsx` — capa de audio remoto a nivel de sala (red de seguridad)
+
+Añadir un `<RoomAudioRenderer>`-equivalente: un único componente que se suscribe a todos los `RemoteAudioTrack` de la sala y los adjunta a elementos `<audio>` ocultos, independientemente de qué tiles estén visibles. Esto asegura que:
+- Un participante audible aunque su tile esté filtrado por `hideNoVideo` o no esté en `maxTiles`.
+- No se duplica el audio (el tile sigue adjuntando para `setSinkId` por participante; el renderer global usa una clave por SID y se desactiva si el tile ya tiene el track adjuntado, o mutea el global cuando el tile lo toma).
+
+Implementación mínima: nuevo componente `RoomAudioSink.tsx` que escucha `RoomEvent.TrackSubscribed` / `TrackUnsubscribed` filtrando `Track.Source.Microphone`, y adjunta a un `<audio autoPlay>` por SID. Se monta una sola vez dentro de `LiveKitCallView`.
+
+### 4. Verificación de `Room.startAudio()` tras toggle
+
+Asegurar que después de `toggleMic` (lado coordinador) se invoca `room.startAudio()` si `!room.canPlaybackAudio` (algunos navegadores requieren un gesto de usuario reciente para reproducir audio remoto). Ya existe el listener; añadir llamada explícita en el primer `toggleMic` exitoso por sesión.
 
 ## Detalles técnicos
 
-```ts
-// CoworkParticipantView.tsx
-const prevScreenShareRef = useRef(false);
+- Archivos a modificar:
+  - `src/pages/cowork/CoworkHostDashboard.tsx` (lógica enter/leave + indicador)
+  - `src/pages/messenger/videocall/LiveKitCallView.tsx` (montar `RoomAudioSink`)
+  - `src/hooks/useLiveKit.ts` (forzar `startAudio()` en primer `toggleMic`)
+  - `src/pages/messenger/videocall/RoomAudioSink.tsx` (nuevo)
 
-const handleMediaStateChange = useCallback((state) => {
-  trackMediaState(state);
-  // Detectar fin del screen share
-  if (prevScreenShareRef.current && !state.screenShareOn && hasScreenShareAccess) {
-    setHasScreenShareAccess(false);
-    screenShareTokenRef.current = null;
-    toast.info("Permiso de pantalla finalizado");
-    // Reconectar con token estándar
-    if (myRoom?.livekit_room_name) {
-      setConnectedLkRoom(null);
-      setTimeout(() => setConnectedLkRoom(myRoom.livekit_room_name), 300);
-    }
-  }
-  prevScreenShareRef.current = state.screenShareOn;
-}, [trackMediaState, hasScreenShareAccess, myRoom?.livekit_room_name]);
-```
+- No se requieren cambios en la edge function `livekit-token` ni en el esquema DB. Los grants ya son correctos (`canPublish: true`, `canSubscribe: true`).
 
-## Archivos a modificar
-- `src/pages/cowork/CoworkParticipantView.tsx`
+- Comportamiento esperado tras el fix:
+  - Coordinador en Hub: oye y habla con otros coordinadores del Hub.
+  - Coordinador entra a Sala A: el Hub se desconecta automáticamente, el mic publica en Sala A; los participantes de A lo oyen y él los oye.
+  - Coordinador sale de Sala A: vuelve al Hub automáticamente.
+  - Participantes en una sala: se oyen entre sí sin requerir cámara encendida.
 
-## Resultado esperado
-El botón "Compartir pantalla" volverá a aparecer en la barra superior del participante apenas detenga el share, obligándolo a solicitar nuevamente la aprobación del coordinador para futuras transmisiones.
+## Fuera de alcance
+
+- Permitir al coordinador estar en Hub y en una sala simultáneamente (requeriría una segunda pestaña/contexto de audio o mezclar mics, fuera del modelo actual de LiveKit por pestaña).
