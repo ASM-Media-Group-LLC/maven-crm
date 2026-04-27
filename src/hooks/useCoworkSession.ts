@@ -178,13 +178,8 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("getHostCode", { sessionId });
   }, [sessionId]);
 
-  const assignToRoom = useCallback(async (targetUserId: string, roomId: string) => {
-    return invokeCowork("assignToRoom", { sessionId, targetUserId, roomId });
-  }, [sessionId]);
+  // assignToRoom and moveParticipant removed — participants self-join via URL ?room=X
 
-  const moveParticipant = useCallback(async (targetUserId: string, targetRoomId: string) => {
-    return invokeCowork("moveParticipant", { sessionId, targetUserId, targetRoomId });
-  }, [sessionId]);
 
   const issueLiveKitToken = useCallback(async (purpose: string, roomId?: string) => {
     return invokeCowork("issueLiveKitToken", { sessionId, purpose, roomId });
