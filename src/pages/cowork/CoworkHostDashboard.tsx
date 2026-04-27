@@ -286,6 +286,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             setActiveRoomId(null);
                             setActiveRoomName(`Llamada privada con ${cowork.profiles[req.user_id] || "User"}`);
                             setHubMinimized(true);
+                          } else if (req.room_id) {
+                            enterRoom(req.room_id);
                           }
                         }}>
                           Atender
