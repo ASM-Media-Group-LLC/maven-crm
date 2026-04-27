@@ -151,7 +151,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-foreground">{cowork.session?.name}</h2>
-              <p className="text-xs text-muted-foreground">Host Dashboard</p>
+              <p className="text-xs text-muted-foreground">Coordinador Dashboard</p>
             </div>
             <div className="flex gap-1">
               <Button
