@@ -193,7 +193,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           <div className="p-3 border-b border-border/50">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Radio className={`h-3 w-3 ${hubConnected ? "text-emerald-500" : "text-muted-foreground/50"}`} />
-              <span>Host Hub</span>
+              <span>Coordinador Hub</span>
               {hubConnected && (
                 <Button
                   variant="ghost"
@@ -493,7 +493,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             <div className="flex items-center justify-between px-3 py-1.5 bg-muted border-b border-border shrink-0">
               <div className="flex items-center gap-1.5 text-xs text-amber-500 font-medium">
                 <Crown className="h-3 w-3" />
-                Host Hub
+                Coordinador Hub
               </div>
               <div className="flex gap-0.5">
                 <Button
@@ -527,7 +527,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <LiveKitCallView
                 roomName={cowork.session.host_hub_livekit_room}
                 displayName={displayName}
-                callDisplayName="Host Hub"
+                callDisplayName="Coordinador Hub"
                 isAdmin={true}
                 onLeave={() => { setHubConnected(false); setHubMaximized(false); }}
                 hideShareLink
