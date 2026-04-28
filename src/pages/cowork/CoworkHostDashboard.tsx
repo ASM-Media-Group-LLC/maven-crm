@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Users2, Headphones, Hand, Monitor, DoorOpen,
   Check, X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone, Share2,
-  Mic, MicOff, Video, VideoOff,
+  Mic, MicOff, Video, VideoOff, ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
@@ -354,6 +354,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               initialMicOn={false}
               initialCamOn={false}
               getToken={oneOnOneRoom ? getOneOnOneToken : getActiveRoomToken}
+              leaveLabel="Regresar a dashboard"
+              leaveIcon={ArrowLeft}
             />
           </div>
         ) : (
