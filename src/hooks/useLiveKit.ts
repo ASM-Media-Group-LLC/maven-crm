@@ -852,6 +852,8 @@ export function useLiveKit() {
     }
     connectingRef.current = true;
 
+    let livekitUrlForError: string | undefined;
+
     try {
       if (roomRef.current) {
         roomRef.current.disconnect(true);
