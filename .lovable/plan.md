@@ -1,38 +1,29 @@
-## Problema
+# Botón "Regresar a dashboard" para el coordinador
 
-En el `CoworkHostDashboard`, al pulsar **"Atender"** sobre una solicitud:
+## Contexto
 
-- **Solicitud de ayuda (Hand)**: la tarjeta desaparece inmediatamente porque se llama a `resolveHostRequest`, dejando la lista limpia mientras el coordinador entra a la sala.
-- **Solicitud de llamada privada (Phone)**: la tarjeta NO desaparece. Se llama a `ackHostRequest` (estado `acknowledged`), por lo que el render conmuta al segundo botón **"Unirse a llamada privada"** (captura `image-349.png`), aun cuando el coordinador ya fue llevado a la sala 1:1 en ese mismo click.
+Actualmente, el coordinador ve el botón estándar de colgar (círculo rojo con icono de teléfono) cuando entra a una llamada desde su Dashboard. Esto sucede en tres flujos:
 
-Esto resulta confuso: el botón "Unirse a llamada privada" aparece justo después de atender, como si la acción no hubiera surtido efecto.
+1. **Llamada privada 1:1** (al atender una solicitud `oneone`).
+2. **Atención de solicitud de ayuda** (al pulsar "Atender" en una solicitud normal → entra a la sala).
+3. **Unión voluntaria a una sala** (al hacer clic en una tarjeta de sala desde el dashboard).
 
-## Causa
+Los tres flujos renderizan el mismo `LiveKitCallView` en `CoworkHostDashboard.tsx` (línea 339), por lo que basta con propagar las props `leaveLabel` y `leaveIcon` (que ya existen en `CallControls`/`LiveKitCallView` desde un cambio previo) desde este punto único.
 
-`src/pages/cowork/CoworkHostDashboard.tsx` líneas 254-283:
+Nota: la pantalla de llamada privada del participante mantiene su botón actual ("Regresar a la sala"), que es correcto para ese flujo.
 
-- Rama `is1on1` del botón "Atender" usa `ackHostRequest` (no resolver) + entra a la sala 1:1.
-- Existe una segunda rama (`req.status === "acknowledged" && is1on1`) que renderiza "Unirse a llamada privada", pensada como **reconexión** si el coordinador abandona la sala 1:1 sin resolverla.
-- Como tras "Atender" el estado pasa a `acknowledged`, ese segundo botón aparece de inmediato.
+## Cambios
 
-## Solución
+### `src/pages/cowork/CoworkHostDashboard.tsx`
 
-Replicar el mismo patrón que la solicitud de ayuda: al pulsar **"Atender"** en una llamada privada, ocultar la tarjeta de la lista mientras el coordinador está dentro de la 1:1, y mostrar el botón de reconexión **únicamente** cuando realmente sea necesario (el coordinador salió de la 1:1 sin resolverla).
+- Importar `ArrowLeft` desde `lucide-react`.
+- En el `<LiveKitCallView>` del coordinador (línea ~339), agregar:
+  - `leaveLabel="Regresar a dashboard"`
+  - `leaveIcon={ArrowLeft}`
+- Como esto aplica al `LiveKitCallView` único que se usa para los tres flujos (1:1, atención de solicitud y unión voluntaria), el botón se mostrará uniformemente como una píldora roja con texto + flecha en todos los casos.
 
-### Cambios en `src/pages/cowork/CoworkHostDashboard.tsx`
+No se requieren cambios en `CallControls.tsx` ni en `LiveKitCallView.tsx` (las props ya están soportadas).
 
-1. **Filtrar la lista `openHostRequests`** para ocultar la solicitud 1:1 que el coordinador está atendiendo en este momento (cuando `req.id === oneOnOneRequestId`). Así, al pulsar "Atender", la tarjeta desaparece igual que con una solicitud de ayuda.
+## Resultado esperado
 
-2. **Mantener** la lógica actual de `ackHostRequest` + entrar a la sala 1:1 (no se cambia a `resolve` porque la solicitud debe seguir viva mientras dure la llamada para soportar reconexión).
-
-3. **Conservar** el botón "Unirse a llamada privada" para el caso de reconexión: aparecerá solo cuando `status === "acknowledged"` Y `oneOnOneRequestId !== req.id` (es decir, el coordinador ya no está conectado a esa 1:1).
-
-### Resultado esperado
-
-- "Atender" en llamada privada → tarjeta desaparece de SOLICITUDES, coordinador entra a la 1:1. Mismo flujo visual que "Atender" en solicitud de ayuda.
-- Si el coordinador minimiza/sale de la 1:1 sin resolverla → la tarjeta reaparece con el botón "Unirse a llamada privada" para reconectar.
-- Al resolver/finalizar la 1:1 → la tarjeta desaparece definitivamente.
-
-### Archivos a modificar
-
-- `src/pages/cowork/CoworkHostDashboard.tsx` (1 archivo, ~5 líneas)
+En cualquier llamada que el coordinador inicie desde su dashboard (privada, atención de ayuda, o unión voluntaria a sala), el botón rojo circular de colgar se reemplaza por un botón píldora rojo con la flecha izquierda + texto **"Regresar a dashboard"**. Al pulsarlo, sigue ejecutando la lógica actual (`leaveOneOnOne` + `leaveActiveRoom`), que finaliza la solicitud (si aplica) y devuelve al coordinador a su Hub/dashboard.
