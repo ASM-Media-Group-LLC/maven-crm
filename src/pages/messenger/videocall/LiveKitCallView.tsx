@@ -73,10 +73,44 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   const displayNameRef = useRef(displayName);
   displayNameRef.current = displayName;
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
 
   useEffect(() => {
-    lk.connect(roomName, displayNameRef.current, isAdmin, { initialMicOn, initialCamOn, audioDeviceId: initialAudioDeviceId, videoDeviceId: initialVideoDeviceId, audioOutputDeviceId: initialAudioOutputDeviceId, backgroundEffect: initialBackgroundEffect, tokenProvider: getToken });
-    return () => { lk.disconnect(); };
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retried = false;
+
+    const tryConnect = async () => {
+      try {
+        await lk.connect(roomName, displayNameRef.current, isAdmin, {
+          initialMicOn,
+          initialCamOn,
+          audioDeviceId: initialAudioDeviceId,
+          videoDeviceId: initialVideoDeviceId,
+          audioOutputDeviceId: initialAudioOutputDeviceId,
+          backgroundEffect: initialBackgroundEffect,
+          tokenProvider: getTokenRef.current ? () => getTokenRef.current!() : undefined,
+        });
+      } catch (err: any) {
+        if (cancelled) return;
+        const msg = String(err?.message || err || "");
+        // Auto-retry once on race-condition aborts (StrictMode double-mount, fast remount)
+        if (!retried && /Abort handler called|aborted|AbortError/i.test(msg)) {
+          retried = true;
+          console.warn("[LiveKit] Signal aborted, retrying once in 600ms…", msg);
+          retryTimer = setTimeout(() => { if (!cancelled) void tryConnect(); }, 600);
+        }
+      }
+    };
+
+    void tryConnect();
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      lk.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName, isAdmin, initialMicOn, initialCamOn, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect]);
 
