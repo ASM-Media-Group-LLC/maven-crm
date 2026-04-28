@@ -1176,6 +1176,7 @@ export function useLiveKit() {
       setError(err.message || "Connection failed");
       setConnectionState(ConnectionState.Disconnected);
       console.error("LiveKit connect error:", err);
+      throw err;
     } finally {
       connectingRef.current = false;
     }
