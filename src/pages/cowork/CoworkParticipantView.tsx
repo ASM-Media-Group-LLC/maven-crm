@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Hand, Monitor, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft } from "lucide-react";
+import { Hand, Monitor, Loader2, Crown, Phone, PhoneCall, MoreVertical, ArrowLeft, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
