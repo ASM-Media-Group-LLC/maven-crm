@@ -539,8 +539,6 @@ export function useLiveKit() {
       return true;
     }
 
-    let livekitUrlForError: string | undefined;
-
     try {
       if (effect === "none") {
         const existingProcessor = bgProcessorRef.current;
