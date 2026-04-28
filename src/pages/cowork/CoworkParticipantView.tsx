@@ -23,6 +23,7 @@ interface Props {
 }
 
 export default function CoworkParticipantView({ cowork, userId }: Props) {
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [displayName, setDisplayName] = useState("User");
   const [connectedLkRoom, setConnectedLkRoom] = useState<string | null>(null);
