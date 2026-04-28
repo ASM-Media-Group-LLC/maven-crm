@@ -80,6 +80,17 @@ function wait(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
+function formatLiveKitConnectionError(err: any, livekitUrl?: string) {
+  const rawMessage = String(err?.message || err || "Connection failed");
+  const host = livekitUrl ? livekitUrl.replace(/^wss?:\/\//, "").replace(/\/$/, "") : "LiveKit";
+
+  if (/Abort handler called|serverUnreachable|websocket.*closed|ERR_CONNECTION_TIMED_OUT|timeout|timed out/i.test(rawMessage)) {
+    return `No se pudo conectar con el servidor de video (${host}). Verifica que LiveKit esté activo y que HTTPS/WSS en el puerto 443 sea accesible.`;
+  }
+
+  return rawMessage;
+}
+
 // ── Audio feedback helper (shared AudioContext to avoid exhaustion) ──
 let sharedAudioCtx: AudioContext | null = null;
 function getAudioContext(): AudioContext | null {
@@ -841,6 +852,8 @@ export function useLiveKit() {
     }
     connectingRef.current = true;
 
+    let livekitUrlForError: string | undefined;
+
     try {
       if (roomRef.current) {
         roomRef.current.disconnect(true);
@@ -891,6 +904,7 @@ export function useLiveKit() {
       }
 
       const livekitUrl = tokenData.url;
+      livekitUrlForError = livekitUrl;
       if (!livekitUrl || typeof livekitUrl !== "string" || (!livekitUrl.startsWith("wss://") && !livekitUrl.startsWith("ws://"))) {
         throw new Error(`Invalid LiveKit URL: "${livekitUrl}". Ensure LIVEKIT_URL is configured.`);
       }
@@ -1173,7 +1187,7 @@ export function useLiveKit() {
       }, PARTICIPANT_SYNC_INTERVAL_MS);
     } catch (err: any) {
       clearSyncInterval();
-      setError(err.message || "Connection failed");
+      setError(formatLiveKitConnectionError(err, livekitUrlForError));
       setConnectionState(ConnectionState.Disconnected);
       console.error("LiveKit connect error:", err);
       throw err;
