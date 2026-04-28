@@ -1184,7 +1184,7 @@ export function useLiveKit() {
       }, PARTICIPANT_SYNC_INTERVAL_MS);
     } catch (err: any) {
       clearSyncInterval();
-      setError(err.message || "Connection failed");
+      setError(formatLiveKitConnectionError(err, roomRef.current ? undefined : undefined));
       setConnectionState(ConnectionState.Disconnected);
       console.error("LiveKit connect error:", err);
       throw err;
