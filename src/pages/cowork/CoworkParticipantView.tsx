@@ -380,13 +380,20 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             displayName={displayName}
             callDisplayName={myRoom?.name}
             isAdmin={false}
-            onLeave={() => {
+            onLeave={async () => {
               setConnectedLkRoom(null);
               setManuallyLeft(true);
               setHasScreenShareAccess(false);
               screenShareTokenRef.current = null;
-              // Release the assignment server-side so the host dashboard updates.
-              cowork.leaveRoom?.().catch(() => {});
+              // Release the assignment server-side so the host dashboard updates,
+              // then navigate out of Cowork to prevent the auto-rejoin effect.
+              try {
+                await cowork.leaveRoom?.();
+              } catch {
+                // best-effort
+              }
+              toast.success("Saliste de la sala");
+              navigate("/dashboard");
             }}
             hideShareLink
             suppressLeaveToast
@@ -395,26 +402,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             initialCamOn={false}
             getToken={getToken}
             onMediaStateChange={handleMediaStateChange}
+            leaveLabel="Salir y volver al dashboard"
+            leaveIcon={LogOut}
           />
-        ) : manuallyLeft ? (
-          <div className="flex flex-col items-center justify-center h-full gap-4 p-4">
-            <div className="flex flex-col items-center gap-3 bg-muted/50 rounded-3xl px-6 md:px-10 py-8 max-w-xs w-full">
-              <p className="text-muted-foreground text-sm">Has salido de la sala</p>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="gap-1.5 rounded-full"
-                onClick={() => {
-                  setManuallyLeft(false);
-                  if (myRoom?.livekit_room_name) {
-                    setConnectedLkRoom(myRoom.livekit_room_name);
-                  }
-                }}
-              >
-                Reconectar
-              </Button>
-            </div>
-          </div>
         ) : (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
