@@ -539,6 +539,8 @@ export function useLiveKit() {
       return true;
     }
 
+    let livekitUrlForError: string | undefined;
+
     try {
       if (effect === "none") {
         const existingProcessor = bgProcessorRef.current;
@@ -902,6 +904,7 @@ export function useLiveKit() {
       }
 
       const livekitUrl = tokenData.url;
+      livekitUrlForError = livekitUrl;
       if (!livekitUrl || typeof livekitUrl !== "string" || (!livekitUrl.startsWith("wss://") && !livekitUrl.startsWith("ws://"))) {
         throw new Error(`Invalid LiveKit URL: "${livekitUrl}". Ensure LIVEKIT_URL is configured.`);
       }
@@ -1184,7 +1187,7 @@ export function useLiveKit() {
       }, PARTICIPANT_SYNC_INTERVAL_MS);
     } catch (err: any) {
       clearSyncInterval();
-      setError(formatLiveKitConnectionError(err, roomRef.current ? undefined : undefined));
+      setError(formatLiveKitConnectionError(err, livekitUrlForError));
       setConnectionState(ConnectionState.Disconnected);
       console.error("LiveKit connect error:", err);
       throw err;
