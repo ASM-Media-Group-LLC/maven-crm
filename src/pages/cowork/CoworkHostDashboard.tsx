@@ -354,6 +354,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               initialMicOn={false}
               initialCamOn={false}
               getToken={oneOnOneRoom ? getOneOnOneToken : getActiveRoomToken}
+              leaveLabel="Regresar a dashboard"
+              leaveIcon={ArrowLeft}
             />
           </div>
         ) : (
