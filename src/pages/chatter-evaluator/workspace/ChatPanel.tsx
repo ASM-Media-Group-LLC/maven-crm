@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, Paperclip, Volume2, VolumeX, Clock } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, Paperclip, Volume2, VolumeX, Clock, Smile } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -349,11 +354,14 @@ export const ChatPanel = ({ session }: Props) => {
     }
   };
 
-  const handleSendTip = async () => {
+  const handleSendTip = async (amountArg?: number) => {
     if (!session) return;
-    const raw = prompt("Monto del tip ($):", "10");
-    if (!raw) return;
-    const amount = parseFloat(raw);
+    let amount = amountArg;
+    if (typeof amount !== "number") {
+      const raw = prompt("Monto del tip ($):", "10");
+      if (!raw) return;
+      amount = parseFloat(raw);
+    }
     if (isNaN(amount) || amount <= 0) {
       toast.error("Monto inválido");
       return;
@@ -503,15 +511,68 @@ export const ChatPanel = ({ session }: Props) => {
             rows={2}
             className="min-h-[2.25rem] flex-1 resize-none rounded-md border bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
           />
-          <Button
-            onClick={handleSendTip}
-            size="icon"
-            variant="outline"
-            disabled={session.status === "ended"}
-            title="Enviar tip"
-          >
-            <DollarSign className="h-4 w-4" />
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                size="icon"
+                variant="outline"
+                disabled={session.status === "ended"}
+                title="Enviar tip"
+              >
+                <DollarSign className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="end">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Tip rápido</div>
+              <div className="grid grid-cols-3 gap-1">
+                {[5, 10, 20, 50, 100, 200].map((amt) => (
+                  <Button
+                    key={amt}
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() => handleSendTip(amt)}
+                  >
+                    ${amt}
+                  </Button>
+                ))}
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="mt-1 w-full text-xs"
+                onClick={() => handleSendTip()}
+              >
+                Otro monto…
+              </Button>
+            </PopoverContent>
+          </Popover>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                size="icon"
+                variant="outline"
+                disabled={session.status === "ended"}
+                title="Emoji"
+              >
+                <Smile className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-2" align="end">
+              <div className="grid grid-cols-8 gap-1 text-xl">
+                {["😏","🔥","💦","😈","❤️","🥵","😍","🙈","🍆","💋","😘","😉","🤤","🥰","😜","💸"].map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => setInput((v) => v + e)}
+                    className="rounded p-1 hover:bg-muted"
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button
             onClick={handleSend}
             disabled={session.status === "ended" || !input.trim() || sendMut.isPending}
