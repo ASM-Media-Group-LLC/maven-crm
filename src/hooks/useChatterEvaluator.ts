@@ -645,10 +645,15 @@ export const useSubmitEvaluation = () => {
             emails: config.notification_emails ?? [],
           });
 
+          // Send as text/plain instead of application/json so the browser
+          // skips the CORS preflight. Google Apps Script web apps do not
+          // handle OPTIONS preflight by default; they happily read the body
+          // via e.postData.contents regardless of Content-Type.
           const res = await fetch(config.apps_script_url, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify(payload),
+            redirect: "follow",
           });
           if (!res.ok) {
             webhookError = `webhook HTTP ${res.status}`;
