@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Volume2, VolumeX, Clock } from "lucide-react";
+import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Volume2, VolumeX, Clock, Check, CheckCheck } from "lucide-react";
 import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -57,9 +57,12 @@ interface BubbleProps {
   fanAvatar: string;
   profile: ChatterProfile | null;
   side: "fan" | "chatter";
+  /** ISO timestamp of when the OTHER side last read messages, or null. Used
+   *  to render single vs. double check on the chatter's own messages. */
+  readByOther: string | null;
 }
 
-const Bubble = ({ msg, fanName, fanAvatar, profile, side }: BubbleProps) => {
+const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther }: BubbleProps) => {
   if (msg.deleted === "full") return null;
 
   if (msg.role === "system") {
@@ -122,7 +125,18 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side }: BubbleProps) => {
             </div>
           )}
         </div>
-        <span className="text-[10px] text-muted-foreground">{formatTime(msg.created_at)}</span>
+        <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          {formatTime(msg.created_at)}
+          {/* Double-check on the chatter's own messages. Single = enviado.
+              Double sky-blue = leído por el examinador. */}
+          {isMine && msg.msg_type === "message" && (
+            readByOther && new Date(readByOther) >= new Date(msg.created_at) ? (
+              <CheckCheck className="h-3 w-3 text-sky-400" />
+            ) : (
+              <Check className="h-3 w-3" />
+            )
+          )}
+        </span>
       </div>
     </div>
   );
@@ -573,6 +587,7 @@ const ChatterPublicView = () => {
               fanAvatar={fanAvatar}
               profile={profile}
               side="chatter"
+              readByOther={session.read_by_examiner_at ?? null}
             />
           ))}
         </div>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, Paperclip, Volume2, VolumeX, Clock } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, CheckCheck, Paperclip, Volume2, VolumeX, Clock } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -34,11 +34,15 @@ const MessageBubble = ({
   fanName,
   fanAvatar,
   profile,
+  readByOther,
 }: {
   msg: ChatterMessage;
   fanName: string;
   fanAvatar: string;
   profile: ChatterProfile | null;
+  /** ISO timestamp of when the OTHER side last read messages, or null. Used
+   *  to show single vs. double check on the examiner's own messages. */
+  readByOther: string | null;
 }) => {
   if (msg.deleted === "full") return null;
 
@@ -107,7 +111,18 @@ const MessageBubble = ({
             </div>
           )}
         </div>
-        <span className="text-[10px] text-muted-foreground">{formatTime(msg.created_at)}</span>
+        <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          {formatTime(msg.created_at)}
+          {/* Double-check indicator on the examiner's own (fan-role) messages.
+              Single check = sent. Double check (sky-blue) = read by chatter. */}
+          {isFan && msg.msg_type === "message" && (
+            readByOther && new Date(readByOther) >= new Date(msg.created_at) ? (
+              <CheckCheck className="h-3 w-3 text-sky-400" />
+            ) : (
+              <Check className="h-3 w-3" />
+            )
+          )}
+        </span>
       </div>
     </div>
   );
@@ -238,6 +253,22 @@ export const ChatPanel = ({ session }: Props) => {
         },
         () => {
           qc.invalidateQueries({ queryKey: ["chatter-messages", session.id] });
+        },
+      )
+      .on(
+        // Also invalidate the sessions list so updates from the chatter side
+        // (typing_chatter, read_by_chatter_at) reach this component live.
+        // The selected session in WorkspaceContent is derived from that list.
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "chatter_sessions",
+          filter: `id=eq.${session.id}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ["chatter-sessions"] });
+          qc.invalidateQueries({ queryKey: ["chatter-session", session.id] });
         },
       )
       .subscribe();
@@ -480,6 +511,7 @@ export const ChatPanel = ({ session }: Props) => {
             fanName={fanName}
             fanAvatar={fanAvatar}
             profile={profile}
+            readByOther={session?.read_by_chatter_at ?? null}
           />
         ))}
       </div>
