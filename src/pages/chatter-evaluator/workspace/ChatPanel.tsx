@@ -168,7 +168,7 @@ const MessageBubble = ({
         <span className="text-[10px] text-muted-foreground">{name}</span>
         {(msg.content || msg.deleted === "chatter") && (
           <div
-            className={`group/bubble relative rounded-2xl px-3 py-1.5 ${isFan ? "pl-7" : ""} ${
+            className={`group/bubble relative rounded-2xl px-3 py-1.5 ${
               msg.deleted === "chatter"
                 ? "rounded-bl-sm bg-rose-500 italic text-white"
                 : isFan
@@ -177,20 +177,29 @@ const MessageBubble = ({
             }`}
           >
             {msg.deleted === "chatter" ? "(mensaje eliminado por el chatter)" : msg.content}
-            {/* Examiner-only delete on the LEFT inside the bubble. Lands
-                where the original .msg.fan .msg-delete-btn put it
-                (left:-8px) but sits inside the bubble bounds so the
-                hover area stays continuous. */}
+            {/* Examiner-only delete — floats OUTSIDE the bubble on the
+                side opposite the avatar (right side) so it doesn't crash
+                into the avatar slot. Hidden by default; appears only
+                while hovering the bubble. The transparent <span> is a
+                "bridge": it sits in the gap between the bubble and the
+                button, keeping the group hover active while the cursor
+                crosses over so the button doesn't blink off mid-move. */}
             {isFan && (
-              <button
-                type="button"
-                onClick={() => onDelete(msg)}
-                className="absolute left-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
-                title="Eliminar mensaje"
-                aria-label="Eliminar mensaje"
-              >
-                <XIcon className="h-3 w-3" />
-              </button>
+              <>
+                <span
+                  aria-hidden
+                  className="absolute right-[-28px] top-0 bottom-0 w-7 pointer-events-auto"
+                />
+                <button
+                  type="button"
+                  onClick={() => onDelete(msg)}
+                  className="absolute right-[-28px] top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm ring-1 ring-border hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
+                  title="Eliminar mensaje"
+                  aria-label="Eliminar mensaje"
+                >
+                  <XIcon className="h-3 w-3" />
+                </button>
+              </>
             )}
           </div>
         )}
@@ -308,6 +317,12 @@ export const ChatPanel = ({ session }: Props) => {
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
   const lastMessageIdRef = useRef<string | null>(null);
+  // Tracks which session the message refs are calibrated for. Switching
+  // sessions (clicking another chat in the sidebar) reloads the messages
+  // query with a brand-new last id — without this guard the effect below
+  // saw "different last message id" and fired the notification ping for
+  // every chat switch.
+  const lastSessionIdRef = useRef<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [tipAmount, setTipAmount] = useState<number | null>(null);
@@ -343,6 +358,21 @@ export const ChatPanel = ({ session }: Props) => {
   // and fire the tip popup whenever a brand-new tip system message lands.
   useEffect(() => {
     const msgs = messagesQ.data ?? [];
+    const sid = session?.id ?? null;
+
+    // Session switched: re-baseline the refs to the new session's tail
+    // without firing any sounds/popups. Anything that lands AFTER this
+    // baseline (via realtime) will trigger normally.
+    if (lastSessionIdRef.current !== sid) {
+      lastSessionIdRef.current = sid;
+      lastMessageIdRef.current = msgs[msgs.length - 1]?.id ?? null;
+      const baselineEvent = [...msgs]
+        .reverse()
+        .find((m) => m.role === "system" && (m.msg_type === "tip" || m.msg_type === "purchase"));
+      lastTipIdRef.current = baselineEvent?.id ?? null;
+      return;
+    }
+
     if (msgs.length === 0) {
       lastMessageIdRef.current = null;
       lastTipIdRef.current = null;
@@ -373,7 +403,7 @@ export const ChatPanel = ({ session }: Props) => {
         playTipSound(newestEvent.price);
       }
     }
-  }, [messagesQ.data]);
+  }, [messagesQ.data, session?.id]);
 
   // Realtime: subscribe to chatter_messages inserts/updates for this session
   // so messages from the chatter side (Phase 5) appear instantly here

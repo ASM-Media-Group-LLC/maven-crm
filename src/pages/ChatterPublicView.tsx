@@ -190,25 +190,39 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
         <span className="text-[10px] text-muted-foreground">{name}</span>
         {(msg.content || msg.deleted === "chatter") && (
           <div
-            className={`group/bubble relative rounded-2xl px-3.5 py-2 ${isMine ? "pl-9" : ""} ${
+            className={`group/bubble relative rounded-2xl px-3.5 py-2 ${
               isMine
                 ? "rounded-br-sm bg-primary text-primary-foreground"
                 : "rounded-bl-sm bg-muted text-foreground"
-            } ${msg.deleted === "chatter" ? "italic opacity-60" : ""}`}
+            } ${msg.deleted === "chatter" ? "opacity-60" : ""}`}
           >
-            {msg.deleted === "chatter" ? "(mensaje eliminado)" : msg.content}
-            {/* Chatter-only delete on the LEFT inside the bubble. Hover
-                area is continuous so the click lands on the first try. */}
-            {isMine && (
-              <button
-                type="button"
-                onClick={() => onDelete(msg)}
-                className="absolute left-1.5 top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-white/15 text-primary-foreground/80 hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
-                title="Eliminar mensaje"
-                aria-label="Eliminar mensaje"
-              >
-                <X className="h-3 w-3" />
-              </button>
+            {/* Chatter still sees the original content of their own
+                deleted messages, with a small "eliminado" tag underneath
+                so they remember the state. The examiner sees a separate
+                "(mensaje eliminado por el chatter)" placeholder. */}
+            {msg.content}
+            {msg.deleted === "chatter" && (
+              <div className="mt-0.5 text-[10px] italic opacity-80">eliminado</div>
+            )}
+            {/* Chatter-only delete — floats OUTSIDE the bubble on the
+                left. Hidden by default; the transparent <span> bridges
+                the gap so the cursor doesn't lose group-hover mid-move. */}
+            {isMine && msg.deleted !== "chatter" && (
+              <>
+                <span
+                  aria-hidden
+                  className="absolute left-[-28px] top-0 bottom-0 w-7 pointer-events-auto"
+                />
+                <button
+                  type="button"
+                  onClick={() => onDelete(msg)}
+                  className="absolute left-[-28px] top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm ring-1 ring-border hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
+                  title="Eliminar mensaje"
+                  aria-label="Eliminar mensaje"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </>
             )}
           </div>
         )}
@@ -950,11 +964,11 @@ const ChatterPublicView = () => {
               </p>
             )}
             {messages
-              // The chatter never sees a message they soft-deleted, and
-              // never sees one the examiner hard-deleted. The examiner's
-              // bubble component shows "(mensaje eliminado por el chatter)"
-              // for the soft case — that placeholder is only for them.
-              .filter((m) => m.deleted !== "chatter" && m.deleted !== "full")
+              // Hide only examiner-side hard-deletes (deleted='full').
+              // Chatter-side soft-deletes still render here with the
+              // original content + a small "eliminado" tag — the user
+              // wants the reminder of what they wrote.
+              .filter((m) => m.deleted !== "full")
               .map((m) => (
               <Bubble
                 key={m.id}
@@ -1069,7 +1083,7 @@ const ChatterPublicView = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar mensaje</AlertDialogTitle>
             <AlertDialogDescription>
-              Si eliminas, el examinador verá que lo borraste. ¿Seguro?
+              ¿Seguro que quieres eliminar este mensaje?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
