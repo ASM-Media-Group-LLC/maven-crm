@@ -1,0 +1,16 @@
+{
+  "name": "maven-migrate-chatters",
+  "version": "1.0.0",
+  "description": "One-time migration of Roleplaychatters Firebase data into Maven's Supabase branch.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "migrate": "node migrate.mjs",
+    "migrate:dry": "node migrate.mjs --dry-run",
+    "verify": "node verify.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
+    "firebase-admin": "^13.8.0"
+  }
+}
