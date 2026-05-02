@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,48 +25,53 @@ const ProfileCard = ({
     .join("");
 
   return (
-    <Card className="overflow-hidden transition-colors hover:border-primary/40">
-      <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-muted">
-        {profile.avatar_url ? (
-          <img
-            src={profile.avatar_url}
-            alt={profile.name}
-            className="h-full w-full object-cover"
-            style={{
-              objectPosition: `${profile.avatar_x ?? 50}% ${profile.avatar_y ?? 50}%`,
-              transform: `scale(${(profile.avatar_zoom ?? 100) / 100})`,
-            }}
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-            }}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-muted-foreground">
-            {initials}
-          </div>
-        )}
-      </div>
-      <CardContent className="space-y-2 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="truncate text-base font-semibold">{profile.name}</h3>
-            {profile.location && (
-              <p className="truncate text-xs text-muted-foreground">
-                {profile.location}
-                {profile.age ? ` · ${profile.age}` : ""}
-              </p>
-            )}
-          </div>
-          <Badge variant="secondary" className="shrink-0">
-            <ImageIcon className="mr-1 h-3 w-3" />
-            {vaultCount}
-          </Badge>
+    <Link
+      to={`/chatter-evaluator/${profile.key}`}
+      className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      <Card className="overflow-hidden transition-colors hover:border-primary/40">
+        <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-muted">
+          {profile.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt={profile.name}
+              className="h-full w-full object-cover"
+              style={{
+                objectPosition: `${profile.avatar_x ?? 50}% ${profile.avatar_y ?? 50}%`,
+                transform: `scale(${(profile.avatar_zoom ?? 100) / 100})`,
+              }}
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-muted-foreground">
+              {initials}
+            </div>
+          )}
         </div>
-        {profile.nationality && (
-          <p className="text-xs text-muted-foreground">{profile.nationality}</p>
-        )}
-      </CardContent>
-    </Card>
+        <CardContent className="space-y-2 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="truncate text-base font-semibold">{profile.name}</h3>
+              {profile.location && (
+                <p className="truncate text-xs text-muted-foreground">
+                  {profile.location}
+                  {profile.age ? ` · ${profile.age}` : ""}
+                </p>
+              )}
+            </div>
+            <Badge variant="secondary" className="shrink-0">
+              <ImageIcon className="mr-1 h-3 w-3" />
+              {vaultCount}
+            </Badge>
+          </div>
+          {profile.nationality && (
+            <p className="text-xs text-muted-foreground">{profile.nationality}</p>
+          )}
+        </CardContent>
+      </Card>
+    </Link>
   );
 };
 
