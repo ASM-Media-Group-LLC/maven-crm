@@ -144,11 +144,22 @@ function transformProfile(key, fb) {
   return out;
 }
 
+const DOWNLOAD_TIMEOUT_MS = 60_000;
+
 async function downloadToBuffer(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
-  const ab = await res.arrayBuffer();
-  return Buffer.from(ab);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), DOWNLOAD_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const ab = await res.arrayBuffer();
+    return Buffer.from(ab);
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error(`timeout after ${DOWNLOAD_TIMEOUT_MS / 1000}s`);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function objectPathFromOriginalUrl(profileKey, name, originalUrl) {
@@ -273,20 +284,42 @@ for (const [profileKey, items] of Object.entries(fbContent)) {
   }
   log(`\n  ${profileKey} → ${items.length} item(s)`);
   let pos = 0;
+  let skipped = 0;
   for (const item of items) {
     totalItems++;
     pos++;
     if (!item?.url) { log(`    ${pos}. ✗ no url`); continue; }
 
+    const itemName = item.name || "(unnamed)";
+
+    // Idempotency: skip if a row with the same (profile_id, name) already exists.
+    // This lets the user Ctrl+C and re-run without producing duplicates.
+    if (!DRY_RUN) {
+      const { data: existing } = await supa
+        .from("chatter_vault_items")
+        .select("id")
+        .eq("profile_id", profileId)
+        .eq("name", itemName)
+        .maybeSingle();
+      if (existing) {
+        log(`    ${pos}. ↺ skip (already migrated): ${itemName}`);
+        skipped++;
+        continue;
+      }
+    }
+
     let finalUrl = item.url;
 
     if (!SKIP_FILES && !DRY_RUN) {
+      const sizeHint = inferMediaType(item.url, itemName) === "video" ? "video" : "image";
+      log(`    ${pos}. ↓ downloading ${sizeHint}: ${itemName}`);
       try {
         const buf = await downloadToBuffer(item.url);
-        const objectPath = objectPathFromOriginalUrl(profileKey, item.name, item.url);
+        log(`        (${(buf.length / 1024 / 1024).toFixed(2)} MB) ↑ uploading…`);
+        const objectPath = objectPathFromOriginalUrl(profileKey, itemName, item.url);
         const { error: upErr } = await supa.storage.from(VAULT_BUCKET).upload(objectPath, buf, {
           upsert: true,
-          contentType: inferContentType(item.name, item.url),
+          contentType: inferContentType(itemName, item.url),
         });
         if (upErr) throw upErr;
         const { data: pub } = supa.storage.from(VAULT_BUCKET).getPublicUrl(objectPath);
@@ -294,30 +327,30 @@ for (const [profileKey, items] of Object.entries(fbContent)) {
         copied++;
       } catch (e) {
         copyFailed++;
-        log(`    ${pos}. ⚠ keep original (copy failed): ${e.message}`);
+        log(`        ⚠ keep original (copy failed): ${e.message}`);
       }
     }
 
     if (DRY_RUN) {
-      log(`    ${pos}. (dry) ${item.name || "(no-name)"} → would insert (${inferMediaType(finalUrl, item.name)})`);
+      log(`    ${pos}. (dry) ${itemName} → would insert (${inferMediaType(finalUrl, itemName)})`);
       continue;
     }
 
     const row = {
       profile_id: profileId,
-      name: item.name || "(unnamed)",
+      name: itemName,
       url: finalUrl,
-      media_type: inferMediaType(finalUrl, item.name),
+      media_type: inferMediaType(finalUrl, itemName),
       position: pos,
     };
     const { error } = await supa.from("chatter_vault_items").insert(row);
     if (error) {
-      // tolerate dup on re-run by ignoring unique violations
-      if (!/duplicate/i.test(error.message)) log(`    ${pos}. ✗ ${error.message}`);
+      log(`    ${pos}. ✗ ${error.message}`);
     } else {
-      log(`    ${pos}. ✓ ${row.name}`);
+      log(`    ${pos}. ✓ inserted`);
     }
   }
+  if (skipped > 0) log(`  (${skipped} item(s) skipped — already in DB from previous run)`);
 }
 
 // -------- 5. summary --------
