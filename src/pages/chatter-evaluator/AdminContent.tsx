@@ -575,29 +575,33 @@ const ConfigSection = () => {
           </p>
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
             <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                className="mt-2 w-full justify-between font-normal"
-              >
-                {notifyUserIds.length === 0
-                  ? "Seleccionar empleados…"
-                  : `${notifyUserIds.length} seleccionado(s)`}
-                <ChevronsUpDown className="h-4 w-4 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-              {/* Search box at the top filters the list as the user types
-                  on full_name OR role. Empty filter shows everyone. */}
-              <div className="border-b p-2">
+              {/* Editable trigger — typing here filters the list directly
+                  instead of opening a separate search box inside the
+                  popover. The placeholder doubles as a "N seleccionado(s)"
+                  counter when the input is empty and there are picks. */}
+              <div className="relative mt-2">
                 <Input
-                  autoFocus
                   value={pickerFilter}
-                  onChange={(e) => setPickerFilter(e.target.value)}
-                  placeholder="Buscar empleado…"
-                  className="h-8 text-sm"
+                  onFocus={() => setPickerOpen(true)}
+                  onChange={(e) => {
+                    setPickerFilter(e.target.value);
+                    if (!pickerOpen) setPickerOpen(true);
+                  }}
+                  placeholder={
+                    notifyUserIds.length === 0
+                      ? "Seleccionar empleados…"
+                      : `${notifyUserIds.length} seleccionado(s) — escribe para filtrar`
+                  }
+                  className="w-full pr-8"
                 />
+                <ChevronsUpDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-50" />
               </div>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-[var(--radix-popover-trigger-width)] p-0"
+              align="start"
+              onOpenAutoFocus={(e) => e.preventDefault()}
+            >
               <div className="max-h-72 overflow-y-auto p-1">
                 {usersQ.isLoading && (
                   <div className="p-3 text-xs text-muted-foreground">Cargando…</div>
