@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, CheckCheck, Paperclip, Volume2, VolumeX, Clock } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, CheckCheck, Paperclip, Clock } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { EmojiBar, DEFAULT_EMOJIS } from "./EmojiBar";
+import { VolumeControl, getSoundVolume } from "./VolumeControl";
 import { useUpdateChatterConfig } from "@/hooks/useChatterEvaluator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -158,8 +159,12 @@ const PublicLinkBanner = ({ session }: { session: ChatterSession }) => {
 };
 
 // 3-tone soft "ding" using WebAudio — no asset to ship, no permission.
+// Volume is read from the VolumeControl's persisted setting (0..1) so a
+// muted slider produces no sound.
 let _audioCtx: AudioContext | null = null;
 const playPing = () => {
+  const vol = getSoundVolume();
+  if (vol <= 0) return;
   try {
     _audioCtx ??= new (window.AudioContext || (window as any).webkitAudioContext)();
     const ctx = _audioCtx;
@@ -169,7 +174,7 @@ const playPing = () => {
     o.frequency.setValueAtTime(880, now);
     o.frequency.exponentialRampToValueAtTime(1320, now + 0.15);
     g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.12, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.12 * vol, now + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
     o.connect(g);
     g.connect(ctx.destination);
@@ -198,7 +203,6 @@ export const ChatPanel = ({ session }: Props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [muted, setMuted] = useState<boolean>(() => localStorage.getItem("maven.chatter.muted") === "1");
   const lastMessageIdRef = useRef<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const updateConfigMut = useUpdateChatterConfig();
@@ -227,14 +231,9 @@ export const ChatPanel = ({ session }: Props) => {
     lastMessageIdRef.current = last.id;
     if (!prevLastId) return; // initial load
     if (prevLastId === last.id) return;
-    if (last.role === "chatter" && !muted) playPing();
-  }, [messagesQ.data, muted]);
-
-  const toggleMute = () => {
-    const next = !muted;
-    setMuted(next);
-    localStorage.setItem("maven.chatter.muted", next ? "1" : "0");
-  };
+    // playPing reads the persisted volume itself and no-ops at 0.
+    if (last.role === "chatter") playPing();
+  }, [messagesQ.data]);
 
   // Realtime: subscribe to chatter_messages inserts/updates for this session
   // so messages from the chatter side (Phase 5) appear instantly here
@@ -481,15 +480,10 @@ export const ChatPanel = ({ session }: Props) => {
             </div>
           );
         })()}
-        <Button
-          onClick={toggleMute}
-          size="icon"
-          variant="ghost"
-          className="h-8 w-8"
-          title={muted ? "Activar sonido" : "Silenciar notificaciones"}
-        >
-          {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-        </Button>
+        {/* Volume control matches the original Roleplaychatters layout:
+            an icon button (🔊/🔉/🔇) plus a 0–100 slider, persisted in
+            localStorage. */}
+        <VolumeControl />
       </div>
 
       <PublicLinkBanner session={session} />

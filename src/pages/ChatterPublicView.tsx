@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Volume2, VolumeX, Clock, Check, CheckCheck } from "lucide-react";
+import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Clock, Check, CheckCheck } from "lucide-react";
 import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
+import { VolumeControl, getSoundVolume } from "@/pages/chatter-evaluator/workspace/VolumeControl";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -175,6 +176,8 @@ const fileToBase64 = (file: File): Promise<string> =>
 
 let _audioCtxC: AudioContext | null = null;
 const playPing = () => {
+  const vol = getSoundVolume();
+  if (vol <= 0) return;
   try {
     _audioCtxC ??= new (window.AudioContext || (window as any).webkitAudioContext)();
     const ctx = _audioCtxC;
@@ -184,7 +187,7 @@ const playPing = () => {
     o.frequency.setValueAtTime(880, t);
     o.frequency.exponentialRampToValueAtTime(1320, t + 0.15);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.12 * vol, t + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
     o.connect(g);
     g.connect(ctx.destination);
@@ -211,7 +214,6 @@ const ChatterPublicView = () => {
   const [claimed, setClaimed] = useState(false);
   const [vaultOpen, setVaultOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [muted, setMuted] = useState<boolean>(() => localStorage.getItem("maven.chatter.public.muted") === "1");
   const [now, setNow] = useState(Date.now());
   // Chatter-side emojis live in memory only (matches the original
   // Roleplaychatters behavior — they reset to DEFAULT_EMOJIS on reload).
@@ -225,12 +227,6 @@ const ChatterPublicView = () => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
-
-  const toggleMute = () => {
-    const next = !muted;
-    setMuted(next);
-    localStorage.setItem("maven.chatter.public.muted", next ? "1" : "0");
-  };
 
   // 1) Session
   const sessionQ = useQuery({
@@ -380,8 +376,8 @@ const ChatterPublicView = () => {
     const prev = lastMessageIdRef.current;
     lastMessageIdRef.current = last.id;
     if (!prev || prev === last.id) return;
-    if (last.role === "fan" && !muted) playPing();
-  }, [messagesQ.data, muted]);
+    if (last.role === "fan") playPing();
+  }, [messagesQ.data]);
 
   // Mark messages as read on focus / new examiner messages
   useEffect(() => {
@@ -545,13 +541,9 @@ const ChatterPublicView = () => {
               </div>
             );
           })()}
-          <button
-            onClick={toggleMute}
-            className="rounded p-1 hover:bg-white/10"
-            aria-label={muted ? "Activar sonido" : "Silenciar"}
-          >
-            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-          </button>
+          {/* Volume control matches the original Roleplaychatters chatter
+              header layout (icon button + slider, persisted). */}
+          <VolumeControl onDark />
         </div>
       </header>
 
