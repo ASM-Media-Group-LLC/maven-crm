@@ -2,8 +2,15 @@ import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign,
-  MessageCircle, MessageSquare, Contact, Rocket,
+  MessageCircle, MessageSquare, Contact, Rocket, Sun, Moon, LogOut,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { useMyProfile } from "@/hooks/useUserProfile";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { useSidebarBadges } from "@/hooks/useSidebarBadges";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -576,8 +583,129 @@ const DashboardSidebar = () => {
 
       </SidebarContent>
 
-      <SidebarFooter />
+      <SidebarFooter className="border-t border-border p-3">
+        <UserFooterBlock collapsed={collapsed} />
+      </SidebarFooter>
     </Sidebar>
+  );
+};
+
+// ----- Sidebar footer: avatar + Sesión activa + theme + Settings + Salir
+// Mirrors the screenshot the user sketched. Collapsed state shows just
+// the icons stacked vertically so the rail is still usable when the
+// user toggles to icon-only mode.
+const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { t } = useLanguage();
+  const { theme, setTheme } = useTheme();
+  const profileQ = useMyProfile();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const fullName =
+    user?.user_metadata?.full_name || profileQ.data?.full_name || "Usuario";
+  const initials = fullName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  const avatarUrl = profileQ.data?.avatar_url ?? null;
+
+  const handleLogout = async () => {
+    await signOut();
+    toast({ title: t("topbar.logoutSuccess"), description: t("topbar.logoutDesc") });
+    navigate("/login");
+  };
+
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center gap-2">
+        <Avatar className="h-8 w-8">
+          {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName} />}
+          <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+        </Avatar>
+        {mounted && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full text-muted-foreground"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            title={theme === "dark" ? t("topbar.lightMode") : t("topbar.darkMode")}
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => navigate("/settings")}
+          title="Settings"
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="destructive"
+          size="icon"
+          className="h-8 w-8"
+          onClick={handleLogout}
+          title="Salir"
+        >
+          <LogOut className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Identity row — avatar, name, "Sesión activa", theme toggle. */}
+      <div className="flex items-center gap-2">
+        <Avatar className="h-9 w-9 shrink-0">
+          {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName} />}
+          <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold">{fullName}</div>
+          <div className="truncate text-[11px] text-emerald-500">Sesión activa</div>
+        </div>
+        {mounted && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 rounded-full text-muted-foreground"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            title={theme === "dark" ? t("topbar.lightMode") : t("topbar.darkMode")}
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+        )}
+      </div>
+
+      {/* Settings row — same hover style as the rest of the sidebar
+          so it doesn't look out of place. */}
+      <button
+        type="button"
+        onClick={() => navigate("/settings")}
+        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover"
+      >
+        <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span>Settings</span>
+      </button>
+
+      {/* Salir — full-width destructive pill matching the screenshot. */}
+      <Button
+        variant="destructive"
+        onClick={handleLogout}
+        className="w-full justify-center gap-2"
+      >
+        <LogOut className="h-4 w-4" />
+        Salir
+      </Button>
+    </div>
   );
 };
 
