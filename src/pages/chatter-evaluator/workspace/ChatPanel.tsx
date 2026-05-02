@@ -547,21 +547,15 @@ export const ChatPanel = ({ session }: Props) => {
     }
   };
 
-  if (!session) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
-        <MessageCircle className="h-10 w-10" />
-        <p className="text-sm">Selecciona una sesión a la izquierda para empezar a chatear.</p>
-      </div>
-    );
-  }
-
   const messages = messagesQ.data ?? [];
 
   // Live metrics shown in the header (matches the original chat-info row in
   // index.html line 3390): MSGS = chatter messages with content, WPM = words
   // / active typing minutes (gaps > 90s ignored as idle), RESP. TIME = avg
   // gap between a fan message and the chatter's first reply.
+  // NOTE: useMemo MUST stay above any conditional early returns — putting
+  // it after `if (!session) return ...` violates rules of hooks and blanks
+  // the screen the moment a session is selected.
   const metrics = useMemo(() => {
     const chatterMsgs = messages.filter(
       (m) => m.role === "chatter" && (m.content?.length ?? 0) > 0,
@@ -609,6 +603,15 @@ export const ChatPanel = ({ session }: Props) => {
     }
     return { msgCount, wpm, respTime };
   }, [messages]);
+
+  if (!session) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
+        <MessageCircle className="h-10 w-10" />
+        <p className="text-sm">Selecciona una sesión a la izquierda para empezar a chatear.</p>
+      </div>
+    );
+  }
 
   const handleCopyLink = async () => {
     try {
