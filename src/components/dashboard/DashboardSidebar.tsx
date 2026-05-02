@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign,
-  MessageCircle, Contact, Rocket,
+  MessageCircle, MessageSquare, Contact, Rocket,
 } from "lucide-react";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { useSidebarBadges } from "@/hooks/useSidebarBadges";
@@ -77,6 +77,7 @@ const DashboardSidebar = () => {
     { title: t("nav.leadgen"), url: "/leadgen", icon: Activity, badge: leadgenCount || undefined, module: "LeadGen" },
     { title: t("nav.closers"), url: "/closers", icon: Phone, badge: closersCount || undefined, module: "Closers" },
     { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets" },
+    { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: MessageSquare, module: "Dashboard" },
   ];
   const operationsMenu = operationsMenuAll.filter((item) => canAccess(item.module));
 
