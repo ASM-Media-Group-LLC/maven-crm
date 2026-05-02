@@ -200,12 +200,12 @@ const WorkspaceContent = () => {
         // bumped to v2 so previously-saved oversized layouts get
         // reset to the new defaults (criteria/sessions were eating
         // ~20% each — way wider than the old fixed grid).
-        autoSaveId="maven-chatter-workspace-v2"
+        autoSaveId="maven-chatter-workspace-v3"
         className="min-h-0 flex-1"
       >
         {!criteriaHidden && (
           <>
-            <ResizablePanel defaultSize={14} minSize={11} maxSize={28} className="min-h-0">
+            <ResizablePanel defaultSize={13} minSize={10} maxSize={25} className="min-h-0">
               <CriteriaPanel
                 session={selectedSession}
                 scores={currentScores}
@@ -216,15 +216,15 @@ const WorkspaceContent = () => {
             <ResizableHandle withHandle />
           </>
         )}
-        <ResizablePanel defaultSize={14} minSize={11} maxSize={28} className="min-h-0">
+        <ResizablePanel defaultSize={13} minSize={10} maxSize={25} className="min-h-0">
           <SessionsPanel selectedId={selectedId} onSelect={setSelectedId} />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={56} minSize={30} className="min-h-0">
+        <ResizablePanel defaultSize={60} minSize={30} className="min-h-0">
           <ChatPanel session={selectedSession} />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={16} minSize={13} maxSize={28} className="min-h-0">
+        <ResizablePanel defaultSize={14} minSize={11} maxSize={28} className="min-h-0">
           <CharacterInfoSidebar profileId={selectedSession?.profile_id ?? null} />
         </ResizablePanel>
       </ResizablePanelGroup>
