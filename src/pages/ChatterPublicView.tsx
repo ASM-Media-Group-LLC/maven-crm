@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Send, Loader2, Lock, AlertTriangle, MessageCircle, FolderOpen, X, Image as ImageIcon, Play, Paperclip } from "lucide-react";
+import { Send, Loader2, Lock, AlertTriangle, MessageCircle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Volume2, VolumeX, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -158,6 +158,36 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
+let _audioCtxC: AudioContext | null = null;
+const playPing = () => {
+  try {
+    _audioCtxC ??= new (window.AudioContext || (window as any).webkitAudioContext)();
+    const ctx = _audioCtxC;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.frequency.setValueAtTime(880, t);
+    o.frequency.exponentialRampToValueAtTime(1320, t + 0.15);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start(t);
+    o.stop(t + 0.3);
+  } catch {
+    /* no-op */
+  }
+};
+
+const formatRemaining = (ms: number): string => {
+  if (ms <= 0) return "00:00";
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+};
+
 const ChatterPublicView = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const qc = useQueryClient();
@@ -166,8 +196,23 @@ const ChatterPublicView = () => {
   const [claimed, setClaimed] = useState(false);
   const [vaultOpen, setVaultOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [muted, setMuted] = useState<boolean>(() => localStorage.getItem("maven.chatter.public.muted") === "1");
+  const [now, setNow] = useState(Date.now());
+  const lastMessageIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Tick clock every second for countdown
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    localStorage.setItem("maven.chatter.public.muted", next ? "1" : "0");
+  };
 
   // 1) Session
   const sessionQ = useQuery({
@@ -303,12 +348,22 @@ const ChatterPublicView = () => {
     };
   }, [sessionId, claimed, qc]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom + ping on new fan messages
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messagesQ.data]);
+    const msgs = messagesQ.data ?? [];
+    if (msgs.length === 0) {
+      lastMessageIdRef.current = null;
+      return;
+    }
+    const last = msgs[msgs.length - 1];
+    const prev = lastMessageIdRef.current;
+    lastMessageIdRef.current = last.id;
+    if (!prev || prev === last.id) return;
+    if (last.role === "fan" && !muted) playPing();
+  }, [messagesQ.data, muted]);
 
   // Mark messages as read on focus / new examiner messages
   useEffect(() => {
@@ -454,7 +509,31 @@ const ChatterPublicView = () => {
               {examinerTyping ? " · escribiendo…" : ""}
             </div>
           </div>
-          <MessageCircle className="h-5 w-5 opacity-70" />
+          {(() => {
+            const startMs = session.started_at
+              ? new Date(session.started_at).getTime()
+              : new Date(session.created_at).getTime();
+            const remaining = startMs + session.duration_minutes * 60_000 - now;
+            const isLow = remaining > 0 && remaining < 5 * 60_000;
+            return (
+              <div
+                className={`flex items-center gap-1 rounded-md bg-black/20 px-2 py-1 font-mono text-xs ${
+                  remaining <= 0 ? "text-rose-200" : isLow ? "text-amber-200" : ""
+                }`}
+                title="Tiempo restante"
+              >
+                <Clock className="h-3 w-3" />
+                {formatRemaining(remaining)}
+              </div>
+            );
+          })()}
+          <button
+            onClick={toggleMute}
+            className="rounded p-1 hover:bg-white/10"
+            aria-label={muted ? "Activar sonido" : "Silenciar"}
+          >
+            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
         </div>
       </header>
 

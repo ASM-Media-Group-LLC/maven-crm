@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, Paperclip } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, Paperclip, Volume2, VolumeX, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -135,6 +135,37 @@ const PublicLinkBanner = ({ session }: { session: ChatterSession }) => {
   );
 };
 
+// 3-tone soft "ding" using WebAudio — no asset to ship, no permission.
+let _audioCtx: AudioContext | null = null;
+const playPing = () => {
+  try {
+    _audioCtx ??= new (window.AudioContext || (window as any).webkitAudioContext)();
+    const ctx = _audioCtx;
+    const now = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.frequency.setValueAtTime(880, now);
+    o.frequency.exponentialRampToValueAtTime(1320, now + 0.15);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.12, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start(now);
+    o.stop(now + 0.3);
+  } catch {
+    /* no-op */
+  }
+};
+
+const formatRemaining = (ms: number): string => {
+  if (ms <= 0) return "00:00";
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+};
+
 export const ChatPanel = ({ session }: Props) => {
   const messagesQ = useChatterMessages(session?.id ?? null);
   const profilesQ = useChatterProfiles();
@@ -145,6 +176,36 @@ export const ChatPanel = ({ session }: Props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [muted, setMuted] = useState<boolean>(() => localStorage.getItem("maven.chatter.muted") === "1");
+  const lastMessageIdRef = useRef<string | null>(null);
+  const [now, setNow] = useState(Date.now());
+
+  // Tick clock every second for countdown
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Play ping when a NEW message arrives from the chatter (not on initial load)
+  useEffect(() => {
+    const msgs = messagesQ.data ?? [];
+    if (msgs.length === 0) {
+      lastMessageIdRef.current = null;
+      return;
+    }
+    const last = msgs[msgs.length - 1];
+    const prevLastId = lastMessageIdRef.current;
+    lastMessageIdRef.current = last.id;
+    if (!prevLastId) return; // initial load
+    if (prevLastId === last.id) return;
+    if (last.role === "chatter" && !muted) playPing();
+  }, [messagesQ.data, muted]);
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    localStorage.setItem("maven.chatter.muted", next ? "1" : "0");
+  };
 
   // Realtime: subscribe to chatter_messages inserts/updates for this session
   // so messages from the chatter side (Phase 5) appear instantly here
@@ -198,11 +259,53 @@ export const ChatPanel = ({ session }: Props) => {
         content,
         fromExaminer: true,
       });
+      // Clear typing indicator after send
+      void supabase
+        .from("chatter_sessions" as never)
+        .update({ typing_fan: false, typing_fan_at: null } as never)
+        .eq("id", session.id as never);
     } catch (e) {
       toast.error("No se pudo enviar", { description: (e as Error).message });
       setInput(content); // restore
     }
   };
+
+  // Typing indicator (debounced on the fan/examiner side)
+  const typingTimer = useRef<number | null>(null);
+  const handleInputChange = (val: string) => {
+    setInput(val);
+    if (!session) return;
+    if (val.length > 0) {
+      void supabase
+        .from("chatter_sessions" as never)
+        .update({ typing_fan: true, typing_fan_at: new Date().toISOString() } as never)
+        .eq("id", session.id as never);
+      if (typingTimer.current) window.clearTimeout(typingTimer.current);
+      typingTimer.current = window.setTimeout(() => {
+        void supabase
+          .from("chatter_sessions" as never)
+          .update({ typing_fan: false, typing_fan_at: null } as never)
+          .eq("id", session.id as never);
+      }, 3000);
+    }
+  };
+
+  // Mark messages as read by examiner whenever new chatter messages appear
+  useEffect(() => {
+    if (!session) return;
+    const msgs = messagesQ.data ?? [];
+    const hasUnread = msgs.some(
+      (m) =>
+        m.role === "chatter" &&
+        (!session.read_by_examiner_at ||
+          new Date(m.created_at) > new Date(session.read_by_examiner_at)),
+    );
+    if (!hasUnread) return;
+    void supabase
+      .from("chatter_sessions" as never)
+      .update({ read_by_examiner_at: new Date().toISOString() } as never)
+      .eq("id", session.id as never);
+  }, [messagesQ.data, session]);
 
   const handleFileUpload = async (file: File) => {
     if (!session) return;
@@ -300,8 +403,45 @@ export const ChatPanel = ({ session }: Props) => {
           <div className="truncate text-sm font-semibold">{profile?.name ?? "?"}</div>
           <div className="truncate text-[11px] text-muted-foreground">
             chatter: {session.chatter_name} · status: {session.status}
+            {session.typing_chatter && session.status !== "ended" && (
+              <span className="ml-2 italic text-emerald-400">escribiendo…</span>
+            )}
           </div>
         </div>
+        {(() => {
+          // Compute time remaining from started_at + duration_minutes (or
+          // created_at if not started). Once ended, hide.
+          if (session.status === "ended") return null;
+          const startMs = session.started_at
+            ? new Date(session.started_at).getTime()
+            : new Date(session.created_at).getTime();
+          const remaining = startMs + session.duration_minutes * 60_000 - now;
+          const isLow = remaining > 0 && remaining < 5 * 60_000;
+          return (
+            <div
+              className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-mono ${
+                remaining <= 0
+                  ? "bg-rose-500/20 text-rose-300"
+                  : isLow
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "bg-muted text-muted-foreground"
+              }`}
+              title="Tiempo restante de la sesión"
+            >
+              <Clock className="h-3 w-3" />
+              {formatRemaining(remaining)}
+            </div>
+          );
+        })()}
+        <Button
+          onClick={toggleMute}
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8"
+          title={muted ? "Activar sonido" : "Silenciar notificaciones"}
+        >
+          {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+        </Button>
       </div>
 
       <PublicLinkBanner session={session} />
@@ -351,7 +491,7 @@ export const ChatPanel = ({ session }: Props) => {
           </Button>
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
