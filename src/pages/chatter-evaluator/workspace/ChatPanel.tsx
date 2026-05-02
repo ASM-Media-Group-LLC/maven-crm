@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, CheckCheck, Paperclip, Clock, Pencil, Plus } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Plus, Link2, Square } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -23,7 +22,18 @@ import {
   useRenameChatterSession,
   useExtendChatterSession,
   usePurchaseChatterMessage,
+  useEndChatterSession,
 } from "@/hooks/useChatterEvaluator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -38,6 +48,25 @@ import type { ChatterSession, ChatterMessage, ChatterProfile } from "../types";
 interface Props {
   session: ChatterSession | null;
 }
+
+// Tiny header metric — label on top in muted uppercase, value below in
+// the foreground color. Matches .info-item in the original chat-header.
+const Metric = ({
+  label,
+  value,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+}) => (
+  <div className="flex flex-col items-center leading-tight">
+    <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+      {label}
+    </span>
+    <span className={`mt-0.5 text-sm font-bold ${valueClass ?? ""}`}>{value}</span>
+  </div>
+);
 
 const formatTime = (iso: string): string => {
   const d = new Date(iso);
@@ -231,35 +260,6 @@ const MessageBubble = ({
   );
 };
 
-const PublicLinkBanner = ({ session }: { session: ChatterSession }) => {
-  const [copied, setCopied] = useState(false);
-  const url = `${window.location.origin}/chatter/${session.id}`;
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-      toast.success("Link copiado");
-    } catch (e) {
-      toast.error((e as Error).message);
-    }
-  };
-  if (session.status === "ended") return null;
-  return (
-    <Card className="m-3 border-amber-500/40 bg-amber-500/5 p-2">
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-amber-300">Link para el aspirante:</span>
-        <code className="flex-1 truncate rounded bg-background/50 px-2 py-1 text-[10px]">
-          {url}
-        </code>
-        <Button onClick={handleCopy} size="icon" variant="outline" className="h-6 w-6">
-          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-        </Button>
-      </div>
-    </Card>
-  );
-};
-
 // New-message ding. Uses the same notification.mp3 the original
 // Roleplaychatters shipped (copied to /public/sounds) — the WebAudio
 // fallback the migration started with sounded different, and the user
@@ -296,6 +296,9 @@ export const ChatPanel = ({ session }: Props) => {
   const renameMut = useRenameChatterSession();
   const extendMut = useExtendChatterSession();
   const purchaseMut = usePurchaseChatterMessage();
+  const endMut = useEndChatterSession();
+  const [endOpen, setEndOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const updateConfigMut = useUpdateChatterConfig();
   const examinerEmojis =
     configQ.data?.examiner_emojis && configQ.data.examiner_emojis.length > 0
@@ -555,94 +558,187 @@ export const ChatPanel = ({ session }: Props) => {
 
   const messages = messagesQ.data ?? [];
 
+  // Live metrics shown in the header (matches the original chat-info row in
+  // index.html line 3390): MSGS = chatter messages with content, WPM = words
+  // / active typing minutes (gaps > 90s ignored as idle), RESP. TIME = avg
+  // gap between a fan message and the chatter's first reply.
+  const metrics = useMemo(() => {
+    const chatterMsgs = messages.filter(
+      (m) => m.role === "chatter" && (m.content?.length ?? 0) > 0,
+    );
+    const msgCount = chatterMsgs.length;
+
+    let wpm: string | number = "—";
+    if (chatterMsgs.length >= 2) {
+      const MAX_GAP_MS = 90_000;
+      let activeMs = 0;
+      for (let i = 1; i < chatterMsgs.length; i++) {
+        const gap =
+          new Date(chatterMsgs[i].created_at).getTime() -
+          new Date(chatterMsgs[i - 1].created_at).getTime();
+        if (gap < MAX_GAP_MS) activeMs += gap;
+      }
+      const totalWords = chatterMsgs.reduce(
+        (sum, m) => sum + (m.content ?? "").split(/\s+/).filter(Boolean).length,
+        0,
+      );
+      const activeMin = activeMs / 60_000;
+      wpm = activeMin > 0.1 ? Math.round(totalWords / activeMin) : "—";
+    }
+
+    let respTime: string = "—";
+    const responseTimes: number[] = [];
+    let lastFanTs: number | null = null;
+    let waitingForReply = false;
+    for (const m of messages) {
+      if (m.role === "fan" && !m.deleted) {
+        if (!waitingForReply) {
+          lastFanTs = new Date(m.created_at).getTime();
+          waitingForReply = true;
+        }
+      } else if (m.role === "chatter" && !m.deleted && waitingForReply && lastFanTs) {
+        const diff = new Date(m.created_at).getTime() - lastFanTs;
+        if (diff > 0) responseTimes.push(diff);
+        waitingForReply = false;
+        lastFanTs = null;
+      }
+    }
+    if (responseTimes.length > 0) {
+      const avg = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
+      respTime = `${(avg / 60_000).toFixed(1)}m`;
+    }
+    return { msgCount, wpm, respTime };
+  }, [messages]);
+
+  const handleCopyLink = async () => {
+    try {
+      const url = `${window.location.origin}/chatter/${session.id}`;
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1500);
+      toast.success("Link copiado");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b p-3">
-        <div className="aspect-square h-10 w-10 overflow-hidden rounded-full bg-muted">
-          {profile?.avatar_url && (
-            <img
-              src={profile.avatar_url}
-              alt={profile.name}
-              className="h-full w-full object-cover"
-              style={{
-                objectPosition: `${profile.avatar_x ?? 50}% ${profile.avatar_y ?? 50}%`,
-                transform: `scale(${(profile.avatar_zoom ?? 100) / 100})`,
-              }}
-            />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">{profile?.name ?? "?"}</div>
-          <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className="truncate">
-              chatter: {session.chatter_name} · status: {session.status}
-            </span>
-            {session.status !== "ended" && (
-              <button
-                type="button"
-                onClick={() => {
-                  setRenameValue(session.chatter_name);
-                  setRenameOpen(true);
-                }}
-                className="shrink-0 rounded p-0.5 hover:bg-muted hover:text-foreground"
-                title="Editar nombre del chatter"
-                aria-label="Editar nombre del chatter"
-              >
-                <Pencil className="h-3 w-3" />
-              </button>
-            )}
-            {session.typing_chatter && session.status !== "ended" && (
-              <span className="italic text-emerald-400">escribiendo…</span>
-            )}
-          </div>
-        </div>
-        {(() => {
-          // Compute time remaining from started_at + duration_minutes (or
-          // created_at if not started). Once ended, hide.
-          if (session.status === "ended") return null;
-          const startMs = session.started_at
-            ? new Date(session.started_at).getTime()
-            : new Date(session.created_at).getTime();
-          const remaining = startMs + session.duration_minutes * 60_000 - now;
-          const isLow = remaining > 0 && remaining < 5 * 60_000;
-          return (
-            <div
-              className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-mono ${
-                remaining <= 0
-                  ? "bg-rose-500/20 text-rose-300"
-                  : isLow
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "bg-muted text-muted-foreground"
-              }`}
-              title="Tiempo restante de la sesión"
-            >
-              <Clock className="h-3 w-3" />
-              {formatRemaining(remaining)}
+      {/* Header — mirrors the original Roleplaychatters chat-header
+          (index.html line 3382): identity on the left, 4 live metrics
+          in the center, action buttons on the right. */}
+      {(() => {
+        const startMs = session.started_at
+          ? new Date(session.started_at).getTime()
+          : new Date(session.created_at).getTime();
+        const remaining = startMs + session.duration_minutes * 60_000 - now;
+        const isExpired = remaining <= 0;
+        const isLow = remaining > 0 && remaining < 5 * 60_000;
+        const ended = session.status === "ended";
+        const timeLabel = ended
+          ? "Cerrada"
+          : session.status === "waiting"
+          ? "Esperando…"
+          : formatRemaining(remaining);
+        const timeClass = ended
+          ? "text-muted-foreground"
+          : isExpired
+          ? "text-rose-400"
+          : isLow
+          ? "text-amber-400"
+          : "text-foreground";
+        return (
+          <div className="flex flex-wrap items-center gap-4 border-b px-4 py-3">
+            {/* Identity */}
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="aspect-square h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
+                {profile?.avatar_url && (
+                  <img
+                    src={profile.avatar_url}
+                    alt={profile.name}
+                    className="h-full w-full object-cover"
+                    style={{
+                      objectPosition: `${profile.avatar_x ?? 50}% ${profile.avatar_y ?? 50}%`,
+                      transform: `scale(${(profile.avatar_zoom ?? 100) / 100})`,
+                    }}
+                  />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-bold">{profile?.name ?? "?"}</div>
+                <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <span className="truncate">Chatter: {session.chatter_name}</span>
+                  {!ended && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRenameValue(session.chatter_name);
+                        setRenameOpen(true);
+                      }}
+                      className="shrink-0 rounded p-0.5 opacity-60 hover:bg-muted hover:opacity-100"
+                      title="Editar nombre"
+                      aria-label="Editar nombre del chatter"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                  )}
+                  {session.typing_chatter && !ended && (
+                    <span className="italic text-emerald-400">escribiendo…</span>
+                  )}
+                </div>
+              </div>
             </div>
-          );
-        })()}
-        {session.status !== "ended" && (
-          <Button
-            onClick={() => {
-              setAddTimeValue("10");
-              setAddTimeOpen(true);
-            }}
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8"
-            title="Agregar minutos a la sesión"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        )}
-        {/* Volume control matches the original Roleplaychatters layout:
-            an icon button (🔊/🔉/🔇) plus a 0–100 slider, persisted in
-            localStorage. */}
-        <VolumeControl />
-      </div>
 
-      <PublicLinkBanner session={session} />
+            {/* Metrics */}
+            <div className="ml-auto flex flex-wrap items-center gap-6">
+              <Metric label="TIEMPO" value={timeLabel} valueClass={`font-mono ${timeClass}`} />
+              <Metric label="MSGS" value={String(metrics.msgCount)} valueClass="font-mono" />
+              <Metric label="WPM" value={String(metrics.wpm)} valueClass="font-mono" />
+              <Metric label="RESP. TIME" value={metrics.respTime} valueClass="font-mono" />
+            </div>
+
+            {/* Volume + Actions */}
+            <div className="flex flex-wrap items-center gap-2">
+              <VolumeControl />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCopyLink}
+                title="Copiar link público del chatter"
+                className="gap-1.5"
+              >
+                {linkCopied ? <Check className="h-3.5 w-3.5" /> : <Link2 className="h-3.5 w-3.5" />}
+                {linkCopied ? "Copiado" : "Copiar link"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setAddTimeValue("10");
+                  setAddTimeOpen(true);
+                }}
+                disabled={ended}
+                title="Agregar minutos a la sesión"
+                className="gap-1.5"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                + Tiempo
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setEndOpen(true)}
+                disabled={ended}
+                title="Terminar la sesión"
+                className="gap-1.5 border-rose-500/60 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
+              >
+                <Square className="h-3.5 w-3.5 fill-current" />
+                Terminar
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Messages */}
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-3 space-y-3">
@@ -780,6 +876,43 @@ export const ChatPanel = ({ session }: Props) => {
 
       <MediaViewer url={mediaUrl} onClose={() => setMediaUrl(null)} />
       <TipPopup amount={tipAmount} onDone={() => setTipAmount(null)} />
+
+      {/* End session dialog (matches endSession in the original — confirm
+          before flipping status to 'ended'). */}
+      <AlertDialog open={endOpen} onOpenChange={setEndOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Terminar sesión</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esto cierra la sesión para el chatter. No podrá seguir escribiendo
+              y el link se invalida. ¿Seguro?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={endMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={(e) => {
+                e.preventDefault();
+                endMut.mutate(session.id, {
+                  onSuccess: () => {
+                    setEndOpen(false);
+                    toast.success("Sesión terminada");
+                  },
+                  onError: (err) =>
+                    toast.error("No se pudo terminar", {
+                      description: (err as Error).message,
+                    }),
+                });
+              }}
+              disabled={endMut.isPending}
+            >
+              {endMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Terminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Rename chatter dialog (matches editChatterName from the original) */}
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
