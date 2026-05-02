@@ -315,15 +315,14 @@ const Settings = () => {
         </div>
       </aside>
 
-      {/* Right side — active tab content. Inner wrapper caps width so
-          forms stay readable on ultra-wide monitors. */}
+      {/* Right side — active tab content, flush-left so it fills the
+          available width on desktop instead of floating in the middle
+          like a mobile screen. */}
       <section className="min-w-0 flex-1 overflow-y-auto p-6 lg:p-8">
-        <div className="mx-auto max-w-3xl">
-          {active === "account" && <MyAccountTab />}
-          {active === "mp" && showProyectoMP && <ProyectoMPTab />}
-          {active === "admin" && showAdmin && <AdminTab canAccess={canAccess} isAdmin={isAdmin} />}
-          {active === "resources" && showResources && <ResourcesTab t={t} />}
-        </div>
+        {active === "account" && <MyAccountTab />}
+        {active === "mp" && showProyectoMP && <ProyectoMPTab />}
+        {active === "admin" && showAdmin && <AdminTab canAccess={canAccess} isAdmin={isAdmin} />}
+        {active === "resources" && showResources && <ResourcesTab t={t} />}
       </section>
     </main>
   );
