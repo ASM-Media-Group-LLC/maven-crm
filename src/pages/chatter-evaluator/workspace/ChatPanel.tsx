@@ -168,23 +168,24 @@ const MessageBubble = ({
         <span className="text-[10px] text-muted-foreground">{name}</span>
         {(msg.content || msg.deleted === "chatter") && (
           <div
-            className={`group/bubble relative rounded-2xl px-3 py-1.5 ${isFan ? "pr-7" : ""} ${
-              isFan
+            className={`group/bubble relative rounded-2xl px-3 py-1.5 ${isFan ? "pl-7" : ""} ${
+              msg.deleted === "chatter"
+                ? "rounded-bl-sm bg-rose-500 italic text-white"
+                : isFan
                 ? "rounded-bl-sm bg-muted text-foreground"
                 : "rounded-br-sm bg-primary text-primary-foreground"
-            } ${msg.deleted === "chatter" ? "border border-rose-500/40 italic text-rose-400 opacity-80" : ""}`}
+            }`}
           >
             {msg.deleted === "chatter" ? "(mensaje eliminado por el chatter)" : msg.content}
-            {/* Examiner-only delete. Sits INSIDE the bubble (top-right) so
-                there's no hover gap between the bubble and the button —
-                same shape as the original .msg-delete-btn (index.html
-                line 606), which lived inside .msg-body and toggled on
-                its hover. */}
+            {/* Examiner-only delete on the LEFT inside the bubble. Lands
+                where the original .msg.fan .msg-delete-btn put it
+                (left:-8px) but sits inside the bubble bounds so the
+                hover area stays continuous. */}
             {isFan && (
               <button
                 type="button"
                 onClick={() => onDelete(msg)}
-                className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
+                className="absolute left-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
                 title="Eliminar mensaje"
                 aria-label="Eliminar mensaje"
               >
@@ -323,6 +324,7 @@ export const ChatPanel = ({ session }: Props) => {
   const [endOpen, setEndOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const chatFontSize = useChatFontSize();
+  const [confirmDelMsg, setConfirmDelMsg] = useState<ChatterMessage | null>(null);
   const updateConfigMut = useUpdateChatterConfig();
   const examinerEmojis =
     configQ.data?.examiner_emojis && configQ.data.examiner_emojis.length > 0
@@ -787,16 +789,7 @@ export const ChatPanel = ({ session }: Props) => {
             profile={profile}
             readByOther={session?.read_by_chatter_at ?? null}
             onOpenMedia={(url) => setMediaUrl(url)}
-            onDelete={(target) => {
-              if (!session) return;
-              deleteMsgMut.mutate(
-                { sessionId: session.id, messageId: target.id },
-                {
-                  onError: (err) =>
-                    toast.error("No se pudo eliminar", { description: (err as Error).message }),
-                },
-              );
-            }}
+            onDelete={(target) => setConfirmDelMsg(target)}
             onPurchase={(target) => {
               if (!session || !target.price) return;
               purchaseMut.mutate(
@@ -919,6 +912,43 @@ export const ChatPanel = ({ session }: Props) => {
 
       <MediaViewer url={mediaUrl} onClose={() => setMediaUrl(null)} />
       <TipPopup amount={tipAmount} onDone={() => setTipAmount(null)} />
+
+      {/* Delete-message confirm — same Maven-styled AlertDialog as the
+          other destructive flows, no native browser prompt. */}
+      <AlertDialog open={!!confirmDelMsg} onOpenChange={(o) => !o && setConfirmDelMsg(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar mensaje</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDelMsg
+                ? `¿Eliminar este mensaje? Desaparece para ti y el chatter. No se puede deshacer.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMsgMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={(e) => {
+                e.preventDefault();
+                if (!confirmDelMsg || !session) return;
+                deleteMsgMut.mutate(
+                  { sessionId: session.id, messageId: confirmDelMsg.id },
+                  {
+                    onSuccess: () => setConfirmDelMsg(null),
+                    onError: (err) =>
+                      toast.error("No se pudo eliminar", { description: (err as Error).message }),
+                  },
+                );
+              }}
+              disabled={deleteMsgMut.isPending}
+            >
+              {deleteMsgMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* End session dialog (matches endSession in the original — confirm
           before flipping status to 'ended'). */}

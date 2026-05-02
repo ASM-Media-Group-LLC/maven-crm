@@ -15,6 +15,16 @@ import {
   pVal,
 } from "@/pages/chatter-evaluator/workspace/ChatToolbar";
 import { CharacterInfoPanel } from "@/pages/chatter-evaluator/workspace/CharacterInfoPanel";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -180,23 +190,20 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
         <span className="text-[10px] text-muted-foreground">{name}</span>
         {(msg.content || msg.deleted === "chatter") && (
           <div
-            className={`group/bubble relative rounded-2xl px-3.5 py-2 ${isMine ? "pr-9" : ""} ${
+            className={`group/bubble relative rounded-2xl px-3.5 py-2 ${isMine ? "pl-9" : ""} ${
               isMine
                 ? "rounded-br-sm bg-primary text-primary-foreground"
                 : "rounded-bl-sm bg-muted text-foreground"
             } ${msg.deleted === "chatter" ? "italic opacity-60" : ""}`}
           >
             {msg.deleted === "chatter" ? "(mensaje eliminado)" : msg.content}
-            {/* Chatter-only delete. INSIDE the bubble (top-right) so the
-                hover area is continuous — moving the mouse onto the
-                button doesn't lose the hover state the way an offset
-                outside the bubble did. Same idea as the original
-                .msg-delete-btn floating inside .msg-body. */}
+            {/* Chatter-only delete on the LEFT inside the bubble. Hover
+                area is continuous so the click lands on the first try. */}
             {isMine && (
               <button
                 type="button"
                 onClick={() => onDelete(msg)}
-                className="absolute right-1.5 top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-white/15 text-primary-foreground/80 hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
+                className="absolute left-1.5 top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-white/15 text-primary-foreground/80 hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
                 title="Eliminar mensaje"
                 aria-label="Eliminar mensaje"
               >
@@ -369,6 +376,8 @@ const ChatterPublicView = () => {
   // when a brand-new "tip" system message lands in the realtime feed.
   const [tipAmount, setTipAmount] = useState<number | null>(null);
   const lastTipIdRef = useRef<string | null>(null);
+  const [confirmDelMsg, setConfirmDelMsg] = useState<ChatterMessage | null>(null);
+  const [deletingMsg, setDeletingMsg] = useState(false);
   const lastMessageIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -956,16 +965,7 @@ const ChatterPublicView = () => {
                 side="chatter"
                 readByOther={session.read_by_examiner_at ?? null}
                 onOpenMedia={(url) => setMediaUrl(url)}
-                onDelete={(target) => {
-                  callChatterApi("delete-message", {
-                    sessionId: session.id,
-                    messageId: target.id,
-                  }).catch((e) =>
-                    toast.error("No se pudo eliminar", {
-                      description: (e as Error).message,
-                    }),
-                  );
-                }}
+                onDelete={(target) => setConfirmDelMsg(target)}
               />
             ))}
           </div>
@@ -1063,6 +1063,45 @@ const ChatterPublicView = () => {
 
       <MediaViewer url={mediaUrl} onClose={() => setMediaUrl(null)} />
       <TipPopup amount={tipAmount} onDone={() => setTipAmount(null)} />
+
+      <AlertDialog open={!!confirmDelMsg} onOpenChange={(o) => !o && setConfirmDelMsg(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar mensaje</AlertDialogTitle>
+            <AlertDialogDescription>
+              Si eliminas, el examinador verá que lo borraste. ¿Seguro?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingMsg}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!confirmDelMsg || !session) return;
+                setDeletingMsg(true);
+                try {
+                  await callChatterApi("delete-message", {
+                    sessionId: session.id,
+                    messageId: confirmDelMsg.id,
+                  });
+                  setConfirmDelMsg(null);
+                } catch (err) {
+                  toast.error("No se pudo eliminar", {
+                    description: (err as Error).message,
+                  });
+                } finally {
+                  setDeletingMsg(false);
+                }
+              }}
+              disabled={deletingMsg}
+            >
+              {deletingMsg && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
