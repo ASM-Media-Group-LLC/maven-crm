@@ -194,10 +194,23 @@ const ChatterProfileEditContent = () => {
     <main className="flex-1 overflow-y-auto p-6">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex items-center justify-between gap-3">
-          <Button asChild variant="ghost" size="sm">
-            <Link to={`/chatter-evaluator/${profile.key}`}>
-              <ArrowLeft className="mr-2 h-4 w-4" /> Volver al perfil
-            </Link>
+          {/* Use the browser history so we land on whichever screen
+              the user came from (admin list, profile detail, or
+              elsewhere) instead of always defaulting to the profile
+              detail page. Falls back to the detail page if there's
+              nothing meaningful to go back to (direct URL load). */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate(`/chatter-evaluator/${profile.key}`);
+              }
+            }}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" /> Volver
           </Button>
           <Button onClick={handleSave} disabled={update.isPending} className="gap-2">
             {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
