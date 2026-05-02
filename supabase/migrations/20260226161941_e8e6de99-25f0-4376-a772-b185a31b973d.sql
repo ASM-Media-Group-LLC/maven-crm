@@ -207,16 +207,19 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_participants;
 -- Storage bucket for chat files
 -- ============================================
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('chat-files', 'chat-files', true);
+VALUES ('chat-files', 'chat-files', true) ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "Authenticated users can upload chat files" ON storage.objects;
 CREATE POLICY "Authenticated users can upload chat files"
   ON storage.objects FOR INSERT
   WITH CHECK (bucket_id = 'chat-files' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Chat files are publicly accessible" ON storage.objects;
 CREATE POLICY "Chat files are publicly accessible"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'chat-files');
 
+DROP POLICY IF EXISTS "Users can delete their own chat files" ON storage.objects;
 CREATE POLICY "Users can delete their own chat files"
   ON storage.objects FOR DELETE
   USING (bucket_id = 'chat-files' AND auth.uid()::text = (storage.foldername(name))[1]);

@@ -87,14 +87,17 @@ CREATE POLICY "Users can update their own views"
   USING (user_id = auth.uid());
 
 -- 7. Storage RLS for announcement-files
+DROP POLICY IF EXISTS "Authenticated users can upload announcement files" ON storage.objects;
 CREATE POLICY "Authenticated users can upload announcement files"
   ON storage.objects FOR INSERT TO authenticated
   WITH CHECK (bucket_id = 'announcement-files');
 
+DROP POLICY IF EXISTS "Anyone can read announcement files" ON storage.objects;
 CREATE POLICY "Anyone can read announcement files"
   ON storage.objects FOR SELECT TO public
   USING (bucket_id = 'announcement-files');
 
+DROP POLICY IF EXISTS "Authenticated users can delete announcement files" ON storage.objects;
 CREATE POLICY "Authenticated users can delete announcement files"
   ON storage.objects FOR DELETE TO authenticated
   USING (bucket_id = 'announcement-files');

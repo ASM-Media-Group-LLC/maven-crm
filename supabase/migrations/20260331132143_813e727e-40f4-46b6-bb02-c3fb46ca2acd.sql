@@ -22,11 +22,14 @@ CREATE POLICY "Authenticated can update templates"
   ON public.invoice_templates FOR UPDATE TO authenticated USING (true);
 
 -- Storage bucket for template logos
-INSERT INTO storage.buckets (id, name, public) VALUES ('template-logos', 'template-logos', true);
+INSERT INTO storage.buckets (id, name, public) VALUES ('template-logos', 'template-logos', true) ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "Anyone can view template logos" ON storage.objects;
 CREATE POLICY "Anyone can view template logos"
   ON storage.objects FOR SELECT USING (bucket_id = 'template-logos');
+DROP POLICY IF EXISTS "Authenticated can upload template logos" ON storage.objects;
 CREATE POLICY "Authenticated can upload template logos"
   ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'template-logos');
+DROP POLICY IF EXISTS "Authenticated can update template logos" ON storage.objects;
 CREATE POLICY "Authenticated can update template logos"
   ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'template-logos');

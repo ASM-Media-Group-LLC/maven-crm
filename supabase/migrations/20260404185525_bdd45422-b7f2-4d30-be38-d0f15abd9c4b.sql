@@ -57,14 +57,17 @@ VALUES ('task-files', 'task-files', false)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage policies
+DROP POLICY IF EXISTS "Authenticated users can upload task files" ON storage.objects;
 CREATE POLICY "Authenticated users can upload task files"
 ON storage.objects FOR INSERT TO authenticated
 WITH CHECK (bucket_id = 'task-files');
 
+DROP POLICY IF EXISTS "Authenticated users can read task files" ON storage.objects;
 CREATE POLICY "Authenticated users can read task files"
 ON storage.objects FOR SELECT TO authenticated
 USING (bucket_id = 'task-files');
 
+DROP POLICY IF EXISTS "Users can delete their own task files" ON storage.objects;
 CREATE POLICY "Users can delete their own task files"
 ON storage.objects FOR DELETE TO authenticated
 USING (bucket_id = 'task-files' AND auth.uid()::text = (storage.foldername(name))[1]);
