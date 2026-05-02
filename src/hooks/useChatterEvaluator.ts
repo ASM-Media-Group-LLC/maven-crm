@@ -231,6 +231,10 @@ export const useUploadChatterAvatar = () =>
     },
   });
 
+// Add a vault item — either by uploading a file or by referencing an
+// external URL the admin pastes. Mirrors the original Roleplaychatters
+// admin which had both options side-by-side (📎 Subir desde PC and the
+// "URL + Nombre + +" row, index.html line 1267 / 1271).
 export const useAddVaultItem = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -238,20 +242,45 @@ export const useAddVaultItem = () => {
       profileId,
       profileKey,
       file,
+      url,
+      name,
     }: {
       profileId: string;
       profileKey: string;
-      file: File;
+      file?: File;
+      url?: string;
+      name?: string;
     }): Promise<ChatterVaultItem> => {
-      const path = `${profileKey}/${Date.now()}-${sanitizeFilename(file.name)}`;
-      const upload = await supabase.storage.from(VAULT_BUCKET).upload(path, file, {
-        upsert: false,
-        contentType: file.type || undefined,
-      });
-      if (upload.error) throw upload.error;
-      const { data: pub } = supabase.storage.from(VAULT_BUCKET).getPublicUrl(path);
+      let finalUrl: string;
+      let finalName: string;
+      let mediaType: "image" | "video" | "other";
 
-      // Position: append at end
+      if (file) {
+        const path = `${profileKey}/${Date.now()}-${sanitizeFilename(file.name)}`;
+        const upload = await supabase.storage.from(VAULT_BUCKET).upload(path, file, {
+          upsert: false,
+          contentType: file.type || undefined,
+        });
+        if (upload.error) throw upload.error;
+        const { data: pub } = supabase.storage.from(VAULT_BUCKET).getPublicUrl(path);
+        finalUrl = pub.publicUrl;
+        finalName = file.name;
+        mediaType = inferMediaType(file.name);
+      } else if (url) {
+        const trimmed = url.trim();
+        if (!/^https?:\/\//i.test(trimmed)) {
+          throw new Error("La URL debe empezar con http:// o https://");
+        }
+        finalUrl = trimmed;
+        // If the admin gave a custom name, use it. Otherwise fall back
+        // to the last path segment so the row at least shows something
+        // recognizable in the gallery hover label.
+        finalName = name?.trim() || trimmed.split("/").pop() || "item";
+        mediaType = inferMediaType(finalName);
+      } else {
+        throw new Error("Necesitas un archivo o una URL");
+      }
+
       const { data: maxRow } = await sb
         .from("chatter_vault_items")
         .select("position")
@@ -263,9 +292,9 @@ export const useAddVaultItem = () => {
 
       const row = {
         profile_id: profileId,
-        name: file.name,
-        url: pub.publicUrl,
-        media_type: inferMediaType(file.name),
+        name: finalName,
+        url: finalUrl,
+        media_type: mediaType,
         position: nextPos,
       };
       const { data, error } = await sb

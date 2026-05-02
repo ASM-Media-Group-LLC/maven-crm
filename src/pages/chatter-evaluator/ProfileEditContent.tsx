@@ -13,8 +13,10 @@ import {
   useChatterProfiles,
   useUpdateChatterProfile,
   useUploadChatterAvatar,
+  useChatterVaultByProfile,
   type ChatterProfileUpdate,
 } from "@/hooks/useChatterEvaluator";
+import { VaultGallery } from "./VaultGallery";
 import type { ChatterProfile } from "./types";
 
 interface BilingualConfig {
@@ -94,12 +96,15 @@ const ChatterProfileEditContent = () => {
   const profilesQ = useChatterProfiles();
   const update = useUpdateChatterProfile();
   const uploadAvatar = useUploadChatterAvatar();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const profile = useMemo(
     () => profilesQ.data?.find((p) => p.key === profileKey) ?? null,
     [profilesQ.data, profileKey]
   );
+  // Vault items query for the right-bottom Vault section. Same hook the
+  // ProfileDetailContent uses, so the same items show up regardless of
+  // which screen the admin is on.
+  const vaultQ = useChatterVaultByProfile(profile?.id);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<FormState | null>(null);
   useEffect(() => {
@@ -404,6 +409,34 @@ const ChatterProfileEditContent = () => {
             ))}
           </CardContent>
         </Card>
+
+        {/* Vault — mirrors the original Roleplaychatters admin edit
+            screen (index.html line 1264 "Vault - Contenido precargado").
+            Drag/drop to upload, click to open lightbox, ✕ to remove. */}
+        {profile && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-semibold">
+                  Vault ({vaultQ.isLoading ? "…" : vaultQ.data?.length ?? 0})
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Contenido precargado del personaje (fotos / videos).
+                </p>
+              </div>
+              {vaultQ.isLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando vault…</p>
+              ) : (
+                <VaultGallery
+                  items={vaultQ.data ?? []}
+                  profileId={profile.id}
+                  profileKey={profile.key}
+                  editable
+                />
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Bottom save */}
         <div className="flex justify-end pt-2">
