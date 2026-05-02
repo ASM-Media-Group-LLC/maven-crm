@@ -890,7 +890,6 @@ const ChatterPublicView = () => {
             </div>
             <LangSelect />
             <VolumeControl />
-            <FontZoom />
             <ThemeToggle />
           </div>
         </header>
@@ -937,12 +936,14 @@ const ChatterPublicView = () => {
         </div>
 
         {/* Emoji bar (in-memory). The original places it just above the
-            composer row, not full-width like a popover. */}
+            composer row with the A−/A+ font-zoom buttons pushed to the
+            right edge via .chat-zoom { margin-left: auto }. */}
         <EmojiBar
           emojis={chatterEmojis}
           onPick={(e) => setInput((v) => v + e)}
           onAdd={(e) => setChatterEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
           onRemove={(e) => setChatterEmojis((curr) => curr.filter((x) => x !== e))}
+          trailing={<FontZoom />}
         />
 
         {/* Composer row */}

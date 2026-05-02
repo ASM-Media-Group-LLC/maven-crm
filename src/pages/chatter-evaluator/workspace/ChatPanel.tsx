@@ -706,7 +706,6 @@ export const ChatPanel = ({ session }: Props) => {
             {/* Volume + Actions (right) */}
             <div className="flex flex-wrap items-center justify-end gap-2">
               <VolumeControl />
-              <FontZoom />
               <Button
                 size="sm"
                 variant="outline"
@@ -793,6 +792,7 @@ export const ChatPanel = ({ session }: Props) => {
           onRemove={(e) =>
             persistEmojis(examinerEmojis.filter((x) => x !== e))
           }
+          trailing={<FontZoom />}
         />
       )}
 

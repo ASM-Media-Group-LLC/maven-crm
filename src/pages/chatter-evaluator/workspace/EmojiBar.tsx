@@ -30,6 +30,10 @@ interface EmojiBarProps {
   /** When true, all the chip-mode interactions (edit on/off, X to remove,
    *  + to add) are visible. When false, the bar is read-only display. */
   editable?: boolean;
+  /** Anything pushed to the right edge of the bar via `margin-left: auto`.
+   *  Used to host the A−/A+ font zoom buttons in the same spot the
+   *  original Roleplaychatters had them (.chat-zoom on the emoji row). */
+  trailing?: React.ReactNode;
 }
 
 export const EmojiBar = ({
@@ -38,6 +42,7 @@ export const EmojiBar = ({
   onAdd,
   onRemove,
   editable = true,
+  trailing,
 }: EmojiBarProps) => {
   const [editMode, setEditMode] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -100,6 +105,7 @@ export const EmojiBar = ({
             </button>
           </>
         )}
+        {trailing && <div className="ml-auto flex items-center">{trailing}</div>}
       </div>
 
       {editable && (

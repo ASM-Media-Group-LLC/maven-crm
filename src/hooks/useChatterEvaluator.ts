@@ -574,6 +574,22 @@ export const usePurchaseChatterMessage = () => {
   });
 };
 
+export const useDeleteChatterSession = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      // ON DELETE CASCADE on chatter_messages / chatter_evaluations means
+      // a single delete on chatter_sessions wipes the whole session.
+      const { error } = await sb
+        .from("chatter_sessions")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
+  });
+};
+
 export const useEndChatterSession = () => {
   const qc = useQueryClient();
   return useMutation({

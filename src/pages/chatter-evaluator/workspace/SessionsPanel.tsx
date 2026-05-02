@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Clock, CircleDot, CircleDashed } from "lucide-react";
+import { Plus, X, Clock, CircleDot, CircleDashed, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   useChatterSessions,
   useChatterProfiles,
   useEndChatterSession,
+  useDeleteChatterSession,
 } from "@/hooks/useChatterEvaluator";
 import { NewSessionDialog } from "../NewSessionDialog";
 import type { ChatterSession, ChatterProfile } from "../types";
@@ -39,12 +41,14 @@ const SessionRow = ({
   active,
   onSelect,
   onEnd,
+  onDelete,
 }: {
   session: ChatterSession;
   profile: ChatterProfile | null;
   active: boolean;
   onSelect: () => void;
   onEnd: () => void;
+  onDelete: () => void;
 }) => (
   <button
     type="button"
@@ -82,14 +86,28 @@ const SessionRow = ({
         <span>{formatRelative(session.created_at)}</span>
       </div>
     </div>
-    {session.status !== "ended" && (
+    {session.status !== "ended" ? (
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onEnd(); }}
         className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/20 hover:text-destructive group-hover:opacity-100"
         aria-label="Cerrar sesión"
+        title="Cerrar sesión"
       >
         <X className="h-3 w-3" />
+      </button>
+    ) : (
+      // Closed sessions get a trash icon instead — fully removes the
+      // session row + cascades messages/evaluation, since the user
+      // explicitly asked for a way to clean up the closed list.
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/20 hover:text-destructive group-hover:opacity-100"
+        aria-label="Eliminar sesión"
+        title="Eliminar permanentemente"
+      >
+        <Trash2 className="h-3 w-3" />
       </button>
     )}
   </button>
@@ -99,6 +117,7 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   const sessionsQ = useChatterSessions("all");
   const profilesQ = useChatterProfiles();
   const endMut = useEndChatterSession();
+  const deleteMut = useDeleteChatterSession();
   const qc = useQueryClient();
   const [newOpen, setNewOpen] = useState(false);
   const [tab, setTab] = useState<"open" | "ended">("open");
@@ -138,6 +157,17 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
       if (selectedId === id) onSelect(null);
     } catch {
       // toast is handled by the global query error if any; silent fallback
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("¿Eliminar esta sesión cerrada? Se borran mensajes y evaluación. No se puede deshacer.")) return;
+    try {
+      await deleteMut.mutateAsync(id);
+      if (selectedId === id) onSelect(null);
+      toast.success("Sesión eliminada");
+    } catch (e) {
+      toast.error("No se pudo eliminar", { description: (e as Error).message });
     }
   };
 
@@ -197,6 +227,7 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
             active={s.id === selectedId}
             onSelect={() => onSelect(s.id)}
             onEnd={() => handleEnd(s.id)}
+            onDelete={() => handleDelete(s.id)}
           />
         ))}
       </div>
