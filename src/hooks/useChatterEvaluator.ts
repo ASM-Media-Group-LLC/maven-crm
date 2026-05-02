@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { buildEmailHtml, buildEmailSubject } from "@/pages/chatter-evaluator/emailTemplate";
 import type {
   ChatterProfile,
   ChatterVaultItem,
@@ -727,14 +728,14 @@ const fireWebhookInBackground = async (
       .maybeSingle();
     const profile = (prof as ChatterProfile | null) ?? null;
 
-    const payload = {
+    const corePayload = {
       evaluationId: evaluation.id,
       sessionId: session.id,
       createdAt: evaluation.created_at,
       chatterName: session.chatter_name,
       modelName: profile?.name ?? session.profile_id,
       examinerName: evaluation.examiner_name ?? "(unnamed)",
-      verdict: evaluation.verdict,
+      verdict: evaluation.verdict as "apto" | "no_apto",
       verdictLabel: evaluation.verdict === "apto" ? "APTO" : "NO APTO",
       scorePct: evaluation.score_pct ?? 0,
       badge:
@@ -758,7 +759,16 @@ const fireWebhookInBackground = async (
           m.role === "fan" ? (config?.fan_name ?? "JavixBuster") :
           m.role === "chatter" ? session.chatter_name : "system",
       })),
+    };
+
+    // Build the email body + subject on the client. Apps Script uses
+    // these as-is so that future visual changes to the email ship with
+    // a normal Maven deploy (no Apps Script redeploy needed).
+    const payload = {
+      ...corePayload,
       emails: config?.notification_emails ?? [],
+      emailSubject: buildEmailSubject(corePayload),
+      emailHtml: buildEmailHtml(corePayload),
     };
 
     const res = await fetch(config.apps_script_url, {

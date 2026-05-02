@@ -146,11 +146,24 @@ function sendMavenEmail(body, docUrl) {
     throw new Error("no recipients in payload (config.notification_emails empty?)");
   }
 
-  var subject = CONFIG.SUBJECT_PREFIX + " — " +
-    body.verdictLabel + ": " + body.chatterName +
-    " (" + body.scorePct + "%)";
+  // Prefer the subject + html the Maven client built. Fall back to the
+  // legacy in-script template only when the client didn't send them
+  // (older deploys, or someone hitting the script with curl). This way
+  // any future visual change to the email lives in the TS source under
+  // src/pages/chatter-evaluator/emailTemplate.ts and ships with a
+  // normal Maven deploy — no Apps Script redeploy needed.
+  var subject = body.emailSubject ||
+    (CONFIG.SUBJECT_PREFIX + " — " + body.verdictLabel + ": " + body.chatterName + " (" + body.scorePct + "%)");
 
-  var html = renderEmailHtml(body, docUrl);
+  var html = body.emailHtml || renderEmailHtml(body, docUrl);
+
+  // Append the doc link below whatever HTML we received so the recipient
+  // can still jump to the chat transcript directly.
+  if (docUrl) {
+    html += '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#64748b;font-size:12px;padding:12px 32px 26px;">' +
+      '🔗 <a href="' + docUrl + '" style="color:#6d28d9;text-decoration:none;">Abrir transcripción del chat en Drive</a>' +
+      '</div>';
+  }
 
   // Loop and send individually so each recipient sees only their own
   // address in the To: header.
