@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, Paperclip, Volume2, VolumeX, Clock, Smile } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, Paperclip, Volume2, VolumeX, Clock } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { EmojiBar, DEFAULT_EMOJIS } from "./EmojiBar";
+import { useUpdateChatterConfig } from "@/hooks/useChatterEvaluator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -184,6 +186,13 @@ export const ChatPanel = ({ session }: Props) => {
   const [muted, setMuted] = useState<boolean>(() => localStorage.getItem("maven.chatter.muted") === "1");
   const lastMessageIdRef = useRef<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  const updateConfigMut = useUpdateChatterConfig();
+  const examinerEmojis =
+    configQ.data?.examiner_emojis && configQ.data.examiner_emojis.length > 0
+      ? configQ.data.examiner_emojis
+      : DEFAULT_EMOJIS;
+  const persistEmojis = (next: string[]) =>
+    updateConfigMut.mutate({ examiner_emojis: next });
 
   // Tick clock every second for countdown
   useEffect(() => {
@@ -475,8 +484,20 @@ export const ChatPanel = ({ session }: Props) => {
         ))}
       </div>
 
+      {/* Emoji bar (always visible, examiner emojis are persisted globally) */}
+      {session.status !== "ended" && (
+        <EmojiBar
+          emojis={examinerEmojis}
+          onPick={(e) => setInput((v) => v + e)}
+          onAdd={(e) => persistEmojis([...examinerEmojis, e])}
+          onRemove={(e) =>
+            persistEmojis(examinerEmojis.filter((x) => x !== e))
+          }
+        />
+      )}
+
       {/* Input */}
-      <div className="border-t p-2">
+      <div className="p-2">
         <input
           ref={fileInputRef}
           type="file"
@@ -545,32 +566,6 @@ export const ChatPanel = ({ session }: Props) => {
               >
                 Otro monto…
               </Button>
-            </PopoverContent>
-          </Popover>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                size="icon"
-                variant="outline"
-                disabled={session.status === "ended"}
-                title="Emoji"
-              >
-                <Smile className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-2" align="end">
-              <div className="grid grid-cols-8 gap-1 text-xl">
-                {["😏","🔥","💦","😈","❤️","🥵","😍","🙈","🍆","💋","😘","😉","🤤","🥰","😜","💸"].map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    onClick={() => setInput((v) => v + e)}
-                    className="rounded p-1 hover:bg-muted"
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
             </PopoverContent>
           </Popover>
           <Button

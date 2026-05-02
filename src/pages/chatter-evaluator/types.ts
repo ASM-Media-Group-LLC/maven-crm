@@ -129,5 +129,6 @@ export interface ChatterConfig {
   fan_name: string;
   fan_avatar_url: string;
   fan_avatar_url_light: string | null;
+  examiner_emojis: string[];
   updated_at: string;
 }

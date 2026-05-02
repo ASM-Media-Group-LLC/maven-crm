@@ -1,12 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Send, Loader2, Lock, AlertTriangle, MessageCircle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Volume2, VolumeX, Clock, Smile } from "lucide-react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Volume2, VolumeX, Clock } from "lucide-react";
+import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -203,6 +199,9 @@ const ChatterPublicView = () => {
   const [uploading, setUploading] = useState(false);
   const [muted, setMuted] = useState<boolean>(() => localStorage.getItem("maven.chatter.public.muted") === "1");
   const [now, setNow] = useState(Date.now());
+  // Chatter-side emojis live in memory only (matches the original
+  // Roleplaychatters behavior — they reset to DEFAULT_EMOJIS on reload).
+  const [chatterEmojis, setChatterEmojis] = useState<string[]>([...DEFAULT_EMOJIS]);
   const lastMessageIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -579,6 +578,17 @@ const ChatterPublicView = () => {
         </div>
       </div>
 
+      {/* Emoji bar above composer (chatter side: in-memory only,
+          matches original Roleplaychatters behavior). */}
+      <div className="mx-auto w-full max-w-2xl">
+        <EmojiBar
+          emojis={chatterEmojis}
+          onPick={(e) => setInput((v) => v + e)}
+          onAdd={(e) => setChatterEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
+          onRemove={(e) => setChatterEmojis((curr) => curr.filter((x) => x !== e))}
+        />
+      </div>
+
       {/* Composer */}
       <div className="border-t bg-card p-3">
         <div className="mx-auto flex max-w-2xl items-end gap-2">
@@ -610,27 +620,6 @@ const ChatterPublicView = () => {
           >
             <FolderOpen className="h-4 w-4" />
           </Button>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button size="icon" variant="outline" title="Emoji">
-                <Smile className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-2" align="end">
-              <div className="grid grid-cols-8 gap-1 text-xl">
-                {["😏","🔥","💦","😈","❤️","🥵","😍","🙈","🍆","💋","😘","😉","🤤","🥰","😜","💸"].map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    onClick={() => setInput((v) => v + e)}
-                    className="rounded p-1 hover:bg-muted"
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
           <textarea
             value={input}
             onChange={(e) => handleInputChange(e.target.value)}
