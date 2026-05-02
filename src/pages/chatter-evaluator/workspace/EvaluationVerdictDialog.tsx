@@ -61,7 +61,15 @@ export const EvaluationVerdictDialog = ({
   }, [open, scorePct]);
 
   const criteria = criteriaQ.data ?? [];
-  const filledCount = Object.values(scores).filter(Boolean).length;
+  // Only count scores whose key matches a CURRENT criterion id. After a
+  // criteria reset, localStorage may still hold scores keyed by old ids
+  // that no longer exist — those would inflate the count and (worse)
+  // never be matched against `criteria`, leaving the button stuck
+  // disabled even when every visible row has been rated.
+  const filledCount = criteria.reduce(
+    (n, c) => (scores[c.id] ? n + 1 : n),
+    0,
+  );
   const allFilled = filledCount === criteria.length && criteria.length > 0;
   const missing = criteria.length - filledCount;
 

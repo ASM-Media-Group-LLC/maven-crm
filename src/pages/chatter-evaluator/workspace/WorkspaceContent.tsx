@@ -106,7 +106,14 @@ const WorkspaceContent = () => {
 
   const handleSubmit = () => {
     if (!selectedSession) return;
-    const filled = Object.values(currentScores).filter(Boolean).length;
+    // Only count scores against current criterion ids — see the same
+    // guard in EvaluationVerdictDialog: stale ids from a prior reset
+    // would otherwise bypass this check.
+    const criteria = criteriaQ.data ?? [];
+    const filled = criteria.reduce(
+      (n, c) => (currentScores[c.id] ? n + 1 : n),
+      0,
+    );
     if (filled === 0) {
       toast.error("No hay criterios calificados");
       return;
