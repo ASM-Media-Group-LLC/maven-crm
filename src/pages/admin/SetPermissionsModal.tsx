@@ -93,15 +93,22 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
     });
   };
 
-  // Toggle module + cascade to all its submodules
+  // Toggle module + cascade to all its submodules. When the parent
+  // checkbox is in indeterminate state, treat the click as "select all"
+  // (cleanest user expectation).
   const toggleModule = (mod: string) => {
     setState((prev) => {
       const next = { ...prev };
       const moduleKey = getKey(mod, null);
-      const newVal = !next[moduleKey]?.can_access;
-      next[moduleKey] = { ...next[moduleKey], can_access: newVal };
       const cfg = MODULES_CONFIG.find((m) => m.module === mod);
-      cfg?.submodules.forEach((sub) => {
+      const subs = cfg?.submodules ?? [];
+      const allSubsOn =
+        subs.length > 0 && subs.every((s) => prev[getKey(mod, s)]?.can_access);
+      const moduleOn = prev[moduleKey]?.can_access;
+      // If everything's on → turn it all off. Otherwise turn it all on.
+      const newVal = !(moduleOn && (subs.length === 0 || allSubsOn));
+      next[moduleKey] = { ...next[moduleKey], can_access: newVal };
+      subs.forEach((sub) => {
         const k = getKey(mod, sub);
         next[k] = { ...next[k], can_access: newVal };
       });
@@ -109,11 +116,37 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
     });
   };
 
-  const toggleSub = (key: string) => {
-    setState((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], can_access: !prev[key]?.can_access },
-    }));
+  // Toggle a single sub and re-derive the parent module: if any sub is
+  // on, the module should read as "active" (so the sidebar still shows
+  // it); if every sub is off, the module is off.
+  const toggleSub = (mod: string, key: string) => {
+    setState((prev) => {
+      const next = { ...prev, [key]: { ...prev[key], can_access: !prev[key]?.can_access } };
+      const cfg = MODULES_CONFIG.find((m) => m.module === mod);
+      if (cfg && cfg.submodules.length > 0) {
+        const moduleKey = getKey(mod, null);
+        const anySubOn = cfg.submodules.some(
+          (sub) => next[getKey(mod, sub)]?.can_access,
+        );
+        next[moduleKey] = { ...next[moduleKey], can_access: anySubOn };
+      }
+      return next;
+    });
+  };
+
+  // Returns true / false / "indeterminate" so the parent checkbox can
+  // visually reflect partial sub-selection.
+  const getModuleCheckState = (mod: string): boolean | "indeterminate" => {
+    const cfg = MODULES_CONFIG.find((m) => m.module === mod);
+    const moduleKey = getKey(mod, null);
+    const moduleOn = state[moduleKey]?.can_access ?? false;
+    if (!cfg || cfg.submodules.length === 0) return moduleOn;
+    const subStates = cfg.submodules.map((s) => state[getKey(mod, s)]?.can_access);
+    const allOn = subStates.every(Boolean);
+    const anyOn = subStates.some(Boolean);
+    if (allOn) return true;
+    if (anyOn) return "indeterminate";
+    return false;
   };
 
   const setModuleDataScope = (mod: string, scope: string) => {
@@ -194,94 +227,106 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
             </div>
           </div>
 
-          {/* Module cards */}
-          <div className="space-y-3 px-1">
-            {MODULES_CONFIG.map((mod) => {
-              const moduleKey = getKey(mod.module, null);
-              const isExpanded = expanded[mod.module] ?? false;
-              const hasSubmodules = mod.submodules.length > 0;
-              const enabledCount = getEnabledSubCount(mod.module);
-              const totalSubs = mod.submodules.length;
-              const dataScope = getModuleDataScope(mod.module);
-
+          {/* Module cards — grouped by sidebar section */}
+          <div className="space-y-5 px-1">
+            {Array.from(new Set(MODULES_CONFIG.map((m) => m.group))).map((group) => {
+              const groupModules = MODULES_CONFIG.filter((m) => m.group === group);
               return (
-                <Collapsible
-                  key={mod.module}
-                  open={isExpanded}
-                  onOpenChange={(o) => setExpanded((p) => ({ ...p, [mod.module]: o }))}
-                >
-                  <div className="border border-border rounded-lg bg-muted/30">
-                    {/* Summary row */}
-                    <div className="px-4 py-3">
-                      <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center">
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            checked={state[moduleKey]?.can_access ?? false}
-                            onCheckedChange={() => toggleModule(mod.module)}
-                          />
-                          <span className="text-sm font-semibold">{mod.module}</span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {hasSubmodules ? `${enabledCount}/${totalSubs} ${t("permissions.functionsCount")}` : "—"}
-                        </span>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">
-                            {getDataScopeLabels(t)[dataScope] || t("permissions.allData")}
-                          </span>
-                          {hasSubmodules ? (
-                            <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 cursor-pointer ml-2">
-                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                            </CollapsibleTrigger>
-                          ) : (
-                            <span className="ml-2 w-4" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                <div key={group} className="space-y-2">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                    {group}
+                  </h3>
+                  <div className="space-y-2">
+                    {groupModules.map((mod) => {
+                      const isExpanded = expanded[mod.module] ?? false;
+                      const hasSubmodules = mod.submodules.length > 0;
+                      const enabledCount = getEnabledSubCount(mod.module);
+                      const totalSubs = mod.submodules.length;
+                      const dataScope = getModuleDataScope(mod.module);
+                      const moduleCheckState = getModuleCheckState(mod.module);
 
-                    {/* Expanded details */}
-                    <CollapsibleContent>
-                      <div className="border-t border-border px-4 py-3">
-                        <div className="grid grid-cols-[1fr_1fr] gap-4">
-                          {/* Left: submodules */}
-                          <div className="space-y-2">
-                            {hasSubmodules ? (
-                              mod.submodules.map((sub) => {
-                                const key = getKey(mod.module, sub);
-                                return (
-                                  <div key={key} className="flex items-center gap-2">
-                                    <Checkbox
-                                      checked={state[key]?.can_access ?? false}
-                                      onCheckedChange={() => toggleSub(key)}
-                                    />
-                                    <span className="text-sm">{sub}</span>
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <p className="text-xs text-muted-foreground">{t("permissions.noSubfunctions")}</p>
-                            )}
-                          </div>
-                          {/* Right: data scope radio */}
-                          <div>
-                            <RadioGroup
-                              value={dataScope}
-                              onValueChange={(v) => setModuleDataScope(mod.module, v)}
-                              className="space-y-2"
-                            >
-                              {getDataScopeOptions(t).map((o) => (
-                                <div key={o.value} className="flex items-center gap-2">
-                                  <RadioGroupItem value={o.value} id={`${mod.module}-${o.value}`} className="h-3.5 w-3.5" />
-                                  <Label htmlFor={`${mod.module}-${o.value}`} className="text-sm">{o.label}</Label>
+                      return (
+                        <Collapsible
+                          key={mod.module}
+                          open={isExpanded}
+                          onOpenChange={(o) => setExpanded((p) => ({ ...p, [mod.module]: o }))}
+                        >
+                          <div className="border border-border rounded-lg bg-muted/30">
+                            {/* Summary row */}
+                            <div className="px-4 py-3">
+                              <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center">
+                                <div className="flex items-center gap-2">
+                                  <Checkbox
+                                    checked={moduleCheckState}
+                                    onCheckedChange={() => toggleModule(mod.module)}
+                                  />
+                                  <span className="text-sm font-semibold">{mod.module}</span>
                                 </div>
-                              ))}
-                            </RadioGroup>
+                                <span className="text-xs text-muted-foreground">
+                                  {hasSubmodules ? `${enabledCount}/${totalSubs} ${t("permissions.functionsCount")}` : "—"}
+                                </span>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-muted-foreground">
+                                    {getDataScopeLabels(t)[dataScope] || t("permissions.allData")}
+                                  </span>
+                                  {hasSubmodules ? (
+                                    <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 cursor-pointer ml-2">
+                                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                    </CollapsibleTrigger>
+                                  ) : (
+                                    <span className="ml-2 w-4" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Expanded details */}
+                            <CollapsibleContent>
+                              <div className="border-t border-border px-4 py-3">
+                                <div className="grid grid-cols-[1fr_1fr] gap-4">
+                                  {/* Left: submodules */}
+                                  <div className="space-y-2">
+                                    {hasSubmodules ? (
+                                      mod.submodules.map((sub) => {
+                                        const key = getKey(mod.module, sub);
+                                        return (
+                                          <div key={key} className="flex items-center gap-2">
+                                            <Checkbox
+                                              checked={state[key]?.can_access ?? false}
+                                              onCheckedChange={() => toggleSub(mod.module, key)}
+                                            />
+                                            <span className="text-sm">{sub}</span>
+                                          </div>
+                                        );
+                                      })
+                                    ) : (
+                                      <p className="text-xs text-muted-foreground">{t("permissions.noSubfunctions")}</p>
+                                    )}
+                                  </div>
+                                  {/* Right: data scope radio */}
+                                  <div>
+                                    <RadioGroup
+                                      value={dataScope}
+                                      onValueChange={(v) => setModuleDataScope(mod.module, v)}
+                                      className="space-y-2"
+                                    >
+                                      {getDataScopeOptions(t).map((o) => (
+                                        <div key={o.value} className="flex items-center gap-2">
+                                          <RadioGroupItem value={o.value} id={`${mod.module}-${o.value}`} className="h-3.5 w-3.5" />
+                                          <Label htmlFor={`${mod.module}-${o.value}`} className="text-sm">{o.label}</Label>
+                                        </div>
+                                      ))}
+                                    </RadioGroup>
+                                  </div>
+                                </div>
+                              </div>
+                            </CollapsibleContent>
                           </div>
-                        </div>
-                      </div>
-                    </CollapsibleContent>
+                        </Collapsible>
+                      );
+                    })}
                   </div>
-                </Collapsible>
+                </div>
               );
             })}
           </div>

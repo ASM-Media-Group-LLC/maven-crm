@@ -23,20 +23,43 @@ export interface RolePermission {
   data_scope: string;
 }
 
-export const MODULES_CONFIG = [
-  { module: "Dashboard", submodules: [] },
-  { module: "Creator Sales", submodules: ["Dashboard", "Sales Report", "Sales Report V1", "AI Sales", "AI Config"] },
-  { module: "Contactos", submodules: ["Contactos", "Agencias"] },
-  { module: "Creadores", submodules: ["Lista", "Perfil", "Nuevo", "Prospectos", "Onboarding", "Dashboard"] },
-  { module: "Eventos", submodules: ["Lista", "Detalle", "Nuevo", "Editar"] },
-  { module: "Promolog", submodules: [] },
-  { module: "LeadGen", submodules: ["Lista", "Base de Datos"] },
-  { module: "Closers", submodules: [] },
-  { module: "Tickets", submodules: [] },
-  { module: "Tareas", submodules: ["Proyectos", "Tareas"] },
-  { module: "HR", submodules: ["Dashboard", "Directorio", "Empleados", "Ausencias", "Incidentes", "Candidatos", "Onboarding", "Offboarding", "Capacitación", "Desempeño", "Asistencia", "Vacaciones", "Permisos", "Horarios", "Monitoreo", "Organización", "Deducciones"] },
-  { module: "Finanzas", submodules: ["Dashboard", "Nómina", "Facturación", "Control", "Reportes", "Collections", "Horas Variables", "Configuración"] },
-  { module: "Administración", submodules: ["Usuarios", "Auditoría"] },
+// Grouped + ordered to mirror the live sidebar so admins flip access in
+// the same shape they see in the app. The `group` is just a label for
+// the section header in the permissions modal — runtime checks only
+// look at `module` + `submodule`.
+export interface ModuleConfig {
+  group: string;
+  module: string;
+  submodules: string[];
+}
+
+export const MODULES_CONFIG: ModuleConfig[] = [
+  // === Menú principal ===
+  { group: "Menú",          module: "Dashboard",     submodules: [] },
+  { group: "Menú",          module: "Messenger",     submodules: [] },
+  { group: "Menú",          module: "Contactos",     submodules: [] },
+  { group: "Menú",          module: "Tareas",        submodules: [] },
+  { group: "Menú",          module: "Eventos",       submodules: [] },
+  { group: "Menú",          module: "SuperContacts", submodules: [] }, // sidebar lo muestra como "Wishlist"
+  { group: "Menú",          module: "Creadores",     submodules: ["Dashboard", "Lista", "Onboarding", "Offboarding", "Personalizados", "Perfil", "Nuevo"] },
+  { group: "Menú",          module: "Creator Sales", submodules: ["Dashboard", "Reportes", "IA Ventas", "Auditoría"] },
+
+  // === Operaciones ===
+  { group: "Operaciones",   module: "Promolog",      submodules: [] },
+  { group: "Operaciones",   module: "LeadGen",       submodules: [] },
+  { group: "Operaciones",   module: "Closers",       submodules: [] },
+  { group: "Operaciones",   module: "Tickets",       submodules: [] },
+  { group: "Operaciones",   module: "Chatters",      submodules: ["Evaluator", "Workspace", "Admin"] },
+
+  // === Finanzas ===
+  { group: "Finanzas",      module: "Finanzas",      submodules: ["Dashboard", "Collections", "Nómina", "Horas Variables", "Invoices", "Templates", "Control Financiero", "Reportes", "Configuración"] },
+
+  // === Recursos Humanos ===
+  { group: "Recursos Humanos", module: "HR",         submodules: ["Dashboard", "Candidatos", "Onboarding", "Empleados Activos", "Offboarding", "Asistencia", "Horarios", "Horarios Chatters", "Horas Extra", "Banco de Horas", "Vacaciones", "Permisos", "Monitoreo", "Incidentes", "Desempeño", "Capacitación", "Directorio", "Organigrama", "Deducciones", "Anuncios"] },
+
+  // === Configuración / Settings ===
+  { group: "Configuración", module: "Administración", submodules: ["Usuarios", "Roles", "Auditoría"] },
+  { group: "Configuración", module: "ProyectoMP",     submodules: [] },
 ];
 
 export const useRoles = () => {
