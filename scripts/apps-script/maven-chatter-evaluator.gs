@@ -58,19 +58,21 @@ var CONFIG = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Maven palette
+// Maven palette (dark theme + purple, matches the legacy report layout)
 // ═══════════════════════════════════════════════════════════════════════════
 var COLORS = {
-  primary:        "#6d28d9",  // purple-700
-  primaryDark:    "#4338ca",  // indigo-700
-  bg:             "#f4f4f7",
-  card:           "#ffffff",
-  text:           "#1f2937",
-  muted:          "#6b7280",
-  border:         "#e5e7eb",
-  pass:           "#22c55e",
-  partial:        "#f59e0b",
-  fail:           "#ef4444",
+  primary:        "#a78bfa",  // purple-400 (visible on dark bg)
+  primaryDeep:    "#7c3aed",  // purple-600
+  bg:             "#0a0a0f",
+  card:           "#12121a",
+  cardSoft:       "#1a1a24",
+  border:         "#2a2a38",
+  text:           "#f0eef4",
+  textMuted:      "#7a7890",
+  textDim:        "#5a5870",
+  pass:           "#5ccb8a",
+  partial:        "#e0c06a",
+  fail:           "#e05c7a",
 };
 
 var STATUS = {

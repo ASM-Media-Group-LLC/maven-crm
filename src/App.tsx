@@ -71,6 +71,7 @@ const ChatterProfileDetail = lazy(() => import("./pages/ChatterProfileDetail"));
 const ChatterProfileEdit = lazy(() => import("./pages/ChatterProfileEdit"));
 const ChatterAdmin = lazy(() => import("./pages/ChatterAdmin"));
 const ChatterWorkspace = lazy(() => import("./pages/ChatterWorkspace"));
+const ChatterPublicView = lazy(() => import("./pages/ChatterPublicView"));
 const Contactos = lazy(() => import("./pages/Contactos"));
 const NuevoContacto = lazy(() => import("./pages/NuevoContacto"));
 
@@ -194,6 +195,8 @@ const App = () => (
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/eventos/share/:token" element={<EventoSharePage />} />
+              {/* Chatter public view — no auth, accessible via /chatter/<sessionId> */}
+              <Route path="/chatter/:sessionId" element={<ChatterPublicView />} />
               <Route path="/shared/agenda/:token" element={<SharedAgendaPage />} />
               <Route path="/tareas/share/:token" element={<TaskSharePage />} />
               <Route path="/tareas/project-share/:token" element={<ProjectSharePage />} />
