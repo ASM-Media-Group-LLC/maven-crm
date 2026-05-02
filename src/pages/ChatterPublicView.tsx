@@ -39,6 +39,39 @@ const getDeviceId = (): string => {
   return id;
 };
 
+// Per-session tab claim — matches the original Roleplaychatters tab lock
+// (index.html line 2364 onward). Each tab writes its own UUID + a fresh
+// timestamp every 2 seconds to localStorage. A claim is "stale" after 6s
+// (3× heartbeat) and can be silently taken over. A *fresh* claim from
+// another tab triggers the "Use here / Cancel" prompt before stealing it.
+const TAB_HEARTBEAT_MS = 2000;
+const TAB_STALE_MS = 6000;
+const tabKey = (sessionId: string) => `maven.chatter.tab.${sessionId}`;
+
+interface TabClaim {
+  tabId: string;
+  ts: number;
+}
+const readTabClaim = (sessionId: string): TabClaim | null => {
+  try {
+    const raw = localStorage.getItem(tabKey(sessionId));
+    return raw ? (JSON.parse(raw) as TabClaim) : null;
+  } catch {
+    return null;
+  }
+};
+const writeTabClaim = (sessionId: string, tabId: string) => {
+  try {
+    localStorage.setItem(tabKey(sessionId), JSON.stringify({ tabId, ts: Date.now() }));
+  } catch {
+    /* no-op */
+  }
+};
+const clearTabClaim = (sessionId: string, tabId: string) => {
+  const c = readTabClaim(sessionId);
+  if (c?.tabId === tabId) localStorage.removeItem(tabKey(sessionId));
+};
+
 const formatTime = (iso: string): string => {
   const d = new Date(iso);
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
@@ -228,6 +261,36 @@ const NotFoundScreen = ({ reason }: { reason: string }) => (
   </div>
 );
 
+const TabLockedScreen = () => (
+  <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+    <Lock className="h-12 w-12 text-amber-500" />
+    <h1 className="text-xl font-bold">Sesión abierta en otra pestaña</h1>
+    <p className="max-w-sm text-sm text-muted-foreground">
+      Esta sesión se está usando en otra pestaña de este navegador.
+    </p>
+  </div>
+);
+
+const TabTakeoverScreen = ({
+  onUseHere,
+  onCancel,
+}: {
+  onUseHere: () => void;
+  onCancel: () => void;
+}) => (
+  <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+    <div className="text-5xl">👥</div>
+    <h1 className="text-xl font-bold">¿Usar esta sesión aquí?</h1>
+    <p className="max-w-sm text-sm text-muted-foreground">
+      Ya hay otra pestaña usando esta sesión. Si continúas, la otra pestaña se cerrará.
+    </p>
+    <div className="mt-2 flex gap-3">
+      <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+      <Button onClick={onUseHere}>Usar aquí</Button>
+    </div>
+  </div>
+);
+
 const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -348,6 +411,14 @@ const ChatterPublicView = () => {
   const [input, setInput] = useState("");
   const [locked, setLocked] = useState(false);
   const [claimed, setClaimed] = useState(false);
+  // Tab-lock state. "checking" while we read localStorage, "prompt" if a
+  // live claim from another tab exists (user picks Use here / Cancel),
+  // "active" once we own the claim, "blocked" after taking over the loser
+  // sees a permanent locked screen.
+  const [tabState, setTabState] = useState<"checking" | "prompt" | "active" | "blocked">(
+    "checking",
+  );
+  const tabIdRef = useRef<string>(crypto.randomUUID());
   const [vaultOpen, setVaultOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -444,9 +515,61 @@ const ChatterPublicView = () => {
     },
   });
 
-  // Claim device on mount, refresh every 20s while open
+  // ----- Tab lock (per-browser) ---------------------------------------------
+  // Run once per sessionId. Decides whether to take over silently (no live
+  // claim, or stale), prompt the user (live claim from another tab), or
+  // claim free.
   useEffect(() => {
     if (!sessionId) return;
+    const myTabId = tabIdRef.current;
+    const existing = readTabClaim(sessionId);
+    const isFresh = existing && Date.now() - (existing.ts ?? 0) < TAB_STALE_MS;
+    if (existing && existing.tabId !== myTabId && isFresh) {
+      setTabState("prompt");
+    } else {
+      writeTabClaim(sessionId, myTabId);
+      setTabState("active");
+    }
+    const onUnload = () => clearTabClaim(sessionId, myTabId);
+    window.addEventListener("beforeunload", onUnload);
+    window.addEventListener("pagehide", onUnload);
+    return () => {
+      window.removeEventListener("beforeunload", onUnload);
+      window.removeEventListener("pagehide", onUnload);
+      clearTabClaim(sessionId, myTabId);
+    };
+  }, [sessionId]);
+
+  // Heartbeat + storage listener once we own the claim. If another tab
+  // takes over (writes a new tabId for our key), we lock ourselves.
+  useEffect(() => {
+    if (!sessionId || tabState !== "active") return;
+    const myTabId = tabIdRef.current;
+    const heartbeat = setInterval(() => writeTabClaim(sessionId, myTabId), TAB_HEARTBEAT_MS);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== tabKey(sessionId)) return;
+      try {
+        const v = e.newValue ? (JSON.parse(e.newValue) as TabClaim) : null;
+        if (v && v.tabId !== myTabId) {
+          clearInterval(heartbeat);
+          setTabState("blocked");
+        }
+      } catch {
+        /* no-op */
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      clearInterval(heartbeat);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [sessionId, tabState]);
+
+  // Claim device on mount, refresh every 20s while open. Only runs once we
+  // own the local tab claim (otherwise two tabs in the same browser would
+  // race against the strict device lock).
+  useEffect(() => {
+    if (!sessionId || tabState !== "active") return;
     let cancelled = false;
     const claim = async () => {
       try {
@@ -470,7 +593,7 @@ const ChatterPublicView = () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [sessionId]);
+  }, [sessionId, tabState]);
 
   // Realtime subscription on messages
   useEffect(() => {
@@ -702,6 +825,20 @@ const ChatterPublicView = () => {
   if (!session) return <NotFoundScreen reason="Esta sesión no existe o fue eliminada." />;
   if (session.status === "ended") return <NotFoundScreen reason="Esta sesión ya fue cerrada por el examinador." />;
   if (locked) return <LockedScreen />;
+  if (tabState === "blocked") return <TabLockedScreen />;
+  if (tabState === "prompt") {
+    return (
+      <TabTakeoverScreen
+        onUseHere={() => {
+          // Stealing the claim — the previous tab's `storage` listener will
+          // see the new tabId and lock itself.
+          writeTabClaim(sessionId!, tabIdRef.current);
+          setTabState("active");
+        }}
+        onCancel={() => setTabState("blocked")}
+      />
+    );
+  }
 
   if (!claimed) {
     return (

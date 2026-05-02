@@ -115,16 +115,14 @@ Deno.serve(async (req) => {
 
     case "claim-device": {
       if (!body.deviceId) return json(400, { ok: false, error: "deviceId required" });
-      // If another device is currently active and was claimed in the last
-      // 30 seconds, reject. Otherwise (re)claim.
-      const stale = Date.now() - 30 * 1000;
-      const claimedAt = session.active_device_claimed_at
-        ? new Date(session.active_device_claimed_at).getTime()
-        : 0;
+      // Strict single-device lock — matches the original Roleplaychatters
+      // (index.html line 2309 "DEVICE LOCK (strict: one device per session,
+      // no takeover)"). Once a device has claimed the session, every other
+      // device is rejected forever. The original device can always
+      // re-claim/refresh because its id matches.
       const isOtherDevice =
         session.active_device_id && session.active_device_id !== body.deviceId;
-      const isFresh = claimedAt > stale;
-      if (isOtherDevice && isFresh) {
+      if (isOtherDevice) {
         return json(409, {
           ok: false,
           error: "session_locked",
