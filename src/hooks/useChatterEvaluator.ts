@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   ChatterProfile,
@@ -688,13 +689,112 @@ export type SubmitEvaluationInput = {
   scorePct: number;
 };
 
+// Apps Script webhooks routinely take 10–30s to return (the script
+// generates a Drive doc, appends to a Sheet, and sends emails). We don't
+// want the examiner staring at a spinner for that long, so the webhook
+// is fired-and-forgotten in the background and announces its own outcome
+// with a sonner toast when it eventually finishes.
+const fireWebhookInBackground = async (
+  evaluation: ChatterEvaluation,
+  sessionId: string,
+): Promise<void> => {
+  try {
+    const [{ data: cfg }, { data: ses }, { data: msgs }] = await Promise.all([
+      sb.from("chatter_config").select("*").eq("id", 1).maybeSingle(),
+      sb.from("chatter_sessions").select("*").eq("id", sessionId).maybeSingle(),
+      sb
+        .from("chatter_messages")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: true }),
+    ]);
+    const session = ses as ChatterSession | null;
+    const config = cfg as ChatterConfig | null;
+    const messages = (msgs ?? []) as ChatterMessage[];
+    if (!session) throw new Error("session disappeared mid-submit");
+
+    if (!config?.apps_script_url) {
+      toast.warning("Reporte no enviado", {
+        description: "Falta apps_script_url en Admin → Config.",
+      });
+      return;
+    }
+
+    const { data: prof } = await sb
+      .from("chatter_profiles")
+      .select("*")
+      .eq("id", session.profile_id)
+      .maybeSingle();
+    const profile = (prof as ChatterProfile | null) ?? null;
+
+    const payload = {
+      evaluationId: evaluation.id,
+      sessionId: session.id,
+      createdAt: evaluation.created_at,
+      chatterName: session.chatter_name,
+      modelName: profile?.name ?? session.profile_id,
+      examinerName: evaluation.examiner_name ?? "(unnamed)",
+      verdict: evaluation.verdict,
+      verdictLabel: evaluation.verdict === "apto" ? "APTO" : "NO APTO",
+      scorePct: evaluation.score_pct ?? 0,
+      badge:
+        (evaluation.score_pct ?? 0) >= 80 ? "APROBADO" :
+        (evaluation.score_pct ?? 0) >= 50 ? "A CRITERIO" : "NO APTO",
+      criteria: evaluation.criteria_results.map((c) => ({
+        label: c.label,
+        status: c.status,
+        statusLabel:
+          c.status === "pass" ? "Cumple" :
+          c.status === "partial" ? "Parcial" : "No cumple",
+      })),
+      feedback: evaluation.feedback ?? "",
+      chatHistory: messages.map((m) => ({
+        role: m.role,
+        type: m.msg_type,
+        content: m.content,
+        price: m.price,
+        timestamp: m.created_at,
+        from:
+          m.role === "fan" ? (config?.fan_name ?? "JavixBuster") :
+          m.role === "chatter" ? session.chatter_name : "system",
+      })),
+      emails: config?.notification_emails ?? [],
+    };
+
+    const res = await fetch(config.apps_script_url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload),
+      redirect: "follow",
+    });
+    if (!res.ok) {
+      toast.warning("Reporte: webhook falló", {
+        description: `HTTP ${res.status} — la evaluación quedó guardada en la DB.`,
+      });
+      return;
+    }
+    await sb
+      .from("chatter_evaluations")
+      .update({
+        sent_to_apps_script: true,
+        sent_at: new Date().toISOString(),
+      })
+      .eq("id", evaluation.id);
+    toast.success("Reporte enviado", {
+      description: "Apps Script generó el doc + Sheet + emails.",
+    });
+  } catch (e) {
+    toast.warning("Reporte: webhook falló", {
+      description: (e as Error).message,
+    });
+  }
+};
+
 export const useSubmitEvaluation = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: SubmitEvaluationInput): Promise<{
       evaluation: ChatterEvaluation;
-      webhookOk: boolean;
-      webhookError?: string;
     }> => {
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr) throw userErr;
@@ -725,100 +825,13 @@ export const useSubmitEvaluation = () => {
         .update({ status: "ended", ended_at: new Date().toISOString() })
         .eq("id", input.sessionId);
 
-      // 3) Best-effort POST to the Apps Script webhook (Maven-branded
-      //    script — see scripts/apps-script/maven-chatter-evaluator.gs in
-      //    the repo for the deployable code). text/plain skips the CORS
-      //    preflight; Apps Script reads the body via e.postData.contents.
-      let webhookOk = false;
-      let webhookError: string | undefined;
-      try {
-        const [{ data: cfg }, { data: ses }, { data: msgs }] = await Promise.all([
-          sb.from("chatter_config").select("*").eq("id", 1).maybeSingle(),
-          sb.from("chatter_sessions").select("*").eq("id", input.sessionId).maybeSingle(),
-          sb
-            .from("chatter_messages")
-            .select("*")
-            .eq("session_id", input.sessionId)
-            .order("created_at", { ascending: true }),
-        ]);
-        const session = ses as ChatterSession | null;
-        const config = cfg as ChatterConfig | null;
-        const messages = (msgs ?? []) as ChatterMessage[];
-        if (!session) throw new Error("session disappeared mid-submit");
+      // 3) Fire the webhook in the background. The mutation resolves NOW
+      //    so the dialog can close and the examiner moves on; the toast
+      //    inside fireWebhookInBackground announces the result whenever
+      //    Apps Script finishes (typically 10–30s later).
+      void fireWebhookInBackground(evaluation, input.sessionId);
 
-        if (!config?.apps_script_url) {
-          webhookError = "apps_script_url is not configured (Admin → Config)";
-        } else {
-          const { data: prof } = await sb
-            .from("chatter_profiles")
-            .select("*")
-            .eq("id", session.profile_id)
-            .maybeSingle();
-          const profile = (prof as ChatterProfile | null) ?? null;
-
-          const payload = {
-            // Identifiers
-            evaluationId: evaluation.id,
-            sessionId: session.id,
-            createdAt: evaluation.created_at,
-            // Subjects
-            chatterName: session.chatter_name,
-            modelName: profile?.name ?? session.profile_id,
-            examinerName: evaluation.examiner_name ?? "(unnamed)",
-            // Result
-            verdict: evaluation.verdict,                       // "apto" | "no_apto"
-            verdictLabel: evaluation.verdict === "apto" ? "APTO" : "NO APTO",
-            scorePct: evaluation.score_pct ?? 0,
-            badge:
-              (evaluation.score_pct ?? 0) >= 80 ? "APROBADO" :
-              (evaluation.score_pct ?? 0) >= 50 ? "A CRITERIO" : "NO APTO",
-            criteria: evaluation.criteria_results.map((c) => ({
-              label: c.label,
-              status: c.status,                                // "pass" | "partial" | "fail"
-              statusLabel:
-                c.status === "pass" ? "Cumple" :
-                c.status === "partial" ? "Parcial" : "No cumple",
-            })),
-            feedback: evaluation.feedback ?? "",
-            // Chat history (for Drive doc creation)
-            chatHistory: messages.map((m) => ({
-              role: m.role,
-              type: m.msg_type,
-              content: m.content,
-              price: m.price,
-              timestamp: m.created_at,
-              from:
-                m.role === "fan" ? (config?.fan_name ?? "JavixBuster") :
-                m.role === "chatter" ? session.chatter_name : "system",
-            })),
-            // Distribution
-            emails: config?.notification_emails ?? [],
-          };
-
-          const res = await fetch(config.apps_script_url, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(payload),
-            redirect: "follow",
-          });
-          if (!res.ok) {
-            webhookError = `webhook HTTP ${res.status}`;
-          } else {
-            webhookOk = true;
-            await sb
-              .from("chatter_evaluations")
-              .update({
-                sent_to_apps_script: true,
-                sent_at: new Date().toISOString(),
-              })
-              .eq("id", evaluation.id);
-          }
-        }
-      } catch (e) {
-        webhookError = (e as Error).message;
-      }
-
-      return { evaluation, webhookOk, webhookError };
+      return { evaluation };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["chatter-sessions"] });

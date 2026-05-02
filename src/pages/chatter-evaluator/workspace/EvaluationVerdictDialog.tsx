@@ -112,7 +112,7 @@ export const EvaluationVerdictDialog = ({
     window.localStorage.setItem(EXAMINER_NAME_KEY, examinerName.trim());
 
     try {
-      const result = await submit.mutateAsync({
+      await submit.mutateAsync({
         sessionId: session.id,
         examinerName: examinerName.trim(),
         verdict,
@@ -121,17 +121,12 @@ export const EvaluationVerdictDialog = ({
         scorePct,
       });
 
-      if (result.webhookOk) {
-        toast.success("Evaluación enviada", {
-          description: "Doc + Sheet + emails creados vía Apps Script.",
-        });
-      } else {
-        toast.warning("Evaluación guardada — webhook falló", {
-          description:
-            result.webhookError ??
-            "Apps Script no respondió. La evaluación está en DB; revisa la URL en Admin.",
-        });
-      }
+      // Webhook fires in the background (Apps Script can take 10-30s).
+      // The submit hook itself emits a toast with the webhook outcome
+      // when it eventually finishes.
+      toast.success("Evaluación guardada", {
+        description: "El reporte se está enviando a Apps Script en segundo plano.",
+      });
 
       onOpenChange(false);
       onSubmitted?.();

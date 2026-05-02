@@ -202,10 +202,12 @@ function renderEmailHtml(body, docUrl) {
   return '' +
     '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Maven Chatter Evaluator — Evaluación</title></head>' +
     '<body style="margin:0;padding:0;background:' + COLORS.bg + ';font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:' + COLORS.text + ';">' +
-      // Outer wrapper aligns the card to the RIGHT (not centered) per request.
-      // padding-right keeps a small gutter on wide screens; on narrow ones the
-      // 600px max-width gracefully shrinks.
-      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' + COLORS.bg + ';padding:24px 0;"><tr><td align="right" style="padding-right:24px;">' +
+      // Outer wrapper aligns the card to the LEFT — the user wanted the
+      // card pinned to the left side of Gmail's reading pane (where the
+      // arrow in their screenshot pointed) rather than the right gutter.
+      // padding-left keeps a small gutter on wide screens; on narrow ones
+      // the 600px max-width gracefully shrinks.
+      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' + COLORS.bg + ';padding:24px 0;"><tr><td align="left" style="padding-left:24px;">' +
         '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:' + COLORS.card + ';border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);">' +
 
           // Header
