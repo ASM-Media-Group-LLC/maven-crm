@@ -539,9 +539,26 @@ const ChatterPublicView = () => {
       if (!isInitial && newestEvent.price) {
         setTipAmount(newestEvent.price);
         playTipSound(newestEvent.price);
+        // Bottom-right toast (matches showToast in the original index.html
+        // line 3664). The center popup gets the user's eyes; the toast is
+        // the persistent confirmation that stays for ~7s.
+        const isPurchase = newestEvent.msg_type === "purchase";
+        const who = configQ.data?.fan_name ?? "JavixBuster";
+        toast(
+          isPurchase ? "🎉 ¡Felicidades!" : "💸 ¡Recibiste un tip!",
+          {
+            description: isPurchase
+              ? `${who} compró tu contenido — $${newestEvent.price}`
+              : `$${newestEvent.price} USD`,
+            duration: 7000,
+            className: isPurchase
+              ? "border-emerald-500 [&_[data-title]]:text-emerald-400"
+              : "border-amber-500 [&_[data-title]]:text-amber-400",
+          },
+        );
       }
     }
-  }, [messagesQ.data]);
+  }, [messagesQ.data, configQ.data]);
 
   // Initialize lastTipIdRef on first load so historical events don't fire.
   useEffect(() => {

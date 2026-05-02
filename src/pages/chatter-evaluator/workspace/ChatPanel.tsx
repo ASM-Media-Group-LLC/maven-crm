@@ -150,7 +150,7 @@ const MessageBubble = ({
               // container is `position:relative`, button is absolutely
               // positioned at top:50% right:-44px so it floats outside
               // the bubble at vertical center.
-              <div className="mt-1 mr-12">
+              <div className="mt-1 ml-12">
                 <div
                   className={`relative inline-block rounded-[14px] border-2 p-1 ${
                     msg.purchased
@@ -185,7 +185,7 @@ const MessageBubble = ({
                     onClick={() => onPurchase(msg)}
                     disabled={msg.purchased || purchasing}
                     title={msg.purchased ? "Comprado" : `Comprar — $${msg.price}`}
-                    className={`absolute right-[-44px] top-1/2 z-[5] flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 text-base font-bold shadow-md transition-all ${
+                    className={`absolute left-[-44px] top-1/2 z-[5] flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 text-base font-bold shadow-md transition-all ${
                       msg.purchased
                         ? "cursor-default border-emerald-500 bg-emerald-500/15 text-emerald-400"
                         : "cursor-pointer border-orange-500 bg-card text-orange-500 hover:scale-110 hover:bg-orange-500 hover:text-white"
