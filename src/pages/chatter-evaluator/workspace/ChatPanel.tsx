@@ -146,9 +146,11 @@ const MessageBubble = ({
           <>
             {isPriced ? (
               // PPV bubble — orange when unbought, green once purchased.
-              // Sizes match the original .msg-priced (4px padding + 12px
-              // border-radius) and .msg-img (200x200 cover).
-              <div className="mt-1 flex items-start gap-2">
+              // Matches the original .msg-priced + .msg-purchase-btn:
+              // container is `position:relative`, button is absolutely
+              // positioned at top:50% right:-44px so it floats outside
+              // the bubble at vertical center.
+              <div className="mt-1 mr-12">
                 <div
                   className={`relative inline-block rounded-[14px] border-2 p-1 ${
                     msg.purchased
@@ -178,20 +180,20 @@ const MessageBubble = ({
                   >
                     ${msg.price}{msg.purchased ? " ✓" : ""}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => onPurchase(msg)}
+                    disabled={msg.purchased || purchasing}
+                    title={msg.purchased ? "Comprado" : `Comprar — $${msg.price}`}
+                    className={`absolute right-[-44px] top-1/2 z-[5] flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 text-base font-bold shadow-md transition-all ${
+                      msg.purchased
+                        ? "cursor-default border-emerald-500 bg-emerald-500/15 text-emerald-400"
+                        : "cursor-pointer border-orange-500 bg-card text-orange-500 hover:scale-110 hover:bg-orange-500 hover:text-white"
+                    }`}
+                  >
+                    {msg.purchased ? "✓" : purchasing ? <Loader2 className="h-4 w-4 animate-spin" /> : "$"}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onPurchase(msg)}
-                  disabled={msg.purchased || purchasing}
-                  title={msg.purchased ? "Comprado" : `Comprar — $${msg.price}`}
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 text-base font-bold shadow-md transition-all ${
-                    msg.purchased
-                      ? "cursor-default border-emerald-500 bg-emerald-500/15 text-emerald-400"
-                      : "cursor-pointer border-orange-500 bg-card text-orange-500 hover:scale-110 hover:bg-orange-500 hover:text-white"
-                  }`}
-                >
-                  {msg.purchased ? "✓" : purchasing ? <Loader2 className="h-4 w-4 animate-spin" /> : "$"}
-                </button>
               </div>
             ) : (
               <div className="mt-1 flex flex-wrap gap-1">
