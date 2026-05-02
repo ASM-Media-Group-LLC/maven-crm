@@ -1,8 +1,7 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Rocket,
@@ -25,10 +24,17 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile, useUploadUserAvatar } from "@/hooks/useUserProfile";
 import ChangePasswordModal from "@/components/dashboard/ChangePasswordModal";
 
-// Settings landing — tabs for Mi cuenta / Proyecto MP / Administración /
-// Recursos. Mi cuenta is what the user lands on. The other three replace
-// the corresponding sidebar groups so the left rail stays focused on the
-// day-to-day operational tabs.
+// Settings page — left rail with the user's role banner + tab list,
+// right side renders the active section. Layout matches the screenshot
+// the user shared (KASH "Role settings" page).
+
+type TabKey = "account" | "mp" | "admin" | "resources";
+
+interface TabDef {
+  key: TabKey;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
 
 const Row = ({
   to,
@@ -88,14 +94,15 @@ const MyAccountTab = () => {
 
   return (
     <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Mi cuenta</h1>
+        <p className="text-sm text-muted-foreground">
+          Foto de perfil y seguridad de la cuenta.
+        </p>
+      </div>
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Foto de perfil</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           <div className="flex items-center gap-5">
-            {/* Hover-to-upload avatar (same pattern as the chatter
-                profile editor — camera overlay, click-to-pick file). */}
             <div className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-full">
               <Avatar className="h-full w-full">
                 {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName} />}
@@ -143,10 +150,8 @@ const MyAccountTab = () => {
       </Card>
 
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Seguridad</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
+          <div className="mb-3 text-sm font-semibold">Seguridad</div>
           <Button variant="outline" onClick={() => setPwOpen(true)} className="gap-2">
             <KeyRound className="h-4 w-4" />
             Cambiar contraseña
@@ -159,122 +164,165 @@ const MyAccountTab = () => {
   );
 };
 
+const ProyectoMPTab = () => (
+  <div className="space-y-4">
+    <div>
+      <h1 className="text-2xl font-bold tracking-tight">Proyecto MP</h1>
+      <p className="text-sm text-muted-foreground">
+        Pipeline, tareas, contenido y métricas del proyecto MP.
+      </p>
+    </div>
+    <Card>
+      <CardContent className="space-y-2 p-4">
+        <Row
+          to="/proyectomp"
+          icon={Rocket}
+          title="Abrir Proyecto MP"
+          description="Dashboard principal con todas las pestañas."
+        />
+      </CardContent>
+    </Card>
+  </div>
+);
+
+const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePermissions>["canAccess"]; isAdmin: boolean }) => (
+  <div className="space-y-4">
+    <div>
+      <h1 className="text-2xl font-bold tracking-tight">Administración</h1>
+      <p className="text-sm text-muted-foreground">
+        Usuarios, roles y auditoría de la plataforma.
+      </p>
+    </div>
+    <Card>
+      <CardContent className="space-y-2 p-4">
+        {(canAccess("Administración", "Usuarios") || isAdmin) && (
+          <Row
+            to="/admin/usuarios"
+            icon={Shield}
+            title="Usuarios"
+            description="Gestión de usuarios, roles y permisos."
+          />
+        )}
+        {(canAccess("Administración", "Roles") || isAdmin) && (
+          <Row
+            to="/admin/auditoria"
+            icon={ClipboardCheck}
+            title="Auditoría"
+            description="Historial de cambios de roles y permisos."
+          />
+        )}
+      </CardContent>
+    </Card>
+  </div>
+);
+
+const ResourcesTab = ({ t }: { t: ReturnType<typeof useLanguage>["t"] }) => (
+  <div className="space-y-4">
+    <div>
+      <h1 className="text-2xl font-bold tracking-tight">{t("sidebar.resources") || "Recursos"}</h1>
+      <p className="text-sm text-muted-foreground">
+        Documentación, design system y roadmap.
+      </p>
+    </div>
+    <Card>
+      <CardContent className="space-y-2 p-4">
+        <Row
+          to="/design-system"
+          icon={Palette}
+          title={t("nav.designSystem") || "Design System"}
+          description="Componentes, paleta y guía de estilo."
+        />
+        <Row
+          to="/docs"
+          icon={FileText}
+          title={t("nav.docs") || "Docs"}
+          description="Documentación interna del proyecto."
+        />
+        <Row
+          to="/roadmap"
+          icon={Map}
+          title="Roadmap"
+          description="Seguimiento de funciones planificadas."
+        />
+      </CardContent>
+    </Card>
+  </div>
+);
+
 const Settings = () => {
   const { t } = useLanguage();
   const { canAccess } = usePermissions();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, role } = useUserRole();
 
   const showProyectoMP = canAccess("ProyectoMP") || isAdmin;
   const showAdmin = canAccess("Administración") || isAdmin;
   const showResources = showAdmin;
 
+  // Build the tab list dynamically — same canAccess() rules the
+  // sidebar used to apply.
+  const tabs: TabDef[] = [
+    { key: "account", label: "Mi cuenta", icon: UserIcon },
+    ...(showProyectoMP ? [{ key: "mp" as const, label: "Proyecto MP", icon: Rocket }] : []),
+    ...(showAdmin ? [{ key: "admin" as const, label: "Administración", icon: Shield }] : []),
+    ...(showResources ? [{ key: "resources" as const, label: t("sidebar.resources") || "Recursos", icon: Palette }] : []),
+  ];
+
+  const [active, setActive] = useState<TabKey>("account");
+
+  // Pretty role label — "Admin" / "Manager" / etc, falls back to the
+  // raw role string when nothing matches.
+  const roleLabel: Record<string, string> = {
+    admin: "Admin",
+    manager: "Manager",
+    agent: "Chatter",
+    employee: "Empleado",
+    closer: "Closer",
+    supervisor: "Supervisor",
+  };
+  const prettyRole = role ? roleLabel[role] ?? role : "—";
+
   return (
     <main className="flex-1 overflow-y-auto p-6">
-      <div className="mx-auto max-w-3xl space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-          <p className="text-sm text-muted-foreground">
-            Tu cuenta, administración y recursos de la plataforma.
-          </p>
-        </div>
+      <div className="mx-auto flex max-w-6xl gap-6">
+        {/* Left rail — "Conectado como X" header + vertical tab list,
+            framed in a rounded card. Mirrors the KASH screenshot the
+            user shared. */}
+        <aside className="w-60 shrink-0">
+          <div className="sticky top-6 overflow-hidden rounded-2xl border bg-card">
+            <div className="border-b px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Conectado como {prettyRole}
+            </div>
+            <nav className="p-2">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = active === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActive(tab.key)}
+                    className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-sm transition-colors ${
+                      isActive
+                        ? "bg-primary/15 text-primary font-medium"
+                        : "text-foreground hover:bg-muted/60"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
 
-        <Tabs defaultValue="account" className="w-full">
-          <TabsList className="w-full justify-start">
-            <TabsTrigger value="account" className="gap-1.5">
-              <UserIcon className="h-3.5 w-3.5" />
-              Mi cuenta
-            </TabsTrigger>
-            {showProyectoMP && (
-              <TabsTrigger value="mp" className="gap-1.5">
-                <Rocket className="h-3.5 w-3.5" />
-                Proyecto MP
-              </TabsTrigger>
-            )}
-            {showAdmin && (
-              <TabsTrigger value="admin" className="gap-1.5">
-                <Shield className="h-3.5 w-3.5" />
-                Administración
-              </TabsTrigger>
-            )}
-            {showResources && (
-              <TabsTrigger value="resources" className="gap-1.5">
-                <Palette className="h-3.5 w-3.5" />
-                Recursos
-              </TabsTrigger>
-            )}
-          </TabsList>
-
-          <TabsContent value="account" className="mt-4">
-            <MyAccountTab />
-          </TabsContent>
-
-          {showProyectoMP && (
-            <TabsContent value="mp" className="mt-4">
-              <Card>
-                <CardContent className="space-y-2 pt-6">
-                  <Row
-                    to="/proyectomp"
-                    icon={Rocket}
-                    title="Proyecto MP"
-                    description="Pipeline, tareas, contenido y métricas del proyecto MP."
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {showAdmin && (
-            <TabsContent value="admin" className="mt-4">
-              <Card>
-                <CardContent className="space-y-2 pt-6">
-                  {(canAccess("Administración", "Usuarios") || isAdmin) && (
-                    <Row
-                      to="/admin/usuarios"
-                      icon={Shield}
-                      title="Usuarios"
-                      description="Gestión de usuarios, roles y permisos."
-                    />
-                  )}
-                  {(canAccess("Administración", "Roles") || isAdmin) && (
-                    <Row
-                      to="/admin/auditoria"
-                      icon={ClipboardCheck}
-                      title="Auditoría"
-                      description="Historial de cambios de roles y permisos."
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
-          {showResources && (
-            <TabsContent value="resources" className="mt-4">
-              <Card>
-                <CardContent className="space-y-2 pt-6">
-                  <Row
-                    to="/design-system"
-                    icon={Palette}
-                    title={t("nav.designSystem") || "Design System"}
-                    description="Componentes, paleta y guía de estilo."
-                  />
-                  <Row
-                    to="/docs"
-                    icon={FileText}
-                    title={t("nav.docs") || "Docs"}
-                    description="Documentación interna del proyecto."
-                  />
-                  <Row
-                    to="/roadmap"
-                    icon={Map}
-                    title="Roadmap"
-                    description="Seguimiento de funciones planificadas."
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-        </Tabs>
+        {/* Right side — active tab content */}
+        <section className="min-w-0 flex-1">
+          {active === "account" && <MyAccountTab />}
+          {active === "mp" && showProyectoMP && <ProyectoMPTab />}
+          {active === "admin" && showAdmin && <AdminTab canAccess={canAccess} isAdmin={isAdmin} />}
+          {active === "resources" && showResources && <ResourcesTab t={t} />}
+        </section>
       </div>
     </main>
   );
