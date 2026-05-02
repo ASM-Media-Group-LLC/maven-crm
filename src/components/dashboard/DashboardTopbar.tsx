@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Sun, Moon, LogOut, KeyRound, Globe, Check } from "lucide-react";
+import { Search, Sun, Moon, LogOut, Globe, Check, Settings as SettingsIcon } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,7 +14,6 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import ChangePasswordModal from "./ChangePasswordModal";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import GlobalSearchCommand from "./GlobalSearchCommand";
 
@@ -27,7 +26,6 @@ const DashboardTopbar = () => {
   
   const { role } = useUserRole();
   const [mounted, setMounted] = useState(false);
-  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -62,19 +60,6 @@ const DashboardTopbar = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Theme toggle */}
-          {mounted && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              title={theme === "dark" ? t("topbar.lightMode") : t("topbar.darkMode")}
-            >
-              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
-          )}
-
           {/* Language dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -117,32 +102,58 @@ const DashboardTopbar = () => {
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuContent align="end" className="w-64 p-0">
+              {/* Header — avatar + name + "Sesión activa" + theme
+                  toggle on the right (see screenshot the user sent). */}
               <div className="flex items-center gap-3 p-3">
                 <Avatar className="h-10 w-10">
                   <AvatarFallback className="text-xs">{initials}</AvatarFallback>
                 </Avatar>
-                <div className="flex flex-col overflow-hidden">
-                  <span className="text-sm font-medium truncate">{fullName}</span>
-                  <span className="text-xs text-muted-foreground truncate">{email}</span>
+                <div className="flex min-w-0 flex-col overflow-hidden">
+                  <span className="truncate text-sm font-semibold">{fullName}</span>
+                  <span className="truncate text-xs text-emerald-500">Sesión activa</span>
                 </div>
+                {mounted && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="ml-auto h-8 w-8 rounded-full text-muted-foreground"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setTheme(theme === "dark" ? "light" : "dark");
+                    }}
+                    title={theme === "dark" ? t("topbar.lightMode") : t("topbar.darkMode")}
+                  >
+                    {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  </Button>
+                )}
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setPasswordModalOpen(true)}>
-                <KeyRound className="mr-2 h-4 w-4" />
-                {t("topbar.changePassword")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
-                <LogOut className="mr-2 h-4 w-4" />
-                {t("topbar.logout")}
-              </DropdownMenuItem>
+              <div className="p-1">
+                <DropdownMenuItem onClick={() => navigate("/settings")} className="gap-2">
+                  <SettingsIcon className="h-4 w-4" />
+                  Settings
+                </DropdownMenuItem>
+              </div>
+              <DropdownMenuSeparator />
+              {/* Salir — full-width rose pill matching the screenshot. */}
+              <div className="p-2">
+                <Button
+                  variant="destructive"
+                  onClick={handleLogout}
+                  className="w-full justify-center gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Salir
+                </Button>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </header>
 
       <GlobalSearchCommand open={searchOpen} onOpenChange={setSearchOpen} />
-      <ChangePasswordModal open={passwordModalOpen} onOpenChange={setPasswordModalOpen} />
     </>
   );
 };

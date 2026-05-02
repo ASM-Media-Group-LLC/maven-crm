@@ -569,78 +569,10 @@ const DashboardSidebar = () => {
         </CollapsibleSidebarGroup>
         )}
 
-        {canAccess("ProyectoMP") && (
-          <CollapsibleSidebarGroup label="Proyecto MP" storageKey="proyectomp">
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Proyecto MP">
-                    <NavLink to="/proyectomp" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                      <Rocket className="h-4 w-4 shrink-0" />
-                      <span>Proyecto MP</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-          </CollapsibleSidebarGroup>
-        )}
-
-        {canAccess("Administración") && (
-          <CollapsibleSidebarGroup label="Administración" storageKey="admin">
-              <SidebarMenu>
-                {canAccess("Administración", "Usuarios") && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild tooltip="Usuarios">
-                      <NavLink to="/admin/usuarios" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                        <Shield className="h-4 w-4 shrink-0" />
-                        <span>Usuarios</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-                {canAccess("Administración", "Roles") && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild tooltip="Auditoría">
-                      <NavLink to="/admin/auditoria" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                        <ClipboardCheck className="h-4 w-4 shrink-0" />
-                        <span>Auditoría</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-              </SidebarMenu>
-          </CollapsibleSidebarGroup>
-        )}
-
-        {canAccess("Administración") && (
-          <CollapsibleSidebarGroup label={t("sidebar.resources")} storageKey="recursos">
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip={t("nav.designSystem")}>
-                    <NavLink to="/design-system" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                      <Palette className="h-4 w-4 shrink-0" />
-                      <span>{t("nav.designSystem")}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip={t("nav.docs")}>
-                    <NavLink to="/docs" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                      <FileText className="h-4 w-4 shrink-0" />
-                      <span>{t("nav.docs")}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Roadmap">
-                    <NavLink to="/roadmap" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                      <Map className="h-4 w-4 shrink-0" />
-                      <span>Roadmap</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-          </CollapsibleSidebarGroup>
-        )}
+        {/* Proyecto MP, Administración and Recursos used to live here
+            as their own sidebar groups. They've all moved into the
+            Settings page (reachable from the user dropdown), keeping
+            the left rail focused on day-to-day operational tabs. */}
 
       </SidebarContent>
 

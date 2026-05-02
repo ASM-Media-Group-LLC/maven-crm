@@ -117,6 +117,7 @@ import Roadmap from "./pages/Roadmap";
 import Messenger from "./pages/Messenger";
 import Notificaciones from "./pages/Notificaciones";
 import NotificacionesSettings from "./pages/ajustes/NotificacionesSettings";
+import Settings from "./pages/Settings";
 
 // HR — eager. The user navigates between subtabs constantly.
 import HRLayout from "./pages/hr/HRLayout";
@@ -281,6 +282,7 @@ const App = () => (
                 <Route path="/tareas/:projectId" element={<TareaProject />} />
                 <Route path="/roadmap" element={<Roadmap />} />
                 <Route path="/messenger" element={<Messenger />} />
+                <Route path="/settings" element={<Settings />} />
                 <Route path="/notificaciones" element={<Notificaciones />} />
                 <Route path="/ajustes/notificaciones" element={<NotificacionesSettings />} />
                 <Route path="/wishlist" element={<Wishlist />} />
