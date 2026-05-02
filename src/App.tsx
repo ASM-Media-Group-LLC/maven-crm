@@ -195,9 +195,17 @@ const queryClient = new QueryClient({
 // every nav feel like a hard reload. This sits as a thin progress strip
 // at the top so the previous page stays visible underneath.
 const LoadingFallback = () => (
-  <div className="fixed inset-x-0 top-0 z-[100] h-0.5 overflow-hidden">
-    <div className="h-full w-1/3 animate-[loading-bar_1.2s_ease-in-out_infinite] bg-primary" />
-  </div>
+  <>
+    <div className="fixed inset-x-0 top-0 z-[100] h-0.5 overflow-hidden">
+      <div className="h-full w-1/3 animate-[loading-bar_1.2s_ease-in-out_infinite] bg-primary" />
+    </div>
+    <div
+      className="fixed inset-0 z-[99] flex items-center justify-center bg-background opacity-0"
+      style={{ animation: "delayed-fade-in 0.25s ease-out 0.18s forwards" }}
+    >
+      <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-primary/15 border-t-primary" />
+    </div>
+  </>
 );
 
 const App = () => (

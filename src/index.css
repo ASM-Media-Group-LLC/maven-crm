@@ -447,3 +447,11 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   50%  { transform: translateX(140%); }
   100% { transform: translateX(140%); }
 }
+
+/* Fade in with a small delay — used by the Suspense fallback so a quick
+   navigation (chunk already cached) doesn't flash a full-screen loader,
+   while a slower one (cold-load via direct URL) still surfaces clearly. */
+@keyframes delayed-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
