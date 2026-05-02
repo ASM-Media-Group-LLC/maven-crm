@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Save, Plus, X, Loader2, Camera, Upload, Pencil, Check } from "lucide-react";
+import { ArrowLeft, Save, Plus, X, Loader2, Camera, Upload, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import {
   useChatterProfiles,
@@ -130,7 +130,9 @@ const ChatterProfileEditContent = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<FormState | null>(null);
-  const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null);
+  // Tracks which label is currently being inline-edited.
+  // Encoded as `${fieldKey}__${lang}` so ES and EN are independent.
+  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
   useEffect(() => {
     if (profile) setForm(buildFormState(profile));
   }, [profile]);
@@ -452,88 +454,88 @@ const ChatterProfileEditContent = () => {
                 const ov = form.labelOverrides[fieldKey];
                 const labelEs = ov?.es?.trim() || c.label;
                 const labelEn = ov?.en?.trim() || c.label;
-                const isEditing = editingLabelKey === fieldKey;
+
+                const renderLabel = (lang: "es" | "en", value: string, valueKey: string) => {
+                  const id = `${fieldKey}__${lang}`;
+                  const editing = editingLabelId === id;
+                  const stopEditing = () => setEditingLabelId(null);
+                  return (
+                    <div className="mb-1 flex items-center gap-1.5">
+                      <Badge variant="outline" className="text-[10px] uppercase">
+                        {lang}
+                      </Badge>
+                      {editing ? (
+                        <Input
+                          autoFocus
+                          value={ov?.[lang] ?? value}
+                          onChange={(e) => setLabelOverride(fieldKey, lang, e.target.value)}
+                          onBlur={stopEditing}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === "Escape") {
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                          placeholder={c.label}
+                          className="h-7 max-w-[220px] text-sm font-medium"
+                        />
+                      ) : (
+                        <>
+                          <Label
+                            htmlFor={valueKey}
+                            className="text-sm font-medium leading-none"
+                          >
+                            {value}
+                          </Label>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setEditingLabelId(id)}
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                            aria-label={`Renombrar etiqueta ${lang.toUpperCase()}`}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  );
+                };
+
+                const hasOverride = !!ov;
+
                 return (
                   <div key={c.key} className="space-y-1">
-                    {isEditing ? (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Input
-                          value={ov?.es ?? c.label}
-                          onChange={(e) => setLabelOverride(fieldKey, "es", e.target.value)}
-                          placeholder="Etiqueta ES"
-                          className="h-8 max-w-[180px] text-sm"
-                        />
-                        <Input
-                          value={ov?.en ?? c.label}
-                          onChange={(e) => setLabelOverride(fieldKey, "en", e.target.value)}
-                          placeholder="Label EN"
-                          className="h-8 max-w-[180px] text-sm"
-                        />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setEditingLabelKey(null)}
-                          className="h-8 gap-1 px-2 text-xs"
-                        >
-                          <Check className="h-3.5 w-3.5" /> Listo
-                        </Button>
-                        {ov && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              clearLabelOverride(fieldKey);
-                              setEditingLabelKey(null);
-                            }}
-                            className="h-8 px-2 text-xs text-muted-foreground"
-                          >
-                            Restaurar
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <Label className="text-sm font-medium">
-                          {labelEs}
-                          {labelEs !== labelEn && (
-                            <span className="ml-1 text-[10px] font-normal text-muted-foreground">
-                              · {labelEn}
-                            </span>
-                          )}
-                        </Label>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setEditingLabelKey(fieldKey)}
-                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                          aria-label="Renombrar etiqueta"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
                     <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                       <div>
-                        <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
-                          <Badge variant="outline" className="text-[10px]">ES</Badge>
-                        </div>
+                        {renderLabel("es", labelEs, fieldKey)}
                         <Cmp
+                          id={fieldKey}
                           value={form.fields[c.key as string] ?? ""}
                           onChange={(e) => setField(c.key as string, e.target.value)}
                           rows={c.type === "textarea" ? 3 : undefined}
                         />
                       </div>
                       <div>
-                        <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
-                          <Badge variant="outline" className="text-[10px]">EN</Badge>
-                        </div>
+                        {renderLabel("en", labelEn, c.keyEn as string)}
                         <Cmp
+                          id={c.keyEn as string}
                           value={form.fields[c.keyEn as string] ?? ""}
                           onChange={(e) => setField(c.keyEn as string, e.target.value)}
                           rows={c.type === "textarea" ? 3 : undefined}
                         />
                       </div>
                     </div>
+                    {hasOverride && (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => clearLabelOverride(fieldKey)}
+                          className="text-[10px] text-muted-foreground hover:text-foreground"
+                        >
+                          Restaurar etiqueta original
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -587,33 +589,53 @@ const ChatterProfileEditContent = () => {
                 <div>
                   <div className="mb-1 text-xs text-muted-foreground">Título</div>
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    <Input
-                      value={s.title}
-                      placeholder="Título ES (ej. Personalidad)"
-                      onChange={(e) => setSectionField(i, "title", e.target.value)}
-                    />
-                    <Input
-                      value={s.title_en}
-                      placeholder="Title EN (e.g. Personality)"
-                      onChange={(e) => setSectionField(i, "title_en", e.target.value)}
-                    />
+                    <div>
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <Badge variant="outline" className="text-[10px] uppercase">ES</Badge>
+                      </div>
+                      <Input
+                        value={s.title}
+                        placeholder="Título ES (ej. Personalidad)"
+                        onChange={(e) => setSectionField(i, "title", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <Badge variant="outline" className="text-[10px] uppercase">EN</Badge>
+                      </div>
+                      <Input
+                        value={s.title_en}
+                        placeholder="Title EN (e.g. Personality)"
+                        onChange={(e) => setSectionField(i, "title_en", e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
                 <div>
                   <div className="mb-1 text-xs text-muted-foreground">Contenido</div>
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    <Textarea
-                      value={s.value}
-                      placeholder="Contenido ES"
-                      rows={3}
-                      onChange={(e) => setSectionField(i, "value", e.target.value)}
-                    />
-                    <Textarea
-                      value={s.value_en}
-                      placeholder="Content EN"
-                      rows={3}
-                      onChange={(e) => setSectionField(i, "value_en", e.target.value)}
-                    />
+                    <div>
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <Badge variant="outline" className="text-[10px] uppercase">ES</Badge>
+                      </div>
+                      <Textarea
+                        value={s.value}
+                        placeholder="Contenido ES"
+                        rows={3}
+                        onChange={(e) => setSectionField(i, "value", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <Badge variant="outline" className="text-[10px] uppercase">EN</Badge>
+                      </div>
+                      <Textarea
+                        value={s.value_en}
+                        placeholder="Content EN"
+                        rows={3}
+                        onChange={(e) => setSectionField(i, "value_en", e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
