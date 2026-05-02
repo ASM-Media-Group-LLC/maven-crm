@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { toast } from "sonner";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
 import {
   useChatterSessions,
   useChatterConfig,
@@ -19,6 +24,7 @@ import {
 } from "@/hooks/useChatterEvaluator";
 
 const ACTIVE_KEY = "maven.chatter.workspace.activeSessionId";
+const CRITERIA_HIDDEN_KEY = "maven.chatter.workspace.criteriaHidden";
 
 const WorkspaceContent = () => {
   const sessionsQ = useChatterSessions("all");
@@ -26,6 +32,22 @@ const WorkspaceContent = () => {
   const criteriaQ = useChatterCriteria();
   const [params, setParams] = useSearchParams();
   const [verdictOpen, setVerdictOpen] = useState(false);
+  // Criteria rail can be hidden when the examiner just wants to focus on
+  // the chat. Persisted per browser so reloads keep the choice.
+  const [criteriaHidden, setCriteriaHidden] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(CRITERIA_HIDDEN_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CRITERIA_HIDDEN_KEY, criteriaHidden ? "1" : "0");
+    } catch {
+      /* no-op */
+    }
+  }, [criteriaHidden]);
 
   // Active session: priority is ?session=<id> in URL, else last from
   // localStorage, else the first open session.
@@ -137,37 +159,72 @@ const WorkspaceContent = () => {
     <main className="flex min-h-0 flex-1 flex-col">
       {/* Top bar */}
       <div className="flex items-center justify-between border-b px-4 py-2">
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/chatter-evaluator">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Volver
-          </Link>
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/chatter-evaluator">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Volver
+            </Link>
+          </Button>
+          {/* Toggle the criteria rail. The examiner can collapse it to
+              get more horizontal real estate for the chat + character
+              info while a session is in progress, then re-open it when
+              they're ready to grade. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCriteriaHidden((v) => !v)}
+            title={criteriaHidden ? "Mostrar criterios" : "Ocultar criterios"}
+            className="gap-2"
+          >
+            {criteriaHidden ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+            <span className="hidden sm:inline text-xs">
+              {criteriaHidden ? "Mostrar criterios" : "Ocultar criterios"}
+            </span>
+          </Button>
+        </div>
         <div className="text-xs text-muted-foreground">
           fan: {configQ.data?.fan_name ?? "JavixBuster"}
         </div>
       </div>
 
-      {/* 4-panel grid: criteria · sessions · chat · character info.
-          Character info shows the same persona snapshot the chatter sees
-          on their public view, so the examiner is reading from the exact
-          same notes while typing as the fan. */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[260px_260px_1fr_300px]">
-        <aside className="min-h-0 border-r">
-          <CriteriaPanel
-            session={selectedSession}
-            scores={currentScores}
-            setScores={setScoresForCurrent}
-            onSubmitEvaluation={handleSubmit}
-          />
-        </aside>
-        <aside className="min-h-0 border-r">
+      {/* Resizable panel layout. Each panel can be dragged via its
+          handle; criteria can be fully hidden via the toolbar toggle.
+          react-resizable-panels persists each panel's size under
+          autoSaveId so the browser remembers the layout. */}
+      <ResizablePanelGroup
+        direction="horizontal"
+        autoSaveId="maven-chatter-workspace-v1"
+        className="min-h-0 flex-1"
+      >
+        {!criteriaHidden && (
+          <>
+            <ResizablePanel defaultSize={20} minSize={14} maxSize={32} className="min-h-0">
+              <CriteriaPanel
+                session={selectedSession}
+                scores={currentScores}
+                setScores={setScoresForCurrent}
+                onSubmitEvaluation={handleSubmit}
+              />
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+          </>
+        )}
+        <ResizablePanel defaultSize={20} minSize={14} maxSize={32} className="min-h-0">
           <SessionsPanel selectedId={selectedId} onSelect={setSelectedId} />
-        </aside>
-        <section className="min-h-0 border-r">
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={40} minSize={25} className="min-h-0">
           <ChatPanel session={selectedSession} />
-        </section>
-        <CharacterInfoSidebar profileId={selectedSession?.profile_id ?? null} />
-      </div>
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={20} minSize={16} maxSize={32} className="min-h-0">
+          <CharacterInfoSidebar profileId={selectedSession?.profile_id ?? null} />
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       {selectedSession && (
         <EvaluationVerdictDialog
@@ -194,7 +251,7 @@ const CharacterInfoSidebar = ({ profileId }: { profileId: string | null }) => {
     : null;
 
   return (
-    <aside className="hidden min-h-0 overflow-y-auto bg-card md:block">
+    <aside className="h-full min-h-0 overflow-y-auto bg-card">
       {profile ? (
         <CharacterInfoPanel profile={profile} lang={lang} compact />
       ) : (
