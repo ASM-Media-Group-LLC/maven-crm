@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Save, Plus, X, Loader2, Camera, Upload } from "lucide-react";
+import { ArrowLeft, Save, Plus, X, Loader2, Camera, Upload, Pencil, Check } from "lucide-react";
 import { toast } from "sonner";
 import {
   useChatterProfiles,
@@ -18,6 +18,13 @@ import {
 } from "@/hooks/useChatterEvaluator";
 import { VaultGallery } from "./VaultGallery";
 import type { ChatterProfile } from "./types";
+import {
+  getCustomSections,
+  getLabelOverrides,
+  mergeExtras,
+  type CustomSection,
+  type LabelOverrides,
+} from "./profileExtras";
 
 interface BilingualConfig {
   key: keyof ChatterProfile;
@@ -49,7 +56,15 @@ type FormState = {
   avatar_x: number;
   avatar_y: number;
   avatar_zoom: number;
+  labelOverrides: LabelOverrides;
+  customSections: CustomSection[];
+  extra_fields_raw: Record<string, unknown>;
 };
+
+const newSectionId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `sec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const buildFormState = (p: ChatterProfile): FormState => {
   const fields: Record<string, string> = {};
@@ -67,6 +82,9 @@ const buildFormState = (p: ChatterProfile): FormState => {
     avatar_x: p.avatar_x ?? 50,
     avatar_y: p.avatar_y ?? 50,
     avatar_zoom: p.avatar_zoom ?? 100,
+    labelOverrides: getLabelOverrides(p),
+    customSections: getCustomSections(p),
+    extra_fields_raw: p.extra_fields ?? {},
   };
 };
 
@@ -87,6 +105,11 @@ const buildPatch = (s: FormState): ChatterProfileUpdate => {
   patch.avatar_x = s.avatar_x;
   patch.avatar_y = s.avatar_y;
   patch.avatar_zoom = s.avatar_zoom;
+  patch.extra_fields = mergeExtras(
+    s.extra_fields_raw,
+    s.labelOverrides,
+    s.customSections,
+  );
   return patch as ChatterProfileUpdate;
 };
 
@@ -107,6 +130,7 @@ const ChatterProfileEditContent = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<FormState | null>(null);
+  const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null);
   useEffect(() => {
     if (profile) setForm(buildFormState(profile));
   }, [profile]);
@@ -151,6 +175,72 @@ const ChatterProfileEditContent = () => {
   const removePriceRow = (idx: number) =>
     setForm((s) =>
       s ? { ...s, prices: s.prices.filter((_, i) => i !== idx) } : s
+    );
+
+  const setLabelOverride = (
+    fieldKey: string,
+    lang: "es" | "en",
+    val: string,
+  ) =>
+    setForm((s) => {
+      if (!s) return s;
+      const current = s.labelOverrides[fieldKey] ?? { es: "", en: "" };
+      return {
+        ...s,
+        labelOverrides: {
+          ...s.labelOverrides,
+          [fieldKey]: { ...current, [lang]: val },
+        },
+      };
+    });
+
+  const clearLabelOverride = (fieldKey: string) =>
+    setForm((s) => {
+      if (!s) return s;
+      const next = { ...s.labelOverrides };
+      delete next[fieldKey];
+      return { ...s, labelOverrides: next };
+    });
+
+  const setSectionField = (
+    idx: number,
+    key: keyof CustomSection,
+    val: string,
+  ) =>
+    setForm((s) => {
+      if (!s) return s;
+      const next = [...s.customSections];
+      next[idx] = { ...next[idx], [key]: val };
+      return { ...s, customSections: next };
+    });
+
+  const addCustomSection = () =>
+    setForm((s) =>
+      s
+        ? {
+            ...s,
+            customSections: [
+              ...s.customSections,
+              {
+                id: newSectionId(),
+                title: "",
+                title_en: "",
+                value: "",
+                value_en: "",
+              },
+            ],
+          }
+        : s,
+    );
+
+  const removeCustomSection = (idx: number) =>
+    setForm((s) =>
+      s
+        ? {
+            ...s,
+            customSections: s.customSections.filter((_, i) => i !== idx),
+          }
+        : s,
     );
 
   const handleSave = async () => {
@@ -351,12 +441,77 @@ const ChatterProfileEditContent = () => {
         <Card>
           <CardContent className="space-y-4 p-6">
             <h2 className="text-lg font-semibold">Personaje y reglas</h2>
+            <p className="text-xs text-muted-foreground">
+              Haz clic en el lápiz para renombrar cualquier etiqueta (ES + EN). El nuevo
+              nombre aparecerá tanto aquí como en el panel del chatter y del examinador.
+            </p>
             <div className="space-y-5">
               {BILINGUAL_FIELDS.map((c) => {
                 const Cmp = c.type === "textarea" ? Textarea : Input;
+                const fieldKey = c.key as string;
+                const ov = form.labelOverrides[fieldKey];
+                const labelEs = ov?.es?.trim() || c.label;
+                const labelEn = ov?.en?.trim() || c.label;
+                const isEditing = editingLabelKey === fieldKey;
                 return (
                   <div key={c.key} className="space-y-1">
-                    <Label className="text-sm font-medium">{c.label}</Label>
+                    {isEditing ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                          value={ov?.es ?? c.label}
+                          onChange={(e) => setLabelOverride(fieldKey, "es", e.target.value)}
+                          placeholder="Etiqueta ES"
+                          className="h-8 max-w-[180px] text-sm"
+                        />
+                        <Input
+                          value={ov?.en ?? c.label}
+                          onChange={(e) => setLabelOverride(fieldKey, "en", e.target.value)}
+                          placeholder="Label EN"
+                          className="h-8 max-w-[180px] text-sm"
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditingLabelKey(null)}
+                          className="h-8 gap-1 px-2 text-xs"
+                        >
+                          <Check className="h-3.5 w-3.5" /> Listo
+                        </Button>
+                        {ov && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              clearLabelOverride(fieldKey);
+                              setEditingLabelKey(null);
+                            }}
+                            className="h-8 px-2 text-xs text-muted-foreground"
+                          >
+                            Restaurar
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-sm font-medium">
+                          {labelEs}
+                          {labelEs !== labelEn && (
+                            <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                              · {labelEn}
+                            </span>
+                          )}
+                        </Label>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setEditingLabelKey(fieldKey)}
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          aria-label="Renombrar etiqueta"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                       <div>
                         <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
@@ -383,6 +538,86 @@ const ChatterProfileEditContent = () => {
                 );
               })}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Custom sections — same add/remove pattern as Catálogo de precios.
+            Stored in extra_fields under __customSections; rendered by the
+            chatter and examiner panels alongside the built-in cards. */}
+        <Card>
+          <CardContent className="space-y-3 p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Secciones personalizadas</h2>
+              <Button
+                onClick={addCustomSection}
+                size="sm"
+                variant="outline"
+                className="gap-1"
+              >
+                <Plus className="h-4 w-4" /> Agregar sección
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Cada sección extra tiene título y contenido en español e inglés. Aparecerán
+              como tarjetas adicionales en los paneles del chatter y del examinador.
+            </p>
+            {form.customSections.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Sin secciones personalizadas todavía.
+              </p>
+            )}
+            {form.customSections.map((s, i) => (
+              <div
+                key={s.id}
+                className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-4"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Sección {i + 1}
+                  </Label>
+                  <Button
+                    onClick={() => removeCustomSection(i)}
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Eliminar sección"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div>
+                  <div className="mb-1 text-xs text-muted-foreground">Título</div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <Input
+                      value={s.title}
+                      placeholder="Título ES (ej. Personalidad)"
+                      onChange={(e) => setSectionField(i, "title", e.target.value)}
+                    />
+                    <Input
+                      value={s.title_en}
+                      placeholder="Title EN (e.g. Personality)"
+                      onChange={(e) => setSectionField(i, "title_en", e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-1 text-xs text-muted-foreground">Contenido</div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <Textarea
+                      value={s.value}
+                      placeholder="Contenido ES"
+                      rows={3}
+                      onChange={(e) => setSectionField(i, "value", e.target.value)}
+                    />
+                    <Textarea
+                      value={s.value_en}
+                      placeholder="Content EN"
+                      rows={3}
+                      onChange={(e) => setSectionField(i, "value_en", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
 

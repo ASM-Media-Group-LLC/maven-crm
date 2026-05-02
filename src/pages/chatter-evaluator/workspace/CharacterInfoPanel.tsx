@@ -1,5 +1,10 @@
 import type { ChatterProfile } from "../types";
 import { pVal, type ChatterLang } from "./ChatToolbar";
+import {
+  getCustomSections,
+  getLabelOverrides,
+  resolveLabel,
+} from "../profileExtras";
 
 // Right-rail character info — drawer-style cards mirroring the categories
 // admins fill in the profile editor (identity, body & limits, services,
@@ -78,12 +83,20 @@ interface CharacterInfoPanelProps {
 
 export const CharacterInfoPanel = ({ profile, lang, compact = false }: CharacterInfoPanelProps) => {
   const en = lang === "en";
+  const langKey: "es" | "en" = en ? "en" : "es";
   const p = profile as unknown as Record<string, unknown>;
   const name = pVal(p, "name", lang) || profile.name;
   const nationality = pVal(p, "nationality", lang);
   const location = pVal(p, "location", lang);
   const age = pVal(p, "age", lang);
   const hasMeta = Boolean(nationality || location || age);
+  const overrides = getLabelOverrides(profile);
+  const customSections = getCustomSections(profile);
+  const lbl = (
+    fieldKey: string,
+    fallbackEs: string,
+    fallbackEn: string,
+  ) => resolveLabel(overrides, fieldKey, langKey, fallbackEs, fallbackEn);
 
   const usersTerm = pVal(p, "users_term", lang);
   const greeting = pVal(p, "greeting", lang);
@@ -129,7 +142,7 @@ export const CharacterInfoPanel = ({ profile, lang, compact = false }: Character
               {nationality && (
                 <div className="px-2">
                   <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                    {en ? "Nationality" : "Nacionalidad"}
+                    {lbl("nationality", "Nacionalidad", "Nationality")}
                   </div>
                   <div className="mt-0.5 text-xs font-semibold text-foreground/90">
                     {nationality}
@@ -139,7 +152,7 @@ export const CharacterInfoPanel = ({ profile, lang, compact = false }: Character
               {location && (
                 <div className="px-2">
                   <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                    {en ? "Location" : "Ubicación"}
+                    {lbl("location", "Ubicación", "Location")}
                   </div>
                   <div className="mt-0.5 text-xs font-semibold text-foreground/90">
                     📍 {location}
@@ -149,7 +162,7 @@ export const CharacterInfoPanel = ({ profile, lang, compact = false }: Character
               {age && (
                 <div className="px-2">
                   <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                    {en ? "Age" : "Edad"}
+                    {lbl("age", "Edad", "Age")}
                   </div>
                   <div className="mt-0.5 text-xs font-semibold text-foreground/90">
                     {age}
@@ -164,26 +177,44 @@ export const CharacterInfoPanel = ({ profile, lang, compact = false }: Character
       <div className={`space-y-2.5 ${stackPad}`}>
         {hasAny(usersTerm, greeting) && (
           <InfoCard title={en ? "Identity" : "Identidad"} icon="🪪" tone="violet">
-            <InfoRow label={en ? "How to call the user" : "Cómo llamar al usuario"} value={usersTerm} accent="rgb(167 139 250)" />
-            <InfoRow label={en ? "Greeting" : "Saludo inicial"} value={greeting} accent="rgb(167 139 250)" />
+            <InfoRow label={lbl("users_term", "Cómo llamar al usuario", "How to call the user")} value={usersTerm} accent="rgb(167 139 250)" />
+            <InfoRow label={lbl("greeting", "Saludo inicial", "Greeting")} value={greeting} accent="rgb(167 139 250)" />
           </InfoCard>
         )}
 
         {hasAny(body, nudity, anal, collabs) && (
           <InfoCard title={en ? "Body & limits" : "Cuerpo y límites"} icon="🌶️" tone="rose">
-            <InfoRow label={en ? "Body / terms" : "Cuerpo / términos"} value={body} accent="rgb(251 113 133)" />
-            <InfoRow label={en ? "Nudity" : "Desnudos"} value={nudity} accent="rgb(251 113 133)" />
-            <InfoRow label="Anal" value={anal} accent="rgb(251 113 133)" />
-            <InfoRow label={en ? "Collabs" : "Colaboraciones"} value={collabs} accent="rgb(251 113 133)" />
+            <InfoRow label={lbl("body", "Cuerpo / términos", "Body / terms")} value={body} accent="rgb(251 113 133)" />
+            <InfoRow label={lbl("nudity", "Desnudos", "Nudity")} value={nudity} accent="rgb(251 113 133)" />
+            <InfoRow label={lbl("anal", "Anal", "Anal")} value={anal} accent="rgb(251 113 133)" />
+            <InfoRow label={lbl("collabs", "Colaboraciones", "Collabs")} value={collabs} accent="rgb(251 113 133)" />
           </InfoCard>
         )}
 
         {hasAny(videocall, custom) && (
           <InfoCard title={en ? "Services" : "Servicios"} icon="🎥" tone="emerald">
-            <InfoRow label={en ? "Videocalls" : "Videollamadas"} value={videocall} accent="rgb(52 211 153)" />
-            <InfoRow label={en ? "Custom" : "Personalizados"} value={custom} accent="rgb(52 211 153)" />
+            <InfoRow label={lbl("videocall", "Videollamadas", "Videocalls")} value={videocall} accent="rgb(52 211 153)" />
+            <InfoRow label={lbl("custom", "Personalizados", "Custom")} value={custom} accent="rgb(52 211 153)" />
           </InfoCard>
         )}
+
+        {customSections.map((s) => {
+          const title = (en ? s.title_en : s.title)?.trim() || s.title || s.title_en;
+          const value = (en ? s.value_en : s.value)?.trim() || s.value || s.value_en;
+          if (!title && !value) return null;
+          return (
+            <InfoCard
+              key={s.id}
+              title={title || (en ? "Section" : "Sección")}
+              icon="📌"
+              tone="violet"
+            >
+              <p className="whitespace-pre-line text-sm leading-snug text-foreground">
+                {value}
+              </p>
+            </InfoCard>
+          );
+        })}
 
         {prices && (
           <InfoCard title={en ? "Prices" : "Precios"} icon="💰" tone="gold">

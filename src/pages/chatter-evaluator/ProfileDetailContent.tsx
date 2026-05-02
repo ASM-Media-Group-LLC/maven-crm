@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ExternalLink, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import {
   useChatterProfiles,
   useChatterVaultByProfile,
@@ -173,30 +173,6 @@ const ChatterProfileDetailContent = () => {
           )}
         </div>
 
-        {(() => {
-          // Filter out Lovable/Roleplaychatters metadata that has no use in
-          // Maven (e.g. "__labels" — they used it to render field labels
-          // dynamically in their UI; our React form uses hardcoded labels).
-          const cleaned = Object.fromEntries(
-            Object.entries(profile.extra_fields ?? {}).filter(
-              ([k]) => !k.startsWith("__"),
-            ),
-          );
-          if (Object.keys(cleaned).length === 0) return null;
-          return (
-            <Card>
-              <CardContent className="p-6">
-                <h2 className="mb-2 text-sm font-semibold text-muted-foreground">
-                  Campos adicionales
-                  <ExternalLink className="ml-1 inline h-3 w-3" />
-                </h2>
-                <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">
-                  {JSON.stringify(cleaned, null, 2)}
-                </pre>
-              </CardContent>
-            </Card>
-          );
-        })()}
       </div>
     </main>
   );
