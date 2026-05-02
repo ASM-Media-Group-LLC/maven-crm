@@ -26,6 +26,8 @@ type Body = {
   // send
   content?: string;
   images?: string[];
+  price?: number;                        // when set, msg_type defaults to "purchase"
+  msgType?: "message" | "purchase";      // explicit override
   // claim-device
   deviceId?: string;
   // set-typing
@@ -69,17 +71,31 @@ Deno.serve(async (req) => {
   switch (body.action) {
     case "send": {
       const content = (body.content ?? "").trim();
-      if (!content && !(body.images?.length)) {
+      const images = body.images ?? [];
+      if (!content && images.length === 0) {
         return json(400, { ok: false, error: "content or images required" });
       }
+      // Restrict chatter-side msg_type to message or purchase. If a price is
+      // set we treat it as a purchase by default (matches the original
+      // Roleplaychatters semantics where the chatter sends content "for sale").
+      let msgType: "message" | "purchase" = body.msgType ?? "message";
+      if (typeof body.price === "number" && body.price > 0 && !body.msgType) {
+        msgType = "purchase";
+      }
+      if (msgType !== "message" && msgType !== "purchase") {
+        return json(400, { ok: false, error: "invalid msgType for chatter" });
+      }
+      const price = typeof body.price === "number" && body.price >= 0 ? body.price : null;
+
       const { data, error } = await supa
         .from("chatter_messages")
         .insert({
           session_id: body.sessionId,
           role: "chatter",
-          msg_type: "message",
+          msg_type: msgType,
           content: content || null,
-          images: body.images ?? [],
+          images,
+          price,
           from_examiner: false,
         })
         .select("*")
