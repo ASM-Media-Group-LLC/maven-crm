@@ -7,6 +7,21 @@
 -- via RLS using the existing user_roles / role_permissions infrastructure.
 
 -- ----------------------------------------------------------------------------
+-- 0. PREREQ: updated_at trigger function (idempotent — already exists in prod
+--    but Supabase branches don't always inherit functions; CREATE OR REPLACE
+--    is safe regardless).
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+-- ----------------------------------------------------------------------------
 -- 1. SHARED: profiles (Annie, Camila, Ferp, Julieta, Michelle + futuros)
 -- ----------------------------------------------------------------------------
 CREATE TABLE public.chatter_profiles (
