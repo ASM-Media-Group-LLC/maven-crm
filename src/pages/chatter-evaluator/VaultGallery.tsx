@@ -7,7 +7,6 @@ import {
 } from "@hello-pangea/dnd";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -131,8 +130,6 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [orderedItems, setOrderedItems] = useState(items);
   const [confirmDelete, setConfirmDelete] = useState<ChatterVaultItem | null>(null);
-  const [urlInput, setUrlInput] = useState("");
-  const [urlNameInput, setUrlNameInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addMut = useAddVaultItem();
   const delMut = useDeleteVaultItem();
@@ -159,24 +156,6 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
     }
     if (ok > 0) toast.success(`${ok} archivo(s) subido(s)`);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const handleAddByUrl = async () => {
-    const url = urlInput.trim();
-    if (!url) return;
-    try {
-      await addMut.mutateAsync({
-        profileId,
-        profileKey,
-        url,
-        name: urlNameInput.trim() || undefined,
-      });
-      setUrlInput("");
-      setUrlNameInput("");
-      toast.success("Item agregado");
-    } catch (e) {
-      toast.error("No se pudo agregar", { description: (e as Error).message });
-    }
   };
 
   const handleConfirmedDelete = async () => {
@@ -210,7 +189,7 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
   return (
     <div className="space-y-3">
       {editable && (
-        <div className="space-y-2">
+        <div className="flex items-center justify-end gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -219,48 +198,15 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
             className="hidden"
             onChange={(e) => handleUpload(e.target.files)}
           />
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={addMut.isPending}
-              size="sm"
-              className="gap-2"
-            >
-              {addMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Subir archivos
-            </Button>
-          </div>
-          {/* Or by URL — same flow as the original Roleplaychatters
-              admin (URL input + Nombre input + +). */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="O pega una URL directamente"
-              className="flex-1 min-w-[200px]"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void handleAddByUrl();
-                }
-              }}
-            />
-            <Input
-              value={urlNameInput}
-              onChange={(e) => setUrlNameInput(e.target.value)}
-              placeholder="Nombre"
-              className="max-w-[150px]"
-            />
-            <Button
-              onClick={() => void handleAddByUrl()}
-              disabled={!urlInput.trim() || addMut.isPending}
-              size="sm"
-              variant="outline"
-              className="gap-1"
-            >
-              <Plus className="h-4 w-4" /> Agregar
-            </Button>
-          </div>
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={addMut.isPending}
+            size="sm"
+            className="gap-2"
+          >
+            {addMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Subir archivos
+          </Button>
         </div>
       )}
 
