@@ -176,30 +176,33 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
           </div>
         )}
       </div>
-      <div className={`group/bubble relative flex max-w-[75%] flex-col ${isMine ? "items-end" : "items-start"}`}>
+      <div className={`flex max-w-[75%] flex-col ${isMine ? "items-end" : "items-start"}`}>
         <span className="text-[10px] text-muted-foreground">{name}</span>
-        {/* Chatter can soft-delete their own messages. The ✕ floats next
-            to the bubble and only appears on hover. */}
-        {isMine && (
-          <button
-            type="button"
-            onClick={() => onDelete(msg)}
-            className="absolute left-[-22px] top-3.5 hidden h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm ring-1 ring-border hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
-            title="Eliminar mensaje"
-            aria-label="Eliminar mensaje"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        )}
         {(msg.content || msg.deleted === "chatter") && (
           <div
-            className={`rounded-2xl px-3.5 py-2 ${
+            className={`group/bubble relative rounded-2xl px-3.5 py-2 ${isMine ? "pr-9" : ""} ${
               isMine
                 ? "rounded-br-sm bg-primary text-primary-foreground"
                 : "rounded-bl-sm bg-muted text-foreground"
             } ${msg.deleted === "chatter" ? "italic opacity-60" : ""}`}
           >
             {msg.deleted === "chatter" ? "(mensaje eliminado)" : msg.content}
+            {/* Chatter-only delete. INSIDE the bubble (top-right) so the
+                hover area is continuous — moving the mouse onto the
+                button doesn't lose the hover state the way an offset
+                outside the bubble did. Same idea as the original
+                .msg-delete-btn floating inside .msg-body. */}
+            {isMine && (
+              <button
+                type="button"
+                onClick={() => onDelete(msg)}
+                className="absolute right-1.5 top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-white/15 text-primary-foreground/80 hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
+                title="Eliminar mensaje"
+                aria-label="Eliminar mensaje"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </div>
         )}
         {msg.images && msg.images.length > 0 && (

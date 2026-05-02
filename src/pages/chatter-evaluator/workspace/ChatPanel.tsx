@@ -164,30 +164,33 @@ const MessageBubble = ({
           </div>
         )}
       </div>
-      <div className={`group/bubble relative flex max-w-[70%] flex-col ${isFan ? "items-start" : "items-end"}`}>
+      <div className={`flex max-w-[70%] flex-col ${isFan ? "items-start" : "items-end"}`}>
         <span className="text-[10px] text-muted-foreground">{name}</span>
-        {/* Examiner can hard-delete their own (fan-role) messages. The
-            ✕ floats next to the bubble and only appears on hover. */}
-        {isFan && (
-          <button
-            type="button"
-            onClick={() => onDelete(msg)}
-            className="absolute right-[-22px] top-3.5 hidden h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm ring-1 ring-border hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
-            title="Eliminar mensaje"
-            aria-label="Eliminar mensaje"
-          >
-            <XIcon className="h-3 w-3" />
-          </button>
-        )}
         {(msg.content || msg.deleted === "chatter") && (
           <div
-            className={`rounded-2xl px-3 py-1.5 ${
+            className={`group/bubble relative rounded-2xl px-3 py-1.5 ${isFan ? "pr-7" : ""} ${
               isFan
                 ? "rounded-bl-sm bg-muted text-foreground"
                 : "rounded-br-sm bg-primary text-primary-foreground"
             } ${msg.deleted === "chatter" ? "border border-rose-500/40 italic text-rose-400 opacity-80" : ""}`}
           >
             {msg.deleted === "chatter" ? "(mensaje eliminado por el chatter)" : msg.content}
+            {/* Examiner-only delete. Sits INSIDE the bubble (top-right) so
+                there's no hover gap between the bubble and the button —
+                same shape as the original .msg-delete-btn (index.html
+                line 606), which lived inside .msg-body and toggled on
+                its hover. */}
+            {isFan && (
+              <button
+                type="button"
+                onClick={() => onDelete(msg)}
+                className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-foreground/10 text-muted-foreground hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
+                title="Eliminar mensaje"
+                aria-label="Eliminar mensaje"
+              >
+                <XIcon className="h-3 w-3" />
+              </button>
+            )}
           </div>
         )}
         {msg.images && msg.images.length > 0 && (
