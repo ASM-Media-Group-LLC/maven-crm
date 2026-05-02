@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign,
-  MessageCircle, MessageSquare, Contact, Rocket, Sun, Moon, LogOut,
+  MessageCircle, MessageSquare, Contact, Rocket, Sun, Moon, LogOut, Home, Briefcase,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
@@ -203,6 +203,73 @@ const DashboardSidebar = () => {
 
   const isHRActive = pathname === "/hr" || pathname.startsWith("/hr/");
 
+  const rrhhCollapsedItems: Array<
+    | { kind?: "item"; title: string; url: string }
+    | { kind: "label"; title: string }
+    | { kind: "separator" }
+  > = [
+    { title: "Dashboard HR", url: "/hr" },
+    ...hrGroups.flatMap((g) => {
+      const flat: Array<{ title: string; url: string }> = [];
+      if (g.items)
+        flat.push(
+          ...g.items
+            .filter((i): i is { title: string; url: string } => i.url !== null)
+            .map((i) => ({ title: i.title, url: i.url }))
+        );
+      if (g.subGroups)
+        g.subGroups.forEach((sg) =>
+          flat.push(
+            ...sg.items
+              .filter((i): i is { title: string; url: string } => i.url !== null)
+              .map((i) => ({ title: i.title, url: i.url }))
+          )
+        );
+      return flat.length > 0
+        ? ([
+            { kind: "separator" } as const,
+            { kind: "label", title: g.label } as const,
+            ...flat,
+          ])
+        : [];
+    }),
+  ];
+
+  type CI =
+    | { kind?: "item"; title: string; url: string }
+    | { kind: "label"; title: string }
+    | { kind: "separator" };
+
+  const menuCollapsedItems: CI[] = [
+    ...mainMenu.map((i) => ({ title: i.title, url: i.url })),
+    ...(canAccess("Creadores") && allCreadoresItems.length > 0
+      ? ([
+          { kind: "separator" } as const,
+          { kind: "label", title: t("nav.creators") } as const,
+          ...allCreadoresItems.map((i) => ({ title: i.title, url: i.url })),
+        ] as CI[])
+      : []),
+    ...(canAccess("Creator Sales")
+      ? ([
+          { kind: "separator" } as const,
+          { kind: "label", title: "Ventas" } as const,
+          ...creatorSalesSubItems.map((i) => ({ title: i.title, url: i.url })),
+        ] as CI[])
+      : []),
+  ];
+  const isMenuActive =
+    mainMenu.some((i) => pathname === i.url || pathname.startsWith(i.url + "/")) ||
+    isCreadoresActive ||
+    isCreatorSalesActive;
+
+  const operationsCollapsedItems: CI[] = operationsMenu.map((i) => ({
+    title: i.title,
+    url: i.url,
+  }));
+  const isOperationsActive = operationsMenu.some(
+    (i) => pathname === i.url || pathname.startsWith(i.url + "/")
+  );
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="flex h-14 items-center justify-start px-5 border-b border-border shrink-0">
@@ -210,7 +277,13 @@ const DashboardSidebar = () => {
       </SidebarHeader>
 
       <SidebarContent>
-        <CollapsibleSidebarGroup label={t("sidebar.menu")} storageKey="menu">
+        <CollapsibleSidebarGroup
+          label={t("sidebar.menu")}
+          storageKey="menu"
+          icon={Home}
+          active={isMenuActive}
+          collapsedItems={menuCollapsedItems}
+        >
             <SidebarMenu>
               {mainMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
@@ -330,7 +403,13 @@ const DashboardSidebar = () => {
             </SidebarMenu>
         </CollapsibleSidebarGroup>
 
-        <CollapsibleSidebarGroup label={t("sidebar.operations")} storageKey="operations">
+        <CollapsibleSidebarGroup
+          label={t("sidebar.operations")}
+          storageKey="operations"
+          icon={Briefcase}
+          active={isOperationsActive}
+          collapsedItems={operationsCollapsedItems}
+        >
             <SidebarMenu>
               {operationsMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
@@ -401,8 +480,24 @@ const DashboardSidebar = () => {
 
           const isFinanzasActive = pathname === "/finanzas" || pathname.startsWith("/finanzas/");
 
+          const finCollapsedItems: CI[] = [
+            { title: "Dashboard Financiero", url: "/finanzas" },
+            { title: "Collections", url: "/finanzas/collections" },
+            ...finanzasGroups.flatMap((g) => [
+              { kind: "separator" } as const,
+              { kind: "label", title: g.label } as const,
+              ...g.items.map((i) => ({ title: i.title, url: i.url })),
+            ]),
+          ];
+
           return (
-            <CollapsibleSidebarGroup label="Finanzas" storageKey="finanzas">
+            <CollapsibleSidebarGroup
+              label="Finanzas"
+              storageKey="finanzas"
+              icon={Wallet}
+              active={isFinanzasActive}
+              collapsedItems={finCollapsedItems}
+            >
                 <SidebarMenu>
                   {collapsed ? (
                     <SidebarMenuItem>
@@ -477,7 +572,13 @@ const DashboardSidebar = () => {
         })()}
 
         {canAccess("HR") && (
-        <CollapsibleSidebarGroup label="Recursos Humanos" storageKey="rrhh">
+        <CollapsibleSidebarGroup
+          label="Recursos Humanos"
+          storageKey="rrhh"
+          icon={UserCog}
+          active={isHRActive}
+          collapsedItems={rrhhCollapsedItems}
+        >
             <SidebarMenu>
               {/* Dashboard HR - top level */}
               {collapsed ? (
@@ -651,7 +752,7 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
           type="button"
           onClick={handleLogout}
           title="Salir"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-rose-600 text-white shadow-md shadow-rose-500/20 ring-1 ring-rose-400/30 transition-all hover:from-rose-500 hover:to-rose-700 hover:shadow-lg hover:shadow-rose-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-md shadow-accent/25 ring-1 ring-accent/30 transition-all hover:shadow-lg hover:shadow-accent/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         >
           <LogOut className="h-4 w-4" />
         </button>
@@ -701,7 +802,7 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
       <button
         type="button"
         onClick={handleLogout}
-        className="group flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-br from-rose-500 to-rose-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-rose-500/20 ring-1 ring-rose-400/30 transition-all hover:-translate-y-0.5 hover:from-rose-500 hover:to-rose-700 hover:shadow-lg hover:shadow-rose-500/30 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60"
+        className="group flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-br from-accent to-primary px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-accent/25 ring-1 ring-accent/30 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-accent/40 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         <LogOut className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
         Salir
