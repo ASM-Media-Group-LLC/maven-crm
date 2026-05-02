@@ -2,9 +2,6 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { subMonths, format } from "date-fns";
 import { es } from "date-fns/locale";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { supabase } from "@/integrations/supabase/client";
 import { useEarningsData } from "./sales-performance/useEarningsData";
 import {
@@ -512,11 +509,6 @@ const Dashboard2 = () => {
 
   // ─── Render ────────────────────────────────────────────────────
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <DashboardSidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <DashboardTopbar />
           <main className="flex-1 overflow-auto">
             {/* ══════ COMPACT HEADER ══════ */}
             <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-3">
@@ -1860,9 +1852,6 @@ const Dashboard2 = () => {
               </DialogContent>
             </Dialog>
           </main>
-        </div>
-      </div>
-    </SidebarProvider>
   );
 };
 

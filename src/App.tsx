@@ -11,6 +11,7 @@ import { OnlinePresenceProvider } from "@/hooks/useOnlinePresence";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionRoute from "@/components/PermissionRoute";
 import AdminRoute from "./components/AdminRoute";
+import AppShell from "@/components/dashboard/AppShell";
 
 // Eagerly loaded (public / shell)
 import Landing from "./pages/Landing";
@@ -217,7 +218,41 @@ const App = () => (
               <Route path="/tareas/share/:token" element={<TaskSharePage />} />
               <Route path="/tareas/project-share/:token" element={<ProjectSharePage />} />
 
-              {/* Protected routes */}
+              {/* Protected routes that share the AppShell — Sidebar +
+                  Topbar mount once and persist across nav between these
+                  routes. Anything not yet refactored to render only its
+                  inner content stays as a standalone Route below. */}
+              <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard2" element={<AdminRoute><Dashboard2 /></AdminRoute>} />
+                <Route path="/contactos" element={<PermissionRoute module="Contactos"><Contactos /></PermissionRoute>} />
+                <Route path="/contactos/nuevo" element={<PermissionRoute module="Contactos"><NuevoContacto /></PermissionRoute>} />
+                <Route path="/creadores" element={<PermissionRoute module="Creadores" submodule="Lista"><Creadores /></PermissionRoute>} />
+                <Route path="/creadores/nuevo" element={<PermissionRoute module="Creadores" submodule="Nuevo"><NuevoCreador /></PermissionRoute>} />
+                <Route path="/eventos" element={<PermissionRoute module="Eventos"><Eventos /></PermissionRoute>} />
+                <Route path="/eventos/nuevo" element={<PermissionRoute module="Eventos"><NuevoEvento /></PermissionRoute>} />
+                <Route path="/eventos/:id/editar" element={<PermissionRoute module="Eventos"><EditEvento /></PermissionRoute>} />
+                <Route path="/eventos/:id" element={<PermissionRoute module="Eventos"><EventoDetail /></PermissionRoute>} />
+                <Route path="/leadgen" element={<PermissionRoute module="LeadGen"><LeadGen /></PermissionRoute>} />
+                <Route path="/leadgen/base-datos" element={<PermissionRoute module="LeadGen"><LeadGenBaseDatos /></PermissionRoute>} />
+                <Route path="/closers" element={<PermissionRoute module="Closers"><Closers /></PermissionRoute>} />
+                <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />
+                <Route path="/promolog" element={<PermissionRoute module="Promolog"><Promolog /></PermissionRoute>} />
+                {/* Chatter Evaluator: gated with ProtectedRoute on the staging branch
+                    (where user_roles isn't populated). Swap to PermissionRoute
+                    module="Chatters" when merging to prod. */}
+                <Route path="/chatter-evaluator" element={<ChatterEvaluator />} />
+                <Route path="/chatter-evaluator/admin" element={<ChatterAdmin />} />
+                <Route path="/chatter-evaluator/workspace" element={<ChatterWorkspace />} />
+                <Route path="/chatter-evaluator/:profileKey" element={<ChatterProfileDetail />} />
+                <Route path="/chatter-evaluator/:profileKey/edit" element={<ChatterProfileEdit />} />
+                <Route path="/tareas" element={<Tareas />} />
+                <Route path="/tareas/:projectId" element={<TareaProject />} />
+              </Route>
+
+              {/* Protected routes that still own their shell — kept
+                  standalone until refactored. These will still feel like
+                  a full reload when navigating to/from them. */}
               <Route path="/design-system" element={<ProtectedRoute><DesignSystem /></ProtectedRoute>} />
               <Route path="/docs" element={<ProtectedRoute><Docs /></ProtectedRoute>} />
               <Route path="/sales-overview" element={<PermissionRoute module="Creator Sales"><SalesOverview /></PermissionRoute>} />
@@ -228,42 +263,16 @@ const App = () => (
               <Route path="/sales-overview/alto-potencial" element={<PermissionRoute module="Creator Sales"><AltoPotencialPage /></PermissionRoute>} />
               <Route path="/sales-overview/en-riesgo" element={<PermissionRoute module="Creator Sales"><EnRiesgoPage /></PermissionRoute>} />
               <Route path="/salesdashboard" element={<PermissionRoute module="Creator Sales"><SalesDashboard /></PermissionRoute>} />
-              
               <Route path="/sales-audit" element={<PermissionRoute module="Creator Sales"><SalesAudit /></PermissionRoute>} />
               <Route path="/aisales" element={<PermissionRoute module="Creator Sales"><AiSales /></PermissionRoute>} />
               <Route path="/ai-sales-config" element={<PermissionRoute module="Creator Sales"><AiSalesConfig /></PermissionRoute>} />
-              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/dashboard2" element={<AdminRoute><Dashboard2 /></AdminRoute>} />
-              <Route path="/contactos" element={<PermissionRoute module="Contactos"><Contactos /></PermissionRoute>} />
-              <Route path="/contactos/nuevo" element={<PermissionRoute module="Contactos"><NuevoContacto /></PermissionRoute>} />
               <Route path="/creadores/dashboard" element={<PermissionRoute module="Creadores" submodule="Dashboard"><CreadorasDashboardPage /></PermissionRoute>} />
-              <Route path="/creadores" element={<PermissionRoute module="Creadores" submodule="Lista"><Creadores /></PermissionRoute>} />
               <Route path="/creadores/onboarding" element={<PermissionRoute module="Creadores" submodule="Onboarding"><OnboardingPage /></PermissionRoute>} />
               <Route path="/creadores/onboarding/nuevo" element={<PermissionRoute module="Creadores" submodule="Onboarding"><OnboardingWizardPage /></PermissionRoute>} />
               <Route path="/creadores/onboarding/:id" element={<PermissionRoute module="Creadores" submodule="Onboarding"><OnboardingWizardPage /></PermissionRoute>} />
               <Route path="/creadores/offboarding" element={<PermissionRoute module="Creadores" submodule="Offboarding"><OffboardingListPage /></PermissionRoute>} />
               <Route path="/creadores/offboarding/:offboardingId" element={<PermissionRoute module="Creadores" submodule="Offboarding"><OffboardingDetailPage /></PermissionRoute>} />
-              <Route path="/creadores/nuevo" element={<PermissionRoute module="Creadores" submodule="Nuevo"><NuevoCreador /></PermissionRoute>} />
               <Route path="/creadores/:id" element={<PermissionRoute module="Creadores" submodule="Perfil"><CreadorProfile /></PermissionRoute>} />
-              <Route path="/eventos" element={<PermissionRoute module="Eventos"><Eventos /></PermissionRoute>} />
-              <Route path="/leadgen" element={<PermissionRoute module="LeadGen"><LeadGen /></PermissionRoute>} />
-              <Route path="/leadgen/base-datos" element={<PermissionRoute module="LeadGen"><LeadGenBaseDatos /></PermissionRoute>} />
-              <Route path="/closers" element={<PermissionRoute module="Closers"><Closers /></PermissionRoute>} />
-              <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />
-              <Route path="/promolog" element={<PermissionRoute module="Promolog"><Promolog /></PermissionRoute>} />
-              {/* Chatter Evaluator: gated with ProtectedRoute on the staging branch
-                  (where user_roles isn't populated). Swap to PermissionRoute
-                  module="Chatters" when merging to prod. */}
-              <Route path="/chatter-evaluator" element={<ProtectedRoute><ChatterEvaluator /></ProtectedRoute>} />
-              <Route path="/chatter-evaluator/admin" element={<ProtectedRoute><ChatterAdmin /></ProtectedRoute>} />
-              <Route path="/chatter-evaluator/workspace" element={<ProtectedRoute><ChatterWorkspace /></ProtectedRoute>} />
-              <Route path="/chatter-evaluator/:profileKey" element={<ProtectedRoute><ChatterProfileDetail /></ProtectedRoute>} />
-              <Route path="/chatter-evaluator/:profileKey/edit" element={<ProtectedRoute><ChatterProfileEdit /></ProtectedRoute>} />
-              <Route path="/tareas" element={<ProtectedRoute><Tareas /></ProtectedRoute>} />
-              <Route path="/tareas/:projectId" element={<ProtectedRoute><TareaProject /></ProtectedRoute>} />
-              <Route path="/eventos/nuevo" element={<PermissionRoute module="Eventos"><NuevoEvento /></PermissionRoute>} />
-              <Route path="/eventos/:id/editar" element={<PermissionRoute module="Eventos"><EditEvento /></PermissionRoute>} />
-              <Route path="/eventos/:id" element={<PermissionRoute module="Eventos"><EventoDetail /></PermissionRoute>} />
               <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
               <Route path="/messenger" element={<ProtectedRoute><Messenger /></ProtectedRoute>} />
               <Route path="/call/:roomName" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />

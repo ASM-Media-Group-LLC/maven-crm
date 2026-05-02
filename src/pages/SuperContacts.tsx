@@ -1,7 +1,4 @@
 import { useState } from "react";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus, UserPlus, ClipboardPaste, FileSpreadsheet, ChevronDown, BarChart3, TrendingUp } from "lucide-react";
@@ -16,11 +13,6 @@ const SuperContacts = () => {
   const [productivityOpen, setProductivityOpen] = useState(false);
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <DashboardSidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <DashboardTopbar />
           <div className="flex-1 overflow-auto p-4 md:p-6">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold">Wishlist</h1>
@@ -71,9 +63,6 @@ const SuperContacts = () => {
             <SuperContactsAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
             <SuperContactsProductivityModal open={productivityOpen} onOpenChange={setProductivityOpen} />
           </div>
-        </div>
-      </div>
-    </SidebarProvider>
   );
 };
 
