@@ -80,13 +80,10 @@ export const CharacterInfoPanel = ({ profile, lang, compact = false }: Character
   const en = lang === "en";
   const p = profile as unknown as Record<string, unknown>;
   const name = pVal(p, "name", lang) || profile.name;
-  const meta = [
-    pVal(p, "nationality", lang),
-    pVal(p, "location", lang) ? `📍 ${pVal(p, "location", lang)}` : "",
-    pVal(p, "age", lang),
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const nationality = pVal(p, "nationality", lang);
+  const location = pVal(p, "location", lang);
+  const age = pVal(p, "age", lang);
+  const hasMeta = Boolean(nationality || location || age);
 
   const usersTerm = pVal(p, "users_term", lang);
   const greeting = pVal(p, "greeting", lang);
@@ -127,7 +124,40 @@ export const CharacterInfoPanel = ({ profile, lang, compact = false }: Character
             )}
           </div>
           <div className={nameClass}>{name}</div>
-          {meta && <div className="mt-1.5 text-xs text-muted-foreground">{meta}</div>}
+          {hasMeta && (
+            <div className="mt-3 grid w-full grid-flow-col auto-cols-fr divide-x divide-border/40 text-center">
+              {nationality && (
+                <div className="px-2">
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                    {en ? "Nationality" : "Nacionalidad"}
+                  </div>
+                  <div className="mt-0.5 text-xs font-semibold text-foreground/90">
+                    {nationality}
+                  </div>
+                </div>
+              )}
+              {location && (
+                <div className="px-2">
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                    {en ? "City" : "Ciudad"}
+                  </div>
+                  <div className="mt-0.5 text-xs font-semibold text-foreground/90">
+                    📍 {location}
+                  </div>
+                </div>
+              )}
+              {age && (
+                <div className="px-2">
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                    {en ? "Age" : "Edad"}
+                  </div>
+                  <div className="mt-0.5 text-xs font-semibold text-foreground/90">
+                    {age}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
