@@ -12,6 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft,
   GripVertical,
   Plus,
@@ -205,43 +212,48 @@ const CriteriaSection = () => {
   const serverItems = useMemo(() => criteriaQ.data ?? [], [criteriaQ.data]);
   const [items, setItems] = useState<ChatterCriterion[]>(serverItems);
   const [confirmDelete, setConfirmDelete] = useState<ChatterCriterion | null>(null);
+  // Editor dialog state. `editing` holds the criterion currently being
+  // created (null id) or edited (existing id). The earlier prompt()
+  // calls were the browser's native dialog — replaced by this Maven-
+  // styled editor with both ES and EN inputs at once.
+  const [editing, setEditing] = useState<{ id?: string; label: string; label_en: string } | null>(null);
   useEffect(() => setItems(serverItems), [serverItems]);
 
-  const handleAdd = async () => {
-    const label = prompt("Etiqueta del criterio (ES):");
-    if (!label) return;
-    const label_en = prompt("Etiqueta en inglés (opcional):") || null;
-    try {
-      await upsert.mutateAsync({
-        patch: {
-          label,
-          label_en,
-          weight: 1,
-          position: items.length + 1,
-          is_active: true,
-        },
-      });
-      toast.success("Criterio agregado");
-    } catch (e) {
-      toast.error("Error", { description: (e as Error).message });
-    }
-  };
+  const openCreate = () =>
+    setEditing({ label: "", label_en: "" });
+  const openEdit = (c: ChatterCriterion) =>
+    setEditing({ id: c.id, label: c.label, label_en: c.label_en ?? "" });
 
-  const handleEdit = async (c: ChatterCriterion, key: "label" | "label_en") => {
-    const next = prompt(
-      key === "label" ? "Etiqueta (ES):" : "Etiqueta (EN):",
-      c[key] ?? "",
-    );
-    if (next === null) return;
+  const handleSaveEdit = async () => {
+    if (!editing) return;
+    const label = editing.label.trim();
+    if (!label) {
+      toast.error("La etiqueta en español es obligatoria");
+      return;
+    }
+    const label_en = editing.label_en.trim() || null;
     try {
-      await upsert.mutateAsync({
-        id: c.id,
-        patch: {
-          label: key === "label" ? next : c.label,
-          label_en: key === "label_en" ? next : c.label_en,
-        },
-      });
-      toast.success("Criterio actualizado");
+      if (editing.id) {
+        // Edit: keep position/weight/is_active untouched (they're not in
+        // this dialog), so we just patch the labels.
+        await upsert.mutateAsync({
+          id: editing.id,
+          patch: { label, label_en },
+        });
+        toast.success("Criterio actualizado");
+      } else {
+        await upsert.mutateAsync({
+          patch: {
+            label,
+            label_en,
+            weight: 1,
+            position: items.length + 1,
+            is_active: true,
+          },
+        });
+        toast.success("Criterio agregado");
+      }
+      setEditing(null);
     } catch (e) {
       toast.error("Error", { description: (e as Error).message });
     }
@@ -293,7 +305,7 @@ const CriteriaSection = () => {
               Lista por defecto que ven los examiners cuando crean una sesión.
             </p>
           </div>
-          <Button onClick={handleAdd} size="sm" variant="outline" className="gap-1">
+          <Button onClick={openCreate} size="sm" variant="outline" className="gap-1">
             <Plus className="h-4 w-4" /> Agregar
           </Button>
         </div>
@@ -320,22 +332,16 @@ const CriteriaSection = () => {
                         <div {...prov.dragHandleProps} className="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing">
                           <GripVertical className="h-4 w-4" />
                         </div>
-                        <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-2 gap-2">
-                          <button
-                            onClick={() => handleEdit(c, "label")}
-                            className="truncate text-left text-sm hover:text-primary"
-                            title="Click para editar (ES)"
-                          >
-                            {c.label}
-                          </button>
-                          <button
-                            onClick={() => handleEdit(c, "label_en")}
-                            className="truncate text-left text-xs text-muted-foreground hover:text-primary"
-                            title="Click para editar (EN)"
-                          >
+                        <button
+                          onClick={() => openEdit(c)}
+                          className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-2 gap-2 rounded text-left transition-colors hover:bg-muted/50 px-1 py-0.5"
+                          title="Editar criterio"
+                        >
+                          <span className="truncate text-sm">{c.label}</span>
+                          <span className="truncate text-xs text-muted-foreground">
                             {c.label_en || "(sin EN)"}
-                          </button>
-                        </div>
+                          </span>
+                        </button>
                         <Switch
                           checked={c.is_active}
                           onCheckedChange={(v) => handleToggle(c, v)}
@@ -386,6 +392,60 @@ const CriteriaSection = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Maven-styled criterion editor — replaces the native prompt()
+          chain that used to ask for ES then EN one at a time. */}
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editing?.id ? "Editar criterio" : "Nuevo criterio"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label htmlFor="crit_es" className="text-xs">
+                Etiqueta (ES) <span className="text-rose-400">*</span>
+              </Label>
+              <Input
+                id="crit_es"
+                autoFocus
+                value={editing?.label ?? ""}
+                onChange={(e) =>
+                  setEditing((curr) => (curr ? { ...curr, label: e.target.value } : curr))
+                }
+                placeholder="Ej: Conexión emocional real"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="crit_en" className="text-xs">Etiqueta (EN)</Label>
+              <Input
+                id="crit_en"
+                value={editing?.label_en ?? ""}
+                onChange={(e) =>
+                  setEditing((curr) => (curr ? { ...curr, label_en: e.target.value } : curr))
+                }
+                placeholder="Optional English label"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)} disabled={upsert.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={!editing?.label.trim() || upsert.isPending}
+              className="gap-2"
+            >
+              {upsert.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {editing?.id ? "Guardar" : "Agregar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
@@ -402,7 +462,13 @@ const ConfigSection = () => {
   const [fanAvatar, setFanAvatar] = useState("");
   const [notifyUserIds, setNotifyUserIds] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerFilter, setPickerFilter] = useState("");
   const usersQ = useMavenUsers();
+  // Reset the filter every time the popover opens so reopening doesn't
+  // remember a stale search term.
+  useEffect(() => {
+    if (!pickerOpen) setPickerFilter("");
+  }, [pickerOpen]);
 
   useEffect(() => {
     if (!cfgQ.data) return;
@@ -521,6 +587,17 @@ const ConfigSection = () => {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+              {/* Search box at the top filters the list as the user types
+                  on full_name OR role. Empty filter shows everyone. */}
+              <div className="border-b p-2">
+                <Input
+                  autoFocus
+                  value={pickerFilter}
+                  onChange={(e) => setPickerFilter(e.target.value)}
+                  placeholder="Buscar empleado…"
+                  className="h-8 text-sm"
+                />
+              </div>
               <div className="max-h-72 overflow-y-auto p-1">
                 {usersQ.isLoading && (
                   <div className="p-3 text-xs text-muted-foreground">Cargando…</div>
@@ -530,37 +607,53 @@ const ConfigSection = () => {
                     No hay usuarios Maven todavía.
                   </div>
                 )}
-                {(usersQ.data ?? []).map((u) => {
-                  const selected = notifyUserIds.includes(u.id);
-                  const name = u.full_name || "Sin nombre";
-                  return (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => toggleNotifyUser(u.id)}
-                      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted ${
-                        selected ? "bg-primary/10" : ""
-                      }`}
-                    >
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border">
-                        {selected && <CheckIcon className="h-3 w-3" />}
-                      </span>
-                      <div className="aspect-square h-6 w-6 shrink-0 overflow-hidden rounded-full bg-muted">
-                        {u.avatar_url && (
-                          <img src={u.avatar_url} alt={name} className="h-full w-full object-cover" />
-                        )}
+                {(() => {
+                  const q = pickerFilter.trim().toLowerCase();
+                  const filtered = (usersQ.data ?? []).filter((u) => {
+                    if (!q) return true;
+                    const name = (u.full_name ?? "").toLowerCase();
+                    const role = (u.role ?? "").toLowerCase();
+                    return name.includes(q) || role.includes(q);
+                  });
+                  if (!usersQ.isLoading && q && filtered.length === 0) {
+                    return (
+                      <div className="p-3 text-xs text-muted-foreground">
+                        Sin resultados para "{pickerFilter}".
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate">{name}</div>
-                        {u.role && (
-                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            {u.role}
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+                    );
+                  }
+                  return filtered.map((u) => {
+                    const selected = notifyUserIds.includes(u.id);
+                    const name = u.full_name || "Sin nombre";
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => toggleNotifyUser(u.id)}
+                        className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted ${
+                          selected ? "bg-primary/10" : ""
+                        }`}
+                      >
+                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border">
+                          {selected && <CheckIcon className="h-3 w-3" />}
+                        </span>
+                        <div className="aspect-square h-6 w-6 shrink-0 overflow-hidden rounded-full bg-muted">
+                          {u.avatar_url && (
+                            <img src={u.avatar_url} alt={name} className="h-full w-full object-cover" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate">{name}</div>
+                          {u.role && (
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                              {u.role}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  });
+                })()}
               </div>
             </PopoverContent>
           </Popover>
