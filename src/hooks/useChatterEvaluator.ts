@@ -7,6 +7,9 @@ import type {
   ChatterConfig,
   ChatterSession,
   ChatterMessage,
+  ChatterEvaluation,
+  CriterionResult,
+  EvaluationVerdict,
 } from "@/pages/chatter-evaluator/types";
 
 // The chatter_* tables aren't in the generated Supabase types yet, so we use
@@ -513,6 +516,163 @@ export const useSendChatterMessage = () => {
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["chatter-messages", vars.sessionId] });
+    },
+  });
+};
+
+// ---- Evaluations ---------------------------------------------------------
+
+export type SubmitEvaluationInput = {
+  sessionId: string;
+  examinerName: string;
+  verdict: EvaluationVerdict;
+  feedback: string;
+  criteriaResults: CriterionResult[];
+  scorePct: number;
+};
+
+const buildAppsScriptPayload = (params: {
+  evaluation: ChatterEvaluation;
+  session: ChatterSession;
+  profile: ChatterProfile | null;
+  messages: ChatterMessage[];
+  fanName: string;
+  emails: string[];
+}) => {
+  const { evaluation, session, profile, messages, fanName, emails } = params;
+  return {
+    chatterName: session.chatter_name,
+    modelName: profile?.name ?? session.profile_id,
+    examinerName: evaluation.examiner_name ?? "(unnamed)",
+    verdict: evaluation.verdict === "apto" ? "APTO" : "NO APTO",
+    score: evaluation.score_pct ?? 0,
+    total: evaluation.criteria_results.length,
+    percentage: evaluation.score_pct ?? 0,
+    badge:
+      (evaluation.score_pct ?? 0) >= 80 ? "APROBADO" :
+      (evaluation.score_pct ?? 0) >= 50 ? "A CRITERIO" : "NO APTO",
+    criteria: evaluation.criteria_results.map((c) => ({
+      label: c.label,
+      status:
+        c.status === "pass" ? "Cumple" :
+        c.status === "partial" ? "Parcial" : "No cumple",
+    })),
+    feedback: evaluation.feedback ?? "",
+    chatHistory: messages.map((m) => ({
+      role: m.role,
+      type: m.msg_type,
+      content: m.content,
+      price: m.price,
+      timestamp: m.created_at,
+      from: m.role === "fan" ? fanName : m.role === "chatter" ? session.chatter_name : "system",
+    })),
+    emails,
+    sessionId: session.id,
+    createdAt: evaluation.created_at,
+  };
+};
+
+export const useSubmitEvaluation = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: SubmitEvaluationInput): Promise<{
+      evaluation: ChatterEvaluation;
+      webhookOk: boolean;
+      webhookError?: string;
+    }> => {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+      if (!userData.user) throw new Error("No autenticado");
+
+      // 1) Insert evaluation row
+      const row = {
+        session_id: input.sessionId,
+        examiner_user_id: userData.user.id,
+        examiner_name: input.examinerName,
+        verdict: input.verdict,
+        feedback: input.feedback || null,
+        criteria_results: input.criteriaResults,
+        score_pct: input.scorePct,
+        sent_to_apps_script: false,
+      };
+      const { data: evalData, error: evalErr } = await sb
+        .from("chatter_evaluations")
+        .insert(row)
+        .select("*")
+        .single();
+      if (evalErr) throw evalErr;
+      const evaluation = evalData as ChatterEvaluation;
+
+      // 2) Mark session as ended
+      await sb
+        .from("chatter_sessions")
+        .update({ status: "ended", ended_at: new Date().toISOString() })
+        .eq("id", input.sessionId);
+
+      // 3) Best-effort POST to Apps Script webhook (don't block on failure)
+      let webhookOk = false;
+      let webhookError: string | undefined;
+      try {
+        const [{ data: cfg }, { data: ses }, { data: msgs }] = await Promise.all([
+          sb.from("chatter_config").select("*").eq("id", 1).maybeSingle(),
+          sb.from("chatter_sessions").select("*").eq("id", input.sessionId).maybeSingle(),
+          sb
+            .from("chatter_messages")
+            .select("*")
+            .eq("session_id", input.sessionId)
+            .order("created_at", { ascending: true }),
+        ]);
+        const session = ses as ChatterSession | null;
+        const config = cfg as ChatterConfig | null;
+        const messages = (msgs ?? []) as ChatterMessage[];
+
+        if (!session) throw new Error("session disappeared mid-submit");
+        if (!config?.apps_script_url) {
+          webhookError = "apps_script_url is not configured";
+        } else {
+          const { data: prof } = await sb
+            .from("chatter_profiles")
+            .select("*")
+            .eq("id", session.profile_id)
+            .maybeSingle();
+
+          const payload = buildAppsScriptPayload({
+            evaluation,
+            session,
+            profile: (prof as ChatterProfile | null) ?? null,
+            messages,
+            fanName: config.fan_name ?? "JavixBuster",
+            emails: config.notification_emails ?? [],
+          });
+
+          const res = await fetch(config.apps_script_url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            webhookError = `webhook HTTP ${res.status}`;
+          } else {
+            webhookOk = true;
+            // Mark evaluation as sent
+            await sb
+              .from("chatter_evaluations")
+              .update({
+                sent_to_apps_script: true,
+                sent_at: new Date().toISOString(),
+              })
+              .eq("id", evaluation.id);
+          }
+        }
+      } catch (e) {
+        webhookError = (e as Error).message;
+      }
+
+      return { evaluation, webhookOk, webhookError };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chatter-sessions"] });
+      qc.invalidateQueries({ queryKey: ["chatter-evaluations"] });
     },
   });
 };

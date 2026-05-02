@@ -100,6 +100,28 @@ export interface ChatterMessage {
   created_at: string;
 }
 
+export type EvaluationVerdict = "apto" | "no_apto";
+
+export interface CriterionResult {
+  criterion_id: string;
+  label: string;
+  status: "pass" | "partial" | "fail";
+}
+
+export interface ChatterEvaluation {
+  id: string;
+  session_id: string;
+  examiner_user_id: string;
+  examiner_name: string | null;
+  verdict: EvaluationVerdict;
+  feedback: string | null;
+  criteria_results: CriterionResult[];
+  score_pct: number | null;
+  sent_to_apps_script: boolean;
+  sent_at: string | null;
+  created_at: string;
+}
+
 export interface ChatterConfig {
   id: number;
   apps_script_url: string | null;

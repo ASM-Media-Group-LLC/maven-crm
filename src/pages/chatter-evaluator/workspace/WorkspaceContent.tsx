@@ -6,17 +6,21 @@ import { toast } from "sonner";
 import {
   useChatterSessions,
   useChatterConfig,
+  useChatterCriteria,
 } from "@/hooks/useChatterEvaluator";
 import { CriteriaPanel, readScoresFromStorage, type CriteriaScores } from "./CriteriaPanel";
 import { SessionsPanel } from "./SessionsPanel";
 import { ChatPanel } from "./ChatPanel";
+import { EvaluationVerdictDialog } from "./EvaluationVerdictDialog";
 
 const ACTIVE_KEY = "maven.chatter.workspace.activeSessionId";
 
 const WorkspaceContent = () => {
   const sessionsQ = useChatterSessions("all");
   const configQ = useChatterConfig();
+  const criteriaQ = useChatterCriteria();
   const [params, setParams] = useSearchParams();
+  const [verdictOpen, setVerdictOpen] = useState(false);
 
   // Active session: priority is ?session=<id> in URL, else last from
   // localStorage, else the first open session.
@@ -81,19 +85,40 @@ const WorkspaceContent = () => {
     setScoresBySession((prev) => ({ ...prev, [selectedId]: next }));
   };
 
-  const handleSubmit = async () => {
+  const currentScores = selectedId ? scoresBySession[selectedId] ?? {} : {};
+
+  const currentScorePct = useMemo(() => {
+    const criteria = criteriaQ.data ?? [];
+    if (criteria.length === 0) return 0;
+    let pass = 0, part = 0;
+    for (const c of criteria) {
+      const s = currentScores[c.id];
+      if (s === "pass") pass++;
+      else if (s === "partial") part++;
+    }
+    return Math.round(((pass + part * 0.5) / criteria.length) * 100);
+  }, [currentScores, criteriaQ.data]);
+
+  const handleSubmit = () => {
     if (!selectedSession) return;
-    const scores = scoresBySession[selectedSession.id] ?? {};
-    const filled = Object.values(scores).filter(Boolean).length;
+    const filled = Object.values(currentScores).filter(Boolean).length;
     if (filled === 0) {
       toast.error("No hay criterios calificados");
       return;
     }
-    // For now, just toast — the full submission flow (verdict + feedback +
-    // Apps Script webhook) is wired in Phase 4.
-    toast.message("Phase 4 wires the verdict modal + webhook", {
-      description: `${filled} criterio(s) calificados. Próximo paso: modal de verdict + envío al webhook de Apps Script.`,
+    setVerdictOpen(true);
+  };
+
+  const handleSubmitted = () => {
+    // Clear scores for the just-submitted session
+    if (!selectedId) return;
+    setScoresBySession((prev) => {
+      const next = { ...prev };
+      delete next[selectedId];
+      return next;
     });
+    window.localStorage.removeItem(`maven.chatter.scores.${selectedId}`);
+    setSelectedId(null);
   };
 
   return (
@@ -115,7 +140,7 @@ const WorkspaceContent = () => {
         <aside className="min-h-0 border-r">
           <CriteriaPanel
             session={selectedSession}
-            scores={selectedId ? scoresBySession[selectedId] ?? {} : {}}
+            scores={currentScores}
             setScores={setScoresForCurrent}
             onSubmitEvaluation={handleSubmit}
           />
@@ -127,6 +152,17 @@ const WorkspaceContent = () => {
           <ChatPanel session={selectedSession} />
         </section>
       </div>
+
+      {selectedSession && (
+        <EvaluationVerdictDialog
+          session={selectedSession}
+          scores={currentScores}
+          scorePct={currentScorePct}
+          open={verdictOpen}
+          onOpenChange={setVerdictOpen}
+          onSubmitted={handleSubmitted}
+        />
+      )}
     </main>
   );
 };

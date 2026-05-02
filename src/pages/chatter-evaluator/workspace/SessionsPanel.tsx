@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, X, Clock, CircleDot, CircleDashed } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   useChatterSessions,
   useChatterProfiles,
@@ -97,8 +99,26 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   const sessionsQ = useChatterSessions("all");
   const profilesQ = useChatterProfiles();
   const endMut = useEndChatterSession();
+  const qc = useQueryClient();
   const [newOpen, setNewOpen] = useState(false);
   const [tab, setTab] = useState<"open" | "ended">("open");
+
+  // Realtime: keep the list in sync when sessions are updated externally
+  // (e.g. the chatter claims a device, status flips to active) or other
+  // examiners create new ones.
+  useEffect(() => {
+    const channel = supabase
+      .channel("chatter-sessions-list")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chatter_sessions" },
+        () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
 
   const profilesById = useMemo(() => {
     const m = new Map<string, ChatterProfile>();

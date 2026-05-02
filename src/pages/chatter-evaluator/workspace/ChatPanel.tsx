@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Send, DollarSign, Loader2, MessageCircle, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import {
   useChatterMessages,
   useSendChatterMessage,
@@ -138,8 +140,34 @@ export const ChatPanel = ({ session }: Props) => {
   const profilesQ = useChatterProfiles();
   const configQ = useChatterConfig();
   const sendMut = useSendChatterMessage();
+  const qc = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
+
+  // Realtime: subscribe to chatter_messages inserts/updates for this session
+  // so messages from the chatter side (Phase 5) appear instantly here
+  // without polling. Cleanup on session change / unmount.
+  useEffect(() => {
+    if (!session?.id) return;
+    const channel = supabase
+      .channel(`chatter-messages:${session.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chatter_messages",
+          filter: `session_id=eq.${session.id}`,
+        },
+        () => {
+          qc.invalidateQueries({ queryKey: ["chatter-messages", session.id] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.id, qc]);
 
   const profile = useMemo(() => {
     if (!session) return null;
