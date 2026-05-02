@@ -23,6 +23,20 @@ ENV SUPABASE_URL=$SUPABASE_URL
 ENV SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY
 
 COPY . .
+
+# Override any .env shipped in the repo with the values from build-args.
+# Vite's loadEnv reads .env files first, so without this step a .env
+# committed in the repo (pointing at prod) would beat the deployment env.
+# .env.production has higher priority than .env so this guarantees our values win.
+RUN printf "VITE_SUPABASE_URL=%s\nVITE_SUPABASE_PUBLISHABLE_KEY=%s\nVITE_SUPABASE_PROJECT_ID=%s\nVITE_PUBLIC_URL=%s\nSUPABASE_URL=%s\nSUPABASE_PUBLISHABLE_KEY=%s\n" \
+    "$VITE_SUPABASE_URL" \
+    "$VITE_SUPABASE_PUBLISHABLE_KEY" \
+    "$VITE_SUPABASE_PROJECT_ID" \
+    "$VITE_PUBLIC_URL" \
+    "$SUPABASE_URL" \
+    "$SUPABASE_PUBLISHABLE_KEY" \
+    > .env.production
+
 RUN npm run build
 
 # Stage 2: Serve the built bundle with nginx
