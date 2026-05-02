@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Plus, Link2, Square } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/popover";
 import { EmojiBar, DEFAULT_EMOJIS } from "./EmojiBar";
 import { VolumeControl, playSoundFile } from "./VolumeControl";
+import { FontZoom, useChatFontSize } from "./ChatToolbar";
 import { MediaViewer } from "./MediaViewer";
 import { TipPopup, playTipSound } from "./TipPopup";
 import { useUpdateChatterConfig } from "@/hooks/useChatterEvaluator";
@@ -299,6 +300,7 @@ export const ChatPanel = ({ session }: Props) => {
   const endMut = useEndChatterSession();
   const [endOpen, setEndOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const chatFontSize = useChatFontSize();
   const updateConfigMut = useUpdateChatterConfig();
   const examinerEmojis =
     configQ.data?.examiner_emojis && configQ.data.examiner_emojis.length > 0
@@ -651,8 +653,8 @@ export const ChatPanel = ({ session }: Props) => {
           ? "text-amber-400"
           : "text-foreground";
         return (
-          <div className="flex flex-wrap items-center gap-4 border-b px-4 py-3">
-            {/* Identity */}
+          <div className="grid grid-cols-1 items-center gap-3 border-b px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+            {/* Identity (left) */}
             <div className="flex min-w-0 items-center gap-3">
               <div className="aspect-square h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
                 {profile?.avatar_url && (
@@ -692,17 +694,19 @@ export const ChatPanel = ({ session }: Props) => {
               </div>
             </div>
 
-            {/* Metrics */}
-            <div className="ml-auto flex flex-wrap items-center gap-6">
+            {/* Metrics (centered, fixed-width column so they don't slide
+                with the side content) */}
+            <div className="flex flex-wrap items-center justify-center gap-6">
               <Metric label="TIEMPO" value={timeLabel} valueClass={`font-mono ${timeClass}`} />
               <Metric label="MSGS" value={String(metrics.msgCount)} valueClass="font-mono" />
               <Metric label="WPM" value={String(metrics.wpm)} valueClass="font-mono" />
               <Metric label="RESP. TIME" value={metrics.respTime} valueClass="font-mono" />
             </div>
 
-            {/* Volume + Actions */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Volume + Actions (right) */}
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <VolumeControl />
+              <FontZoom />
               <Button
                 size="sm"
                 variant="outline"
@@ -722,9 +726,7 @@ export const ChatPanel = ({ session }: Props) => {
                 }}
                 disabled={ended}
                 title="Agregar minutos a la sesión"
-                className="gap-1.5"
               >
-                <Plus className="h-3.5 w-3.5" />
                 + Tiempo
               </Button>
               <Button
@@ -744,7 +746,7 @@ export const ChatPanel = ({ session }: Props) => {
       })()}
 
       {/* Messages */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-3 space-y-3">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-3 space-y-3" style={{ fontSize: `${chatFontSize}px` }}>
         {messagesQ.isLoading && (
           <p className="text-xs text-muted-foreground">Cargando mensajes…</p>
         )}
@@ -832,13 +834,17 @@ export const ChatPanel = ({ session }: Props) => {
           />
           <Popover>
             <PopoverTrigger asChild>
+              {/* Gold-accent tip button — matches the original
+                  btn-content with the gold border/text override
+                  (index.html line 3420). */}
               <Button
                 size="icon"
                 variant="outline"
                 disabled={session.status === "ended"}
                 title="Enviar tip"
+                className="border-amber-500 text-amber-500 hover:bg-amber-500/10 hover:text-amber-400"
               >
-                <DollarSign className="h-4 w-4" />
+                <DollarSign className="h-4 w-4" strokeWidth={3} />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-56 p-2" align="end">

@@ -6,6 +6,15 @@ import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/Em
 import { VolumeControl, playSoundFile } from "@/pages/chatter-evaluator/workspace/VolumeControl";
 import { MediaViewer } from "@/pages/chatter-evaluator/workspace/MediaViewer";
 import { TipPopup, playTipSound } from "@/pages/chatter-evaluator/workspace/TipPopup";
+import {
+  FontZoom,
+  ThemeToggle,
+  LangSelect,
+  useChatFontSize,
+  useChatterLang,
+  pVal,
+  type ChatterLang,
+} from "@/pages/chatter-evaluator/workspace/ChatToolbar";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -337,11 +346,15 @@ const InfoNote = ({ label, value, tone }: { label: string; value: string | null 
   );
 };
 
-const CharacterInfoPanel = ({ profile }: { profile: ChatterProfile }) => {
+const CharacterInfoPanel = ({ profile, lang }: { profile: ChatterProfile; lang: ChatterLang }) => {
+  const en = lang === "en";
+  // Profile-as-record for pVal; strongly typed reads stay through `profile`.
+  const p = profile as unknown as Record<string, unknown>;
+  const name = pVal(p, "name", lang) || profile.name;
   const meta = [
-    profile.nationality,
-    profile.location ? `📍 ${profile.location}` : null,
-    profile.age ? `${profile.age}` : null,
+    pVal(p, "nationality", lang),
+    pVal(p, "location", lang) ? `📍 ${pVal(p, "location", lang)}` : "",
+    pVal(p, "age", lang),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -353,7 +366,7 @@ const CharacterInfoPanel = ({ profile }: { profile: ChatterProfile }) => {
           {profile.avatar_url ? (
             <img
               src={profile.avatar_url}
-              alt={profile.name}
+              alt={name}
               className="h-full w-full object-cover"
               style={{
                 objectPosition: `${profile.avatar_x ?? 50}% ${profile.avatar_y ?? 50}%`,
@@ -362,42 +375,42 @@ const CharacterInfoPanel = ({ profile }: { profile: ChatterProfile }) => {
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-3xl font-bold text-white">
-              {profile.name[0]}
+              {name[0]}
             </div>
           )}
         </div>
-        <div className="text-xl font-bold">{profile.name}</div>
+        <div className="text-xl font-bold">{name}</div>
         {meta && <div className="mt-1.5 text-xs text-muted-foreground">{meta}</div>}
       </div>
       <div className="p-4">
         <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-amber-500">
-          Información del personaje
+          {en ? "Character info" : "Información del personaje"}
         </div>
-        <InfoNote label="Cómo llamar al usuario" value={profile.users_term} />
-        <InfoNote label="Saludo inicial" value={profile.greeting} />
+        <InfoNote label={en ? "How to call the user" : "Cómo llamar al usuario"} value={pVal(p, "users_term", lang)} />
+        <InfoNote label={en ? "Greeting" : "Saludo inicial"} value={pVal(p, "greeting", lang)} />
         <div className="my-4 h-px bg-border" />
-        <InfoNote label="Cuerpo / términos" value={profile.body} />
-        <InfoNote label="Desnudos" value={profile.nudity} />
-        <InfoNote label="Anal" value={profile.anal} />
-        <InfoNote label="Colaboraciones" value={profile.collabs} />
+        <InfoNote label={en ? "Body / terms" : "Cuerpo / términos"} value={pVal(p, "body", lang)} />
+        <InfoNote label={en ? "Nudity" : "Desnudos"} value={pVal(p, "nudity", lang)} />
+        <InfoNote label="Anal" value={pVal(p, "anal", lang)} />
+        <InfoNote label={en ? "Collabs" : "Colaboraciones"} value={pVal(p, "collabs", lang)} />
         <div className="my-4 h-px bg-border" />
-        <InfoNote label="Videollamadas" value={profile.videocall} />
-        <InfoNote label="Personalizados" value={profile.custom} />
+        <InfoNote label={en ? "Videocalls" : "Videollamadas"} value={pVal(p, "videocall", lang)} />
+        <InfoNote label={en ? "Custom" : "Personalizados"} value={pVal(p, "custom", lang)} />
         {profile.prices && Object.keys(profile.prices).length > 0 && (
           <>
             <div className="my-4 h-px bg-border" />
             <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-amber-500">
-              Precios
+              {en ? "Prices" : "Precios"}
             </div>
             {Object.entries(profile.prices).map(([k, v]) => (
               <InfoNote key={k} label={k} value={v} tone="gold" />
             ))}
           </>
         )}
-        {profile.extra && (
+        {pVal(p, "extra", lang) && (
           <>
             <div className="my-4 h-px bg-border" />
-            <InfoNote label="Importante" value={profile.extra} tone="warning" />
+            <InfoNote label={en ? "Important" : "Importante"} value={pVal(p, "extra", lang)} tone="warning" />
           </>
         )}
       </div>
@@ -813,6 +826,30 @@ const ChatterPublicView = () => {
   const fanName = config?.fan_name ?? "JavixBuster";
   const fanAvatar = config?.fan_avatar_url ?? "/JavixBuster.png";
 
+  // Per-tab UI prefs that mirror the original Roleplaychatters chatter
+  // header: language (ES/EN), font size (A-/A+), and theme is handled by
+  // next-themes through the shared ThemeToggle.
+  const [lang] = useChatterLang();
+  const fontSize = useChatFontSize();
+
+  // Total spent by the fan — sum of every system tip/purchase price.
+  // Mirrors chatterTotalSpent in the original (index.html line 2643).
+  const totalSpent = useMemo(
+    () =>
+      messages.reduce(
+        (sum, m) =>
+          m.role === "system" && (m.msg_type === "tip" || m.msg_type === "purchase")
+            ? sum + (m.price ?? 0)
+            : sum,
+        0,
+      ),
+    [messages],
+  );
+
+  // Locale-aware character/persona name (used in placeholders, persona bar).
+  const personaName =
+    pVal(profile as unknown as Record<string, unknown>, "name", lang) || profile?.name || "el personaje";
+
   // Loading
   if (sessionQ.isLoading) {
     return (
@@ -868,7 +905,7 @@ const ChatterPublicView = () => {
       <aside className="hidden w-[260px] shrink-0 flex-col border-r bg-card md:flex">
         <div className="border-b p-5">
           <div className="mb-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Conversaciones
+            {lang === "en" ? "Conversations" : "Conversaciones"}
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
             <div className="aspect-square h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-purple-600 to-amber-500">
@@ -880,26 +917,47 @@ const ChatterPublicView = () => {
               <div className="truncate text-sm font-bold">{fanName}</div>
               <div className="flex items-center gap-1.5 text-[11px] text-emerald-500">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                en línea
+                {lang === "en" ? "online" : "en línea"}
+              </div>
+              {/* Total spent — mirrors chatterTotalSpent in the original. */}
+              <div className="mt-1 font-mono text-[13px] font-bold text-amber-500">
+                ${totalSpent} {lang === "en" ? "spent" : "gastados"}
               </div>
             </div>
           </div>
         </div>
         <div className="flex-1 p-5">
-          <div
-            className={`rounded-xl bg-muted p-4 text-center font-mono text-3xl font-bold ${
-              timerExpired ? "text-rose-500" : timerLow ? "text-amber-400" : "text-amber-500"
-            }`}
-          >
-            {formatRemaining(remainingMs)}
-          </div>
-          <div className="mt-3 text-center text-xs text-muted-foreground">
-            {session.status === "waiting"
-              ? "El temporizador iniciará al primer mensaje"
-              : timerExpired
-              ? "Tiempo agotado"
-              : "Tiempo restante"}
-          </div>
+          {session.status === "waiting" ? (
+            // Original: "Esperando..." + "El temporizador iniciará al primer
+            // mensaje" — the timer doesn't start ticking until the chatter
+            // sends the first message (the edge function flips status to
+            // 'active' and stamps started_at on first send).
+            <>
+              <div className="rounded-xl bg-muted p-4 text-center font-mono text-3xl font-bold text-muted-foreground">
+                {lang === "en" ? "Waiting…" : "Esperando…"}
+              </div>
+              <div className="mt-3 text-center text-xs text-muted-foreground">
+                {lang === "en"
+                  ? "The timer starts on your first message"
+                  : "El temporizador inicia con tu primer mensaje"}
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                className={`rounded-xl bg-muted p-4 text-center font-mono text-3xl font-bold ${
+                  timerExpired ? "text-rose-500" : timerLow ? "text-amber-400" : "text-amber-500"
+                }`}
+              >
+                {formatRemaining(remainingMs)}
+              </div>
+              <div className="mt-3 text-center text-xs text-muted-foreground">
+                {timerExpired
+                  ? lang === "en" ? "Time's up" : "Tiempo agotado"
+                  : lang === "en" ? "Time remaining" : "Tiempo restante"}
+              </div>
+            </>
+          )}
         </div>
       </aside>
 
@@ -915,37 +973,46 @@ const ChatterPublicView = () => {
             </div>
             <div className="truncate text-sm font-semibold">{fanName}</div>
           </div>
-          <span className="hidden text-sm font-bold md:inline">Chat con {fanName}</span>
+          <span className="hidden text-sm font-bold md:inline">
+            {lang === "en" ? "Chat with" : "Chat con"} {fanName}
+          </span>
           <div className="flex items-center gap-2">
             {/* Mobile timer chip */}
             <div className="md:hidden flex items-center gap-1 rounded-md bg-muted px-2 py-1 font-mono text-xs">
               <Clock className="h-3 w-3" />
               {formatRemaining(remainingMs)}
             </div>
+            <LangSelect />
             <VolumeControl />
+            <FontZoom />
+            <ThemeToggle />
           </div>
         </header>
 
         {/* Persona reminder (slim bar) */}
         {profile && (
           <div className="border-b bg-amber-500/5 px-5 py-2 text-xs">
-            <span className="text-muted-foreground">Estás interpretando a </span>
-            <strong className="text-foreground">{profile.name}</strong>
+            <span className="text-muted-foreground">
+              {lang === "en" ? "You are playing " : "Estás interpretando a "}
+            </span>
+            <strong className="text-foreground">{personaName}</strong>
             {examinerTyping && (
-              <span className="ml-2 text-muted-foreground">· {fanName} escribiendo…</span>
+              <span className="ml-2 text-muted-foreground">
+                · {fanName} {lang === "en" ? "typing…" : "escribiendo…"}
+              </span>
             )}
           </div>
         )}
 
         {/* Messages */}
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-4" style={{ fontSize: `${fontSize}px` }}>
           <div className="space-y-3">
             {messagesQ.isLoading && (
               <p className="text-xs text-muted-foreground">Cargando…</p>
             )}
             {!messagesQ.isLoading && messages.length === 0 && (
               <p className="rounded-md bg-muted/50 p-4 text-center text-xs text-muted-foreground">
-                {fanName} aún no ha escrito. Espera o saluda primero como {profile?.name ?? "el personaje"}.
+                {fanName} aún no ha escrito. Espera o saluda primero como {personaName}.
               </p>
             )}
             {messages.map((m) => (
@@ -1012,7 +1079,7 @@ const ChatterPublicView = () => {
                   void handleSend();
                 }
               }}
-              placeholder={`Responder como ${profile?.name ?? "el personaje"}…`}
+              placeholder={`Responder como ${personaName}…`}
               rows={2}
               className="min-h-[2.5rem] flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
@@ -1029,7 +1096,7 @@ const ChatterPublicView = () => {
 
       {/* RIGHT — full character info (matches the original right panel) */}
       <aside className="hidden w-[340px] shrink-0 overflow-y-auto border-l bg-card md:block">
-        {profile && <CharacterInfoPanel profile={profile} />}
+        {profile && <CharacterInfoPanel profile={profile} lang={lang} />}
       </aside>
 
       {/* Vault drawer */}
