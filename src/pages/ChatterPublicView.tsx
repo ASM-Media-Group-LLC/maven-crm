@@ -194,20 +194,13 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
               isMine
                 ? "rounded-br-sm bg-primary text-primary-foreground"
                 : "rounded-bl-sm bg-muted text-foreground"
-            } ${msg.deleted === "chatter" ? "opacity-60" : ""}`}
+            }`}
           >
-            {/* Chatter still sees the original content of their own
-                deleted messages, with a small "eliminado" tag underneath
-                so they remember the state. The examiner sees a separate
-                "(mensaje eliminado por el chatter)" placeholder. */}
             {msg.content}
-            {msg.deleted === "chatter" && (
-              <div className="mt-0.5 text-[10px] italic opacity-80">eliminado</div>
-            )}
             {/* Chatter-only delete — floats OUTSIDE the bubble on the
                 left. Hidden by default; the transparent <span> bridges
                 the gap so the cursor doesn't lose group-hover mid-move. */}
-            {isMine && msg.deleted !== "chatter" && (
+            {isMine && (
               <>
                 <span
                   aria-hidden
@@ -964,11 +957,10 @@ const ChatterPublicView = () => {
               </p>
             )}
             {messages
-              // Hide only examiner-side hard-deletes (deleted='full').
-              // Chatter-side soft-deletes still render here with the
-              // original content + a small "eliminado" tag — the user
-              // wants the reminder of what they wrote.
-              .filter((m) => m.deleted !== "full")
+              // Chatter never sees their own soft-deletes (the examiner
+              // does, with a rose bubble + "eliminado" tag) and never
+              // sees an examiner hard-delete.
+              .filter((m) => m.deleted !== "chatter" && m.deleted !== "full")
               .map((m) => (
               <Bubble
                 key={m.id}

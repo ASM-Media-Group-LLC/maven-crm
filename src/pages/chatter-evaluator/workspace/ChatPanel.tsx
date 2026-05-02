@@ -170,13 +170,19 @@ const MessageBubble = ({
           <div
             className={`group/bubble relative rounded-2xl px-3 py-1.5 ${
               msg.deleted === "chatter"
-                ? "rounded-bl-sm bg-rose-500 italic text-white"
+                ? "rounded-bl-sm bg-rose-500 text-white"
                 : isFan
                 ? "rounded-bl-sm bg-muted text-foreground"
                 : "rounded-br-sm bg-primary text-primary-foreground"
             }`}
           >
-            {msg.deleted === "chatter" ? "(mensaje eliminado por el chatter)" : msg.content}
+            {/* Examiner keeps seeing the chatter's original message even
+                after the chatter soft-deletes it — the bubble just turns
+                rose and gets a small "eliminado" tag below the body. */}
+            {msg.content}
+            {msg.deleted === "chatter" && (
+              <div className="mt-0.5 text-[10px] italic opacity-90">eliminado</div>
+            )}
             {/* Examiner-only delete — floats OUTSIDE the bubble on the
                 side opposite the avatar (right side) so it doesn't crash
                 into the avatar slot. Hidden by default; appears only
