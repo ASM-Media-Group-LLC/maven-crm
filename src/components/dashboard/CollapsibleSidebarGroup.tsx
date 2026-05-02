@@ -9,6 +9,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 const STORAGE_PREFIX = "maven.sidebar.section.";
@@ -26,6 +27,9 @@ export const CollapsibleSidebarGroup = ({
   defaultOpen = true,
   children,
 }: Props) => {
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
+
   const [open, setOpen] = useState<boolean>(() => {
     if (typeof window === "undefined") return defaultOpen;
     const stored = window.localStorage.getItem(STORAGE_PREFIX + storageKey);
@@ -36,6 +40,19 @@ export const CollapsibleSidebarGroup = ({
     if (typeof window === "undefined") return;
     window.localStorage.setItem(STORAGE_PREFIX + storageKey, String(open));
   }, [open, storageKey]);
+
+  // When the sidebar is in icon-only mode the SidebarGroupLabel is
+  // hidden by shadcn's CSS and there's no way to expand a closed
+  // collapsible — the menu items would simply disappear. Skip the
+  // collapsible entirely in that mode and just render the children
+  // (icons) directly so the rail still works.
+  if (collapsed) {
+    return (
+      <SidebarGroup>
+        <SidebarGroupContent>{children}</SidebarGroupContent>
+      </SidebarGroup>
+    );
+  }
 
   return (
     <SidebarGroup>
