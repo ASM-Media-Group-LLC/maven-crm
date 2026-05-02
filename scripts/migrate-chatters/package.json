@@ -7,6 +7,8 @@
   "scripts": {
     "migrate": "node migrate.mjs",
     "migrate:dry": "node migrate.mjs --dry-run",
+    "migrate:avatars": "node migrate-avatars.mjs",
+    "migrate:avatars:dry": "node migrate-avatars.mjs --dry-run",
     "verify": "node verify.mjs"
   },
   "dependencies": {
