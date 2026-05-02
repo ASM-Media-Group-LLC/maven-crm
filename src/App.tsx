@@ -66,7 +66,6 @@ const LeadGenBaseDatos = lazy(() => import("./pages/LeadGenBaseDatos"));
 const Closers = lazy(() => import("./pages/Closers"));
 const Tickets = lazy(() => import("./pages/Tickets"));
 const Promolog = lazy(() => import("./pages/Promolog"));
-const ChatterEvaluator = lazy(() => import("./pages/ChatterEvaluator"));
 const Contactos = lazy(() => import("./pages/Contactos"));
 const NuevoContacto = lazy(() => import("./pages/NuevoContacto"));
 
@@ -228,7 +227,6 @@ const App = () => (
               <Route path="/closers" element={<PermissionRoute module="Closers"><Closers /></PermissionRoute>} />
               <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />
               <Route path="/promolog" element={<PermissionRoute module="Promolog"><Promolog /></PermissionRoute>} />
-              <Route path="/chatter-evaluator" element={<PermissionRoute module="Chatters"><ChatterEvaluator /></PermissionRoute>} />
               <Route path="/tareas" element={<ProtectedRoute><Tareas /></ProtectedRoute>} />
               <Route path="/tareas/:projectId" element={<ProtectedRoute><TareaProject /></ProtectedRoute>} />
               <Route path="/eventos/nuevo" element={<PermissionRoute module="Eventos"><NuevoEvento /></PermissionRoute>} />
