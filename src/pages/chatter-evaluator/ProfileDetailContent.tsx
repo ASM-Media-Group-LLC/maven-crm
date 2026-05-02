@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, Pencil } from "lucide-react";
 import {
   useChatterProfiles,
   useChatterVaultByProfile,
@@ -82,9 +82,14 @@ const ChatterProfileDetailContent = () => {
   return (
     <main className="flex-1 overflow-y-auto p-6">
       <div className="mx-auto max-w-6xl space-y-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3">
           <Button asChild variant="ghost" size="sm">
             <Link to="/chatter-evaluator"><ArrowLeft className="mr-2 h-4 w-4" /> Perfiles</Link>
+          </Button>
+          <Button asChild size="sm" className="gap-2">
+            <Link to={`/chatter-evaluator/${profile.key}/edit`}>
+              <Pencil className="h-4 w-4" /> Editar perfil
+            </Link>
           </Button>
         </div>
 

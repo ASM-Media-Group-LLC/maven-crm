@@ -68,6 +68,7 @@ const Tickets = lazy(() => import("./pages/Tickets"));
 const Promolog = lazy(() => import("./pages/Promolog"));
 const ChatterEvaluator = lazy(() => import("./pages/ChatterEvaluator"));
 const ChatterProfileDetail = lazy(() => import("./pages/ChatterProfileDetail"));
+const ChatterProfileEdit = lazy(() => import("./pages/ChatterProfileEdit"));
 const Contactos = lazy(() => import("./pages/Contactos"));
 const NuevoContacto = lazy(() => import("./pages/NuevoContacto"));
 
@@ -234,6 +235,7 @@ const App = () => (
                   module="Chatters" when merging to prod. */}
               <Route path="/chatter-evaluator" element={<ProtectedRoute><ChatterEvaluator /></ProtectedRoute>} />
               <Route path="/chatter-evaluator/:profileKey" element={<ProtectedRoute><ChatterProfileDetail /></ProtectedRoute>} />
+              <Route path="/chatter-evaluator/:profileKey/edit" element={<ProtectedRoute><ChatterProfileEdit /></ProtectedRoute>} />
               <Route path="/tareas" element={<ProtectedRoute><Tareas /></ProtectedRoute>} />
               <Route path="/tareas/:projectId" element={<ProtectedRoute><TareaProject /></ProtectedRoute>} />
               <Route path="/eventos/nuevo" element={<PermissionRoute module="Eventos"><NuevoEvento /></PermissionRoute>} />

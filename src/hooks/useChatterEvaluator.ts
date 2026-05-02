@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   ChatterProfile,
@@ -86,3 +86,37 @@ export const useChatterConfig = () =>
       return (data ?? null) as ChatterConfig | null;
     },
   });
+
+// ---------------------------------------------------------------------------
+// Mutations
+// ---------------------------------------------------------------------------
+
+export type ChatterProfileUpdate = Partial<
+  Omit<ChatterProfile, "id" | "key" | "created_at" | "updated_at">
+>;
+
+export const useUpdateChatterProfile = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: ChatterProfileUpdate;
+    }): Promise<ChatterProfile> => {
+      const { data, error } = await sb
+        .from("chatter_profiles")
+        .update(patch)
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ChatterProfile;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chatter-profiles"] });
+    },
+  });
+};
+
