@@ -118,6 +118,15 @@ export const buildEmailHtml = (p: EmailPayload): string => {
               `</td></tr>`
             : "") +
 
+          // Transcript CTA — sits inside the card, below the feedback.
+          // {{DOC_URL}} is replaced by Apps Script with the Drive doc URL
+          // (or '#' if doc creation failed).
+          `<tr><td style="padding:18px 32px 8px;">` +
+            `<a href="{{DOC_URL}}" target="_blank" style="display:inline-block;background:${COLORS.primary};color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;">` +
+              `Ver transcripción del chat` +
+            `</a>` +
+          `</td></tr>` +
+
           // Footer
           `<tr><td style="padding:18px 32px 26px;border-top:1px solid ${COLORS.border};margin-top:8px;">` +
             `<div style="font-size:12px;color:${COLORS.muted};">${p.chatHistory.length} mensaje(s) intercambiados durante la sesión.</div>` +

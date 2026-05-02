@@ -352,6 +352,43 @@ export const ORIGINAL_CRITERIA: { label: string; label_en: string }[] = [
   { label: "Tiempos de respuesta",              label_en: "Response times" },
 ];
 
+// Lightweight directory of Maven users (profiles + their role) for the
+// "Maven Notifications" multi-select in Admin. Only fields we actually
+// render in the picker; emails would require an admin edge function so
+// we skip them here.
+export interface MavenUserOption {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  role: "admin" | "manager" | "employee" | null;
+}
+
+export const useMavenUsers = () =>
+  useQuery({
+    queryKey: ["maven-users-for-chatter-notify"],
+    queryFn: async (): Promise<MavenUserOption[]> => {
+      const { data: profiles, error: pErr } = await sb
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .order("full_name", { ascending: true });
+      if (pErr) throw pErr;
+      const { data: roles, error: rErr } = await sb
+        .from("user_roles")
+        .select("user_id, role");
+      if (rErr) throw rErr;
+      const roleByUser = new Map<string, MavenUserOption["role"]>();
+      for (const r of (roles ?? []) as { user_id: string; role: MavenUserOption["role"] }[]) {
+        roleByUser.set(r.user_id, r.role);
+      }
+      return ((profiles ?? []) as { id: string; full_name: string | null; avatar_url: string | null }[]).map(
+        (p) => ({
+          ...p,
+          role: roleByUser.get(p.id) ?? null,
+        }),
+      );
+    },
+  });
+
 export const useResetCriteria = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -835,7 +872,38 @@ export const useSubmitEvaluation = () => {
         .update({ status: "ended", ended_at: new Date().toISOString() })
         .eq("id", input.sessionId);
 
-      // 3) Fire the webhook in the background. The mutation resolves NOW
+      // 3) Internal Maven notifications. Best-effort: if the insert
+      //    fails we don't want to block the submit — RLS lets any
+      //    authenticated user create notifications, so this should
+      //    rarely error.
+      try {
+        const { data: cfgRow } = await sb
+          .from("chatter_config")
+          .select("notify_user_ids")
+          .eq("id", 1)
+          .maybeSingle();
+        const userIds = (cfgRow?.notify_user_ids ?? []) as string[];
+        if (userIds.length > 0) {
+          const verdictLabel = input.verdict === "apto" ? "APTO" : "NO APTO";
+          const rows = userIds.map((uid) => ({
+            user_id: uid,
+            type: "chatter_evaluation",
+            title: `Evaluación: ${verdictLabel} — ${input.examinerName} (${input.scorePct}%)`,
+            message: input.feedback?.slice(0, 200) || `Sesión ${input.sessionId} cerrada.`,
+            reference_id: evaluation.id,
+            reference_type: "chatter_evaluation",
+            module_origin: "chatter-evaluator",
+            priority: input.verdict === "no_apto" ? "high" : "medium",
+            deep_link_url: `/chatter-evaluator/workspace?session=${input.sessionId}`,
+            required_permission_module: "ChatterEvaluator",
+          }));
+          await sb.from("notifications").insert(rows);
+        }
+      } catch {
+        /* swallow — toast handles webhook outcome separately */
+      }
+
+      // 4) Fire the webhook in the background. The mutation resolves NOW
       //    so the dialog can close and the examiner moves on; the toast
       //    inside fireWebhookInBackground announces the result whenever
       //    Apps Script finishes (typically 10–30s later).

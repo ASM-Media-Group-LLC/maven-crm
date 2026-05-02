@@ -129,6 +129,9 @@ export interface ChatterConfig {
   id: number;
   apps_script_url: string | null;
   notification_emails: string[];
+  /** Maven user_ids that receive an in-app notification when an
+   *  evaluation is submitted. Picked from `profiles` in Admin. */
+  notify_user_ids: string[];
   fan_name: string;
   fan_avatar_url: string;
   fan_avatar_url_light: string | null;

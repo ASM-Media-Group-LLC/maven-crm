@@ -157,13 +157,11 @@ function sendMavenEmail(body, docUrl) {
 
   var html = body.emailHtml || renderEmailHtml(body, docUrl);
 
-  // Append the doc link below whatever HTML we received so the recipient
-  // can still jump to the chat transcript directly.
-  if (docUrl) {
-    html += '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#64748b;font-size:12px;padding:12px 32px 26px;">' +
-      '🔗 <a href="' + docUrl + '" style="color:#6d28d9;text-decoration:none;">Abrir transcripción del chat en Drive</a>' +
-      '</div>';
-  }
+  // The client-built HTML embeds a "{{DOC_URL}}" placeholder where the
+  // "Ver transcript" CTA lives (inside the email card, below the
+  // feedback). Replace it with the real Drive URL — or with '#' so the
+  // button still renders gracefully if doc creation failed.
+  html = html.replace(/\{\{DOC_URL\}\}/g, docUrl || "#");
 
   // Loop and send individually so each recipient sees only their own
   // address in the To: header.
@@ -291,26 +289,15 @@ function createChatDoc(body) {
   folder.addFile(docFile);
   DriveApp.getRootFolder().removeFile(docFile);
 
-  // Share the doc with the email recipients as Viewers, so the link in
-  // the email actually opens for them. We use addViewer per recipient
-  // (instead of ANYONE_WITH_LINK) so the doc stays auditable.
-  // Falls back to ANYONE_WITH_LINK if any addViewer call fails (e.g.,
-  // recipient doesn't have a Google account).
+  // Share via "anyone with the link can view" so recipients can open the
+  // doc without us calling addViewer per email. addViewer auto-triggers
+  // a separate Google Docs "shared with you" email per recipient — that
+  // was creating a duplicate notification on top of our own evaluation
+  // email. ANYONE_WITH_LINK is silent.
   try {
-    (body.emails || []).forEach(function (email) {
-      try {
-        docFile.addViewer(email);
-      } catch (e) {
-        Logger.log("addViewer failed for " + email + ": " + e.message);
-      }
-    });
+    docFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   } catch (e) {
-    Logger.log("share loop error: " + e.message);
-    try {
-      docFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    } catch (e2) {
-      Logger.log("fallback ANYONE_WITH_LINK failed: " + e2.message);
-    }
+    Logger.log("setSharing ANYONE_WITH_LINK failed: " + e.message);
   }
 
   var b = doc.getBody();

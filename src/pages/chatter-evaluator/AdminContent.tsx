@@ -28,7 +28,14 @@ import {
   useDeleteCriterion,
   useReorderCriteria,
   useUpdateChatterConfig,
+  useMavenUsers,
 } from "@/hooks/useChatterEvaluator";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Bell, ChevronsUpDown, Check as CheckIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -246,6 +253,9 @@ const ConfigSection = () => {
   const [newEmail, setNewEmail] = useState("");
   const [fanName, setFanName] = useState("");
   const [fanAvatar, setFanAvatar] = useState("");
+  const [notifyUserIds, setNotifyUserIds] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const usersQ = useMavenUsers();
 
   useEffect(() => {
     if (!cfgQ.data) return;
@@ -253,7 +263,13 @@ const ConfigSection = () => {
     setEmails(cfgQ.data.notification_emails ?? []);
     setFanName(cfgQ.data.fan_name);
     setFanAvatar(cfgQ.data.fan_avatar_url);
+    setNotifyUserIds(cfgQ.data.notify_user_ids ?? []);
   }, [cfgQ.data]);
+
+  const toggleNotifyUser = (id: string) =>
+    setNotifyUserIds((curr) =>
+      curr.includes(id) ? curr.filter((x) => x !== id) : [...curr, id],
+    );
 
   const addEmail = () => {
     const e = newEmail.trim().toLowerCase();
@@ -274,6 +290,7 @@ const ConfigSection = () => {
       await update.mutateAsync({
         apps_script_url: appsUrl || null,
         notification_emails: emails,
+        notify_user_ids: notifyUserIds,
         fan_name: fanName,
         fan_avatar_url: fanAvatar,
       });
@@ -334,6 +351,95 @@ const ConfigSection = () => {
               <p className="text-xs text-muted-foreground">Sin emails configurados.</p>
             )}
           </div>
+        </div>
+
+        <div className="border-t pt-5">
+          <Label className="flex items-center gap-1.5">
+            <Bell className="h-3.5 w-3.5" /> Notificaciones internas Maven
+          </Label>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Empleados que reciben una notificación dentro de Maven cuando se envía una evaluación.
+          </p>
+          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                className="mt-2 w-full justify-between font-normal"
+              >
+                {notifyUserIds.length === 0
+                  ? "Seleccionar empleados…"
+                  : `${notifyUserIds.length} seleccionado(s)`}
+                <ChevronsUpDown className="h-4 w-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+              <div className="max-h-72 overflow-y-auto p-1">
+                {usersQ.isLoading && (
+                  <div className="p-3 text-xs text-muted-foreground">Cargando…</div>
+                )}
+                {!usersQ.isLoading && (usersQ.data ?? []).length === 0 && (
+                  <div className="p-3 text-xs text-muted-foreground">
+                    No hay usuarios Maven todavía.
+                  </div>
+                )}
+                {(usersQ.data ?? []).map((u) => {
+                  const selected = notifyUserIds.includes(u.id);
+                  const name = u.full_name || "Sin nombre";
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => toggleNotifyUser(u.id)}
+                      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted ${
+                        selected ? "bg-primary/10" : ""
+                      }`}
+                    >
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border">
+                        {selected && <CheckIcon className="h-3 w-3" />}
+                      </span>
+                      <div className="aspect-square h-6 w-6 shrink-0 overflow-hidden rounded-full bg-muted">
+                        {u.avatar_url && (
+                          <img src={u.avatar_url} alt={name} className="h-full w-full object-cover" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate">{name}</div>
+                        {u.role && (
+                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            {u.role}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+          {notifyUserIds.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {notifyUserIds.map((id) => {
+                const u = (usersQ.data ?? []).find((x) => x.id === id);
+                const name = u?.full_name || id.slice(0, 8);
+                return (
+                  <div
+                    key={id}
+                    className="flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-xs"
+                  >
+                    <span>{name}</span>
+                    <button
+                      onClick={() => toggleNotifyUser(id)}
+                      className="text-muted-foreground hover:text-destructive"
+                      aria-label={`Quitar ${name}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="border-t pt-5">
