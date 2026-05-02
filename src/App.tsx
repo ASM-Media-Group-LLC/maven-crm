@@ -12,6 +12,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionRoute from "@/components/PermissionRoute";
 import AdminRoute from "./components/AdminRoute";
 import AppShell from "@/components/dashboard/AppShell";
+import Logo from "@/components/Logo";
 
 // All sidebar-reachable pages are imported eagerly so the FIRST nav to
 // each one is instant — no chunk download, no spinner. The initial
@@ -200,10 +201,13 @@ const LoadingFallback = () => (
       <div className="h-full w-1/3 animate-[loading-bar_1.2s_ease-in-out_infinite] bg-primary" />
     </div>
     <div
-      className="fixed inset-0 z-[99] flex items-center justify-center bg-background opacity-0"
+      className="fixed inset-0 z-[99] flex flex-col items-center justify-center gap-9 bg-background opacity-0"
       style={{ animation: "delayed-fade-in 0.25s ease-out 0.18s forwards" }}
     >
-      <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-primary/15 border-t-primary" />
+      <Logo size="lg" />
+      <div className="relative h-1 w-[220px] overflow-hidden rounded-full bg-foreground/10">
+        <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-accent to-primary animate-[loading-bar_1.2s_ease-in-out_infinite]" />
+      </div>
     </div>
   </>
 );
