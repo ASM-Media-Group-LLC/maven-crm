@@ -647,15 +647,14 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
         >
           <Settings className="h-4 w-4" />
         </Button>
-        <Button
-          variant="destructive"
-          size="icon"
-          className="h-8 w-8"
+        <button
+          type="button"
           onClick={handleLogout}
           title="Salir"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-rose-600 text-white shadow-md shadow-rose-500/20 ring-1 ring-rose-400/30 transition-all hover:from-rose-500 hover:to-rose-700 hover:shadow-lg hover:shadow-rose-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60"
         >
           <LogOut className="h-4 w-4" />
-        </Button>
+        </button>
       </div>
     );
   }
@@ -696,15 +695,17 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
         <span>Settings</span>
       </button>
 
-      {/* Salir — full-width destructive pill matching the screenshot. */}
-      <Button
-        variant="destructive"
+      {/* Salir — Maven-styled pill: rose gradient, soft glow ring, slight
+          lift on hover. Keeps the destructive intent (red) but feels
+          like the rest of the app instead of a flat danger button. */}
+      <button
+        type="button"
         onClick={handleLogout}
-        className="w-full justify-center gap-2"
+        className="group flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-br from-rose-500 to-rose-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-rose-500/20 ring-1 ring-rose-400/30 transition-all hover:-translate-y-0.5 hover:from-rose-500 hover:to-rose-700 hover:shadow-lg hover:shadow-rose-500/30 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/60"
       >
-        <LogOut className="h-4 w-4" />
+        <LogOut className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
         Salir
-      </Button>
+      </button>
     </div>
   );
 };
