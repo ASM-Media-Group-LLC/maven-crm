@@ -14,13 +14,14 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
+  Sidebar, SidebarContent,
   SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub,
   SidebarMenuSubItem, SidebarMenuSubButton, SidebarFooter, SidebarSeparator, useSidebar,
 } from "@/components/ui/sidebar";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
+import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
 
 const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-2.5 text-sm sidebar-glass-hover";
 const ACTIVE_CLASS = "sidebar-glass-active font-medium";
@@ -202,9 +203,7 @@ const DashboardSidebar = () => {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>{t("sidebar.menu")}</SidebarGroupLabel>
-          <SidebarGroupContent>
+        <CollapsibleSidebarGroup label={t("sidebar.menu")} storageKey="menu">
             <SidebarMenu>
               {mainMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
@@ -322,12 +321,9 @@ const DashboardSidebar = () => {
                 </Collapsible>
               ))}
             </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        </CollapsibleSidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>{t("sidebar.operations")}</SidebarGroupLabel>
-          <SidebarGroupContent>
+        <CollapsibleSidebarGroup label={t("sidebar.operations")} storageKey="operations">
             <SidebarMenu>
               {operationsMenu.map((item) => (
                 <SidebarMenuItem key={item.url}>
@@ -345,8 +341,7 @@ const DashboardSidebar = () => {
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        </CollapsibleSidebarGroup>
 
         {/* ── Finanzas ────────────────────────────────────────────── */}
         {canAccess("Finanzas") && (() => {
@@ -400,9 +395,7 @@ const DashboardSidebar = () => {
           const isFinanzasActive = pathname === "/finanzas" || pathname.startsWith("/finanzas/");
 
           return (
-            <SidebarGroup>
-              <SidebarGroupLabel>Finanzas</SidebarGroupLabel>
-              <SidebarGroupContent>
+            <CollapsibleSidebarGroup label="Finanzas" storageKey="finanzas">
                 <SidebarMenu>
                   {collapsed ? (
                     <SidebarMenuItem>
@@ -472,15 +465,12 @@ const DashboardSidebar = () => {
                     </>
                   )}
                 </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+            </CollapsibleSidebarGroup>
           );
         })()}
 
         {canAccess("HR") && (
-        <SidebarGroup>
-          <SidebarGroupLabel>Recursos Humanos</SidebarGroupLabel>
-          <SidebarGroupContent>
+        <CollapsibleSidebarGroup label="Recursos Humanos" storageKey="rrhh">
             <SidebarMenu>
               {/* Dashboard HR - top level */}
               {collapsed ? (
@@ -576,14 +566,11 @@ const DashboardSidebar = () => {
                 </>
               )}
             </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        </CollapsibleSidebarGroup>
         )}
 
         {canAccess("ProyectoMP") && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Proyecto MP</SidebarGroupLabel>
-            <SidebarGroupContent>
+          <CollapsibleSidebarGroup label="Proyecto MP" storageKey="proyectomp">
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild tooltip="Proyecto MP">
@@ -594,14 +581,11 @@ const DashboardSidebar = () => {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          </CollapsibleSidebarGroup>
         )}
 
         {canAccess("Administración") && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Administración</SidebarGroupLabel>
-            <SidebarGroupContent>
+          <CollapsibleSidebarGroup label="Administración" storageKey="admin">
               <SidebarMenu>
                 {canAccess("Administración", "Usuarios") && (
                   <SidebarMenuItem>
@@ -624,14 +608,11 @@ const DashboardSidebar = () => {
                   </SidebarMenuItem>
                 )}
               </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          </CollapsibleSidebarGroup>
         )}
 
         {canAccess("Administración") && (
-          <SidebarGroup>
-            <SidebarGroupLabel>{t("sidebar.resources")}</SidebarGroupLabel>
-            <SidebarGroupContent>
+          <CollapsibleSidebarGroup label={t("sidebar.resources")} storageKey="recursos">
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild tooltip={t("nav.designSystem")}>
@@ -658,8 +639,7 @@ const DashboardSidebar = () => {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          </CollapsibleSidebarGroup>
         )}
 
       </SidebarContent>
