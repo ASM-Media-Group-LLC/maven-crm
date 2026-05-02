@@ -164,7 +164,12 @@ const ChatterProfileDetailContent = () => {
           {vaultQ.isLoading ? (
             <p className="text-sm text-muted-foreground">Cargando vault…</p>
           ) : (
-            <VaultGallery items={items} />
+            <VaultGallery
+              items={items}
+              profileId={profile.id}
+              profileKey={profile.key}
+              editable
+            />
           )}
         </div>
 

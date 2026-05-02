@@ -120,3 +120,129 @@ export const useUpdateChatterProfile = () => {
   });
 };
 
+// ---- Vault items mutations ------------------------------------------------
+
+const VAULT_BUCKET = "chatter-vault";
+
+const inferMediaType = (filename: string): "image" | "video" | "other" => {
+  const lower = filename.toLowerCase();
+  if (/\.(mp4|mov|webm|m4v|avi|mkv)$/.test(lower)) return "video";
+  if (/\.(jpg|jpeg|png|gif|webp|avif|svg|bmp)$/.test(lower)) return "image";
+  return "other";
+};
+
+const sanitizeFilename = (name: string): string =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || `item-${Date.now()}`;
+
+export const useAddVaultItem = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      profileId,
+      profileKey,
+      file,
+    }: {
+      profileId: string;
+      profileKey: string;
+      file: File;
+    }): Promise<ChatterVaultItem> => {
+      const path = `${profileKey}/${Date.now()}-${sanitizeFilename(file.name)}`;
+      const upload = await supabase.storage.from(VAULT_BUCKET).upload(path, file, {
+        upsert: false,
+        contentType: file.type || undefined,
+      });
+      if (upload.error) throw upload.error;
+      const { data: pub } = supabase.storage.from(VAULT_BUCKET).getPublicUrl(path);
+
+      // Position: append at end
+      const { data: maxRow } = await sb
+        .from("chatter_vault_items")
+        .select("position")
+        .eq("profile_id", profileId)
+        .order("position", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextPos = ((maxRow?.position as number | undefined) ?? 0) + 1;
+
+      const row = {
+        profile_id: profileId,
+        name: file.name,
+        url: pub.publicUrl,
+        media_type: inferMediaType(file.name),
+        position: nextPos,
+      };
+      const { data, error } = await sb
+        .from("chatter_vault_items")
+        .insert(row)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ChatterVaultItem;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["chatter-vault", vars.profileId] });
+      qc.invalidateQueries({ queryKey: ["chatter-vault-counts"] });
+    },
+  });
+};
+
+export const useDeleteVaultItem = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      item,
+    }: {
+      item: ChatterVaultItem;
+    }): Promise<void> => {
+      // Best-effort: if URL points to our Storage bucket, also delete the
+      // underlying object. Otherwise (URL on the legacy host), just remove
+      // the DB row — we don't own the file.
+      const m = item.url.match(/\/storage\/v1\/object\/public\/chatter-vault\/(.+)$/);
+      if (m) {
+        await supabase.storage.from(VAULT_BUCKET).remove([decodeURIComponent(m[1])]);
+      }
+      const { error } = await sb
+        .from("chatter_vault_items")
+        .delete()
+        .eq("id", item.id);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["chatter-vault", vars.item.profile_id] });
+      qc.invalidateQueries({ queryKey: ["chatter-vault-counts"] });
+    },
+  });
+};
+
+export const useReorderVaultItems = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      profileId,
+      orderedIds,
+    }: {
+      profileId: string;
+      orderedIds: string[];
+    }): Promise<void> => {
+      // Update each row's position. Could batch via RPC; for now sequential is fine
+      // for the small N (~76) we have.
+      for (let i = 0; i < orderedIds.length; i++) {
+        const { error } = await sb
+          .from("chatter_vault_items")
+          .update({ position: i + 1 })
+          .eq("id", orderedIds[i]);
+        if (error) throw error;
+      }
+      // Touch the profile_id closure to silence unused warnings on simple builds
+      void profileId;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["chatter-vault", vars.profileId] });
+    },
+  });
+};
+
