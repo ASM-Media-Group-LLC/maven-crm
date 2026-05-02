@@ -419,3 +419,13 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* Confetti shower used by the chatter tip popup. Mirrors the JS
+   animation in the original Roleplaychatters showTipPopup: scale up + a
+   bit of rotation while fading in (first 20%), then drift down with
+   more rotation while fading out. */
+@keyframes tip-confetti {
+  0%   { opacity: 0;   transform: scale(0)    rotate(0deg)   translateY(0); }
+  20%  { opacity: 1;   transform: scale(1.2)  rotate(30deg)  translateY(0); }
+  100% { opacity: 0;   transform: scale(0.8)  rotate(180deg) translateY(40px); }
+}

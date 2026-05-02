@@ -1,8 +1,19 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Minus, X, Send, Loader2 } from "lucide-react";
-import { useChatterCriteria } from "@/hooks/useChatterEvaluator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Check, Minus, X, Send, Loader2, RotateCcw } from "lucide-react";
+import { useChatterCriteria, useResetCriteria } from "@/hooks/useChatterEvaluator";
+import { toast } from "sonner";
 import type { ChatterSession } from "../types";
 
 export type CriterionVerdict = "pass" | "partial" | "fail" | null;
@@ -49,6 +60,8 @@ export const CriteriaPanel = ({
 }: Props) => {
   const criteriaQ = useChatterCriteria();
   const criteria = useMemo(() => criteriaQ.data ?? [], [criteriaQ.data]);
+  const resetMut = useResetCriteria();
+  const [confirmReset, setConfirmReset] = useState(false);
 
   // Persist scores per session
   useEffect(() => {
@@ -83,9 +96,27 @@ export const CriteriaPanel = ({
   return (
     <div className="flex h-full flex-col">
       <div className="border-b p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Criterios
-        </h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Criterios
+          </h2>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1 px-2 text-[11px]"
+            title="Restablecer criterios originales"
+            onClick={() => setConfirmReset(true)}
+            disabled={resetMut.isPending}
+          >
+            {resetMut.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <RotateCcw className="h-3 w-3" />
+            )}
+            Reset
+          </Button>
+        </div>
         {session ? (
           <p className="mt-1 truncate text-xs text-muted-foreground">
             Evaluando: <strong>{session.chatter_name}</strong>
@@ -166,6 +197,40 @@ export const CriteriaPanel = ({
           Enviar evaluación
         </Button>
       </div>
+
+      <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restablecer criterios</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esto reemplaza todos los criterios actuales por los 10 originales
+              de Roleplaychatters. Cualquier criterio personalizado se borra.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                resetMut.mutate(undefined, {
+                  onSuccess: () => {
+                    setConfirmReset(false);
+                    toast.success("Criterios originales restablecidos");
+                  },
+                  onError: (err) =>
+                    toast.error("No se pudo restablecer", {
+                      description: (err as Error).message,
+                    }),
+                });
+              }}
+              disabled={resetMut.isPending}
+            >
+              {resetMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Restablecer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

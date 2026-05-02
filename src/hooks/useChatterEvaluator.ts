@@ -335,6 +335,46 @@ export const useDeleteCriterion = () => {
   });
 };
 
+// The original ten criteria from Roleplaychatters (index.html DEFAULT_CRITERIA,
+// line 2132). Order matters — it's the order admins are used to seeing.
+export const ORIGINAL_CRITERIA: { label: string; label_en: string }[] = [
+  { label: "Detección de oportunidad de venta", label_en: "Detecting a sales opportunity" },
+  { label: "Cierre o intento de venta",         label_en: "Closing or attempting a sale" },
+  { label: "Conexión emocional real",           label_en: "Real emotional connection" },
+  { label: "Personalización estratégica",        label_en: "Strategic personalization" },
+  { label: "Lenguaje emocional y sugestivo",    label_en: "Emotional and suggestive language" },
+  { label: "Coherencia del personaje",          label_en: "Character coherence" },
+  { label: "Control del ritmo y escalada",      label_en: "Pace and escalation control" },
+  { label: "Manejo de objeciones",              label_en: "Objection handling" },
+  { label: "Ortografía y presentación",          label_en: "Spelling and presentation" },
+  { label: "Tiempos de respuesta",              label_en: "Response times" },
+];
+
+export const useResetCriteria = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<void> => {
+      // Wipe everything, then insert the originals in order. We don't try to
+      // diff/match — admins who hit reset want their canonical list back.
+      const { error: delErr } = await sb
+        .from("chatter_criteria_defaults")
+        .delete()
+        .gte("position", 0);
+      if (delErr) throw delErr;
+      const rows = ORIGINAL_CRITERIA.map((c, i) => ({
+        label: c.label,
+        label_en: c.label_en,
+        weight: 1,
+        position: i + 1,
+        is_active: true,
+      }));
+      const { error: insErr } = await sb.from("chatter_criteria_defaults").insert(rows);
+      if (insErr) throw insErr;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-criteria"] }),
+  });
+};
+
 export const useReorderCriteria = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -447,6 +487,49 @@ export const useCreateChatterSession = () => {
         .single();
       if (error) throw error;
       return data as ChatterSession;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
+  });
+};
+
+export const useRenameChatterSession = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, chatterName }: { id: string; chatterName: string }): Promise<void> => {
+      const trimmed = chatterName.trim();
+      if (!trimmed) throw new Error("El nombre no puede estar vacío");
+      const { error } = await sb
+        .from("chatter_sessions")
+        .update({ chatter_name: trimmed })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
+  });
+};
+
+export const useExtendChatterSession = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, addMinutes }: { id: string; addMinutes: number }): Promise<void> => {
+      if (!Number.isFinite(addMinutes) || addMinutes <= 0) {
+        throw new Error("Minutos inválidos");
+      }
+      // Read current duration first — Postgres can't do `field = field + n`
+      // through PostgREST without a stored function, and we already have a
+      // session row in cache, but a fresh read keeps this safe under races.
+      const { data: row, error: readErr } = await sb
+        .from("chatter_sessions")
+        .select("duration_minutes")
+        .eq("id", id)
+        .single();
+      if (readErr) throw readErr;
+      const next = (row?.duration_minutes ?? 0) + Math.floor(addMinutes);
+      const { error } = await sb
+        .from("chatter_sessions")
+        .update({ duration_minutes: next })
+        .eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
   });

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, CheckCheck, Paperclip, Clock } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, CheckCheck, Paperclip, Clock, Pencil, Plus } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -11,6 +11,7 @@ import {
 import { EmojiBar, DEFAULT_EMOJIS } from "./EmojiBar";
 import { VolumeControl, getSoundVolume } from "./VolumeControl";
 import { MediaViewer } from "./MediaViewer";
+import { TipPopup, playTipSound } from "./TipPopup";
 import { useUpdateChatterConfig } from "@/hooks/useChatterEvaluator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +20,18 @@ import {
   useSendChatterMessage,
   useChatterProfiles,
   useChatterConfig,
+  useRenameChatterSession,
+  useExtendChatterSession,
 } from "@/hooks/useChatterEvaluator";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import type { ChatterSession, ChatterMessage, ChatterProfile } from "../types";
 
 interface Props {
@@ -213,6 +225,14 @@ export const ChatPanel = ({ session }: Props) => {
   const lastMessageIdRef = useRef<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [tipAmount, setTipAmount] = useState<number | null>(null);
+  const lastTipIdRef = useRef<string | null>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [addTimeOpen, setAddTimeOpen] = useState(false);
+  const [addTimeValue, setAddTimeValue] = useState("10");
+  const renameMut = useRenameChatterSession();
+  const extendMut = useExtendChatterSession();
   const updateConfigMut = useUpdateChatterConfig();
   const examinerEmojis =
     configQ.data?.examiner_emojis && configQ.data.examiner_emojis.length > 0
@@ -228,19 +248,32 @@ export const ChatPanel = ({ session }: Props) => {
   }, []);
 
   // Play ping when a NEW message arrives from the chatter (not on initial load)
+  // and fire the tip popup whenever a brand-new tip system message lands.
   useEffect(() => {
     const msgs = messagesQ.data ?? [];
     if (msgs.length === 0) {
       lastMessageIdRef.current = null;
+      lastTipIdRef.current = null;
       return;
     }
     const last = msgs[msgs.length - 1];
     const prevLastId = lastMessageIdRef.current;
     lastMessageIdRef.current = last.id;
-    if (!prevLastId) return; // initial load
-    if (prevLastId === last.id) return;
-    // playPing reads the persisted volume itself and no-ops at 0.
-    if (last.role === "chatter") playPing();
+    if (prevLastId && prevLastId !== last.id && last.role === "chatter") {
+      playPing();
+    }
+
+    const newestTip = [...msgs]
+      .reverse()
+      .find((m) => m.msg_type === "tip" && m.role === "system" && m.price);
+    if (newestTip && newestTip.id !== lastTipIdRef.current) {
+      const isInitial = lastTipIdRef.current === null;
+      lastTipIdRef.current = newestTip.id;
+      if (!isInitial && newestTip.price) {
+        setTipAmount(newestTip.price);
+        playTipSound(newestTip.price);
+      }
+    }
   }, [messagesQ.data]);
 
   // Realtime: subscribe to chatter_messages inserts/updates for this session
@@ -471,10 +504,26 @@ export const ChatPanel = ({ session }: Props) => {
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold">{profile?.name ?? "?"}</div>
-          <div className="truncate text-[11px] text-muted-foreground">
-            chatter: {session.chatter_name} · status: {session.status}
+          <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span className="truncate">
+              chatter: {session.chatter_name} · status: {session.status}
+            </span>
+            {session.status !== "ended" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRenameValue(session.chatter_name);
+                  setRenameOpen(true);
+                }}
+                className="shrink-0 rounded p-0.5 hover:bg-muted hover:text-foreground"
+                title="Editar nombre del chatter"
+                aria-label="Editar nombre del chatter"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            )}
             {session.typing_chatter && session.status !== "ended" && (
-              <span className="ml-2 italic text-emerald-400">escribiendo…</span>
+              <span className="italic text-emerald-400">escribiendo…</span>
             )}
           </div>
         </div>
@@ -503,6 +552,20 @@ export const ChatPanel = ({ session }: Props) => {
             </div>
           );
         })()}
+        {session.status !== "ended" && (
+          <Button
+            onClick={() => {
+              setAddTimeValue("10");
+              setAddTimeOpen(true);
+            }}
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            title="Agregar minutos a la sesión"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        )}
         {/* Volume control matches the original Roleplaychatters layout:
             an icon button (🔊/🔉/🔇) plus a 0–100 slider, persisted in
             localStorage. */}
@@ -630,6 +693,131 @@ export const ChatPanel = ({ session }: Props) => {
       </div>
 
       <MediaViewer url={mediaUrl} onClose={() => setMediaUrl(null)} />
+      <TipPopup amount={tipAmount} onDone={() => setTipAmount(null)} />
+
+      {/* Rename chatter dialog (matches editChatterName from the original) */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Editar nombre del chatter</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            placeholder="Nombre del chatter"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (!renameValue.trim() || !session) return;
+                renameMut.mutate(
+                  { id: session.id, chatterName: renameValue },
+                  {
+                    onSuccess: () => {
+                      setRenameOpen(false);
+                      toast.success("Nombre actualizado");
+                    },
+                    onError: (err) =>
+                      toast.error("No se pudo actualizar", { description: (err as Error).message }),
+                  },
+                );
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameOpen(false)} disabled={renameMut.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (!session || !renameValue.trim()) return;
+                renameMut.mutate(
+                  { id: session.id, chatterName: renameValue },
+                  {
+                    onSuccess: () => {
+                      setRenameOpen(false);
+                      toast.success("Nombre actualizado");
+                    },
+                    onError: (err) =>
+                      toast.error("No se pudo actualizar", { description: (err as Error).message }),
+                  },
+                );
+              }}
+              disabled={!renameValue.trim() || renameMut.isPending}
+            >
+              {renameMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add time dialog (matches openAddTime from the original) */}
+      <Dialog open={addTimeOpen} onOpenChange={setAddTimeOpen}>
+        <DialogContent className="max-w-sm text-center">
+          <DialogHeader>
+            <DialogTitle>Agregar tiempo</DialogTitle>
+            <DialogDescription>
+              Suma minutos al tiempo total de la sesión. El chatter lo verá al instante.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center gap-2 py-2">
+            <Input
+              type="number"
+              min={1}
+              autoFocus
+              value={addTimeValue}
+              onChange={(e) => setAddTimeValue(e.target.value)}
+              className="w-24 text-center text-xl font-bold"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const m = parseInt(addTimeValue, 10);
+                  if (!session || !Number.isFinite(m) || m <= 0) return;
+                  extendMut.mutate(
+                    { id: session.id, addMinutes: m },
+                    {
+                      onSuccess: () => {
+                        setAddTimeOpen(false);
+                        toast.success(`+${m} min agregados`);
+                      },
+                      onError: (err) =>
+                        toast.error("No se pudo extender", { description: (err as Error).message }),
+                    },
+                  );
+                }
+              }}
+            />
+            <span className="text-sm text-muted-foreground">minutos</span>
+          </div>
+          <DialogFooter className="justify-center sm:justify-center">
+            <Button variant="outline" onClick={() => setAddTimeOpen(false)} disabled={extendMut.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                const m = parseInt(addTimeValue, 10);
+                if (!session || !Number.isFinite(m) || m <= 0) return;
+                extendMut.mutate(
+                  { id: session.id, addMinutes: m },
+                  {
+                    onSuccess: () => {
+                      setAddTimeOpen(false);
+                      toast.success(`+${m} min agregados`);
+                    },
+                    onError: (err) =>
+                      toast.error("No se pudo extender", { description: (err as Error).message }),
+                  },
+                );
+              }}
+              disabled={extendMut.isPending}
+            >
+              {extendMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Agregar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

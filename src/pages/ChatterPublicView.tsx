@@ -5,6 +5,7 @@ import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, 
 import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { VolumeControl, getSoundVolume } from "@/pages/chatter-evaluator/workspace/VolumeControl";
 import { MediaViewer } from "@/pages/chatter-evaluator/workspace/MediaViewer";
+import { TipPopup, playTipSound } from "@/pages/chatter-evaluator/workspace/TipPopup";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -320,6 +321,10 @@ const ChatterPublicView = () => {
   // Roleplaychatters behavior — they reset to DEFAULT_EMOJIS on reload).
   const [chatterEmojis, setChatterEmojis] = useState<string[]>([...DEFAULT_EMOJIS]);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  // When non-null, the TipPopup overlay is mounted and animates. We set this
+  // when a brand-new "tip" system message lands in the realtime feed.
+  const [tipAmount, setTipAmount] = useState<number | null>(null);
+  const lastTipIdRef = useRef<string | null>(null);
   const lastMessageIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -472,6 +477,7 @@ const ChatterPublicView = () => {
     const msgs = messagesQ.data ?? [];
     if (msgs.length === 0) {
       lastMessageIdRef.current = null;
+      lastTipIdRef.current = null;
       return;
     }
     const last = msgs[msgs.length - 1];
@@ -479,6 +485,31 @@ const ChatterPublicView = () => {
     lastMessageIdRef.current = last.id;
     if (!prev || prev === last.id) return;
     if (last.role === "fan") playPing();
+
+    // Trigger the tip popup + per-amount sound when a brand-new tip
+    // system message arrives. Skipped on the initial load so re-opening
+    // the chat doesn't replay every historical tip.
+    const newestTip = [...msgs]
+      .reverse()
+      .find((m) => m.msg_type === "tip" && m.role === "system" && m.price);
+    if (newestTip && newestTip.id !== lastTipIdRef.current) {
+      const isInitial = lastTipIdRef.current === null;
+      lastTipIdRef.current = newestTip.id;
+      if (!isInitial && newestTip.price) {
+        setTipAmount(newestTip.price);
+        playTipSound(newestTip.price);
+      }
+    }
+  }, [messagesQ.data]);
+
+  // Initialize lastTipIdRef on first load so historical tips don't fire.
+  useEffect(() => {
+    if (lastTipIdRef.current !== null) return;
+    const msgs = messagesQ.data ?? [];
+    const newestTip = [...msgs]
+      .reverse()
+      .find((m) => m.msg_type === "tip" && m.role === "system");
+    if (newestTip) lastTipIdRef.current = newestTip.id;
   }, [messagesQ.data]);
 
   // Mark messages as read — but ONLY when the chatter is actually looking
@@ -824,6 +855,7 @@ const ChatterPublicView = () => {
       />
 
       <MediaViewer url={mediaUrl} onClose={() => setMediaUrl(null)} />
+      <TipPopup amount={tipAmount} onDone={() => setTipAmount(null)} />
     </div>
   );
 };
