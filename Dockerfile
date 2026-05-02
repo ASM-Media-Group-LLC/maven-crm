@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Install dependencies first (better cache)
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install --no-audit --no-fund
 
 # Build-time env vars (Vite injects VITE_* into the bundle at build time)
 ARG VITE_SUPABASE_URL
