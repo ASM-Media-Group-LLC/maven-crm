@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Clock, CircleDot, CircleDashed, Trash2 } from "lucide-react";
+import { Plus, X, Clock, CircleDot, CircleDashed, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -12,6 +12,16 @@ import {
   useDeleteChatterSession,
 } from "@/hooks/useChatterEvaluator";
 import { NewSessionDialog } from "../NewSessionDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { ChatterSession, ChatterProfile } from "../types";
 
 interface Props {
@@ -121,6 +131,10 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   const qc = useQueryClient();
   const [newOpen, setNewOpen] = useState(false);
   const [tab, setTab] = useState<"open" | "ended">("open");
+  // Confirm dialogs — replace the browser-native confirm() the user
+  // flagged as ugly. Both keep the target session id in state.
+  const [endTarget, setEndTarget] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   // Realtime: keep the list in sync when sessions are updated externally
   // (e.g. the chatter claims a device, status flips to active) or other
@@ -150,21 +164,23 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   const ended = all.filter((s) => s.status === "ended");
   const visible = tab === "open" ? open : ended;
 
-  const handleEnd = async (id: string) => {
-    if (!confirm("¿Cerrar esta sesión? El aspirante ya no podrá enviar mensajes.")) return;
+  const confirmEnd = async () => {
+    if (!endTarget) return;
     try {
-      await endMut.mutateAsync(id);
-      if (selectedId === id) onSelect(null);
-    } catch {
-      // toast is handled by the global query error if any; silent fallback
+      await endMut.mutateAsync(endTarget);
+      if (selectedId === endTarget) onSelect(null);
+      setEndTarget(null);
+    } catch (e) {
+      toast.error("No se pudo cerrar", { description: (e as Error).message });
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar esta sesión cerrada? Se borran mensajes y evaluación. No se puede deshacer.")) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteMut.mutateAsync(id);
-      if (selectedId === id) onSelect(null);
+      await deleteMut.mutateAsync(deleteTarget);
+      if (selectedId === deleteTarget) onSelect(null);
+      setDeleteTarget(null);
       toast.success("Sesión eliminada");
     } catch (e) {
       toast.error("No se pudo eliminar", { description: (e as Error).message });
@@ -226,13 +242,65 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
             profile={profilesById.get(s.profile_id) ?? null}
             active={s.id === selectedId}
             onSelect={() => onSelect(s.id)}
-            onEnd={() => handleEnd(s.id)}
-            onDelete={() => handleDelete(s.id)}
+            onEnd={() => setEndTarget(s.id)}
+            onDelete={() => setDeleteTarget(s.id)}
           />
         ))}
       </div>
 
       <NewSessionDialog open={newOpen} onOpenChange={setNewOpen} />
+
+      <AlertDialog open={!!endTarget} onOpenChange={(o) => !o && setEndTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cerrar sesión</AlertDialogTitle>
+            <AlertDialogDescription>
+              El aspirante ya no podrá enviar mensajes y el link se invalida.
+              La sesión se mueve a la pestaña "Cerradas".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={endMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmEnd();
+              }}
+              disabled={endMut.isPending}
+            >
+              {endMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Cerrar sesión
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar sesión</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se borran permanentemente los mensajes y la evaluación de esta
+              sesión cerrada. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDelete();
+              }}
+              disabled={deleteMut.isPending}
+            >
+              {deleteMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -574,6 +574,25 @@ export const usePurchaseChatterMessage = () => {
   });
 };
 
+// Examiner-side message delete. Mirrors the original deleteMessage with
+// deletedBy='fan' (index.html line 3690): a hard delete that removes the
+// bubble from BOTH views. The chatter side does its own soft delete via
+// the public edge function (action='delete-message').
+export const useDeleteExaminerMessage = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ sessionId, messageId }: { sessionId: string; messageId: string }): Promise<void> => {
+      const { error } = await sb
+        .from("chatter_messages")
+        .update({ deleted: "full" })
+        .eq("id", messageId);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) =>
+      qc.invalidateQueries({ queryKey: ["chatter-messages", vars.sessionId] }),
+  });
+};
+
 export const useDeleteChatterSession = () => {
   const qc = useQueryClient();
   return useMutation({

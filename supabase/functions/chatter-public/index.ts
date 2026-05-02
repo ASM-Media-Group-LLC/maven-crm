@@ -21,7 +21,13 @@ const corsHeaders = {
 };
 
 type Body = {
-  action: "send" | "claim-device" | "set-typing" | "mark-read" | "upload-image";
+  action:
+    | "send"
+    | "claim-device"
+    | "set-typing"
+    | "mark-read"
+    | "upload-image"
+    | "delete-message";
   sessionId: string;
   // send
   content?: string;
@@ -36,6 +42,8 @@ type Body = {
   fileName?: string;
   contentType?: string;
   base64?: string;                       // raw base64 (no data URL prefix)
+  // delete-message
+  messageId?: string;
 };
 
 const json = (status: number, payload: unknown) =>
@@ -155,6 +163,36 @@ Deno.serve(async (req) => {
         .from("chatter_sessions")
         .update({ read_by_chatter_at: new Date().toISOString() })
         .eq("id", body.sessionId);
+      return json(200, { ok: true });
+    }
+
+    case "delete-message": {
+      // Chatter-side soft delete. Mirrors the original Roleplaychatters
+      // deleteMessage with deletedBy='chatter' (index.html line 3691):
+      // the message is hidden from the chatter's own view but the examiner
+      // still sees it as "(mensaje eliminado por el chatter)" in red. The
+      // chatter can only soft-delete their OWN messages.
+      if (!body.messageId) return json(400, { ok: false, error: "messageId required" });
+      const { data: msg, error: mErr } = await supa
+        .from("chatter_messages")
+        .select("id, session_id, role, deleted")
+        .eq("id", body.messageId)
+        .maybeSingle();
+      if (mErr) return json(500, { ok: false, error: mErr.message });
+      if (!msg) return json(404, { ok: false, error: "message not found" });
+      if (msg.session_id !== body.sessionId) {
+        return json(403, { ok: false, error: "wrong session" });
+      }
+      if (msg.role !== "chatter") {
+        return json(403, { ok: false, error: "not your message" });
+      }
+      // 'full' wins over 'chatter' if the examiner already nuked it.
+      if (msg.deleted === "full") return json(200, { ok: true });
+      const { error: uErr } = await supa
+        .from("chatter_messages")
+        .update({ deleted: "chatter" })
+        .eq("id", body.messageId);
+      if (uErr) return json(500, { ok: false, error: uErr.message });
       return json(200, { ok: true });
     }
 

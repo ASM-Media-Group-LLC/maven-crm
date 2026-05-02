@@ -105,9 +105,13 @@ interface BubbleProps {
    *  to render single vs. double check on the chatter's own messages. */
   readByOther: string | null;
   onOpenMedia: (url: string) => void;
+  /** Chatter-side soft delete (deleted='chatter'). The bubble disappears
+   *  here but the examiner still sees the "(mensaje eliminado por el
+   *  chatter)" placeholder. Only invoked from the chatter's own bubbles. */
+  onDelete: (msg: ChatterMessage) => void;
 }
 
-const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMedia }: BubbleProps) => {
+const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMedia, onDelete }: BubbleProps) => {
   if (msg.deleted === "full") return null;
 
   if (msg.role === "system") {
@@ -172,11 +176,24 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
           </div>
         )}
       </div>
-      <div className={`flex max-w-[75%] flex-col ${isMine ? "items-end" : "items-start"}`}>
+      <div className={`group/bubble relative flex max-w-[75%] flex-col ${isMine ? "items-end" : "items-start"}`}>
         <span className="text-[10px] text-muted-foreground">{name}</span>
+        {/* Chatter can soft-delete their own messages. The ✕ floats next
+            to the bubble and only appears on hover. */}
+        {isMine && (
+          <button
+            type="button"
+            onClick={() => onDelete(msg)}
+            className="absolute left-[-22px] top-3.5 hidden h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm ring-1 ring-border hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
+            title="Eliminar mensaje"
+            aria-label="Eliminar mensaje"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
         {(msg.content || msg.deleted === "chatter") && (
           <div
-            className={`rounded-2xl px-3.5 py-2 text-sm ${
+            className={`rounded-2xl px-3.5 py-2 ${
               isMine
                 ? "rounded-br-sm bg-primary text-primary-foreground"
                 : "rounded-bl-sm bg-muted text-foreground"
@@ -920,7 +937,13 @@ const ChatterPublicView = () => {
                 {fanName} aún no ha escrito. Espera o saluda primero como {personaName}.
               </p>
             )}
-            {messages.map((m) => (
+            {messages
+              // The chatter never sees a message they soft-deleted, and
+              // never sees one the examiner hard-deleted. The examiner's
+              // bubble component shows "(mensaje eliminado por el chatter)"
+              // for the soft case — that placeholder is only for them.
+              .filter((m) => m.deleted !== "chatter" && m.deleted !== "full")
+              .map((m) => (
               <Bubble
                 key={m.id}
                 msg={m}
@@ -930,6 +953,16 @@ const ChatterPublicView = () => {
                 side="chatter"
                 readByOther={session.read_by_examiner_at ?? null}
                 onOpenMedia={(url) => setMediaUrl(url)}
+                onDelete={(target) => {
+                  callChatterApi("delete-message", {
+                    sessionId: session.id,
+                    messageId: target.id,
+                  }).catch((e) =>
+                    toast.error("No se pudo eliminar", {
+                      description: (e as Error).message,
+                    }),
+                  );
+                }}
               />
             ))}
           </div>

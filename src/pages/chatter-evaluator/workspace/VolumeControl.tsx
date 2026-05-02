@@ -31,14 +31,72 @@ const setStoredVolume = (v: number) => {
 /** Same icon mapping as the original: 🔊 > 0.5, 🔉 > 0, 🔇 = 0. */
 const iconFor = (v: number) => (v > 0 ? (v > 0.5 ? "🔊" : "🔉") : "🔇");
 
+// All known sound files in /public/sounds. Pre-warming these on first user
+// interaction avoids the autoplay block that was making notifications skip
+// at random — browsers gate Audio() until the document has had a real
+// gesture, so the first ping after a fresh load was getting blocked
+// silently while later ones (after the user clicked anything) worked.
+const SOUND_NAMES = ["notification", "tiny", "Small", "medium", "large", "huge", "Show"] as const;
+
+let _audioUnlocked = false;
+let _audioPool: Map<string, HTMLAudioElement> | null = null;
+
+const ensurePool = (): Map<string, HTMLAudioElement> => {
+  if (_audioPool) return _audioPool;
+  const pool = new Map<string, HTMLAudioElement>();
+  for (const n of SOUND_NAMES) {
+    try {
+      const a = new Audio(`/sounds/${n}.mp3`);
+      a.preload = "auto";
+      pool.set(n, a);
+    } catch {
+      /* no-op */
+    }
+  }
+  _audioPool = pool;
+  return pool;
+};
+
+const unlockAudio = () => {
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
+  const pool = ensurePool();
+  // Silently bump every audio element so the browser flips them into
+  // "user-allowed" state. Mirrors unlockAudio in the original
+  // Roleplaychatters (index.html line 1559).
+  pool.forEach((a) => {
+    try {
+      a.volume = 0;
+      void a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
+    } catch {
+      /* no-op */
+    }
+  });
+};
+
+// Hook the unlock onto the first real user gesture anywhere in the app.
+// `once: true` means it fires exactly once and unbinds itself.
+if (typeof window !== "undefined") {
+  const opts = { once: true, capture: true } as const;
+  window.addEventListener("click", unlockAudio, opts);
+  window.addEventListener("keydown", unlockAudio, opts);
+  window.addEventListener("touchstart", unlockAudio, opts);
+}
+
 // Plays an mp3 from /public/sounds at the persisted volume. Mirrors the
-// original Roleplaychatters playSound (index.html line 1580). One-shot Audio
-// element per call so simultaneous events don't fight over the same node.
+// original Roleplaychatters playSound (index.html line 1580). Reuses a
+// pre-warmed pool so playback isn't gated by a fresh fetch + decode each
+// time, which is what was causing the inconsistent notification ping.
 export const playSoundFile = (name: string): void => {
   const vol = getSoundVolume();
   if (vol <= 0) return;
+  const pool = ensurePool();
+  const base = pool.get(name);
+  if (!base) return;
   try {
-    const a = new Audio(`/sounds/${name}.mp3`);
+    // Clone so two simultaneous events (e.g. message + tip) don't fight
+    // over playback position on the same element.
+    const a = (base.cloneNode(true) as HTMLAudioElement);
     a.volume = vol;
     void a.play().catch(() => {});
   } catch {

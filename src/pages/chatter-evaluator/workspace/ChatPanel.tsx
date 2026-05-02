@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square, X as XIcon } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -24,6 +24,7 @@ import {
   useExtendChatterSession,
   usePurchaseChatterMessage,
   useEndChatterSession,
+  useDeleteExaminerMessage,
 } from "@/hooks/useChatterEvaluator";
 import {
   AlertDialog,
@@ -83,6 +84,7 @@ const MessageBubble = ({
   onOpenMedia,
   onPurchase,
   purchasing,
+  onDelete,
 }: {
   msg: ChatterMessage;
   fanName: string;
@@ -94,6 +96,9 @@ const MessageBubble = ({
   onOpenMedia: (url: string) => void;
   onPurchase: (msg: ChatterMessage) => void;
   purchasing: boolean;
+  /** Examiner-side delete (sets deleted='full'). Only invoked from the
+   *  ✕ button on the examiner's own (fan-role) bubbles. */
+  onDelete: (msg: ChatterMessage) => void;
 }) => {
   if (msg.deleted === "full") return null;
 
@@ -159,15 +164,28 @@ const MessageBubble = ({
           </div>
         )}
       </div>
-      <div className={`flex max-w-[70%] flex-col ${isFan ? "items-start" : "items-end"}`}>
+      <div className={`group/bubble relative flex max-w-[70%] flex-col ${isFan ? "items-start" : "items-end"}`}>
         <span className="text-[10px] text-muted-foreground">{name}</span>
+        {/* Examiner can hard-delete their own (fan-role) messages. The
+            ✕ floats next to the bubble and only appears on hover. */}
+        {isFan && (
+          <button
+            type="button"
+            onClick={() => onDelete(msg)}
+            className="absolute right-[-22px] top-3.5 hidden h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm ring-1 ring-border hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
+            title="Eliminar mensaje"
+            aria-label="Eliminar mensaje"
+          >
+            <XIcon className="h-3 w-3" />
+          </button>
+        )}
         {(msg.content || msg.deleted === "chatter") && (
           <div
-            className={`rounded-2xl px-3 py-1.5 text-sm ${
+            className={`rounded-2xl px-3 py-1.5 ${
               isFan
                 ? "rounded-bl-sm bg-muted text-foreground"
                 : "rounded-br-sm bg-primary text-primary-foreground"
-            } ${msg.deleted === "chatter" ? "italic opacity-60" : ""}`}
+            } ${msg.deleted === "chatter" ? "border border-rose-500/40 italic text-rose-400 opacity-80" : ""}`}
           >
             {msg.deleted === "chatter" ? "(mensaje eliminado por el chatter)" : msg.content}
           </div>
@@ -297,6 +315,7 @@ export const ChatPanel = ({ session }: Props) => {
   const renameMut = useRenameChatterSession();
   const extendMut = useExtendChatterSession();
   const purchaseMut = usePurchaseChatterMessage();
+  const deleteMsgMut = useDeleteExaminerMessage();
   const endMut = useEndChatterSession();
   const [endOpen, setEndOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -754,7 +773,9 @@ export const ChatPanel = ({ session }: Props) => {
             Aún no hay mensajes. Empieza tipeando como JavixBuster (rol "fan").
           </p>
         )}
-        {messages.map((m) => (
+        {messages
+          .filter((m) => m.deleted !== "full")
+          .map((m) => (
           <MessageBubble
             key={m.id}
             msg={m}
@@ -763,6 +784,16 @@ export const ChatPanel = ({ session }: Props) => {
             profile={profile}
             readByOther={session?.read_by_chatter_at ?? null}
             onOpenMedia={(url) => setMediaUrl(url)}
+            onDelete={(target) => {
+              if (!session) return;
+              deleteMsgMut.mutate(
+                { sessionId: session.id, messageId: target.id },
+                {
+                  onError: (err) =>
+                    toast.error("No se pudo eliminar", { description: (err as Error).message }),
+                },
+              );
+            }}
             onPurchase={(target) => {
               if (!session || !target.price) return;
               purchaseMut.mutate(
