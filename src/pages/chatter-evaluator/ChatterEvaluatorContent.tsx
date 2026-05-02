@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Image as ImageIcon, Video, ListChecks, Mail } from "lucide-react";
+import { Plus, Image as ImageIcon, Video, ListChecks, Mail, Settings } from "lucide-react";
 import {
   useChatterProfiles,
   useChatterVaultCounts,
@@ -120,10 +120,18 @@ const ChatterEvaluatorContent = () => {
               Evalúa chatters con perfiles, vault y criterios compartidos.
             </p>
           </div>
-          <Button disabled className="gap-2" title="Disponible en Phase 3">
-            <Plus className="h-4 w-4" />
-            Nueva sesión
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" className="gap-2">
+              <Link to="/chatter-evaluator/admin">
+                <Settings className="h-4 w-4" />
+                Admin
+              </Link>
+            </Button>
+            <Button disabled className="gap-2" title="Disponible en Phase 3">
+              <Plus className="h-4 w-4" />
+              Nueva sesión
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

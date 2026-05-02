@@ -246,3 +246,98 @@ export const useReorderVaultItems = () => {
   });
 };
 
+// ---- Criteria mutations --------------------------------------------------
+
+export type CriterionInput = {
+  label: string;
+  label_en: string | null;
+  weight?: number;
+  position?: number;
+  is_active?: boolean;
+};
+
+export const useUpsertCriterion = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      patch,
+    }: {
+      id?: string;
+      patch: CriterionInput;
+    }): Promise<ChatterCriterion> => {
+      if (id) {
+        const { data, error } = await sb
+          .from("chatter_criteria_defaults")
+          .update(patch)
+          .eq("id", id)
+          .select("*")
+          .single();
+        if (error) throw error;
+        return data as ChatterCriterion;
+      }
+      const { data, error } = await sb
+        .from("chatter_criteria_defaults")
+        .insert(patch)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ChatterCriterion;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-criteria"] }),
+  });
+};
+
+export const useDeleteCriterion = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      const { error } = await sb
+        .from("chatter_criteria_defaults")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-criteria"] }),
+  });
+};
+
+export const useReorderCriteria = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderedIds: string[]): Promise<void> => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        const { error } = await sb
+          .from("chatter_criteria_defaults")
+          .update({ position: i + 1 })
+          .eq("id", orderedIds[i]);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-criteria"] }),
+  });
+};
+
+// ---- Config mutations ----------------------------------------------------
+
+export type ConfigUpdate = Partial<
+  Omit<ChatterConfig, "id" | "updated_at">
+>;
+
+export const useUpdateChatterConfig = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: ConfigUpdate): Promise<ChatterConfig> => {
+      const { data, error } = await sb
+        .from("chatter_config")
+        .update(patch)
+        .eq("id", 1)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ChatterConfig;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-config"] }),
+  });
+};
+

@@ -69,6 +69,7 @@ const Promolog = lazy(() => import("./pages/Promolog"));
 const ChatterEvaluator = lazy(() => import("./pages/ChatterEvaluator"));
 const ChatterProfileDetail = lazy(() => import("./pages/ChatterProfileDetail"));
 const ChatterProfileEdit = lazy(() => import("./pages/ChatterProfileEdit"));
+const ChatterAdmin = lazy(() => import("./pages/ChatterAdmin"));
 const Contactos = lazy(() => import("./pages/Contactos"));
 const NuevoContacto = lazy(() => import("./pages/NuevoContacto"));
 
@@ -234,6 +235,7 @@ const App = () => (
                   (where user_roles isn't populated). Swap to PermissionRoute
                   module="Chatters" when merging to prod. */}
               <Route path="/chatter-evaluator" element={<ProtectedRoute><ChatterEvaluator /></ProtectedRoute>} />
+              <Route path="/chatter-evaluator/admin" element={<ProtectedRoute><ChatterAdmin /></ProtectedRoute>} />
               <Route path="/chatter-evaluator/:profileKey" element={<ProtectedRoute><ChatterProfileDetail /></ProtectedRoute>} />
               <Route path="/chatter-evaluator/:profileKey/edit" element={<ProtectedRoute><ChatterProfileEdit /></ProtectedRoute>} />
               <Route path="/tareas" element={<ProtectedRoute><Tareas /></ProtectedRoute>} />
