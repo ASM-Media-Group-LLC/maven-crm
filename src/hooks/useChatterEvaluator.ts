@@ -5,6 +5,7 @@ import type {
   ChatterVaultItem,
   ChatterCriterion,
   ChatterConfig,
+  ChatterSession,
 } from "@/pages/chatter-evaluator/types";
 
 // The chatter_* tables aren't in the generated Supabase types yet, so we use
@@ -338,6 +339,98 @@ export const useUpdateChatterConfig = () => {
       return data as ChatterConfig;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-config"] }),
+  });
+};
+
+// ---- Sessions queries / mutations ---------------------------------------
+
+const genSessionId = (): string => {
+  // 8-char short ID for clean public URLs (e.g. /chatter/AB12CD34).
+  // Math.random has enough entropy for our N (hundreds at most), but we
+  // include a timestamp slice to further reduce collision risk.
+  const t = Date.now().toString(36).slice(-3).toUpperCase();
+  const r = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `${t}${r}`;
+};
+
+export const useChatterSessions = (status?: "active-only" | "all") =>
+  useQuery({
+    queryKey: ["chatter-sessions", status ?? "all"],
+    queryFn: async (): Promise<ChatterSession[]> => {
+      let q = sb
+        .from("chatter_sessions")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (status === "active-only") q = q.neq("status", "ended");
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as ChatterSession[];
+    },
+  });
+
+export const useChatterSession = (sessionId: string | null | undefined) =>
+  useQuery({
+    queryKey: ["chatter-session", sessionId],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<ChatterSession | null> => {
+      const { data, error } = await sb
+        .from("chatter_sessions")
+        .select("*")
+        .eq("id", sessionId)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as ChatterSession | null;
+    },
+  });
+
+export type CreateSessionInput = {
+  profileId: string;
+  chatterName: string;
+  durationMinutes?: number;
+  examinerName?: string;
+};
+
+export const useCreateChatterSession = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateSessionInput): Promise<ChatterSession> => {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+      if (!userData.user) throw new Error("No autenticado");
+
+      const id = genSessionId();
+      const row = {
+        id,
+        examiner_user_id: userData.user.id,
+        examiner_name: input.examinerName ?? null,
+        profile_id: input.profileId,
+        chatter_name: input.chatterName,
+        status: "waiting" as const,
+        duration_minutes: input.durationMinutes ?? 60,
+      };
+      const { data, error } = await sb
+        .from("chatter_sessions")
+        .insert(row)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ChatterSession;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
+  });
+};
+
+export const useEndChatterSession = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      const { error } = await sb
+        .from("chatter_sessions")
+        .update({ status: "ended", ended_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
   });
 };
 

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +9,10 @@ import {
   useChatterVaultCounts,
   useChatterCriteria,
   useChatterConfig,
+  useChatterSessions,
 } from "@/hooks/useChatterEvaluator";
 import type { ChatterProfile } from "./types";
+import { NewSessionDialog } from "./NewSessionDialog";
 
 const ProfileCard = ({
   profile,
@@ -102,6 +105,8 @@ const ChatterEvaluatorContent = () => {
   const vaultCountsQ = useChatterVaultCounts();
   const criteriaQ = useChatterCriteria();
   const configQ = useChatterConfig();
+  const sessionsQ = useChatterSessions("active-only");
+  const [newSessionOpen, setNewSessionOpen] = useState(false);
 
   const profiles = profilesQ.data ?? [];
   const vaultCounts = vaultCountsQ.data ?? {};
@@ -121,18 +126,28 @@ const ChatterEvaluatorContent = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {sessionsQ.data && sessionsQ.data.length > 0 && (
+              <Button asChild variant="outline" className="gap-2">
+                <Link to="/chatter-evaluator/workspace">
+                  <ListChecks className="h-4 w-4" />
+                  Workspace ({sessionsQ.data.length})
+                </Link>
+              </Button>
+            )}
             <Button asChild variant="outline" className="gap-2">
               <Link to="/chatter-evaluator/admin">
                 <Settings className="h-4 w-4" />
                 Admin
               </Link>
             </Button>
-            <Button disabled className="gap-2" title="Disponible en Phase 3">
+            <Button onClick={() => setNewSessionOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" />
               Nueva sesión
             </Button>
           </div>
         </div>
+
+        <NewSessionDialog open={newSessionOpen} onOpenChange={setNewSessionOpen} />
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard

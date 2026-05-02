@@ -63,6 +63,43 @@ export interface ChatterCriterion {
   created_at: string;
 }
 
+export type ChatterSessionStatus = "waiting" | "active" | "ended";
+
+export interface ChatterSession {
+  id: string;
+  examiner_user_id: string;
+  examiner_name: string | null;
+  profile_id: string;
+  chatter_name: string;
+  status: ChatterSessionStatus;
+  duration_minutes: number;
+  started_at: string | null;
+  ended_at: string | null;
+  expires_at: string | null;
+  active_device_id: string | null;
+  active_device_claimed_at: string | null;
+  typing_chatter: boolean;
+  typing_fan: boolean;
+  typing_chatter_at: string | null;
+  typing_fan_at: string | null;
+  read_by_chatter_at: string | null;
+  read_by_examiner_at: string | null;
+  created_at: string;
+}
+
+export interface ChatterMessage {
+  id: string;
+  session_id: string;
+  role: "fan" | "chatter" | "system";
+  msg_type: "message" | "tip" | "purchase" | "notice";
+  content: string | null;
+  price: number | null;
+  images: string[];
+  deleted: "chatter" | "full" | null;
+  from_examiner: boolean;
+  created_at: string;
+}
+
 export interface ChatterConfig {
   id: number;
   apps_script_url: string | null;
