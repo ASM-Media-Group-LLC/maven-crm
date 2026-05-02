@@ -29,13 +29,17 @@ import {
   useReorderCriteria,
   useUpdateChatterConfig,
   useMavenUsers,
+  useChatterProfiles,
+  useDeleteChatterProfile,
 } from "@/hooks/useChatterEvaluator";
+import { NewProfileDialog } from "./NewProfileDialog";
+import type { ChatterProfile } from "./types";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Bell, ChevronsUpDown, Check as CheckIcon } from "lucide-react";
+import { Bell, ChevronsUpDown, Check as CheckIcon, UserPlus, Pencil } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +51,149 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { ChatterCriterion } from "./types";
+
+// ---------- Models / character profiles ----------
+// Lists every chatter profile in chatter_profiles and lets the admin add
+// new ones. Mirrors the original Roleplaychatters Admin → Modelos screen
+// (index.html line 1283 onward) — same default fields, same key/avatar
+// layout — but with Maven's color palette and using shadcn primitives.
+const ProfilesSection = () => {
+  const profilesQ = useChatterProfiles();
+  const del = useDeleteChatterProfile();
+  const [newOpen, setNewOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<ChatterProfile | null>(null);
+
+  const profiles = profilesQ.data ?? [];
+
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Modelos</h2>
+            <p className="text-xs text-muted-foreground">
+              Personajes que los chatters interpretan durante una sesión.
+            </p>
+          </div>
+          <Button onClick={() => setNewOpen(true)} className="gap-2">
+            <UserPlus className="h-4 w-4" /> Nuevo modelo
+          </Button>
+        </div>
+
+        {profilesQ.isLoading && (
+          <p className="text-xs text-muted-foreground">Cargando…</p>
+        )}
+
+        {!profilesQ.isLoading && profiles.length === 0 && (
+          <div className="flex flex-col items-center gap-2 rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+            <UserPlus className="h-8 w-8 opacity-40" />
+            <p>Todavía no hay modelos.</p>
+            <Button variant="outline" size="sm" onClick={() => setNewOpen(true)} className="gap-1">
+              <Plus className="h-3 w-3" /> Crear el primero
+            </Button>
+          </div>
+        )}
+
+        {profiles.length > 0 && (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {profiles.map((p) => {
+              const meta = [
+                p.nationality,
+                p.location,
+                p.age,
+              ].filter(Boolean).join(" · ");
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-3 rounded-lg border bg-card p-3"
+                >
+                  <div className="aspect-square h-12 w-12 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-purple-600 to-amber-500">
+                    {p.avatar_url ? (
+                      <img
+                        src={p.avatar_url}
+                        alt={p.name}
+                        className="h-full w-full object-cover"
+                        style={{
+                          objectPosition: `${p.avatar_x ?? 50}% ${p.avatar_y ?? 50}%`,
+                          transform: `scale(${(p.avatar_zoom ?? 100) / 100})`,
+                        }}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-base font-bold text-white">
+                        {p.name[0]}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold">{p.name}</div>
+                    <div className="truncate text-[11px] text-muted-foreground">
+                      {meta || <span className="font-mono opacity-60">{p.key}</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button asChild size="icon" variant="ghost" className="h-8 w-8" title="Editar">
+                      <Link to={`/chatter-evaluator/${p.key}/edit`}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      title="Eliminar"
+                      onClick={() => setConfirmDelete(p)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+
+      <NewProfileDialog open={newOpen} onOpenChange={setNewOpen} />
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar modelo</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDelete
+                ? `¿Eliminar el modelo "${confirmDelete.name}"? Esto borra el perfil, su vault y todas las sesiones asociadas. No se puede deshacer.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={del.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={(e) => {
+                e.preventDefault();
+                if (!confirmDelete) return;
+                del.mutate(confirmDelete.id, {
+                  onSuccess: () => {
+                    setConfirmDelete(null);
+                    toast.success("Modelo eliminado");
+                  },
+                  onError: (err) =>
+                    toast.error("No se pudo eliminar", {
+                      description: (err as Error).message,
+                    }),
+                });
+              }}
+              disabled={del.isPending}
+            >
+              {del.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+};
 
 // ---------- Criteria editor ----------
 const CriteriaSection = () => {
@@ -494,6 +641,7 @@ const ChatterAdminContent = () => (
           Criterios de evaluación y configuración global. Estos cambios afectan a todos los examiners.
         </p>
       </div>
+      <ProfilesSection />
       <CriteriaSection />
       <ConfigSection />
     </div>

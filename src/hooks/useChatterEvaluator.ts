@@ -102,6 +102,64 @@ export type ChatterProfileUpdate = Partial<
   Omit<ChatterProfile, "id" | "key" | "created_at" | "updated_at">
 >;
 
+// Insert a new chatter profile. The `key` is the human-readable slug
+// admins type into the "Clave interna" field — must be unique across
+// the table. Mirrors adminAddNewModel from the original
+// Roleplaychatters (index.html line 5090) but inserts into Postgres
+// instead of Firebase.
+export type ChatterProfileCreate = {
+  key: string;
+} & Partial<Omit<ChatterProfile, "id" | "created_at" | "updated_at">>;
+
+export const useCreateChatterProfile = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ChatterProfileCreate): Promise<ChatterProfile> => {
+      const cleanKey = input.key.trim().toLowerCase().replace(/\s+/g, "");
+      if (!cleanKey) throw new Error("La clave interna es obligatoria");
+      // Check uniqueness up-front — gives a friendlier error than the
+      // raw Postgres "duplicate key violates unique constraint".
+      const { data: existing } = await sb
+        .from("chatter_profiles")
+        .select("id")
+        .eq("key", cleanKey)
+        .maybeSingle();
+      if (existing) throw new Error("Ya existe un perfil con esa clave");
+
+      const row = {
+        ...input,
+        key: cleanKey,
+        name: input.name?.trim() || cleanKey,
+        prices: input.prices ?? {},
+        extra_fields: input.extra_fields ?? {},
+      };
+      const { data, error } = await sb
+        .from("chatter_profiles")
+        .insert(row)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ChatterProfile;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chatter-profiles"] });
+    },
+  });
+};
+
+export const useDeleteChatterProfile = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      const { error } = await sb.from("chatter_profiles").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["chatter-profiles"] });
+    },
+  });
+};
+
 export const useUpdateChatterProfile = () => {
   const qc = useQueryClient();
   return useMutation({

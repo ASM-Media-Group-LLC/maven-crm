@@ -35,7 +35,11 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // Bumped from 5 MB to 12 MB so the main bundle can include the
+        // eager-loaded sidebar pages without blowing past the precache
+        // limit. Workbox refuses to precache anything larger than this
+        // value and aborts the build, hence the deploy error.
+        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"],
         navigateFallback: undefined,
         navigateFallbackDenylist: [/^\/~oauth/],
@@ -74,10 +78,52 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    // The eager-loaded sidebar pages push the main chunk over Vite's
+    // default 500 KB warning threshold. We don't care about the warning
+    // since manualChunks below splits it into reasonable vendor pieces.
+    chunkSizeWarningLimit: 2000,
     rollupOptions: {
       ...(mode !== "production" && {
         external: ["virtual:pwa-register"],
       }),
+      output: {
+        // Split heavy vendors into their own chunks so the main bundle
+        // stays small enough for the workbox precache and the browser
+        // can cache them independently across deploys (vendor versions
+        // change less often than app code).
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-query": ["@tanstack/react-query"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-radix": [
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-popover",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-select",
+            "@radix-ui/react-tabs",
+            "@radix-ui/react-tooltip",
+            "@radix-ui/react-alert-dialog",
+            "@radix-ui/react-accordion",
+            "@radix-ui/react-checkbox",
+            "@radix-ui/react-label",
+            "@radix-ui/react-progress",
+            "@radix-ui/react-radio-group",
+            "@radix-ui/react-scroll-area",
+            "@radix-ui/react-separator",
+            "@radix-ui/react-slider",
+            "@radix-ui/react-slot",
+            "@radix-ui/react-switch",
+            "@radix-ui/react-toast",
+            "@radix-ui/react-toggle",
+            "@radix-ui/react-toggle-group",
+          ],
+          "vendor-charts": ["recharts"],
+          "vendor-date": ["date-fns"],
+          "vendor-icons": ["lucide-react"],
+          "vendor-dnd": ["@hello-pangea/dnd"],
+          "vendor-pdf": ["jspdf", "jspdf-autotable"],
+        },
+      },
     },
   },
 }));
