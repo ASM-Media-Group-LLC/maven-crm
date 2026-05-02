@@ -64,6 +64,29 @@ function inferMediaType(url, name = "") {
   return "other";
 }
 
+const CONTENT_TYPE_BY_EXT = {
+  jpg:  "image/jpeg", jpeg: "image/jpeg",
+  png:  "image/png",
+  gif:  "image/gif",
+  webp: "image/webp",
+  avif: "image/avif",
+  svg:  "image/svg+xml",
+  bmp:  "image/bmp",
+  mp4:  "video/mp4",
+  mov:  "video/quicktime",
+  webm: "video/webm",
+  m4v:  "video/x-m4v",
+  avi:  "video/x-msvideo",
+  mkv:  "video/x-matroska",
+};
+
+function inferContentType(name = "", url = "") {
+  const target = (name || url).toLowerCase();
+  const m = target.match(/\.([a-z0-9]+)(?:\?|$)/);
+  if (!m) return "application/octet-stream";
+  return CONTENT_TYPE_BY_EXT[m[1]] || "application/octet-stream";
+}
+
 const FIELDS_BILINGUAL = [
   "name", "nationality", "location", "age", "greeting", "users_term",
   "body", "nudity", "anal", "collabs", "videocall", "custom", "extra",
@@ -263,7 +286,7 @@ for (const [profileKey, items] of Object.entries(fbContent)) {
         const objectPath = objectPathFromOriginalUrl(profileKey, item.name, item.url);
         const { error: upErr } = await supa.storage.from(VAULT_BUCKET).upload(objectPath, buf, {
           upsert: true,
-          contentType: undefined, // Supabase infers
+          contentType: inferContentType(item.name, item.url),
         });
         if (upErr) throw upErr;
         const { data: pub } = supa.storage.from(VAULT_BUCKET).getPublicUrl(objectPath);
