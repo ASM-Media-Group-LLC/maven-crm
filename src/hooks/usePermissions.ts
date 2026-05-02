@@ -39,30 +39,34 @@ export const usePermissions = () => {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Modules that are universally accessible regardless of permissions
+  // Modules everyone can reach unless an admin explicitly turned them
+  // off in the role config. The check happens AFTER explicit perm
+  // lookup so a `can_access: false` row still wins; this matters for
+  // backwards compat — roles saved before a given module existed have
+  // no row for it and would otherwise lose access on deploy.
   const UNIVERSAL_MODULES = ["Dashboard", "Messenger"];
 
   const canAccess = (module: string, submodule?: string): boolean => {
     // Admin always has full access
     if (isAdmin) return true;
 
-    // Universal modules are always accessible
-    if (UNIVERSAL_MODULES.includes(module)) return true;
-
-    // If no permissions configured for this role, DENY access (restrictive fallback)
-    if (permissions.length === 0) return false;
+    // No permissions configured for this role at all → only universal
+    // modules are reachable (everything else is locked).
+    if (permissions.length === 0) {
+      return UNIVERSAL_MODULES.includes(module);
+    }
 
     // Check specific submodule permission first
     if (submodule) {
       const specific = permissions.find(
-        (p) => p.module === module && p.submodule === submodule
+        (p) => p.module === module && p.submodule === submodule,
       );
       if (specific) return specific.can_access;
     }
 
     // Check module-level permission
     const moduleLevel = permissions.find(
-      (p) => p.module === module && !p.submodule
+      (p) => p.module === module && !p.submodule,
     );
     if (moduleLevel) return moduleLevel.can_access;
 
@@ -72,7 +76,10 @@ export const usePermissions = () => {
       return modulePerms.some((p) => p.can_access);
     }
 
-    // No permission configured for this module — deny by default
+    // Nothing configured for this module on this role — fall back to
+    // universal so roles saved before this module existed still work.
+    if (UNIVERSAL_MODULES.includes(module)) return true;
+
     return false;
   };
 

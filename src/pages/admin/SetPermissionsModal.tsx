@@ -58,6 +58,29 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
         s[key] = { can_access: p.can_access, data_scope: p.data_scope };
       }
     });
+    // Inherit module-level access for any submodule that has no saved
+    // row of its own. This keeps existing roles working when we ship
+    // new sub-keys (e.g. "Reportes" replacing legacy "Sales Report"):
+    // they pick up whatever the parent had instead of silently
+    // defaulting to off.
+    MODULES_CONFIG.forEach((m) => {
+      if (m.submodules.length === 0) return;
+      const moduleKey = getKey(m.module, null);
+      const moduleHasPerm = permissions.some(
+        (p) => p.module === m.module && !p.submodule,
+      );
+      if (!moduleHasPerm) return;
+      const moduleVal = s[moduleKey];
+      m.submodules.forEach((sub) => {
+        const hasSubPerm = permissions.some(
+          (p) => p.module === m.module && p.submodule === sub,
+        );
+        if (!hasSubPerm) {
+          const subKey = getKey(m.module, sub);
+          s[subKey] = { ...s[subKey], can_access: moduleVal.can_access, data_scope: moduleVal.data_scope };
+        }
+      });
+    });
     setState(s);
   }, [permissions, open, isAdminRole]);
 

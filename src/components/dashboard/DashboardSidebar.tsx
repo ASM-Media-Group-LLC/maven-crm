@@ -72,25 +72,28 @@ const DashboardSidebar = () => {
     item.url === "/creadores" ? pathname === "/creadores" : pathname.startsWith(item.url)
   );
 
-  const creatorSalesSubItems = [
-    { title: "Dashboard", url: "/sales-overview" },
-    { title: "Reportes", url: "/salesdashboard" },
-    { title: "IA Ventas", url: "/aisales" },
-    { title: "Auditoría", url: "/sales-audit" },
+  const creatorSalesSubItemsAll = [
+    { title: "Dashboard", url: "/sales-overview", submodule: "Dashboard" },
+    { title: "Reportes", url: "/salesdashboard", submodule: "Reportes" },
+    { title: "IA Ventas", url: "/aisales", submodule: "IA Ventas" },
+    { title: "Auditoría", url: "/sales-audit", submodule: "Auditoría" },
   ];
+  const creatorSalesSubItems = creatorSalesSubItemsAll.filter((item) =>
+    canAccess("Creator Sales", item.submodule),
+  );
 
   const operationsMenuAll = [
-    { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: promologCount || undefined, module: "Promolog" },
-    { title: t("nav.leadgen"), url: "/leadgen", icon: Activity, badge: leadgenCount || undefined, module: "LeadGen" },
-    { title: t("nav.closers"), url: "/closers", icon: Phone, badge: closersCount || undefined, module: "Closers" },
-    { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets" },
-    { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: MessageSquare, module: "Dashboard" },
+    { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: promologCount || undefined, module: "Promolog", submodule: undefined as string | undefined },
+    { title: t("nav.leadgen"), url: "/leadgen", icon: Activity, badge: leadgenCount || undefined, module: "LeadGen", submodule: undefined },
+    { title: t("nav.closers"), url: "/closers", icon: Phone, badge: closersCount || undefined, module: "Closers", submodule: undefined },
+    { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets", submodule: undefined },
+    { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: MessageSquare, module: "Chatters", submodule: "Evaluator" as string | undefined },
   ];
-  const operationsMenu = operationsMenuAll.filter((item) => canAccess(item.module));
+  const operationsMenu = operationsMenuAll.filter((item) => canAccess(item.module, item.submodule));
 
   const isCreatorSalesActive = creatorSalesSubItems.some((item) => pathname === item.url) || pathname === "/aisales" || pathname === "/ai-sales-config";
 
-  type HRItem = { title: string; url: string | null };
+  type HRItem = { title: string; url: string | null; submodule?: string };
   type HRSubGroup = { label: string; key: string; items: HRItem[] };
   type HRGroup = {
     label: string;
@@ -100,16 +103,16 @@ const DashboardSidebar = () => {
     subGroups?: HRSubGroup[];
   };
 
-  const hrGroups: HRGroup[] = [
+  const hrGroupsAll: HRGroup[] = [
     {
       label: "Employee Lifecycle",
       icon: UserCheck,
       key: "lifecycle",
       items: [
-        { title: "Candidatos", url: "/hr/candidatos" },
-        { title: "Onboarding", url: "/hr/onboarding" },
-        { title: "Empleados Activos", url: "/hr/directorio" },
-        { title: "Offboarding", url: "/hr/offboarding" },
+        { title: "Candidatos", url: "/hr/candidatos", submodule: "Candidatos" },
+        { title: "Onboarding", url: "/hr/onboarding", submodule: "Onboarding" },
+        { title: "Empleados Activos", url: "/hr/directorio", submodule: "Empleados Activos" },
+        { title: "Offboarding", url: "/hr/offboarding", submodule: "Offboarding" },
       ],
     },
     {
@@ -121,24 +124,24 @@ const DashboardSidebar = () => {
           label: "Control de Tiempo",
           key: "tiempo",
           items: [
-            { title: "Asistencia", url: "/hr/asistencia" },
-            { title: "Horarios y Turnos", url: "/hr/horarios" },
-            { title: "Horarios Chatters", url: "/hr/horarios-chatters" },
-            { title: "Horas Extra", url: "/hr/horarios/horas-extras" },
-            { title: "Banco de Horas", url: "/hr/horarios/banco-horas" },
+            { title: "Asistencia", url: "/hr/asistencia", submodule: "Asistencia" },
+            { title: "Horarios y Turnos", url: "/hr/horarios", submodule: "Horarios" },
+            { title: "Horarios Chatters", url: "/hr/horarios-chatters", submodule: "Horarios Chatters" },
+            { title: "Horas Extra", url: "/hr/horarios/horas-extras", submodule: "Horas Extra" },
+            { title: "Banco de Horas", url: "/hr/horarios/banco-horas", submodule: "Banco de Horas" },
           ],
         },
         {
           label: "Ausencias",
           key: "ausencias",
           items: [
-            { title: "Vacaciones", url: "/hr/vacaciones" },
-            { title: "Permisos", url: "/hr/permisos" },
+            { title: "Vacaciones", url: "/hr/vacaciones", submodule: "Vacaciones" },
+            { title: "Permisos", url: "/hr/permisos", submodule: "Permisos" },
           ],
         },
       ],
       items: [
-        { title: "Monitoreo", url: "/hr/monitoreo" },
+        { title: "Monitoreo", url: "/hr/monitoreo", submodule: "Monitoreo" },
       ],
     },
     {
@@ -146,7 +149,7 @@ const DashboardSidebar = () => {
       icon: Eye,
       key: "seguimiento",
       items: [
-        { title: "Incidentes", url: "/hr/incidentes" },
+        { title: "Incidentes", url: "/hr/incidentes", submodule: "Incidentes" },
       ],
     },
     {
@@ -154,8 +157,8 @@ const DashboardSidebar = () => {
       icon: GraduationCap,
       key: "desarrollo",
       items: [
-        { title: "Desempeño", url: "/hr/desempeno" },
-        { title: "Capacitación", url: "/hr/capacitacion" },
+        { title: "Desempeño", url: "/hr/desempeno", submodule: "Desempeño" },
+        { title: "Capacitación", url: "/hr/capacitacion", submodule: "Capacitación" },
       ],
     },
     {
@@ -163,8 +166,8 @@ const DashboardSidebar = () => {
       icon: Users,
       key: "organizacion",
       items: [
-        { title: "Directorio", url: "/hr/organizacion/directorio" },
-        { title: "Organigrama", url: "/hr/organizacion/organigrama" },
+        { title: "Directorio", url: "/hr/organizacion/directorio", submodule: "Directorio" },
+        { title: "Organigrama", url: "/hr/organizacion/organigrama", submodule: "Organigrama" },
       ],
     },
     {
@@ -172,7 +175,7 @@ const DashboardSidebar = () => {
       icon: Wallet,
       key: "finanzas",
       items: [
-        { title: "Deducciones", url: "/hr/deducciones" },
+        { title: "Deducciones", url: "/hr/deducciones", submodule: "Deducciones" },
       ],
     },
     {
@@ -180,10 +183,28 @@ const DashboardSidebar = () => {
       icon: Megaphone,
       key: "comunicacion",
       items: [
-        { title: "Anuncios Internos", url: "/hr/anuncios" },
+        { title: "Anuncios Internos", url: "/hr/anuncios", submodule: "Anuncios" },
       ],
     },
   ];
+
+  // Filter HR items the role can't actually reach so the sidebar
+  // doesn't show entries that just bounce back to /dashboard.
+  const filterHRItems = (items?: HRItem[]) =>
+    items?.filter((i) => !i.submodule || canAccess("HR", i.submodule));
+  const hrGroups: HRGroup[] = hrGroupsAll
+    .map((g) => ({
+      ...g,
+      items: filterHRItems(g.items),
+      subGroups: g.subGroups
+        ?.map((sg) => ({ ...sg, items: filterHRItems(sg.items) ?? [] }))
+        .filter((sg) => sg.items.length > 0),
+    }))
+    .filter(
+      (g) => (g.items && g.items.length > 0) || (g.subGroups && g.subGroups.length > 0),
+    );
+
+  const showHRDashboard = canAccess("HR", "Dashboard");
 
   // Helper to get all URLs from a group (including subGroups)
   const getGroupUrls = (group: HRGroup): string[] => {
@@ -196,8 +217,20 @@ const DashboardSidebar = () => {
   // Flat list for collapsed dropdown
   const hrFlatItems = hrGroups.flatMap((g) => {
     const items: { title: string; url: string }[] = [];
-    if (g.items) items.push(...g.items.filter((i): i is { title: string; url: string } => i.url !== null));
-    if (g.subGroups) g.subGroups.forEach(sg => items.push(...sg.items.filter((i): i is { title: string; url: string } => i.url !== null)));
+    if (g.items)
+      items.push(
+        ...g.items
+          .filter((i): i is HRItem & { url: string } => i.url !== null)
+          .map((i) => ({ title: i.title, url: i.url })),
+      );
+    if (g.subGroups)
+      g.subGroups.forEach((sg) =>
+        items.push(
+          ...sg.items
+            .filter((i): i is HRItem & { url: string } => i.url !== null)
+            .map((i) => ({ title: i.title, url: i.url })),
+        ),
+      );
     return items;
   });
 
@@ -208,22 +241,22 @@ const DashboardSidebar = () => {
     | { kind: "label"; title: string }
     | { kind: "separator" }
   > = [
-    { title: "Dashboard HR", url: "/hr" },
+    ...(showHRDashboard ? [{ title: "Dashboard HR", url: "/hr" }] : []),
     ...hrGroups.flatMap((g) => {
       const flat: Array<{ title: string; url: string }> = [];
       if (g.items)
         flat.push(
           ...g.items
-            .filter((i): i is { title: string; url: string } => i.url !== null)
-            .map((i) => ({ title: i.title, url: i.url }))
+            .filter((i): i is HRItem & { url: string } => i.url !== null)
+            .map((i) => ({ title: i.title, url: i.url })),
         );
       if (g.subGroups)
         g.subGroups.forEach((sg) =>
           flat.push(
             ...sg.items
-              .filter((i): i is { title: string; url: string } => i.url !== null)
-              .map((i) => ({ title: i.title, url: i.url }))
-          )
+              .filter((i): i is HRItem & { url: string } => i.url !== null)
+              .map((i) => ({ title: i.title, url: i.url })),
+          ),
         );
       return flat.length > 0
         ? ([
@@ -431,17 +464,17 @@ const DashboardSidebar = () => {
 
         {/* ── Finanzas ────────────────────────────────────────────── */}
         {canAccess("Finanzas") && (() => {
-          type FinItem = { title: string; url: string };
+          type FinItem = { title: string; url: string; submodule: string };
           type FinGroup = { label: string; icon: typeof Wallet; key: string; items: FinItem[] };
 
-          const finanzasGroups: FinGroup[] = [
+          const finanzasGroupsAll: FinGroup[] = [
             {
               label: "Operaciones",
               icon: Calculator,
               key: "fin-ops",
               items: [
-                { title: "Nómina", url: "/finanzas/nomina" },
-                { title: "Horas & Variables", url: "/finanzas/horas-variables" },
+                { title: "Nómina", url: "/finanzas/nomina", submodule: "Nómina" },
+                { title: "Horas & Variables", url: "/finanzas/horas-variables", submodule: "Horas Variables" },
               ],
             },
             {
@@ -449,8 +482,8 @@ const DashboardSidebar = () => {
               icon: FileText,
               key: "fin-fact",
               items: [
-                { title: "Invoices", url: "/finanzas/facturacion/invoices" },
-                { title: "Templates", url: "/finanzas/facturacion/templates" },
+                { title: "Invoices", url: "/finanzas/facturacion/invoices", submodule: "Invoices" },
+                { title: "Templates", url: "/finanzas/facturacion/templates", submodule: "Templates" },
               ],
             },
             {
@@ -458,8 +491,8 @@ const DashboardSidebar = () => {
               icon: BarChart3,
               key: "fin-analysis",
               items: [
-                { title: "Control Financiero", url: "/finanzas/control" },
-                { title: "Reportes Avanzados", url: "/finanzas/reportes" },
+                { title: "Control Financiero", url: "/finanzas/control", submodule: "Control Financiero" },
+                { title: "Reportes Avanzados", url: "/finanzas/reportes", submodule: "Reportes" },
               ],
             },
             {
@@ -467,15 +500,25 @@ const DashboardSidebar = () => {
               icon: Settings,
               key: "fin-config",
               items: [
-                { title: "Config. Financiera", url: "/finanzas/configuracion" },
+                { title: "Config. Financiera", url: "/finanzas/configuracion", submodule: "Configuración" },
               ],
             },
           ];
 
+          const finanzasGroups: FinGroup[] = finanzasGroupsAll
+            .map((g) => ({
+              ...g,
+              items: g.items.filter((i) => canAccess("Finanzas", i.submodule)),
+            }))
+            .filter((g) => g.items.length > 0);
+
+          const showFinDashboard = canAccess("Finanzas", "Dashboard");
+          const showFinCollections = canAccess("Finanzas", "Collections");
+
           const finFlatItems = [
-            { title: "Dashboard", url: "/finanzas" },
-            { title: "Collections", url: "/finanzas/collections" },
-            ...finanzasGroups.flatMap(g => g.items),
+            ...(showFinDashboard ? [{ title: "Dashboard", url: "/finanzas" }] : []),
+            ...(showFinCollections ? [{ title: "Collections", url: "/finanzas/collections" }] : []),
+            ...finanzasGroups.flatMap(g => g.items.map(i => ({ title: i.title, url: i.url }))),
           ];
 
           const isFinanzasActive = pathname === "/finanzas" || pathname.startsWith("/finanzas/");
@@ -519,23 +562,27 @@ const DashboardSidebar = () => {
                     </SidebarMenuItem>
                   ) : (
                     <>
-                      <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Dashboard Financiero">
-                          <NavLink to="/finanzas" end className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                            <LayoutDashboard className="h-4 w-4 shrink-0" />
-                            <span>Dashboard Financiero</span>
-                          </NavLink>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
+                      {showFinDashboard && (
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Dashboard Financiero">
+                            <NavLink to="/finanzas" end className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                              <LayoutDashboard className="h-4 w-4 shrink-0" />
+                              <span>Dashboard Financiero</span>
+                            </NavLink>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      )}
 
-                      <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="Collections">
-                          <NavLink to="/finanzas/collections" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                            <DollarSign className="h-4 w-4 shrink-0" />
-                            <span>Collections</span>
-                          </NavLink>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
+                      {showFinCollections && (
+                        <SidebarMenuItem>
+                          <SidebarMenuButton asChild tooltip="Collections">
+                            <NavLink to="/finanzas/collections" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                              <DollarSign className="h-4 w-4 shrink-0" />
+                              <span>Collections</span>
+                            </NavLink>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      )}
 
                       {finanzasGroups.map((group) => {
                         const isGroupActive = group.items.some(i => pathname === i.url || pathname.startsWith(i.url + "/"));
@@ -604,14 +651,16 @@ const DashboardSidebar = () => {
                 </SidebarMenuItem>
               ) : (
                 <>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild tooltip="Dashboard HR">
-                      <NavLink to="/hr" end className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                        <LayoutDashboard className="h-4 w-4 shrink-0" />
-                        <span>Dashboard HR</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  {showHRDashboard && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="Dashboard HR">
+                        <NavLink to="/hr" end className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                          <LayoutDashboard className="h-4 w-4 shrink-0" />
+                          <span>Dashboard HR</span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
 
                   {hrGroups.map((group) => {
                     const groupUrls = getGroupUrls(group);
