@@ -1,19 +1,8 @@
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
-
+// Thin wrapper kept for legacy callers — the real shell (Sidebar +
+// Topbar) is now provided by the parent <AppShell /> route layout, so
+// HRLayout just adds the overflow container that HR pages depend on.
 const HRLayout = ({ children }: { children: React.ReactNode }) => (
-  <SidebarProvider>
-    <div className="flex h-screen w-full overflow-hidden">
-      <DashboardSidebar />
-      <div className="flex flex-1 flex-col min-w-0">
-        <DashboardTopbar />
-        <div className="flex-1 overflow-hidden">
-          {children}
-        </div>
-      </div>
-    </div>
-  </SidebarProvider>
+  <div className="flex-1 overflow-hidden">{children}</div>
 );
 
 export default HRLayout;

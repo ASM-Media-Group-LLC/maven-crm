@@ -1,8 +1,5 @@
 import { useState, useMemo } from "react";
 import { startOfWeek, startOfToday, endOfDay, subMonths, startOfMonth as som } from "date-fns";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import SalesOverviewHeader from "./sales-overview/SalesOverviewHeader";
 import SalesKPICards from "./sales-overview/SalesKPICards";
 import SalesOperationalCards from "./sales-overview/SalesOperationalCards";
@@ -12,7 +9,6 @@ import EarningsByChannelChart from "./sales-dashboard/EarningsByChannelChart";
 import TopCreatorsTable from "./sales-overview/TopCreatorsTable";
 import { usePeriodComparison } from "./sales-overview/usePeriodComparison";
 import { useEarningsData } from "./sales-performance/useEarningsData";
-import ClariAiFab from "@/components/ClariAiFab";
 
 const SalesOverview = () => {
   const today = startOfToday();
@@ -75,12 +71,8 @@ const SalesOverview = () => {
   };
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <DashboardSidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <DashboardTopbar />
-           {!isLoading && (
+    <>
+      {!isLoading && (
             <div className="shrink-0 px-6 pt-6 pb-4 border-b bg-background">
               <SalesOverviewHeader
                 totalEarnings={comparison.totalCurrent}
@@ -117,10 +109,7 @@ const SalesOverview = () => {
               </>
             )}
           </main>
-        </div>
-      </div>
-      <ClariAiFab />
-    </SidebarProvider>
+    </>
   );
 };
 

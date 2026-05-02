@@ -1,7 +1,4 @@
 import { useState } from "react";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -93,12 +90,8 @@ const PersonalizadosPage = () => {
   ).length;
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background">
-        <DashboardSidebar />
-        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-          <DashboardTopbar />
-          <main className="flex-1 overflow-auto px-6 py-6 space-y-6">
+    <>
+      <main className="flex-1 overflow-auto px-6 py-6 space-y-6">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-semibold">Contenido Personalizado</h1>
@@ -229,13 +222,11 @@ const PersonalizadosPage = () => {
               </Table>
             </div>
           </main>
-        </div>
-      </div>
 
       <NewRequestModal open={newOpen} onOpenChange={setNewOpen} />
       <ViewRequestModal request={viewRequest} open={!!viewRequest} onOpenChange={(open) => !open && setViewRequest(null)} />
       <TrackingDrawer request={drawerRequest} open={!!drawerRequest} onOpenChange={(open) => !open && setDrawerRequest(null)} />
-    </SidebarProvider>
+    </>
   );
 };
 

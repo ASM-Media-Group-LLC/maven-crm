@@ -1,7 +1,4 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -20,12 +17,7 @@ const OnboardingWizardPage = () => {
   const handleCancel = () => navigate("/creadores/onboarding");
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <DashboardSidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <DashboardTopbar />
-          <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden">
             <div className="shrink-0 bg-background px-6 pt-4 pb-2 border-b">
               <Breadcrumb>
                 <BreadcrumbList>
@@ -67,9 +59,6 @@ const OnboardingWizardPage = () => {
               />
             </div>
           </div>
-        </div>
-      </div>
-    </SidebarProvider>
   );
 };
 

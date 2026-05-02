@@ -1,9 +1,6 @@
 import { useState, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { SidebarProvider } from "@/components/ui/sidebar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -314,15 +311,7 @@ const SuperContactProfile = () => {
   }, [id]);
 
   const shell = (children: React.ReactNode) => (
-    <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <DashboardSidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <DashboardTopbar />
-          <div className="flex flex-1 flex-col min-h-0">{children}</div>
-        </div>
-      </div>
-    </SidebarProvider>
+    <div className="flex flex-1 flex-col min-h-0">{children}</div>
   );
 
   if (isLoading) return shell(<div className="flex items-center justify-center flex-1"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>);

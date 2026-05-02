@@ -1,8 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -112,36 +109,20 @@ const OffboardingDetailPage = () => {
 
   if (isLoading) {
     return (
-      <SidebarProvider>
-        <div className="flex min-h-screen w-full">
-          <DashboardSidebar />
-          <div className="flex flex-1 flex-col">
-            <DashboardTopbar />
-            <main className="flex-1 p-6 flex items-center justify-center text-muted-foreground">
-              Cargando...
-            </main>
-          </div>
-        </div>
-      </SidebarProvider>
+      <main className="flex-1 p-6 flex items-center justify-center text-muted-foreground">
+        Cargando...
+      </main>
     );
   }
 
   if (!offboarding) {
     return (
-      <SidebarProvider>
-        <div className="flex min-h-screen w-full">
-          <DashboardSidebar />
-          <div className="flex flex-1 flex-col">
-            <DashboardTopbar />
-            <main className="flex-1 p-6 flex flex-col items-center justify-center gap-3">
-              <p className="text-muted-foreground">Offboarding no encontrado</p>
-              <Button variant="outline" onClick={() => navigate("/creadores/offboarding")}>
-                <ArrowLeft className="h-4 w-4 mr-1.5" /> Volver
-              </Button>
-            </main>
-          </div>
-        </div>
-      </SidebarProvider>
+      <main className="flex-1 p-6 flex flex-col items-center justify-center gap-3">
+        <p className="text-muted-foreground">Offboarding no encontrado</p>
+        <Button variant="outline" onClick={() => navigate("/creadores/offboarding")}>
+          <ArrowLeft className="h-4 w-4 mr-1.5" /> Volver
+        </Button>
+      </main>
     );
   }
 
@@ -240,13 +221,9 @@ ${form.comentarios || "Sin comentarios"}
   };
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <DashboardSidebar />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <DashboardTopbar />
-          {/* Sticky Header */}
-          <div className="shrink-0 sticky top-0 z-10 bg-background border-b border-border px-6 py-3 flex items-center gap-3">
+    <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Sticky Header */}
+      <div className="shrink-0 sticky top-0 z-10 bg-background border-b border-border px-6 py-3 flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate("/creadores/offboarding")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -463,9 +440,7 @@ ${form.comentarios || "Sin comentarios"}
               </Button>
             </div>
           </main>
-        </div>
-      </div>
-    </SidebarProvider>
+    </div>
   );
 };
 

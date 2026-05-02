@@ -1,9 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { startOfDay, startOfWeek, startOfMonth } from "date-fns";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { useEarningsData } from "../sales-performance/useEarningsData";
 import { usePeriodComparison } from "./usePeriodComparison";
 import { ChevronRight, TrendingDown, DollarSign, AlertTriangle } from "lucide-react";
@@ -12,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import ClariAiFab from "@/components/ClariAiFab";
 
 type Period = "Hoy" | "7 días" | "Este mes";
 const periods: Period[] = ["Hoy", "7 días", "Este mes"];
@@ -52,12 +48,7 @@ const BajandoPage = () => {
   ];
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <DashboardSidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <DashboardTopbar />
-          <main className="flex-1 overflow-auto p-6 space-y-6">
+    <main className="flex-1 overflow-auto p-6 space-y-6">
             {isLoading ? (
               <div className="p-8 text-center text-sm text-muted-foreground">Cargando datos…</div>
             ) : (
@@ -147,10 +138,6 @@ const BajandoPage = () => {
               </>
             )}
           </main>
-        </div>
-      </div>
-      <ClariAiFab />
-    </SidebarProvider>
   );
 };
 

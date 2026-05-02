@@ -1,7 +1,4 @@
 import { useState, useMemo } from "react";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, LayoutGrid, List, Shield, UserCog, Users, User, Plus } from "lucide-react";
@@ -87,12 +84,7 @@ const AdminUsuarios = () => {
   ];
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <DashboardSidebar />
-        <div className="flex-1 flex flex-col min-w-0">
-          <DashboardTopbar />
-          <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
             {/* Fixed Header */}
             <header className="bg-background px-6 pt-6 pb-4 border-b shrink-0">
               <div className="flex items-center justify-between">
@@ -273,9 +265,6 @@ const AdminUsuarios = () => {
               />
             </div>
           </main>
-        </div>
-      </div>
-    </SidebarProvider>
   );
 };
 

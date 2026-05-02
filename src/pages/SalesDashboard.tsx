@@ -1,9 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { startOfDay, endOfDay, startOfWeek, startOfMonth, subDays, format } from "date-fns";
 import { Download } from "lucide-react";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import DashboardFilters from "./sales-dashboard/DashboardFilters";
 import EarningsTrendChart from "./sales-dashboard/EarningsTrendChart";
 import EarningsByChannelChart from "./sales-dashboard/EarningsByChannelChart";
@@ -14,7 +11,6 @@ import CreatorPerformanceView from "./sales-dashboard/CreatorPerformanceView";
 import { useEarningsData } from "./sales-performance/useEarningsData";
 import { ALL_COLUMNS } from "./sales-performance/types";
 import { Button } from "@/components/ui/button";
-import ClariAiFab from "@/components/ClariAiFab";
 import type { ViewTab, TimePeriod, EarningsMode } from "./sales-dashboard/DashboardFilters";
 import type { EarningsRow } from "./sales-performance/types";
 
@@ -118,12 +114,8 @@ const SalesDashboard = () => {
   }, [filteredRows, comparedRows, rowsToCsv]);
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <DashboardSidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <DashboardTopbar />
-          <div className="shrink-0 flex items-center justify-between border-b border-border bg-background px-6 pt-6 pb-4">
+    <>
+      <div className="shrink-0 flex items-center justify-between border-b border-border bg-background px-6 pt-6 pb-4">
             <div>
               <h1 className="text-2xl font-bold text-foreground">Reporte de Ventas</h1>
               <p className="text-sm text-muted-foreground">Rendimiento de ventas y análisis por creadora</p>
@@ -164,10 +156,7 @@ const SalesDashboard = () => {
               <CreatorPerformanceView rows={filteredRows} earningsMode={earningsMode} />
             )}
           </main>
-        </div>
-      </div>
-      <ClariAiFab />
-    </SidebarProvider>
+    </>
   );
 };
 

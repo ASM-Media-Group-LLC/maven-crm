@@ -1,8 +1,5 @@
 import { useState, useMemo } from "react";
 import { startOfDay, startOfWeek, startOfMonth, subMonths, endOfDay, differenceInDays, getDaysInMonth, getDate } from "date-fns";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { useEarningsData } from "../sales-performance/useEarningsData";
 import { usePeriodComparison } from "./usePeriodComparison";
 import ComparativasHeader from "./comparativas/ComparativasHeader";
@@ -13,7 +10,6 @@ import ProyeccionCard from "./comparativas/ProyeccionCard";
 import DesgloseRevenueCard from "./comparativas/DesgloseRevenueCard";
 import RankingCards from "./comparativas/RankingCards";
 import ComparativaTable from "./comparativas/ComparativaTable";
-import ClariAiFab from "@/components/ClariAiFab";
 
 type Period = "Hoy" | "7 días" | "Este mes";
 
@@ -89,12 +85,7 @@ const ComparativasPage = () => {
   }, [allRows]);
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <DashboardSidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <DashboardTopbar />
-          <main className="flex-1 overflow-auto p-6 space-y-6">
+    <main className="flex-1 overflow-auto p-6 space-y-6">
             {isLoading ? (
               <div className="p-8 text-center text-sm text-muted-foreground">Cargando datos…</div>
             ) : (
@@ -122,11 +113,7 @@ const ComparativasPage = () => {
                 <ComparativaTable creators={comparison.creators} />
               </>
             )}
-          </main>
-        </div>
-      </div>
-      <ClariAiFab />
-    </SidebarProvider>
+    </main>
   );
 };
 

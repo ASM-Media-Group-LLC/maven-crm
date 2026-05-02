@@ -19,9 +19,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Card, CardContent } from "@/components/ui/card";
 import { PhoneInput } from "@/components/ui/phone-input";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import StartOnboardingModal from "./StartOnboardingModal";
 import {
   useProspectos, useAddProspect, useUpdateProspect, useDeleteProspect,
@@ -106,12 +103,7 @@ export default function ProspectosPage() {
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <DashboardSidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <DashboardTopbar />
-          <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
         {/* Header */}
         <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
           <div className="flex items-center justify-between gap-4">
@@ -523,8 +515,5 @@ export default function ProspectosPage() {
         {/* Start Onboarding Modal */}
         <StartOnboardingModal prospect={onboardItem} onClose={() => setOnboardItem(null)} />
       </div>
-        </div>
-      </div>
-    </SidebarProvider>
   );
 }

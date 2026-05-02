@@ -1,7 +1,4 @@
 import { useState, useCallback } from "react";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Upload, FileSpreadsheet, History } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AuditComparisonTable from "./sales-audit/AuditComparisonTable";
@@ -24,12 +21,7 @@ const SalesAudit = () => {
   }, [handleFile]);
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background">
-        <DashboardSidebar />
-        <div className="flex-1 flex flex-col w-full">
-          <DashboardTopbar />
-          <main className="flex-1 p-4 md:p-6 space-y-6 overflow-auto">
+    <main className="flex-1 p-4 md:p-6 space-y-6 overflow-auto">
             <div>
               <h1 className="text-2xl font-bold">Auditoría de Ventas</h1>
               <p className="text-sm text-muted-foreground mt-1">
@@ -94,10 +86,7 @@ const SalesAudit = () => {
                 <AuditHistory />
               </TabsContent>
             </Tabs>
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
+    </main>
   );
 };
 

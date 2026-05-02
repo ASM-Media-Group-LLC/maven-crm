@@ -1,8 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import ClariAiChat from "@/components/ClariAiChat";
 import AiChatSidebar from "@/components/AiChatSidebar";
 import { Button } from "@/components/ui/button";
@@ -58,70 +55,62 @@ const AiSales = () => {
   };
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <DashboardSidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <DashboardTopbar />
-          <main className="flex flex-1 overflow-hidden">
-            {/* Chat Sidebar */}
-            <AiChatSidebar
-              conversations={conversations}
-              activeId={activeId}
-              onSelect={setActiveId}
-              onCreate={handleCreate}
-              onDelete={handleDelete}
-              onRename={handleRename}
-            />
+    <main className="flex flex-1 overflow-hidden">
+      {/* Chat Sidebar */}
+      <AiChatSidebar
+        conversations={conversations}
+        activeId={activeId}
+        onSelect={setActiveId}
+        onCreate={handleCreate}
+        onDelete={handleDelete}
+        onRename={handleRename}
+      />
 
-            {/* Main Chat Area */}
-            <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-border bg-background px-6 py-3 shrink-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-sm font-semibold truncate">
-                    {activeConversation?.title ?? "IA Ventas"}
-                  </span>
-                  {!activeConversation && (
-                    <span className="text-xs text-muted-foreground">
-                      Asistente de ventas con IA
-                    </span>
-                  )}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 shrink-0"
-                  onClick={() => navigate("/ai-sales-config")}
-                >
-                  <Settings className="h-4 w-4" />
-                  Configuración
-                </Button>
-              </div>
-
-              {/* Chat Component */}
-              <ClariAiChat
-                key={activeId ?? "empty"}
-                mode="full"
-                conversationId={activeId}
-                onMessageSaved={handleMessageSaved}
-                onConversationTitleSet={handleTitleSet}
-                onAutoCreate={async () => {
-                  try {
-                    const conv = await createConversation.mutateAsync(undefined);
-                    setActiveId(conv.id);
-                    return conv.id;
-                  } catch {
-                    toast.error("Error al crear conversación");
-                    return null;
-                  }
-                }}
-              />
-            </div>
-          </main>
+      {/* Main Chat Area */}
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border bg-background px-6 py-3 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-semibold truncate">
+              {activeConversation?.title ?? "IA Ventas"}
+            </span>
+            {!activeConversation && (
+              <span className="text-xs text-muted-foreground">
+                Asistente de ventas con IA
+              </span>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 shrink-0"
+            onClick={() => navigate("/ai-sales-config")}
+          >
+            <Settings className="h-4 w-4" />
+            Configuración
+          </Button>
         </div>
+
+        {/* Chat Component */}
+        <ClariAiChat
+          key={activeId ?? "empty"}
+          mode="full"
+          conversationId={activeId}
+          onMessageSaved={handleMessageSaved}
+          onConversationTitleSet={handleTitleSet}
+          onAutoCreate={async () => {
+            try {
+              const conv = await createConversation.mutateAsync(undefined);
+              setActiveId(conv.id);
+              return conv.id;
+            } catch {
+              toast.error("Error al crear conversación");
+              return null;
+            }
+          }}
+        />
       </div>
-    </SidebarProvider>
+    </main>
   );
 };
 
