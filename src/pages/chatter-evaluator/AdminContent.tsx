@@ -29,6 +29,16 @@ import {
   useReorderCriteria,
   useUpdateChatterConfig,
 } from "@/hooks/useChatterEvaluator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { ChatterCriterion } from "./types";
 
 // ---------- Criteria editor ----------
@@ -40,6 +50,7 @@ const CriteriaSection = () => {
 
   const serverItems = useMemo(() => criteriaQ.data ?? [], [criteriaQ.data]);
   const [items, setItems] = useState<ChatterCriterion[]>(serverItems);
+  const [confirmDelete, setConfirmDelete] = useState<ChatterCriterion | null>(null);
   useEffect(() => setItems(serverItems), [serverItems]);
 
   const handleAdd = async () => {
@@ -93,10 +104,11 @@ const CriteriaSection = () => {
     }
   };
 
-  const handleDelete = async (c: ChatterCriterion) => {
-    if (!confirm(`¿Eliminar "${c.label}"?`)) return;
+  const handleConfirmedDelete = async () => {
+    if (!confirmDelete) return;
     try {
-      await del.mutateAsync(c.id);
+      await del.mutateAsync(confirmDelete.id);
+      setConfirmDelete(null);
       toast.success("Criterio eliminado");
     } catch (e) {
       toast.error("Error", { description: (e as Error).message });
@@ -176,7 +188,7 @@ const CriteriaSection = () => {
                           aria-label="Activo"
                         />
                         <Button
-                          onClick={() => handleDelete(c)}
+                          onClick={() => setConfirmDelete(c)}
                           size="icon"
                           variant="ghost"
                           className="h-8 w-8"
@@ -193,6 +205,33 @@ const CriteriaSection = () => {
           </Droppable>
         </DragDropContext>
       </CardContent>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar criterio</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDelete
+                ? `¿Eliminar "${confirmDelete.label}"? No se puede deshacer.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={del.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmedDelete();
+              }}
+              disabled={del.isPending}
+            >
+              {del.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };

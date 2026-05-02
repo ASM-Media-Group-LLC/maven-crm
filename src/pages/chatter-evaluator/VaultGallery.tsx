@@ -9,6 +9,16 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   AlertCircle,
   Image as ImageIcon,
   Play,
@@ -119,6 +129,7 @@ const VaultThumb = ({
 export const VaultGallery = ({ items, profileId, profileKey, editable = false }: Props) => {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [orderedItems, setOrderedItems] = useState(items);
+  const [confirmDelete, setConfirmDelete] = useState<ChatterVaultItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addMut = useAddVaultItem();
   const delMut = useDeleteVaultItem();
@@ -147,10 +158,11 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleDelete = async (item: ChatterVaultItem) => {
-    if (!confirm(`¿Eliminar "${item.name}"?`)) return;
+  const handleConfirmedDelete = async () => {
+    if (!confirmDelete) return;
     try {
-      await delMut.mutateAsync({ item });
+      await delMut.mutateAsync({ item: confirmDelete });
+      setConfirmDelete(null);
       toast.success("Item eliminado");
     } catch (e) {
       toast.error("No se pudo eliminar", { description: (e as Error).message });
@@ -221,7 +233,7 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
                         <VaultThumb
                           item={item}
                           onClick={() => setOpenIndex(i)}
-                          onDelete={() => handleDelete(item)}
+                          onDelete={() => setConfirmDelete(item)}
                           editable
                           dragHandleProps={prov.dragHandleProps ?? undefined}
                         />
@@ -270,6 +282,33 @@ export const VaultGallery = ({ items, profileId, profileKey, editable = false }:
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar item</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDelete
+                ? `¿Eliminar "${confirmDelete.name}" del vault? No se puede deshacer.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={delMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmedDelete();
+              }}
+              disabled={delMut.isPending}
+            >
+              {delMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
