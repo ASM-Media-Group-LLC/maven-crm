@@ -4,7 +4,10 @@
 -- Native Maven implementation of the standalone Roleplaychatters app.
 -- Shared resources (profiles, vault, criteria, config) are global across all
 -- examiners. Sessions / messages / evaluations are per-examiner and isolated
--- via RLS using the existing user_roles / role_permissions infrastructure.
+-- via auth.uid() in RLS. Self-contained: no dependencies on Maven's
+-- user_roles / role_permissions tables, so this migration applies cleanly to
+-- a fresh Supabase branch. App-level access control happens at the React
+-- PermissionRoute (canAccess('Chatters')).
 
 -- ----------------------------------------------------------------------------
 -- 0. PREREQ: updated_at trigger function (idempotent — already exists in prod
@@ -183,6 +186,16 @@ CREATE TABLE public.chatter_evaluations (
 -- ============================================================================
 -- ROW LEVEL SECURITY
 -- ============================================================================
+-- Self-contained RLS: does NOT depend on Maven's user_roles / role_permissions
+-- tables, so this migration applies cleanly to a fresh Supabase branch where
+-- those tables haven't been provisioned. Access control for the Chatter
+-- Evaluator UI is enforced at the React level via PermissionRoute /
+-- canAccess('Chatters'); RLS here just confirms the request is authenticated
+-- and (for per-examiner data) belongs to the right examiner.
+--
+-- Follow-up tightening: a later migration may replace the shared-table
+-- policies with role-based checks once user_roles is guaranteed to exist in
+-- the target environment.
 ALTER TABLE public.chatter_profiles          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chatter_vault_items       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chatter_criteria_defaults ENABLE ROW LEVEL SECURITY;
@@ -191,103 +204,59 @@ ALTER TABLE public.chatter_sessions          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chatter_messages          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chatter_evaluations       ENABLE ROW LEVEL SECURITY;
 
--- Helper: does the current user have access to the Chatters module?
--- Anyone with Chatters access can edit shared resources (profiles, vault,
--- criteria, config) — same flat permission model as the original
--- Roleplaychatters app where any logged-in user could edit anything.
-CREATE OR REPLACE FUNCTION public.has_chatters_access()
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT
-    -- Admin always
-    EXISTS (
-      SELECT 1 FROM public.user_roles
-      WHERE user_id = auth.uid() AND role = 'admin'
-    )
-    OR
-    -- Or has explicit Chatters module permission via role config
-    EXISTS (
-      SELECT 1
-      FROM public.user_roles ur
-      JOIN public.roles_config rc
-        ON rc.name = ur.role::text AND rc.is_active = true
-      JOIN public.role_permissions rp ON rp.role_id = rc.id
-      WHERE ur.user_id = auth.uid()
-        AND rp.module = 'Chatters'
-        AND rp.can_access = true
-    )
-$$;
-
--- ---- chatter_profiles: read for any authenticated, write for admin/manager
+-- ---- shared tables: any authenticated user reads & writes
 CREATE POLICY chatter_profiles_read ON public.chatter_profiles
   FOR SELECT TO authenticated USING (true);
 CREATE POLICY chatter_profiles_write ON public.chatter_profiles
   FOR ALL TO authenticated
-  USING (public.has_chatters_access())
-  WITH CHECK (public.has_chatters_access());
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
 
--- ---- chatter_vault_items: same pattern
 CREATE POLICY chatter_vault_read ON public.chatter_vault_items
   FOR SELECT TO authenticated USING (true);
 CREATE POLICY chatter_vault_write ON public.chatter_vault_items
   FOR ALL TO authenticated
-  USING (public.has_chatters_access())
-  WITH CHECK (public.has_chatters_access());
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
 
--- ---- chatter_criteria_defaults: same pattern
 CREATE POLICY chatter_criteria_read ON public.chatter_criteria_defaults
   FOR SELECT TO authenticated USING (true);
 CREATE POLICY chatter_criteria_write ON public.chatter_criteria_defaults
   FOR ALL TO authenticated
-  USING (public.has_chatters_access())
-  WITH CHECK (public.has_chatters_access());
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
 
--- ---- chatter_config: same pattern (read all, write admin/manager)
 CREATE POLICY chatter_config_read ON public.chatter_config
   FOR SELECT TO authenticated USING (true);
 CREATE POLICY chatter_config_write ON public.chatter_config
   FOR ALL TO authenticated
-  USING (public.has_chatters_access())
-  WITH CHECK (public.has_chatters_access());
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
 
--- ---- chatter_sessions: examiner sees own; admin sees all
+-- ---- per-examiner: chatter_sessions
 CREATE POLICY chatter_sessions_read ON public.chatter_sessions
   FOR SELECT TO authenticated
-  USING (
-    examiner_user_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin')
-  );
+  USING (examiner_user_id = auth.uid());
 CREATE POLICY chatter_sessions_insert ON public.chatter_sessions
   FOR INSERT TO authenticated
   WITH CHECK (examiner_user_id = auth.uid());
 CREATE POLICY chatter_sessions_update ON public.chatter_sessions
   FOR UPDATE TO authenticated
-  USING (
-    examiner_user_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin')
-  );
+  USING (examiner_user_id = auth.uid());
 CREATE POLICY chatter_sessions_delete ON public.chatter_sessions
   FOR DELETE TO authenticated
   USING (examiner_user_id = auth.uid());
 
--- ---- chatter_messages: tied to session ownership
+-- ---- per-examiner: chatter_messages (tied to session ownership)
 CREATE POLICY chatter_messages_read ON public.chatter_messages
   FOR SELECT TO authenticated
   USING (
     EXISTS (
       SELECT 1 FROM public.chatter_sessions s
-      WHERE s.id = session_id
-      AND (
-        s.examiner_user_id = auth.uid()
-        OR EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin')
-      )
+      WHERE s.id = session_id AND s.examiner_user_id = auth.uid()
     )
   );
-CREATE POLICY chatter_messages_write ON public.chatter_messages
+CREATE POLICY chatter_messages_insert ON public.chatter_messages
   FOR INSERT TO authenticated
   WITH CHECK (
     EXISTS (
@@ -304,13 +273,10 @@ CREATE POLICY chatter_messages_update ON public.chatter_messages
     )
   );
 
--- ---- chatter_evaluations: examiner manages own
+-- ---- per-examiner: chatter_evaluations
 CREATE POLICY chatter_evaluations_read ON public.chatter_evaluations
   FOR SELECT TO authenticated
-  USING (
-    examiner_user_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin')
-  );
+  USING (examiner_user_id = auth.uid());
 CREATE POLICY chatter_evaluations_insert ON public.chatter_evaluations
   FOR INSERT TO authenticated
   WITH CHECK (examiner_user_id = auth.uid());
