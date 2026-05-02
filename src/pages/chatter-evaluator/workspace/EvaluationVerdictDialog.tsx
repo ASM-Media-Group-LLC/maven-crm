@@ -62,6 +62,8 @@ export const EvaluationVerdictDialog = ({
 
   const criteria = criteriaQ.data ?? [];
   const filledCount = Object.values(scores).filter(Boolean).length;
+  const allFilled = filledCount === criteria.length && criteria.length > 0;
+  const missing = criteria.length - filledCount;
 
   const handleSubmit = async () => {
     if (!examinerName.trim()) {
@@ -87,6 +89,15 @@ export const EvaluationVerdictDialog = ({
 
     if (criteriaResults.length === 0) {
       toast.error("No hay criterios calificados");
+      return;
+    }
+    if (criteriaResults.length < criteria.length) {
+      toast.error(
+        `Faltan ${criteria.length - criteriaResults.length} criterio(s) por calificar`,
+        {
+          description: "Antes de enviar la evaluación, califica todos.",
+        },
+      );
       return;
     }
 
@@ -154,11 +165,11 @@ export const EvaluationVerdictDialog = ({
             <div className={`text-sm font-semibold ${badgeColor}`}>{badgeText}</div>
           </div>
 
-          {filledCount < criteria.length && (
-            <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-xs text-amber-300">
+          {missing > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-rose-500/40 bg-rose-500/5 p-2 text-xs text-rose-300">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                Hay {criteria.length - filledCount} criterio(s) sin calificar — solo se incluirán los calificados en el reporte.
+                Faltan {missing} criterio(s) por calificar. Termina de calificarlos antes de enviar la evaluación.
               </span>
             </div>
           )}
@@ -222,8 +233,14 @@ export const EvaluationVerdictDialog = ({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={submit.isPending || !verdict || !examinerName.trim()}
+            disabled={
+              submit.isPending ||
+              !verdict ||
+              !examinerName.trim() ||
+              !allFilled
+            }
             className="gap-2"
+            title={!allFilled ? "Completa todos los criterios antes de enviar" : undefined}
           >
             {submit.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             Enviar evaluación
