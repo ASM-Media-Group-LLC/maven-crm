@@ -16,6 +16,9 @@
 -- Inserting messages still goes through the chatter-public edge function
 -- (so we can enforce role='chatter' and prevent abuse). RLS for INSERT
 -- stays restricted to authenticated users.
+--
+-- Idempotent: drops the policies before recreating, so this script can be
+-- safely re-run if a prior attempt half-applied.
 
 GRANT USAGE ON SCHEMA public TO anon;
 GRANT SELECT ON public.chatter_sessions          TO anon;
@@ -25,7 +28,10 @@ GRANT SELECT ON public.chatter_config            TO anon;
 GRANT UPDATE (typing_chatter, typing_chatter_at, read_by_chatter_at)
   ON public.chatter_sessions TO anon;
 
--- ---- chatter_sessions: anon can SELECT non-ended sessions ----
+-- ---- chatter_sessions ----
+DROP POLICY IF EXISTS chatter_sessions_anon_read          ON public.chatter_sessions;
+DROP POLICY IF EXISTS chatter_sessions_anon_update_typing ON public.chatter_sessions;
+
 CREATE POLICY chatter_sessions_anon_read ON public.chatter_sessions
   FOR SELECT TO anon
   USING (status <> 'ended');
@@ -35,29 +41,39 @@ CREATE POLICY chatter_sessions_anon_update_typing ON public.chatter_sessions
   USING (status <> 'ended')
   WITH CHECK (status <> 'ended');
 
--- ---- chatter_messages: anon can SELECT messages of non-ended sessions ----
+-- ---- chatter_messages ----
+-- Note: explicit table-qualified column names so Postgres doesn't try to
+-- resolve `session_id` against the inner subquery's table.
+DROP POLICY IF EXISTS chatter_messages_anon_read ON public.chatter_messages;
+
 CREATE POLICY chatter_messages_anon_read ON public.chatter_messages
   FOR SELECT TO anon
   USING (
     EXISTS (
       SELECT 1 FROM public.chatter_sessions s
-      WHERE s.id = session_id AND s.status <> 'ended'
+      WHERE s.id = chatter_messages.session_id
+        AND s.status <> 'ended'
     )
   );
 
--- ---- chatter_profiles: anon can SELECT only profiles tied to a non-ended
---      session (prevents enumerating the whole profile catalog) ----
+-- ---- chatter_profiles ----
+-- Explicit chatter_profiles.id qualification (otherwise Postgres tries to
+-- match s.profile_id [uuid] = s.id [text from sessions] and explodes).
+DROP POLICY IF EXISTS chatter_profiles_anon_read ON public.chatter_profiles;
+
 CREATE POLICY chatter_profiles_anon_read ON public.chatter_profiles
   FOR SELECT TO anon
   USING (
     EXISTS (
       SELECT 1 FROM public.chatter_sessions s
-      WHERE s.profile_id = id AND s.status <> 'ended'
+      WHERE s.profile_id = chatter_profiles.id
+        AND s.status <> 'ended'
     )
   );
 
--- ---- chatter_config: anon can SELECT (only public-facing fields matter
---      to the chatter view: fan_name + fan_avatar_url) ----
+-- ---- chatter_config ----
+DROP POLICY IF EXISTS chatter_config_anon_read ON public.chatter_config;
+
 CREATE POLICY chatter_config_anon_read ON public.chatter_config
   FOR SELECT TO anon USING (true);
 
