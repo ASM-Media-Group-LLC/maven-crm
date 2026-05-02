@@ -86,10 +86,8 @@ function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
 
-    // 1) Email
-    var emailResult = sendMavenEmail(body);
-
-    // 2) Drive Doc (optional)
+    // 1) Drive Doc first (so we can include its URL in the email).
+    //    The doc is shared with all email recipients as Viewers.
     var docUrl = null;
     if (CONFIG.DRIVE_FOLDER_ID) {
       try {
@@ -98,6 +96,9 @@ function doPost(e) {
         Logger.log("createChatDoc failed: " + err.message);
       }
     }
+
+    // 2) Email (includes the doc link if available)
+    var emailResult = sendMavenEmail(body, docUrl);
 
     // 3) Sheet (optional)
     if (CONFIG.SHEET_ID) {
@@ -137,7 +138,7 @@ function doGet() {
 // ═══════════════════════════════════════════════════════════════════════════
 // Email
 // ═══════════════════════════════════════════════════════════════════════════
-function sendMavenEmail(body) {
+function sendMavenEmail(body, docUrl) {
   var recipients = body.emails || [];
   if (!recipients.length) {
     throw new Error("no recipients in payload (config.notification_emails empty?)");
@@ -147,10 +148,10 @@ function sendMavenEmail(body) {
     body.verdictLabel + ": " + body.chatterName +
     " (" + body.scorePct + "%)";
 
-  var html = renderEmailHtml(body);
+  var html = renderEmailHtml(body, docUrl);
 
-  // Send a single email with everyone in `to` (so they see each other) or
-  // loop and send individually. Loop keeps things private; let's loop.
+  // Loop and send individually so each recipient sees only their own
+  // address in the To: header.
   for (var i = 0; i < recipients.length; i++) {
     MailApp.sendEmail({
       to: recipients[i],
@@ -163,7 +164,7 @@ function sendMavenEmail(body) {
   return { recipients: recipients };
 }
 
-function renderEmailHtml(body) {
+function renderEmailHtml(body, docUrl) {
   var verdictColor = body.verdict === "apto" ? COLORS.pass : COLORS.fail;
   var badgeColor =
     body.scorePct >= 80 ? COLORS.pass :
@@ -241,7 +242,12 @@ function renderEmailHtml(body) {
 
           // Footer
           '<tr><td style="padding:18px 32px 28px;">' +
-            '<div style="font-size:12px;color:' + COLORS.muted + ';">' + historyCount + ' mensaje(s) intercambiados durante la sesión.</div>' +
+            '<div style="font-size:12px;color:' + COLORS.muted + ';">' +
+              historyCount + ' mensaje(s) intercambiados durante la sesión.' +
+              (docUrl
+                ? ' <a href="' + escapeHtml(docUrl) + '" style="color:' + COLORS.primary + ';font-weight:600;text-decoration:none;">Ver chat completo en Drive →</a>'
+                : "") +
+            '</div>' +
             '<div style="font-size:11px;color:#9ca3af;margin-top:14px;padding-top:14px;border-top:1px solid #f3f4f6;">' +
               'Maven CRM — Chatter Evaluator · Notificación automática.<br/>' +
               'Sesión <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;">' + escapeHtml(body.sessionId) + '</code> · evaluación ' +
@@ -264,6 +270,28 @@ function createChatDoc(body) {
   var docFile = DriveApp.getFileById(doc.getId());
   folder.addFile(docFile);
   DriveApp.getRootFolder().removeFile(docFile);
+
+  // Share the doc with the email recipients as Viewers, so the link in
+  // the email actually opens for them. We use addViewer per recipient
+  // (instead of ANYONE_WITH_LINK) so the doc stays auditable.
+  // Falls back to ANYONE_WITH_LINK if any addViewer call fails (e.g.,
+  // recipient doesn't have a Google account).
+  try {
+    (body.emails || []).forEach(function (email) {
+      try {
+        docFile.addViewer(email);
+      } catch (e) {
+        Logger.log("addViewer failed for " + email + ": " + e.message);
+      }
+    });
+  } catch (e) {
+    Logger.log("share loop error: " + e.message);
+    try {
+      docFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (e2) {
+      Logger.log("fallback ANYONE_WITH_LINK failed: " + e2.message);
+    }
+  }
 
   var b = doc.getBody();
 
@@ -391,5 +419,5 @@ function testEmail() {
     feedback: "Muy buen tono general, mejorar el cierre de la conversación con más empatía.",
     chatHistory: [],
     emails: [Session.getActiveUser().getEmail()],
-  });
+  }, "https://docs.google.com/document/d/EXAMPLE_TEST_DOC_ID/edit");
 }
