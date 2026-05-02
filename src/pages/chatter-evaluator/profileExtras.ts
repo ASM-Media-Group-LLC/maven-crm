@@ -2,8 +2,13 @@ import type { ChatterProfile } from "./types";
 
 // Both the profile editor and the public/examiner panel need to agree on
 // where "user-defined" extras live. We stash them inside the profile's
-// `extra_fields` JSONB column under reserved keys (prefixed `__`) so the
-// debug "Campos adicionales" view in ProfileDetailContent skips them.
+// `extra_fields` JSONB column under reserved keys (prefixed `__`).
+//
+// Legacy imports from Roleplaychatters / Lovable left arbitrary loose
+// key/value pairs in `extra_fields` (e.g. `fetiches` + `fetiches_en`).
+// We surface those automatically as custom sections so the user sees
+// them as proper editable cards instead of a raw JSON dump, and on the
+// next save we strip the loose keys so the storage shape converges.
 
 const KEY_LABELS = "__labelOverrides";
 const KEY_SECTIONS = "__customSections";
@@ -29,24 +34,95 @@ export const getLabelOverrides = (profile: ChatterProfile | null | undefined): L
   return raw as LabelOverrides;
 };
 
+const titleCase = (s: string) =>
+  s
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+
+const englishTitleCase = (s: string) =>
+  s.replace(/_en$/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+
+/** Convert legacy loose key/value pairs in `extra_fields` (left over from
+ * the Roleplaychatters import) into custom sections. Pairs `foo` with
+ * `foo_en` when both exist; otherwise treats the lone key as ES. */
+const legacyFieldsToSections = (
+  extra: Record<string, unknown>,
+): CustomSection[] => {
+  const sections: CustomSection[] = [];
+  const handled = new Set<string>();
+
+  for (const key of Object.keys(extra)) {
+    if (key.startsWith("__")) continue;          // reserved (our own keys)
+    if (handled.has(key)) continue;
+
+    const isEn = key.endsWith("_en");
+    const baseKey = isEn ? key.slice(0, -3) : key;
+    const enKey = `${baseKey}_en`;
+
+    // Skip if base key exists — we'll process it (and pull this _en in)
+    // when we hit the base.
+    if (isEn && Object.prototype.hasOwnProperty.call(extra, baseKey)) {
+      continue;
+    }
+
+    handled.add(baseKey);
+    handled.add(enKey);
+
+    const esVal = extra[baseKey];
+    const enVal = extra[enKey];
+
+    sections.push({
+      id: `legacy:${baseKey}`,
+      title: titleCase(baseKey),
+      title_en: englishTitleCase(baseKey),
+      value: typeof esVal === "string" ? esVal : esVal == null ? "" : String(esVal),
+      value_en: typeof enVal === "string" ? enVal : enVal == null ? "" : String(enVal),
+    });
+  }
+
+  return sections;
+};
+
 export const getCustomSections = (profile: ChatterProfile | null | undefined): CustomSection[] => {
-  const raw = profile?.extra_fields?.[KEY_SECTIONS];
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (s): s is CustomSection =>
-      !!s && typeof s === "object" && typeof s.id === "string"
+  const extra = profile?.extra_fields ?? {};
+  const raw = extra[KEY_SECTIONS];
+  const explicit = Array.isArray(raw)
+    ? raw.filter(
+        (s): s is CustomSection =>
+          !!s && typeof s === "object" && typeof s.id === "string",
+      )
+    : [];
+
+  // Skip legacy migration for any title already represented in the
+  // explicit list (case-insensitive) so the user can't see duplicates
+  // after one save round-trip.
+  const knownTitles = new Set(
+    explicit.flatMap((s) => [s.title?.toLowerCase(), s.title_en?.toLowerCase()].filter(Boolean)),
   );
+  const legacy = legacyFieldsToSections(extra).filter(
+    (s) => !knownTitles.has(s.title.toLowerCase()) && !knownTitles.has(s.title_en.toLowerCase()),
+  );
+
+  return [...explicit, ...legacy];
 };
 
 /** Build the value to write back into `extra_fields` from current state.
- * Preserves any other keys already present (legacy import metadata, etc). */
+ * Drops legacy loose keys so the storage shape converges to just the
+ * reserved __* keys, and our custom sections become the source of truth. */
 export const mergeExtras = (
   base: Record<string, unknown> | null | undefined,
   labelOverrides: LabelOverrides,
   customSections: CustomSection[],
 ): Record<string, unknown> => {
-  const next: Record<string, unknown> = { ...(base ?? {}) };
-  // Drop empty entries so we don't bloat the JSON
+  const next: Record<string, unknown> = {};
+  // Preserve only reserved (`__*`) keys from the base — drop the legacy
+  // loose keys (fetiches, dick_rating, …) since they're now stored
+  // inside __customSections instead.
+  for (const [k, v] of Object.entries(base ?? {})) {
+    if (k.startsWith("__")) next[k] = v;
+  }
+
   const cleanLabels: LabelOverrides = {};
   for (const [k, v] of Object.entries(labelOverrides)) {
     if (v && (v.es?.trim() || v.en?.trim())) cleanLabels[k] = v;
