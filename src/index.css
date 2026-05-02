@@ -429,3 +429,12 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   20%  { opacity: 1;   transform: scale(1.2)  rotate(30deg)  translateY(0); }
   100% { opacity: 0;   transform: scale(0.8)  rotate(180deg) translateY(40px); }
 }
+
+/* Indeterminate progress bar shown by App.tsx's Suspense fallback while
+   a lazy route chunk downloads. Sits as a thin strip at the top of the
+   viewport so the previous page stays visible underneath. */
+@keyframes loading-bar {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(140%); }
+  100% { transform: translateX(140%); }
+}

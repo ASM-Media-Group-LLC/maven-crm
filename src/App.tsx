@@ -160,16 +160,32 @@ const HorasVariablesPage = lazy(() => import("./pages/finanzas/horas-variables/H
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60_000,
-      refetchOnWindowFocus: true,
+      // Bumped from 60s to 5min: most app data (user profile, permissions,
+      // sidebar counts, tab badges) doesn't need to refetch on every nav.
+      // The pages that DO want fresher data already pass their own
+      // staleTime/refetchInterval.
+      staleTime: 5 * 60_000,
+      // Bumped from default (5min) to 30min so cached queries survive a
+      // few nav round-trips — switching to a tab and back instantly
+      // re-uses the data instead of triggering a "loading" state.
+      gcTime: 30 * 60_000,
+      // Was true. Every time the user came back to the tab the entire
+      // app's queries refired, which is a big chunk of the "feels like a
+      // full reload" perception. Pages that want fresh-on-focus opt in
+      // explicitly via their own useQuery options.
+      refetchOnWindowFocus: false,
       retry: 1,
     },
   },
 });
 
+// Subtle loading bar while a lazy chunk downloads. The previous full-
+// screen spinner blanked everything (sidebar, topbar, content) and made
+// every nav feel like a hard reload. This sits as a thin progress strip
+// at the top so the previous page stays visible underneath.
 const LoadingFallback = () => (
-  <div className="flex items-center justify-center min-h-screen bg-background">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+  <div className="fixed inset-x-0 top-0 z-[100] h-0.5 overflow-hidden">
+    <div className="h-full w-1/3 animate-[loading-bar_1.2s_ease-in-out_infinite] bg-primary" />
   </div>
 );
 
