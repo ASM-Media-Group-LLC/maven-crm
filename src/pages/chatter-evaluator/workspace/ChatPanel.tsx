@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/popover";
 import { EmojiBar, DEFAULT_EMOJIS } from "./EmojiBar";
 import { VolumeControl, getSoundVolume } from "./VolumeControl";
+import { MediaViewer } from "./MediaViewer";
 import { useUpdateChatterConfig } from "@/hooks/useChatterEvaluator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +37,7 @@ const MessageBubble = ({
   fanAvatar,
   profile,
   readByOther,
+  onOpenMedia,
 }: {
   msg: ChatterMessage;
   fanName: string;
@@ -44,6 +46,7 @@ const MessageBubble = ({
   /** ISO timestamp of when the OTHER side last read messages, or null. Used
    *  to show single vs. double check on the examiner's own messages. */
   readByOther: string | null;
+  onOpenMedia: (url: string) => void;
 }) => {
   if (msg.deleted === "full") return null;
 
@@ -105,8 +108,12 @@ const MessageBubble = ({
                   key={i}
                   src={url}
                   alt=""
-                  className="rounded"
+                  className="cursor-zoom-in rounded transition-opacity hover:opacity-90"
                   loading="lazy"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenMedia(url);
+                  }}
                 />
               ))}
             </div>
@@ -205,6 +212,7 @@ export const ChatPanel = ({ session }: Props) => {
   const [uploading, setUploading] = useState(false);
   const lastMessageIdRef = useRef<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const updateConfigMut = useUpdateChatterConfig();
   const examinerEmojis =
     configQ.data?.examiner_emojis && configQ.data.examiner_emojis.length > 0
@@ -334,21 +342,36 @@ export const ChatPanel = ({ session }: Props) => {
     }
   };
 
-  // Mark messages as read by examiner whenever new chatter messages appear
+  // Mark messages as read by examiner — but only when the tab is actually
+  // visible AND the window has focus. Otherwise the chatter would see a
+  // double check even though the examiner has the tab in the background.
+  // Mirrors the original _isLooking() guard (index.html line 2456).
   useEffect(() => {
     if (!session) return;
-    const msgs = messagesQ.data ?? [];
-    const hasUnread = msgs.some(
-      (m) =>
-        m.role === "chatter" &&
-        (!session.read_by_examiner_at ||
-          new Date(m.created_at) > new Date(session.read_by_examiner_at)),
-    );
-    if (!hasUnread) return;
-    void supabase
-      .from("chatter_sessions" as never)
-      .update({ read_by_examiner_at: new Date().toISOString() } as never)
-      .eq("id", session.id as never);
+    const sid = session.id;
+    const markIfLooking = () => {
+      if (document.hidden || !document.hasFocus()) return;
+      // Re-check unread inside the listener so focus-gained also flushes.
+      const msgs = messagesQ.data ?? [];
+      const hasUnread = msgs.some(
+        (m) =>
+          m.role === "chatter" &&
+          (!session.read_by_examiner_at ||
+            new Date(m.created_at) > new Date(session.read_by_examiner_at)),
+      );
+      if (!hasUnread) return;
+      void supabase
+        .from("chatter_sessions" as never)
+        .update({ read_by_examiner_at: new Date().toISOString() } as never)
+        .eq("id", sid as never);
+    };
+    markIfLooking();
+    document.addEventListener("visibilitychange", markIfLooking);
+    window.addEventListener("focus", markIfLooking);
+    return () => {
+      document.removeEventListener("visibilitychange", markIfLooking);
+      window.removeEventListener("focus", markIfLooking);
+    };
   }, [messagesQ.data, session]);
 
   const handleFileUpload = async (file: File) => {
@@ -506,6 +529,7 @@ export const ChatPanel = ({ session }: Props) => {
             fanAvatar={fanAvatar}
             profile={profile}
             readByOther={session?.read_by_chatter_at ?? null}
+            onOpenMedia={(url) => setMediaUrl(url)}
           />
         ))}
       </div>
@@ -604,6 +628,8 @@ export const ChatPanel = ({ session }: Props) => {
           </Button>
         </div>
       </div>
+
+      <MediaViewer url={mediaUrl} onClose={() => setMediaUrl(null)} />
     </div>
   );
 };

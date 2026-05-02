@@ -4,6 +4,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Clock, Check, CheckCheck } from "lucide-react";
 import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { VolumeControl, getSoundVolume } from "@/pages/chatter-evaluator/workspace/VolumeControl";
+import { MediaViewer } from "@/pages/chatter-evaluator/workspace/MediaViewer";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -61,9 +62,10 @@ interface BubbleProps {
   /** ISO timestamp of when the OTHER side last read messages, or null. Used
    *  to render single vs. double check on the chatter's own messages. */
   readByOther: string | null;
+  onOpenMedia: (url: string) => void;
 }
 
-const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther }: BubbleProps) => {
+const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMedia }: BubbleProps) => {
   if (msg.deleted === "full") return null;
 
   if (msg.role === "system") {
@@ -121,7 +123,17 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther }: BubbleP
           {msg.images && msg.images.length > 0 && (
             <div className="mt-1 grid grid-cols-2 gap-1">
               {msg.images.map((url, i) => (
-                <img key={i} src={url} alt="" className="rounded" loading="lazy" />
+                <img
+                  key={i}
+                  src={url}
+                  alt=""
+                  className="cursor-zoom-in rounded transition-opacity hover:opacity-90"
+                  loading="lazy"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenMedia(url);
+                  }}
+                />
               ))}
             </div>
           )}
@@ -218,6 +230,7 @@ const ChatterPublicView = () => {
   // Chatter-side emojis live in memory only (matches the original
   // Roleplaychatters behavior — they reset to DEFAULT_EMOJIS on reload).
   const [chatterEmojis, setChatterEmojis] = useState<string[]>([...DEFAULT_EMOJIS]);
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const lastMessageIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -379,10 +392,24 @@ const ChatterPublicView = () => {
     if (last.role === "fan") playPing();
   }, [messagesQ.data]);
 
-  // Mark messages as read on focus / new examiner messages
+  // Mark messages as read — but ONLY when the chatter is actually looking
+  // at the tab (matches the original Roleplaychatters _isLooking() check at
+  // index.html line 2456). Otherwise the examiner sees the double check
+  // even when the chatter never opened the link, which is misleading.
   useEffect(() => {
     if (!sessionId || !claimed) return;
-    callChatterApi("mark-read", { sessionId }).catch(() => {});
+    const isLooking = () => !document.hidden && document.hasFocus();
+    const tryMark = () => {
+      if (!isLooking()) return;
+      callChatterApi("mark-read", { sessionId }).catch(() => {});
+    };
+    tryMark();
+    document.addEventListener("visibilitychange", tryMark);
+    window.addEventListener("focus", tryMark);
+    return () => {
+      document.removeEventListener("visibilitychange", tryMark);
+      window.removeEventListener("focus", tryMark);
+    };
   }, [messagesQ.data, sessionId, claimed]);
 
   const sendMut = useMutation({
@@ -580,6 +607,7 @@ const ChatterPublicView = () => {
               profile={profile}
               side="chatter"
               readByOther={session.read_by_examiner_at ?? null}
+              onOpenMedia={(url) => setMediaUrl(url)}
             />
           ))}
         </div>
@@ -668,6 +696,8 @@ const ChatterPublicView = () => {
         }}
         sending={sendVaultItemMut.isPending}
       />
+
+      <MediaViewer url={mediaUrl} onClose={() => setMediaUrl(null)} />
     </div>
   );
 };
