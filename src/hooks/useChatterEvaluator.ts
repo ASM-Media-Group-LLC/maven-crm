@@ -531,47 +531,6 @@ export type SubmitEvaluationInput = {
   scorePct: number;
 };
 
-const buildAppsScriptPayload = (params: {
-  evaluation: ChatterEvaluation;
-  session: ChatterSession;
-  profile: ChatterProfile | null;
-  messages: ChatterMessage[];
-  fanName: string;
-  emails: string[];
-}) => {
-  const { evaluation, session, profile, messages, fanName, emails } = params;
-  return {
-    chatterName: session.chatter_name,
-    modelName: profile?.name ?? session.profile_id,
-    examinerName: evaluation.examiner_name ?? "(unnamed)",
-    verdict: evaluation.verdict === "apto" ? "APTO" : "NO APTO",
-    score: evaluation.score_pct ?? 0,
-    total: evaluation.criteria_results.length,
-    percentage: evaluation.score_pct ?? 0,
-    badge:
-      (evaluation.score_pct ?? 0) >= 80 ? "APROBADO" :
-      (evaluation.score_pct ?? 0) >= 50 ? "A CRITERIO" : "NO APTO",
-    criteria: evaluation.criteria_results.map((c) => ({
-      label: c.label,
-      status:
-        c.status === "pass" ? "Cumple" :
-        c.status === "partial" ? "Parcial" : "No cumple",
-    })),
-    feedback: evaluation.feedback ?? "",
-    chatHistory: messages.map((m) => ({
-      role: m.role,
-      type: m.msg_type,
-      content: m.content,
-      price: m.price,
-      timestamp: m.created_at,
-      from: m.role === "fan" ? fanName : m.role === "chatter" ? session.chatter_name : "system",
-    })),
-    emails,
-    sessionId: session.id,
-    createdAt: evaluation.created_at,
-  };
-};
-
 export const useSubmitEvaluation = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -609,12 +568,15 @@ export const useSubmitEvaluation = () => {
         .update({ status: "ended", ended_at: new Date().toISOString() })
         .eq("id", input.sessionId);
 
-      // 3) Best-effort POST to Apps Script webhook (don't block on failure)
+      // 3) Send Maven-branded email via our own edge function. Replaces the
+      //    Apps Script email step entirely (Apps Script can keep being
+      //    invoked elsewhere for the Drive doc + Sheet log, but the email
+      //    branding now lives in Maven). On failure the evaluation is still
+      //    saved; the hook returns the error string for the UI toast.
       let webhookOk = false;
       let webhookError: string | undefined;
       try {
-        const [{ data: cfg }, { data: ses }, { data: msgs }] = await Promise.all([
-          sb.from("chatter_config").select("*").eq("id", 1).maybeSingle(),
+        const [{ data: ses }, { data: msgs }] = await Promise.all([
           sb.from("chatter_sessions").select("*").eq("id", input.sessionId).maybeSingle(),
           sb
             .from("chatter_messages")
@@ -623,51 +585,44 @@ export const useSubmitEvaluation = () => {
             .order("created_at", { ascending: true }),
         ]);
         const session = ses as ChatterSession | null;
-        const config = cfg as ChatterConfig | null;
         const messages = (msgs ?? []) as ChatterMessage[];
-
         if (!session) throw new Error("session disappeared mid-submit");
-        if (!config?.apps_script_url) {
-          webhookError = "apps_script_url is not configured";
+
+        const { data: prof } = await sb
+          .from("chatter_profiles")
+          .select("*")
+          .eq("id", session.profile_id)
+          .maybeSingle();
+
+        const emailPayload = {
+          evaluationId: evaluation.id,
+          sessionId: session.id,
+          chatterName: session.chatter_name,
+          modelName: (prof as ChatterProfile | null)?.name ?? session.profile_id,
+          examinerName: evaluation.examiner_name ?? "(unnamed)",
+          verdict: evaluation.verdict,
+          scorePct: evaluation.score_pct ?? 0,
+          criteria: evaluation.criteria_results,
+          feedback: evaluation.feedback ?? "",
+          chatHistorySize: messages.length,
+        };
+
+        const { data: invokeData, error: invokeErr } = await supabase.functions.invoke(
+          "chatter-send-evaluation-email",
+          { body: emailPayload },
+        );
+        if (invokeErr) throw invokeErr;
+        if (!invokeData?.ok) {
+          webhookError = invokeData?.error ?? "edge function returned !ok";
         } else {
-          const { data: prof } = await sb
-            .from("chatter_profiles")
-            .select("*")
-            .eq("id", session.profile_id)
-            .maybeSingle();
-
-          const payload = buildAppsScriptPayload({
-            evaluation,
-            session,
-            profile: (prof as ChatterProfile | null) ?? null,
-            messages,
-            fanName: config.fan_name ?? "JavixBuster",
-            emails: config.notification_emails ?? [],
-          });
-
-          // Send as text/plain instead of application/json so the browser
-          // skips the CORS preflight. Google Apps Script web apps do not
-          // handle OPTIONS preflight by default; they happily read the body
-          // via e.postData.contents regardless of Content-Type.
-          const res = await fetch(config.apps_script_url, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(payload),
-            redirect: "follow",
-          });
-          if (!res.ok) {
-            webhookError = `webhook HTTP ${res.status}`;
-          } else {
-            webhookOk = true;
-            // Mark evaluation as sent
-            await sb
-              .from("chatter_evaluations")
-              .update({
-                sent_to_apps_script: true,
-                sent_at: new Date().toISOString(),
-              })
-              .eq("id", evaluation.id);
-          }
+          webhookOk = true;
+          await sb
+            .from("chatter_evaluations")
+            .update({
+              sent_to_apps_script: true,
+              sent_at: new Date().toISOString(),
+            })
+            .eq("id", evaluation.id);
         }
       } catch (e) {
         webhookError = (e as Error).message;
