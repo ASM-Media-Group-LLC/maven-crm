@@ -6,6 +6,7 @@ import type {
   ChatterCriterion,
   ChatterConfig,
   ChatterSession,
+  ChatterMessage,
 } from "@/pages/chatter-evaluator/types";
 
 // The chatter_* tables aren't in the generated Supabase types yet, so we use
@@ -138,6 +139,34 @@ const sanitizeFilename = (name: string): string =>
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80) || `item-${Date.now()}`;
+
+// Upload an avatar image for a profile to Storage and return its public URL.
+// Uses _avatars/ prefix in the same chatter-vault bucket so we keep one bucket.
+export const useUploadChatterAvatar = () =>
+  useMutation({
+    mutationFn: async ({
+      profileKey,
+      file,
+    }: {
+      profileKey: string;
+      file: File;
+    }): Promise<{ url: string; path: string }> => {
+      if (!file.type.startsWith("image/")) {
+        throw new Error("El archivo debe ser una imagen.");
+      }
+      const path = `_avatars/${profileKey}-${Date.now()}-${sanitizeFilename(file.name)}`;
+      const { error: upErr } = await supabase.storage
+        .from(VAULT_BUCKET)
+        .upload(path, file, {
+          upsert: false,
+          contentType: file.type,
+          cacheControl: "3600",
+        });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from(VAULT_BUCKET).getPublicUrl(path);
+      return { url: pub.publicUrl, path };
+    },
+  });
 
 export const useAddVaultItem = () => {
   const qc = useQueryClient();
@@ -431,6 +460,60 @@ export const useEndChatterSession = () => {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
+  });
+};
+
+// ---- Messages (used by chat panel; realtime wiring is Phase 4) ----------
+
+export const useChatterMessages = (sessionId: string | null | undefined) =>
+  useQuery({
+    queryKey: ["chatter-messages", sessionId],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<ChatterMessage[]> => {
+      const { data, error } = await sb
+        .from("chatter_messages")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as ChatterMessage[];
+    },
+  });
+
+export type SendMessageInput = {
+  sessionId: string;
+  role: "fan" | "chatter" | "system";
+  msgType?: "message" | "tip" | "purchase" | "notice";
+  content?: string | null;
+  price?: number | null;
+  images?: string[];
+  fromExaminer?: boolean;
+};
+
+export const useSendChatterMessage = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: SendMessageInput): Promise<ChatterMessage> => {
+      const row = {
+        session_id: input.sessionId,
+        role: input.role,
+        msg_type: input.msgType ?? "message",
+        content: input.content ?? null,
+        price: input.price ?? null,
+        images: input.images ?? [],
+        from_examiner: input.fromExaminer ?? false,
+      };
+      const { data, error } = await sb
+        .from("chatter_messages")
+        .insert(row)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ChatterMessage;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["chatter-messages", vars.sessionId] });
+    },
   });
 };
 
