@@ -7,7 +7,6 @@ import { VolumeControl, getSoundVolume } from "@/pages/chatter-evaluator/workspa
 import { MediaViewer } from "@/pages/chatter-evaluator/workspace/MediaViewer";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -216,6 +215,96 @@ const formatRemaining = (ms: number): string => {
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+};
+
+// Right-rail character info — mirrors index.html ~line 2542 in the original:
+// avatar, name, meta, then a stack of labelled note items (greeting, body,
+// nudity, anal, collabs, videocalls, custom, prices, extra). Anything blank
+// is hidden so admins who only fill some fields don't see "—" everywhere.
+const InfoNote = ({ label, value, tone }: { label: string; value: string | null | undefined; tone?: "gold" | "warning" }) => {
+  if (!value) return null;
+  const valueClass =
+    tone === "gold"
+      ? "text-sm font-semibold text-amber-500"
+      : tone === "warning"
+      ? "rounded-md bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-400"
+      : "text-sm text-foreground";
+  return (
+    <div className="mb-3.5">
+      <div className="mb-1 font-mono text-[9px] uppercase tracking-wider text-amber-500/80">
+        {label}
+      </div>
+      <div className={valueClass}>{value}</div>
+    </div>
+  );
+};
+
+const CharacterInfoPanel = ({ profile }: { profile: ChatterProfile }) => {
+  const meta = [
+    profile.nationality,
+    profile.location ? `📍 ${profile.location}` : null,
+    profile.age ? `${profile.age}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <>
+      <div className="border-b p-6 text-center">
+        <div className="mx-auto mb-4 aspect-square h-[90px] w-[90px] overflow-hidden rounded-full bg-gradient-to-br from-purple-600 to-amber-500">
+          {profile.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt={profile.name}
+              className="h-full w-full object-cover"
+              style={{
+                objectPosition: `${profile.avatar_x ?? 50}% ${profile.avatar_y ?? 50}%`,
+                transform: `scale(${(profile.avatar_zoom ?? 100) / 100})`,
+              }}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-3xl font-bold text-white">
+              {profile.name[0]}
+            </div>
+          )}
+        </div>
+        <div className="text-xl font-bold">{profile.name}</div>
+        {meta && <div className="mt-1.5 text-xs text-muted-foreground">{meta}</div>}
+      </div>
+      <div className="p-4">
+        <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-amber-500">
+          Información del personaje
+        </div>
+        <InfoNote label="Cómo llamar al usuario" value={profile.users_term} />
+        <InfoNote label="Saludo inicial" value={profile.greeting} />
+        <div className="my-4 h-px bg-border" />
+        <InfoNote label="Cuerpo / términos" value={profile.body} />
+        <InfoNote label="Desnudos" value={profile.nudity} />
+        <InfoNote label="Anal" value={profile.anal} />
+        <InfoNote label="Colaboraciones" value={profile.collabs} />
+        <div className="my-4 h-px bg-border" />
+        <InfoNote label="Videollamadas" value={profile.videocall} />
+        <InfoNote label="Personalizados" value={profile.custom} />
+        {profile.prices && Object.keys(profile.prices).length > 0 && (
+          <>
+            <div className="my-4 h-px bg-border" />
+            <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-amber-500">
+              Precios
+            </div>
+            {Object.entries(profile.prices).map(([k, v]) => (
+              <InfoNote key={k} label={k} value={v} tone="gold" />
+            ))}
+          </>
+        )}
+        {profile.extra && (
+          <>
+            <div className="my-4 h-px bg-border" />
+            <InfoNote label="Importante" value={profile.extra} tone="warning" />
+          </>
+        )}
+      </div>
+    </>
+  );
 };
 
 const ChatterPublicView = () => {
@@ -533,150 +622,187 @@ const ChatterPublicView = () => {
 
   const examinerTyping = session.typing_fan;
 
+  // Countdown shared across the left timer and any other display.
+  const startMs = session.started_at
+    ? new Date(session.started_at).getTime()
+    : new Date(session.created_at).getTime();
+  const remainingMs = startMs + session.duration_minutes * 60_000 - now;
+  const timerLow = remainingMs > 0 && remainingMs < 5 * 60_000;
+  const timerExpired = remainingMs <= 0;
+
   return (
-    <div className="flex h-screen flex-col bg-background">
-      {/* Header */}
-      <header className="border-b bg-gradient-to-r from-purple-700 to-indigo-700 px-4 py-3 text-white shadow">
-        <div className="mx-auto flex max-w-2xl items-center gap-3">
-          <div className="aspect-square h-11 w-11 overflow-hidden rounded-full bg-white/20">
-            {fanAvatar && (
-              <img src={fanAvatar} alt={fanName} className="h-full w-full object-cover" />
-            )}
+    // Three-column layout (matches the original Roleplaychatters chatter view,
+    // index.html ~line 2497). Left = conversations + timer, center = chat,
+    // right = full character info. Stacks below md so it stays usable on
+    // narrow screens.
+    <div className="flex h-screen flex-col bg-background md:flex-row">
+      {/* LEFT — conversations + timer */}
+      <aside className="hidden w-[260px] shrink-0 flex-col border-r bg-card md:flex">
+        <div className="border-b p-5">
+          <div className="mb-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            Conversaciones
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold">{fanName}</div>
-            <div className="truncate text-[11px] opacity-80">
-              {session.status === "waiting" ? "esperando primer mensaje" : "en línea"}
-              {examinerTyping ? " · escribiendo…" : ""}
+          <div className="flex items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+            <div className="aspect-square h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-purple-600 to-amber-500">
+              {fanAvatar && (
+                <img src={fanAvatar} alt={fanName} className="h-full w-full object-cover" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-bold">{fanName}</div>
+              <div className="flex items-center gap-1.5 text-[11px] text-emerald-500">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                en línea
+              </div>
             </div>
           </div>
-          {(() => {
-            const startMs = session.started_at
-              ? new Date(session.started_at).getTime()
-              : new Date(session.created_at).getTime();
-            const remaining = startMs + session.duration_minutes * 60_000 - now;
-            const isLow = remaining > 0 && remaining < 5 * 60_000;
-            return (
-              <div
-                className={`flex items-center gap-1 rounded-md bg-black/20 px-2 py-1 font-mono text-xs ${
-                  remaining <= 0 ? "text-rose-200" : isLow ? "text-amber-200" : ""
-                }`}
-                title="Tiempo restante"
-              >
-                <Clock className="h-3 w-3" />
-                {formatRemaining(remaining)}
-              </div>
-            );
-          })()}
-          {/* Volume control matches the original Roleplaychatters chatter
-              header layout (icon button + slider, persisted). */}
-          <VolumeControl onDark />
         </div>
-      </header>
+        <div className="flex-1 p-5">
+          <div
+            className={`rounded-xl bg-muted p-4 text-center font-mono text-3xl font-bold ${
+              timerExpired ? "text-rose-500" : timerLow ? "text-amber-400" : "text-amber-500"
+            }`}
+          >
+            {formatRemaining(remainingMs)}
+          </div>
+          <div className="mt-3 text-center text-xs text-muted-foreground">
+            {session.status === "waiting"
+              ? "El temporizador iniciará al primer mensaje"
+              : timerExpired
+              ? "Tiempo agotado"
+              : "Tiempo restante"}
+          </div>
+        </div>
+      </aside>
 
-      {/* Persona reminder card */}
-      {profile && (
-        <Card className="mx-4 mt-3 border-amber-500/30 bg-amber-500/5">
-          <div className="flex items-center gap-2 p-3 text-xs">
-            <span className="text-muted-foreground">Estás interpretando a:</span>
+      {/* CENTER — chat */}
+      <section className="flex min-w-0 flex-1 flex-col">
+        {/* Chat header */}
+        <header className="flex items-center justify-between gap-3 border-b bg-card px-5 py-3">
+          {/* Mobile-only: the fan avatar sits in the chat header since the
+              left rail is hidden below md. */}
+          <div className="flex min-w-0 items-center gap-2 md:hidden">
+            <div className="aspect-square h-8 w-8 overflow-hidden rounded-full bg-muted">
+              {fanAvatar && <img src={fanAvatar} alt={fanName} className="h-full w-full object-cover" />}
+            </div>
+            <div className="truncate text-sm font-semibold">{fanName}</div>
+          </div>
+          <span className="hidden text-sm font-bold md:inline">Chat con {fanName}</span>
+          <div className="flex items-center gap-2">
+            {/* Mobile timer chip */}
+            <div className="md:hidden flex items-center gap-1 rounded-md bg-muted px-2 py-1 font-mono text-xs">
+              <Clock className="h-3 w-3" />
+              {formatRemaining(remainingMs)}
+            </div>
+            <VolumeControl />
+          </div>
+        </header>
+
+        {/* Persona reminder (slim bar) */}
+        {profile && (
+          <div className="border-b bg-amber-500/5 px-5 py-2 text-xs">
+            <span className="text-muted-foreground">Estás interpretando a </span>
             <strong className="text-foreground">{profile.name}</strong>
-            {profile.location && (
-              <span className="text-muted-foreground">· {profile.location}</span>
+            {examinerTyping && (
+              <span className="ml-2 text-muted-foreground">· {fanName} escribiendo…</span>
             )}
           </div>
-        </Card>
-      )}
+        )}
 
-      {/* Messages */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="mx-auto max-w-2xl space-y-3">
-          {messagesQ.isLoading && (
-            <p className="text-xs text-muted-foreground">Cargando…</p>
-          )}
-          {!messagesQ.isLoading && messages.length === 0 && (
-            <p className="rounded-md bg-muted/50 p-4 text-center text-xs text-muted-foreground">
-              {fanName} aún no ha escrito. Espera o saluda primero como {profile?.name ?? "el personaje"}.
-            </p>
-          )}
-          {messages.map((m) => (
-            <Bubble
-              key={m.id}
-              msg={m}
-              fanName={fanName}
-              fanAvatar={fanAvatar}
-              profile={profile}
-              side="chatter"
-              readByOther={session.read_by_examiner_at ?? null}
-              onOpenMedia={(url) => setMediaUrl(url)}
-            />
-          ))}
+        {/* Messages */}
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="space-y-3">
+            {messagesQ.isLoading && (
+              <p className="text-xs text-muted-foreground">Cargando…</p>
+            )}
+            {!messagesQ.isLoading && messages.length === 0 && (
+              <p className="rounded-md bg-muted/50 p-4 text-center text-xs text-muted-foreground">
+                {fanName} aún no ha escrito. Espera o saluda primero como {profile?.name ?? "el personaje"}.
+              </p>
+            )}
+            {messages.map((m) => (
+              <Bubble
+                key={m.id}
+                msg={m}
+                fanName={fanName}
+                fanAvatar={fanAvatar}
+                profile={profile}
+                side="chatter"
+                readByOther={session.read_by_examiner_at ?? null}
+                onOpenMedia={(url) => setMediaUrl(url)}
+              />
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Emoji bar above composer (chatter side: in-memory only,
-          matches original Roleplaychatters behavior). */}
-      <div className="mx-auto w-full max-w-2xl">
+        {/* Emoji bar (in-memory). The original places it just above the
+            composer row, not full-width like a popover. */}
         <EmojiBar
           emojis={chatterEmojis}
           onPick={(e) => setInput((v) => v + e)}
           onAdd={(e) => setChatterEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
           onRemove={(e) => setChatterEmojis((curr) => curr.filter((x) => x !== e))}
         />
-      </div>
 
-      {/* Composer */}
-      <div className="border-t bg-card p-3">
-        <div className="mx-auto flex max-w-2xl items-end gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,video/*"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void handleFileUpload(f);
-            }}
-          />
-          <Button
-            onClick={() => fileInputRef.current?.click()}
-            size="icon"
-            variant="outline"
-            title="Subir foto / video"
-            disabled={uploading}
-          >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-          </Button>
-          <Button
-            onClick={() => setVaultOpen(true)}
-            size="icon"
-            variant="outline"
-            title="Vault del personaje"
-            disabled={!profile}
-          >
-            <FolderOpen className="h-4 w-4" />
-          </Button>
-          <textarea
-            value={input}
-            onChange={(e) => handleInputChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void handleSend();
-              }
-            }}
-            placeholder={`Responder como ${profile?.name ?? "el personaje"}…`}
-            rows={2}
-            className="min-h-[2.5rem] flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim() || sendMut.isPending}
-            size="icon"
-          >
-            {sendMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
+        {/* Composer row */}
+        <div className="border-t bg-card p-3">
+          <div className="flex items-end gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleFileUpload(f);
+              }}
+            />
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              size="icon"
+              variant="outline"
+              title="Subir foto / video"
+              disabled={uploading}
+            >
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+            </Button>
+            <Button
+              onClick={() => setVaultOpen(true)}
+              size="icon"
+              variant="outline"
+              title="Vault del personaje"
+              disabled={!profile}
+            >
+              <FolderOpen className="h-4 w-4" />
+            </Button>
+            <textarea
+              value={input}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleSend();
+                }
+              }}
+              placeholder={`Responder como ${profile?.name ?? "el personaje"}…`}
+              rows={2}
+              className="min-h-[2.5rem] flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || sendMut.isPending}
+              size="icon"
+            >
+              {sendMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
-      </div>
+      </section>
+
+      {/* RIGHT — full character info (matches the original right panel) */}
+      <aside className="hidden w-[340px] shrink-0 overflow-y-auto border-l bg-card md:block">
+        {profile && <CharacterInfoPanel profile={profile} />}
+      </aside>
 
       {/* Vault drawer */}
       <VaultPickerDialog
