@@ -139,7 +139,7 @@ export const CharacterInfoPanel = ({ profile, lang, compact = false }: Character
               {location && (
                 <div className="px-2">
                   <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                    {en ? "City" : "Ciudad"}
+                    {en ? "Location" : "Ubicación"}
                   </div>
                   <div className="mt-0.5 text-xs font-semibold text-foreground/90">
                     📍 {location}
