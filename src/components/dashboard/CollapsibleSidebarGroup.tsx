@@ -41,10 +41,14 @@ export const CollapsibleSidebarGroup = ({
     <SidebarGroup>
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <SidebarGroupLabel className="flex w-full cursor-pointer items-center justify-between hover:text-foreground transition-colors">
+          {/* Group label restyled — uppercase tracking + a touch more
+              opacity than the shadcn default so titles like "Operaciones"
+              are actually readable. Hover ramps up to full white plus a
+              subtle background tint so the row feels clickable. */}
+          <SidebarGroupLabel className="group/label flex w-full cursor-pointer items-center justify-between rounded-md text-[11px] font-semibold uppercase tracking-wider !text-foreground/80 transition-colors hover:!text-foreground hover:bg-foreground/5">
             <span>{label}</span>
             <ChevronRight
-              className={`h-4 w-4 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+              className={`h-4 w-4 shrink-0 opacity-60 transition-transform group-hover/label:opacity-100 ${open ? "rotate-90" : ""}`}
             />
           </SidebarGroupLabel>
         </CollapsibleTrigger>

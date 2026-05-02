@@ -193,18 +193,27 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 
 /* Sidebar glass hover effect */
 .sidebar-glass-hover {
-  @apply transition-all duration-200 border border-transparent;
+  @apply transition-all duration-200 border border-transparent text-foreground/85;
 }
 .sidebar-glass-hover:hover {
   background: linear-gradient(135deg, hsl(var(--primary) / 0.08), hsl(var(--accent) / 0.08));
   backdrop-filter: blur(12px);
   border-color: hsl(0 0% 100% / 0.06);
+  /* Keep the label readable on the tinted background — the previous
+     value let it inherit muted foreground which made the text disappear
+     into the gradient. */
+  color: hsl(var(--foreground));
 }
 
 .sidebar-glass-active {
-  background: linear-gradient(135deg, hsl(var(--primary) / 0.12), hsl(var(--accent) / 0.12)) !important;
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--accent) / 0.18)) !important;
   border-left: 2px solid hsl(var(--accent));
-  color: hsl(var(--accent));
+  /* Active item label stays white — the previous accent color washed
+     into the tinted background and was hard to read. */
+  color: hsl(var(--foreground)) !important;
+}
+.sidebar-glass-active:hover {
+  color: hsl(var(--foreground)) !important;
 }
 
 /* Auth animated gradient blobs */
