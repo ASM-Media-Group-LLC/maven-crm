@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Clock, Check, CheckCheck } from "lucide-react";
 import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
-import { VolumeControl, getSoundVolume } from "@/pages/chatter-evaluator/workspace/VolumeControl";
+import { VolumeControl, playSoundFile } from "@/pages/chatter-evaluator/workspace/VolumeControl";
 import { MediaViewer } from "@/pages/chatter-evaluator/workspace/MediaViewer";
 import { TipPopup, playTipSound } from "@/pages/chatter-evaluator/workspace/TipPopup";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,14 +69,30 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
   if (msg.deleted === "full") return null;
 
   if (msg.role === "system") {
+    const isTip = msg.msg_type === "tip";
+    const isPurchase = msg.msg_type === "purchase";
+    if ((isTip || isPurchase) && msg.price) {
+      const cls = isPurchase
+        ? "border-emerald-500 bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 text-emerald-400"
+        : "border-amber-500 bg-gradient-to-br from-amber-500/20 to-amber-500/5 text-amber-400";
+      return (
+        <div className="my-2 flex justify-center">
+          <div className={`flex w-full max-w-[420px] items-center gap-2.5 rounded-xl border px-5 py-2 ${cls}`}>
+            <span className="text-lg">{isPurchase ? "🎉" : "💸"}</span>
+            <span className="text-xs font-bold uppercase tracking-wide">
+              {isPurchase ? "Contenido comprado" : "Tip recibida"}
+            </span>
+            <span className="ml-auto text-sm font-extrabold text-foreground">
+              ${msg.price} USD
+            </span>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="my-2 text-center">
         <span className="rounded-full bg-muted px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-          {msg.msg_type === "tip" && msg.price
-            ? `💸 Tip $${msg.price}`
-            : msg.msg_type === "purchase" && msg.price
-            ? `🛒 Compra $${msg.price}`
-            : msg.content || "system"}
+          {msg.content || "system"}
         </span>
       </div>
     );
@@ -86,6 +102,10 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
   const isMine = msg.role === side;
   const name = msg.role === "fan" ? fanName : profile?.name ?? "chatter";
   const avatar = msg.role === "fan" ? fanAvatar : profile?.avatar_url ?? null;
+  // The chatter sees the same PPV bubble (orange unbought, green purchased)
+  // for any of their own priced messages — read-only, the buy button only
+  // exists on the examiner side.
+  const isPriced = isMine && (msg.price ?? 0) > 0 && msg.images && msg.images.length > 0;
 
   return (
     <div className={`flex gap-2 ${isMine ? "flex-row-reverse" : ""}`}>
@@ -112,32 +132,67 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
       </div>
       <div className={`flex max-w-[75%] flex-col ${isMine ? "items-end" : "items-start"}`}>
         <span className="text-[10px] text-muted-foreground">{name}</span>
-        <div
-          className={`rounded-2xl px-3.5 py-2 text-sm ${
-            isMine
-              ? "rounded-br-sm bg-primary text-primary-foreground"
-              : "rounded-bl-sm bg-muted text-foreground"
-          } ${msg.deleted === "chatter" ? "italic opacity-60" : ""}`}
-        >
-          {msg.deleted === "chatter" ? "(mensaje eliminado)" : msg.content}
-          {msg.images && msg.images.length > 0 && (
-            <div className="mt-1 grid grid-cols-2 gap-1">
+        {(msg.content || msg.deleted === "chatter") && (
+          <div
+            className={`rounded-2xl px-3.5 py-2 text-sm ${
+              isMine
+                ? "rounded-br-sm bg-primary text-primary-foreground"
+                : "rounded-bl-sm bg-muted text-foreground"
+            } ${msg.deleted === "chatter" ? "italic opacity-60" : ""}`}
+          >
+            {msg.deleted === "chatter" ? "(mensaje eliminado)" : msg.content}
+          </div>
+        )}
+        {msg.images && msg.images.length > 0 && (
+          isPriced ? (
+            <div
+              className={`mt-1 inline-block rounded-[14px] border-2 p-1 ${
+                msg.purchased
+                  ? "border-emerald-500 bg-emerald-500/10"
+                  : "border-orange-500 bg-orange-500/5"
+              }`}
+            >
+              <div className="flex flex-wrap gap-1">
+                {msg.images.map((url, i) => (
+                  <img
+                    key={i}
+                    src={url}
+                    alt=""
+                    loading="lazy"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenMedia(url);
+                    }}
+                    className="max-h-[200px] max-w-[200px] cursor-zoom-in rounded-[12px] object-cover"
+                  />
+                ))}
+              </div>
+              <span
+                className={`block rounded-b-[12px] px-4 py-1.5 text-center text-sm font-bold text-white ${
+                  msg.purchased ? "bg-emerald-500" : "bg-orange-500"
+                }`}
+              >
+                ${msg.price}{msg.purchased ? " ✓" : ""}
+              </span>
+            </div>
+          ) : (
+            <div className="mt-1 flex flex-wrap gap-1">
               {msg.images.map((url, i) => (
                 <img
                   key={i}
                   src={url}
                   alt=""
-                  className="cursor-zoom-in rounded transition-opacity hover:opacity-90"
                   loading="lazy"
                   onClick={(e) => {
                     e.stopPropagation();
                     onOpenMedia(url);
                   }}
+                  className="max-h-[200px] max-w-[200px] cursor-zoom-in rounded-[12px] border border-border object-cover"
                 />
               ))}
             </div>
-          )}
-        </div>
+          )
+        )}
         <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
           {formatTime(msg.created_at)}
           {/* Double-check on the chatter's own messages. Single = enviado.
@@ -186,29 +241,8 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-let _audioCtxC: AudioContext | null = null;
-const playPing = () => {
-  const vol = getSoundVolume();
-  if (vol <= 0) return;
-  try {
-    _audioCtxC ??= new (window.AudioContext || (window as any).webkitAudioContext)();
-    const ctx = _audioCtxC;
-    const t = ctx.currentTime;
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.frequency.setValueAtTime(880, t);
-    o.frequency.exponentialRampToValueAtTime(1320, t + 0.15);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.12 * vol, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.start(t);
-    o.stop(t + 0.3);
-  } catch {
-    /* no-op */
-  }
-};
+// Same notification.mp3 as the original — see ChatPanel.tsx for context.
+const playPing = () => playSoundFile("notification");
 
 const formatRemaining = (ms: number): string => {
   if (ms <= 0) return "00:00";
@@ -489,27 +523,36 @@ const ChatterPublicView = () => {
     // Trigger the tip popup + per-amount sound when a brand-new tip
     // system message arrives. Skipped on the initial load so re-opening
     // the chat doesn't replay every historical tip.
-    const newestTip = [...msgs]
+    // Tips and purchases share the popup + per-amount sound (the original
+    // ran the same emoji-tier popup off either event).
+    const newestEvent = [...msgs]
       .reverse()
-      .find((m) => m.msg_type === "tip" && m.role === "system" && m.price);
-    if (newestTip && newestTip.id !== lastTipIdRef.current) {
+      .find(
+        (m) =>
+          m.role === "system" &&
+          (m.msg_type === "tip" || m.msg_type === "purchase") &&
+          m.price,
+      );
+    if (newestEvent && newestEvent.id !== lastTipIdRef.current) {
       const isInitial = lastTipIdRef.current === null;
-      lastTipIdRef.current = newestTip.id;
-      if (!isInitial && newestTip.price) {
-        setTipAmount(newestTip.price);
-        playTipSound(newestTip.price);
+      lastTipIdRef.current = newestEvent.id;
+      if (!isInitial && newestEvent.price) {
+        setTipAmount(newestEvent.price);
+        playTipSound(newestEvent.price);
       }
     }
   }, [messagesQ.data]);
 
-  // Initialize lastTipIdRef on first load so historical tips don't fire.
+  // Initialize lastTipIdRef on first load so historical events don't fire.
   useEffect(() => {
     if (lastTipIdRef.current !== null) return;
     const msgs = messagesQ.data ?? [];
-    const newestTip = [...msgs]
+    const newestEvent = [...msgs]
       .reverse()
-      .find((m) => m.msg_type === "tip" && m.role === "system");
-    if (newestTip) lastTipIdRef.current = newestTip.id;
+      .find(
+        (m) => m.role === "system" && (m.msg_type === "tip" || m.msg_type === "purchase"),
+      );
+    if (newestEvent) lastTipIdRef.current = newestEvent.id;
   }, [messagesQ.data]);
 
   // Mark messages as read — but ONLY when the chatter is actually looking

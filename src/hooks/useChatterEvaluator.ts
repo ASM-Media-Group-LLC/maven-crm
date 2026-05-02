@@ -535,6 +535,45 @@ export const useExtendChatterSession = () => {
   });
 };
 
+// Mark a priced chatter message as purchased AND drop a system 'purchase'
+// notification into the same session. Mirrors window.doPurchase in the
+// original (index.html line 3579): flip the flag, then post a notice so
+// the chatter (and the examiner's own log) sees the confirmation.
+export const usePurchaseChatterMessage = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      messageId,
+      price,
+      examinerName,
+    }: {
+      sessionId: string;
+      messageId: string;
+      price: number;
+      examinerName?: string;
+    }): Promise<void> => {
+      const { error: updErr } = await sb
+        .from("chatter_messages")
+        .update({ purchased: true })
+        .eq("id", messageId);
+      if (updErr) throw updErr;
+      const fanName = examinerName || "JavixBuster";
+      const { error: insErr } = await sb.from("chatter_messages").insert({
+        session_id: sessionId,
+        role: "system",
+        msg_type: "purchase",
+        content: `${fanName} compró tu contenido`,
+        price,
+        from_examiner: true,
+      });
+      if (insErr) throw insErr;
+    },
+    onSuccess: (_, vars) =>
+      qc.invalidateQueries({ queryKey: ["chatter-messages", vars.sessionId] }),
+  });
+};
+
 export const useEndChatterSession = () => {
   const qc = useQueryClient();
   return useMutation({

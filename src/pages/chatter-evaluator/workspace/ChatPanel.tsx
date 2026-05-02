@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { EmojiBar, DEFAULT_EMOJIS } from "./EmojiBar";
-import { VolumeControl, getSoundVolume } from "./VolumeControl";
+import { VolumeControl, playSoundFile } from "./VolumeControl";
 import { MediaViewer } from "./MediaViewer";
 import { TipPopup, playTipSound } from "./TipPopup";
 import { useUpdateChatterConfig } from "@/hooks/useChatterEvaluator";
@@ -22,6 +22,7 @@ import {
   useChatterConfig,
   useRenameChatterSession,
   useExtendChatterSession,
+  usePurchaseChatterMessage,
 } from "@/hooks/useChatterEvaluator";
 import { Input } from "@/components/ui/input";
 import {
@@ -50,6 +51,8 @@ const MessageBubble = ({
   profile,
   readByOther,
   onOpenMedia,
+  onPurchase,
+  purchasing,
 }: {
   msg: ChatterMessage;
   fanName: string;
@@ -59,18 +62,38 @@ const MessageBubble = ({
    *  to show single vs. double check on the examiner's own messages. */
   readByOther: string | null;
   onOpenMedia: (url: string) => void;
+  onPurchase: (msg: ChatterMessage) => void;
+  purchasing: boolean;
 }) => {
   if (msg.deleted === "full") return null;
 
   if (msg.role === "system") {
+    // Tip / purchase pill (matches .msg-tip / purchase variant in the
+    // original — gold gradient + border for tips, green for purchases).
+    const isTip = msg.msg_type === "tip";
+    const isPurchase = msg.msg_type === "purchase";
+    if ((isTip || isPurchase) && msg.price) {
+      const cls = isPurchase
+        ? "border-emerald-500 bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 text-emerald-400"
+        : "border-amber-500 bg-gradient-to-br from-amber-500/20 to-amber-500/5 text-amber-400";
+      return (
+        <div className="my-2 flex justify-center">
+          <div className={`flex w-full max-w-[420px] items-center gap-2.5 rounded-xl border px-5 py-2 ${cls}`}>
+            <span className="text-lg">{isPurchase ? "🎉" : "💸"}</span>
+            <span className="text-xs font-bold uppercase tracking-wide">
+              {isPurchase ? "Contenido comprado" : "Tip enviada"}
+            </span>
+            <span className="ml-auto text-sm font-extrabold text-foreground">
+              ${msg.price} USD
+            </span>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="my-2 text-center">
         <span className="rounded-full bg-muted px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-          {msg.msg_type === "tip" && msg.price
-            ? `💸 Tip $${msg.price}`
-            : msg.msg_type === "purchase" && msg.price
-            ? `🛒 Compra $${msg.price}`
-            : msg.content || "system"}
+          {msg.content || "system"}
         </span>
       </div>
     );
@@ -79,6 +102,9 @@ const MessageBubble = ({
   const isFan = msg.role === "fan";
   const name = isFan ? fanName : profile?.name ?? "chatter";
   const avatar = isFan ? fanAvatar : profile?.avatar_url ?? null;
+  // Priced PPV bubble: chatter sent images with a price > 0. The examiner
+  // can flip the purchased state with the $ button on the side.
+  const isPriced = !isFan && (msg.price ?? 0) > 0 && msg.images && msg.images.length > 0;
 
   return (
     <div className={`flex gap-2 ${isFan ? "" : "flex-row-reverse"}`}>
@@ -105,32 +131,87 @@ const MessageBubble = ({
       </div>
       <div className={`flex max-w-[70%] flex-col ${isFan ? "items-start" : "items-end"}`}>
         <span className="text-[10px] text-muted-foreground">{name}</span>
-        <div
-          className={`rounded-2xl px-3 py-1.5 text-sm ${
-            isFan
-              ? "rounded-bl-sm bg-muted text-foreground"
-              : "rounded-br-sm bg-primary text-primary-foreground"
-          } ${msg.deleted === "chatter" ? "italic opacity-60" : ""}`}
-        >
-          {msg.deleted === "chatter" ? "(mensaje eliminado por el chatter)" : msg.content}
-          {msg.images && msg.images.length > 0 && (
-            <div className="mt-1 grid grid-cols-2 gap-1">
-              {msg.images.map((url, i) => (
-                <img
-                  key={i}
-                  src={url}
-                  alt=""
-                  className="cursor-zoom-in rounded transition-opacity hover:opacity-90"
-                  loading="lazy"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenMedia(url);
-                  }}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {(msg.content || msg.deleted === "chatter") && (
+          <div
+            className={`rounded-2xl px-3 py-1.5 text-sm ${
+              isFan
+                ? "rounded-bl-sm bg-muted text-foreground"
+                : "rounded-br-sm bg-primary text-primary-foreground"
+            } ${msg.deleted === "chatter" ? "italic opacity-60" : ""}`}
+          >
+            {msg.deleted === "chatter" ? "(mensaje eliminado por el chatter)" : msg.content}
+          </div>
+        )}
+        {msg.images && msg.images.length > 0 && (
+          <>
+            {isPriced ? (
+              // PPV bubble — orange when unbought, green once purchased.
+              // Sizes match the original .msg-priced (4px padding + 12px
+              // border-radius) and .msg-img (200x200 cover).
+              <div className="mt-1 flex items-start gap-2">
+                <div
+                  className={`relative inline-block rounded-[14px] border-2 p-1 ${
+                    msg.purchased
+                      ? "border-emerald-500 bg-emerald-500/10"
+                      : "border-orange-500 bg-orange-500/5"
+                  }`}
+                >
+                  <div className="flex flex-wrap gap-1">
+                    {msg.images.map((url, i) => (
+                      <img
+                        key={i}
+                        src={url}
+                        alt=""
+                        loading="lazy"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenMedia(url);
+                        }}
+                        className="max-h-[200px] max-w-[200px] cursor-zoom-in rounded-[12px] object-cover"
+                      />
+                    ))}
+                  </div>
+                  <span
+                    className={`block rounded-b-[12px] px-4 py-1.5 text-center text-sm font-bold text-white ${
+                      msg.purchased ? "bg-emerald-500" : "bg-orange-500"
+                    }`}
+                  >
+                    ${msg.price}{msg.purchased ? " ✓" : ""}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onPurchase(msg)}
+                  disabled={msg.purchased || purchasing}
+                  title={msg.purchased ? "Comprado" : `Comprar — $${msg.price}`}
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 text-base font-bold shadow-md transition-all ${
+                    msg.purchased
+                      ? "cursor-default border-emerald-500 bg-emerald-500/15 text-emerald-400"
+                      : "cursor-pointer border-orange-500 bg-card text-orange-500 hover:scale-110 hover:bg-orange-500 hover:text-white"
+                  }`}
+                >
+                  {msg.purchased ? "✓" : purchasing ? <Loader2 className="h-4 w-4 animate-spin" /> : "$"}
+                </button>
+              </div>
+            ) : (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {msg.images.map((url, i) => (
+                  <img
+                    key={i}
+                    src={url}
+                    alt=""
+                    loading="lazy"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenMedia(url);
+                    }}
+                    className="max-h-[200px] max-w-[200px] cursor-zoom-in rounded-[12px] border border-border object-cover"
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
         <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
           {formatTime(msg.created_at)}
           {/* Double-check indicator on the examiner's own (fan-role) messages.
@@ -177,32 +258,11 @@ const PublicLinkBanner = ({ session }: { session: ChatterSession }) => {
   );
 };
 
-// 3-tone soft "ding" using WebAudio — no asset to ship, no permission.
-// Volume is read from the VolumeControl's persisted setting (0..1) so a
-// muted slider produces no sound.
-let _audioCtx: AudioContext | null = null;
-const playPing = () => {
-  const vol = getSoundVolume();
-  if (vol <= 0) return;
-  try {
-    _audioCtx ??= new (window.AudioContext || (window as any).webkitAudioContext)();
-    const ctx = _audioCtx;
-    const now = ctx.currentTime;
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.frequency.setValueAtTime(880, now);
-    o.frequency.exponentialRampToValueAtTime(1320, now + 0.15);
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.12 * vol, now + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.start(now);
-    o.stop(now + 0.3);
-  } catch {
-    /* no-op */
-  }
-};
+// New-message ding. Uses the same notification.mp3 the original
+// Roleplaychatters shipped (copied to /public/sounds) — the WebAudio
+// fallback the migration started with sounded different, and the user
+// asked to match the original 1:1.
+const playPing = () => playSoundFile("notification");
 
 const formatRemaining = (ms: number): string => {
   if (ms <= 0) return "00:00";
@@ -233,6 +293,7 @@ export const ChatPanel = ({ session }: Props) => {
   const [addTimeValue, setAddTimeValue] = useState("10");
   const renameMut = useRenameChatterSession();
   const extendMut = useExtendChatterSession();
+  const purchaseMut = usePurchaseChatterMessage();
   const updateConfigMut = useUpdateChatterConfig();
   const examinerEmojis =
     configQ.data?.examiner_emojis && configQ.data.examiner_emojis.length > 0
@@ -263,15 +324,22 @@ export const ChatPanel = ({ session }: Props) => {
       playPing();
     }
 
-    const newestTip = [...msgs]
+    // Same popup + per-amount sound for tips AND purchases (the original
+    // ran playSoundTip / playSoundPurchase off the same tier mapping).
+    const newestEvent = [...msgs]
       .reverse()
-      .find((m) => m.msg_type === "tip" && m.role === "system" && m.price);
-    if (newestTip && newestTip.id !== lastTipIdRef.current) {
+      .find(
+        (m) =>
+          m.role === "system" &&
+          (m.msg_type === "tip" || m.msg_type === "purchase") &&
+          m.price,
+      );
+    if (newestEvent && newestEvent.id !== lastTipIdRef.current) {
       const isInitial = lastTipIdRef.current === null;
-      lastTipIdRef.current = newestTip.id;
-      if (!isInitial && newestTip.price) {
-        setTipAmount(newestTip.price);
-        playTipSound(newestTip.price);
+      lastTipIdRef.current = newestEvent.id;
+      if (!isInitial && newestEvent.price) {
+        setTipAmount(newestEvent.price);
+        playTipSound(newestEvent.price);
       }
     }
   }, [messagesQ.data]);
@@ -593,6 +661,22 @@ export const ChatPanel = ({ session }: Props) => {
             profile={profile}
             readByOther={session?.read_by_chatter_at ?? null}
             onOpenMedia={(url) => setMediaUrl(url)}
+            onPurchase={(target) => {
+              if (!session || !target.price) return;
+              purchaseMut.mutate(
+                {
+                  sessionId: session.id,
+                  messageId: target.id,
+                  price: target.price,
+                  examinerName: fanName,
+                },
+                {
+                  onError: (err) =>
+                    toast.error("No se pudo comprar", { description: (err as Error).message }),
+                },
+              );
+            }}
+            purchasing={purchaseMut.isPending}
           />
         ))}
       </div>

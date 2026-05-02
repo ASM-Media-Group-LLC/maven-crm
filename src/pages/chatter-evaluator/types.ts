@@ -97,6 +97,9 @@ export interface ChatterMessage {
   images: string[];
   deleted: "chatter" | "full" | null;
   from_examiner: boolean;
+  // True once the examiner has "bought" a priced (PPV) image. Mirrors the
+  // `purchased` flag in the original Roleplaychatters message shape.
+  purchased: boolean;
   created_at: string;
 }
 

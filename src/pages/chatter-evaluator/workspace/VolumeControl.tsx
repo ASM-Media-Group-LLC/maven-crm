@@ -31,6 +31,21 @@ const setStoredVolume = (v: number) => {
 /** Same icon mapping as the original: 🔊 > 0.5, 🔉 > 0, 🔇 = 0. */
 const iconFor = (v: number) => (v > 0 ? (v > 0.5 ? "🔊" : "🔉") : "🔇");
 
+// Plays an mp3 from /public/sounds at the persisted volume. Mirrors the
+// original Roleplaychatters playSound (index.html line 1580). One-shot Audio
+// element per call so simultaneous events don't fight over the same node.
+export const playSoundFile = (name: string): void => {
+  const vol = getSoundVolume();
+  if (vol <= 0) return;
+  try {
+    const a = new Audio(`/sounds/${name}.mp3`);
+    a.volume = vol;
+    void a.play().catch(() => {});
+  } catch {
+    /* no-op */
+  }
+};
+
 interface VolumeControlProps {
   /** Optional className for the outer wrapper (lets callers tune spacing). */
   className?: string;

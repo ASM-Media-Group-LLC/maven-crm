@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getSoundVolume } from "./VolumeControl";
+import { playSoundFile } from "./VolumeControl";
 
 // Mirrors the original Roleplaychatters showTipPopup (index.html line 5360):
 // fullscreen overlay, emoji that scales with amount, confetti shower, big
@@ -8,48 +8,19 @@ import { getSoundVolume } from "./VolumeControl";
 // the same as it did before.
 
 const tierForAmount = (amount: number) => {
-  if (amount <= 5) return { emoji: "🪙🪙", sizePx: 80, confettiCount: 8, freq: 660 };
-  if (amount <= 10) return { emoji: "💸💸", sizePx: 85, confettiCount: 12, freq: 740 };
-  if (amount <= 50) return { emoji: "🔥🔥", sizePx: 90, confettiCount: 20, freq: 880 };
-  if (amount <= 100) return { emoji: "👿👿", sizePx: 100, confettiCount: 30, freq: 988 };
-  if (amount <= 200) return { emoji: "🥵🥵👿👿", sizePx: 110, confettiCount: 45, freq: 1175 };
-  return { emoji: "🥵🥵👿👿💦💦", sizePx: 120, confettiCount: 60, freq: 1320 };
+  if (amount <= 5)   return { emoji: "🪙🪙",                sizePx: 80,  confettiCount: 8,  sound: "tiny" };
+  if (amount <= 10)  return { emoji: "💸💸",               sizePx: 85,  confettiCount: 12, sound: "Small" };
+  if (amount <= 50)  return { emoji: "🔥🔥",               sizePx: 90,  confettiCount: 20, sound: "medium" };
+  if (amount <= 100) return { emoji: "👿👿",               sizePx: 100, confettiCount: 30, sound: "large" };
+  if (amount <= 200) return { emoji: "🥵🥵👿👿",           sizePx: 110, confettiCount: 45, sound: "huge" };
+  return                    { emoji: "🥵🥵👿👿💦💦",       sizePx: 120, confettiCount: 60, sound: "Show" };
 };
 
-// WebAudio "ka-ching" — pitch and length scale with amount. Replaces the
-// per-tier mp3 assets (tiny/Small/medium/large/huge/Show) the original
-// shipped, since we don't ship those files.
-let _audioCtxTip: AudioContext | null = null;
-export const playTipSound = (amount: number) => {
-  const vol = getSoundVolume();
-  if (vol <= 0) return;
-  const { freq } = tierForAmount(amount);
-  try {
-    _audioCtxTip ??= new (window.AudioContext || (window as any).webkitAudioContext)();
-    const ctx = _audioCtxTip;
-    const t = ctx.currentTime;
-    // Two-note arpeggio so a bigger tip has a meatier sound.
-    const dur = Math.min(0.8, 0.35 + amount / 400);
-    const o1 = ctx.createOscillator();
-    const o2 = ctx.createOscillator();
-    const g = ctx.createGain();
-    o1.type = "triangle";
-    o2.type = "sine";
-    o1.frequency.setValueAtTime(freq, t);
-    o2.frequency.setValueAtTime(freq * 1.5, t + dur * 0.4);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.18 * vol, t + 0.03);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o1.connect(g);
-    o2.connect(g);
-    g.connect(ctx.destination);
-    o1.start(t);
-    o2.start(t + dur * 0.4);
-    o1.stop(t + dur);
-    o2.stop(t + dur);
-  } catch {
-    /* no-op */
-  }
+// Same per-amount mp3 mapping as the original (index.html playSoundTip,
+// line 1601). The files live under /public/sounds and were copied verbatim
+// from the original project.
+export const playTipSound = (amount: number): void => {
+  playSoundFile(tierForAmount(amount).sound);
 };
 
 interface ConfettiBit {

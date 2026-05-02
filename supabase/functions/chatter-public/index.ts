@@ -79,16 +79,13 @@ Deno.serve(async (req) => {
       if (!content && images.length === 0) {
         return json(400, { ok: false, error: "content or images required" });
       }
-      // Restrict chatter-side msg_type to message or purchase. If a price is
-      // set we treat it as a purchase by default (matches the original
-      // Roleplaychatters semantics where the chatter sends content "for sale").
-      let msgType: "message" | "purchase" = body.msgType ?? "message";
-      if (typeof body.price === "number" && body.price > 0 && !body.msgType) {
-        msgType = "purchase";
-      }
-      if (msgType !== "message" && msgType !== "purchase") {
-        return json(400, { ok: false, error: "invalid msgType for chatter" });
-      }
+      // The chatter always sends a regular `message` — even when a price is
+      // attached. The `purchase` msg_type is reserved for the system-side
+      // notification the examiner generates when they actually buy the
+      // content (matches the original Roleplaychatters behavior in
+      // doPurchase, index.html line 3579). This keeps `price` on the
+      // outgoing message so the examiner can render the buy button.
+      const msgType: "message" = "message";
       const price = typeof body.price === "number" && body.price >= 0 ? body.price : null;
 
       const { data, error } = await supa
