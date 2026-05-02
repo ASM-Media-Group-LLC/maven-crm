@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { toast } from "sonner";
 import {
   ResizablePanelGroup,
@@ -25,6 +25,22 @@ import {
 
 const ACTIVE_KEY = "maven.chatter.workspace.activeSessionId";
 const CRITERIA_HIDDEN_KEY = "maven.chatter.workspace.criteriaHidden";
+const INFO_HIDDEN_KEY = "maven.chatter.workspace.infoHidden";
+
+// Breakpoint below which the side rails refuse to render — at 1100px or
+// less the criteria + info panels get squeezed too narrow to read.
+const NARROW_BREAKPOINT = 1100;
+const useIsNarrow = (): boolean => {
+  const [narrow, setNarrow] = useState(() =>
+    typeof window === "undefined" ? false : window.innerWidth < NARROW_BREAKPOINT,
+  );
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth < NARROW_BREAKPOINT);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return narrow;
+};
 
 const WorkspaceContent = () => {
   const sessionsQ = useChatterSessions("all");
@@ -32,22 +48,44 @@ const WorkspaceContent = () => {
   const criteriaQ = useChatterCriteria();
   const [params, setParams] = useSearchParams();
   const [verdictOpen, setVerdictOpen] = useState(false);
-  // Criteria rail can be hidden when the examiner just wants to focus on
-  // the chat. Persisted per browser so reloads keep the choice.
-  const [criteriaHidden, setCriteriaHidden] = useState<boolean>(() => {
+  // Each side rail can be hidden independently. Persisted per browser so
+  // reloads keep the choice. Also auto-hidden on narrow viewports so the
+  // chat keeps a usable width.
+  const [criteriaHiddenByUser, setCriteriaHiddenByUser] = useState<boolean>(() => {
     try {
       return window.localStorage.getItem(CRITERIA_HIDDEN_KEY) === "1";
     } catch {
       return false;
     }
   });
+  const [infoHiddenByUser, setInfoHiddenByUser] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(INFO_HIDDEN_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   useEffect(() => {
     try {
-      window.localStorage.setItem(CRITERIA_HIDDEN_KEY, criteriaHidden ? "1" : "0");
+      window.localStorage.setItem(CRITERIA_HIDDEN_KEY, criteriaHiddenByUser ? "1" : "0");
     } catch {
       /* no-op */
     }
-  }, [criteriaHidden]);
+  }, [criteriaHiddenByUser]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(INFO_HIDDEN_KEY, infoHiddenByUser ? "1" : "0");
+    } catch {
+      /* no-op */
+    }
+  }, [infoHiddenByUser]);
+  const isNarrow = useIsNarrow();
+  // Effective visibility = user pref OR narrow viewport. The toggle
+  // buttons keep working in either case — pressing "Mostrar" on a narrow
+  // viewport will reveal the rail temporarily even if the user later
+  // resizes wide and back.
+  const criteriaHidden = criteriaHiddenByUser || isNarrow;
+  const infoHidden = infoHiddenByUser || isNarrow;
 
   // Active session: priority is ?session=<id> in URL, else last from
   // localStorage, else the first open session.
@@ -165,25 +203,37 @@ const WorkspaceContent = () => {
               <ArrowLeft className="mr-2 h-4 w-4" /> Volver
             </Link>
           </Button>
-          {/* Toggle the criteria rail. The examiner can collapse it to
-              get more horizontal real estate for the chat + character
-              info while a session is in progress, then re-open it when
-              they're ready to grade. */}
+          {/* Toggle the criteria rail. */}
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setCriteriaHidden((v) => !v)}
+            onClick={() => setCriteriaHiddenByUser((v) => !v)}
             title={criteriaHidden ? "Mostrar criterios" : "Ocultar criterios"}
             className="gap-2"
+            disabled={isNarrow && !criteriaHiddenByUser}
           >
             {criteriaHidden ? (
               <PanelLeftOpen className="h-4 w-4" />
             ) : (
               <PanelLeftClose className="h-4 w-4" />
             )}
-            <span className="hidden sm:inline text-xs">
-              {criteriaHidden ? "Mostrar criterios" : "Ocultar criterios"}
-            </span>
+            <span className="hidden sm:inline text-xs">Criterios</span>
+          </Button>
+          {/* Toggle the right-side character info rail. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setInfoHiddenByUser((v) => !v)}
+            title={infoHidden ? "Mostrar info personaje" : "Ocultar info personaje"}
+            className="gap-2"
+            disabled={isNarrow && !infoHiddenByUser}
+          >
+            {infoHidden ? (
+              <PanelRightOpen className="h-4 w-4" />
+            ) : (
+              <PanelRightClose className="h-4 w-4" />
+            )}
+            <span className="hidden sm:inline text-xs">Info personaje</span>
           </Button>
         </div>
         <div className="text-xs text-muted-foreground">
@@ -223,10 +273,14 @@ const WorkspaceContent = () => {
         <ResizablePanel defaultSize={60} minSize={30} className="min-h-0">
           <ChatPanel session={selectedSession} />
         </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={14} minSize={11} maxSize={28} className="min-h-0">
-          <CharacterInfoSidebar profileId={selectedSession?.profile_id ?? null} />
-        </ResizablePanel>
+        {!infoHidden && (
+          <>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={14} minSize={11} maxSize={28} className="min-h-0">
+              <CharacterInfoSidebar profileId={selectedSession?.profile_id ?? null} />
+            </ResizablePanel>
+          </>
+        )}
       </ResizablePanelGroup>
 
       {selectedSession && (
