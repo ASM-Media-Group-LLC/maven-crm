@@ -12,6 +12,11 @@ import { CriteriaPanel, readScoresFromStorage, type CriteriaScores } from "./Cri
 import { SessionsPanel } from "./SessionsPanel";
 import { ChatPanel } from "./ChatPanel";
 import { EvaluationVerdictDialog } from "./EvaluationVerdictDialog";
+import { CharacterInfoPanel } from "./CharacterInfoPanel";
+import { useChatterLang } from "./ChatToolbar";
+import {
+  useChatterProfiles,
+} from "@/hooks/useChatterEvaluator";
 
 const ACTIVE_KEY = "maven.chatter.workspace.activeSessionId";
 
@@ -135,8 +140,11 @@ const WorkspaceContent = () => {
         </div>
       </div>
 
-      {/* 3-panel grid */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[280px_280px_1fr]">
+      {/* 4-panel grid: criteria · sessions · chat · character info.
+          Character info shows the same persona snapshot the chatter sees
+          on their public view, so the examiner is reading from the exact
+          same notes while typing as the fan. */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[260px_260px_1fr_300px]">
         <aside className="min-h-0 border-r">
           <CriteriaPanel
             session={selectedSession}
@@ -148,9 +156,10 @@ const WorkspaceContent = () => {
         <aside className="min-h-0 border-r">
           <SessionsPanel selectedId={selectedId} onSelect={setSelectedId} />
         </aside>
-        <section className="min-h-0">
+        <section className="min-h-0 border-r">
           <ChatPanel session={selectedSession} />
         </section>
+        <CharacterInfoSidebar profileId={selectedSession?.profile_id ?? null} />
       </div>
 
       {selectedSession && (
@@ -164,6 +173,29 @@ const WorkspaceContent = () => {
         />
       )}
     </main>
+  );
+};
+
+// Lightweight wrapper that resolves the profile from the cached profiles
+// list and renders the same CharacterInfoPanel the chatter sees, in compact
+// mode so it fits the 300px rail.
+const CharacterInfoSidebar = ({ profileId }: { profileId: string | null }) => {
+  const profilesQ = useChatterProfiles();
+  const [lang] = useChatterLang();
+  const profile = profileId
+    ? (profilesQ.data ?? []).find((p) => p.id === profileId) ?? null
+    : null;
+
+  return (
+    <aside className="hidden min-h-0 overflow-y-auto bg-card md:block">
+      {profile ? (
+        <CharacterInfoPanel profile={profile} lang={lang} compact />
+      ) : (
+        <div className="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground">
+          Selecciona una sesión para ver la información del personaje.
+        </div>
+      )}
+    </aside>
   );
 };
 

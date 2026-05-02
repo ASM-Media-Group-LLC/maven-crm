@@ -13,8 +13,8 @@ import {
   useChatFontSize,
   useChatterLang,
   pVal,
-  type ChatterLang,
 } from "@/pages/chatter-evaluator/workspace/ChatToolbar";
+import { CharacterInfoPanel } from "@/pages/chatter-evaluator/workspace/CharacterInfoPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -322,100 +322,6 @@ const formatRemaining = (ms: number): string => {
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-};
-
-// Right-rail character info — mirrors index.html ~line 2542 in the original:
-// avatar, name, meta, then a stack of labelled note items (greeting, body,
-// nudity, anal, collabs, videocalls, custom, prices, extra). Anything blank
-// is hidden so admins who only fill some fields don't see "—" everywhere.
-const InfoNote = ({ label, value, tone }: { label: string; value: string | null | undefined; tone?: "gold" | "warning" }) => {
-  if (!value) return null;
-  const valueClass =
-    tone === "gold"
-      ? "text-sm font-semibold text-amber-500"
-      : tone === "warning"
-      ? "rounded-md bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-400"
-      : "text-sm text-foreground";
-  return (
-    <div className="mb-3.5">
-      <div className="mb-1 font-mono text-[9px] uppercase tracking-wider text-amber-500/80">
-        {label}
-      </div>
-      <div className={valueClass}>{value}</div>
-    </div>
-  );
-};
-
-const CharacterInfoPanel = ({ profile, lang }: { profile: ChatterProfile; lang: ChatterLang }) => {
-  const en = lang === "en";
-  // Profile-as-record for pVal; strongly typed reads stay through `profile`.
-  const p = profile as unknown as Record<string, unknown>;
-  const name = pVal(p, "name", lang) || profile.name;
-  const meta = [
-    pVal(p, "nationality", lang),
-    pVal(p, "location", lang) ? `📍 ${pVal(p, "location", lang)}` : "",
-    pVal(p, "age", lang),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-  return (
-    <>
-      <div className="border-b p-6 text-center">
-        <div className="mx-auto mb-4 aspect-square h-[90px] w-[90px] overflow-hidden rounded-full bg-gradient-to-br from-purple-600 to-amber-500">
-          {profile.avatar_url ? (
-            <img
-              src={profile.avatar_url}
-              alt={name}
-              className="h-full w-full object-cover"
-              style={{
-                objectPosition: `${profile.avatar_x ?? 50}% ${profile.avatar_y ?? 50}%`,
-                transform: `scale(${(profile.avatar_zoom ?? 100) / 100})`,
-              }}
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-3xl font-bold text-white">
-              {name[0]}
-            </div>
-          )}
-        </div>
-        <div className="text-xl font-bold">{name}</div>
-        {meta && <div className="mt-1.5 text-xs text-muted-foreground">{meta}</div>}
-      </div>
-      <div className="p-4">
-        <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-amber-500">
-          {en ? "Character info" : "Información del personaje"}
-        </div>
-        <InfoNote label={en ? "How to call the user" : "Cómo llamar al usuario"} value={pVal(p, "users_term", lang)} />
-        <InfoNote label={en ? "Greeting" : "Saludo inicial"} value={pVal(p, "greeting", lang)} />
-        <div className="my-4 h-px bg-border" />
-        <InfoNote label={en ? "Body / terms" : "Cuerpo / términos"} value={pVal(p, "body", lang)} />
-        <InfoNote label={en ? "Nudity" : "Desnudos"} value={pVal(p, "nudity", lang)} />
-        <InfoNote label="Anal" value={pVal(p, "anal", lang)} />
-        <InfoNote label={en ? "Collabs" : "Colaboraciones"} value={pVal(p, "collabs", lang)} />
-        <div className="my-4 h-px bg-border" />
-        <InfoNote label={en ? "Videocalls" : "Videollamadas"} value={pVal(p, "videocall", lang)} />
-        <InfoNote label={en ? "Custom" : "Personalizados"} value={pVal(p, "custom", lang)} />
-        {profile.prices && Object.keys(profile.prices).length > 0 && (
-          <>
-            <div className="my-4 h-px bg-border" />
-            <div className="mb-3 text-[10px] font-bold uppercase tracking-widest text-amber-500">
-              {en ? "Prices" : "Precios"}
-            </div>
-            {Object.entries(profile.prices).map(([k, v]) => (
-              <InfoNote key={k} label={k} value={v} tone="gold" />
-            ))}
-          </>
-        )}
-        {pVal(p, "extra", lang) && (
-          <>
-            <div className="my-4 h-px bg-border" />
-            <InfoNote label={en ? "Important" : "Importante"} value={pVal(p, "extra", lang)} tone="warning" />
-          </>
-        )}
-      </div>
-    </>
-  );
 };
 
 const ChatterPublicView = () => {
@@ -1134,6 +1040,14 @@ interface VaultPickerProps {
   sending: boolean;
 }
 
+// Vault price presets — same tier ladder as the examiner's quick-tip
+// popover but starting at $0 (free) since the chatter often sends teaser
+// content for free. The chatter MUST pick one of these (or "Otro monto…")
+// before the dialog allows a send. Keeps the unit cost decision explicit
+// instead of letting an empty-string default mean "free".
+const VAULT_PRICE_PRESETS = [0, 5, 10, 20, 50, 100, 200] as const;
+type PriceChoice = number | "custom" | null;
+
 const VaultPickerDialog = ({
   open,
   onOpenChange,
@@ -1144,26 +1058,44 @@ const VaultPickerDialog = ({
   sending,
 }: VaultPickerProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [priceStr, setPriceStr] = useState("");
+  const [priceChoice, setPriceChoice] = useState<PriceChoice>(null);
+  const [customPriceStr, setCustomPriceStr] = useState("");
   const [caption, setCaption] = useState("");
 
   // Reset on close
   useEffect(() => {
     if (!open) {
       setSelectedId(null);
-      setPriceStr("");
+      setPriceChoice(null);
+      setCustomPriceStr("");
       setCaption("");
     }
   }, [open]);
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
+  // Resolve the final numeric price from the chosen tier. Returns null
+  // when the user hasn't picked yet or the custom amount is empty/invalid.
+  const resolvedPrice: number | null = (() => {
+    if (priceChoice === null) return null;
+    if (priceChoice === "custom") {
+      const n = parseFloat(customPriceStr);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    }
+    return priceChoice;
+  })();
+
+  const canSend =
+    !!selected && !sending && (priceChoice !== null) &&
+    (priceChoice !== "custom" || resolvedPrice !== null);
+
   const handleSend = () => {
-    if (!selected) return;
-    const price = priceStr.trim() ? parseFloat(priceStr) : NaN;
+    if (!canSend || !selected || resolvedPrice === null) return;
     onSend({
       item: selected,
-      price: isNaN(price) || price <= 0 ? null : price,
+      // 0 still means "send for free" — pass null so it goes as a normal
+      // image instead of a $0 PPV bubble that nobody'd want to "buy".
+      price: resolvedPrice > 0 ? resolvedPrice : null,
       caption: caption.trim(),
     });
   };
@@ -1174,7 +1106,8 @@ const VaultPickerDialog = ({
         <DialogHeader>
           <DialogTitle>Vault de {profileName}</DialogTitle>
           <DialogDescription>
-            Selecciona un item para enviarlo al fan. Si pones un precio, se manda como compra (PPV).
+            Selecciona un item y elige el precio. Con un monto &gt; 0 se envía
+            como compra (PPV); con "Gratis" se manda como imagen normal.
           </DialogDescription>
         </DialogHeader>
 
@@ -1254,20 +1187,66 @@ const VaultPickerDialog = ({
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_140px]">
-              <Input
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                placeholder="Mensaje opcional (ej. 'mira esto baby 😏')"
-              />
-              <Input
-                type="number"
-                min={0}
-                step={1}
-                value={priceStr}
-                onChange={(e) => setPriceStr(e.target.value)}
-                placeholder="Precio $ (opcional)"
-              />
+            <Input
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="Mensaje opcional (ej. 'mira esto baby 😏')"
+            />
+
+            {/* Required price tier picker — mirrors the examiner's quick-tip
+                popover but with $0 (free) as a valid choice. */}
+            <div>
+              <div className="mb-1.5 text-xs font-medium text-muted-foreground">
+                Precio <span className="text-rose-400">*</span>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {VAULT_PRICE_PRESETS.map((amt) => {
+                  const active = priceChoice === amt;
+                  return (
+                    <Button
+                      key={amt}
+                      type="button"
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      className={`h-8 text-xs ${
+                        active && amt === 0 ? "" : active ? "bg-amber-500 text-white hover:bg-amber-600" : ""
+                      }`}
+                      onClick={() => {
+                        setPriceChoice(amt);
+                        setCustomPriceStr("");
+                      }}
+                    >
+                      {amt === 0 ? "Gratis" : `$${amt}`}
+                    </Button>
+                  );
+                })}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={priceChoice === "custom" ? "default" : "outline"}
+                  className={`h-8 text-xs ${
+                    priceChoice === "custom" ? "bg-amber-500 text-white hover:bg-amber-600" : ""
+                  }`}
+                  onClick={() => setPriceChoice("custom")}
+                >
+                  Otro…
+                </Button>
+              </div>
+              {priceChoice === "custom" && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">$</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    autoFocus
+                    value={customPriceStr}
+                    onChange={(e) => setCustomPriceStr(e.target.value)}
+                    placeholder="Monto"
+                    className="max-w-[140px]"
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1276,9 +1255,23 @@ const VaultPickerDialog = ({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
             Cancelar
           </Button>
-          <Button onClick={handleSend} disabled={!selected || sending} className="gap-2">
+          <Button
+            onClick={handleSend}
+            disabled={!canSend}
+            title={
+              !selected
+                ? "Selecciona un item del vault"
+                : priceChoice === null
+                ? "Elige un precio (o Gratis)"
+                : priceChoice === "custom" && resolvedPrice === null
+                ? "Ingresa un monto válido"
+                : undefined
+            }
+            className="gap-2"
+          >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             Enviar
+            {resolvedPrice !== null && resolvedPrice > 0 && ` · $${resolvedPrice}`}
           </Button>
         </DialogFooter>
       </DialogContent>
