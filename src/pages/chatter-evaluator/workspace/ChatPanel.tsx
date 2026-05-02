@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Send, DollarSign, Loader2, MessageCircle, Copy, Check } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Copy, Check, Paperclip } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -142,7 +142,9 @@ export const ChatPanel = ({ session }: Props) => {
   const sendMut = useSendChatterMessage();
   const qc = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   // Realtime: subscribe to chatter_messages inserts/updates for this session
   // so messages from the chatter side (Phase 5) appear instantly here
@@ -199,6 +201,48 @@ export const ChatPanel = ({ session }: Props) => {
     } catch (e) {
       toast.error("No se pudo enviar", { description: (e as Error).message });
       setInput(content); // restore
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!session) return;
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("Archivo muy grande", { description: "Máximo 50 MB." });
+      return;
+    }
+    setUploading(true);
+    try {
+      const sanitized =
+        (file.name || "upload")
+          .toLowerCase()
+          .replace(/[^a-z0-9._-]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .slice(0, 80) || `upload-${Date.now()}`;
+      const path = `_chat_uploads/${session.id}/${Date.now()}-${sanitized}`;
+      const { error: upErr } = await supabase.storage
+        .from("chatter-vault")
+        .upload(path, file, { upsert: false, contentType: file.type || undefined });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage
+        .from("chatter-vault")
+        .getPublicUrl(path);
+
+      const caption = input.trim();
+      setInput("");
+      await sendMut.mutateAsync({
+        sessionId: session.id,
+        role: "fan",
+        msgType: "message",
+        content: caption || null,
+        images: [pub.publicUrl],
+        fromExaminer: true,
+      });
+      toast.success("Imagen enviada");
+    } catch (e) {
+      toast.error("No se pudo subir", { description: (e as Error).message });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -285,7 +329,26 @@ export const ChatPanel = ({ session }: Props) => {
 
       {/* Input */}
       <div className="border-t p-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleFileUpload(f);
+          }}
+        />
         <div className="flex items-end gap-2">
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            size="icon"
+            variant="outline"
+            disabled={session.status === "ended" || uploading}
+            title="Subir foto / video"
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+          </Button>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}

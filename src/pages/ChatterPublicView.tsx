@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Send, Loader2, Lock, AlertTriangle, MessageCircle, FolderOpen, X, Image as ImageIcon, Play } from "lucide-react";
+import { Send, Loader2, Lock, AlertTriangle, MessageCircle, FolderOpen, X, Image as ImageIcon, Play, Paperclip } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -145,6 +145,19 @@ const NotFoundScreen = ({ reason }: { reason: string }) => (
   </div>
 );
 
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("read error"));
+    reader.onload = () => {
+      const result = reader.result as string;
+      // result is "data:<mime>;base64,<data>"
+      const idx = result.indexOf(",");
+      resolve(idx >= 0 ? result.slice(idx + 1) : result);
+    };
+    reader.readAsDataURL(file);
+  });
+
 const ChatterPublicView = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const qc = useQueryClient();
@@ -152,6 +165,8 @@ const ChatterPublicView = () => {
   const [locked, setLocked] = useState(false);
   const [claimed, setClaimed] = useState(false);
   const [vaultOpen, setVaultOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 1) Session
@@ -342,6 +357,41 @@ const ChatterPublicView = () => {
     }
   };
 
+  const handleFileUpload = async (file: File) => {
+    if (!sessionId) return;
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Archivo muy grande", {
+        description: "Máximo 8 MB. Comprime la imagen antes de enviar.",
+      });
+      return;
+    }
+    setUploading(true);
+    try {
+      const base64 = await fileToBase64(file);
+      const upload = await callChatterApi("upload-image", {
+        sessionId,
+        fileName: file.name,
+        contentType: file.type,
+        base64,
+      });
+      // Optional caption from current input
+      const caption = input.trim();
+      setInput("");
+      await callChatterApi("send", {
+        sessionId,
+        content: caption || null,
+        images: [upload.url],
+      });
+      qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] });
+      toast.success("Imagen enviada");
+    } catch (e) {
+      toast.error("No se pudo subir", { description: (e as Error).message });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   // Typing indicator (debounced)
   const typingTimer = useRef<number | null>(null);
   const handleInputChange = (val: string) => {
@@ -448,6 +498,25 @@ const ChatterPublicView = () => {
       {/* Composer */}
       <div className="border-t bg-card p-3">
         <div className="mx-auto flex max-w-2xl items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void handleFileUpload(f);
+            }}
+          />
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            size="icon"
+            variant="outline"
+            title="Subir foto / video"
+            disabled={uploading}
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+          </Button>
           <Button
             onClick={() => setVaultOpen(true)}
             size="icon"

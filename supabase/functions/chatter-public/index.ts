@@ -21,7 +21,7 @@ const corsHeaders = {
 };
 
 type Body = {
-  action: "send" | "claim-device" | "set-typing" | "mark-read";
+  action: "send" | "claim-device" | "set-typing" | "mark-read" | "upload-image";
   sessionId: string;
   // send
   content?: string;
@@ -32,6 +32,10 @@ type Body = {
   deviceId?: string;
   // set-typing
   typing?: boolean;
+  // upload-image
+  fileName?: string;
+  contentType?: string;
+  base64?: string;                       // raw base64 (no data URL prefix)
 };
 
 const json = (status: number, payload: unknown) =>
@@ -157,6 +161,37 @@ Deno.serve(async (req) => {
         .update({ read_by_chatter_at: new Date().toISOString() })
         .eq("id", body.sessionId);
       return json(200, { ok: true });
+    }
+
+    case "upload-image": {
+      if (!body.base64 || !body.fileName) {
+        return json(400, { ok: false, error: "base64 and fileName required" });
+      }
+      const ct = body.contentType ?? "image/jpeg";
+      if (!ct.startsWith("image/") && !ct.startsWith("video/")) {
+        return json(400, { ok: false, error: "only image/* or video/* supported" });
+      }
+      // Decode base64 → bytes. Hard cap at 8 MB (post-decode) to keep edge
+      // function payload reasonable; the frontend should refuse larger files
+      // before encoding.
+      const bin = Uint8Array.from(atob(body.base64), (c) => c.charCodeAt(0));
+      if (bin.length > 8 * 1024 * 1024) {
+        return json(413, { ok: false, error: "file too large (max 8 MB)" });
+      }
+      const safeName = (body.fileName || "upload")
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80) || `upload-${Date.now()}`;
+      const path = `_chat_uploads/${body.sessionId}/${Date.now()}-${safeName}`;
+      const { error: upErr } = await supa.storage
+        .from("chatter-vault")
+        .upload(path, bin, { upsert: false, contentType: ct });
+      if (upErr) return json(500, { ok: false, error: upErr.message });
+      const { data: pub } = supa.storage
+        .from("chatter-vault")
+        .getPublicUrl(path);
+      return json(200, { ok: true, url: pub.publicUrl, path });
     }
 
     default:
