@@ -247,17 +247,18 @@ section("2) config");
 
 // -------- 3. criteria defaults --------
 section("3) criteria defaults");
+// Exact 10 from the original Roleplaychatters DEFAULT_CRITERIA in index.html.
 const DEFAULT_CRITERIA = [
-  { label: "Saluda al usuario",                           label_en: "Greets the user" },
-  { label: "Mantiene la personalidad del personaje",      label_en: "Stays in character" },
-  { label: "Conexión emocional con el usuario",           label_en: "Emotional connection" },
-  { label: "Cierra la venta cuando hay oportunidad",      label_en: "Closes the sale when possible" },
-  { label: "Responde en tiempo razonable",                label_en: "Responds in reasonable time" },
-  { label: "Maneja objeciones",                           label_en: "Handles objections" },
-  { label: "Up-sell de contenido",                        label_en: "Content upsell" },
-  { label: "Ortografía y gramática",                      label_en: "Spelling and grammar" },
-  { label: "Tono coherente con el perfil",                label_en: "Tone matches profile" },
-  { label: "Cierre de la conversación",                   label_en: "Conversation wrap-up" },
+  { label: "Detección de oportunidad de venta", label_en: "Sales opportunity detection"   },
+  { label: "Cierre o intento de venta",         label_en: "Closing or sales attempt"      },
+  { label: "Conexión emocional real",           label_en: "Real emotional connection"     },
+  { label: "Personalización estratégica",       label_en: "Strategic personalization"     },
+  { label: "Lenguaje emocional y sugestivo",    label_en: "Emotional and suggestive tone" },
+  { label: "Coherencia del personaje",          label_en: "Character coherence"           },
+  { label: "Control del ritmo y escalada",      label_en: "Pacing and escalation control" },
+  { label: "Manejo de objeciones",              label_en: "Objection handling"            },
+  { label: "Ortografía y presentación",         label_en: "Spelling and presentation"     },
+  { label: "Tiempos de respuesta",              label_en: "Response timing"               },
 ];
 for (let i = 0; i < DEFAULT_CRITERIA.length; i++) {
   const row = { ...DEFAULT_CRITERIA[i], position: i + 1, weight: 1, is_active: true };
