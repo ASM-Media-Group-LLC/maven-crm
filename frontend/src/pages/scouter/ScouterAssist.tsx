@@ -5,6 +5,7 @@ import { Eye, Heart, Users, BarChart3, Wrench } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import ScouterHome from "./ScouterHome";
 import ScouterLeads from "./ScouterLeads";
+import ScouterFunnel from "./ScouterFunnel";
 
 // Scouter Assist landing — visual scaffold for the migration of the
 // `app/scouter/*` area from kash-call-qa into Maven. Each subtab is a
@@ -108,6 +109,8 @@ const ScouterAssist = () => {
                 <ScouterHome favoritesOnly />
               ) : s.key === "leads" ? (
                 <ScouterLeads />
+              ) : s.key === "funnel" ? (
+                <ScouterFunnel />
               ) : (
                 <Card>
                   <CardContent className="space-y-3 p-6">
