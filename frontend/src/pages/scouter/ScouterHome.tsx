@@ -175,8 +175,6 @@ const LeadCard = ({
   );
 };
 
-);
-
 // ─── Main ────────────────────────────────────────────────────────────────
 interface ScouterHomeProps {
   /** When true, the screen filters to leads the current user has marked

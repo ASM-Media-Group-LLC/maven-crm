@@ -282,6 +282,121 @@ export const useScouterStats = () =>
     },
   });
 
+export type FunnelWindow = "7d" | "30d" | "90d" | "all";
+
+export interface FunnelData {
+  window: FunnelWindow;
+  funnel: {
+    discovered: number;     // total leads in window (all statuses)
+    contacted: number;      // status ∈ {contacting, confirmed, active}
+    confirmed: number;      // status ∈ {confirmed, active}
+    active: number;         // status === active
+    rejected: number;
+    discarded: number;
+  };
+  rates: {
+    contactRate: number;    // contacted / discovered
+    confirmRate: number;    // confirmed / contacted
+    closeRate: number;      // active / confirmed
+    overall: number;        // active / discovered
+  };
+  topSources: Array<{ source: string; count: number }>;
+  perCompany: Array<{ company_id: string; total: number; active: number }>;
+}
+
+const windowSinceIso = (w: FunnelWindow): string | null => {
+  if (w === "all") return null;
+  const days = w === "7d" ? 7 : w === "30d" ? 30 : 90;
+  return new Date(Date.now() - days * 86400_000).toISOString();
+};
+
+export const useScouterFunnel = (window: FunnelWindow = "30d") =>
+  useQuery({
+    queryKey: ["scouter-funnel", window],
+    queryFn: async (): Promise<FunnelData> => {
+      const since = windowSinceIso(window);
+      const head = (filter: (q: any) => any) =>
+        filter(sb.from("scouter_leads").select("*", { count: "exact", head: true }));
+      const apply = (q: any) => (since ? q.gte("created_at", since) : q);
+
+      const [
+        { count: discovery },
+        { count: candidate },
+        { count: contacting },
+        { count: confirmed },
+        { count: active },
+        { count: rejected },
+        { count: discarded },
+        { data: rowsForBreakdown },
+      ] = await Promise.all([
+        head((q: any) => apply(q.eq("status", "discovery"))),
+        head((q: any) => apply(q.eq("status", "candidate"))),
+        head((q: any) => apply(q.eq("status", "contacting"))),
+        head((q: any) => apply(q.eq("status", "confirmed"))),
+        head((q: any) => apply(q.eq("status", "active"))),
+        head((q: any) => apply(q.eq("status", "rejected"))),
+        head((q: any) => apply(q.eq("status", "discarded"))),
+        apply(
+          sb
+            .from("scouter_leads")
+            .select("status, discovery_source, company_id")
+            .order("created_at", { ascending: false })
+            .limit(5000),
+        ),
+      ]);
+
+      const cnt = (n: number | null | undefined) => n ?? 0;
+      const discovered =
+        cnt(discovery) + cnt(candidate) + cnt(contacting) + cnt(confirmed) +
+        cnt(active) + cnt(rejected) + cnt(discarded);
+      const contacted = cnt(contacting) + cnt(confirmed) + cnt(active);
+      const confirmedCum = cnt(confirmed) + cnt(active);
+      const activeCum = cnt(active);
+      const ratio = (a: number, b: number) => (b > 0 ? a / b : 0);
+
+      const sourceMap = new Map<string, number>();
+      const companyMap = new Map<string, { total: number; active: number }>();
+      for (const r of (rowsForBreakdown ?? []) as Array<{
+        status: string;
+        discovery_source: string | null;
+        company_id: string;
+      }>) {
+        if (r.discovery_source) {
+          sourceMap.set(r.discovery_source, (sourceMap.get(r.discovery_source) ?? 0) + 1);
+        }
+        const c = companyMap.get(r.company_id) ?? { total: 0, active: 0 };
+        c.total++;
+        if (r.status === "active") c.active++;
+        companyMap.set(r.company_id, c);
+      }
+
+      return {
+        window,
+        funnel: {
+          discovered,
+          contacted,
+          confirmed: confirmedCum,
+          active: activeCum,
+          rejected: cnt(rejected),
+          discarded: cnt(discarded),
+        },
+        rates: {
+          contactRate: ratio(contacted, discovered),
+          confirmRate: ratio(confirmedCum, contacted),
+          closeRate: ratio(activeCum, confirmedCum),
+          overall: ratio(activeCum, discovered),
+        },
+        topSources: Array.from(sourceMap.entries())
+          .map(([source, count]) => ({ source, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 8),
+        perCompany: Array.from(companyMap.entries())
+          .map(([company_id, v]) => ({ company_id, ...v }))
+          .sort((a, b) => b.total - a.total),
+      };
+    },
+  });
+
 export const useScouterCompanies = () =>
   useQuery({
     queryKey: ["scouter-companies"],
