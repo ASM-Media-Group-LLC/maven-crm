@@ -94,6 +94,8 @@ import Closers from "./pages/Closers";
 import Tickets from "./pages/Tickets";
 import Promolog from "./pages/Promolog";
 import ChatterEvaluator from "./pages/ChatterEvaluator";
+import ScouterAssist from "./pages/scouter/ScouterAssist";
+import AgencyQA from "./pages/agency-qa/AgencyQA";
 import ChatterProfileDetail from "./pages/ChatterProfileDetail";
 import ChatterProfileEdit from "./pages/ChatterProfileEdit";
 import ChatterAdmin from "./pages/ChatterAdmin";
@@ -270,6 +272,9 @@ const App = () => (
                 <Route path="/closers" element={<PermissionRoute module="Closers"><Closers /></PermissionRoute>} />
                 <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />
                 <Route path="/promolog" element={<PermissionRoute module="Promolog"><Promolog /></PermissionRoute>} />
+                {/* Migrated areas from kash-call-qa — placeholders for now */}
+                <Route path="/scouter-assist" element={<PermissionRoute module="Scouter Assist"><ScouterAssist /></PermissionRoute>} />
+                <Route path="/agency-qa" element={<PermissionRoute module="Agency QA"><AgencyQA /></PermissionRoute>} />
                 {/* Sales Overview */}
                 <Route path="/sales-overview" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><SalesOverview /></PermissionRoute>} />
                 <Route path="/sales-overview/comparativas" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><ComparativasPage /></PermissionRoute>} />
