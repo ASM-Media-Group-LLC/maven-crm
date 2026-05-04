@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Eye, Heart, Users, BarChart3, Wrench } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
+import ScouterHome from "./ScouterHome";
 
 // Scouter Assist landing — visual scaffold for the migration of the
 // `app/scouter/*` area from kash-call-qa into Maven. Each subtab is a
@@ -100,19 +101,23 @@ const ScouterAssist = () => {
           </TabsList>
           {visibleSubs.map((s) => (
             <TabsContent key={s.key} value={s.key} className="mt-4">
-              <Card>
-                <CardContent className="space-y-3 p-6">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-500/90">
-                    <Wrench className="h-3.5 w-3.5" />
-                    En migración
-                  </div>
-                  <h2 className="text-lg font-semibold">{s.label}</h2>
-                  <p className="text-sm text-muted-foreground">{s.whatsComing}</p>
-                  <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[11px] font-mono text-muted-foreground">
-                    Origen: {s.source}
-                  </div>
-                </CardContent>
-              </Card>
+              {s.key === "home" ? (
+                <ScouterHome />
+              ) : (
+                <Card>
+                  <CardContent className="space-y-3 p-6">
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-500/90">
+                      <Wrench className="h-3.5 w-3.5" />
+                      En migración
+                    </div>
+                    <h2 className="text-lg font-semibold">{s.label}</h2>
+                    <p className="text-sm text-muted-foreground">{s.whatsComing}</p>
+                    <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[11px] font-mono text-muted-foreground">
+                      Origen: {s.source}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
           ))}
         </Tabs>
