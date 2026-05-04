@@ -6,9 +6,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useRolePermissions, MODULES_CONFIG, type RolePermission } from "./useRoles";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ChevronDown, ChevronRight, Copy } from "lucide-react";
+import { toast } from "sonner";
+import { useRolePermissions, useRoles, MODULES_CONFIG, type RolePermission } from "./useRoles";
 import { useLanguage } from "@/hooks/useLanguage";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SetPermissionsModalProps {
   open: boolean;
@@ -36,10 +39,68 @@ const getDataScopeOptions = (t: (key: any) => string) => [
 const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermissionsModalProps) => {
   const { t } = useLanguage();
   const { permissions, isLoading, savePermissions, isSaving } = useRolePermissions(roleId);
+  const { roles } = useRoles();
   const [state, setState] = useState<PermState>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [copyingFrom, setCopyingFrom] = useState(false);
 
   const isAdminRole = roleName.toLowerCase() === "admin";
+
+  // Other roles the admin can copy from. Hide the current role and any
+  // disabled ones so the dropdown only shows valid sources.
+  const copyableRoles = useMemo(
+    () => roles.filter((r) => r.id !== roleId && r.is_active),
+    [roles, roleId],
+  );
+
+  const handleCopyFrom = async (sourceId: string, sourceName: string) => {
+    setCopyingFrom(true);
+    try {
+      const { data, error } = await supabase
+        .from("role_permissions")
+        .select("module, submodule, can_access, data_scope")
+        .eq("role_id", sourceId);
+      if (error) throw error;
+
+      // Reset state from MODULES_CONFIG, then layer the source role's
+      // perms on top. Module-level access falls through to submodules
+      // that the source didn't have explicit rows for.
+      const next: PermState = {};
+      MODULES_CONFIG.forEach((m) => {
+        next[getKey(m.module, null)] = { can_access: false, data_scope: "all" };
+        m.submodules.forEach((sub) => {
+          next[getKey(m.module, sub)] = { can_access: false, data_scope: "all" };
+        });
+      });
+      (data ?? []).forEach((p) => {
+        const key = getKey(p.module, p.submodule);
+        if (next[key] !== undefined) {
+          next[key] = { can_access: p.can_access, data_scope: p.data_scope };
+        }
+      });
+      MODULES_CONFIG.forEach((m) => {
+        if (m.submodules.length === 0) return;
+        const moduleVal = next[getKey(m.module, null)];
+        m.submodules.forEach((sub) => {
+          const subKey = getKey(m.module, sub);
+          const hasSubInSource = (data ?? []).some(
+            (p) => p.module === m.module && p.submodule === sub,
+          );
+          if (!hasSubInSource) {
+            next[subKey] = { ...next[subKey], can_access: moduleVal.can_access, data_scope: moduleVal.data_scope };
+          }
+        });
+      });
+      setState(next);
+      toast.success(`Permisos copiados de ${sourceName}`, {
+        description: "Recuerda guardar para aplicarlos.",
+      });
+    } catch (e) {
+      toast.error("No se pudo copiar", { description: (e as Error).message });
+    } finally {
+      setCopyingFrom(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -216,10 +277,40 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl max-h-[85vh]">
         <DialogHeader>
-          <DialogTitle>
-            {t("permissions.title")} <span className="font-bold capitalize">{roleName}</span>
-          </DialogTitle>
-          <DialogDescription>{t("permissions.description")}</DialogDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1.5">
+              <DialogTitle>
+                {t("permissions.title")} <span className="font-bold capitalize">{roleName}</span>
+              </DialogTitle>
+              <DialogDescription>{t("permissions.description")}</DialogDescription>
+            </div>
+            {copyableRoles.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 shrink-0"
+                    disabled={copyingFrom}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copyingFrom ? "Copiando…" : "Copiar de otro rol"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[200px]">
+                  {copyableRoles.map((r) => (
+                    <DropdownMenuItem
+                      key={r.id}
+                      onClick={() => handleCopyFrom(r.id, r.name)}
+                      className="capitalize"
+                    >
+                      {r.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </DialogHeader>
 
         <ScrollArea className="h-[58vh] pr-2">
