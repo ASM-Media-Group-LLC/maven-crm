@@ -176,11 +176,22 @@ serve(async (req) => {
     // ===== END AUTH VALIDATION =====
 
     const { messages, config } = await req.json();
-    const userModel = config?.model || "google/gemini-3-flash-preview";
+    // Models like "google/gemini-*" or "openai/*" came from when this
+    // function pointed at the Lovable AI gateway. They no longer
+    // resolve against MiniMax — fall back to MiniMax-Text-01 unless
+    // the saved config already uses a MiniMax model name.
+    const savedModel: string | undefined = config?.model;
+    const userModel =
+      savedModel && /^(MiniMax|abab)/i.test(savedModel)
+        ? savedModel
+        : "MiniMax-Text-01";
     const userTone = config?.tone || "default";
     const userInstructions = config?.customInstructions || "";
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const MINIMAX_API_KEY = Deno.env.get("MINIMAX_API_KEY");
+    if (!MINIMAX_API_KEY) throw new Error("MINIMAX_API_KEY is not configured");
+    const MINIMAX_URL =
+      Deno.env.get("MINIMAX_BASE_URL") ||
+      "https://api.minimaxi.chat/v1/text/chatcompletion_v2";
 
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -300,21 +311,18 @@ Campos diarios: total, subs, messages, tips, active_fans, new_fans, creators.
 Campos por creadora: total, subs, new_subs, recurring, messages, tips, active_fans, new_fans, following, ranking.
 Montos en USD bruto. La "fecha efectiva" ajusta registros entre 00:00-00:55 al día anterior.`;
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: userModel,
-          messages: [{ role: "system", content: systemPrompt }, ...messages],
-          stream: true,
-        }),
-      }
-    );
+    const response = await fetch(MINIMAX_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${MINIMAX_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: userModel,
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        stream: true,
+      }),
+    });
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -323,13 +331,13 @@ Montos en USD bruto. La "fecha efectiva" ajusta registros entre 00:00-00:55 al d
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (response.status === 402 || response.status === 401) {
         return new Response(
-          JSON.stringify({ error: "Créditos agotados. Agrega fondos en Settings → Workspace → Usage." }),
+          JSON.stringify({ error: "Cuota de IA agotada o key inválida. Revisa MINIMAX_API_KEY." }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      console.error("AI gateway error:", response.status);
+      console.error("MiniMax error:", response.status, await response.text().catch(() => ""));
       return new Response(
         JSON.stringify({ error: "Error del servicio AI" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
