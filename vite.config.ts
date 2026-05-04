@@ -21,7 +21,10 @@ export default defineConfig(({ mode }) => ({
   publicDir: "public",
   server: {
     host: "::",
-    port: 8080,
+    // Honour the PORT env var when present (Claude Code preview /
+    // Dokploy / generic harnesses set it). Falls back to 8080 for
+    // bare `npm run dev` invocations.
+    port: process.env.PORT ? Number(process.env.PORT) : 8080,
     hmr: {
       overlay: false,
     },
