@@ -5,7 +5,20 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
+//
+// Repo layout (since the frontend / backend / servicios split):
+//   frontend/index.html  ← Vite entry
+//   frontend/src/        ← UI source
+//   frontend/public/     ← static assets
+//   backend/supabase/    ← edge functions + migrations (deno, separate runtime)
+//   servicios/           ← reserved for future microservices
+//
+// Vite is told `root: 'frontend'` so it picks up index.html from there,
+// and `build.outDir: '../dist'` so the build output still ends up at
+// the repo root for Dokploy / nginx to serve.
 export default defineConfig(({ mode }) => ({
+  root: "frontend",
+  publicDir: "public",
   server: {
     host: "::",
     port: 8080,
@@ -74,10 +87,14 @@ export default defineConfig(({ mode }) => ({
   ].filter(Boolean),
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(__dirname, "./frontend/src"),
     },
   },
   build: {
+    // Build output goes to <repo-root>/dist so Dokploy/nginx still find
+    // the static files at the same path they used before the split.
+    outDir: path.resolve(__dirname, "./dist"),
+    emptyOutDir: true,
     // The eager-loaded sidebar pages push the main chunk over Vite's
     // default 500 KB warning threshold. We don't care about the warning
     // since manualChunks below splits it into reasonable vendor pieces.
