@@ -24,6 +24,60 @@ export interface QaCloser {
   created_at: string;
 }
 
+// ─── Analysis JSON shape (mirrors kash app/api/analyze/prompt.ts) ──────
+export interface AnalysisDimension {
+  name: string;
+  score: number; // 0–10 in kash
+  feedback: string;
+}
+
+export interface AnalysisRedFlag {
+  type: string;
+  description: string;
+  quote: string;
+}
+
+export interface AnalysisKeyMoment {
+  kind: "positivo" | "negativo";
+  quote: string;
+  why: string;
+}
+
+export interface AnalysisModelObjection {
+  topic: string;
+  description: string;
+  quote: string;
+}
+
+export interface AnalysisModelSignals {
+  interest_level: "alto" | "medio" | "bajo" | "ambiguo";
+  interest_reason: string;
+  complicity_level: "alto" | "medio" | "bajo";
+  complicity_reason: string;
+  objections: AnalysisModelObjection[];
+  summary_of_model: string;
+}
+
+export interface AnalysisCallFacts {
+  ubicacion: string | null;
+  motivo_principal: string;
+  observaciones_clave: string[];
+}
+
+export interface CallAnalysis {
+  overall_score?: number;
+  summary?: string;
+  call_facts?: AnalysisCallFacts;
+  call_outcome?: CallOutcome;
+  call_outcome_reason?: string;
+  closer_speaker_label?: "Hablante 1" | "Hablante 2" | null;
+  model_signals?: AnalysisModelSignals;
+  dimensions?: AnalysisDimension[];
+  red_flags?: AnalysisRedFlag[];
+  key_moments?: AnalysisKeyMoment[];
+  improvements?: string[];
+}
+
 export interface QaCall {
   id: string;
   model_id: string | null;
@@ -32,12 +86,10 @@ export interface QaCall {
   evaluator_name: string;
   transcript: string;
   audio_metrics: unknown | null;
-  /** Full Claude / IA analysis payload — sections, dimensions,
-   *  call_outcome, etc. Cast to a richer type in the call detail view. */
-  claude_analysis: {
-    call_outcome?: CallOutcome;
-    [key: string]: unknown;
-  };
+  /** Full Claude / IA analysis payload — every field is optional
+   *  because legacy rows or partial analyses may not include the
+   *  full schema. The detail view must guard against missing data. */
+  claude_analysis: CallAnalysis;
   claude_score: number;
   created_at: string;
 }
@@ -87,6 +139,25 @@ export const useQaCalls = (params: ListParams = {}) => {
     },
   });
 };
+
+/** Single call + joined model + closer for the detail drawer. */
+export const useQaCall = (id: string | null) =>
+  useQuery({
+    queryKey: ["qa-call", id],
+    enabled: !!id,
+    queryFn: async (): Promise<QaCallRow | null> => {
+      if (!id) return null;
+      const { data, error } = await sb
+        .from("qa_calls")
+        .select(
+          "*, model:qa_models(name, avatar_data_url), closer:qa_closers(name)",
+        )
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as QaCallRow | null;
+    },
+  });
 
 export const useQaModels = () =>
   useQuery({

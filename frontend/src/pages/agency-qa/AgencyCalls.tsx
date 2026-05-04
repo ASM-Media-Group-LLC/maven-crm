@@ -25,6 +25,7 @@ import {
   type QaCallRow,
   type CallOutcome,
 } from "@/hooks/useAgencyQa";
+import CallDetailDrawer from "./CallDetailDrawer";
 
 // Calls subtab — first real screen of Agency QA. Replaces the "En
 // migración" placeholder with a list of analyzed calls (qa_calls).
@@ -99,6 +100,8 @@ const AgencyCalls = () => {
   const [outcomeFilter, setOutcomeFilter] = useState<string>("all");
   const [closerFilter, setCloserFilter] = useState<string>("all");
   const [modelFilter, setModelFilter] = useState<string>("all");
+  const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const callsQ = useQaCalls({
     search,
@@ -236,7 +239,8 @@ const AgencyCalls = () => {
                     key={row.id}
                     className="cursor-pointer hover:bg-muted/40"
                     onClick={() => {
-                      // Detail drawer arrives in the next slice.
+                      setSelectedCallId(row.id);
+                      setDrawerOpen(true);
                     }}
                   >
                     <TableCell className="tabular-nums">{fmtDate(row.call_date)}</TableCell>
@@ -269,6 +273,15 @@ const AgencyCalls = () => {
           </Table>
         )}
       </div>
+
+      <CallDetailDrawer
+        callId={selectedCallId}
+        open={drawerOpen}
+        onOpenChange={(v) => {
+          setDrawerOpen(v);
+          if (!v) setSelectedCallId(null);
+        }}
+      />
     </div>
   );
 };
