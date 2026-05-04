@@ -10,8 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, ShieldCheck, Star, Loader2 } from "lucide-react";
 import {
+  useLeadFavoriteIds,
   useScouterLeads,
   useScouterStats,
+  useToggleLeadFavorite,
   type ScouterLead,
 } from "@/hooks/useScouterLeads";
 
@@ -95,7 +97,17 @@ const StatCard = ({
 );
 
 // ─── Lead card ──────────────────────────────────────────────────────────
-const LeadCard = ({ lead, onClick }: { lead: ScouterLead; onClick: () => void }) => {
+const LeadCard = ({
+  lead,
+  isFavorite,
+  onClick,
+  onToggleFavorite,
+}: {
+  lead: ScouterLead;
+  isFavorite: boolean;
+  onClick: () => void;
+  onToggleFavorite: () => void;
+}) => {
   const statusCfg = STATUS_META[lead.status] ?? STATUS_META.discovery;
   const initial = (
     lead.name?.trim().charAt(0) ||
@@ -152,12 +164,32 @@ const LeadCard = ({ lead, onClick }: { lead: ScouterLead; onClick: () => void })
             {lead.category}
           </span>
         )}
-        {/* (favorito read-only por ahora — toggle viene en otra slice) */}
-        {false && (
-          <span className="absolute bottom-1.5 right-1.5 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-black/55">
-            <Star className="h-3.5 w-3.5 text-amber-400" />
-          </span>
-        )}
+        {/* Favorite toggle — bottom-right; nested <span role="button"> so
+            React doesn't complain about <button> inside <button>. */}
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleFavorite();
+            }
+          }}
+          className="absolute bottom-1.5 right-1.5 flex h-[24px] w-[24px] cursor-pointer items-center justify-center rounded-full bg-black/55 transition-transform hover:scale-110"
+        >
+          <Star
+            className="h-3.5 w-3.5"
+            fill={isFavorite ? "rgb(251 191 36)" : "transparent"}
+            stroke={isFavorite ? "rgb(251 191 36)" : "rgba(255,255,255,0.85)"}
+            strokeWidth={2}
+          />
+        </span>
       </div>
 
       {/* Body */}
@@ -244,8 +276,8 @@ const LeadDrawer = ({
             ))}
           </dl>
           <p className="text-xs text-muted-foreground">
-            Edición y favoritos llegan en una slice próxima — esta vista es
-            read-only por ahora.
+            Edición de campos llega en una slice próxima. Para marcar / desmarcar
+            como favorito, usa la estrella sobre la foto del lead.
           </p>
         </div>
       </SheetContent>
@@ -254,14 +286,26 @@ const LeadDrawer = ({
 };
 
 // ─── Main ────────────────────────────────────────────────────────────────
-const ScouterHome = () => {
-  const [statusFilter, setStatusFilter] = useState<string>("discovery");
+interface ScouterHomeProps {
+  /** When true, the screen filters to leads the current user has marked
+   *  as favorite, hides the stats row (less noise), and defaults the
+   *  status filter to "all" so all favorites show regardless of stage. */
+  favoritesOnly?: boolean;
+}
+
+const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
+  const [statusFilter, setStatusFilter] = useState<string>(
+    favoritesOnly ? "all" : "discovery",
+  );
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<ScouterLead | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const stats = useScouterStats();
-  const leads = useScouterLeads({ status: statusFilter, search });
+  const leads = useScouterLeads({ status: statusFilter, search, favoritesOnly });
+  const favoriteIdsQ = useLeadFavoriteIds();
+  const favoriteIds = favoriteIdsQ.data ?? new Set<string>();
+  const toggleFavorite = useToggleLeadFavorite();
 
   const visibleLeads = leads.data ?? [];
   const totalShown = visibleLeads.length;
@@ -298,12 +342,15 @@ const ScouterHome = () => {
 
   return (
     <div className="space-y-5">
-      {/* Stats row */}
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        {statBlocks.map((b) => (
-          <StatCard key={b.label} {...b} />
-        ))}
-      </div>
+      {/* Stats row — hidden in favoritesOnly mode since the numbers refer
+          to global discovery, not the user's saved set. */}
+      {!favoritesOnly && (
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          {statBlocks.map((b) => (
+            <StatCard key={b.label} {...b} />
+          ))}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
@@ -342,10 +389,13 @@ const ScouterHome = () => {
         </div>
       ) : visibleLeads.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/20 p-10 text-center">
-          <p className="text-sm font-medium">Sin leads para mostrar</p>
+          <p className="text-sm font-medium">
+            {favoritesOnly ? "Sin favoritos todavía" : "Sin leads para mostrar"}
+          </p>
           <p className="text-xs text-muted-foreground">
-            Cuando el bot descubra cuentas IG aparecerán aquí. (El botón Descubrir
-            llega en la próxima iteración.)
+            {favoritesOnly
+              ? "Marca leads como favoritos desde el grid de Home tocando la estrella en la esquina inferior derecha."
+              : "Cuando el bot descubra cuentas IG aparecerán aquí. (El botón Descubrir llega en la próxima iteración.)"}
           </p>
         </div>
       ) : (
@@ -354,10 +404,17 @@ const ScouterHome = () => {
             <LeadCard
               key={lead.id}
               lead={lead}
+              isFavorite={favoriteIds.has(lead.id)}
               onClick={() => {
                 setSelected(lead);
                 setDrawerOpen(true);
               }}
+              onToggleFavorite={() =>
+                toggleFavorite.mutate({
+                  leadId: lead.id,
+                  isFavorite: favoriteIds.has(lead.id),
+                })
+              }
             />
           ))}
         </div>

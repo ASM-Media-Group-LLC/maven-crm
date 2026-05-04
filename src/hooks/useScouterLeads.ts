@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 // Types mirror the scouter_leads / scouter_companies tables. Kept inline
@@ -98,6 +99,20 @@ export const useScouterLeads = (params: ListParams = {}) => {
   return useQuery({
     queryKey: ["scouter-leads", { status, limit, search, favoritesOnly }],
     queryFn: async (): Promise<ScouterLead[]> => {
+      // When favoritesOnly is on, fetch the current user's favorite ids
+      // first and constrain the leads query with `id IN (...)`. RLS on
+      // scouter_lead_favorites already scopes rows to auth.uid(), so
+      // this naturally returns only the caller's favorites.
+      let favoriteIds: string[] | null = null;
+      if (favoritesOnly) {
+        const { data: favRows, error: favErr } = await sb
+          .from("scouter_lead_favorites")
+          .select("lead_id");
+        if (favErr) throw favErr;
+        favoriteIds = ((favRows ?? []) as { lead_id: string }[]).map((r) => r.lead_id);
+        if (favoriteIds.length === 0) return [];
+      }
+
       let q = sb
         .from("scouter_leads")
         .select("*")
@@ -110,10 +125,65 @@ export const useScouterLeads = (params: ListParams = {}) => {
           `instagram_handle.ilike.${term},name.ilike.${term},country.ilike.${term},city.ilike.${term}`,
         );
       }
-      // favoritesOnly handled in a future slice once toggle UI lands
+      if (favoriteIds) q = q.in("id", favoriteIds);
+
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as ScouterLead[];
+    },
+  });
+};
+
+/** Set of lead ids the current user has marked as favorite. Used to
+ * render the star overlay on cards and to drive favoritesOnly filters. */
+export const useLeadFavoriteIds = () =>
+  useQuery({
+    queryKey: ["scouter-lead-favorite-ids"],
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await sb
+        .from("scouter_lead_favorites")
+        .select("lead_id");
+      if (error) throw error;
+      return new Set(((data ?? []) as { lead_id: string }[]).map((r) => r.lead_id));
+    },
+  });
+
+/** Toggle favorite for a given lead — inserts a row if none exists for
+ * the (lead_id, current_user) pair, deletes it otherwise. */
+export const useToggleLeadFavorite = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ leadId, isFavorite }: { leadId: string; isFavorite: boolean }) => {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userData.user) throw userErr ?? new Error("No auth user");
+      const userId = userData.user.id;
+      if (isFavorite) {
+        // Remove
+        const { error } = await sb
+          .from("scouter_lead_favorites")
+          .delete()
+          .eq("lead_id", leadId)
+          .eq("user_id", userId);
+        if (error) throw error;
+      } else {
+        // Add — onConflict ignore so a double-click doesn't blow up.
+        const { error } = await sb
+          .from("scouter_lead_favorites")
+          .upsert(
+            { lead_id: leadId, user_id: userId },
+            { onConflict: "lead_id,user_id" },
+          );
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-lead-favorite-ids"] });
+      qc.invalidateQueries({ queryKey: ["scouter-leads"] });
+    },
+    onError: (e) => {
+      toast.error("No se pudo actualizar el favorito", {
+        description: (e as Error).message,
+      });
     },
   });
 };

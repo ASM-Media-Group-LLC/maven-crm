@@ -103,6 +103,8 @@ const ScouterAssist = () => {
             <TabsContent key={s.key} value={s.key} className="mt-4">
               {s.key === "home" ? (
                 <ScouterHome />
+              ) : s.key === "favoritas" ? (
+                <ScouterHome favoritesOnly />
               ) : (
                 <Card>
                   <CardContent className="space-y-3 p-6">
