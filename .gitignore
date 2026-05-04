@@ -1,3 +1,6 @@
+# SDD infrastructure
+.atl/
+
 # Logs
 logs
 *.log
