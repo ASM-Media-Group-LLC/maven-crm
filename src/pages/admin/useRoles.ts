@@ -37,6 +37,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // === Menú principal ===
   { group: "Menú",          module: "Dashboard",     submodules: [] },
   { group: "Menú",          module: "Messenger",     submodules: [] },
+  { group: "Menú",          module: "Cowork",        submodules: [] },
   { group: "Menú",          module: "Contactos",     submodules: [] },
   { group: "Menú",          module: "Tareas",        submodules: [] },
   { group: "Menú",          module: "Eventos",       submodules: [] },

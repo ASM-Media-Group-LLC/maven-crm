@@ -44,7 +44,7 @@ export const usePermissions = () => {
   // lookup so a `can_access: false` row still wins; this matters for
   // backwards compat — roles saved before a given module existed have
   // no row for it and would otherwise lose access on deploy.
-  const UNIVERSAL_MODULES = ["Dashboard", "Messenger"];
+  const UNIVERSAL_MODULES = ["Dashboard", "Messenger", "Cowork"];
 
   const canAccess = (module: string, submodule?: string): boolean => {
     // Admin always has full access

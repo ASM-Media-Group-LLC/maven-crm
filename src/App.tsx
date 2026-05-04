@@ -352,7 +352,7 @@ const App = () => (
 
               {/* Full-screen routes that intentionally bypass the shell */}
               <Route path="/call/:roomName" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
-              <Route path="/cowork" element={<ProtectedRoute><CoworkPage /></ProtectedRoute>} />
+              <Route path="/cowork" element={<PermissionRoute module="Cowork"><CoworkPage /></PermissionRoute>} />
 
               {/* Proyecto MP routes (own custom MPSidebar + MPTopbar) */}
               <Route path="/proyectomp" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPDashboard /></ProyectoMPLayout></PermissionRoute>} />
