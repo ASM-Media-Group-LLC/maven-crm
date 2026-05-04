@@ -19,7 +19,7 @@ import DocumentosTabContent from "./DocumentosTabContent";
 import TicketsTabContent from "./TicketsTabContent";
 import HistorialTabContent from "./HistorialTabContent";
 import OperacionesTabContent from "./OperacionesTabContent";
-import { generateCreatorPdf } from "./generateCreatorPdf";
+// generateCreatorPdf pulls jspdf — loaded on demand below.
 import ChangeStatusModal from "./ChangeStatusModal";
 import VerificationSection from "./VerificationSection";
 import { useOffboarding } from "./useOffboarding";
@@ -209,7 +209,10 @@ const CreadorProfileContent = () => {
           </div>
 
           <div className="flex flex-col items-end gap-2 shrink-0">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => generateCreatorPdf(c)}>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={async () => {
+              const { generateCreatorPdf } = await import("./generateCreatorPdf");
+              generateCreatorPdf(c);
+            }}>
               <Download className="h-4 w-4" /> Exportar Ficha Técnica
             </Button>
             {c.status && (

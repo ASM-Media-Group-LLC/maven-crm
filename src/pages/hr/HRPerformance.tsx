@@ -24,7 +24,8 @@ import { PERFORMANCE_EVALUATION_STATUSES } from "@/lib/hrConstants";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import * as XLSX from "xlsx";
+// xlsx loaded on demand inside handleExport — keeps the export
+// dependency out of the cold-load bundle.
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface EvalRecord {
@@ -180,7 +181,8 @@ export default function HRPerformance() {
   });
 
   // ─── Export ───────────────────────────────────────────────────────────
-  function handleExport() {
+  async function handleExport() {
+    const XLSX = await import("xlsx");
     const rows = filtered.map((ev) => {
       const emp = ev.employees;
       return {

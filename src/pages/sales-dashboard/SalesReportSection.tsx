@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback } from "react";
 import { Download, Search, CalendarDays } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import * as XLSX from "xlsx";
+// xlsx loaded on demand inside handleDownloadExcel — keeps the export
+// dependency out of the cold-load bundle for users who never click it.
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import EarningsTable from "../sales-performance/EarningsTable";
@@ -121,13 +122,14 @@ const SalesReportSection = ({ rows, comparedRows, earningsMode, dateFrom, dateTo
     });
   };
 
-  const handleDownloadExcel = useCallback(() => {
+  const handleDownloadExcel = useCallback(async () => {
     const cols = ALL_COLUMNS.filter((c) => visibleColumns.has(c.key));
     const exportData = filtered.map((r) => {
       const obj: Record<string, unknown> = {};
       cols.forEach((c) => { obj[c.label] = r[c.key] ?? ""; });
       return obj;
     });
+    const XLSX = await import("xlsx");
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Earnings");

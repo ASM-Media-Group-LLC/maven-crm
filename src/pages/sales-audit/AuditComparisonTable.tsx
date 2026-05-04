@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import * as XLSX from "xlsx";
+// xlsx is loaded on demand inside the read/export handlers — keeps
+// ~140 KB gzipped out of the initial bundle since most users never
+// land on this audit screen.
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +76,7 @@ const AuditComparisonTable = ({ file }: Props) => {
       setLoading(true);
 
       const buffer = await file.arrayBuffer();
+      const XLSX = await import("xlsx");
       const wb = XLSX.read(buffer, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
@@ -326,7 +329,8 @@ const AuditComparisonTable = ({ file }: Props) => {
     return { totalExcel, totalSystem, matchCount, diffCount };
   }, [rows]);
 
-  const exportAudit = () => {
+  const exportAudit = async () => {
+    const XLSX = await import("xlsx");
     const exportData = rows.map((r) => ({
       Creadora: r.creator,
       "Entradas Excel": r.excelEntries,

@@ -5,8 +5,9 @@ import {
   FileText, Clock, CheckCircle, DollarSign, Plus, Eye, Trash2, Ban, RotateCcw, Send, Download, Mail,
   Search, X, LayoutGrid, List,
 } from "lucide-react";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+// jspdf + html2canvas loaded on demand inside handleDownloadPdf —
+// these two libraries are big and only needed when the user clicks
+// "download PDF" on a specific invoice.
 import { usePaymentMethods } from "@/hooks/useFinancialConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -219,9 +220,20 @@ export default function FacturacionPage() {
   const toggleBulk = (id: string) => setBulkSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const handleDownloadPdf = useCallback(async (inv: any) => {
-    // Render InvoiceA4Preview off-screen
-    const { createRoot } = await import("react-dom/client");
-    const { default: InvoiceA4PreviewComp } = await import("./InvoiceA4Preview");
+    // Lazy-load all the heavy export deps (jspdf + html2canvas + the
+    // off-screen invoice preview component + react-dom/client) so the
+    // page itself loads light.
+    const [
+      { createRoot },
+      { default: InvoiceA4PreviewComp },
+      { default: jsPDF },
+      { default: html2canvas },
+    ] = await Promise.all([
+      import("react-dom/client"),
+      import("./InvoiceA4Preview"),
+      import("jspdf"),
+      import("html2canvas"),
+    ]);
 
     // Create a temporary wrapper
     const wrapper = document.createElement("div");

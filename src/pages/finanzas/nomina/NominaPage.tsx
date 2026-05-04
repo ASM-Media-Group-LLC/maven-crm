@@ -24,7 +24,8 @@ import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import CalcularNominaModal from "./CalcularNominaModal";
 import CrearBatchModal from "./CrearBatchModal";
 import { useNomina } from "./useNomina";
-import { generatePayrollPdf, generateBankFile } from "./generatePayrollPdf";
+// generatePayrollPdf + generateBankFile pull jspdf — loaded on demand
+// from the export buttons below so the nómina page stays light.
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 
 const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
@@ -141,6 +142,7 @@ export default function NominaPage() {
       const { error } = await supabase.from("payroll_periods").update({ status: "cerrado" }).in("id", ids);
       if (error) throw error;
       // Generate bank files for each
+      const { generateBankFile } = await import("./generatePayrollPdf");
       for (const p of openPeriods) {
         const pDetails = details.filter(d => d.payroll_period_id === p.id);
         generateBankFile(p, pDetails);
@@ -193,7 +195,10 @@ export default function NominaPage() {
                       <TableCell><Badge variant="default">{p.status}</Badge></TableCell>
                       <TableCell className="text-sm font-medium">{fmt(Number(p.net_total) || 0)}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => generatePayrollPdf(p, details.filter(d => d.payroll_period_id === p.id))}>
+                        <Button variant="ghost" size="sm" onClick={async () => {
+                          const { generatePayrollPdf } = await import("./generatePayrollPdf");
+                          generatePayrollPdf(p, details.filter(d => d.payroll_period_id === p.id));
+                        }}>
                           <FileDown className="h-3.5 w-3.5 mr-1" />PDF
                         </Button>
                       </TableCell>
@@ -250,7 +255,10 @@ export default function NominaPage() {
                       <TableCell><Badge variant="secondary">{p.status}</Badge></TableCell>
                       <TableCell className="text-sm font-medium">{fmt(Number(p.net_total) || 0)}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => generateBankFile(p, details.filter(d => d.payroll_period_id === p.id))}>
+                        <Button variant="ghost" size="sm" onClick={async () => {
+                          const { generateBankFile } = await import("./generatePayrollPdf");
+                          generateBankFile(p, details.filter(d => d.payroll_period_id === p.id));
+                        }}>
                           <FileText className="h-3.5 w-3.5 mr-1" />CSV
                         </Button>
                       </TableCell>

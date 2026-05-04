@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { DateInput } from "@/components/ui/date-input";
 import { Progress } from "@/components/ui/progress";
 import { usePayrollParams } from "@/hooks/useFinancialConfig";
-import { generateSettlementPdf } from "./generateSettlementPdf";
+// generateSettlementPdf pulls jspdf — loaded on demand below.
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
 const STEPS = [
@@ -207,8 +207,9 @@ export default function HROffboardingNew() {
 
   const fmt = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 
-  const handleDownloadSettlement = () => {
+  const handleDownloadSettlement = async () => {
     if (!selectedEmployee) return;
+    const { generateSettlementPdf } = await import("./generateSettlementPdf");
     generateSettlementPdf({
       employeeName: `${selectedEmployee.first_name} ${selectedEmployee.last_name}`,
       hireDate: hireDate || "",
