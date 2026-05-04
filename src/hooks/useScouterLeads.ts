@@ -148,6 +148,50 @@ export const useLeadFavoriteIds = () =>
     },
   });
 
+/** Patch any subset of mutable fields on a lead and refresh queries. */
+export type LeadPatch = Partial<
+  Pick<
+    ScouterLead,
+    | "status"
+    | "category"
+    | "notes"
+    | "assigned_closer"
+    | "assigned_agency"
+    | "sub_product"
+    | "monetization_usd"
+    | "split_pct"
+    | "country"
+    | "city"
+    | "phone"
+    | "platform"
+    | "onlyfans_url"
+    | "name"
+  >
+>;
+
+export const useUpdateLead = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: LeadPatch }) => {
+      const { data, error } = await sb
+        .from("scouter_leads")
+        .update(patch)
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ScouterLead;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-leads"] });
+      qc.invalidateQueries({ queryKey: ["scouter-stats"] });
+    },
+    onError: (e) => {
+      toast.error("No se pudo guardar", { description: (e as Error).message });
+    },
+  });
+};
+
 /** Toggle favorite for a given lead — inserts a row if none exists for
  * the (lead_id, current_user) pair, deletes it otherwise. */
 export const useToggleLeadFavorite = () => {
