@@ -207,22 +207,23 @@ export const useAnalyzeQaCall = () => {
         body: { call_id: callId },
       });
       if (error) {
-        // Edge function 4xx/5xx come back wrapped in error.context.body
-        // or as plain message — surface the most useful one.
-        const msg =
-          (error as { context?: { body?: string } }).context?.body
-            ? (() => {
-                try {
-                  const parsed = JSON.parse(
-                    (error as { context: { body: string } }).context.body,
-                  );
-                  return parsed.error ?? error.message;
-                } catch {
-                  return error.message;
-                }
-              })()
-            : error.message;
-        throw new Error(msg);
+        // FunctionsHttpError trae la response cruda en error.context.
+        // El SDK moderno expone .json() como async para parsear el body
+        // — que es donde el edge function pone el campo `error` con el
+        // mensaje útil. Sin esto el toast queda en el genérico
+        // "Edge Function returned a non-2xx status code".
+        let detail: string | null = null;
+        type WithCtx = { context?: { json?: () => Promise<unknown> } };
+        const ctx = (error as unknown as WithCtx).context;
+        if (ctx && typeof ctx.json === "function") {
+          try {
+            const body = (await ctx.json()) as { error?: string };
+            if (body?.error) detail = body.error;
+          } catch {
+            // body no era JSON parseable, dejamos detail null
+          }
+        }
+        throw new Error(detail ?? error.message ?? "Error al analizar.");
       }
       if ((data as { error?: string })?.error) {
         throw new Error((data as { error: string }).error);

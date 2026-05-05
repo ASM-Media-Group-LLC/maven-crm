@@ -232,8 +232,14 @@ async function diarizeWithLlm(apiKey: string, flatText: string): Promise<string>
   const url =
     Deno.env.get("GROQ_BASE_URL") ||
     "https://api.groq.com/openai/v1/chat/completions";
+  // Default a 8b-instant: la diarización es una tarea mecánica
+  // (split de turnos por speaker) que no necesita 70b, y la free tier
+  // de Groq da 30k TPM en 8b vs 6k en 70b — sin esto, transcripts
+  // medianos/largos disparan HTTP 413 "Request too large" del lado Groq
+  // y caemos al fallback de transcript plano. Si querés probar 70b:
+  // setear GROQ_DIARIZE_MODEL=llama-3.3-70b-versatile.
   const model =
-    Deno.env.get("GROQ_DIARIZE_MODEL") || "llama-3.3-70b-versatile";
+    Deno.env.get("GROQ_DIARIZE_MODEL") || "llama-3.1-8b-instant";
 
   const systemPrompt = `Sos experto en post-procesar transcripts de llamadas de venta entre dos personas. Recibís un transcript plano (sin etiquetas de hablante) y tu trabajo es DIVIDIRLO EN TURNOS asignando "Hablante 1" o "Hablante 2" a cada uno.
 

@@ -65,7 +65,13 @@ serve(async (req) => {
     }
     const GROQ_URL =
       Deno.env.get("GROQ_BASE_URL") || "https://api.groq.com/openai/v1/chat/completions";
-    const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "llama-3.3-70b-versatile";
+    // Default a 8b-instant porque la free tier de Groq da 30k TPM en
+    // ese modelo vs solo 6k en 70b — y un análisis QA típico
+    // (system prompt + transcript + max_tokens) supera fácilmente 10k
+    // tokens, lo que dispara HTTP 413 "Request too large" con 70b.
+    // Si el usuario sube de tier o quiere calidad mayor: setear el
+    // secret GROQ_MODEL=llama-3.3-70b-versatile.
+    const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "llama-3.1-8b-instant";
 
     let body: AnalyzeRequest;
     try {
@@ -158,7 +164,12 @@ serve(async (req) => {
         response_format: { type: "json_object" },
         // Temp baja para análisis consistente — no queremos creatividad.
         temperature: 0.2,
-        max_tokens: 4000,
+        // El JSON pedido es voluminoso: 11 dimensions + red_flags +
+        // key_moments + improvements + model_signals con sub-objetos.
+        // Con 4000 max_tokens el output se cortaba a la mitad y JSON.parse
+        // fallaba ("El modelo IA devolvió JSON malformado"). 8000 da
+        // margen para análisis ricos sin pasarse del context window.
+        max_tokens: 8000,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },
