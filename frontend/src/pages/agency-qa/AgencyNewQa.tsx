@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
+import { compressAudioIfNeeded } from "@/lib/audioCompress";
 import {
   useAnalyzeQaCall,
   useCreateQaCall,
@@ -121,10 +122,25 @@ const AgencyNewQa = () => {
         const result = await mammoth.extractRawText({ arrayBuffer });
         text = result.value ?? "";
       } else {
-        // Audio: pasamos al edge function qa-transcribe (Groq Whisper).
-        // Toast informativo porque puede tardar 5-30s según duración.
-        toast.loading("Transcribiendo audio con Whisper…", { id: "transcribe" });
-        const result = await transcribe.mutateAsync(file);
+        // Audio. Si el archivo está sobre 23MB, lo comprimimos local-side
+        // a mp3 mono 16kHz 32kbps para entrar en el límite de 25MB de
+        // Groq Whisper. Si está por debajo, lo subimos como vino.
+        let toUpload = file;
+        if (file.size > 23 * 1024 * 1024) {
+          toast.loading("Comprimiendo audio (puede tardar 10-30s)…", {
+            id: "compress",
+          });
+          const compressed = await compressAudioIfNeeded(file, (pct, label) => {
+            toast.loading(`${label} ${pct}%`, { id: "compress" });
+          });
+          toast.dismiss("compress");
+          toUpload = compressed.file;
+          toast.message(
+            `Audio comprimido: ${(compressed.originalSize / 1024 / 1024).toFixed(1)}MB → ${(compressed.finalSize / 1024 / 1024).toFixed(1)}MB`,
+          );
+        }
+        toast.loading("Transcribiendo con Whisper…", { id: "transcribe" });
+        const result = await transcribe.mutateAsync(toUpload);
         toast.dismiss("transcribe");
         text = result.text;
       }
@@ -142,8 +158,9 @@ const AgencyNewQa = () => {
       );
     } catch (err) {
       toast.dismiss("transcribe");
+      toast.dismiss("compress");
       toast.error(
-        isAudio ? "No se pudo transcribir el audio" : "No se pudo leer el archivo",
+        isAudio ? "No se pudo procesar el audio" : "No se pudo leer el archivo",
         { description: (err as Error).message },
       );
     } finally {
@@ -380,7 +397,7 @@ const AgencyNewQa = () => {
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Upload className="h-4 w-4" />
                       <span>
-                        Subí .txt / .docx, o audio (.mp3 / .m4a / .wav, máx 25MB) — o pegá el texto abajo.
+                        Subí .txt / .docx, o audio (.mp3 / .m4a / .wav). Audios &gt; 23MB se comprimen automáticamente en el navegador.
                       </span>
                     </div>
                     <Button
