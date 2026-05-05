@@ -6,6 +6,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import AgencyCalls from "./AgencyCalls";
 import AgencyModels from "./AgencyModels";
 import AgencyAnalytics from "./AgencyAnalytics";
+import AgencyNewQa from "./AgencyNewQa";
 
 // Agency QA landing — visual scaffold for the migration of the
 // closers-QA area of kash-call-qa into Maven.
@@ -117,6 +118,8 @@ const AgencyQA = () => {
                 <AgencyModels />
               ) : s.key === "analytics" ? (
                 <AgencyAnalytics />
+              ) : s.key === "new-qa" ? (
+                <AgencyNewQa />
               ) : (
                 <Card>
                   <CardContent className="space-y-3 p-6">

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 // Types for the qa_* tables (Agency QA area). Kept inline since the
@@ -136,6 +136,46 @@ export const useQaCalls = (params: ListParams = {}) => {
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as QaCallRow[];
+    },
+  });
+};
+
+/** Create a new qa_call row from the Nueva QA form. claude_analysis
+ * starts as `{}` and claude_score as 0; the AI dispatch (qa-analyze
+ * edge function calling Groq) lands in a follow-up slice. */
+export interface CreateQaCallInput {
+  closer_id: string;
+  model_id: string;
+  call_date: string;        // ISO yyyy-mm-dd
+  evaluator_name: string;
+  transcript: string;
+}
+
+export const useCreateQaCall = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateQaCallInput): Promise<QaCall> => {
+      const { data, error } = await sb
+        .from("qa_calls")
+        .insert({
+          closer_id: input.closer_id,
+          model_id: input.model_id,
+          call_date: input.call_date,
+          evaluator_name: input.evaluator_name,
+          transcript: input.transcript,
+          claude_analysis: {},
+          claude_score: 0,
+          audio_metrics: null,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as QaCall;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-calls"] });
+      qc.invalidateQueries({ queryKey: ["qa-models-with-stats"] });
+      qc.invalidateQueries({ queryKey: ["qa-analytics"] });
     },
   });
 };

@@ -70,7 +70,7 @@ dist/             ← build output, lo sirve Dokploy
 | Subtab | Estado | Notas |
 |---|---|---|
 | Calls | ✅ | Tabla densa + drawer detalle (radar dimensiones, red flags, key moments, improvements, model signals, transcript collapsible) |
-| Nueva QA | 🟡 placeholder | TranscriptUploader + form + dispatch del análisis |
+| Nueva QA | ✅ create / 🟡 enrich | Form crea row con `claude_analysis: {}`. Falta dispatch IA (edge function `qa-analyze` + `GROQ_API_KEY`). |
 | QA Chat | 🟡 placeholder | Mike chat (chat con sesión scoped a closer/all) |
 | Modelos | ✅ | Catálogo con stats agregados (count calls / avg score / last outcome); click row → CallDetailDrawer reusado |
 | Analytics | 🟡 placeholder | Dashboard agregado |
