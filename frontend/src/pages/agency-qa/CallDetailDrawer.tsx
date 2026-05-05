@@ -22,7 +22,15 @@ import {
   Save,
   Sparkles,
   MessageSquareQuote,
+  ThumbsUp,
+  ThumbsDown,
+  MessageSquare,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Radar,
   RadarChart,
@@ -32,6 +40,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
 import {
@@ -42,8 +51,13 @@ import {
   useQaHumanFeedback,
   useCreateQaHumanFeedback,
   useAnalyzeQaCall,
+  useQaSectionFeedback,
+  useUpsertQaSectionFeedback,
+  useDeleteQaSectionFeedback,
   type CallAnalysis,
   type CallOutcome,
+  type QaSectionFeedback,
+  type QaSectionType,
 } from "@/hooks/useAgencyQa";
 
 // CallDetailDrawer — opens when a row is clicked in AgencyCalls.
@@ -104,8 +118,216 @@ const Section = ({ title, children, hint }: { title: string; children: React.Rea
   </section>
 );
 
+// ─── Section thumbs (per-item feedback wiring) ─────────────────────────
+// Botones 👍/👎 al lado de cada dimension/red_flag/key_moment/improvement.
+// Persiste en qa_section_feedback con UNIQUE(call_id,section_type,
+// section_index) — al re-votar, upsert pisa la row anterior. Click sobre
+// el voto activo lo borra (toggle off → "sin opinion").
+//
+// El popover de notas se abre desde un ícono de chat al costado: permite
+// agregar texto + suggested_score sin romper el flow visual.
+type SectionFeedbackContext = {
+  callId: string;
+  feedbackByKey: Map<string, QaSectionFeedback>;
+  evaluatorName: string;
+};
+
+const sectionKey = (type: QaSectionType, index: number) => `${type}:${index}`;
+
+const SectionThumbs = ({
+  ctx,
+  type,
+  index,
+  label,
+}: {
+  ctx: SectionFeedbackContext;
+  type: QaSectionType;
+  index: number;
+  label?: string | null;
+}) => {
+  const upsert = useUpsertQaSectionFeedback();
+  const remove = useDeleteQaSectionFeedback();
+  const existing = ctx.feedbackByKey.get(sectionKey(type, index)) ?? null;
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(existing?.note ?? "");
+  const [scoreDraft, setScoreDraft] = useState(
+    existing?.suggested_score != null ? String(existing.suggested_score) : "",
+  );
+  const isUp = existing?.thumbs === 1;
+  const isDown = existing?.thumbs === -1;
+  const hasNote = !!existing?.note || existing?.suggested_score != null;
+
+  const handleVote = async (vote: 1 | -1) => {
+    try {
+      // Toggle off: si re-clickea su voto actual, borramos la row.
+      if (existing && existing.thumbs === vote && !hasNote) {
+        await remove.mutateAsync({
+          call_id: ctx.callId,
+          section_type: type,
+          section_index: index,
+        });
+        return;
+      }
+      await upsert.mutateAsync({
+        call_id: ctx.callId,
+        section_type: type,
+        section_index: index,
+        section_label: label ?? null,
+        thumbs: vote,
+        note: existing?.note ?? null,
+        suggested_score: existing?.suggested_score ?? null,
+        evaluator_name: ctx.evaluatorName,
+      });
+    } catch (err) {
+      toast.error("No se pudo guardar el voto", {
+        description: (err as Error).message,
+      });
+    }
+  };
+
+  const handleSaveNote = async () => {
+    const trimmed = noteDraft.trim();
+    const numericScore =
+      scoreDraft.trim() === "" ? null : Math.max(0, Math.min(100, parseInt(scoreDraft, 10)));
+    if (scoreDraft.trim() !== "" && Number.isNaN(numericScore)) {
+      toast.error("El score sugerido debe ser un número 0-100");
+      return;
+    }
+    try {
+      await upsert.mutateAsync({
+        call_id: ctx.callId,
+        section_type: type,
+        section_index: index,
+        section_label: label ?? null,
+        // Si todavía no hay voto explícito, asumimos 👎 cuando hay nota
+        // (es lo más común — querés explicar por qué algo está mal).
+        thumbs: existing?.thumbs ?? -1,
+        note: trimmed || null,
+        suggested_score: numericScore,
+        evaluator_name: ctx.evaluatorName,
+      });
+      setNoteOpen(false);
+      toast.success("Nota guardada");
+    } catch (err) {
+      toast.error("No se pudo guardar la nota", {
+        description: (err as Error).message,
+      });
+    }
+  };
+
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      <button
+        type="button"
+        onClick={() => handleVote(1)}
+        disabled={upsert.isPending || remove.isPending}
+        className={cn(
+          "flex h-6 w-6 items-center justify-center rounded-full transition-colors",
+          isUp
+            ? "bg-emerald-500/20 text-emerald-500"
+            : "text-muted-foreground hover:bg-muted/50",
+        )}
+        title={isUp ? "Quitar 👍" : "Marcar 👍"}
+      >
+        <ThumbsUp className="h-3 w-3" />
+      </button>
+      <button
+        type="button"
+        onClick={() => handleVote(-1)}
+        disabled={upsert.isPending || remove.isPending}
+        className={cn(
+          "flex h-6 w-6 items-center justify-center rounded-full transition-colors",
+          isDown
+            ? "bg-rose-500/20 text-rose-400"
+            : "text-muted-foreground hover:bg-muted/50",
+        )}
+        title={isDown ? "Quitar 👎" : "Marcar 👎"}
+      >
+        <ThumbsDown className="h-3 w-3" />
+      </button>
+      <Popover open={noteOpen} onOpenChange={setNoteOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "flex h-6 w-6 items-center justify-center rounded-full transition-colors",
+              hasNote
+                ? "bg-primary/20 text-primary"
+                : "text-muted-foreground hover:bg-muted/50",
+            )}
+            title={hasNote ? "Editar nota" : "Agregar nota"}
+            onClick={() => {
+              setNoteDraft(existing?.note ?? "");
+              setScoreDraft(
+                existing?.suggested_score != null ? String(existing.suggested_score) : "",
+              );
+            }}
+          >
+            <MessageSquare className="h-3 w-3" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 space-y-2 p-3" align="end">
+          <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+            Nota sobre esta sección
+          </Label>
+          <Textarea
+            rows={3}
+            value={noteDraft}
+            onChange={(e) => setNoteDraft(e.target.value)}
+            placeholder="Por qué corregís esto, qué le faltó al análisis…"
+            className="text-sm"
+          />
+          <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+            Score sugerido (opcional, 0-100)
+          </Label>
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            inputMode="numeric"
+            placeholder="ej. 65"
+            value={scoreDraft}
+            onChange={(e) => setScoreDraft(e.target.value)}
+            className="h-8 text-sm"
+          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setNoteOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSaveNote}
+              disabled={upsert.isPending}
+              className="gap-1.5"
+            >
+              {upsert.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Save className="h-3 w-3" />
+              )}
+              Guardar
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+};
+
 // ─── Analysis sub-renderers ────────────────────────────────────────────
-const DimensionsBlock = ({ dimensions }: { dimensions: NonNullable<CallAnalysis["dimensions"]> }) => {
+const DimensionsBlock = ({
+  dimensions,
+  ctx,
+}: {
+  dimensions: NonNullable<CallAnalysis["dimensions"]>;
+  ctx?: SectionFeedbackContext;
+}) => {
   if (dimensions.length === 0) return null;
   // recharts wants 0-100 normalized; kash dimensions are 0-10.
   const radarData = dimensions.map((d) => ({
@@ -133,11 +355,19 @@ const DimensionsBlock = ({ dimensions }: { dimensions: NonNullable<CallAnalysis[
       <ul className="mt-2 space-y-2">
         {dimensions.map((d, i) => (
           <li key={`${d.name}-${i}`} className="text-sm">
-            <div className="flex items-baseline justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <span className="font-medium">{d.name}</span>
-              <span className="font-bold tabular-nums" style={{ color: scoreColor(d.score * 10) }}>
-                {d.score}/10
-              </span>
+              <div className="flex items-center gap-2">
+                <span
+                  className="font-bold tabular-nums"
+                  style={{ color: scoreColor(d.score * 10) }}
+                >
+                  {d.score}/10
+                </span>
+                {ctx && (
+                  <SectionThumbs ctx={ctx} type="dimension" index={i} label={d.name} />
+                )}
+              </div>
             </div>
             <p className="text-xs leading-snug text-muted-foreground">{d.feedback}</p>
           </li>
@@ -147,17 +377,31 @@ const DimensionsBlock = ({ dimensions }: { dimensions: NonNullable<CallAnalysis[
   );
 };
 
-const KeyMomentsBlock = ({ moments }: { moments: NonNullable<CallAnalysis["key_moments"]> }) => {
+const KeyMomentsBlock = ({
+  moments,
+  ctx,
+}: {
+  moments: NonNullable<CallAnalysis["key_moments"]>;
+  ctx?: SectionFeedbackContext;
+}) => {
   if (moments.length === 0) return null;
   return (
     <Section title="Momentos clave">
       <ul className="space-y-2">
         {moments.map((m, i) => (
           <li key={i} className="rounded-md border border-border/60 bg-card p-2.5">
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
+            <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider">
               <span style={{ color: m.kind === "positivo" ? "rgb(22 163 74)" : "rgb(220 38 38)" }}>
                 {m.kind === "positivo" ? "✓ Positivo" : "✗ Negativo"}
               </span>
+              {ctx && (
+                <SectionThumbs
+                  ctx={ctx}
+                  type="key_moment"
+                  index={i}
+                  label={m.quote.slice(0, 60)}
+                />
+              )}
             </div>
             <blockquote className="border-l-2 border-border pl-2 text-xs italic text-foreground/80">
               "{m.quote}"
@@ -170,18 +414,27 @@ const KeyMomentsBlock = ({ moments }: { moments: NonNullable<CallAnalysis["key_m
   );
 };
 
-const RedFlagsBlock = ({ flags }: { flags: NonNullable<CallAnalysis["red_flags"]> }) => {
+const RedFlagsBlock = ({
+  flags,
+  ctx,
+}: {
+  flags: NonNullable<CallAnalysis["red_flags"]>;
+  ctx?: SectionFeedbackContext;
+}) => {
   if (flags.length === 0) return null;
   return (
     <Section title="Red flags" hint={`${flags.length}`}>
       <ul className="space-y-2">
         {flags.map((f, i) => (
           <li key={i} className="rounded-md border border-rose-500/30 bg-rose-500/5 p-2.5">
-            <div className="mb-1 flex items-center gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">
-                {f.type.replace(/_/g, " ")}
-              </span>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">
+                  {f.type.replace(/_/g, " ")}
+                </span>
+              </div>
+              {ctx && <SectionThumbs ctx={ctx} type="red_flag" index={i} label={f.type} />}
             </div>
             <p className="text-xs text-foreground/80">{f.description}</p>
             {f.quote && (
@@ -196,14 +449,30 @@ const RedFlagsBlock = ({ flags }: { flags: NonNullable<CallAnalysis["red_flags"]
   );
 };
 
-const ImprovementsBlock = ({ improvements }: { improvements: string[] }) => {
+const ImprovementsBlock = ({
+  improvements,
+  ctx,
+}: {
+  improvements: string[];
+  ctx?: SectionFeedbackContext;
+}) => {
   if (improvements.length === 0) return null;
   return (
     <Section title="Acciones de mejora">
       <ol className="space-y-1.5 pl-4 text-sm leading-relaxed">
         {improvements.map((s, i) => (
           <li key={i} className="list-decimal text-foreground/90 marker:text-muted-foreground">
-            <span className="ml-1">{s}</span>
+            <div className="flex items-start justify-between gap-2">
+              <span className="ml-1">{s}</span>
+              {ctx && (
+                <SectionThumbs
+                  ctx={ctx}
+                  type="improvement"
+                  index={i}
+                  label={s.slice(0, 60)}
+                />
+              )}
+            </div>
           </li>
         ))}
       </ol>
@@ -277,6 +546,25 @@ const CallDetailDrawer = ({
   const a = call?.claude_analysis ?? {};
   const audioUrlQ = useQaAudioSignedUrl(call?.audio_path ?? null);
 
+  // Section feedback context — un solo fetch por call, todos los blocks
+  // lo comparten. evaluator_name viene del perfil/auth para que cada
+  // upsert quede atribuído a quien votó.
+  const { user } = useAuth();
+  const profileQ = useMyProfile();
+  const sectionFeedbackQ = useQaSectionFeedback(callId);
+  const evaluatorName =
+    profileQ.data?.full_name?.trim() ||
+    user?.user_metadata?.full_name?.trim() ||
+    user?.email ||
+    "Sin nombre";
+  const feedbackByKey = new Map<string, QaSectionFeedback>();
+  for (const fb of sectionFeedbackQ.data ?? []) {
+    feedbackByKey.set(sectionKey(fb.section_type, fb.section_index), fb);
+  }
+  const sectionCtx: SectionFeedbackContext | undefined = call
+    ? { callId: call.id, feedbackByKey, evaluatorName }
+    : undefined;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full max-w-xl overflow-y-auto sm:max-w-2xl">
@@ -339,11 +627,17 @@ const CallDetailDrawer = ({
                 </Section>
               )}
 
-              {a.dimensions && a.dimensions.length > 0 && <DimensionsBlock dimensions={a.dimensions} />}
-              {a.key_moments && a.key_moments.length > 0 && <KeyMomentsBlock moments={a.key_moments} />}
-              {a.red_flags && a.red_flags.length > 0 && <RedFlagsBlock flags={a.red_flags} />}
+              {a.dimensions && a.dimensions.length > 0 && (
+                <DimensionsBlock dimensions={a.dimensions} ctx={sectionCtx} />
+              )}
+              {a.key_moments && a.key_moments.length > 0 && (
+                <KeyMomentsBlock moments={a.key_moments} ctx={sectionCtx} />
+              )}
+              {a.red_flags && a.red_flags.length > 0 && (
+                <RedFlagsBlock flags={a.red_flags} ctx={sectionCtx} />
+              )}
               {a.improvements && a.improvements.length > 0 && (
-                <ImprovementsBlock improvements={a.improvements} />
+                <ImprovementsBlock improvements={a.improvements} ctx={sectionCtx} />
               )}
               {a.model_signals && <ModelSignalsBlock signals={a.model_signals} />}
 

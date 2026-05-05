@@ -1,0 +1,22 @@
+{
+  "name": "scouter-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Maven Scouter worker — drena scouter_jobs queue (Apify discovery + AI scoring de leads).",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "apify-client": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}

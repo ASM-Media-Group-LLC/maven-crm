@@ -330,6 +330,120 @@ export const useCreateQaHumanFeedback = () => {
   });
 };
 
+// ─── Section feedback (qa_section_feedback) ──────────────────────────
+// Thumbs 👍/👎 + nota + score sugerido por cada item del análisis IA
+// (cada dimension, red_flag, key_moment). Constraint UNIQUE(call_id,
+// section_type, section_index) garantiza un feedback por sección — al
+// volver a votar, upsert lo reemplaza. Nada de historial acá: si una
+// sección ya tenía thumbs, el último click la pisa.
+
+export type QaSectionType = "dimension" | "red_flag" | "key_moment" | "improvement" | string;
+
+export interface QaSectionFeedback {
+  id: string;
+  call_id: string;
+  section_type: QaSectionType;
+  section_index: number;
+  section_label: string | null;
+  thumbs: number; // 1 | -1
+  note: string | null;
+  suggested_score: number | null;
+  evaluator_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Lee TODOS los thumbs+notas del call (una sola query — la cantidad
+ *  por call es chica, ~30 items max). El componente filtra por section
+ *  type/index al renderizar. */
+export const useQaSectionFeedback = (callId: string | null) =>
+  useQuery({
+    queryKey: ["qa-section-feedback", callId],
+    enabled: !!callId,
+    queryFn: async (): Promise<QaSectionFeedback[]> => {
+      if (!callId) return [];
+      const { data, error } = await sb
+        .from("qa_section_feedback")
+        .select("*")
+        .eq("call_id", callId);
+      if (error) throw error;
+      return (data ?? []) as QaSectionFeedback[];
+    },
+  });
+
+export interface UpsertQaSectionFeedbackInput {
+  call_id: string;
+  section_type: QaSectionType;
+  section_index: number;
+  section_label?: string | null;
+  thumbs: number; // 1 | -1
+  note?: string | null;
+  suggested_score?: number | null;
+  evaluator_name?: string | null;
+}
+
+/** Upsert (por call_id + section_type + section_index) de un feedback de
+ *  sección. Postgres usa el UNIQUE constraint declarado en la migration
+ *  para resolver el conflicto y replazar la row existente.
+ *
+ *  Importante: pasar `onConflict` con la lista exacta de columnas del
+ *  UNIQUE — sin eso PostgREST no sabe cuál constraint usar y rechaza. */
+export const useUpsertQaSectionFeedback = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpsertQaSectionFeedbackInput): Promise<QaSectionFeedback> => {
+      const { data, error } = await sb
+        .from("qa_section_feedback")
+        .upsert(
+          {
+            call_id: input.call_id,
+            section_type: input.section_type,
+            section_index: input.section_index,
+            section_label: input.section_label ?? null,
+            thumbs: input.thumbs,
+            note: input.note ?? null,
+            suggested_score: input.suggested_score ?? null,
+            evaluator_name: input.evaluator_name ?? null,
+          },
+          { onConflict: "call_id,section_type,section_index" },
+        )
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as QaSectionFeedback;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["qa-section-feedback", variables.call_id] });
+    },
+  });
+};
+
+/** Helper opcional — borra un thumbs (cuando el usuario quiere
+ *  "destildar" su voto). No es estrictamente necesario porque la UI
+ *  igual puede ofrecer toggle entre 👍 y 👎, pero a veces queremos
+ *  volver al estado "sin opinion". */
+export const useDeleteQaSectionFeedback = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      call_id: string;
+      section_type: QaSectionType;
+      section_index: number;
+    }): Promise<void> => {
+      const { error } = await sb
+        .from("qa_section_feedback")
+        .delete()
+        .eq("call_id", input.call_id)
+        .eq("section_type", input.section_type)
+        .eq("section_index", input.section_index);
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["qa-section-feedback", variables.call_id] });
+    },
+  });
+};
+
 /** Create a new qa_call row from the Nueva QA form. claude_analysis
  * starts as `{}` and claude_score as 0. The AI dispatch happens after
  * insert via useAnalyzeQaCall (qa-analyze edge function). */
