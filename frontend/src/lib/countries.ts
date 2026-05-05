@@ -1,0 +1,68 @@
+// Lista canónica de países usada por el formulario de Nueva QA y por
+// los filtros del dashboard de Modelos. Port verbatim del kash
+// lib/country-normalize.ts — la idea es que el closer elija siempre
+// del mismo set para no fragmentar los modelos por inconsistencias
+// de tipeo ("Argentina" vs "argentina" vs "AR").
+//
+// El orden refleja el peso de mercado del negocio (latam primero,
+// europa después, resto al final).
+
+export const CANONICAL_COUNTRIES = [
+  "Argentina",
+  "Brasil",
+  "Chile",
+  "Colombia",
+  "México",
+  "Perú",
+  "Uruguay",
+  "Paraguay",
+  "Bolivia",
+  "Ecuador",
+  "Venezuela",
+  "Cuba",
+  "Costa Rica",
+  "Panamá",
+  "Guatemala",
+  "El Salvador",
+  "Honduras",
+  "Nicaragua",
+  "República Dominicana",
+  "Puerto Rico",
+  "España",
+  "Portugal",
+  "Italia",
+  "Francia",
+  "Alemania",
+  "UK",
+  "Irlanda",
+  "Noruega",
+  "Suecia",
+  "Países Bajos",
+  "Polonia",
+  "Rusia",
+  "Ucrania",
+  "Rumania",
+  "República Checa",
+  "Hungría",
+  "US/CA",
+  "Australia",
+  "Nueva Zelanda",
+  "Japón",
+  "China",
+  "Corea del Sur",
+  "Tailandia",
+  "Filipinas",
+  "Indonesia",
+  "Vietnam",
+  "Singapur",
+  "India",
+  "Pakistán",
+  "Israel",
+  "Turquía",
+  "Marruecos",
+  "Egipto",
+  "Sudáfrica",
+  "Nigeria",
+] as const;
+
+export type CanonicalCountry = (typeof CANONICAL_COUNTRIES)[number];

@@ -11,7 +11,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Check,
   CheckCircle2,
+  ChevronsUpDown,
   FileAudio,
   Loader2,
   Save,
@@ -19,6 +21,17 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { CANONICAL_COUNTRIES } from "@/lib/countries";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
@@ -366,12 +379,7 @@ const AgencyNewQa = () => {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="country">País modelo</Label>
-                <Input
-                  id="country"
-                  placeholder="Argentina"
-                  value={modelCountry}
-                  onChange={(e) => setModelCountry(e.target.value)}
-                />
+                <CountryCombobox value={modelCountry} onChange={setModelCountry} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="ig">Instagram</Label>
@@ -518,6 +526,66 @@ const AgencyNewQa = () => {
         </Card>
       )}
     </div>
+  );
+};
+
+/** Searchable combobox for the country field. Lets the closer type to
+ *  filter the canonical list (e.g. "arg" → Argentina) and pick from
+ *  the dropdown. Built on shadcn Command + Popover; cmdk handles the
+ *  fuzzy matching out of the box. */
+const CountryCombobox = ({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          <span className={cn(!value && "text-muted-foreground")}>
+            {value || "Elegí un país"}
+          </span>
+          <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar país…" className="h-9" />
+          <CommandList>
+            <CommandEmpty>Sin resultados.</CommandEmpty>
+            <CommandGroup>
+              {CANONICAL_COUNTRIES.map((country) => (
+                <CommandItem
+                  key={country}
+                  value={country}
+                  onSelect={(picked) => {
+                    onChange(picked === value.toLowerCase() ? "" : country);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-3.5 w-3.5",
+                      value === country ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  {country}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 };
 
