@@ -163,7 +163,7 @@ export const useScouterLeads = (params: ListParams = {}) => {
 
       // AI quality filter
       if (aiQuality === "approved") {
-        q = q.in("ai_status", ["high_fit", "medium_fit", "maybe"]);
+        q = q.in("ai_status", ["high_fit", "medium_fit", "maybe", "approved"]);
       } else if (aiQuality === "high_fit") {
         q = q.eq("ai_status", "high_fit");
       } else if (aiQuality === "scored") {
