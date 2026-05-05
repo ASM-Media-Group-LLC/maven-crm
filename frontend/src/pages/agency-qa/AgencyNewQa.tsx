@@ -42,6 +42,7 @@ import {
   useCreateQaCall,
   useCurrentTenantId,
   useFetchIgAvatar,
+  useFireQaWebhook,
   useQaModels,
   useTenantProfiles,
   useTranscribeAudio,
@@ -100,6 +101,7 @@ const AgencyNewQa = () => {
   const upsertCloser = useUpsertQaCloser();
   const upsertModel = useUpsertQaModel();
   const fetchAvatar = useFetchIgAvatar();
+  const fireWebhook = useFireQaWebhook();
 
   const defaultEvaluator = useMemo(() => {
     return (
@@ -239,37 +241,37 @@ const AgencyNewQa = () => {
         });
       }
 
-      // 3. Transcribir vía Whisper.
+      // 3. Generamos call_id client-side y subimos el audio a Storage
+      // PRIMERO. Antes transcribíamos mandando el File en multipart al
+      // edge function, pero con audios comprimidos de ~8MB el gateway
+      // cortaba la conexión y el browser veía "Failed to fetch". Storage
+      // tiene transporte propio dimensionado para archivos grandes —
+      // el edge después baja por path con service role.
+      const callId = crypto.randomUUID();
+      const ext = (audioForUpload.name.split(".").pop() || "mp3").toLowerCase();
+      const audioPath = `${tenantQ.data}/${callId}.${ext}`;
+
+      setSubmitStage("Subiendo audio a Storage…");
+      toast.loading("Subiendo audio…", { id: "upload" });
+      const savedAudioPath = await uploadAudio.mutateAsync({
+        file: audioForUpload,
+        path: audioPath,
+      });
+      toast.dismiss("upload");
+
+      // 4. Transcribir vía Whisper (el edge baja desde Storage).
       setSubmitStage("Transcribiendo con Whisper…");
       toast.loading("Transcribiendo audio…", { id: "transcribe" });
-      const transcribeResult = await transcribe.mutateAsync(audioForUpload);
+      const transcribeResult = await transcribe.mutateAsync({
+        audioPath: savedAudioPath,
+      });
       toast.dismiss("transcribe");
       const transcriptText = transcribeResult.text.trim();
       if (transcriptText.length === 0) {
         throw new Error("Whisper devolvió transcripción vacía. ¿El audio tiene voz audible?");
       }
 
-      // 4. Generamos call_id client-side para usarlo como path del audio
-      // y poder hacer todo en orden: upload audio → insert con audio_path.
-      const callId = crypto.randomUUID();
-      const ext = (audioForUpload.name.split(".").pop() || "mp3").toLowerCase();
-      const audioPath = `${tenantQ.data}/${callId}.${ext}`;
-
-      // 5. Subir audio a Storage.
-      setSubmitStage("Subiendo audio a Storage…");
-      let savedAudioPath: string | null = null;
-      try {
-        savedAudioPath = await uploadAudio.mutateAsync({
-          file: audioForUpload,
-          path: audioPath,
-        });
-      } catch (storageErr) {
-        toast.error("Audio no se subió a Storage (la QA queda sin audio)", {
-          description: (storageErr as Error).message,
-        });
-      }
-
-      // 6. Insert qa_calls con id explícito + transcript + audio_path.
+      // 5. Insert qa_calls con id explícito + transcript + audio_path.
       setSubmitStage("Guardando QA…");
       const row = await create.mutateAsync({
         closer_id: qaCloserId,
@@ -299,6 +301,20 @@ const AgencyNewQa = () => {
         toast.success(`Análisis IA listo · score ${result.score}/100`, {
           description: "Aparece en Calls con detalle completo.",
         });
+        // 9. Fire-and-forget del webhook a Apps Script para mail + Drive
+        // doc + Sheet log. El examiner no espera el GAS (~10-30s); el
+        // toast aparece cuando termina, o un warning si falla.
+        void fireWebhook.mutateAsync({ callId: row.id })
+          .then(() => {
+            toast.success("Reporte enviado por mail", {
+              description: "Apps Script recibió el análisis.",
+            });
+          })
+          .catch((webhookErr) => {
+            toast.warning("Reporte: webhook falló", {
+              description: (webhookErr as Error).message,
+            });
+          });
       } catch (analyzeErr) {
         toast.error("Análisis IA falló — la QA quedó guardada igual", {
           description: (analyzeErr as Error).message,
@@ -306,6 +322,7 @@ const AgencyNewQa = () => {
       }
     } catch (err) {
       toast.dismiss("compress");
+      toast.dismiss("upload");
       toast.dismiss("transcribe");
       toast.error("No se pudo procesar la QA", {
         description: (err as Error).message,

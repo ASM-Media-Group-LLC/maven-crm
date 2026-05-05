@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  buildQaEmailHtml,
+  buildQaEmailSubject,
+  labelForOutcome,
+  type QaEmailPayload,
+} from "@/pages/agency-qa/qaEmailTemplate";
 
 // Types for the qa_* tables (Agency QA area). Kept inline since the
 // generated Supabase types haven't been regenerated post-migration.
@@ -143,43 +149,47 @@ export const useQaCalls = (params: ListParams = {}) => {
   });
 };
 
-/** Send an audio file to the qa-transcribe edge function (Groq Whisper)
- *  and return the transcript text. Used by the Nueva QA upload zone
- *  when the user picks an audio file (mp3/m4a/wav/webm).
+/** Trigger qa-transcribe (Groq Whisper) for an audio that ya está en
+ *  qa-audio Storage. Pattern path-based: el browser sube el mp3 a
+ *  Storage primero (transporte robusto, sin límite chico de body), y
+ *  acá solo mandamos el path en JSON para que el edge baje el archivo
+ *  con service role y se lo pase a Groq.
  *
- *  We bypass supabase.functions.invoke and use plain fetch because
- *  invoke doesn't always serialize FormData cleanly across SDK versions
- *  — direct fetch is one less moving part. */
+ *  Antes mandábamos el File en multipart/form-data directo al edge.
+ *  Para audios comprimidos de ~8MB el gateway cortaba la conexión sin
+ *  respuesta clara → "Failed to fetch" en el browser. Pasar a path
+ *  elimina ese cuello de botella. */
 export const useTranscribeAudio = () =>
   useMutation({
-    mutationFn: async (file: File): Promise<{ text: string; duration: number | null }> => {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/qa-transcribe`;
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
-      if (!token) throw new Error("No hay sesión activa.");
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("language", "es");
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          // apikey header le dice al gateway de Supabase que se trata de
-          // una llamada autenticada vs anónima.
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: fd,
+    mutationFn: async (input: {
+      audioPath: string;
+      language?: string;
+    }): Promise<{ text: string; duration: number | null }> => {
+      const { data, error } = await supabase.functions.invoke("qa-transcribe", {
+        body: { audio_path: input.audioPath, language: input.language ?? "es" },
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(
-          (data as { error?: string }).error ??
-            `Error ${res.status} al transcribir.`,
-        );
+      if (error) {
+        // FunctionsHttpError trae el body de la response como JSON; intentamos
+        // sacar el `error` específico que devuelve el edge para que el toast
+        // muestre algo útil ("Groq tardó más de 120s") en vez de un genérico.
+        let detail: string | null = null;
+        type WithCtx = { context?: { json?: () => Promise<unknown> } };
+        const ctx = (error as unknown as WithCtx).context;
+        if (ctx && typeof ctx.json === "function") {
+          try {
+            const body = (await ctx.json()) as { error?: string };
+            if (body?.error) detail = body.error;
+          } catch {
+            // body no era JSON, dejamos detail null
+          }
+        }
+        throw new Error(detail ?? error.message ?? "Error al transcribir.");
       }
+      const payload = data as { text?: string; duration?: number | null; error?: string };
+      if (payload?.error) throw new Error(payload.error);
       return {
-        text: (data as { text: string }).text,
-        duration: (data as { duration?: number | null }).duration ?? null,
+        text: payload?.text ?? "",
+        duration: payload?.duration ?? null,
       };
     },
   });
@@ -851,6 +861,120 @@ export const useUpdateQaConfig = () => {
     },
   });
 };
+
+// ─── QA Webhook (kash-style email vía Apps Script) ───────────────────
+// Mismo pattern que useChatterEvaluator.fireWebhookInBackground:
+// armamos el payload en el cliente (incluido el HTML del mail) y lo
+// disparamos al apps_script_url configurado en qa_config. El AppScript
+// se encarga de relayear a MailApp.sendEmail + escribir en Drive/Sheets.
+//
+// El payload lleva `type: "qa_call_analysis"` para que el mismo GAS pueda
+// hacer dispatch entre tipos (chatter_evaluation vs qa_call_analysis) sin
+// necesidad de un webhook separado.
+
+interface FireInput {
+  callId: string;
+}
+
+const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> => {
+  const [{ data: cfg }, { data: row }] = await Promise.all([
+    sb.from("qa_config").select("*").eq("id", 1).maybeSingle(),
+    sb
+      .from("qa_calls")
+      .select(
+        "*, model:qa_models(name, category), closer:qa_closers(name)",
+      )
+      .eq("id", callId)
+      .maybeSingle(),
+  ]);
+
+  const config = cfg as QaConfig | null;
+  const call = row as (QaCall & {
+    model: { name: string; category: string | null } | null;
+    closer: { name: string } | null;
+  }) | null;
+
+  if (!call) throw new Error("QA call no encontrada para webhook.");
+  if (!config?.apps_script_url) {
+    // No es error — el webhook simplemente no está wireado en este tenant.
+    // El submit continúa sin mail.
+    return;
+  }
+
+  const score = call.claude_score ?? call.claude_analysis?.overall_score ?? 0;
+
+  // Toggle gating: si nadie pidió notificar este evento, no disparamos.
+  // notify_on_analyzed cubre el caso "todos los análisis nuevos".
+  // notify_on_low_score cubre solo cuando bajó del threshold.
+  const shouldNotify =
+    config.notify_on_analyzed === true ||
+    (config.notify_on_low_score === true &&
+      score < (config.low_score_threshold ?? 60));
+  if (!shouldNotify) return;
+
+  const a = call.claude_analysis ?? {};
+  const outcome = (a.call_outcome as string | null) ?? null;
+  const emailPayload: QaEmailPayload = {
+    callId: call.id,
+    createdAt: call.created_at,
+    closerName: call.closer?.name ?? "(sin nombre)",
+    modelName: call.model?.name ?? "(sin nombre)",
+    modelCategory: call.model?.category ?? null,
+    callDate: call.call_date,
+    evaluatorName: call.evaluator_name ?? "",
+    overallScore: score,
+    summary: a.summary ?? "",
+    callOutcome: outcome,
+    callOutcomeLabel: labelForOutcome(outcome),
+    callOutcomeReason: a.call_outcome_reason ?? null,
+    dimensions: (a.dimensions ?? []).map((d) => ({
+      name: d.name,
+      score: d.score,
+      feedback: d.feedback,
+    })),
+    redFlags: (a.red_flags ?? []).map((f) => ({
+      type: f.type,
+      description: f.description,
+      quote: f.quote,
+    })),
+    keyMoments: (a.key_moments ?? []).map((k) => ({
+      kind: k.kind,
+      quote: k.quote,
+      why: k.why,
+    })),
+    improvements: a.improvements ?? [],
+  };
+
+  // Payload final = todos los datos crudos + email pre-renderizado +
+  // type discriminator para el dispatch en GAS.
+  const payload = {
+    type: "qa_call_analysis" as const,
+    ...emailPayload,
+    emails: config.notification_emails ?? [],
+    emailSubject: buildQaEmailSubject(emailPayload),
+    emailHtml: buildQaEmailHtml(emailPayload),
+  };
+
+  // text/plain para evitar el preflight CORS — Apps Script rechaza
+  // OPTIONS y querer hacer JSON dispara preflight. El GAS hace
+  // JSON.parse(e.postData.contents) del lado server.
+  const res = await fetch(config.apps_script_url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload),
+    redirect: "follow",
+  });
+  if (!res.ok) throw new Error(`Apps Script devolvió HTTP ${res.status}`);
+};
+
+/** Dispara el webhook de notificación de QA. Pensado para correr
+ *  fire-and-forget desde el submit de Nueva QA — el examiner no debe
+ *  esperar a que termine el GAS (10-30s para generar Doc + Sheet + mail).
+ *  Cualquier error lo expone como toast.warning, NO bloquea el flujo. */
+export const useFireQaWebhook = () =>
+  useMutation({
+    mutationFn: (input: FireInput) => fireQaWebhookInBackground(input),
+  });
 
 // ─── QA Chat (Mike) ────────────────────────────────────────────────────
 // kash equivalent: app/qa/chat/page.tsx + components/MikeChatPanel.tsx +
