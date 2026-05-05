@@ -29,7 +29,13 @@ create table if not exists public.qa_config (
   constraint qa_config_singleton check (id = 1)
 );
 
-insert into public.qa_config (id) values (1) on conflict (id) do nothing;
+-- Seed explícito con el tenant_id de ASM Tech porque correr este
+-- INSERT desde el SQL Editor (rol postgres, sin JWT) hace que el
+-- DEFAULT current_tenant_id() devuelva NULL → violation. Cuando entren
+-- más tenants, cada uno crea su propia row vía la app o un seed manual.
+insert into public.qa_config (id, tenant_id)
+  values (1, (select id from public.tenants where slug = 'asm-tech'))
+  on conflict (id) do nothing;
 
 create trigger qa_config_updated_at
   before update on public.qa_config
