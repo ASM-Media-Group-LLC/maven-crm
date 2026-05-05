@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Eye, Heart, Users, BarChart3, Wrench } from "lucide-react";
+import { Eye, Heart, Users, BarChart3, Wrench, Radar, Settings } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import ScouterHome from "./ScouterHome";
 import ScouterLeads from "./ScouterLeads";
 import ScouterFunnel from "./ScouterFunnel";
+import ScouterDiscover from "./ScouterDiscover";
+import ScouterSettings from "./ScouterSettings";
 
 // Scouter Assist landing — visual scaffold for the migration of the
 // `app/scouter/*` area from kash-call-qa into Maven. Each subtab is a
@@ -21,7 +23,7 @@ import ScouterFunnel from "./ScouterFunnel";
 // subtab is independently gateable as a submodule so admins can grant
 // e.g. "Funnel only" later.
 
-type SubKey = "home" | "favoritas" | "leads" | "funnel";
+type SubKey = "home" | "busquedas" | "favoritas" | "leads" | "funnel" | "settings";
 
 interface SubDef {
   key: SubKey;
@@ -41,6 +43,15 @@ const SUBS: SubDef[] = [
     whatsComing:
       "Panel de descubrimiento de prospectos: filtros por país, categoría, seguidores, engagement. Lista priorizada por scoring.",
     source: "app/scouter/page.tsx → ScouterDiscoverPanel.tsx",
+  },
+  {
+    key: "busquedas",
+    label: "Búsquedas",
+    submodule: "Busquedas",
+    icon: Radar,
+    whatsComing:
+      "Botón de escaneo con animación radar, consola live del worker, y grid de leads recién descubiertas aprobadas por IA.",
+    source: "app/scouter/page.tsx → ScouterDiscoverPanel.tsx (discover section)",
   },
   {
     key: "favoritas",
@@ -68,6 +79,15 @@ const SUBS: SubDef[] = [
     whatsComing:
       "Embudo del pipeline: nuevos → contactados → respondieron → convertidos. Gráficas de conversión por canal y por scouter.",
     source: "app/scouter/funnel/page.tsx → ScouterFunnelPanel.tsx",
+  },
+  {
+    key: "settings",
+    label: "Settings",
+    submodule: "Settings",
+    icon: Settings,
+    whatsComing:
+      "Gestión de compañías, configuración de búsqueda por IA, presupuesto Apify, y parámetros del scorer.",
+    source: "kash settings/scouter → ScouterSettings.tsx",
   },
 ];
 
@@ -105,12 +125,16 @@ const ScouterAssist = () => {
             <TabsContent key={s.key} value={s.key} className="mt-4">
               {s.key === "home" ? (
                 <ScouterHome />
+              ) : s.key === "busquedas" ? (
+                <ScouterDiscover />
               ) : s.key === "favoritas" ? (
                 <ScouterHome favoritesOnly />
               ) : s.key === "leads" ? (
                 <ScouterLeads />
               ) : s.key === "funnel" ? (
                 <ScouterFunnel />
+              ) : s.key === "settings" ? (
+                <ScouterSettings />
               ) : (
                 <Card>
                   <CardContent className="space-y-3 p-6">
