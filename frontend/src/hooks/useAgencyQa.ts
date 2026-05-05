@@ -260,6 +260,175 @@ export const useQaClosers = () =>
     },
   });
 
+// ─── Analytics aggregates ──────────────────────────────────────────────
+export type QaWindow = "7d" | "30d" | "90d" | "all";
+
+export interface QaAnalytics {
+  window: QaWindow;
+  total_calls: number;
+  cerro: number;
+  no_cerro: number;
+  en_espera: number;
+  unscored: number;
+  close_rate: number;        // cerro / total_calls
+  avg_score: number;         // mean of claude_score across all rows in window
+  active_models: number;     // unique model_ids with >=1 call in window
+  active_closers: number;    // unique closer_ids with >=1 call in window
+  closer_leaderboard: Array<{
+    closer_id: string;
+    closer_name: string;
+    calls: number;
+    avg_score: number;
+    cerro: number;
+    close_rate: number;
+  }>;
+  top_models: Array<{
+    model_id: string;
+    model_name: string;
+    calls: number;
+    avg_score: number;
+  }>;
+  /** Weekly volume series for the last 12 weeks (ISO week start →
+   *  count). Older periods (90d, all) still bucket by week to keep
+   *  the chart shape stable. */
+  weekly_volume: Array<{ week_start: string; count: number; avg_score: number }>;
+}
+
+const windowSinceIso = (w: QaWindow): string | null => {
+  if (w === "all") return null;
+  const days = w === "7d" ? 7 : w === "30d" ? 30 : 90;
+  return new Date(Date.now() - days * 86400_000).toISOString();
+};
+
+export const useQaAnalytics = (window: QaWindow = "30d") =>
+  useQuery({
+    queryKey: ["qa-analytics", window],
+    queryFn: async (): Promise<QaAnalytics> => {
+      const since = windowSinceIso(window);
+
+      // Single fat query — call rows + joined closer/model names.
+      // Capped at 5k rows; beyond that the dashboard should move to
+      // an RPC. With current scale we're nowhere near.
+      let q = sb
+        .from("qa_calls")
+        .select(
+          "id, model_id, closer_id, claude_score, claude_analysis, call_date, created_at, model:qa_models(name), closer:qa_closers(name)",
+        )
+        .order("call_date", { ascending: false })
+        .limit(5000);
+      if (since) q = q.gte("created_at", since);
+      const { data, error } = await q;
+      if (error) throw error;
+
+      const rows = (data ?? []) as any[];
+      const total = rows.length;
+
+      let cerro = 0;
+      let no_cerro = 0;
+      let en_espera = 0;
+      let unscored = 0;
+      let scoreSum = 0;
+
+      const byCloser = new Map<
+        string,
+        { name: string; calls: number; scoreSum: number; cerro: number }
+      >();
+      const byModel = new Map<
+        string,
+        { name: string; calls: number; scoreSum: number }
+      >();
+      const byWeek = new Map<string, { count: number; scoreSum: number }>();
+
+      const weekStartIso = (iso: string): string => {
+        // call_date is YYYY-MM-DD (date type, no time). Normalise to
+        // Monday of that ISO week for stable bucketing.
+        const d = new Date(`${iso}T00:00:00Z`);
+        const day = d.getUTCDay() || 7; // 1..7 with Mon=1
+        if (day !== 1) d.setUTCDate(d.getUTCDate() - (day - 1));
+        return d.toISOString().slice(0, 10);
+      };
+
+      for (const r of rows) {
+        scoreSum += r.claude_score ?? 0;
+        const outcome = r.claude_analysis?.call_outcome;
+        if (outcome === "cerro") cerro++;
+        else if (outcome === "no_cerro") no_cerro++;
+        else if (outcome === "en_espera") en_espera++;
+        else unscored++;
+
+        if (r.closer_id) {
+          const name = r.closer?.name ?? "—";
+          const c = byCloser.get(r.closer_id) ?? { name, calls: 0, scoreSum: 0, cerro: 0 };
+          c.calls++;
+          c.scoreSum += r.claude_score ?? 0;
+          if (outcome === "cerro") c.cerro++;
+          byCloser.set(r.closer_id, c);
+        }
+
+        if (r.model_id) {
+          const name = r.model?.name ?? "—";
+          const m = byModel.get(r.model_id) ?? { name, calls: 0, scoreSum: 0 };
+          m.calls++;
+          m.scoreSum += r.claude_score ?? 0;
+          byModel.set(r.model_id, m);
+        }
+
+        const wk = weekStartIso(r.call_date);
+        const w = byWeek.get(wk) ?? { count: 0, scoreSum: 0 };
+        w.count++;
+        w.scoreSum += r.claude_score ?? 0;
+        byWeek.set(wk, w);
+      }
+
+      const closer_leaderboard = Array.from(byCloser.entries())
+        .map(([id, v]) => ({
+          closer_id: id,
+          closer_name: v.name,
+          calls: v.calls,
+          avg_score: v.calls > 0 ? Math.round(v.scoreSum / v.calls) : 0,
+          cerro: v.cerro,
+          close_rate: v.calls > 0 ? v.cerro / v.calls : 0,
+        }))
+        .sort((a, b) => b.avg_score - a.avg_score)
+        .slice(0, 10);
+
+      const top_models = Array.from(byModel.entries())
+        .map(([id, v]) => ({
+          model_id: id,
+          model_name: v.name,
+          calls: v.calls,
+          avg_score: v.calls > 0 ? Math.round(v.scoreSum / v.calls) : 0,
+        }))
+        .sort((a, b) => b.calls - a.calls)
+        .slice(0, 10);
+
+      const weekly_volume = Array.from(byWeek.entries())
+        .map(([week_start, v]) => ({
+          week_start,
+          count: v.count,
+          avg_score: v.count > 0 ? Math.round(v.scoreSum / v.count) : 0,
+        }))
+        .sort((a, b) => a.week_start.localeCompare(b.week_start))
+        .slice(-12);
+
+      return {
+        window,
+        total_calls: total,
+        cerro,
+        no_cerro,
+        en_espera,
+        unscored,
+        close_rate: total > 0 ? cerro / total : 0,
+        avg_score: total > 0 ? Math.round(scoreSum / total) : 0,
+        active_models: byModel.size,
+        active_closers: byCloser.size,
+        closer_leaderboard,
+        top_models,
+        weekly_volume,
+      };
+    },
+  });
+
 // Utility shared by the table + future call-detail page.
 export const scoreColor = (score: number | null): string => {
   if (score == null) return "rgb(148 163 184)";

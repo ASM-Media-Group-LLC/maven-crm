@@ -5,6 +5,7 @@ import { PhoneCall, Plus, MessageSquare, Users, BarChart3, Wrench } from "lucide
 import { usePermissions } from "@/hooks/usePermissions";
 import AgencyCalls from "./AgencyCalls";
 import AgencyModels from "./AgencyModels";
+import AgencyAnalytics from "./AgencyAnalytics";
 
 // Agency QA landing — visual scaffold for the migration of the
 // closers-QA area of kash-call-qa into Maven.
@@ -114,6 +115,8 @@ const AgencyQA = () => {
                 <AgencyCalls />
               ) : s.key === "models" ? (
                 <AgencyModels />
+              ) : s.key === "analytics" ? (
+                <AgencyAnalytics />
               ) : (
                 <Card>
                   <CardContent className="space-y-3 p-6">

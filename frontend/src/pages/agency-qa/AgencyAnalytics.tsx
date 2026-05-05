@@ -1,0 +1,414 @@
+import { useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Trophy, Users, BarChart3, TrendingUp } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RTooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  CartesianGrid,
+} from "recharts";
+import {
+  useQaAnalytics,
+  scoreColor,
+  type QaWindow,
+} from "@/hooks/useAgencyQa";
+
+// Analytics subtab — supervisor dashboard for Agency QA. Aggregates
+// every qa_calls row in the chosen window and surfaces:
+//   1. KPI strip (total calls, close rate, avg score, active closers)
+//   2. Outcome donut (cerro / no_cerro / en_espera / unscored)
+//   3. Weekly volume line (last 12 ISO-weeks bucketed)
+//   4. Closer leaderboard (top 10 by avg score)
+//   5. Top models by # calls (top 10)
+//
+// Out of scope (next slices): drill-down a closer/modelo individual,
+// export PDF, period-vs-period comparison, audio metrics rollup.
+
+const WINDOW_OPTIONS: Array<{ value: QaWindow; label: string }> = [
+  { value: "7d",  label: "Últimos 7 días" },
+  { value: "30d", label: "Últimos 30 días" },
+  { value: "90d", label: "Últimos 90 días" },
+  { value: "all", label: "Todo el histórico" },
+];
+
+const OUTCOME_COLORS: Record<string, string> = {
+  cerro:     "#16a34a",
+  no_cerro:  "#dc2626",
+  en_espera: "#ca8a04",
+  unscored:  "#71717a",
+};
+const OUTCOME_LABELS: Record<string, string> = {
+  cerro:     "Exitoso",
+  no_cerro:  "Rechazado",
+  en_espera: "En espera",
+  unscored:  "Sin scorear",
+};
+
+const formatPct = (n: number) => `${(n * 100).toFixed(1)}%`;
+
+const fmtWeekShort = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
+};
+
+// ─── KPI card ──────────────────────────────────────────────────────────
+const Kpi = ({
+  label,
+  value,
+  hint,
+  color,
+  icon: Icon,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  color: string;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+}) => (
+  <div className="rounded-xl border border-border bg-muted/20 p-3">
+    <div className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          {label}
+        </div>
+        <div className="mt-1 text-2xl font-bold tabular-nums" style={{ color }}>
+          {value}
+        </div>
+        {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
+      </div>
+      <Icon className="h-5 w-5 shrink-0" style={{ color, opacity: 0.6 }} />
+    </div>
+  </div>
+);
+
+// ─── Main ──────────────────────────────────────────────────────────────
+const AgencyAnalytics = () => {
+  const [window, setWindow] = useState<QaWindow>("30d");
+  const q = useQaAnalytics(window);
+  const data = q.data;
+
+  const outcomeData = data
+    ? [
+        { key: "cerro", value: data.cerro },
+        { key: "no_cerro", value: data.no_cerro },
+        { key: "en_espera", value: data.en_espera },
+        { key: "unscored", value: data.unscored },
+      ].filter((d) => d.value > 0)
+    : [];
+
+  const weeklyData = (data?.weekly_volume ?? []).map((w) => ({
+    label: fmtWeekShort(w.week_start),
+    calls: w.count,
+    avg: w.avg_score,
+  }));
+
+  return (
+    <div className="space-y-5">
+      {/* Header + window selector */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Analytics de QA</h2>
+          <p className="text-xs text-muted-foreground">
+            Métricas agregadas de todas las llamadas analizadas en el período.
+          </p>
+        </div>
+        <Select value={window} onValueChange={(v) => setWindow(v as QaWindow)}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {WINDOW_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {q.isError ? (
+        <div className="rounded-xl border border-rose-500/40 bg-rose-500/5 p-6 text-sm">
+          <p className="font-semibold text-rose-400">No se pudo cargar Analytics</p>
+          <p className="mt-1 text-xs text-rose-300/80">
+            {(q.error as Error)?.message ??
+              "Error desconocido leyendo qa_calls."}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Causa más probable: las migrations de Agency QA todavía no están
+            aplicadas en esta branch de Supabase. Aplica las migrations
+            (vía dashboard SQL editor o el bundle en
+            <code className="mx-1 rounded bg-muted/40 px-1">scripts/manual-pending-migrations.sql</code>
+            ) y refresca.
+          </p>
+        </div>
+      ) : q.isLoading || !data ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : data.total_calls === 0 ? (
+        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-10 text-center">
+          <p className="text-sm font-medium">Sin datos en este período</p>
+          <p className="text-xs text-muted-foreground">
+            Cuando el equipo cargue una QA desde "Nueva QA", el dashboard se llena
+            automáticamente. Probá ampliar la ventana de tiempo si esperabas ver algo.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* KPI strip */}
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <Kpi
+              label="Análisis totales"
+              value={data.total_calls}
+              hint={`en ${WINDOW_OPTIONS.find((w) => w.value === data.window)?.label.toLowerCase()}`}
+              color="rgb(99 102 241)"
+              icon={BarChart3}
+            />
+            <Kpi
+              label="Close rate"
+              value={formatPct(data.close_rate)}
+              hint={`${data.cerro} cerros`}
+              color="rgb(22 163 74)"
+              icon={Trophy}
+            />
+            <Kpi
+              label="Score promedio"
+              value={data.avg_score}
+              hint={`/ 100`}
+              color={scoreColor(data.avg_score)}
+              icon={TrendingUp}
+            />
+            <Kpi
+              label="Closers activos"
+              value={data.active_closers}
+              hint={`${data.active_models} modelos con calls`}
+              color="rgb(148 163 184)"
+              icon={Users}
+            />
+          </div>
+
+          {/* Two-column row: outcome donut + weekly volume */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {/* Outcome donut */}
+            <div className="rounded-xl border border-border bg-card p-4">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Distribución de resultados
+              </h3>
+              {outcomeData.length === 0 ? (
+                <p className="py-8 text-center text-xs text-muted-foreground">
+                  Sin resultados en el período.
+                </p>
+              ) : (
+                <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start">
+                  <div className="h-48 w-48 shrink-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={outcomeData}
+                          dataKey="value"
+                          nameKey="key"
+                          innerRadius={45}
+                          outerRadius={75}
+                          paddingAngle={2}
+                          stroke="hsl(var(--card))"
+                          strokeWidth={2}
+                        >
+                          {outcomeData.map((d) => (
+                            <Cell key={d.key} fill={OUTCOME_COLORS[d.key]} />
+                          ))}
+                        </Pie>
+                        <RTooltip
+                          contentStyle={{
+                            background: "hsl(var(--popover))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: 8,
+                            fontSize: 12,
+                          }}
+                          formatter={(value: number, _name: string, item: any) => [
+                            value,
+                            OUTCOME_LABELS[item.payload.key],
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul className="flex-1 space-y-2 text-sm">
+                    {outcomeData.map((d) => {
+                      const pct = data.total_calls > 0 ? (d.value / data.total_calls) * 100 : 0;
+                      return (
+                        <li key={d.key} className="flex items-center justify-between gap-3">
+                          <span className="flex items-center gap-2">
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ background: OUTCOME_COLORS[d.key] }}
+                            />
+                            {OUTCOME_LABELS[d.key]}
+                          </span>
+                          <span className="tabular-nums text-muted-foreground">
+                            <span className="text-foreground">{d.value}</span> · {pct.toFixed(1)}%
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Weekly volume line */}
+            <div className="rounded-xl border border-border bg-card p-4">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Volumen por semana (últimas 12)
+              </h3>
+              {weeklyData.length === 0 ? (
+                <p className="py-8 text-center text-xs text-muted-foreground">
+                  Sin actividad semanal.
+                </p>
+              ) : (
+                <div className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={weeklyData}>
+                      <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      />
+                      <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
+                      <RTooltip
+                        contentStyle={{
+                          background: "hsl(var(--popover))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: 8,
+                          fontSize: 12,
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="calls"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        name="Calls"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Two-column row: closer leaderboard + top models */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {/* Closer leaderboard */}
+            <div className="rounded-xl border border-border bg-card p-4">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Closer leaderboard (top 10 por avg score)
+              </h3>
+              {data.closer_leaderboard.length === 0 ? (
+                <p className="py-8 text-center text-xs text-muted-foreground">
+                  Sin closers con calls en el período.
+                </p>
+              ) : (
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={data.closer_leaderboard}
+                      layout="vertical"
+                      margin={{ top: 4, right: 24, bottom: 4, left: 4 }}
+                    >
+                      <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" horizontal={false} />
+                      <XAxis
+                        type="number"
+                        domain={[0, 100]}
+                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="closer_name"
+                        width={120}
+                        tick={{ fontSize: 11, fill: "hsl(var(--foreground))" }}
+                      />
+                      <RTooltip
+                        contentStyle={{
+                          background: "hsl(var(--popover))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: 8,
+                          fontSize: 12,
+                        }}
+                        formatter={(value: number, name: string, item: any) => {
+                          if (name === "avg_score") return [value, "Score avg"];
+                          if (name === "calls") return [value, "Calls"];
+                          if (name === "close_rate") return [`${(value * 100).toFixed(0)}%`, "Close rate"];
+                          return [value, name];
+                        }}
+                      />
+                      <Bar dataKey="avg_score" radius={[0, 4, 4, 0]}>
+                        {data.closer_leaderboard.map((c) => (
+                          <Cell key={c.closer_id} fill={scoreColor(c.avg_score)} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+
+            {/* Top models */}
+            <div className="rounded-xl border border-border bg-card p-4">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Modelos con más calls (top 10)
+              </h3>
+              {data.top_models.length === 0 ? (
+                <p className="py-8 text-center text-xs text-muted-foreground">
+                  Sin modelos con calls en el período.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {data.top_models.map((m) => {
+                    const max = data.top_models[0]?.calls || 1;
+                    const pct = (m.calls / max) * 100;
+                    return (
+                      <li key={m.model_id} className="space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="min-w-0 truncate font-medium">{m.model_name}</span>
+                          <span className="tabular-nums text-muted-foreground">
+                            <span className="text-foreground">{m.calls}</span> calls · avg{" "}
+                            <span className="font-bold" style={{ color: scoreColor(m.avg_score) }}>
+                              {m.avg_score}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted/30">
+                          <div
+                            className="h-full rounded-full bg-primary/70"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default AgencyAnalytics;
