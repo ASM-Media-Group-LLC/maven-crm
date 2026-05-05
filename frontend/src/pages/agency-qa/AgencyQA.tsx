@@ -14,23 +14,24 @@ import {
   Megaphone,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { cn } from "@/lib/utils";
 import AgencyCalls from "./AgencyCalls";
 import AgencyModels from "./AgencyModels";
 import AgencyAnalytics from "./AgencyAnalytics";
 import AgencyNewQa from "./AgencyNewQa";
 import AgencyQaChat from "./AgencyQaChat";
 
-// Agency QA — 2 niveles de tabs:
+// Agency QA — 2 niveles:
 //
-//   1. Outer: Closers QA · Chatters QA · Managers QA · Spammers QA
-//      Cada rol tiene su propio set de QAs. Solo Closers QA está
-//      poblado por ahora (port de kash-call-qa); el resto son
-//      placeholders hasta que migremos esos flujos.
+//   1. Left rail (vertical, estilo Settings): roles
+//        Closers QA · Chatters QA · Managers QA · Spammers QA
+//      Cada rol tiene su propio mundo de QAs. Solo Closers QA está
+//      poblado (port de kash-call-qa); el resto son placeholders.
 //
-//   2. Inner (solo dentro de Closers QA): los 5 subtabs históricos
-//      Calls · Nueva QA · QA Chat · Modelos · Analytics. Cada uno
-//      sigue siendo gateable por canAccess() — un closer puede ver
-//      Calls + Nueva QA, un supervisor el dashboard completo.
+//   2. Inside Closers QA → horizontal tabs:
+//        Calls · Nueva QA · QA Chat · Modelos · Analytics
+//      Estos se mantienen como tabs horizontales (no se restructuran)
+//      y siguen siendo gateables individualmente vía canAccess().
 
 type ClosersQaKey = "calls" | "new-qa" | "qa-chat" | "models" | "analytics";
 
@@ -91,20 +92,22 @@ const CLOSERS_QA_SUBS: ClosersQaSub[] = [
   },
 ];
 
-type RoleTabKey = "closers-qa" | "chatters-qa" | "managers-qa" | "spammers-qa";
+type RoleKey = "closers-qa" | "chatters-qa" | "managers-qa" | "spammers-qa";
 
-interface RoleTab {
-  key: RoleTabKey;
+interface RoleSection {
+  key: RoleKey;
   label: string;
+  description: string;
   icon: React.ComponentType<{ className?: string }>;
   ready: boolean;
   comingSoon: string;
 }
 
-const ROLE_TABS: RoleTab[] = [
+const ROLE_SECTIONS: RoleSection[] = [
   {
     key: "closers-qa",
     label: "Closers QA",
+    description: "Llamadas de venta de closers a modelos.",
     icon: Headphones,
     ready: true,
     comingSoon: "",
@@ -112,6 +115,7 @@ const ROLE_TABS: RoleTab[] = [
   {
     key: "chatters-qa",
     label: "Chatters QA",
+    description: "Conversaciones de chatters con fans en OF.",
     icon: MessageCircle,
     ready: false,
     comingSoon:
@@ -120,6 +124,7 @@ const ROLE_TABS: RoleTab[] = [
   {
     key: "managers-qa",
     label: "Managers QA",
+    description: "1-on-1 manager → modelo, follow-ups.",
     icon: Briefcase,
     ready: false,
     comingSoon:
@@ -128,6 +133,7 @@ const ROLE_TABS: RoleTab[] = [
   {
     key: "spammers-qa",
     label: "Spammers QA",
+    description: "DMs masivos, bumps, content drops.",
     icon: Megaphone,
     ready: false,
     comingSoon:
@@ -145,100 +151,128 @@ const ClosersQaSection = () => {
   );
 
   return (
-    <Tabs value={active} onValueChange={(v) => setActive(v as ClosersQaKey)}>
-      <TabsList>
-        {visibleSubs.map((s) => {
-          const Icon = s.icon;
-          return (
-            <TabsTrigger key={s.key} value={s.key} className="gap-1.5">
-              <Icon className="h-3.5 w-3.5" />
-              {s.label}
-            </TabsTrigger>
-          );
-        })}
-      </TabsList>
-      {visibleSubs.map((s) => (
-        <TabsContent key={s.key} value={s.key} className="mt-4">
-          {s.key === "calls" ? (
-            <AgencyCalls />
-          ) : s.key === "models" ? (
-            <AgencyModels />
-          ) : s.key === "analytics" ? (
-            <AgencyAnalytics />
-          ) : s.key === "new-qa" ? (
-            <AgencyNewQa />
-          ) : s.key === "qa-chat" ? (
-            <AgencyQaChat />
-          ) : (
-            <Card>
-              <CardContent className="space-y-3 p-6">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-500/90">
-                  <Wrench className="h-3.5 w-3.5" />
-                  En migración
-                </div>
-                <h2 className="text-lg font-semibold">{s.label}</h2>
-                <p className="text-sm text-muted-foreground">{s.whatsComing}</p>
-                <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[11px] font-mono text-muted-foreground">
-                  Origen: {s.source}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      ))}
-    </Tabs>
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-xl font-bold tracking-tight">Closers QA</h2>
+        <p className="text-sm text-muted-foreground">
+          Auditorías de llamadas de venta de closers a modelos.
+        </p>
+      </div>
+      <Tabs value={active} onValueChange={(v) => setActive(v as ClosersQaKey)}>
+        <TabsList>
+          {visibleSubs.map((s) => {
+            const Icon = s.icon;
+            return (
+              <TabsTrigger key={s.key} value={s.key} className="gap-1.5">
+                <Icon className="h-3.5 w-3.5" />
+                {s.label}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+        {visibleSubs.map((s) => (
+          <TabsContent key={s.key} value={s.key} className="mt-4">
+            {s.key === "calls" ? (
+              <AgencyCalls />
+            ) : s.key === "models" ? (
+              <AgencyModels />
+            ) : s.key === "analytics" ? (
+              <AgencyAnalytics />
+            ) : s.key === "new-qa" ? (
+              <AgencyNewQa />
+            ) : s.key === "qa-chat" ? (
+              <AgencyQaChat />
+            ) : (
+              <Card>
+                <CardContent className="space-y-3 p-6">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-500/90">
+                    <Wrench className="h-3.5 w-3.5" />
+                    En migración
+                  </div>
+                  <h2 className="text-lg font-semibold">{s.label}</h2>
+                  <p className="text-sm text-muted-foreground">{s.whatsComing}</p>
+                  <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[11px] font-mono text-muted-foreground">
+                    Origen: {s.source}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        ))}
+      </Tabs>
+    </div>
   );
 };
 
-const ComingSoonRoleTab = ({ tab }: { tab: RoleTab }) => (
-  <Card>
-    <CardContent className="space-y-3 p-6">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-500/90">
-        <Wrench className="h-3.5 w-3.5" />
-        Próximamente
-      </div>
-      <h2 className="text-lg font-semibold">{tab.label}</h2>
-      <p className="text-sm text-muted-foreground">{tab.comingSoon}</p>
-    </CardContent>
-  </Card>
+const ComingSoonSection = ({ section }: { section: RoleSection }) => (
+  <div className="space-y-4">
+    <div>
+      <h2 className="text-xl font-bold tracking-tight">{section.label}</h2>
+      <p className="text-sm text-muted-foreground">{section.description}</p>
+    </div>
+    <Card>
+      <CardContent className="space-y-3 p-6">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-500/90">
+          <Wrench className="h-3.5 w-3.5" />
+          Próximamente
+        </div>
+        <p className="text-sm text-muted-foreground">{section.comingSoon}</p>
+      </CardContent>
+    </Card>
+  </div>
 );
 
 const AgencyQA = () => {
-  const [activeRole, setActiveRole] = useState<RoleTabKey>("closers-qa");
+  const [activeRole, setActiveRole] = useState<RoleKey>("closers-qa");
+  const activeSection = ROLE_SECTIONS.find((s) => s.key === activeRole);
 
   return (
-    <main className="flex-1 overflow-y-auto p-6">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Agency QA</h1>
-          <p className="text-sm text-muted-foreground">
-            Auditorías de llamadas / conversaciones con IA por rol.
-          </p>
+    <main className="flex flex-1 overflow-y-auto">
+      {/* Left rail vertical estilo Settings — 4 role categorías. */}
+      <aside className="w-60 shrink-0 border-r bg-card/40 p-4">
+        <div className="sticky top-4 space-y-1">
+          <div className="px-2 pb-2">
+            <h1 className="text-base font-bold tracking-tight">Agency QA</h1>
+            <p className="text-[11px] text-muted-foreground">
+              Auditorías por rol.
+            </p>
+          </div>
+          {ROLE_SECTIONS.map((sec) => {
+            const Icon = sec.icon;
+            const isActive = activeRole === sec.key;
+            return (
+              <button
+                key={sec.key}
+                type="button"
+                onClick={() => setActiveRole(sec.key)}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
+                  isActive
+                    ? "bg-primary/15 text-primary font-medium"
+                    : "text-foreground hover:bg-muted/60",
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="truncate">{sec.label}</span>
+                {!sec.ready && (
+                  <span className="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground">
+                    soon
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
+      </aside>
 
-        <Tabs
-          value={activeRole}
-          onValueChange={(v) => setActiveRole(v as RoleTabKey)}
-        >
-          <TabsList>
-            {ROLE_TABS.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <TabsTrigger key={tab.key} value={tab.key} className="gap-1.5">
-                  <Icon className="h-3.5 w-3.5" />
-                  {tab.label}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-
-          {ROLE_TABS.map((tab) => (
-            <TabsContent key={tab.key} value={tab.key} className="mt-6">
-              {tab.ready ? <ClosersQaSection /> : <ComingSoonRoleTab tab={tab} />}
-            </TabsContent>
-          ))}
-        </Tabs>
-      </div>
+      {/* Right side — contenido de la sección activa. */}
+      <section className="min-w-0 flex-1 overflow-y-auto p-6 lg:p-8">
+        {activeRole === "closers-qa" ? (
+          <ClosersQaSection />
+        ) : activeSection ? (
+          <ComingSoonSection section={activeSection} />
+        ) : null}
+      </section>
     </main>
   );
 };
