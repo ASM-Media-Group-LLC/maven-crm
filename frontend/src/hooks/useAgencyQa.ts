@@ -788,6 +788,70 @@ export const OUTCOME_META: Record<
   en_espera: { label: "En espera", bg: "rgb(202 138 4)",  icon: "⏳" },
 };
 
+// ─── QA Config (notificaciones globales) ──────────────────────────────
+// Singleton (id=1) por tenant. Mismo patrón que chatter_config — un
+// solo row con apps_script_url + lista de emails externos + lista de
+// profiles.id internos + toggles por evento. La edge function
+// notification-automations lee esto y dispara cuando entran las
+// condiciones (qa_calls insert / claude_analysis update / score < threshold).
+
+export interface QaConfig {
+  id: number;
+  apps_script_url: string | null;
+  notification_emails: string[];
+  notify_user_ids: string[];
+  notify_on_uploaded: boolean;
+  notify_on_analyzed: boolean;
+  notify_on_low_score: boolean;
+  notify_on_failed: boolean;
+  low_score_threshold: number;
+  updated_at: string;
+}
+
+export const useQaConfig = () =>
+  useQuery({
+    queryKey: ["qa-config"],
+    queryFn: async (): Promise<QaConfig | null> => {
+      const { data, error } = await sb
+        .from("qa_config")
+        .select("*")
+        .eq("id", 1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as QaConfig | null;
+    },
+  });
+
+export interface UpdateQaConfigInput {
+  apps_script_url?: string | null;
+  notification_emails?: string[];
+  notify_user_ids?: string[];
+  notify_on_uploaded?: boolean;
+  notify_on_analyzed?: boolean;
+  notify_on_low_score?: boolean;
+  notify_on_failed?: boolean;
+  low_score_threshold?: number;
+}
+
+export const useUpdateQaConfig = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpdateQaConfigInput): Promise<QaConfig> => {
+      const { data, error } = await sb
+        .from("qa_config")
+        .update(input)
+        .eq("id", 1)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as QaConfig;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-config"] });
+    },
+  });
+};
+
 // ─── QA Chat (Mike) ────────────────────────────────────────────────────
 // kash equivalent: app/qa/chat/page.tsx + components/MikeChatPanel.tsx +
 // lib/mike-chat.ts + db tables qa_chat_sessions / qa_chat_messages.
