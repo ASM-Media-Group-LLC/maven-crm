@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Eye, Heart, Users, BarChart3, Wrench, Radar, Settings } from "lucide-react";
+import { Eye, Heart, Users, BarChart3, Wrench, Radar, Settings, ClipboardList } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import ScouterHome from "./ScouterHome";
 import ScouterLeads from "./ScouterLeads";
 import ScouterFunnel from "./ScouterFunnel";
 import ScouterDiscover from "./ScouterDiscover";
 import ScouterSettings from "./ScouterSettings";
+import MisTareas from "./MisTareas";
 
 // Scouter Assist landing — visual scaffold for the migration of the
 // `app/scouter/*` area from kash-call-qa into Maven. Each subtab is a
@@ -23,7 +24,7 @@ import ScouterSettings from "./ScouterSettings";
 // subtab is independently gateable as a submodule so admins can grant
 // e.g. "Funnel only" later.
 
-type SubKey = "home" | "busquedas" | "favoritas" | "leads" | "funnel" | "settings";
+type SubKey = "home" | "busquedas" | "favoritas" | "leads" | "funnel" | "settings" | "mis-tareas";
 
 interface SubDef {
   key: SubKey;
@@ -89,6 +90,15 @@ const SUBS: SubDef[] = [
       "Gestión de compañías, configuración de búsqueda por IA, presupuesto Apify, y parámetros del scorer.",
     source: "kash settings/scouter → ScouterSettings.tsx",
   },
+  {
+    key: "mis-tareas",
+    label: "Mis Tareas",
+    submodule: "Mis Tareas",
+    icon: ClipboardList,
+    whatsComing:
+      "Panel diario del spammer con 50 leads asignados por IA y micro-tareas de interacción.",
+    source: "scouter-daily-tasks → MisTareas.tsx",
+  },
 ];
 
 const ScouterAssist = () => {
@@ -135,6 +145,8 @@ const ScouterAssist = () => {
                 <ScouterFunnel />
               ) : s.key === "settings" ? (
                 <ScouterSettings />
+              ) : s.key === "mis-tareas" ? (
+                <MisTareas />
               ) : (
                 <Card>
                   <CardContent className="space-y-3 p-6">
