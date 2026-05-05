@@ -64,12 +64,27 @@ export interface ScouterLead {
   updated_at: string;
 }
 
+export interface CompanySearchConfig {
+  hashtags?: string[];
+  seed_accounts?: string[];
+  followers_min?: number;
+  followers_max?: number;
+  content_type?: "adult" | "fitness" | "lifestyle" | "mixed";
+  profile_tier?: "micro" | "mid" | "macro" | "mega";
+  geo_targets?: string[];
+  bio_keywords?: string[];
+  exclude_keywords?: string[];
+  scoring_notes?: string;
+  ai_generated_at?: string;
+}
+
 export interface ScouterCompany {
   id: string;
   slug: string;
   name: string;
   description: string | null;
   active: boolean;
+  search_config: CompanySearchConfig;
   created_at: string;
 }
 
@@ -473,6 +488,81 @@ export const useScouterCompanies = () =>
     },
   });
 
+/** Fetch ALL companies (including inactive) for the settings panel. */
+export const useScouterCompaniesAll = () =>
+  useQuery({
+    queryKey: ["scouter-companies-all"],
+    queryFn: async (): Promise<ScouterCompany[]> => {
+      const { data, error } = await sb
+        .from("scouter_companies")
+        .select("*")
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as ScouterCompany[];
+    },
+  });
+
+export type CompanyInput = {
+  slug: string;
+  name: string;
+  description?: string | null;
+  active?: boolean;
+  search_config?: CompanySearchConfig;
+};
+
+export const useCreateCompany = () => {
+  const qc = useQueryClient();
+  const tenantQ = useCurrentTenantId();
+  return useMutation({
+    mutationFn: async (input: CompanyInput): Promise<ScouterCompany> => {
+      const tenantId = tenantQ.data;
+      if (!tenantId) throw new Error("Tenant no resuelto.");
+      const { data, error } = await sb
+        .from("scouter_companies")
+        .insert({
+          slug: input.slug,
+          name: input.name,
+          description: input.description ?? null,
+          active: input.active ?? true,
+          search_config: input.search_config ?? {},
+          tenant_id: tenantId,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ScouterCompany;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-companies"] });
+      qc.invalidateQueries({ queryKey: ["scouter-companies-all"] });
+      toast.success("Compañía creada");
+    },
+    onError: (e) => toast.error("Error al crear compañía", { description: (e as Error).message }),
+  });
+};
+
+export const useUpdateCompany = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: Partial<CompanyInput> & { id: string }): Promise<ScouterCompany> => {
+      const { data, error } = await sb
+        .from("scouter_companies")
+        .update(patch)
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ScouterCompany;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-companies"] });
+      qc.invalidateQueries({ queryKey: ["scouter-companies-all"] });
+      toast.success("Compañía actualizada");
+    },
+    onError: (e) => toast.error("Error al actualizar", { description: (e as Error).message }),
+  });
+};
+
 // ─── Worker queue · scouter_jobs ───────────────────────────────────────
 // Hooks para enquear / monitorear los jobs que consume el
 // scouter-worker (servicios/scouter-worker). Los inserts tienen que
@@ -691,13 +781,15 @@ interface ScouterJobsParams {
   status?: JobStatus | JobStatus[];
   kind?: JobKind | JobKind[];
   limit?: number;
+  /** Override refetch interval (ms). Default 10_000. */
+  refetchInterval?: number;
 }
 
 /** Lista jobs para el panel de monitoreo. Default: últimos 50 sin
  *  filtro. Pasar { status: ["queued", "running"] } para ver lo que
  *  está en curso. */
 export const useScouterJobs = (params: ScouterJobsParams = {}) => {
-  const { status, kind, limit = 50 } = params;
+  const { status, kind, limit = 50, refetchInterval: customInterval } = params;
   return useQuery({
     queryKey: ["scouter-jobs", { status, kind, limit }],
     queryFn: async (): Promise<ScouterJob[]> => {
@@ -716,9 +808,7 @@ export const useScouterJobs = (params: ScouterJobsParams = {}) => {
       if (error) throw error;
       return (data ?? []) as ScouterJob[];
     },
-    // Refetch cada 10s mientras la pestaña esté visible — la queue
-    // tiene movimiento real cada ~15s del worker poll.
-    refetchInterval: 10_000,
+    refetchInterval: customInterval ?? 10_000,
   });
 };
 
