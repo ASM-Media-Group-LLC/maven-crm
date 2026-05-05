@@ -176,22 +176,24 @@ serve(async (req) => {
     // ===== END AUTH VALIDATION =====
 
     const { messages, config } = await req.json();
-    // Models like "google/gemini-*" or "openai/*" came from when this
-    // function pointed at the Lovable AI gateway. They no longer
-    // resolve against MiniMax — fall back to MiniMax-Text-01 unless
-    // the saved config already uses a MiniMax model name.
+    // Models from older providers (Lovable gateway: google/gemini-*,
+    // MiniMax: MiniMax-Text-01 / abab*) don't resolve against Groq.
+    // Fall back to the default Groq model unless the saved config
+    // already references a Groq one (llama / mixtral / gemma).
     const savedModel: string | undefined = config?.model;
+    const GROQ_MODEL_DEFAULT =
+      Deno.env.get("GROQ_MODEL") || "llama-3.3-70b-versatile";
+    const isGroqModel = (m: string) =>
+      /^(llama|mixtral|gemma|meta-llama|qwen|deepseek)/i.test(m);
     const userModel =
-      savedModel && /^(MiniMax|abab)/i.test(savedModel)
-        ? savedModel
-        : "MiniMax-Text-01";
+      savedModel && isGroqModel(savedModel) ? savedModel : GROQ_MODEL_DEFAULT;
     const userTone = config?.tone || "default";
     const userInstructions = config?.customInstructions || "";
-    const MINIMAX_API_KEY = Deno.env.get("MINIMAX_API_KEY");
-    if (!MINIMAX_API_KEY) throw new Error("MINIMAX_API_KEY is not configured");
-    const MINIMAX_URL =
-      Deno.env.get("MINIMAX_BASE_URL") ||
-      "https://api.minimaxi.chat/v1/text/chatcompletion_v2";
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+    if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY is not configured");
+    const GROQ_URL =
+      Deno.env.get("GROQ_BASE_URL") ||
+      "https://api.groq.com/openai/v1/chat/completions";
 
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -311,10 +313,10 @@ Campos diarios: total, subs, messages, tips, active_fans, new_fans, creators.
 Campos por creadora: total, subs, new_subs, recurring, messages, tips, active_fans, new_fans, following, ranking.
 Montos en USD bruto. La "fecha efectiva" ajusta registros entre 00:00-00:55 al día anterior.`;
 
-    const response = await fetch(MINIMAX_URL, {
+    const response = await fetch(GROQ_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${MINIMAX_API_KEY}`,
+        Authorization: `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -333,11 +335,11 @@ Montos en USD bruto. La "fecha efectiva" ajusta registros entre 00:00-00:55 al d
       }
       if (response.status === 402 || response.status === 401) {
         return new Response(
-          JSON.stringify({ error: "Cuota de IA agotada o key inválida. Revisa MINIMAX_API_KEY." }),
+          JSON.stringify({ error: "Cuota de IA agotada o key inválida. Revisa GROQ_API_KEY." }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      console.error("MiniMax error:", response.status, await response.text().catch(() => ""));
+      console.error("Groq error:", response.status, await response.text().catch(() => ""));
       return new Response(
         JSON.stringify({ error: "Error del servicio AI" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

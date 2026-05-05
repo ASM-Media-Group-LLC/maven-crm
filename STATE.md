@@ -12,7 +12,7 @@
 |---|---|
 | Frontend | Vite + React 18 + Tailwind 3 + shadcn/ui |
 | Backend | Supabase (Postgres + Auth + Storage + Edge Functions Deno) |
-| IA | MiniMax (`api.minimaxi.chat`) — migrado desde Lovable AI Gateway |
+| IA | Groq (`api.groq.com/openai/v1`) — migrado: Lovable AI Gateway → MiniMax → Groq |
 | Video | LiveKit (`LIVEKIT_URL` env, self-hosted o cloud) |
 | Email | Resend (sólo para invitaciones de calls hoy) |
 | Deploy | Dokploy → `jhonjlopez-sudo/maven-crm`, branch `main` |
@@ -50,7 +50,7 @@ dist/             ← build output, lo sirve Dokploy
 - **Cowork** — visible en sidebar (MENÚ), permission-gated. Backend (LiveKit) ya wired.
 - **Settings** — vertical tab rail con Mi cuenta / Proyecto MP / Administración / Recursos.
 - **Permisos por rol** — modal con módulos agrupados, copiar de otro rol, herencia padre↔hijo.
-- **Migración de IA** — `ai-sales-chat` y `supercontact-ai` corren contra MiniMax con env vars `MINIMAX_API_KEY`, `MINIMAX_BASE_URL`, `MINIMAX_MODEL`.
+- **Migración de IA** — `ai-sales-chat` y `supercontact-ai` corren contra **Groq** con env vars `GROQ_API_KEY`, `GROQ_BASE_URL` (default `api.groq.com/openai/v1/chat/completions`), `GROQ_MODEL` (default `llama-3.3-70b-versatile`), `GROQ_VISION_MODEL` (default `meta-llama/llama-4-scout-17b-16e-instruct`, sólo para `analyze_image` de SuperContacts).
 
 ### 🟡 En migración desde `kash-call-qa`
 
@@ -94,6 +94,7 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 | 2026-05-02 | Branch JHON-V3 → main del nuevo repo | Migración `ASM-TECH-MIAMI/maven-s-simple-page` → `jhonjlopez-sudo/maven-crm` |
 | 2026-05-04 | Repo dividido en `frontend/` `backend/` `servicios/` | Preparar para microservicios futuros sin romper Dokploy |
 | 2026-05-04 | Lovable AI Gateway → MiniMax | Eliminar dependencia de Lovable en runtime |
+| 2026-05-04 | MiniMax → Groq | Cambio de proveedor; Groq tiene mejor latencia para llama-3.3-70b + tier free razonable |
 | 2026-05-04 | Drawer (no página dedicada) para detalles | Convención cross-area; aplicado en Scouter Lead + Call detail |
 | 2026-05-04 | Radar de `dimensions` con recharts | Coherente con resto de Maven |
 | 2026-05-04 | Multi-tenant por **row-level** en tablas nuevas | Maven se venderá a clientes externos (Phase 2) |

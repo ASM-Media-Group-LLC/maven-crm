@@ -11,12 +11,19 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const MINIMAX_API_KEY = Deno.env.get("MINIMAX_API_KEY");
-    if (!MINIMAX_API_KEY) throw new Error("MINIMAX_API_KEY is not configured");
-    const MINIMAX_URL =
-      Deno.env.get("MINIMAX_BASE_URL") ||
-      "https://api.minimaxi.chat/v1/text/chatcompletion_v2";
-    const MINIMAX_MODEL = Deno.env.get("MINIMAX_MODEL") || "MiniMax-Text-01";
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+    if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY is not configured");
+    const GROQ_URL =
+      Deno.env.get("GROQ_BASE_URL") ||
+      "https://api.groq.com/openai/v1/chat/completions";
+    // Text actions (chat / brand_summary) use the standard text model.
+    const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "llama-3.3-70b-versatile";
+    // analyze_image needs a vision-capable model. Configurable in case
+    // Groq adds new ones; default is llama-4-scout which currently
+    // supports image_url content.
+    const GROQ_VISION_MODEL =
+      Deno.env.get("GROQ_VISION_MODEL") ||
+      "meta-llama/llama-4-scout-17b-16e-instruct";
 
     const { action, contactId, messages, imageBase64, brand, brandOutreach } = await req.json();
 
@@ -98,17 +105,17 @@ Sé específico y práctico.`;
         { role: "user", content: brandPrompt },
       ];
 
-      const response = await fetch(MINIMAX_URL, {
+      const response = await fetch(GROQ_URL, {
         method: "POST",
-        headers: { Authorization: `Bearer ${MINIMAX_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: MINIMAX_MODEL, messages: aiMessages }),
+        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: GROQ_MODEL, messages: aiMessages }),
       });
 
       if (!response.ok) {
         const status = response.status;
         if (status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        if (status === 402 || status === 401) return new Response(JSON.stringify({ error: "MiniMax: cuota agotada o key inválida" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        throw new Error(`MiniMax error: ${status}`);
+        if (status === 402 || status === 401) return new Response(JSON.stringify({ error: "Groq: cuota agotada o key inválida" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        throw new Error(`Groq error: ${status}`);
       }
 
       const data = await response.json();
@@ -132,17 +139,19 @@ Sé específico y práctico.`;
         },
       ];
 
-      const response = await fetch(MINIMAX_URL, {
+      // Vision call — uses GROQ_VISION_MODEL because the regular text
+      // model can't read image_url content blocks.
+      const response = await fetch(GROQ_URL, {
         method: "POST",
-        headers: { Authorization: `Bearer ${MINIMAX_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: MINIMAX_MODEL, messages: aiMessages }),
+        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: GROQ_VISION_MODEL, messages: aiMessages }),
       });
 
       if (!response.ok) {
         const status = response.status;
         if (status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        if (status === 402 || status === 401) return new Response(JSON.stringify({ error: "MiniMax: cuota agotada o key inválida" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        throw new Error(`MiniMax error: ${status}`);
+        if (status === 402 || status === 401) return new Response(JSON.stringify({ error: "Groq: cuota agotada o key inválida" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        throw new Error(`Groq vision error: ${status}`);
       }
 
       const data = await response.json();
@@ -167,17 +176,17 @@ Sé específico y práctico.`;
         ...messages,
       ];
 
-      const response = await fetch(MINIMAX_URL, {
+      const response = await fetch(GROQ_URL, {
         method: "POST",
-        headers: { Authorization: `Bearer ${MINIMAX_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: MINIMAX_MODEL, messages: aiMessages, stream: true }),
+        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: GROQ_MODEL, messages: aiMessages, stream: true }),
       });
 
       if (!response.ok) {
         const status = response.status;
         if (status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        if (status === 402 || status === 401) return new Response(JSON.stringify({ error: "MiniMax: cuota agotada o key inválida" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        throw new Error(`MiniMax error: ${status}`);
+        if (status === 402 || status === 401) return new Response(JSON.stringify({ error: "Groq: cuota agotada o key inválida" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        throw new Error(`Groq error: ${status}`);
       }
 
       return new Response(response.body, {
