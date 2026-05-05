@@ -56,22 +56,26 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Provider selection: Gemini > Groq.
+    //  - Si GEMINI_API_KEY existe → usamos Gemini 2.0 Flash (free tier
+    //    de Google AI Studio: 1M TPM, 15 RPM, 1500 req/día). Mejor
+    //    calidad para juicios subjetivos en español que llama-3.1-8b.
+    //  - Si no, fallback a Groq llama-3.1-8b-instant.
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
-    if (!GROQ_API_KEY) {
+    if (!GEMINI_API_KEY && !GROQ_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "GROQ_API_KEY no configurada en los secrets de Supabase." }),
+        JSON.stringify({
+          error:
+            "Ningún provider configurado. Setea GEMINI_API_KEY (recomendado, free tier de Google AI Studio) o GROQ_API_KEY en los secrets de Supabase.",
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
     const GROQ_URL =
       Deno.env.get("GROQ_BASE_URL") || "https://api.groq.com/openai/v1/chat/completions";
-    // Default a 8b-instant porque la free tier de Groq da 30k TPM en
-    // ese modelo vs solo 6k en 70b — y un análisis QA típico
-    // (system prompt + transcript + max_tokens) supera fácilmente 10k
-    // tokens, lo que dispara HTTP 413 "Request too large" con 70b.
-    // Si el usuario sube de tier o quiere calidad mayor: setear el
-    // secret GROQ_MODEL=llama-3.3-70b-versatile.
     const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "llama-3.1-8b-instant";
+    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash";
 
     let body: AnalyzeRequest;
     try {
@@ -151,65 +155,45 @@ serve(async (req) => {
       (headerLines.length > 0 ? `[CONTEXTO]\n${headerLines.join("\n")}\n\n` : "") +
       `[TRANSCRIPT]\n${transcript}`;
 
-    const groqRes = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        // JSON mode forza al modelo a responder JSON puro (Groq lo
-        // soporta vía OpenAI-compat).
-        response_format: { type: "json_object" },
-        // Temp baja para análisis consistente — no queremos creatividad.
-        temperature: 0.2,
-        // El JSON pedido es voluminoso: 11 dimensions + red_flags +
-        // key_moments + improvements + model_signals con sub-objetos.
-        // Con 4000 max_tokens el output se cortaba a la mitad y JSON.parse
-        // fallaba ("El modelo IA devolvió JSON malformado"). 8000 da
-        // margen para análisis ricos sin pasarse del context window.
-        max_tokens: 8000,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userMessage },
-        ],
-      }),
-    });
-
-    if (!groqRes.ok) {
-      const status = groqRes.status;
-      const errText = await groqRes.text().catch(() => "");
-      console.error("Groq error", status, errText.slice(0, 500));
-      if (status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Groq: rate limit. Probá en unos segundos." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+    // Dispatch al provider configurado.
+    let raw: string;
+    let usage: unknown;
+    let providerLabel: "gemini" | "groq";
+    try {
+      if (GEMINI_API_KEY) {
+        const r = await callGemini(GEMINI_API_KEY, GEMINI_MODEL, SYSTEM_PROMPT, userMessage);
+        raw = r.raw;
+        usage = r.usage;
+        providerLabel = "gemini";
+      } else {
+        const r = await callGroq(GROQ_API_KEY!, GROQ_URL, GROQ_MODEL, SYSTEM_PROMPT, userMessage);
+        raw = r.raw;
+        usage = r.usage;
+        providerLabel = "groq";
       }
-      if (status === 401 || status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Groq: cuota agotada o key inválida." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
+    } catch (providerErr) {
+      const msg = (providerErr as Error).message ?? "Error de provider IA";
+      const status =
+        /rate limit|429/i.test(msg) ? 429
+        : /key|401|402|cuota|quota/i.test(msg) ? 402
+        : 502;
       return new Response(
-        JSON.stringify({ error: `Groq error ${status}` }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify({ error: msg }),
+        { status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const groqData = await groqRes.json();
-    const raw = groqData.choices?.[0]?.message?.content ?? "";
     let analysis: unknown;
     try {
       analysis = JSON.parse(raw);
     } catch (parseErr) {
-      console.error("Groq devolvió JSON inválido:", String(parseErr), raw.slice(0, 500));
+      console.error(
+        `${providerLabel} devolvió JSON inválido:`,
+        String(parseErr),
+        raw.slice(0, 500),
+      );
       return new Response(
-        JSON.stringify({
-          error: "El modelo IA devolvió JSON malformado. Reintentá.",
-        }),
+        JSON.stringify({ error: "El modelo IA devolvió JSON malformado. Reintentá." }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -244,7 +228,8 @@ serve(async (req) => {
         call_id: callId,
         score,
         analysis,
-        usage: groqData.usage ?? null,
+        provider: providerLabel,
+        usage: usage ?? null,
         updated,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -257,3 +242,119 @@ serve(async (req) => {
     );
   }
 });
+
+// ─── Provider helpers ────────────────────────────────────────────────
+// Ambos retornan { raw, usage } donde raw es el JSON-string del análisis.
+// Errores se tiran como Error para que el caller los mapee a HTTP status.
+
+interface LlmCallResult {
+  raw: string;
+  usage: unknown;
+}
+
+async function callGroq(
+  apiKey: string,
+  url: string,
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+): Promise<LlmCallResult> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+      max_tokens: 8000,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    console.error("Groq error", res.status, errText.slice(0, 500));
+    if (res.status === 429) throw new Error("Groq: rate limit. Probá en unos segundos.");
+    if (res.status === 401 || res.status === 402) {
+      throw new Error("Groq: cuota agotada o key inválida.");
+    }
+    if (res.status === 413) {
+      throw new Error("Groq: request too large. Probá un modelo con más TPM.");
+    }
+    throw new Error(`Groq error ${res.status}`);
+  }
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    usage?: unknown;
+  };
+  return {
+    raw: data.choices?.[0]?.message?.content ?? "",
+    usage: data.usage ?? null,
+  };
+}
+
+// Gemini 2.0 Flash vía Google Generative Language API.
+// Free tier: 15 RPM, 1M TPM, 1500 req/día (suficiente para QA en beta).
+// API key se pasa como query param (?key=...), system prompt va en
+// systemInstruction, user content en contents[].parts. responseMimeType
+// "application/json" fuerza el output a JSON parseable.
+async function callGemini(
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+): Promise<LlmCallResult> {
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: "user", parts: [{ text: userMessage }] }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 8000,
+        responseMimeType: "application/json",
+      },
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    console.error("Gemini error", res.status, errText.slice(0, 500));
+    if (res.status === 429) throw new Error("Gemini: rate limit. Probá en unos segundos.");
+    if (res.status === 400 && /api key/i.test(errText)) {
+      throw new Error("Gemini: API key inválida.");
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("Gemini: API key inválida o sin permisos.");
+    }
+    throw new Error(`Gemini error ${res.status}`);
+  }
+  const data = (await res.json()) as {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+      finishReason?: string;
+    }>;
+    usageMetadata?: unknown;
+    promptFeedback?: { blockReason?: string };
+  };
+  if (data.promptFeedback?.blockReason) {
+    throw new Error(`Gemini bloqueó el prompt: ${data.promptFeedback.blockReason}`);
+  }
+  const candidate = data.candidates?.[0];
+  const finishReason = candidate?.finishReason;
+  if (finishReason && finishReason !== "STOP" && finishReason !== "MAX_TOKENS") {
+    throw new Error(`Gemini finalizó con razón ${finishReason}.`);
+  }
+  const raw = candidate?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  return {
+    raw,
+    usage: data.usageMetadata ?? null,
+  };
+}
