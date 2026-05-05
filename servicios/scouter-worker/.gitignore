@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Env vars (local secrets)
+.env
+.env.local
+scripts/.env
+scripts/.env.local
+
+# Build output
+dist/
+*.tsbuildinfo

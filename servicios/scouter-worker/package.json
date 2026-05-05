@@ -9,7 +9,9 @@
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
     "build": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "migrate:dry": "bun run scripts/migrate-from-kash.ts --dry-run",
+    "migrate:apply": "bun run scripts/migrate-from-kash.ts --apply"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -17,6 +19,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/pg": "^8.11.0",
+    "pg": "^8.13.0",
     "typescript": "^5.4.0"
   }
 }
