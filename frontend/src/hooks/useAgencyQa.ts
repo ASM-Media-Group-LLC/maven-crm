@@ -353,6 +353,43 @@ export const useUpsertQaModel = () =>
     },
   });
 
+/** Lookup CRM users that have a given role (e.g. "closer") via the
+ *  user_roles + profiles tables. Used by Nueva QA to populate the
+ *  closer dropdown so the closer field can only be one of the actual
+ *  CRM closers, not free text. */
+export interface CrmUserByRole {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
+export const useCrmUsersByRole = (role: string) =>
+  useQuery({
+    queryKey: ["crm-users-by-role", role],
+    enabled: !!role,
+    queryFn: async (): Promise<CrmUserByRole[]> => {
+      // Two-step lookup: pull all user_ids with this role, then pull
+      // their profile rows. Doing it as a single embedded select via
+      // PostgREST requires an explicit FK between user_roles.user_id
+      // and profiles.id which may not be there — two queries is more
+      // portable across schema variants.
+      const { data: roleRows, error: rolesErr } = await sb
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", role);
+      if (rolesErr) throw rolesErr;
+      const userIds = (roleRows ?? []).map((r: { user_id: string }) => r.user_id);
+      if (userIds.length === 0) return [];
+      const { data: profiles, error: profErr } = await sb
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .in("id", userIds)
+        .order("full_name", { ascending: true });
+      if (profErr) throw profErr;
+      return (profiles ?? []) as CrmUserByRole[];
+    },
+  });
+
 /** Trigger qa-fetch-ig-avatar to backfill qa_models.avatar_data_url from
  *  the model's ig_url. Idempotent — if the model already has an avatar,
  *  the function returns the cached one without re-scraping IG. */

@@ -39,9 +39,9 @@ import { compressAudioIfNeeded } from "@/lib/audioCompress";
 import {
   useAnalyzeQaCall,
   useCreateQaCall,
+  useCrmUsersByRole,
   useCurrentTenantId,
   useFetchIgAvatar,
-  useQaClosers,
   useQaModels,
   useTranscribeAudio,
   useUploadQaAudio,
@@ -82,7 +82,7 @@ const MODEL_CATEGORIES: ModelCategory[] = ["A++", "A", "B+", "B", "C+", "C"];
 const AgencyNewQa = () => {
   const { user } = useAuth();
   const profileQ = useMyProfile();
-  const closersQ = useQaClosers();
+  const closersQ = useCrmUsersByRole("closer");
   const modelsQ = useQaModels();
   const tenantQ = useCurrentTenantId();
   const create = useCreateQaCall();
@@ -102,7 +102,11 @@ const AgencyNewQa = () => {
     );
   }, [profileQ.data, user]);
 
-  const [closerName, setCloserName] = useState<string>("");
+  // closerId aquí = profiles.id del usuario CRM con rol "closer".
+  // Al guardar, resolvemos su full_name y lo upsert-eamos en qa_closers
+  // — así el roster de qa_closers queda sincronizado con los closers
+  // reales del CRM sin tener que mantener dos listas a mano.
+  const [closerId, setCloserId] = useState<string>("");
   const [modelName, setModelName] = useState<string>("");
   const [modelCategory, setModelCategory] = useState<ModelCategory | "">("");
   const [modelCountry, setModelCountry] = useState<string>("");
@@ -154,7 +158,7 @@ const AgencyNewQa = () => {
   };
 
   const errors: Record<string, string> = {};
-  if (!closerName.trim()) errors.closer = "Nombre del closer requerido";
+  if (!closerId) errors.closer = "Elegí un closer";
   if (!modelName.trim()) errors.model = "Nombre de la modelo requerido";
   if (!modelCategory) errors.category = "Categoría requerida";
   if (!callDate) errors.callDate = "Fecha requerida";
@@ -189,10 +193,16 @@ const AgencyNewQa = () => {
         );
       }
 
-      // 2. Upsert closer + modelo por nombre.
+      // 2. Upsert closer (por full_name del CRM) + modelo por nombre.
+      // Resolvemos el full_name del profile pickeado para alimentar
+      // qa_closers; si el profile no tiene full_name (raro pero
+      // posible) caemos al email.
       setSubmitStage("Guardando catálogo…");
-      const [closerId, modelId] = await Promise.all([
-        upsertCloser.mutateAsync(closerName),
+      const pickedCloser = (closersQ.data ?? []).find((u) => u.id === closerId);
+      const closerDisplayName =
+        pickedCloser?.full_name?.trim() || "Closer sin nombre";
+      const [qaCloserId, qaModelId] = await Promise.all([
+        upsertCloser.mutateAsync(closerDisplayName),
         upsertModel.mutateAsync({
           name: modelName,
           category: modelCategory || null,
@@ -206,7 +216,7 @@ const AgencyNewQa = () => {
       // el avatar se persiste async y aparece la próxima vez que se
       // refresca Calls/Models.
       if (modelIgUrl.trim()) {
-        void fetchAvatar.mutateAsync(modelId).catch(() => {
+        void fetchAvatar.mutateAsync(qaModelId).catch(() => {
           // Silent: cuenta privada o IG bloqueando el scrape no debería
           // hacer ruido al closer cuando lo importante (la QA) salió bien.
         });
@@ -245,8 +255,8 @@ const AgencyNewQa = () => {
       // 6. Insert qa_calls con id explícito + transcript + audio_path.
       setSubmitStage("Guardando QA…");
       const row = await create.mutateAsync({
-        closer_id: closerId,
-        model_id: modelId,
+        closer_id: qaCloserId,
+        model_id: qaModelId,
         call_date: callDate,
         evaluator_name: evaluatorName.trim() || defaultEvaluator,
         transcript: transcriptText,
@@ -320,14 +330,8 @@ const AgencyNewQa = () => {
       <form onSubmit={handleSubmit}>
         <Card>
           <CardContent className="space-y-5 p-6">
-            {/* Datalists con sugerencias del catálogo (HTML nativo, sin
-                dependencia extra). El user puede tipear cualquier valor;
-                si matchea con uno existente, fast-path. */}
-            <datalist id="qa-closers-list">
-              {(closersQ.data ?? []).map((c) => (
-                <option key={c.id} value={c.name} />
-              ))}
-            </datalist>
+            {/* datalist solo para el modelo — la lista de closers
+                viene del CRM (rol "closer"), no admite tipear nuevos. */}
             <datalist id="qa-models-list">
               {(modelsQ.data ?? []).map((m) => (
                 <option key={m.id} value={m.name} />
@@ -338,14 +342,33 @@ const AgencyNewQa = () => {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="closer">Closer *</Label>
-                <Input
-                  id="closer"
-                  list="qa-closers-list"
-                  placeholder="Tipeá el nombre del closer"
-                  value={closerName}
-                  onChange={(e) => setCloserName(e.target.value)}
-                  autoComplete="off"
-                />
+                <Select value={closerId || undefined} onValueChange={setCloserId}>
+                  <SelectTrigger id="closer">
+                    <SelectValue
+                      placeholder={
+                        closersQ.isLoading
+                          ? "Cargando…"
+                          : (closersQ.data?.length ?? 0) === 0
+                            ? "Sin closers en el CRM"
+                            : "Elegí un closer"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(closersQ.data ?? []).length === 0 ? (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                        Ningún usuario tiene rol "closer" todavía. Asigná el
+                        rol desde Administración → Usuarios.
+                      </div>
+                    ) : (
+                      closersQ.data!.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.full_name?.trim() || "(sin nombre)"}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
                 {errors.closer && (
                   <p className="text-xs text-rose-400">{errors.closer}</p>
                 )}
