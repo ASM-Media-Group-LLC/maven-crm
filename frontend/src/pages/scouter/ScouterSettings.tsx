@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Plus,
   Sparkles,
@@ -24,6 +31,13 @@ import {
   Target,
   X,
   Pencil,
+  Instagram,
+  ToggleLeft,
+  ToggleRight,
+  Zap,
+  Settings2,
+  Play,
+  UserCircle2,
 } from "lucide-react";
 import {
   useScouterCompaniesAll,
@@ -33,6 +47,15 @@ import {
   type CompanySearchConfig,
 } from "@/hooks/useScouterLeads";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  useSpammerAccounts,
+  useUpdateSpammerAccount,
+  type SpammerAccount,
+  type AccountNiche,
+} from "@/hooks/useSpammerAccounts";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useCurrentTenantId } from "@/hooks/useAgencyQa";
+import { toast } from "sonner";
 
 // ─── AI Enhancement via Groq (through Supabase edge fn or direct) ────
 // We call Groq directly from the frontend using the same pattern as the
@@ -675,6 +698,280 @@ const CompanyCard = ({
   );
 };
 
+// ─── Niche badge colors ──────────────────────────────────────────────
+const NICHE_COLORS: Record<string, string> = {
+  lifestyle: "border-violet-400/40 text-violet-400",
+  fitness: "border-emerald-400/40 text-emerald-400",
+  adult: "border-pink-400/40 text-pink-400",
+  business: "border-blue-400/40 text-blue-400",
+  mixed: "border-amber-400/40 text-amber-400",
+};
+
+// ─── Spammer Account row ─────────────────────────────────────────────
+const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
+  const [editing, setEditing] = useState(false);
+  const [displayName, setDisplayName] = useState(account.display_name);
+  const [niche, setNiche] = useState<AccountNiche>(account.account_niche as AccountNiche);
+  const updateAccount = useUpdateSpammerAccount();
+
+  const handleSave = async () => {
+    await updateAccount.mutateAsync({ id: account.id, display_name: displayName, account_niche: niche });
+    setEditing(false);
+  };
+
+  const handleToggleActive = () => {
+    updateAccount.mutate({ id: account.id, active: !account.active });
+  };
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
+      {/* Avatar */}
+      {account.profile_pic_url ? (
+        <img
+          src={account.profile_pic_url}
+          alt={account.instagram_handle}
+          className="h-9 w-9 rounded-full object-cover flex-shrink-0"
+        />
+      ) : (
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted flex-shrink-0">
+          <UserCircle2 className="h-5 w-5 text-muted-foreground" />
+        </div>
+      )}
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        {editing ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <Input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="h-7 text-xs max-w-[140px]"
+            />
+            <Select value={niche} onValueChange={(v) => setNiche(v as AccountNiche)}>
+              <SelectTrigger className="h-7 text-xs w-[110px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(["lifestyle", "fitness", "adult", "business", "mixed"] as AccountNiche[]).map((n) => (
+                  <SelectItem key={n} value={n} className="text-xs capitalize">
+                    {n}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              onClick={handleSave}
+              disabled={updateAccount.isPending}
+            >
+              {updateAccount.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Save className="h-3 w-3" />
+              )}
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditing(false)}>
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-sm font-medium truncate">{account.display_name}</span>
+            <span className="text-[11px] text-muted-foreground">@{account.instagram_handle}</span>
+            <Badge
+              variant="outline"
+              className={`text-[10px] capitalize ${NICHE_COLORS[account.account_niche] ?? ""}`}
+            >
+              {account.account_niche}
+            </Badge>
+            {!account.active && (
+              <Badge variant="secondary" className="text-[10px]">
+                Inactiva
+              </Badge>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      {!editing && (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs opacity-60 hover:opacity-100"
+            onClick={() => setEditing(true)}
+          >
+            <Pencil className="h-3 w-3" />
+          </Button>
+          <button
+            type="button"
+            onClick={handleToggleActive}
+            disabled={updateAccount.isPending}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            title={account.active ? "Desactivar" : "Activar"}
+          >
+            {account.active ? (
+              <ToggleRight className="h-5 w-5 text-emerald-400" />
+            ) : (
+              <ToggleLeft className="h-5 w-5" />
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Cuentas Spammer section ─────────────────────────────────────────
+const SpammerAccountsSection = () => {
+  const accountsQ = useSpammerAccounts();
+  const accounts = accountsQ.data ?? [];
+  const { isAdmin, isManager } = useUserRole();
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <Instagram className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-base">Cuentas Spammer</CardTitle>
+        </div>
+        <CardDescription className="text-xs">
+          {isAdmin || isManager
+            ? "Todas las cuentas registradas en el tenant."
+            : "Tus cuentas spammer registradas."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {accountsQ.isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : accounts.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center">
+            <Instagram className="mx-auto h-7 w-7 text-muted-foreground mb-2" />
+            <p className="text-sm font-medium">No hay cuentas registradas</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Completá el asistente de bienvenida en la pestaña "Mis Tareas" para agregar cuentas.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {accounts.map((acc) => (
+              <SpammerAccountRow key={acc.id} account={acc} />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// ─── Generación Diaria section ────────────────────────────────────────
+const DailyGenerationSection = () => {
+  const { isAdmin, isManager } = useUserRole();
+  const tenantQ = useCurrentTenantId();
+  const tenantId = tenantQ.data ?? null;
+
+  const [cooldownDays, setCooldownDays] = useState(3);
+  const [batchSize, setBatchSize] = useState(50);
+  const [generating, setGenerating] = useState(false);
+
+  if (!isAdmin && !isManager) return null;
+
+  const handleGenerate = async () => {
+    if (!tenantId) {
+      toast.error("No se pudo obtener el tenant ID.");
+      return;
+    }
+    setGenerating(true);
+    try {
+      const { error } = await supabase.functions.invoke("scouter-generate-tasks", {
+        body: { tenant_id: tenantId, cooldown_days: cooldownDays, batch_size: batchSize },
+      });
+      if (error) throw error;
+      toast.success("Generación iniciada correctamente", {
+        description: `Se procesarán hasta ${batchSize} leads con cooldown de ${cooldownDays} días.`,
+      });
+    } catch (e) {
+      toast.error("Error al generar tareas", { description: (e as Error).message });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-base">Generación Diaria</CardTitle>
+        </div>
+        <CardDescription className="text-xs">
+          Generá tareas de interacción manualmente o ajustá los parámetros del cron diario.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">
+              Cooldown (días)
+            </label>
+            <Input
+              type="number"
+              min={1}
+              max={30}
+              value={cooldownDays}
+              onChange={(e) => setCooldownDays(Math.max(1, Number(e.target.value) || 1))}
+              className="text-sm"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Días sin reasignar el mismo lead. Default: 3.
+            </p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">
+              Batch size
+            </label>
+            <Input
+              type="number"
+              min={1}
+              max={200}
+              value={batchSize}
+              onChange={(e) => setBatchSize(Math.max(1, Number(e.target.value) || 1))}
+              className="text-sm"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Leads procesados por ejecución. Default: 50.
+            </p>
+          </div>
+        </div>
+
+        <Button
+          onClick={handleGenerate}
+          disabled={generating || !tenantId}
+          className="gap-2"
+        >
+          {generating ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Play className="h-4 w-4" />
+          )}
+          {generating ? "Generando…" : "Generar tareas ahora"}
+        </Button>
+
+        {!tenantId && !tenantQ.isLoading && (
+          <p className="text-[11px] text-destructive">
+            No se pudo resolver el tenant ID. Verificá tu sesión.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 // ─── Main ────────────────────────────────────────────────────────────
 const ScouterSettings = () => {
   const companiesQ = useScouterCompaniesAll();
@@ -757,6 +1054,12 @@ const ScouterSettings = () => {
           }
         />
       )}
+
+      {/* Cuentas Spammer section */}
+      <SpammerAccountsSection />
+
+      {/* Generación Diaria section (admin/manager only) */}
+      <DailyGenerationSection />
     </div>
   );
 };

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { ManagerDashboard } from "@/components/scouter/ManagerDashboard";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Star, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
@@ -306,6 +308,10 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
   const [countryFilter, setCountryFilter] = useState<string>("all");
   const [aiQuality, setAiQuality] = useState<AiQualityFilter>("all");
   const [page, setPage] = useState(1);
+  const [managerDate, setManagerDate] = useState<string>(
+    new Date().toISOString().slice(0, 10),
+  );
+  const { isAdmin, isManager, isSupervisor } = useUserRole();
   const pageSize = 60;
   const [selected, setSelected] = useState<ScouterLead | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -375,6 +381,11 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
             />
           ))}
         </div>
+      )}
+
+      {/* Manager dashboard — admin/manager/supervisor only */}
+      {(isAdmin || isManager || isSupervisor) && (
+        <ManagerDashboard date={managerDate} onDateChange={setManagerDate} />
       )}
 
       {/* Filters row */}
