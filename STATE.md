@@ -91,12 +91,15 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 | 2026-05-04 | Drawer (no página dedicada) para detalles | Convención cross-area; aplicado en Scouter Lead + Call detail |
 | 2026-05-04 | Radar de `dimensions` con recharts | Coherente con resto de Maven |
 | 2026-05-04 | Multi-tenant por **row-level** en tablas nuevas | Maven se venderá a clientes externos (Phase 2) |
+| 2026-05-04 | `tenants` + `tenant_members` creadas; `qa_*`/`scouter_*` aisladas por `tenant_id` con RLS scoping | Implementación de la decisión anterior — primer tenant: ASM Tech |
+| 2026-05-04 | Symlink `supabase/` → `backend/supabase/` en raíz | Supabase GitHub Integration espera `supabase/migrations/` en raíz; symlink mantiene el split sin reconfigurar la integration |
+| 2026-05-04 | Supabase GitHub Integration conectada al repo | Migrations auto-aplican a la branch JHON-V3 al push; promoción manual JHON-V3 → main |
 
 ## Deudas conocidas
 
 | # | Deuda | Costo si no se atiende |
 |---|---|---|
-| 1 | RLS de `qa_*` y `scouter_*` permisiva — falta multi-tenant | Cuando entren clientes externos, una agencia ve datos de otra |
+| 1 | ~~RLS de `qa_*` y `scouter_*` permisiva — falta multi-tenant~~ ✅ resuelto en migration `20260504200000`/`210000`/`220000` | — |
 | 2 | Tipos Supabase no regenerados — uso `as unknown` casts | Errores runtime que TS no atrapa al cambiar el schema |
 | 3 | `claude_analysis` jsonb sin parsing zod | Cambio de shape en edge function rompe el drawer en runtime, no en build |
 | 4 | Patrón "tabla densa + drawer detalle" repetido — sin componente compartido | Cada nueva vista duplica ~150 LOC de boilerplate |
@@ -114,8 +117,10 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 
 ## Próxima slice candidata
 
-- **Multi-tenant para `qa_*` y `scouter_*`** (ahora que está confirmado Phase 2 → vendemos a externos).
-- O **Modelos de Agency QA** si queremos seguir avanzando UI primero y dejar multi-tenant para una migration block.
+- **UI de admin de tenants + invite flow** — para que cuando entre el primer cliente externo no se gestione por SQL directo. Pequeño.
+- **Active tenant switcher** — solo necesario cuando un usuario pertenezca a múltiples tenants. Hoy todos están solo en ASM Tech, así que no apura.
+- **Modelos / Analytics / Nueva QA / QA Chat** — completar Agency QA UI.
+- **Worker de Scouter** (Apify + AI scoring) — pieza grande backend, va en `servicios/scouter-worker/`.
 
 ## Cómo retomar este proyecto desde cero
 
