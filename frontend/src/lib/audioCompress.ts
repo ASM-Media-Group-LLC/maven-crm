@@ -10,8 +10,16 @@
 // (Storage) — esto solo prepara el archivo que Whisper necesita.
 
 const TARGET_SAMPLE_RATE = 16_000; // 16kHz — Whisper input nativo
-const TARGET_BITRATE_KBPS = 32; // 32 kbps mono → ~14MB para 60 min
-const COMPRESS_THRESHOLD_BYTES = 23 * 1024 * 1024; // 23MB para tener margen ante el límite duro de 25MB
+// 24 kbps mono → ~10.8MB para 60 min, ~21.6MB para 120 min.
+// Empezamos en 32 kbps pero llamadas largas (>90 min) cruzaban el
+// límite de 25MB de Whisper. 24 kbps tolera bien Whisper (entrena con
+// audio de baja calidad) y da margen hasta ~140 min.
+const TARGET_BITRATE_KBPS = 24;
+const COMPRESS_THRESHOLD_BYTES = 23 * 1024 * 1024; // 23MB — comprime antes del 25MB hard limit de Whisper
+// Si después de comprimir aún excede este tamaño, frontend muestra
+// error claro en vez de mandar y dejar que el edge function rechace
+// con un mensaje genérico.
+const MAX_COMPRESSED_BYTES = 25 * 1024 * 1024;
 
 export interface CompressionResult {
   file: File;
@@ -119,6 +127,19 @@ export async function compressAudioIfNeeded(
   const compressedFile = new File([mp3Blob], `${cleanName}.compressed.mp3`, {
     type: "audio/mpeg",
   });
+
+  // Guard: si el audio es tan largo que ni siquiera 24kbps mono lo
+  // mete bajo el límite de 25MB de Groq Whisper, fallamos acá con un
+  // mensaje accionable. Sin esto el upload a Storage funciona pero
+  // Whisper devuelve 413 con mensaje genérico.
+  if (compressedFile.size > MAX_COMPRESSED_BYTES) {
+    const mb = (compressedFile.size / 1024 / 1024).toFixed(1);
+    const limitMb = (MAX_COMPRESSED_BYTES / 1024 / 1024).toFixed(0);
+    throw new Error(
+      `El audio comprimido pesa ${mb}MB, supera el límite de ${limitMb}MB de Whisper. ` +
+        `Probá recortar la llamada (la duración aprox. máxima es ~140 min) o dividirla en partes.`,
+    );
+  }
 
   return {
     file: compressedFile,

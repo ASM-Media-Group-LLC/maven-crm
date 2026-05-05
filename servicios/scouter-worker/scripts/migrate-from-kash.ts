@@ -138,7 +138,7 @@ const maven = createClient(MAVEN_SUPABASE_URL, MAVEN_SUPABASE_SERVICE_ROLE_KEY, 
 // ─── Helpers ─────────────────────────────────────────────────────────
 async function fetchKashCompanies(): Promise<KashCompany[]> {
   const res = await kashDb.query<KashCompany>(
-    "select id, slug, name, description, active, created_at from scouter_companies order by created_at asc",
+    "select id, slug, name, description, active, created_at from companies order by created_at asc",
   );
   return res.rows;
 }
@@ -156,7 +156,7 @@ async function fetchKashLeads(): Promise<KashLead[]> {
         assigned_agency, monetization_usd, split_pct, notes,
         date_added, date_contacted, date_confirmed, date_active,
         date_rejected, contact_touches, created_at, updated_at
-     from scouter_leads
+     from leads
      order by created_at asc`,
   );
   return res.rows;
@@ -325,12 +325,13 @@ async function main(): Promise<void> {
 
   try {
     // Sanity check: que las tablas existan en kash.
+    // En kash las tablas se llaman "companies" y "leads" (sin prefijo scouter_).
     const t = await kashDb.query<{ table_name: string }>(
-      "select table_name from information_schema.tables where table_schema='public' and table_name like 'scouter_%' order by table_name",
+      "select table_name from information_schema.tables where table_schema='public' and table_name in ('companies','leads') order by table_name",
     );
-    console.log(`✅ Tablas scouter_* en kash: ${t.rows.map((r) => r.table_name).join(", ")}`);
-    if (t.rows.length === 0) {
-      console.error("❌ kash no tiene ninguna tabla scouter_* — ¿es la DB correcta?");
+    console.log(`✅ Tablas en kash: ${t.rows.map((r) => r.table_name).join(", ")}`);
+    if (t.rows.length < 2) {
+      console.error("❌ kash no tiene las tablas companies + leads — ¿es la DB correcta?");
       process.exit(2);
     }
 

@@ -1,67 +1,72 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ShieldCheck, Star, Loader2 } from "lucide-react";
+import { Search, Star, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import {
   useLeadFavoriteIds,
   useScouterLeads,
   useScouterStats,
+  useScouterCompanies,
+  useScouterCountries,
   useToggleLeadFavorite,
   type ScouterLead,
+  type AiQualityFilter,
 } from "@/hooks/useScouterLeads";
 import {
   LeadDrawer,
   STATUS_META,
   STATUS_OPTIONS,
+  VerifiedBadge,
   formatFollowers,
   initialsBg,
   scoreColor,
+  countryToFlag,
 } from "./leadShared";
 
-// First real screen of Scouter Assist — replaces the "En migración" Home
-// placeholder. Mirrors the kash-call-qa /scouter Home layout in three
-// stacked sections:
-//   1. Compact stats row (4 cards)
-//   2. Filters (status + search)
-//   3. Lead cards grid with IG photo / status / verified / category / score
-//
-// Out of scope for this slice (left for later):
-//   - "Descubrir" button + live activity console (needs the worker + Apify)
-//   - Editing leads from the drawer
-//   - Favorites toggle (the star icon renders read-only)
-
-// ─── Stat card ──────────────────────────────────────────────────────────
+// ─── Stat card (clickable) ─────────────────────────────────────────────
 const StatCard = ({
   label,
   big,
-  sub,
   color,
+  active,
+  onClick,
 }: {
   label: string;
   big: string | number;
-  sub?: string;
   color: string;
+  active?: boolean;
+  onClick?: () => void;
 }) => (
-  <div className="rounded-xl border border-border bg-muted/20 p-3">
+  <button
+    type="button"
+    onClick={onClick}
+    className="rounded-xl border p-3 text-left transition-all"
+    style={{
+      borderColor: active ? color : undefined,
+      backgroundColor: active ? color + "12" : undefined,
+      boxShadow: active ? `0 0 12px ${color}30` : undefined,
+    }}
+  >
     <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
       {label}
     </div>
     <div className="mt-1 text-2xl font-bold tabular-nums" style={{ color }}>
       {big}
     </div>
-    {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
-  </div>
+  </button>
 );
 
 // ─── Lead card ──────────────────────────────────────────────────────────
 const LeadCard = ({
   lead,
   isFavorite,
+  companySlug,
   onClick,
   onToggleFavorite,
 }: {
   lead: ScouterLead;
   isFavorite: boolean;
+  companySlug?: string;
   onClick: () => void;
   onToggleFavorite: () => void;
 }) => {
@@ -72,6 +77,7 @@ const LeadCard = ({
     "?"
   ).toUpperCase();
   const aiScore = lead.ai_score;
+  const sc = scoreColor(aiScore);
 
   return (
     <button
@@ -112,7 +118,7 @@ const LeadCard = ({
             className="absolute right-1.5 top-1.5 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-black/55"
             aria-label="Verified"
           >
-            <ShieldCheck className="h-3 w-3" style={{ color: "rgb(14 165 233)" }} />
+            <VerifiedBadge size={14} />
           </span>
         )}
         {/* Category pill — bottom-left */}
@@ -121,8 +127,7 @@ const LeadCard = ({
             {lead.category}
           </span>
         )}
-        {/* Favorite toggle — bottom-right; nested <span role="button"> so
-            React doesn't complain about <button> inside <button>. */}
+        {/* Favorite toggle — bottom-right */}
         <span
           role="button"
           tabIndex={0}
@@ -158,7 +163,7 @@ const LeadCard = ({
           {aiScore != null && (
             <span
               className="shrink-0 text-[13px] font-extrabold tabular-nums"
-              style={{ color: scoreColor(aiScore) }}
+              style={{ color: sc }}
             >
               {aiScore.toFixed(1)}
             </span>
@@ -168,18 +173,127 @@ const LeadCard = ({
           <span className="truncate">
             {[lead.country, lead.city].filter(Boolean).join(" · ") || "—"}
           </span>
-          <span className="shrink-0 tabular-nums">{formatFollowers(lead.followers)}</span>
+          <span className="shrink-0 tabular-nums">
+            {countryToFlag(lead.country)} {formatFollowers(lead.followers)}
+          </span>
         </div>
+        {/* Company tag badges */}
+        {companySlug && (
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            <span className="rounded-full border border-amber-400/60 px-1.5 py-0 text-[8px] font-bold uppercase text-amber-400">
+              {companySlug}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Score progress bar at bottom */}
+      <div className="w-full h-[3px] bg-muted/20 mt-auto">
+        <div
+          className="h-full transition-all"
+          style={{
+            width: `${Math.min((aiScore ?? 0) * 10, 100)}%`,
+            backgroundColor: sc,
+          }}
+        />
       </div>
     </button>
   );
 };
 
+// ─── Pagination ─────────────────────────────────────────────────────────
+const Pagination = ({
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange: (p: number) => void;
+}) => {
+  if (totalPages <= 1) return null;
+
+  // Sliding window of up to 10 pages
+  const windowSize = 10;
+  let start = Math.max(1, page - Math.floor(windowSize / 2));
+  const end = Math.min(totalPages, start + windowSize - 1);
+  if (end - start + 1 < windowSize) {
+    start = Math.max(1, end - windowSize + 1);
+  }
+  const pages: number[] = [];
+  for (let i = start; i <= end; i++) pages.push(i);
+
+  const btn =
+    "h-8 w-8 rounded-md border text-xs font-medium tabular-nums inline-flex items-center justify-center transition-colors disabled:opacity-40";
+  const activeClass = "border-amber-400 bg-amber-400/15 text-amber-400";
+
+  return (
+    <div className="flex flex-col items-center gap-2 pt-4">
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          className={btn}
+          disabled={page === 1}
+          onClick={() => onPageChange(1)}
+          aria-label="Primera página"
+        >
+          <ChevronsLeft className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          className={btn}
+          disabled={page === 1}
+          onClick={() => onPageChange(page - 1)}
+          aria-label="Página anterior"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </button>
+        {pages.map((p) => (
+          <button
+            key={p}
+            type="button"
+            className={`${btn} ${p === page ? activeClass : "hover:bg-muted"}`}
+            onClick={() => onPageChange(p)}
+          >
+            {p}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={btn}
+          disabled={page === totalPages}
+          onClick={() => onPageChange(page + 1)}
+          aria-label="Página siguiente"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          className={btn}
+          disabled={page === totalPages}
+          onClick={() => onPageChange(totalPages)}
+          aria-label="Última página"
+        >
+          <ChevronsRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <span className="text-xs text-muted-foreground">
+        Página {page} de {totalPages}
+      </span>
+    </div>
+  );
+};
+
+// ─── AI quality filter options ──────────────────────────────────────────
+const AI_QUALITY_OPTIONS: Array<{ value: AiQualityFilter; label: string }> = [
+  { value: "approved",  label: "✅ Aprobadas IA" },
+  { value: "high_fit",  label: "Solo high_fit" },
+  { value: "scored",    label: "Evaluadas (incluye low_fit)" },
+  { value: "all",       label: "Todas (sin filtro IA)" },
+];
+
 // ─── Main ────────────────────────────────────────────────────────────────
 interface ScouterHomeProps {
-  /** When true, the screen filters to leads the current user has marked
-   *  as favorite, hides the stats row (less noise), and defaults the
-   *  status filter to "all" so all favorites show regardless of stage. */
   favoritesOnly?: boolean;
 }
 
@@ -188,73 +302,103 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
     favoritesOnly ? "all" : "discovery",
   );
   const [search, setSearch] = useState("");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
+  const [aiQuality, setAiQuality] = useState<AiQualityFilter>("approved");
+  const [page, setPage] = useState(1);
+  const pageSize = 60;
   const [selected, setSelected] = useState<ScouterLead | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Reset to page 1 when any filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, search, companyFilter, countryFilter, aiQuality]);
+
   const stats = useScouterStats();
-  const leads = useScouterLeads({ status: statusFilter, search, favoritesOnly });
+  const companies = useScouterCompanies();
+  const countries = useScouterCountries();
+  const leads = useScouterLeads({
+    status: statusFilter,
+    search,
+    favoritesOnly,
+    company: companyFilter !== "all" ? companyFilter : undefined,
+    country: countryFilter !== "all" ? countryFilter : undefined,
+    aiQuality,
+    page,
+    pageSize,
+  });
   const favoriteIdsQ = useLeadFavoriteIds();
   const favoriteIds = favoriteIdsQ.data ?? new Set<string>();
   const toggleFavorite = useToggleLeadFavorite();
 
-  const visibleLeads = leads.data ?? [];
-  const totalShown = visibleLeads.length;
+  const result = leads.data ?? { leads: [], total: 0 };
+  const visibleLeads = result.leads;
+  const totalLeads = result.total;
+  const totalPages = Math.max(1, Math.ceil(totalLeads / pageSize));
 
+  // Build a company_id -> slug map for card badges
+  const companyMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of companies.data ?? []) {
+      map.set(c.id, c.slug);
+    }
+    return map;
+  }, [companies.data]);
+
+  // Stat cards: 5 cards matching kash style
+  const byStatus = stats.data?.byStatus ?? {};
   const statBlocks = useMemo(() => {
-    const s = stats.data;
+    const total = stats.data?.total ?? 0;
     return [
-      {
-        label: "Descubiertas 24h",
-        big: s ? s.discovered24h : "—",
-        sub: s ? `${s.discovered7d} en 7d` : "",
-        color: "rgb(99 102 241)",
-      },
-      {
-        label: "High fit 7d",
-        big: s ? s.highFit7d : "—",
-        sub: "con IA",
-        color: "rgb(22 163 74)",
-      },
-      {
-        label: "Pendientes IA",
-        big: s ? s.pendingAi : "—",
-        sub: "sin scorear",
-        color: "rgb(234 179 8)",
-      },
-      {
-        label: "Total leads",
-        big: s ? s.total : "—",
-        sub: s ? `${s.discovered30d} nuevos en 30d` : "",
-        color: "rgb(148 163 184)",
-      },
+      { label: "Total",            big: total,                      color: "rgb(var(--foreground) / 1)", statusVal: "all" as const,       dotColor: "currentColor" },
+      { label: "Activas",          big: byStatus["active"] ?? 0,    color: "#22c55e", statusVal: "active" as const,    dotColor: "#22c55e" },
+      { label: "Contactando",      big: byStatus["contacting"] ?? 0, color: "#fbbf24", statusVal: "contacting" as const, dotColor: "#fbbf24" },
+      { label: "Cierres fallidos", big: byStatus["rejected"] ?? 0,  color: "#f87171", statusVal: "rejected" as const,  dotColor: "#f87171" },
+      { label: "Descartes",        big: byStatus["discarded"] ?? 0, color: "#a1a1aa", statusVal: "discarded" as const, dotColor: "#a1a1aa" },
     ];
-  }, [stats.data]);
+  }, [stats.data, byStatus]);
 
   return (
     <div className="space-y-5">
-      {/* Stats row — hidden in favoritesOnly mode since the numbers refer
-          to global discovery, not the user's saved set. */}
+      {/* Stats row */}
       {!favoritesOnly && (
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
           {statBlocks.map((b) => (
-            <StatCard key={b.label} {...b} />
+            <StatCard
+              key={b.label}
+              label={b.label}
+              big={b.big}
+              color={b.dotColor}
+              active={statusFilter === b.statusVal}
+              onClick={() => setStatusFilter(b.statusVal)}
+            />
           ))}
         </div>
       )}
 
-      {/* Filters */}
+      {/* Filters row */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por handle, nombre, país…"
-            className="pl-8"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        {/* Company filter */}
+        <Select value={companyFilter} onValueChange={setCompanyFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Compañía" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">
+              Todas ({companies.data?.length ?? 0})
+            </SelectItem>
+            {(companies.data ?? []).map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Status filter */}
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -265,10 +409,51 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
             ))}
           </SelectContent>
         </Select>
-        <span className="text-xs text-muted-foreground">
+
+        {/* Country filter */}
+        <Select value={countryFilter} onValueChange={setCountryFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="País" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los países</SelectItem>
+            {(countries.data ?? []).map((c) => (
+              <SelectItem key={c.country} value={c.country}>
+                {countryToFlag(c.country)} {c.country} ({c.count})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* AI Quality filter */}
+        <Select value={aiQuality} onValueChange={(v) => setAiQuality(v as AiQualityFilter)}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Calidad IA" />
+          </SelectTrigger>
+          <SelectContent>
+            {AI_QUALITY_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Search — full width remaining */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por handle, nombre, país…"
+            className="pl-8"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
           {leads.isLoading
             ? "Cargando…"
-            : `${totalShown} lead${totalShown === 1 ? "" : "s"} mostrad${totalShown === 1 ? "o" : "os"}`}
+            : `${totalLeads} lead${totalLeads === 1 ? "" : "s"}`}
         </span>
       </div>
 
@@ -289,25 +474,29 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {visibleLeads.map((lead) => (
-            <LeadCard
-              key={lead.id}
-              lead={lead}
-              isFavorite={favoriteIds.has(lead.id)}
-              onClick={() => {
-                setSelected(lead);
-                setDrawerOpen(true);
-              }}
-              onToggleFavorite={() =>
-                toggleFavorite.mutate({
-                  leadId: lead.id,
-                  isFavorite: favoriteIds.has(lead.id),
-                })
-              }
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8">
+            {visibleLeads.map((lead) => (
+              <LeadCard
+                key={lead.id}
+                lead={lead}
+                isFavorite={favoriteIds.has(lead.id)}
+                companySlug={companyMap.get(lead.company_id)}
+                onClick={() => {
+                  setSelected(lead);
+                  setDrawerOpen(true);
+                }}
+                onToggleFavorite={() =>
+                  toggleFavorite.mutate({
+                    leadId: lead.id,
+                    isFavorite: favoriteIds.has(lead.id),
+                  })
+                }
+              />
+            ))}
+          </div>
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+        </>
       )}
 
       <LeadDrawer lead={selected} open={drawerOpen} onOpenChange={setDrawerOpen} />

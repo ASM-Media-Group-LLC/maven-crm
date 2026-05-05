@@ -10,12 +10,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ShieldCheck, Loader2 } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import { useScouterLeads, type ScouterLead } from "@/hooks/useScouterLeads";
 import {
   LeadDrawer,
   STATUS_META,
   STATUS_OPTIONS,
+  VerifiedBadge,
   formatFollowers,
   initialsBg,
   scoreColor,
@@ -38,8 +39,8 @@ const ScouterLeads = () => {
   const [selected, setSelected] = useState<ScouterLead | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const leads = useScouterLeads({ status: statusFilter, search, limit: 200 });
-  const rows = leads.data ?? [];
+  const leads = useScouterLeads({ status: statusFilter, search, pageSize: 200 });
+  const rows = leads.data?.leads ?? [];
 
   return (
     <div className="space-y-4">
@@ -139,7 +140,7 @@ const ScouterLeads = () => {
                       <div className="flex items-center gap-1.5">
                         <span className="font-medium">@{lead.instagram_handle}</span>
                         {lead.verified && (
-                          <ShieldCheck className="h-3.5 w-3.5" style={{ color: "rgb(14 165 233)" }} />
+                          <VerifiedBadge size={14} />
                         )}
                       </div>
                       {lead.name && (

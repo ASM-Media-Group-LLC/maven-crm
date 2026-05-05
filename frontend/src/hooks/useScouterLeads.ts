@@ -87,18 +87,39 @@ export interface ScouterStats {
 // cast through unknown so the calls don't need full type plumbing.
 const sb = supabase as unknown as { from: (table: string) => any };
 
+export type AiQualityFilter = "approved" | "high_fit" | "scored" | "all";
+
 interface ListParams {
   status?: string | "all";
   limit?: number;
   search?: string;
   favoritesOnly?: boolean;
+  company?: string;
+  country?: string;
+  aiQuality?: AiQualityFilter;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ScouterLeadsResult {
+  leads: ScouterLead[];
+  total: number;
 }
 
 export const useScouterLeads = (params: ListParams = {}) => {
-  const { status = "discovery", limit = 60, search = "", favoritesOnly = false } = params;
+  const {
+    status = "discovery",
+    search = "",
+    favoritesOnly = false,
+    company,
+    country,
+    aiQuality = "approved",
+    page = 1,
+    pageSize = 60,
+  } = params;
   return useQuery({
-    queryKey: ["scouter-leads", { status, limit, search, favoritesOnly }],
-    queryFn: async (): Promise<ScouterLead[]> => {
+    queryKey: ["scouter-leads", { status, search, favoritesOnly, company, country, aiQuality, page, pageSize }],
+    queryFn: async (): Promise<ScouterLeadsResult> => {
       // When favoritesOnly is on, fetch the current user's favorite ids
       // first and constrain the leads query with `id IN (...)`. RLS on
       // scouter_lead_favorites already scopes rows to auth.uid(), so
@@ -110,15 +131,31 @@ export const useScouterLeads = (params: ListParams = {}) => {
           .select("lead_id");
         if (favErr) throw favErr;
         favoriteIds = ((favRows ?? []) as { lead_id: string }[]).map((r) => r.lead_id);
-        if (favoriteIds.length === 0) return [];
+        if (favoriteIds.length === 0) return { leads: [], total: 0 };
       }
+
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
 
       let q = sb
         .from("scouter_leads")
-        .select("*")
+        .select("*", { count: "exact" })
         .order("created_at", { ascending: false })
-        .limit(limit);
+        .range(from, to);
       if (status !== "all") q = q.eq("status", status);
+      if (company) q = q.eq("company_id", company);
+      if (country) q = q.eq("country", country);
+
+      // AI quality filter
+      if (aiQuality === "approved") {
+        q = q.in("ai_status", ["high_fit", "medium_fit", "maybe"]);
+      } else if (aiQuality === "high_fit") {
+        q = q.eq("ai_status", "high_fit");
+      } else if (aiQuality === "scored") {
+        q = q.not("ai_status", "is", null);
+      }
+      // "all" -> no filter
+
       if (search.trim()) {
         const term = `%${search.trim()}%`;
         q = q.or(
@@ -127,12 +164,36 @@ export const useScouterLeads = (params: ListParams = {}) => {
       }
       if (favoriteIds) q = q.in("id", favoriteIds);
 
-      const { data, error } = await q;
+      const { data, error, count } = await q;
       if (error) throw error;
-      return (data ?? []) as ScouterLead[];
+      return { leads: (data ?? []) as ScouterLead[], total: count ?? 0 };
     },
   });
 };
+
+/** Returns unique countries with counts for the country filter dropdown. */
+export const useScouterCountries = () =>
+  useQuery({
+    queryKey: ["scouter-countries"],
+    queryFn: async (): Promise<Array<{ country: string; count: number }>> => {
+      const { data, error } = await sb
+        .from("scouter_leads")
+        .select("country")
+        .not("country", "is", null)
+        .limit(5000);
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const row of (data ?? []) as { country: string | null }[]) {
+        if (row.country) {
+          map.set(row.country, (map.get(row.country) ?? 0) + 1);
+        }
+      }
+      return Array.from(map.entries())
+        .map(([country, count]) => ({ country, count }))
+        .sort((a, b) => b.count - a.count);
+    },
+    staleTime: 60_000,
+  });
 
 /** Set of lead ids the current user has marked as favorite. Used to
  * render the star overlay on cards and to drive favoritesOnly filters. */
@@ -154,6 +215,7 @@ export type LeadPatch = Partial<
     ScouterLead,
     | "status"
     | "category"
+    | "bio"
     | "notes"
     | "assigned_closer"
     | "assigned_agency"
