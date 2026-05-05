@@ -71,7 +71,7 @@ dist/             ← build output, lo sirve Dokploy
 |---|---|---|
 | Calls | ✅ | Tabla densa + drawer detalle (radar dimensiones, red flags, key moments, improvements, model signals, transcript collapsible) |
 | Nueva QA | ✅ create / 🟡 enrich | Form crea row con `claude_analysis: {}`. Falta dispatch IA (edge function `qa-analyze` + `GROQ_API_KEY`). |
-| QA Chat | 🟡 placeholder | Mike chat (chat con sesión scoped a closer/all) |
+| QA Chat | ✅ shell / 🟡 IA | Sidebar de sesiones + new-session modal (scope closer/all) + persistencia de mensajes user. Falta edge function `qa-chat-mike` (Groq + context loader desde QAs) para que Mike responda. |
 | Modelos | ✅ | Catálogo con stats agregados (count calls / avg score / last outcome); click row → CallDetailDrawer reusado |
 | Analytics | 🟡 placeholder | Dashboard agregado |
 

@@ -486,3 +486,151 @@ export const OUTCOME_META: Record<
   no_cerro:  { label: "Rechazado", bg: "rgb(220 38 38)",  icon: "✗" },
   en_espera: { label: "En espera", bg: "rgb(202 138 4)",  icon: "⏳" },
 };
+
+// ─── QA Chat (Mike) ────────────────────────────────────────────────────
+// kash equivalent: app/qa/chat/page.tsx + components/MikeChatPanel.tsx +
+// lib/mike-chat.ts + db tables qa_chat_sessions / qa_chat_messages.
+//
+// This slice ships the UI + persistence only. The AI dispatch (Mike's
+// streaming response with cached context) lives in edge function
+// qa-chat-mike and lands in the next slice when GROQ_API_KEY is wired.
+// Until then, sending a message persists the user turn but the
+// assistant response stays at "pendiente".
+
+export type QaChatScope = "closer" | "all";
+
+export interface QaChatSession {
+  id: string;
+  user_id: string;
+  scope_type: QaChatScope;
+  scope_closer_id: string | null;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QaChatSessionRow extends QaChatSession {
+  closer: { name: string } | null;
+}
+
+export interface QaChatMessage {
+  id: string;
+  session_id: string;
+  role: "user" | "assistant";
+  content: string;
+  tokens_in: number | null;
+  tokens_out: number | null;
+  cached_tokens: number | null;
+  created_at: string;
+}
+
+export const useQaChatSessions = () =>
+  useQuery({
+    queryKey: ["qa-chat-sessions"],
+    queryFn: async (): Promise<QaChatSessionRow[]> => {
+      const { data, error } = await sb
+        .from("qa_chat_sessions")
+        .select("*, closer:qa_closers(name)")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as QaChatSessionRow[];
+    },
+  });
+
+export const useQaChatMessages = (sessionId: string | null) =>
+  useQuery({
+    queryKey: ["qa-chat-messages", sessionId],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<QaChatMessage[]> => {
+      if (!sessionId) return [];
+      const { data, error } = await sb
+        .from("qa_chat_messages")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as QaChatMessage[];
+    },
+  });
+
+export interface CreateQaChatSessionInput {
+  scope_type: QaChatScope;
+  scope_closer_id: string | null;
+}
+
+export const useCreateQaChatSession = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateQaChatSessionInput): Promise<QaChatSession> => {
+      const { data: userRes, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+      const userId = userRes.user?.id;
+      if (!userId) throw new Error("No hay sesión activa.");
+      // tenant_id se autocompleta vía DEFAULT current_tenant_id() en la
+      // tabla. user_id sí lo seteamos explícito porque la RLS pide
+      // user_id = auth.uid() en el WITH CHECK.
+      const { data, error } = await sb
+        .from("qa_chat_sessions")
+        .insert({
+          user_id: userId,
+          scope_type: input.scope_type,
+          scope_closer_id: input.scope_closer_id,
+          title: null,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as QaChatSession;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-chat-sessions"] });
+    },
+  });
+};
+
+export const useDeleteQaChatSession = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      const { error } = await sb.from("qa_chat_sessions").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-chat-sessions"] });
+    },
+  });
+};
+
+/** Persist a user message to qa_chat_messages. Returns the row.
+ *  No AI dispatch yet — the assistant turn lands when the qa-chat-mike
+ *  edge function is wired. */
+export const useSendQaChatMessage = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      session_id: string;
+      content: string;
+    }): Promise<QaChatMessage> => {
+      const { data, error } = await sb
+        .from("qa_chat_messages")
+        .insert({
+          session_id: input.session_id,
+          role: "user",
+          content: input.content,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      // Bump updated_at on the parent session so the sidebar reorders.
+      await sb
+        .from("qa_chat_sessions")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", input.session_id);
+      return data as QaChatMessage;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["qa-chat-messages", variables.session_id] });
+      qc.invalidateQueries({ queryKey: ["qa-chat-sessions"] });
+    },
+  });
+};

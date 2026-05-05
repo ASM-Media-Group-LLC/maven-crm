@@ -7,6 +7,7 @@ import AgencyCalls from "./AgencyCalls";
 import AgencyModels from "./AgencyModels";
 import AgencyAnalytics from "./AgencyAnalytics";
 import AgencyNewQa from "./AgencyNewQa";
+import AgencyQaChat from "./AgencyQaChat";
 
 // Agency QA landing — visual scaffold for the migration of the
 // closers-QA area of kash-call-qa into Maven.
@@ -120,6 +121,8 @@ const AgencyQA = () => {
                 <AgencyAnalytics />
               ) : s.key === "new-qa" ? (
                 <AgencyNewQa />
+              ) : s.key === "qa-chat" ? (
+                <AgencyQaChat />
               ) : (
                 <Card>
                   <CardContent className="space-y-3 p-6">

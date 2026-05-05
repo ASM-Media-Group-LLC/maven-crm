@@ -1,0 +1,508 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Loader2,
+  MessageSquarePlus,
+  Send,
+  Sparkles,
+  Trash2,
+  Users,
+  User as UserIcon,
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import {
+  useCreateQaChatSession,
+  useDeleteQaChatSession,
+  useQaChatMessages,
+  useQaChatSessions,
+  useQaClosers,
+  useSendQaChatMessage,
+  type QaChatScope,
+} from "@/hooks/useAgencyQa";
+
+// AgencyQaChat — port del Mike chat de kash. Esta slice cubre UI + persistencia:
+// crea sesiones (scope: closer específico o todo el equipo), persiste mensajes
+// del user, lista sesiones del usuario actual ordenadas por última actividad.
+//
+// El response del asistente NO se genera todavía — falta la edge function
+// qa-chat-mike + GROQ_API_KEY. Mientras tanto, después de mandar un mensaje,
+// aparece una nota "Mike pendiente — falta GROQ_API_KEY" en lugar de la
+// respuesta. Cuando se conecte el backend, esa nota se reemplaza por la
+// llamada a la edge function que streamea tokens.
+
+const formatRelative = (iso: string): string => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  const diffMin = Math.floor((now.getTime() - date.getTime()) / 60_000);
+  if (diffMin < 1) return "ahora";
+  if (diffMin < 60) return `hace ${diffMin} min`;
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  if (sameDay) return `${hh}:${mm}`;
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86_400_000);
+  if (diffDays < 7) {
+    const wd = date
+      .toLocaleDateString("es-AR", { weekday: "short" })
+      .replace(".", "");
+    return `${wd} ${hh}:${mm}`;
+  }
+  const day = date.getDate();
+  const month = date
+    .toLocaleDateString("es-AR", { month: "short" })
+    .replace(".", "");
+  return `${day} ${month}`;
+};
+
+const sessionTitle = (s: {
+  title: string | null;
+  scope_type: QaChatScope;
+  closer: { name: string } | null;
+}): string => {
+  if (s.title) return s.title;
+  if (s.scope_type === "closer") return `Sobre ${s.closer?.name ?? "(closer)"}`;
+  return "Sobre todo el equipo";
+};
+
+const AgencyQaChat = () => {
+  const sessionsQ = useQaChatSessions();
+  const closersQ = useQaClosers();
+  const createSession = useCreateQaChatSession();
+  const deleteSession = useDeleteQaChatSession();
+  const sendMessage = useSendQaChatMessage();
+
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [showNew, setShowNew] = useState(false);
+  const [input, setInput] = useState("");
+
+  const messagesQ = useQaChatMessages(activeId);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const activeSession = useMemo(
+    () => sessionsQ.data?.find((s) => s.id === activeId) ?? null,
+    [sessionsQ.data, activeId],
+  );
+
+  // Auto-select first session on initial load.
+  useEffect(() => {
+    if (!activeId && (sessionsQ.data?.length ?? 0) > 0) {
+      setActiveId(sessionsQ.data![0].id);
+    }
+  }, [sessionsQ.data, activeId]);
+
+  // Auto-scroll on new messages.
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messagesQ.data]);
+
+  const handleSend = async () => {
+    if (!activeId) return;
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    setInput("");
+    try {
+      await sendMessage.mutateAsync({ session_id: activeId, content: trimmed });
+    } catch (err) {
+      toast.error("No se pudo enviar el mensaje", {
+        description: (err as Error).message,
+      });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (
+      !window.confirm("¿Borrar esta conversación? No se puede deshacer.")
+    )
+      return;
+    try {
+      await deleteSession.mutateAsync(id);
+      if (activeId === id) setActiveId(null);
+    } catch (err) {
+      toast.error("No se pudo borrar la conversación", {
+        description: (err as Error).message,
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Chat con Mike</h2>
+          <p className="text-xs text-muted-foreground">
+            Mike es tu supervisor IA — conoce a cada closer, todas las QAs, y
+            te ayuda a coachear al equipo. Cuando{" "}
+            <code className="rounded bg-muted/40 px-1">GROQ_API_KEY</code> esté
+            wired, sus respuestas se streamean acá.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[260px_1fr] gap-3">
+        {/* Sidebar */}
+        <Card className="flex flex-col">
+          <CardContent className="flex flex-col gap-2 p-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setShowNew(true)}
+              className="gap-1.5"
+            >
+              <MessageSquarePlus className="h-3.5 w-3.5" />
+              Nueva conversación
+            </Button>
+
+            <div className="flex max-h-[60vh] flex-col gap-1 overflow-y-auto">
+              {sessionsQ.isLoading ? (
+                <div className="flex items-center gap-1.5 px-2 py-3 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Cargando…
+                </div>
+              ) : (sessionsQ.data?.length ?? 0) === 0 ? (
+                <div className="px-2 py-3 text-xs italic text-muted-foreground">
+                  Sin conversaciones todavía. Click "+ Nueva conversación" para
+                  empezar.
+                </div>
+              ) : (
+                sessionsQ.data!.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setActiveId(s.id)}
+                    className={cn(
+                      "group flex flex-col items-start gap-1 rounded-md border border-transparent px-2 py-2 text-left transition-colors hover:bg-muted/40",
+                      activeId === s.id && "border-border bg-muted/40",
+                    )}
+                  >
+                    <div className="flex w-full items-start justify-between gap-2">
+                      <span className="line-clamp-2 flex-1 text-xs font-medium">
+                        {sessionTitle(s)}
+                      </span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(s.id);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDelete(s.id);
+                          }
+                        }}
+                        className="cursor-pointer text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                        aria-label="Borrar conversación"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </span>
+                    </div>
+                    <div className="flex w-full items-center gap-1.5 text-[10px] text-muted-foreground">
+                      <span
+                        className={cn(
+                          "rounded-full bg-muted/50 px-1.5 py-0.5",
+                          s.scope_type === "closer"
+                            ? "text-amber-500"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {s.scope_type === "closer"
+                          ? (s.closer?.name ?? "(closer)")
+                          : "Todos"}
+                      </span>
+                      <span>· {formatRelative(s.updated_at)}</span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Active conversation */}
+        <Card className="flex min-h-[60vh] flex-col">
+          {activeSession ? (
+            <>
+              <div className="border-b border-border/60 p-3">
+                <p className="text-sm font-semibold">
+                  {sessionTitle(activeSession)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Hablando sobre:{" "}
+                  <strong>
+                    {activeSession.scope_type === "closer"
+                      ? (activeSession.closer?.name ?? "(closer borrado)")
+                      : "todos los closers"}
+                  </strong>
+                </p>
+              </div>
+
+              <div className="flex-1 space-y-3 overflow-y-auto p-4">
+                {messagesQ.isLoading ? (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Cargando mensajes…
+                  </div>
+                ) : (messagesQ.data?.length ?? 0) === 0 ? (
+                  <p className="text-xs italic text-muted-foreground">
+                    Escribí una pregunta para arrancar. Cuando GROQ_API_KEY
+                    esté configurado, Mike responde acá mismo.
+                  </p>
+                ) : (
+                  messagesQ.data!.map((m) => (
+                    <div
+                      key={m.id}
+                      className={cn(
+                        "flex flex-col gap-1",
+                        m.role === "user" ? "items-end" : "items-start",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
+                          m.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "border border-border/60 bg-muted/30",
+                        )}
+                      >
+                        {m.role === "assistant" && (
+                          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-amber-500">
+                            Mike
+                          </div>
+                        )}
+                        <div className="whitespace-pre-wrap">{m.content}</div>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">
+                        {formatRelative(m.created_at)}
+                      </span>
+                    </div>
+                  ))
+                )}
+
+                {/* Stub assistant placeholder while AI dispatch isn't wired */}
+                {(messagesQ.data?.length ?? 0) > 0 &&
+                  messagesQ.data![messagesQ.data!.length - 1].role === "user" && (
+                    <div className="flex flex-col items-start gap-1">
+                      <div className="max-w-[85%] rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+                        <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-500">
+                          <Sparkles className="h-3 w-3" />
+                          Mike pendiente
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          La respuesta automática llega cuando{" "}
+                          <code>GROQ_API_KEY</code> + edge function{" "}
+                          <code>qa-chat-mike</code> estén configurados. Tu
+                          mensaje ya quedó persistido.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                <div ref={messagesEndRef} />
+              </div>
+
+              <div className="flex gap-2 border-t border-border/60 p-3">
+                <Textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void handleSend();
+                    }
+                  }}
+                  placeholder={`Pregunta a Mike sobre ${
+                    activeSession.scope_type === "closer"
+                      ? (activeSession.closer?.name ?? "este closer")
+                      : "el equipo"
+                  }…`}
+                  rows={2}
+                  className="resize-none text-sm"
+                />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        onClick={handleSend}
+                        disabled={!input.trim() || sendMessage.isPending}
+                        className="gap-1.5"
+                      >
+                        {sendMessage.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5" />
+                        )}
+                        Enviar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[220px]">
+                      <p className="text-xs">
+                        Tu mensaje se persiste en{" "}
+                        <code>qa_chat_messages</code>. La respuesta de Mike
+                        queda pendiente hasta wirear Groq.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </>
+          ) : (
+            <CardContent className="flex flex-1 items-center justify-center p-8">
+              <div className="flex flex-col items-center gap-2 text-center">
+                <Sparkles className="h-8 w-8 text-amber-500" />
+                <p className="text-sm font-semibold">
+                  Hola, soy Mike — supervisor del equipo.
+                </p>
+                <p className="max-w-md text-xs text-muted-foreground">
+                  Click "+ Nueva conversación" para arrancar. Elegí un closer
+                  específico o "todos" para preguntas cross-equipo.
+                </p>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      </div>
+
+      <NewSessionDialog
+        open={showNew}
+        onOpenChange={setShowNew}
+        closers={closersQ.data ?? []}
+        onCreate={async (scopeType, scopeCloserId) => {
+          try {
+            const session = await createSession.mutateAsync({
+              scope_type: scopeType,
+              scope_closer_id: scopeCloserId,
+            });
+            setActiveId(session.id);
+            setShowNew(false);
+          } catch (err) {
+            toast.error("No se pudo crear la conversación", {
+              description: (err as Error).message,
+            });
+          }
+        }}
+        creating={createSession.isPending}
+      />
+    </div>
+  );
+};
+
+interface NewSessionDialogProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  closers: Array<{ id: string; name: string }>;
+  creating: boolean;
+  onCreate: (scopeType: QaChatScope, scopeCloserId: string | null) => void;
+}
+
+const NewSessionDialog = ({
+  open,
+  onOpenChange,
+  closers,
+  creating,
+  onCreate,
+}: NewSessionDialogProps) => {
+  const [scope, setScope] = useState<string>("all");
+
+  useEffect(() => {
+    if (open) setScope("all");
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Nueva conversación con Mike</DialogTitle>
+          <DialogDescription>
+            El scope queda fijo en esta sesión. Si querés cambiar de closer
+            después, abrí una sesión nueva.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-muted-foreground">
+            ¿De qué querés hablar?
+          </label>
+          <Select value={scope} onValueChange={setScope}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                <div className="flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" />
+                  Todos los closers (cross-equipo)
+                </div>
+              </SelectItem>
+              {closers.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  <div className="flex items-center gap-1.5">
+                    <UserIcon className="h-3.5 w-3.5" />
+                    {c.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            type="button"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            disabled={creating}
+            onClick={() => {
+              if (scope === "all") onCreate("all", null);
+              else onCreate("closer", scope);
+            }}
+          >
+            {creating ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <MessageSquarePlus className="h-3.5 w-3.5" />
+            )}
+            Empezar conversación
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default AgencyQaChat;
