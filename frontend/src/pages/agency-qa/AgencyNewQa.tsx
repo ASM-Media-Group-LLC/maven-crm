@@ -39,10 +39,10 @@ import { compressAudioIfNeeded } from "@/lib/audioCompress";
 import {
   useAnalyzeQaCall,
   useCreateQaCall,
-  useCrmUsersByRole,
   useCurrentTenantId,
   useFetchIgAvatar,
   useQaModels,
+  useTenantProfiles,
   useTranscribeAudio,
   useUploadQaAudio,
   useUpsertQaCloser,
@@ -82,7 +82,9 @@ const MODEL_CATEGORIES: ModelCategory[] = ["A++", "A", "B+", "B", "C+", "C"];
 const AgencyNewQa = () => {
   const { user } = useAuth();
   const profileQ = useMyProfile();
-  const closersQ = useCrmUsersByRole("closer");
+  // Lista de empleados del tenant actual — todos pueden ser closer
+  // de una llamada, no solo los que tienen el rol formal "closer".
+  const closersQ = useTenantProfiles();
   const modelsQ = useQaModels();
   const tenantQ = useCurrentTenantId();
   const create = useCreateQaCall();
@@ -342,33 +344,12 @@ const AgencyNewQa = () => {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="closer">Closer *</Label>
-                <Select value={closerId || undefined} onValueChange={setCloserId}>
-                  <SelectTrigger id="closer">
-                    <SelectValue
-                      placeholder={
-                        closersQ.isLoading
-                          ? "Cargando…"
-                          : (closersQ.data?.length ?? 0) === 0
-                            ? "Sin closers en el CRM"
-                            : "Elegí un closer"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(closersQ.data ?? []).length === 0 ? (
-                      <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                        Ningún usuario tiene rol "closer" todavía. Asigná el
-                        rol desde Administración → Usuarios.
-                      </div>
-                    ) : (
-                      closersQ.data!.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.full_name?.trim() || "(sin nombre)"}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                <CloserCombobox
+                  value={closerId}
+                  onChange={setCloserId}
+                  options={closersQ.data ?? []}
+                  loading={closersQ.isLoading}
+                />
                 {errors.closer && (
                   <p className="text-xs text-rose-400">{errors.closer}</p>
                 )}
@@ -562,6 +543,89 @@ const AgencyNewQa = () => {
         </Card>
       )}
     </div>
+  );
+};
+
+/** Searchable combobox for the closer field. Filters the CRM users
+ *  with role="closer" by typing. Same pattern as CountryCombobox but
+ *  the value is the profile.id (not the display name). */
+const CloserCombobox = ({
+  value,
+  onChange,
+  options,
+  loading,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  options: Array<{ id: string; full_name: string | null }>;
+  loading?: boolean;
+}) => {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.id === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          id="closer"
+          className="w-full justify-between font-normal"
+        >
+          <span className={cn(!selected && "text-muted-foreground")}>
+            {selected?.full_name?.trim() ||
+              (loading
+                ? "Cargando…"
+                : options.length === 0
+                  ? "Sin empleados en el tenant"
+                  : "Elegí un closer")}
+          </span>
+          <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar closer…" className="h-9" />
+          <CommandList>
+            {options.length === 0 ? (
+              <CommandEmpty>
+                No hay empleados todavía en el tenant.
+              </CommandEmpty>
+            ) : (
+              <>
+                <CommandEmpty>Sin resultados.</CommandEmpty>
+                <CommandGroup>
+                  {options.map((opt) => {
+                    const label = opt.full_name?.trim() || "(sin nombre)";
+                    return (
+                      <CommandItem
+                        key={opt.id}
+                        // value es lo que cmdk usa para filtrar — usamos el
+                        // nombre legible para que tipear "ana" matchee a "Ana".
+                        value={label}
+                        onSelect={() => {
+                          onChange(opt.id === value ? "" : opt.id);
+                          setOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-3.5 w-3.5",
+                            value === opt.id ? "opacity-100" : "opacity-0",
+                          )}
+                        />
+                        {label}
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 };
 

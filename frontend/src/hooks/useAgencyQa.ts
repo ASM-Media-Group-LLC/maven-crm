@@ -353,40 +353,36 @@ export const useUpsertQaModel = () =>
     },
   });
 
-/** Lookup CRM users that have a given role (e.g. "closer") via the
- *  user_roles + profiles tables. Used by Nueva QA to populate the
- *  closer dropdown so the closer field can only be one of the actual
- *  CRM closers, not free text. */
-export interface CrmUserByRole {
+/** Lookup all CRM profiles in the current tenant. Used by Nueva QA
+ *  to populate the closer dropdown. Cualquier empleado de la empresa
+ *  puede ser el closer de una llamada — no obligamos a que tenga el
+ *  rol formal "closer" porque a veces cubren managers o supervisores. */
+export interface CrmUserProfile {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
 }
 
-export const useCrmUsersByRole = (role: string) =>
+export const useTenantProfiles = () =>
   useQuery({
-    queryKey: ["crm-users-by-role", role],
-    enabled: !!role,
-    queryFn: async (): Promise<CrmUserByRole[]> => {
-      // Two-step lookup: pull all user_ids with this role, then pull
-      // their profile rows. Doing it as a single embedded select via
-      // PostgREST requires an explicit FK between user_roles.user_id
-      // and profiles.id which may not be there — two queries is more
-      // portable across schema variants.
-      const { data: roleRows, error: rolesErr } = await sb
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", role);
-      if (rolesErr) throw rolesErr;
-      const userIds = (roleRows ?? []).map((r: { user_id: string }) => r.user_id);
-      if (userIds.length === 0) return [];
+    queryKey: ["tenant-profiles"],
+    queryFn: async (): Promise<CrmUserProfile[]> => {
+      // Pull profiles cuyo id está en tenant_members del tenant actual.
+      // RLS de tenant_members ya filtra por current_tenant_id() entonces
+      // un select sin filtros explícitos solo devuelve los del tenant.
+      const { data: members, error: memErr } = await sb
+        .from("tenant_members")
+        .select("user_id");
+      if (memErr) throw memErr;
+      const ids = (members ?? []).map((m: { user_id: string }) => m.user_id);
+      if (ids.length === 0) return [];
       const { data: profiles, error: profErr } = await sb
         .from("profiles")
         .select("id, full_name, avatar_url")
-        .in("id", userIds)
+        .in("id", ids)
         .order("full_name", { ascending: true });
       if (profErr) throw profErr;
-      return (profiles ?? []) as CrmUserByRole[];
+      return (profiles ?? []) as CrmUserProfile[];
     },
   });
 
