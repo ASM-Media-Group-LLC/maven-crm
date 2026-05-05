@@ -410,3 +410,419 @@ export const useScouterCompanies = () =>
       return (data ?? []) as ScouterCompany[];
     },
   });
+
+// ─── Worker queue · scouter_jobs ───────────────────────────────────────
+// Hooks para enquear / monitorear los jobs que consume el
+// scouter-worker (servicios/scouter-worker). Los inserts tienen que
+// llevar tenant_id explícito porque la tabla no tiene DEFAULT
+// current_tenant_id().
+
+export type JobKind =
+  | "discover_seed"
+  | "discover_hashtag"
+  | "score_lead"
+  | "enrich_profile";
+
+export type JobStatus = "queued" | "running" | "done" | "failed";
+
+export interface ScouterJob {
+  id: string;
+  kind: JobKind;
+  status: JobStatus;
+  company_id: string | null;
+  payload: Record<string, unknown>;
+  attempts: number;
+  max_attempts: number;
+  last_error: string | null;
+  result: unknown;
+  priority: number;
+  tenant_id: string;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+const useCurrentTenantId = () =>
+  useQuery({
+    queryKey: ["current-tenant-id"],
+    queryFn: async (): Promise<string | null> => {
+      // Mismo patrón que en useAgencyQa: la fn pública current_tenant_id()
+      // es el source of truth porque mira el JWT y aplica RLS.
+      const { data, error } = await (
+        supabase.rpc as unknown as (fn: string) => Promise<{ data: string | null; error: unknown }>
+      )("current_tenant_id");
+      if (error) throw error;
+      return (data ?? null) as string | null;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+interface EnqueueJobBase {
+  company_id?: string | null;
+  priority?: number;
+}
+
+export interface EnqueueDiscoverSeedInput extends EnqueueJobBase {
+  seeds: string[];
+  maxLeads?: number;
+}
+
+export const useEnqueueDiscoverySeed = () => {
+  const qc = useQueryClient();
+  const tenantQ = useCurrentTenantId();
+  return useMutation({
+    mutationFn: async (input: EnqueueDiscoverSeedInput): Promise<ScouterJob> => {
+      const tenantId = tenantQ.data;
+      if (!tenantId) throw new Error("Tenant no resuelto todavía. Reintentá en un segundo.");
+      const cleaned = (input.seeds ?? [])
+        .map((s) => s.trim().replace(/^@/, ""))
+        .filter(Boolean);
+      if (cleaned.length === 0) throw new Error("Pasá al menos un @handle.");
+      const { data, error } = await sb
+        .from("scouter_jobs")
+        .insert({
+          kind: "discover_seed",
+          status: "queued",
+          tenant_id: tenantId,
+          company_id: input.company_id ?? null,
+          payload: { seeds: cleaned, maxLeads: input.maxLeads ?? cleaned.length },
+          priority: input.priority ?? 5,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ScouterJob;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
+      toast.success("Discovery encolado", {
+        description: "El worker lo va a tomar en el próximo tick (~15s).",
+      });
+    },
+    onError: (e) => {
+      toast.error("No se pudo encolar el discovery", { description: (e as Error).message });
+    },
+  });
+};
+
+export interface EnqueueDiscoverHashtagInput extends EnqueueJobBase {
+  hashtag: string;
+  maxLeads?: number;
+}
+
+export const useEnqueueDiscoveryHashtag = () => {
+  const qc = useQueryClient();
+  const tenantQ = useCurrentTenantId();
+  return useMutation({
+    mutationFn: async (input: EnqueueDiscoverHashtagInput): Promise<ScouterJob> => {
+      const tenantId = tenantQ.data;
+      if (!tenantId) throw new Error("Tenant no resuelto todavía. Reintentá en un segundo.");
+      const tag = input.hashtag.trim().replace(/^#/, "");
+      if (!tag) throw new Error("Pasá un hashtag.");
+      const { data, error } = await sb
+        .from("scouter_jobs")
+        .insert({
+          kind: "discover_hashtag",
+          status: "queued",
+          tenant_id: tenantId,
+          company_id: input.company_id ?? null,
+          payload: { hashtag: tag, maxLeads: input.maxLeads ?? 30 },
+          priority: input.priority ?? 5,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ScouterJob;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
+      toast.success("Hashtag discovery encolado", {
+        description: "El worker lo va a tomar en el próximo tick (~15s).",
+      });
+    },
+    onError: (e) => {
+      toast.error("No se pudo encolar el hashtag", { description: (e as Error).message });
+    },
+  });
+};
+
+export interface EnqueueScoreLeadInput extends EnqueueJobBase {
+  leadId: string;
+}
+
+/** Encola un score_lead manual (re-scorear un lead específico). El
+ *  flow normal es que discovery enqueue auto este job — usar este
+ *  hook solo cuando el supervisor quiere forzar un re-scoring (por
+ *  ejemplo después de actualizar el prompt del scorer en el worker). */
+export const useEnqueueScoreLead = () => {
+  const qc = useQueryClient();
+  const tenantQ = useCurrentTenantId();
+  return useMutation({
+    mutationFn: async (input: EnqueueScoreLeadInput): Promise<ScouterJob> => {
+      const tenantId = tenantQ.data;
+      if (!tenantId) throw new Error("Tenant no resuelto todavía.");
+      const { data, error } = await sb
+        .from("scouter_jobs")
+        .insert({
+          kind: "score_lead",
+          status: "queued",
+          tenant_id: tenantId,
+          company_id: input.company_id ?? null,
+          payload: { leadId: input.leadId },
+          priority: input.priority ?? 7, // por encima de discovery, queremos resultado rápido
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ScouterJob;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
+      qc.invalidateQueries({ queryKey: ["scouter-leads"] });
+      toast.success("Re-scoring encolado");
+    },
+    onError: (e) => {
+      toast.error("No se pudo encolar el scoring", { description: (e as Error).message });
+    },
+  });
+};
+
+export interface EnqueueEnrichProfileInput extends EnqueueJobBase {
+  leadId: string;
+}
+
+/** Refresca followers/bio/etc. de un lead existente sin re-scorearlo. */
+export const useEnqueueEnrichProfile = () => {
+  const qc = useQueryClient();
+  const tenantQ = useCurrentTenantId();
+  return useMutation({
+    mutationFn: async (input: EnqueueEnrichProfileInput): Promise<ScouterJob> => {
+      const tenantId = tenantQ.data;
+      if (!tenantId) throw new Error("Tenant no resuelto todavía.");
+      const { data, error } = await sb
+        .from("scouter_jobs")
+        .insert({
+          kind: "enrich_profile",
+          status: "queued",
+          tenant_id: tenantId,
+          company_id: input.company_id ?? null,
+          payload: { leadId: input.leadId },
+          priority: input.priority ?? 3,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ScouterJob;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
+      qc.invalidateQueries({ queryKey: ["scouter-leads"] });
+      toast.success("Refresh de perfil encolado");
+    },
+    onError: (e) => {
+      toast.error("No se pudo encolar el refresh", { description: (e as Error).message });
+    },
+  });
+};
+
+interface ScouterJobsParams {
+  status?: JobStatus | JobStatus[];
+  kind?: JobKind | JobKind[];
+  limit?: number;
+}
+
+/** Lista jobs para el panel de monitoreo. Default: últimos 50 sin
+ *  filtro. Pasar { status: ["queued", "running"] } para ver lo que
+ *  está en curso. */
+export const useScouterJobs = (params: ScouterJobsParams = {}) => {
+  const { status, kind, limit = 50 } = params;
+  return useQuery({
+    queryKey: ["scouter-jobs", { status, kind, limit }],
+    queryFn: async (): Promise<ScouterJob[]> => {
+      let q = sb
+        .from("scouter_jobs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (status) {
+        q = Array.isArray(status) ? q.in("status", status) : q.eq("status", status);
+      }
+      if (kind) {
+        q = Array.isArray(kind) ? q.in("kind", kind) : q.eq("kind", kind);
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as ScouterJob[];
+    },
+    // Refetch cada 10s mientras la pestaña esté visible — la queue
+    // tiene movimiento real cada ~15s del worker poll.
+    refetchInterval: 10_000,
+  });
+};
+
+/** Re-encola un job que quedó en failed. Resetea attempts a 0 para
+ *  darle ciclos frescos, mantiene el payload. */
+export const useRetryScouterJob = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (jobId: string): Promise<void> => {
+      const { error } = await sb
+        .from("scouter_jobs")
+        .update({
+          status: "queued",
+          attempts: 0,
+          last_error: null,
+          started_at: null,
+          completed_at: null,
+        })
+        .eq("id", jobId)
+        .eq("status", "failed");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
+      toast.success("Job re-encolado");
+    },
+    onError: (e) => {
+      toast.error("No se pudo re-encolar", { description: (e as Error).message });
+    },
+  });
+};
+
+/** Cancela un job queued (o running zombi). Lo marca como failed con
+ *  un last_error explícito para que quede claro que fue cancelado, no
+ *  que el worker tiró error. */
+export const useCancelScouterJob = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (jobId: string): Promise<void> => {
+      const { error } = await sb
+        .from("scouter_jobs")
+        .update({
+          status: "failed",
+          last_error: "Cancelado por el usuario.",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", jobId)
+        .in("status", ["queued", "running"]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
+      toast.success("Job cancelado");
+    },
+    onError: (e) => {
+      toast.error("No se pudo cancelar", { description: (e as Error).message });
+    },
+  });
+};
+
+// ─── Apify budget · scouter_apify_budget ──────────────────────────────
+
+export interface ScouterApifyBudgetRow {
+  day: string;
+  est_spend_usd: number;
+  runs_count: number;
+  items_processed: number;
+  tenant_id: string;
+  updated_at: string;
+}
+
+const todayIso = (): string => new Date().toISOString().slice(0, 10);
+
+/** Trae la row del día (default) o de un día específico. Útil para
+ *  mostrar un widget "Apify gastado hoy: $X / $10". */
+export const useScouterApifyBudget = (day?: string) => {
+  const targetDay = day ?? todayIso();
+  return useQuery({
+    queryKey: ["scouter-apify-budget", targetDay],
+    queryFn: async (): Promise<ScouterApifyBudgetRow | null> => {
+      const { data, error } = await sb
+        .from("scouter_apify_budget")
+        .select("*")
+        .eq("day", targetDay)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as ScouterApifyBudgetRow | null;
+    },
+    refetchInterval: 30_000,
+  });
+};
+
+// ─── Notifications · scouter_notifications ────────────────────────────
+
+export interface ScouterNotification {
+  id: string;
+  kind: "lead_high_fit" | string;
+  payload: {
+    lead_id?: string;
+    instagram_handle?: string;
+    score?: number;
+    reason?: string;
+    [k: string]: unknown;
+  };
+  tenant_id: string;
+  created_at: string;
+  /** Computed-side: true si el current user ya marcó como leída. */
+  read?: boolean;
+}
+
+/** Lee las últimas N notificaciones del tenant + cruza con
+ *  scouter_notification_reads para saber cuáles están unread para
+ *  el current user. */
+export const useScouterNotifications = (limit = 30) =>
+  useQuery({
+    queryKey: ["scouter-notifications", limit],
+    queryFn: async (): Promise<ScouterNotification[]> => {
+      const { data: notifs, error } = await sb
+        .from("scouter_notifications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      const list = (notifs ?? []) as ScouterNotification[];
+      if (list.length === 0) return [];
+
+      // Cruzamos con reads del current user. RLS en
+      // scouter_notification_reads filtra por user_id = auth.uid()
+      // así que solo recibimos las del current user.
+      const ids = list.map((n) => n.id);
+      const { data: reads, error: readsErr } = await sb
+        .from("scouter_notification_reads")
+        .select("notification_id")
+        .in("notification_id", ids);
+      if (readsErr) throw readsErr;
+      const readSet = new Set(
+        (reads ?? []).map((r) => (r as { notification_id: string }).notification_id),
+      );
+      return list.map((n) => ({ ...n, read: readSet.has(n.id) }));
+    },
+    refetchInterval: 20_000,
+  });
+
+/** Marca una notificación como leída por el current user. Insert
+ *  idempotente — la PK (notification_id, user_id) garantiza un row
+ *  por user-notif. */
+export const useMarkNotificationRead = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (notificationId: string): Promise<void> => {
+      const { data: userRes, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+      const userId = userRes.user?.id;
+      if (!userId) throw new Error("No hay sesión activa.");
+      // tenant_id se autocompletea con el DEFAULT current_tenant_id()
+      // en la tabla. user_id explícito porque hace falta para la PK.
+      const { error } = await sb
+        .from("scouter_notification_reads")
+        .upsert(
+          { notification_id: notificationId, user_id: userId },
+          { onConflict: "notification_id,user_id" },
+        );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-notifications"] });
+    },
+  });
+};
