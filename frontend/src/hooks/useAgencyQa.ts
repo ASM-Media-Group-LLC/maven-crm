@@ -140,9 +140,56 @@ export const useQaCalls = (params: ListParams = {}) => {
   });
 };
 
+/** Trigger the qa-analyze edge function for an existing call_id.
+ *  The function reads the row, calls Groq with the kash analysis prompt,
+ *  parses + validates the JSON response, and writes it back to
+ *  qa_calls.claude_analysis + claude_score. Requires GROQ_API_KEY
+ *  configured in Supabase Edge Function secrets. */
+export const useAnalyzeQaCall = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (callId: string): Promise<{ score: number; analysis: CallAnalysis }> => {
+      const { data, error } = await supabase.functions.invoke("qa-analyze", {
+        body: { call_id: callId },
+      });
+      if (error) {
+        // Edge function 4xx/5xx come back wrapped in error.context.body
+        // or as plain message — surface the most useful one.
+        const msg =
+          (error as { context?: { body?: string } }).context?.body
+            ? (() => {
+                try {
+                  const parsed = JSON.parse(
+                    (error as { context: { body: string } }).context.body,
+                  );
+                  return parsed.error ?? error.message;
+                } catch {
+                  return error.message;
+                }
+              })()
+            : error.message;
+        throw new Error(msg);
+      }
+      if ((data as { error?: string })?.error) {
+        throw new Error((data as { error: string }).error);
+      }
+      return {
+        score: (data as { score: number }).score,
+        analysis: (data as { analysis: CallAnalysis }).analysis,
+      };
+    },
+    onSuccess: (_data, callId) => {
+      qc.invalidateQueries({ queryKey: ["qa-call", callId] });
+      qc.invalidateQueries({ queryKey: ["qa-calls"] });
+      qc.invalidateQueries({ queryKey: ["qa-models-with-stats"] });
+      qc.invalidateQueries({ queryKey: ["qa-analytics"] });
+    },
+  });
+};
+
 /** Create a new qa_call row from the Nueva QA form. claude_analysis
- * starts as `{}` and claude_score as 0; the AI dispatch (qa-analyze
- * edge function calling Groq) lands in a follow-up slice. */
+ * starts as `{}` and claude_score as 0. The AI dispatch happens after
+ * insert via useAnalyzeQaCall (qa-analyze edge function). */
 export interface CreateQaCallInput {
   closer_id: string;
   model_id: string;

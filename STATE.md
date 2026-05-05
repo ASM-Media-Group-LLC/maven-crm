@@ -70,10 +70,10 @@ dist/             ← build output, lo sirve Dokploy
 | Subtab | Estado | Notas |
 |---|---|---|
 | Calls | ✅ | Tabla densa + drawer detalle (radar dimensiones, red flags, key moments, improvements, model signals, transcript collapsible) |
-| Nueva QA | ✅ create / 🟡 enrich | Form crea row con `claude_analysis: {}`. Falta dispatch IA (edge function `qa-analyze` + `GROQ_API_KEY`). |
+| Nueva QA | ✅ | Form crea row + auto-dispatch a edge function `qa-analyze` (Groq + prompt de kash). Botón "Re-analizar IA" para re-trigger manual. |
 | QA Chat | ✅ shell / 🟡 IA | Sidebar de sesiones + new-session modal (scope closer/all) + persistencia de mensajes user. Falta edge function `qa-chat-mike` (Groq + context loader desde QAs) para que Mike responda. |
 | Modelos | ✅ | Catálogo con stats agregados (count calls / avg score / last outcome); click row → CallDetailDrawer reusado |
-| Analytics | 🟡 placeholder | Dashboard agregado |
+| Analytics | ✅ | Dashboard supervisor: KPI strip, outcome donut, weekly volume, closer leaderboard, top models — todo agregado client-side off `useQaAnalytics` |
 
 ## Schema de base de datos
 

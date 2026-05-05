@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
 import {
+  useAnalyzeQaCall,
   useCreateQaCall,
   useQaClosers,
   useQaModels,
@@ -48,6 +49,7 @@ const AgencyNewQa = () => {
   const closersQ = useQaClosers();
   const modelsQ = useQaModels();
   const create = useCreateQaCall();
+  const analyze = useAnalyzeQaCall();
 
   // Pre-fill evaluator name from the logged-in user's profile, with
   // email fallback if profile.full_name is empty.
@@ -98,15 +100,41 @@ const AgencyNewQa = () => {
         transcript,
       });
       toast.success("QA guardada", {
-        description: "El análisis IA queda pendiente hasta configurar Groq.",
+        description: "Analizando con IA…",
       });
       setLastSavedId(row.id);
       // Reset form keeping evaluator + closer (often same closer for several QAs in a row).
       setModelId("");
       setCallDate(today());
       setTranscript("");
+      // Auto-dispatch analysis. If GROQ_API_KEY isn't wired or the edge
+      // function isn't deployed yet, the toast surfaces the error and the
+      // row stays with claude_analysis: {} until re-triggered manually.
+      try {
+        const result = await analyze.mutateAsync(row.id);
+        toast.success(`Análisis IA listo · score ${result.score}/100`, {
+          description: "Aparece en Calls con detalle completo.",
+        });
+      } catch (analyzeErr) {
+        toast.error("Análisis IA falló — la QA quedó guardada igual", {
+          description: (analyzeErr as Error).message,
+        });
+      }
     } catch (err) {
       toast.error("No se pudo guardar la QA", {
+        description: (err as Error).message,
+      });
+    }
+  };
+
+  // Manual re-analyze trigger for the just-saved call (tooltip button).
+  const handleAnalyze = async () => {
+    if (!lastSavedId) return;
+    try {
+      const result = await analyze.mutateAsync(lastSavedId);
+      toast.success(`Análisis IA listo · score ${result.score}/100`);
+    } catch (err) {
+      toast.error("Análisis IA falló", {
         description: (err as Error).message,
       });
     }
@@ -243,28 +271,42 @@ const AgencyNewQa = () => {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span tabIndex={0}>
-                      <Button type="button" variant="outline" disabled className="gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5" />
-                        Analizar con IA
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!lastSavedId || analyze.isPending}
+                        onClick={handleAnalyze}
+                        className="gap-1.5"
+                      >
+                        {analyze.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5" />
+                        )}
+                        Re-analizar IA
                       </Button>
                     </span>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-[260px]">
                     <p className="text-xs">
-                      Falta configurar <code>GROQ_API_KEY</code> en los secrets de
-                      Supabase. Una vez wired, este botón dispara el análisis
-                      automático contra Groq.
+                      Vuelve a correr el análisis Groq sobre la última QA
+                      guardada. Útil si el primer análisis falló o si querés
+                      regenerarlo después de un cambio en el prompt.
                     </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <Button type="submit" disabled={!isValid || create.isPending} className="gap-1.5">
-                {create.isPending ? (
+              <Button
+                type="submit"
+                disabled={!isValid || create.isPending || analyze.isPending}
+                className="gap-1.5"
+              >
+                {create.isPending || analyze.isPending ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Save className="h-3.5 w-3.5" />
                 )}
-                Guardar QA
+                {analyze.isPending ? "Analizando…" : "Guardar QA"}
               </Button>
             </div>
           </CardContent>
