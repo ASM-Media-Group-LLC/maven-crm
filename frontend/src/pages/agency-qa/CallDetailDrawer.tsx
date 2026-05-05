@@ -7,7 +7,22 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Loader2, MapPin, Lightbulb, AlertTriangle, Star, Headphones } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  MapPin,
+  Lightbulb,
+  AlertTriangle,
+  Star,
+  Headphones,
+  Save,
+  Sparkles,
+  MessageSquareQuote,
+} from "lucide-react";
 import {
   Radar,
   RadarChart,
@@ -16,11 +31,17 @@ import {
   PolarRadiusAxis,
   ResponsiveContainer,
 } from "recharts";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { useMyProfile } from "@/hooks/useUserProfile";
 import {
   useQaCall,
   useQaAudioSignedUrl,
   scoreColor,
   OUTCOME_META,
+  useQaHumanFeedback,
+  useCreateQaHumanFeedback,
+  useAnalyzeQaCall,
   type CallAnalysis,
   type CallOutcome,
 } from "@/hooks/useAgencyQa";
@@ -33,10 +54,8 @@ import {
 // Every analysis field is optional — partial / legacy rows may have
 // only some of them — so each section guards before rendering.
 //
-// Out of scope this slice (left for next):
-//   - human_feedback form (qa_human_feedback)
+// Out of scope este slice (left for next):
 //   - per-section thumbs (qa_section_feedback)
-//   - re-analyze button (needs edge function)
 //   - resend email (Resend integration)
 
 const formatLevel = (lv: string) => lv.charAt(0).toUpperCase() + lv.slice(1);
@@ -379,20 +398,253 @@ const CallDetailDrawer = ({
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-400">
                   <Star className="mr-1 inline h-3.5 w-3.5" />
                   Esta llamada no tiene un análisis IA completo. Probablemente sea
-                  una entrada legacy o el análisis falló — usar el botón "Re-
-                  analizar" cuando esté disponible.
+                  una entrada legacy o el análisis falló — usar el botón
+                  "Re-analizar" para reintentar.
                 </div>
               )}
 
-              <p className="pt-3 text-[11px] text-muted-foreground">
-                <Lightbulb className="mr-1 inline h-3 w-3" />
-                Feedback humano y thumbs por sección llegan en la próxima slice.
-              </p>
+              {/* Human feedback + Re-analyze (port del humanContext de kash) */}
+              <FeedbackSection callId={call.id} />
             </div>
           </>
         )}
       </SheetContent>
     </Sheet>
+  );
+};
+
+// ─── Feedback section (qa_human_feedback + re-analyze with feedback) ─
+// Permite al supervisor dejar una observación libre + un score humano
+// opcional. El botón "Re-analizar con feedback" dispara qa-analyze con
+// el flag with_feedback, y la edge function inyecta la última row de
+// qa_human_feedback en el prompt como [FEEDBACK DEL SUPERVISOR] —
+// equivalente al humanContext de kash.
+const FeedbackSection = ({ callId }: { callId: string }) => {
+  const { user } = useAuth();
+  const profileQ = useMyProfile();
+  const feedbackQ = useQaHumanFeedback(callId);
+  const createFeedback = useCreateQaHumanFeedback();
+  const analyze = useAnalyzeQaCall();
+
+  const defaultEvaluator =
+    profileQ.data?.full_name?.trim() ||
+    user?.user_metadata?.full_name?.trim() ||
+    user?.email ||
+    "";
+
+  const [draft, setDraft] = useState("");
+  const [score, setScore] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+
+  const last = feedbackQ.data ?? null;
+
+  const handleSave = async () => {
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      toast.error("Escribí algo de feedback antes de guardar");
+      return;
+    }
+    const numericScore =
+      score.trim() === "" ? null : Math.max(0, Math.min(100, parseInt(score, 10)));
+    if (score.trim() !== "" && Number.isNaN(numericScore)) {
+      toast.error("El score humano debe ser un número 0-100");
+      return;
+    }
+    try {
+      await createFeedback.mutateAsync({
+        call_id: callId,
+        evaluator_name: defaultEvaluator || "Sin nombre",
+        feedback_text: trimmed,
+        human_score: numericScore,
+      });
+      toast.success("Feedback guardado", {
+        description: "Podés re-analizar la QA para que la IA lo considere.",
+      });
+      setDraft("");
+      setScore("");
+    } catch (err) {
+      toast.error("No se pudo guardar el feedback", {
+        description: (err as Error).message,
+      });
+    }
+  };
+
+  const handleReanalyzeWithFeedback = async () => {
+    if (!last && !draft.trim()) {
+      toast.error("Primero guardá un feedback humano");
+      return;
+    }
+    try {
+      const result = await analyze.mutateAsync({ callId, withFeedback: true });
+      toast.success(`Re-análisis listo · score ${result.score}/100`, {
+        description: "El análisis ahora incorpora tu feedback humano.",
+      });
+    } catch (err) {
+      toast.error("Re-análisis falló", {
+        description: (err as Error).message,
+      });
+    }
+  };
+
+  const handleReanalyzePlain = async () => {
+    try {
+      const result = await analyze.mutateAsync({ callId, withFeedback: false });
+      toast.success(`Re-análisis listo · score ${result.score}/100`);
+    } catch (err) {
+      toast.error("Re-análisis falló", {
+        description: (err as Error).message,
+      });
+    }
+  };
+
+  const fmtTs = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleString("es-AR", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return iso;
+    }
+  };
+
+  return (
+    <Section title="Feedback humano">
+      <p className="text-[11px] text-muted-foreground">
+        <Lightbulb className="mr-1 inline h-3 w-3" />
+        Dejá feedback sobre el análisis (qué le faltó, qué interpretó mal).
+        Después podés re-analizar y la IA lo va a tomar en cuenta.
+      </p>
+
+      {feedbackQ.isLoading ? (
+        <div className="text-xs text-muted-foreground">
+          <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
+          Cargando feedback…
+        </div>
+      ) : last ? (
+        <div className="rounded-md border border-border/60 bg-muted/30 p-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <MessageSquareQuote className="h-3 w-3" />
+              <span className="font-medium text-foreground/85">
+                {last.evaluator_name}
+              </span>
+              <span>·</span>
+              <span>{fmtTs(last.created_at)}</span>
+            </div>
+            {typeof last.human_score === "number" && (
+              <span
+                className="rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums text-white"
+                style={{ background: scoreColor(last.human_score) }}
+              >
+                humano {last.human_score}
+              </span>
+            )}
+          </div>
+          <p className="mt-1.5 whitespace-pre-wrap text-sm text-foreground/90">
+            {last.feedback_text}
+          </p>
+          <button
+            type="button"
+            className="mt-2 text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+            onClick={() => setShowHistory((s) => !s)}
+          >
+            {showHistory ? "Ocultar nuevo feedback" : "Agregar otro feedback"}
+          </button>
+        </div>
+      ) : (
+        <p className="text-xs italic text-muted-foreground">
+          Todavía no hay feedback humano para esta QA.
+        </p>
+      )}
+
+      {(showHistory || !last) && (
+        <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-2.5">
+          <div className="space-y-1">
+            <Label htmlFor="feedback-text" className="text-xs">
+              Feedback (qué corregir / agregar)
+            </Label>
+            <Textarea
+              id="feedback-text"
+              rows={3}
+              placeholder="Ej: la IA no detectó el cierre suave al final, la modelo aceptó la propuesta entre líneas. El score real es más alto."
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              className="text-sm"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="human-score" className="text-xs">
+                Score humano (opcional, 0-100)
+              </Label>
+              <Input
+                id="human-score"
+                type="number"
+                min={0}
+                max={100}
+                inputMode="numeric"
+                placeholder="ej. 85"
+                value={score}
+                onChange={(e) => setScore(e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSave}
+                disabled={createFeedback.isPending || !draft.trim()}
+                className="w-full gap-1.5"
+              >
+                {createFeedback.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                Guardar feedback
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2 pt-1">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={handleReanalyzePlain}
+          disabled={analyze.isPending}
+          className="gap-1.5"
+        >
+          {analyze.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Sparkles className="h-3.5 w-3.5" />
+          )}
+          Re-analizar
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={handleReanalyzeWithFeedback}
+          disabled={analyze.isPending || !last}
+          title={!last ? "Primero guardá feedback humano" : undefined}
+          className="gap-1.5"
+        >
+          {analyze.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <MessageSquareQuote className="h-3.5 w-3.5" />
+          )}
+          Re-analizar con feedback
+        </Button>
+      </div>
+    </Section>
   );
 };
 

@@ -53,9 +53,17 @@ RED FLAGS — penalizaciones fuertes, cítalos con texto literal del transcript
 - monologo_excesivo: Un turno continuo del closer demasiado largo (>90s sin cederle la palabra).
 - otro: Otra conducta problemática no listada — explícala.
 
+FEEDBACK DEL SUPERVISOR (cuando aparezca)
+Si en el input ves un bloque [FEEDBACK DEL SUPERVISOR], es una corrección humana sobre un análisis previo de esta misma llamada. Trátalo como SEÑAL FUERTE — el supervisor estuvo más cerca del contexto que vos. Reglas:
+- Ajustá tus puntuaciones (overall_score, dimensions, model_signals) hacia lo que el supervisor indica, sin pisar la rúbrica entera. Si el supervisor da un score humano sugerido, tu overall_score debe quedar dentro de ±8 puntos de ese valor a menos que tengas evidencia textual fuerte que lo contradiga.
+- Si el supervisor dice "la IA no detectó X" o "interpretó mal Y", BUSCÁ X/Y en el transcript y corregí key_moments / red_flags / dimensions consecuentemente. Si no encontrás evidencia, mencionalo en el summary pero igual ajustá hacia su lectura.
+- Si el supervisor dice que un red flag está mal puesto, removelo o reclasificalo. Si dice que falta uno, agregalo con quote literal del transcript.
+- En el summary del JSON, dejá UNA frase final tipo "Análisis re-calibrado con feedback del supervisor — [resumen ajuste]". No apliques esto si no había feedback.
+- NO inventes que hubo feedback si no lo hubo. Solo aplicá estas reglas cuando exista el bloque.
+
 TU TAREA
 
-Analiza el transcript y devuelve EXCLUSIVAMENTE un objeto JSON válido (sin markdown, sin texto adicional, sin backticks) con esta forma exacta:
+Analiza el transcript (con el feedback humano si aparece) y devuelve EXCLUSIVAMENTE un objeto JSON válido (sin markdown, sin texto adicional, sin backticks) con esta forma exacta:
 
 {
   "overall_score": <int 0-100>,

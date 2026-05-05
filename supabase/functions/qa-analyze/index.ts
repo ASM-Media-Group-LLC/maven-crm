@@ -24,6 +24,18 @@ const MAX_TRANSCRIPT_CHARS = 200_000;
 
 interface AnalyzeRequest {
   call_id?: string;
+  // Cuando es true, leemos la última row de qa_human_feedback para este
+  // call y la inyectamos en el prompt como [FEEDBACK DEL SUPERVISOR].
+  // Equivalente al humanContext de kash — el LLM ajusta su análisis
+  // considerando las correcciones del supervisor.
+  with_feedback?: boolean;
+}
+
+interface HumanFeedbackRow {
+  evaluator_name: string;
+  feedback_text: string;
+  human_score: number | null;
+  created_at: string;
 }
 
 interface CallRow {
@@ -151,8 +163,40 @@ serve(async (req) => {
         .join(" · ");
       headerLines.push(`Modelo: ${modelDetails}`);
     }
+
+    // Si vino with_feedback=true, cargamos la última row de
+    // qa_human_feedback para este call. RLS en la tabla restringe por
+    // tenant igual que qa_calls — service role bypass-ea pero seguimos
+    // filtrando por call_id que ya validamos arriba.
+    let humanFeedback: HumanFeedbackRow | null = null;
+    if (body.with_feedback === true) {
+      const { data: hf, error: hfErr } = await supabase
+        .from("qa_human_feedback")
+        .select("evaluator_name, feedback_text, human_score, created_at")
+        .eq("call_id", callId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (hfErr) {
+        // No queremos romper el análisis entero si falla la query del
+        // feedback — logueamos y seguimos sin él.
+        console.error("Error leyendo qa_human_feedback:", hfErr);
+      } else if (hf) {
+        humanFeedback = hf as HumanFeedbackRow;
+      }
+    }
+
+    const feedbackBlock = humanFeedback
+      ? `[FEEDBACK DEL SUPERVISOR — ${humanFeedback.evaluator_name}]\n` +
+        (humanFeedback.human_score !== null
+          ? `Score humano sugerido: ${humanFeedback.human_score}/100\n`
+          : "") +
+        `${humanFeedback.feedback_text.trim()}\n\n`
+      : "";
+
     const userMessage =
       (headerLines.length > 0 ? `[CONTEXTO]\n${headerLines.join("\n")}\n\n` : "") +
+      feedbackBlock +
       `[TRANSCRIPT]\n${transcript}`;
 
     // Dispatch al provider configurado.

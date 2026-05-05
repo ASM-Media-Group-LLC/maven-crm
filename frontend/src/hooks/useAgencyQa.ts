@@ -195,16 +195,34 @@ export const useTranscribeAudio = () =>
   });
 
 /** Trigger the qa-analyze edge function for an existing call_id.
- *  The function reads the row, calls Groq with the kash analysis prompt,
- *  parses + validates the JSON response, and writes it back to
- *  qa_calls.claude_analysis + claude_score. Requires GROQ_API_KEY
- *  configured in Supabase Edge Function secrets. */
+ *  The function reads the row, calls the LLM (Gemini > Groq dispatcher)
+ *  with the kash analysis prompt, parses + validates the JSON response,
+ *  and writes it back to qa_calls.claude_analysis + claude_score.
+ *
+ *  Acepta `withFeedback` opcional: cuando es true, el edge function
+ *  también lee la última row de qa_human_feedback para ese call y la
+ *  inyecta en el prompt como [FEEDBACK DEL SUPERVISOR]. Sirve para
+ *  re-analizar una QA ya analizada incorporando correcciones humanas
+ *  (port del humanContext de kash). */
+export interface AnalyzeQaCallInput {
+  callId: string;
+  withFeedback?: boolean;
+}
+
 export const useAnalyzeQaCall = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (callId: string): Promise<{ score: number; analysis: CallAnalysis }> => {
+    mutationFn: async (
+      input: AnalyzeQaCallInput | string,
+    ): Promise<{ score: number; analysis: CallAnalysis }> => {
+      // Backwards-compat: callers viejos siguen pasando un string callId.
+      const normalized: AnalyzeQaCallInput =
+        typeof input === "string" ? { callId: input } : input;
       const { data, error } = await supabase.functions.invoke("qa-analyze", {
-        body: { call_id: callId },
+        body: {
+          call_id: normalized.callId,
+          with_feedback: normalized.withFeedback === true,
+        },
       });
       if (error) {
         // FunctionsHttpError trae la response cruda en error.context.
@@ -233,11 +251,81 @@ export const useAnalyzeQaCall = () => {
         analysis: (data as { analysis: CallAnalysis }).analysis,
       };
     },
-    onSuccess: (_data, callId) => {
+    onSuccess: (_data, input) => {
+      const callId = typeof input === "string" ? input : input.callId;
       qc.invalidateQueries({ queryKey: ["qa-call", callId] });
       qc.invalidateQueries({ queryKey: ["qa-calls"] });
       qc.invalidateQueries({ queryKey: ["qa-models-with-stats"] });
       qc.invalidateQueries({ queryKey: ["qa-analytics"] });
+    },
+  });
+};
+
+// ─── Human feedback (qa_human_feedback) ──────────────────────────────
+// Cada row es un feedback discreto del supervisor sobre una QA: texto
+// libre + score humano opcional. Mantenemos historial (no upsert), la
+// UI muestra solo la más reciente. Para re-analizar con ese contexto,
+// llamar useAnalyzeQaCall con { callId, withFeedback: true } — el edge
+// function lee la row más reciente.
+
+export interface QaHumanFeedback {
+  id: string;
+  call_id: string;
+  evaluator_name: string;
+  feedback_text: string;
+  human_score: number | null;
+  created_at: string;
+}
+
+/** Lee el feedback humano más reciente para un call_id. Devuelve null
+ *  si la QA todavía no tiene feedback registrado. */
+export const useQaHumanFeedback = (callId: string | null) =>
+  useQuery({
+    queryKey: ["qa-human-feedback", callId],
+    enabled: !!callId,
+    queryFn: async (): Promise<QaHumanFeedback | null> => {
+      if (!callId) return null;
+      const { data, error } = await sb
+        .from("qa_human_feedback")
+        .select("*")
+        .eq("call_id", callId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as QaHumanFeedback | null;
+    },
+  });
+
+export interface CreateQaHumanFeedbackInput {
+  call_id: string;
+  evaluator_name: string;
+  feedback_text: string;
+  human_score?: number | null;
+}
+
+/** Crea una nueva row de feedback humano. Cada llamada es un registro
+ *  separado — el supervisor puede dejar varias entradas a lo largo del
+ *  tiempo y el historial queda. La UI usualmente muestra solo la última. */
+export const useCreateQaHumanFeedback = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateQaHumanFeedbackInput): Promise<QaHumanFeedback> => {
+      const { data, error } = await sb
+        .from("qa_human_feedback")
+        .insert({
+          call_id: input.call_id,
+          evaluator_name: input.evaluator_name,
+          feedback_text: input.feedback_text,
+          human_score: input.human_score ?? null,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as QaHumanFeedback;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["qa-human-feedback", variables.call_id] });
     },
   });
 };
