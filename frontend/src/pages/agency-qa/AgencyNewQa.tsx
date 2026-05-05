@@ -40,6 +40,7 @@ import {
   useAnalyzeQaCall,
   useCreateQaCall,
   useCurrentTenantId,
+  useFetchIgAvatar,
   useQaClosers,
   useQaModels,
   useTranscribeAudio,
@@ -90,6 +91,7 @@ const AgencyNewQa = () => {
   const uploadAudio = useUploadQaAudio();
   const upsertCloser = useUpsertQaCloser();
   const upsertModel = useUpsertQaModel();
+  const fetchAvatar = useFetchIgAvatar();
 
   const defaultEvaluator = useMemo(() => {
     return (
@@ -198,6 +200,17 @@ const AgencyNewQa = () => {
           ig_url: modelIgUrl.trim() || null,
         }),
       ]);
+
+      // 2.5 Fire-and-forget: si el modelo tiene IG y aún no tiene
+      // avatar, intentamos backfillearlo. No bloqueamos el submit —
+      // el avatar se persiste async y aparece la próxima vez que se
+      // refresca Calls/Models.
+      if (modelIgUrl.trim()) {
+        void fetchAvatar.mutateAsync(modelId).catch(() => {
+          // Silent: cuenta privada o IG bloqueando el scrape no debería
+          // hacer ruido al closer cuando lo importante (la QA) salió bien.
+        });
+      }
 
       // 3. Transcribir vía Whisper.
       setSubmitStage("Transcribiendo con Whisper…");

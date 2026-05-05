@@ -353,6 +353,44 @@ export const useUpsertQaModel = () =>
     },
   });
 
+/** Trigger qa-fetch-ig-avatar to backfill qa_models.avatar_data_url from
+ *  the model's ig_url. Idempotent — if the model already has an avatar,
+ *  the function returns the cached one without re-scraping IG. */
+export const useFetchIgAvatar = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (modelId: string): Promise<string | null> => {
+      const { data, error } = await supabase.functions.invoke("qa-fetch-ig-avatar", {
+        body: { model_id: modelId },
+      });
+      if (error) {
+        const msg =
+          (error as { context?: { body?: string } }).context?.body
+            ? (() => {
+                try {
+                  return JSON.parse(
+                    (error as { context: { body: string } }).context.body,
+                  ).error ?? error.message;
+                } catch {
+                  return error.message;
+                }
+              })()
+            : error.message;
+        throw new Error(msg);
+      }
+      if ((data as { error?: string })?.error) {
+        throw new Error((data as { error: string }).error);
+      }
+      return (data as { avatar_data_url: string | null }).avatar_data_url;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-models"] });
+      qc.invalidateQueries({ queryKey: ["qa-models-with-stats"] });
+      qc.invalidateQueries({ queryKey: ["qa-calls"] });
+    },
+  });
+};
+
 /** Resolve the current user's active tenant_id from tenant_members.
  *  We need it client-side to build Storage paths ("{tenant_id}/{call_id}.mp3")
  *  because the RLS policy on storage.objects scopes by path prefix. */
