@@ -72,7 +72,7 @@ dist/             ← build output, lo sirve Dokploy
 | Calls | ✅ | Tabla densa + drawer detalle (radar dimensiones, red flags, key moments, improvements, model signals, transcript collapsible) |
 | Nueva QA | 🟡 placeholder | TranscriptUploader + form + dispatch del análisis |
 | QA Chat | 🟡 placeholder | Mike chat (chat con sesión scoped a closer/all) |
-| Modelos | 🟡 placeholder | Catálogo + leaderboard + score trend |
+| Modelos | ✅ | Catálogo con stats agregados (count calls / avg score / last outcome); click row → CallDetailDrawer reusado |
 | Analytics | 🟡 placeholder | Dashboard agregado |
 
 ## Schema de base de datos
@@ -125,7 +125,7 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 
 - **UI de admin de tenants + invite flow** — para que cuando entre el primer cliente externo no se gestione por SQL directo. Pequeño.
 - **Active tenant switcher** — solo necesario cuando un usuario pertenezca a múltiples tenants. Hoy todos están solo en ASM Tech, así que no apura.
-- **Modelos / Analytics / Nueva QA / QA Chat** — completar Agency QA UI.
+- **Analytics / Nueva QA / QA Chat** — completar Agency QA UI (Modelos ya está ✅).
 - **Worker de Scouter** (Apify + AI scoring) — pieza grande backend, va en `servicios/scouter-worker/`.
 
 ## Cómo retomar este proyecto desde cero

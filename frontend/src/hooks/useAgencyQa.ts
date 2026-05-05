@@ -173,6 +173,79 @@ export const useQaModels = () =>
     },
   });
 
+/** Models + aggregated stats (calls count, avg score, last call) for
+ *  the Models subtab. Aggregation is client-side off two parallel
+ *  queries so it stays simple while call volume is small (<2k). When
+ *  it grows past that threshold, swap the second query for an RPC or
+ *  materialised view. */
+export interface QaModelWithStats extends QaModel {
+  total_calls: number;
+  avg_score: number;
+  last_call_date: string | null;
+  last_call: {
+    id: string;
+    closer_name: string | null;
+    outcome: CallOutcome;
+    score: number;
+  } | null;
+}
+
+export const useQaModelsWithStats = () =>
+  useQuery({
+    queryKey: ["qa-models-with-stats"],
+    queryFn: async (): Promise<QaModelWithStats[]> => {
+      const [{ data: models, error: mErr }, { data: calls, error: cErr }] =
+        await Promise.all([
+          sb
+            .from("qa_models")
+            .select("*")
+            .eq("active", true)
+            .order("name", { ascending: true }),
+          sb
+            .from("qa_calls")
+            .select(
+              "id, model_id, claude_score, claude_analysis, call_date, closer:qa_closers(name)",
+            )
+            .order("call_date", { ascending: false })
+            .limit(2000),
+        ]);
+      if (mErr) throw mErr;
+      if (cErr) throw cErr;
+
+      const byModel = new Map<string, any[]>();
+      for (const c of (calls ?? []) as any[]) {
+        if (!c.model_id) continue;
+        const arr = byModel.get(c.model_id) ?? [];
+        arr.push(c);
+        byModel.set(c.model_id, arr);
+      }
+
+      return ((models ?? []) as QaModel[]).map((m) => {
+        const list = byModel.get(m.id) ?? [];
+        const total = list.length;
+        const avg =
+          total > 0
+            ? Math.round(list.reduce((a, c) => a + (c.claude_score ?? 0), 0) / total)
+            : 0;
+        const last = list[0] ?? null;
+        return {
+          ...m,
+          total_calls: total,
+          avg_score: avg,
+          last_call_date: last?.call_date ?? null,
+          last_call: last
+            ? {
+                id: last.id,
+                closer_name: last.closer?.name ?? null,
+                outcome: last.claude_analysis?.call_outcome ?? null,
+                score: last.claude_score ?? 0,
+              }
+            : null,
+        };
+      });
+    },
+  });
+
 export const useQaClosers = () =>
   useQuery({
     queryKey: ["qa-closers"],

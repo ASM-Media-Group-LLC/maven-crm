@@ -93,11 +93,21 @@ INSERT INTO public.tenants (slug, name)
 VALUES ('asm-tech', 'ASM Tech')
 ON CONFLICT (slug) DO NOTHING;
 
--- Every existing auth.users row becomes an owner of ASM Tech. Future
+-- Every existing auth.users row becomes a 'member' of ASM Tech. Future
 -- signups are NOT auto-attached — they'll come through an explicit
 -- onboarding flow (invite link, admin assignment, etc.).
+--
+-- IMPORTANT: 'member' is the safe default. 'owner' / 'admin' promotion
+-- is done manually via SQL (or via the eventual tenant admin UI). When
+-- role-gated logic ships (invite users, manage tenant settings,
+-- billing, etc.) blindly seeding everyone as 'owner' would expose
+-- privileged actions to the whole team.
+--
+-- Manual promotion example for the workspace lead:
+--   UPDATE public.tenant_members SET role = 'owner'
+--   WHERE user_id = (SELECT id FROM auth.users WHERE email = '<your-email>');
 INSERT INTO public.tenant_members (user_id, tenant_id, role)
-SELECT u.id, t.id, 'owner'
+SELECT u.id, t.id, 'member'
 FROM auth.users u
 CROSS JOIN public.tenants t
 WHERE t.slug = 'asm-tech'

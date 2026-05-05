@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PhoneCall, Plus, MessageSquare, Users, BarChart3, Wrench } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import AgencyCalls from "./AgencyCalls";
+import AgencyModels from "./AgencyModels";
 
 // Agency QA landing — visual scaffold for the migration of the
 // closers-QA area of kash-call-qa into Maven.
@@ -111,6 +112,8 @@ const AgencyQA = () => {
             <TabsContent key={s.key} value={s.key} className="mt-4">
               {s.key === "calls" ? (
                 <AgencyCalls />
+              ) : s.key === "models" ? (
+                <AgencyModels />
               ) : (
                 <Card>
                   <CardContent className="space-y-3 p-6">
