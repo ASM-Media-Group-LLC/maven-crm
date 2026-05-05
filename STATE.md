@@ -25,17 +25,23 @@ frontend/         ← UI (Vite + React)
   index.html
   src/
   public/
-backend/          ← Supabase
-  supabase/
-    config.toml
-    functions/    ← edge functions
-    migrations/   ← SQL migrations
+supabase/         ← backend (Edge Functions + migrations)
+  config.toml
+  functions/      ← deno edge functions
+  migrations/     ← SQL migrations (auto-aplican vía GitHub Integration)
 servicios/        ← reservado para microservicios futuros (vacío)
 dist/             ← build output, lo sirve Dokploy
 .claude/          ← config local (launch.json para preview)
 + configs en root (vite, tsconfig, tailwind, etc.)
 + Dockerfile + nginx.conf en root
 ```
+
+> Nota: el directorio `backend/` que existió brevemente se removió porque
+> la GitHub Integration de Supabase escanea `supabase/` en la raíz por
+> convención. El intento previo con un symlink `supabase` → `backend/supabase`
+> no fue seguido por la Integration (escanea via GitHub API, ve el modo
+> 120000 de symlink y lo ignora). El "split en 3 dominios" sigue siendo
+> visible: `frontend/`, `supabase/` (backend), `servicios/`.
 
 ## Áreas funcionales
 
@@ -92,7 +98,7 @@ Ambos sets ya tienen migrations subidas (`20260504100000`, `20260504110000`) per
 | 2026-05-04 | Radar de `dimensions` con recharts | Coherente con resto de Maven |
 | 2026-05-04 | Multi-tenant por **row-level** en tablas nuevas | Maven se venderá a clientes externos (Phase 2) |
 | 2026-05-04 | `tenants` + `tenant_members` creadas; `qa_*`/`scouter_*` aisladas por `tenant_id` con RLS scoping | Implementación de la decisión anterior — primer tenant: ASM Tech |
-| 2026-05-04 | Symlink `supabase/` → `backend/supabase/` en raíz | Supabase GitHub Integration espera `supabase/migrations/` en raíz; symlink mantiene el split sin reconfigurar la integration |
+| 2026-05-04 | ~~Symlink `supabase/` → `backend/supabase/`~~ → moved real directory back to `supabase/` at root | La GitHub Integration NO sigue symlinks (los ve como mode 120000 y los ignora). Movido el directorio real a la raíz, eliminado `backend/` ya vacío. |
 | 2026-05-04 | Supabase GitHub Integration conectada al repo | Migrations auto-aplican a la branch JHON-V3 al push; promoción manual JHON-V3 → main |
 
 ## Deudas conocidas
