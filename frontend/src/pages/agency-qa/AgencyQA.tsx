@@ -89,8 +89,8 @@ const CLOSERS_QA_SUBS: ClosersQaSub[] = [
     submodule: "QA Chat",
     icon: MessageSquare,
     whatsComing:
-      "Chat con Mike (asistente IA) sobre todas las QAs: ranking, comparativas, tendencias.",
-    source: "app/qa/chat/page.tsx → MikeChatPanel.tsx",
+      "Chat con Clari (asistente IA) sobre todas las QAs: ranking, comparativas, tendencias.",
+    source: "app/qa/chat/page.tsx → ClariChatPanel.tsx",
   },
   {
     key: "models",

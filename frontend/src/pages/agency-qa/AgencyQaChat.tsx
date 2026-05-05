@@ -44,13 +44,13 @@ import {
   type QaChatScope,
 } from "@/hooks/useAgencyQa";
 
-// AgencyQaChat — port del Mike chat de kash. Esta slice cubre UI + persistencia:
+// AgencyQaChat — port del Clari chat de kash. Esta slice cubre UI + persistencia:
 // crea sesiones (scope: closer específico o todo el equipo), persiste mensajes
 // del user, lista sesiones del usuario actual ordenadas por última actividad.
 //
 // El response del asistente NO se genera todavía — falta la edge function
-// qa-chat-mike + GROQ_API_KEY. Mientras tanto, después de mandar un mensaje,
-// aparece una nota "Mike pendiente — falta GROQ_API_KEY" en lugar de la
+// qa-chat-clari + GROQ_API_KEY. Mientras tanto, después de mandar un mensaje,
+// aparece una nota "Clari pendiente — falta GROQ_API_KEY" en lugar de la
 // respuesta. Cuando se conecte el backend, esa nota se reemplaza por la
 // llamada a la edge function que streamea tokens.
 
@@ -130,11 +130,11 @@ const AgencyQaChat = () => {
     setInput("");
     try {
       const result = await sendMessage.mutateAsync({ session_id: activeId, content: trimmed });
-      // sendMessage devuelve { user, assistant, assistantError }: si Mike
+      // sendMessage devuelve { user, assistant, assistantError }: si Clari
       // falló (rate limit, LLM error), el user message igual quedó persistido
       // pero no hay respuesta. Mostramos un toast warning con la causa.
       if (result.assistantError) {
-        toast.warning("Mike no pudo responder", {
+        toast.warning("Clari no pudo responder", {
           description: result.assistantError,
         });
       }
@@ -164,9 +164,9 @@ const AgencyQaChat = () => {
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Chat con Mike</h2>
+          <h2 className="text-base font-semibold">Chat con Clari</h2>
           <p className="text-xs text-muted-foreground">
-            Mike es tu supervisor IA — conoce a cada closer, todas las QAs, y
+            Clari es tu supervisor IA — conoce a cada closer, todas las QAs, y
             te ayuda a coachear al equipo. Hacele preguntas sobre tendencias,
             comparativas entre closers o qué le falta a alguien.
           </p>
@@ -304,7 +304,7 @@ const AgencyQaChat = () => {
                       >
                         {m.role === "assistant" && (
                           <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-amber-500">
-                            Mike
+                            Clari
                           </div>
                         )}
                         <div className="whitespace-pre-wrap">{m.content}</div>
@@ -316,7 +316,7 @@ const AgencyQaChat = () => {
                   ))
                 )}
 
-                {/* "Mike escribiendo…" mientras la mutation está en vuelo
+                {/* "Clari escribiendo…" mientras la mutation está en vuelo
                     (después de insertar el user msg, antes que llegue la
                     respuesta del edge function). Si la mutation termina
                     sin assistant (rate limit, LLM error), el placeholder
@@ -328,7 +328,7 @@ const AgencyQaChat = () => {
                       <div className="max-w-[85%] rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
                         <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-500">
                           <Sparkles className="h-3 w-3 animate-pulse" />
-                          Mike escribiendo…
+                          Clari escribiendo…
                         </div>
                       </div>
                     </div>
@@ -347,7 +347,7 @@ const AgencyQaChat = () => {
                       void handleSend();
                     }
                   }}
-                  placeholder={`Pregunta a Mike sobre ${
+                  placeholder={`Pregunta a Clari sobre ${
                     activeSession.scope_type === "closer"
                       ? (activeSession.closer?.name ?? "este closer")
                       : "el equipo"
@@ -375,7 +375,7 @@ const AgencyQaChat = () => {
                     <TooltipContent className="max-w-[220px]">
                       <p className="text-xs">
                         Tu mensaje se persiste en{" "}
-                        <code>qa_chat_messages</code>. La respuesta de Mike
+                        <code>qa_chat_messages</code>. La respuesta de Clari
                         queda pendiente hasta wirear Groq.
                       </p>
                     </TooltipContent>
@@ -388,7 +388,7 @@ const AgencyQaChat = () => {
               <div className="flex flex-col items-center gap-2 text-center">
                 <Sparkles className="h-8 w-8 text-amber-500" />
                 <p className="text-sm font-semibold">
-                  Hola, soy Mike — supervisor del equipo.
+                  Hola, soy Clari — supervisor del equipo.
                 </p>
                 <p className="max-w-md text-xs text-muted-foreground">
                   Click "+ Nueva conversación" para arrancar. Elegí un closer
@@ -449,7 +449,7 @@ const NewSessionDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Nueva conversación con Mike</DialogTitle>
+          <DialogTitle>Nueva conversación con Clari</DialogTitle>
           <DialogDescription>
             El scope queda fijo en esta sesión. Si querés cambiar de closer
             después, abrí una sesión nueva.

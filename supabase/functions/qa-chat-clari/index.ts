@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { MIKE_SYSTEM_PROMPT } from "./prompt.ts";
+import { CLARI_SYSTEM_PROMPT } from "./prompt.ts";
 
-// qa-chat-mike — generador de la respuesta del asistente IA "Mike"
+// qa-chat-clari — generador de la respuesta del asistente IA "Clari"
 // para una sesión de QA Chat. Pattern:
 //  1. El frontend ya insertó el user message en qa_chat_messages.
 //     Esa decisión es deliberada: si esta función falla (rate limit,
@@ -32,7 +32,7 @@ const corsHeaders = {
 const MAX_HISTORY_MESSAGES = 20;
 
 // Cantidad de QAs que cargamos como contexto. 30 es un balance entre:
-// - Que Mike tenga data suficiente para responder ("quién cierra más",
+// - Que Clari tenga data suficiente para responder ("quién cierra más",
 //   "tendencias del último mes").
 // - No saturar el TPM con un payload gigante en cada request.
 // Si el scope es "closer" cargamos 30 de ese closer; si "all", 30 del
@@ -92,7 +92,7 @@ serve(async (req) => {
     const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "llama-3.1-8b-instant";
 
     // Auth: tomamos el JWT del user y todas las queries van scopadas por
-    // RLS. Mike no necesita service role — todo lo que lee/escribe está
+    // RLS. Clari no necesita service role — todo lo que lee/escribe está
     // en tablas multi-tenant aisladas por current_tenant_id() + user_id.
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -131,7 +131,7 @@ serve(async (req) => {
 
     // Cargar historial. Última ventana de mensajes; el último DEBE ser
     // user (lo insertó el frontend antes de invocarnos). Si no es user,
-    // significa que se está reintentando sobre una sesión donde Mike
+    // significa que se está reintentando sobre una sesión donde Clari
     // ya respondió — devolvemos el último assistant para no duplicar.
     const { data: historyRaw, error: historyErr } = await sb
       .from("qa_chat_messages")
@@ -188,7 +188,7 @@ serve(async (req) => {
     let providerLabel: "gemini" | "groq";
     try {
       if (GEMINI_API_KEY) {
-        const r = await callGemini(GEMINI_API_KEY, GEMINI_MODEL, MIKE_SYSTEM_PROMPT, llmMessages);
+        const r = await callGemini(GEMINI_API_KEY, GEMINI_MODEL, CLARI_SYSTEM_PROMPT, llmMessages);
         responseText = r.text;
         usage = r.usage;
         providerLabel = "gemini";
@@ -197,7 +197,7 @@ serve(async (req) => {
           GROQ_API_KEY!,
           GROQ_URL,
           GROQ_MODEL,
-          MIKE_SYSTEM_PROMPT,
+          CLARI_SYSTEM_PROMPT,
           llmMessages,
         );
         responseText = r.text;
@@ -211,7 +211,7 @@ serve(async (req) => {
     }
 
     if (!responseText.trim()) {
-      return jsonError("Mike no devolvió texto. Probá reformular la pregunta.", 502);
+      return jsonError("Clari no devolvió texto. Probá reformular la pregunta.", 502);
     }
 
     // Token tracking: ambos providers exponen counts en shapes distintos.
@@ -245,7 +245,7 @@ serve(async (req) => {
       qaContextCount: qaCalls.length,
     });
   } catch (e) {
-    console.error("qa-chat-mike error:", e);
+    console.error("qa-chat-clari error:", e);
     return jsonError((e as Error).message ?? "Error interno.", 500);
   }
 });
