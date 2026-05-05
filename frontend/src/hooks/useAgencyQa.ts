@@ -140,6 +140,47 @@ export const useQaCalls = (params: ListParams = {}) => {
   });
 };
 
+/** Send an audio file to the qa-transcribe edge function (Groq Whisper)
+ *  and return the transcript text. Used by the Nueva QA upload zone
+ *  when the user picks an audio file (mp3/m4a/wav/webm).
+ *
+ *  We bypass supabase.functions.invoke and use plain fetch because
+ *  invoke doesn't always serialize FormData cleanly across SDK versions
+ *  — direct fetch is one less moving part. */
+export const useTranscribeAudio = () =>
+  useMutation({
+    mutationFn: async (file: File): Promise<{ text: string; duration: number | null }> => {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/qa-transcribe`;
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      if (!token) throw new Error("No hay sesión activa.");
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("language", "es");
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // apikey header le dice al gateway de Supabase que se trata de
+          // una llamada autenticada vs anónima.
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          (data as { error?: string }).error ??
+            `Error ${res.status} al transcribir.`,
+        );
+      }
+      return {
+        text: (data as { text: string }).text,
+        duration: (data as { duration?: number | null }).duration ?? null,
+      };
+    },
+  });
+
 /** Trigger the qa-analyze edge function for an existing call_id.
  *  The function reads the row, calls Groq with the kash analysis prompt,
  *  parses + validates the JSON response, and writes it back to

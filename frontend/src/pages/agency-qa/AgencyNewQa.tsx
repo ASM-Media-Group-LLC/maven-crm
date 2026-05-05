@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +17,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Loader2, Save, Sparkles, CheckCircle2 } from "lucide-react";
+import {
+  CheckCircle2,
+  FileText,
+  Loader2,
+  Save,
+  Sparkles,
+  Upload,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
@@ -26,20 +34,21 @@ import {
   useCreateQaCall,
   useQaClosers,
   useQaModels,
+  useTranscribeAudio,
 } from "@/hooks/useAgencyQa";
 
 // AgencyNewQa — formulario para registrar manualmente una nueva QA.
-// Esta slice cubre la mitad "create": persiste la fila en qa_calls
-// con claude_analysis: {} y claude_score: 0. La mitad "enrich" (llamar
-// a Groq con el prompt de kash adaptado, parsear el JSON, persistir
-// el análisis) llega en la próxima slice cuando GROQ_API_KEY esté
-// configurado en los secrets de Supabase.
+// Soporta:
+//   - Pegar transcript en el textarea
+//   - Subir archivo .txt (FileReader)
+//   - Subir archivo .docx (mammoth, dynamic import — solo se carga
+//     cuando hace falta para no inflar el bundle inicial)
+// Insertar el row dispara automáticamente la edge function qa-analyze.
 //
-// Out of scope (próximas slices):
-//   - Subir transcript desde archivo (.txt / .docx — kash usa mammoth)
-//   - Audio metrics (kash recibe MP3 + extrae métricas)
-//   - Botón "Analizar con IA" → llama edge function qa-analyze
-//   - Re-analyze de calls existentes
+// Próximas slices:
+//   - Upload de audio (mp3/m4a/wav) → edge function qa-transcribe
+//     con Groq Whisper, auto-fill del transcript.
+//   - Audio metrics (WPM, fillers, monólogo) — kash usa ffmpeg.
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -50,6 +59,7 @@ const AgencyNewQa = () => {
   const modelsQ = useQaModels();
   const create = useCreateQaCall();
   const analyze = useAnalyzeQaCall();
+  const transcribe = useTranscribeAudio();
 
   // Pre-fill evaluator name from the logged-in user's profile, with
   // email fallback if profile.full_name is empty.
@@ -68,6 +78,84 @@ const AgencyNewQa = () => {
   const [evaluatorName, setEvaluatorName] = useState<string>("");
   const [transcript, setTranscript] = useState<string>("");
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; size: number } | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (file: File) => {
+    const lower = file.name.toLowerCase();
+    const isTxt = lower.endsWith(".txt") || file.type === "text/plain";
+    const isDocx =
+      lower.endsWith(".docx") ||
+      file.type ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const isAudio =
+      file.type.startsWith("audio/") ||
+      [".mp3", ".m4a", ".wav", ".webm", ".ogg", ".flac", ".mp4", ".mpga"].some(
+        (ext) => lower.endsWith(ext),
+      );
+
+    if (lower.endsWith(".doc") && !isDocx) {
+      toast.error("Formato .doc antiguo no soportado", {
+        description: "Guardá como .docx o pegá el texto.",
+      });
+      return;
+    }
+    if (!isTxt && !isDocx && !isAudio) {
+      toast.error("Formato no soportado", {
+        description: "Aceptamos .txt, .docx o audio (mp3/m4a/wav/webm).",
+      });
+      return;
+    }
+
+    setParsing(true);
+    try {
+      let text = "";
+      if (isTxt) {
+        text = await file.text();
+      } else if (isDocx) {
+        // mammoth se carga via dynamic import para no inflar el bundle
+        // de páginas que no lo necesitan.
+        const mammoth = await import("mammoth");
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        text = result.value ?? "";
+      } else {
+        // Audio: pasamos al edge function qa-transcribe (Groq Whisper).
+        // Toast informativo porque puede tardar 5-30s según duración.
+        toast.loading("Transcribiendo audio con Whisper…", { id: "transcribe" });
+        const result = await transcribe.mutateAsync(file);
+        toast.dismiss("transcribe");
+        text = result.text;
+      }
+      const cleaned = text.trim();
+      if (cleaned.length === 0) {
+        toast.error("El archivo no tiene texto");
+        return;
+      }
+      setTranscript(cleaned);
+      setUploadedFile({ name: file.name, size: file.size });
+      toast.success(
+        isAudio
+          ? `Audio transcripto · ${cleaned.length.toLocaleString()} chars`
+          : `Transcript cargado · ${cleaned.length.toLocaleString()} chars`,
+      );
+    } catch (err) {
+      toast.dismiss("transcribe");
+      toast.error(
+        isAudio ? "No se pudo transcribir el audio" : "No se pudo leer el archivo",
+        { description: (err as Error).message },
+      );
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const clearUploadedFile = () => {
+    setUploadedFile(null);
+    setTranscript("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   // Re-set evaluator name once profile loads (initial render evaluator
   // is empty until profile resolves).
@@ -107,6 +195,8 @@ const AgencyNewQa = () => {
       setModelId("");
       setCallDate(today());
       setTranscript("");
+      setUploadedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       // Auto-dispatch analysis. If GROQ_API_KEY isn't wired or the edge
       // function isn't deployed yet, the toast surfaces the error and the
       // row stays with claude_analysis: {} until re-triggered manually.
@@ -244,7 +334,7 @@ const AgencyNewQa = () => {
               </div>
             </div>
 
-            {/* Transcript */}
+            {/* Transcript — upload o pegar */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label htmlFor="transcript">Transcript *</Label>
@@ -252,12 +342,82 @@ const AgencyNewQa = () => {
                   {transcriptWords} palabras · {transcriptChars} chars
                 </span>
               </div>
+
+              {/* Upload zone */}
+              <div className="rounded-md border border-dashed border-border/60 bg-muted/20 p-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,audio/*,.mp3,.m4a,.wav,.webm,.ogg,.flac,.mpga,.mp4"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handleFileUpload(file);
+                  }}
+                />
+                {uploadedFile ? (
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <FileText className="h-4 w-4 shrink-0 text-emerald-500" />
+                      <span className="truncate font-medium">{uploadedFile.name}</span>
+                      <span className="text-muted-foreground">
+                        · {(uploadedFile.size / 1024).toFixed(1)} KB
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearUploadedFile}
+                      className="h-7 gap-1 px-2 text-xs"
+                    >
+                      <X className="h-3 w-3" />
+                      Quitar
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Upload className="h-4 w-4" />
+                      <span>
+                        Subí .txt / .docx, o audio (.mp3 / .m4a / .wav, máx 25MB) — o pegá el texto abajo.
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={parsing}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="gap-1.5"
+                    >
+                      {parsing ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5" />
+                      )}
+                      {parsing
+                        ? transcribe.isPending
+                          ? "Transcribiendo…"
+                          : "Leyendo…"
+                        : "Elegir archivo"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               <Textarea
                 id="transcript"
-                placeholder="Pegá la transcripción completa de la llamada aquí…"
+                placeholder="…o pegá la transcripción completa acá."
                 rows={14}
                 value={transcript}
-                onChange={(e) => setTranscript(e.target.value)}
+                onChange={(e) => {
+                  setTranscript(e.target.value);
+                  // Si el usuario edita manualmente después de subir un
+                  // archivo, despegamos el indicador de "archivo cargado"
+                  // (el texto ya no refleja el archivo original).
+                  if (uploadedFile) setUploadedFile(null);
+                }}
                 className="font-mono text-xs"
               />
               {errors.transcript && (
