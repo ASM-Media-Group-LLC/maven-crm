@@ -35,6 +35,7 @@ import { CANONICAL_COUNTRIES } from "@/lib/countries";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
+import { useUserRole } from "@/hooks/useUserRole";
 import { compressAudioIfNeeded } from "@/lib/audioCompress";
 import {
   useAnalyzeQaCall,
@@ -82,8 +83,13 @@ const MODEL_CATEGORIES: ModelCategory[] = ["A++", "A", "B+", "B", "C+", "C"];
 const AgencyNewQa = () => {
   const { user } = useAuth();
   const profileQ = useMyProfile();
-  // Lista de empleados del tenant actual — todos pueden ser closer
-  // de una llamada, no solo los que tienen el rol formal "closer".
+  const { isAdmin, isManager, isSupervisor } = useUserRole();
+  // Solo admin/manager/supervisor pueden subir QAs en nombre de otro
+  // closer. Un closer regular queda lockeado a su propio nombre — no
+  // puede atribuirse una llamada a otro o atribuir la suya a otro.
+  const canPickAnyCloser = isAdmin || isManager || isSupervisor;
+  // Lista de empleados del tenant actual — solo se carga cuando el
+  // user puede elegir. Para closers regulares no hace falta.
   const closersQ = useTenantProfiles();
   const modelsQ = useQaModels();
   const tenantQ = useCurrentTenantId();
@@ -124,6 +130,13 @@ const AgencyNewQa = () => {
   useEffect(() => {
     if (!evaluatorName && defaultEvaluator) setEvaluatorName(defaultEvaluator);
   }, [defaultEvaluator, evaluatorName]);
+
+  // Lock closer al usuario logueado cuando no es admin/manager/supervisor.
+  useEffect(() => {
+    if (!canPickAnyCloser && user?.id && closerId !== user.id) {
+      setCloserId(user.id);
+    }
+  }, [canPickAnyCloser, user?.id, closerId]);
 
   // Auto-fill categoría/país/IG cuando el nombre tipeado matchea
   // exactamente una modelo del catálogo. Solo rellenamos cuando los
@@ -196,13 +209,15 @@ const AgencyNewQa = () => {
       }
 
       // 2. Upsert closer (por full_name del CRM) + modelo por nombre.
-      // Resolvemos el full_name del profile pickeado para alimentar
-      // qa_closers; si el profile no tiene full_name (raro pero
-      // posible) caemos al email.
+      // Para admin/manager/supervisor: usan el name del profile pickeado.
+      // Para closers regulares (lockeados): cae al defaultEvaluator (su
+      // propio name del perfil) porque no cargamos closersQ con su row.
       setSubmitStage("Guardando catálogo…");
       const pickedCloser = (closersQ.data ?? []).find((u) => u.id === closerId);
       const closerDisplayName =
-        pickedCloser?.full_name?.trim() || "Closer sin nombre";
+        pickedCloser?.full_name?.trim() ||
+        defaultEvaluator?.trim() ||
+        "Closer sin nombre";
       const [qaCloserId, qaModelId] = await Promise.all([
         upsertCloser.mutateAsync(closerDisplayName),
         upsertModel.mutateAsync({
@@ -344,12 +359,25 @@ const AgencyNewQa = () => {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="closer">Closer *</Label>
-                <CloserCombobox
-                  value={closerId}
-                  onChange={setCloserId}
-                  options={closersQ.data ?? []}
-                  loading={closersQ.isLoading}
-                />
+                {canPickAnyCloser ? (
+                  <CloserCombobox
+                    value={closerId}
+                    onChange={setCloserId}
+                    options={closersQ.data ?? []}
+                    loading={closersQ.isLoading}
+                  />
+                ) : (
+                  // Closer regular: lockeado a su propio nombre. Mostramos
+                  // el nombre como readonly + tooltip explicando por qué.
+                  <Input
+                    id="closer"
+                    value={defaultEvaluator || "Tu nombre"}
+                    readOnly
+                    tabIndex={-1}
+                    title="Solo admin/manager/supervisor pueden subir QAs en nombre de otro closer."
+                    className="cursor-not-allowed bg-muted/40 text-muted-foreground"
+                  />
+                )}
                 {errors.closer && (
                   <p className="text-xs text-rose-400">{errors.closer}</p>
                 )}

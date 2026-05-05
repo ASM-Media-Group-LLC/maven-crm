@@ -12,6 +12,8 @@ import {
   MessageCircle,
   Briefcase,
   Megaphone,
+  History,
+  Bell,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
@@ -20,6 +22,8 @@ import AgencyModels from "./AgencyModels";
 import AgencyAnalytics from "./AgencyAnalytics";
 import AgencyNewQa from "./AgencyNewQa";
 import AgencyQaChat from "./AgencyQaChat";
+import AgencyQaHistory from "./AgencyQaHistory";
+import AgencyQaNotifications from "./AgencyQaNotifications";
 
 // Agency QA — 2 niveles:
 //
@@ -33,7 +37,14 @@ import AgencyQaChat from "./AgencyQaChat";
 //      Estos se mantienen como tabs horizontales (no se restructuran)
 //      y siguen siendo gateables individualmente vía canAccess().
 
-type ClosersQaKey = "calls" | "new-qa" | "qa-chat" | "models" | "analytics";
+type ClosersQaKey =
+  | "calls"
+  | "new-qa"
+  | "qa-history"
+  | "qa-chat"
+  | "models"
+  | "analytics"
+  | "notifications";
 
 interface ClosersQaSub {
   key: ClosersQaKey;
@@ -64,6 +75,15 @@ const CLOSERS_QA_SUBS: ClosersQaSub[] = [
     source: "app/new-qa/page.tsx → TranscriptUploader.tsx",
   },
   {
+    key: "qa-history",
+    label: "QA History",
+    submodule: "QA History",
+    icon: History,
+    whatsComing:
+      "Mis QAs recientes con estado de transcripción y análisis IA.",
+    source: "(propio de Maven — no existe en kash)",
+  },
+  {
     key: "qa-chat",
     label: "QA Chat",
     submodule: "QA Chat",
@@ -89,6 +109,15 @@ const CLOSERS_QA_SUBS: ClosersQaSub[] = [
     whatsComing:
       "Dashboard agregado: leaderboard de closers, distribución de outcomes, métricas.",
     source: "app/analytics/page.tsx",
+  },
+  {
+    key: "notifications",
+    label: "Notificaciones",
+    submodule: "Notifications",
+    icon: Bell,
+    whatsComing:
+      "Config de emails: disparos por evento (cargada / analizada / score bajo / fallo) + lista de destinatarios.",
+    source: "(propio de Maven — sigue patrón Chatter Evaluator)",
   },
 ];
 
@@ -180,8 +209,12 @@ const ClosersQaSection = () => {
               <AgencyAnalytics />
             ) : s.key === "new-qa" ? (
               <AgencyNewQa />
+            ) : s.key === "qa-history" ? (
+              <AgencyQaHistory />
             ) : s.key === "qa-chat" ? (
               <AgencyQaChat />
+            ) : s.key === "notifications" ? (
+              <AgencyQaNotifications />
             ) : (
               <Card>
                 <CardContent className="space-y-3 p-6">

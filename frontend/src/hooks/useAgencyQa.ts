@@ -353,10 +353,14 @@ export const useUpsertQaModel = () =>
     },
   });
 
-/** Lookup all CRM profiles in the current tenant. Used by Nueva QA
- *  to populate the closer dropdown. Cualquier empleado de la empresa
- *  puede ser el closer de una llamada — no obligamos a que tenga el
- *  rol formal "closer" porque a veces cubren managers o supervisores. */
+/** Lookup all CRM profiles. Used by Nueva QA para popular el closer
+ *  dropdown — cualquier empleado de la empresa puede ser closer de
+ *  una llamada (managers / supervisores también cubren a veces).
+ *
+ *  Confiamos en la policy "Authenticated users can view all profiles"
+ *  (migration 20260226164549) — no necesitamos pasar por tenant_members.
+ *  Cuando el sistema sea multi-tenant real con varios tenants vivos,
+ *  esto se va a re-scope. Por ahora (un tenant: ASM Tech) está OK. */
 export interface CrmUserProfile {
   id: string;
   full_name: string | null;
@@ -367,22 +371,12 @@ export const useTenantProfiles = () =>
   useQuery({
     queryKey: ["tenant-profiles"],
     queryFn: async (): Promise<CrmUserProfile[]> => {
-      // Pull profiles cuyo id está en tenant_members del tenant actual.
-      // RLS de tenant_members ya filtra por current_tenant_id() entonces
-      // un select sin filtros explícitos solo devuelve los del tenant.
-      const { data: members, error: memErr } = await sb
-        .from("tenant_members")
-        .select("user_id");
-      if (memErr) throw memErr;
-      const ids = (members ?? []).map((m: { user_id: string }) => m.user_id);
-      if (ids.length === 0) return [];
-      const { data: profiles, error: profErr } = await sb
+      const { data, error } = await sb
         .from("profiles")
         .select("id, full_name, avatar_url")
-        .in("id", ids)
         .order("full_name", { ascending: true });
-      if (profErr) throw profErr;
-      return (profiles ?? []) as CrmUserProfile[];
+      if (error) throw error;
+      return (data ?? []) as CrmUserProfile[];
     },
   });
 
