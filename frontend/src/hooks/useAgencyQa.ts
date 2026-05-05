@@ -86,6 +86,9 @@ export interface QaCall {
   evaluator_name: string;
   transcript: string;
   audio_metrics: unknown | null;
+  /** Storage path inside qa-audio bucket. NULL for legacy rows that
+   *  predate the audio-only intake (transcripts pegados a mano). */
+  audio_path: string | null;
   /** Full Claude / IA analysis payload — every field is optional
    *  because legacy rows or partial analyses may not include the
    *  full schema. The detail view must guard against missing data. */
@@ -237,12 +240,13 @@ export interface CreateQaCallInput {
   call_date: string;        // ISO yyyy-mm-dd
   evaluator_name: string;
   transcript: string;
+  audio_path?: string | null;
 }
 
 export const useCreateQaCall = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: CreateQaCallInput): Promise<QaCall> => {
+    mutationFn: async (input: CreateQaCallInput): Promise<QaCall & { audio_path: string | null }> => {
       const { data, error } = await sb
         .from("qa_calls")
         .insert({
@@ -251,6 +255,7 @@ export const useCreateQaCall = () => {
           call_date: input.call_date,
           evaluator_name: input.evaluator_name,
           transcript: input.transcript,
+          audio_path: input.audio_path ?? null,
           claude_analysis: {},
           claude_score: 0,
           audio_metrics: null,
@@ -258,7 +263,7 @@ export const useCreateQaCall = () => {
         .select("*")
         .single();
       if (error) throw error;
-      return data as QaCall;
+      return data as QaCall & { audio_path: string | null };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-calls"] });
@@ -267,6 +272,149 @@ export const useCreateQaCall = () => {
     },
   });
 };
+
+export type ModelCategory = "A++" | "A" | "B+" | "B" | "C+" | "C";
+
+/** Upsert a closer by name. If a row with that exact (case-insensitive)
+ *  name exists, return its id; otherwise insert a new active closer. */
+export const useUpsertQaCloser = () =>
+  useMutation({
+    mutationFn: async (name: string): Promise<string> => {
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("Nombre del closer vacío.");
+      const { data: existing, error: lookupErr } = await sb
+        .from("qa_closers")
+        .select("id")
+        .ilike("name", trimmed)
+        .maybeSingle();
+      if (lookupErr) throw lookupErr;
+      if (existing?.id) return existing.id as string;
+      const { data: created, error: insertErr } = await sb
+        .from("qa_closers")
+        .insert({ name: trimmed, active: true })
+        .select("id")
+        .single();
+      if (insertErr) throw insertErr;
+      return created.id as string;
+    },
+  });
+
+/** Upsert a model by name with optional metadata. If the model already
+ *  exists, only fill metadata fields that were empty (don't overwrite
+ *  good data with empty strings from the form). */
+export interface UpsertQaModelInput {
+  name: string;
+  category?: ModelCategory | null;
+  country?: string | null;
+  ig_url?: string | null;
+}
+
+export const useUpsertQaModel = () =>
+  useMutation({
+    mutationFn: async (input: UpsertQaModelInput): Promise<string> => {
+      const trimmed = input.name.trim();
+      if (!trimmed) throw new Error("Nombre de la modelo vacío.");
+      const { data: existing, error: lookupErr } = await sb
+        .from("qa_models")
+        .select("id, category, country, ig_url")
+        .ilike("name", trimmed)
+        .maybeSingle();
+      if (lookupErr) throw lookupErr;
+
+      if (existing?.id) {
+        // Patch metadata gaps without overwriting existing values.
+        const patch: Record<string, string> = {};
+        if (!existing.category && input.category) patch.category = input.category;
+        if (!existing.country && input.country) patch.country = input.country;
+        if (!existing.ig_url && input.ig_url) patch.ig_url = input.ig_url;
+        if (Object.keys(patch).length > 0) {
+          const { error: updateErr } = await sb
+            .from("qa_models")
+            .update(patch)
+            .eq("id", existing.id);
+          if (updateErr) throw updateErr;
+        }
+        return existing.id as string;
+      }
+
+      const { data: created, error: insertErr } = await sb
+        .from("qa_models")
+        .insert({
+          name: trimmed,
+          category: input.category ?? null,
+          country: input.country ?? null,
+          ig_url: input.ig_url ?? null,
+          active: true,
+        })
+        .select("id")
+        .single();
+      if (insertErr) throw insertErr;
+      return created.id as string;
+    },
+  });
+
+/** Resolve the current user's active tenant_id from tenant_members.
+ *  We need it client-side to build Storage paths ("{tenant_id}/{call_id}.mp3")
+ *  because the RLS policy on storage.objects scopes by path prefix. */
+export const useCurrentTenantId = () =>
+  useQuery({
+    queryKey: ["current-tenant-id"],
+    queryFn: async (): Promise<string | null> => {
+      // current_tenant_id() es una function SQL pero no la podemos
+      // llamar directo desde el client sin un wrapper RPC. Workaround:
+      // pegamos en tenant_members con auth.uid() y devolvemos el primero.
+      const { data: userRes, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+      const userId = userRes.user?.id;
+      if (!userId) return null;
+      const { data, error } = await sb
+        .from("tenant_members")
+        .select("tenant_id")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.tenant_id as string) ?? null;
+    },
+  });
+
+/** Upload an audio file to the qa-audio Storage bucket at the given
+ *  path. The caller is expected to use "{tenant_id}/{call_id}.{ext}"
+ *  format because that's what the RLS policy on storage.objects scopes
+ *  by — but we don't enforce here, the policy will reject mismatches. */
+export const useUploadQaAudio = () =>
+  useMutation({
+    mutationFn: async (input: { file: File; path: string }): Promise<string> => {
+      const { error } = await supabase.storage
+        .from("qa-audio")
+        .upload(input.path, input.file, {
+          contentType: input.file.type || "audio/mpeg",
+          upsert: false,
+        });
+      if (error) throw error;
+      return input.path;
+    },
+  });
+
+/** Generate a short-lived signed URL for playback of an audio_path.
+ *  Used in the call detail drawer. URLs expire after 1 hour. */
+export const useQaAudioSignedUrl = (audioPath: string | null) =>
+  useQuery({
+    queryKey: ["qa-audio-signed-url", audioPath],
+    enabled: !!audioPath,
+    // Aprovechamos el TTL de 1h del signed URL — refrescamos cada
+    // 50 min para mantenerlo siempre vigente sin ataque a Storage.
+    staleTime: 50 * 60 * 1000,
+    queryFn: async (): Promise<string | null> => {
+      if (!audioPath) return null;
+      const { data, error } = await supabase.storage
+        .from("qa-audio")
+        .createSignedUrl(audioPath, 60 * 60);
+      if (error) throw error;
+      return data?.signedUrl ?? null;
+    },
+  });
 
 /** Single call + joined model + closer for the detail drawer. */
 export const useQaCall = (id: string | null) =>

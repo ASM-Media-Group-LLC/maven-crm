@@ -7,7 +7,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Loader2, MapPin, Lightbulb, AlertTriangle, Star } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, MapPin, Lightbulb, AlertTriangle, Star, Headphones } from "lucide-react";
 import {
   Radar,
   RadarChart,
@@ -18,6 +18,7 @@ import {
 } from "recharts";
 import {
   useQaCall,
+  useQaAudioSignedUrl,
   scoreColor,
   OUTCOME_META,
   type CallAnalysis,
@@ -255,6 +256,7 @@ const CallDetailDrawer = ({
   const [showTranscript, setShowTranscript] = useState(false);
   const call = callQ.data;
   const a = call?.claude_analysis ?? {};
+  const audioUrlQ = useQaAudioSignedUrl(call?.audio_path ?? null);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -325,6 +327,34 @@ const CallDetailDrawer = ({
                 <ImprovementsBlock improvements={a.improvements} />
               )}
               {a.model_signals && <ModelSignalsBlock signals={a.model_signals} />}
+
+              {/* Audio playback */}
+              {call.audio_path && (
+                <Section title="Audio">
+                  {audioUrlQ.isLoading ? (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Generando link…
+                    </div>
+                  ) : audioUrlQ.data ? (
+                    <div className="flex items-center gap-2">
+                      <Headphones className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <audio
+                        controls
+                        preload="metadata"
+                        src={audioUrlQ.data}
+                        className="w-full"
+                      >
+                        Tu navegador no soporta audio HTML5.
+                      </audio>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      No se pudo cargar el audio (signed URL falló).
+                    </p>
+                  )}
+                </Section>
+              )}
 
               {/* Transcript */}
               <Section title="Transcript" hint={`${call.transcript.length.toLocaleString()} chars`}>
