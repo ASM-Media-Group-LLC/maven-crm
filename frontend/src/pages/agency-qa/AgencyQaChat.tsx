@@ -129,7 +129,15 @@ const AgencyQaChat = () => {
     if (!trimmed) return;
     setInput("");
     try {
-      await sendMessage.mutateAsync({ session_id: activeId, content: trimmed });
+      const result = await sendMessage.mutateAsync({ session_id: activeId, content: trimmed });
+      // sendMessage devuelve { user, assistant, assistantError }: si Mike
+      // falló (rate limit, LLM error), el user message igual quedó persistido
+      // pero no hay respuesta. Mostramos un toast warning con la causa.
+      if (result.assistantError) {
+        toast.warning("Mike no pudo responder", {
+          description: result.assistantError,
+        });
+      }
     } catch (err) {
       toast.error("No se pudo enviar el mensaje", {
         description: (err as Error).message,
@@ -159,9 +167,8 @@ const AgencyQaChat = () => {
           <h2 className="text-base font-semibold">Chat con Mike</h2>
           <p className="text-xs text-muted-foreground">
             Mike es tu supervisor IA — conoce a cada closer, todas las QAs, y
-            te ayuda a coachear al equipo. Cuando{" "}
-            <code className="rounded bg-muted/40 px-1">GROQ_API_KEY</code> esté
-            wired, sus respuestas se streamean acá.
+            te ayuda a coachear al equipo. Hacele preguntas sobre tendencias,
+            comparativas entre closers o qué le falta a alguien.
           </p>
         </div>
       </div>
@@ -274,8 +281,9 @@ const AgencyQaChat = () => {
                   </div>
                 ) : (messagesQ.data?.length ?? 0) === 0 ? (
                   <p className="text-xs italic text-muted-foreground">
-                    Escribí una pregunta para arrancar. Cuando GROQ_API_KEY
-                    esté configurado, Mike responde acá mismo.
+                    Escribí una pregunta para arrancar. Algunos ejemplos:
+                    "¿quién cierra más?", "¿qué le falta a [closer]?",
+                    "compará [closer1] vs [closer2]".
                   </p>
                 ) : (
                   messagesQ.data!.map((m) => (
@@ -308,21 +316,20 @@ const AgencyQaChat = () => {
                   ))
                 )}
 
-                {/* Stub assistant placeholder while AI dispatch isn't wired */}
-                {(messagesQ.data?.length ?? 0) > 0 &&
+                {/* "Mike escribiendo…" mientras la mutation está en vuelo
+                    (después de insertar el user msg, antes que llegue la
+                    respuesta del edge function). Si la mutation termina
+                    sin assistant (rate limit, LLM error), el placeholder
+                    queda como "sin respuesta" hasta el próximo intento. */}
+                {sendMessage.isPending &&
+                  (messagesQ.data?.length ?? 0) > 0 &&
                   messagesQ.data![messagesQ.data!.length - 1].role === "user" && (
                     <div className="flex flex-col items-start gap-1">
                       <div className="max-w-[85%] rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
                         <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-500">
-                          <Sparkles className="h-3 w-3" />
-                          Mike pendiente
+                          <Sparkles className="h-3 w-3 animate-pulse" />
+                          Mike escribiendo…
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          La respuesta automática llega cuando{" "}
-                          <code>GROQ_API_KEY</code> + edge function{" "}
-                          <code>qa-chat-mike</code> estén configurados. Tu
-                          mensaje ya quedó persistido.
-                        </p>
                       </div>
                     </div>
                   )}

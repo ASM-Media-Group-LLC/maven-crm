@@ -1100,8 +1100,13 @@ export const useSendQaChatMessage = () => {
     mutationFn: async (input: {
       session_id: string;
       content: string;
-    }): Promise<QaChatMessage> => {
-      const { data, error } = await sb
+    }): Promise<{ user: QaChatMessage; assistant: QaChatMessage | null; assistantError?: string }> => {
+      // 1. Insertamos el mensaje del user PRIMERO. Si la edge function
+      // qa-chat-mike falla después (rate limit, LLM error), el user
+      // message ya quedó persistido y la UI muestra "Mike pendiente"
+      // como antes — el supervisor puede reintentar pidiendo otra cosa
+      // o esperando a que pase el rate limit.
+      const { data: userMsg, error: userErr } = await sb
         .from("qa_chat_messages")
         .insert({
           session_id: input.session_id,
@@ -1110,15 +1115,48 @@ export const useSendQaChatMessage = () => {
         })
         .select("*")
         .single();
-      if (error) throw error;
-      // Bump updated_at on the parent session so the sidebar reorders.
-      await sb
-        .from("qa_chat_sessions")
-        .update({ updated_at: new Date().toISOString() })
-        .eq("id", input.session_id);
-      return data as QaChatMessage;
+      if (userErr) throw userErr;
+
+      // 2. Disparamos qa-chat-mike. La edge function genera la respuesta
+      // del assistant, la inserta en qa_chat_messages, y bumpea
+      // session.updated_at — frontend solo invalida la query.
+      let assistant: QaChatMessage | null = null;
+      let assistantError: string | undefined;
+      try {
+        const { data: invokeData, error: invokeErr } = await supabase.functions.invoke(
+          "qa-chat-mike",
+          { body: { session_id: input.session_id } },
+        );
+        if (invokeErr) {
+          // Mismo patrón que useAnalyzeQaCall: extraer error específico
+          // del body de la respuesta del edge.
+          let detail: string | null = null;
+          type WithCtx = { context?: { json?: () => Promise<unknown> } };
+          const ctx = (invokeErr as unknown as WithCtx).context;
+          if (ctx && typeof ctx.json === "function") {
+            try {
+              const body = (await ctx.json()) as { error?: string };
+              if (body?.error) detail = body.error;
+            } catch {
+              // body no era JSON
+            }
+          }
+          assistantError = detail ?? invokeErr.message ?? "Mike no respondió.";
+        } else if ((invokeData as { error?: string })?.error) {
+          assistantError = (invokeData as { error: string }).error;
+        } else {
+          assistant =
+            (invokeData as { message?: QaChatMessage })?.message ?? null;
+        }
+      } catch (err) {
+        assistantError = (err as Error).message ?? "Mike no respondió.";
+      }
+
+      return { user: userMsg as QaChatMessage, assistant, assistantError };
     },
     onSuccess: (_data, variables) => {
+      // Invalidamos messages para que la UI repinte con el assistant
+      // recién insertado por la edge function.
       qc.invalidateQueries({ queryKey: ["qa-chat-messages", variables.session_id] });
       qc.invalidateQueries({ queryKey: ["qa-chat-sessions"] });
     },
