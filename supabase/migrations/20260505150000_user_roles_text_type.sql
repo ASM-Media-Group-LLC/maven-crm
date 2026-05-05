@@ -10,8 +10,25 @@
 ALTER TABLE public.user_roles
   ALTER COLUMN role TYPE text USING role::text;
 
--- 2. Add a CHECK constraint that validates against roles_config at write time
---    (optional — the Edge Function already validates, but belt-and-suspenders)
--- Note: we intentionally do NOT add a CHECK here because it would require a
--- subquery which Postgres doesn't support in CHECK constraints. Validation
--- happens in the manage-user-roles Edge Function.
+-- 2. Update has_role() function to cast app_role param to text for comparison.
+--    The function signature stays (uuid, app_role) so existing RLS policies
+--    that call has_role(auth.uid(), 'admin'::app_role) keep working.
+CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role app_role)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = _user_id AND role = _role::text
+  )
+$$;
+
+-- 3. Also create a text overload so new code can call has_role(uid, 'spammer')
+--    without needing to cast to app_role.
+CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role text)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = _user_id AND role = _role
+  )
+$$;
