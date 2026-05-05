@@ -304,7 +304,7 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [countryFilter, setCountryFilter] = useState<string>("all");
-  const [aiQuality, setAiQuality] = useState<AiQualityFilter>("approved");
+  const [aiQuality, setAiQuality] = useState<AiQualityFilter>("all");
   const [page, setPage] = useState(1);
   const pageSize = 60;
   const [selected, setSelected] = useState<ScouterLead | null>(null);
