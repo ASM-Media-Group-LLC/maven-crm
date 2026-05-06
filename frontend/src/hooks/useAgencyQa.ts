@@ -1096,15 +1096,13 @@ export const useUpdateQaConfig = () => {
   });
 };
 
-// ─── QA Webhook (kash-style email vía Apps Script) ───────────────────
-// Mismo pattern que useChatterEvaluator.fireWebhookInBackground:
-// armamos el payload en el cliente (incluido el HTML del mail) y lo
-// disparamos al apps_script_url configurado en qa_config. El AppScript
-// se encarga de relayear a MailApp.sendEmail + escribir en Drive/Sheets.
-//
-// El payload lleva `type: "qa_call_analysis"` para que el mismo GAS pueda
-// hacer dispatch entre tipos (chatter_evaluation vs qa_call_analysis) sin
-// necesidad de un webhook separado.
+// ─── QA Notification Email (vía Resend) ─────────────────────────────
+// Mismo pattern que useChatterEvaluator: armamos subject + HTML en el
+// cliente y lo mandamos por la edge function `send-notification-email`,
+// que relayea a Resend con sender = Maven CRM <noreply@mail.maven-ai.me>.
+// Antes pasaba por un Apps Script (docs/Sheets/email); migramos a Resend
+// para que el remitente sea de Maven y no la cuenta personal del owner
+// del GAS. La columna `apps_script_url` en qa_config ya no se usa.
 
 interface FireInput {
   callId: string;
@@ -1129,11 +1127,7 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
   }) | null;
 
   if (!call) throw new Error("QA call no encontrada para webhook.");
-  if (!config?.apps_script_url) {
-    // No es error — el webhook simplemente no está wireado en este tenant.
-    // El submit continúa sin mail.
-    return;
-  }
+  if (!config) return;
 
   const score = call.claude_score ?? call.claude_analysis?.overall_score ?? 0;
 
@@ -1145,6 +1139,8 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
     (config.notify_on_low_score === true &&
       score < (config.low_score_threshold ?? 60));
   if (!shouldNotify) return;
+  const recipients = config.notification_emails ?? [];
+  if (recipients.length === 0) return;
 
   const a = call.claude_analysis ?? {};
   const outcome = (a.call_outcome as string | null) ?? null;
@@ -1181,31 +1177,23 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
     improvements: a.improvements ?? [],
   };
 
-  // Payload final = todos los datos crudos + email pre-renderizado +
-  // type discriminator para el dispatch en GAS.
-  const payload = {
-    type: "qa_call_analysis" as const,
-    ...emailPayload,
-    emails: config.notification_emails ?? [],
-    emailSubject: buildQaEmailSubject(emailPayload),
-    emailHtml: buildQaEmailHtml(emailPayload),
-  };
+  const subject = buildQaEmailSubject(emailPayload);
+  const html = buildQaEmailHtml(emailPayload);
 
-  // text/plain para evitar el preflight CORS — Apps Script rechaza
-  // OPTIONS y querer hacer JSON dispara preflight. El GAS hace
-  // JSON.parse(e.postData.contents) del lado server.
-  const res = await fetch(config.apps_script_url, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(payload),
-    redirect: "follow",
-  });
-  if (!res.ok) throw new Error(`Apps Script devolvió HTTP ${res.status}`);
+  const { error: mailError } = await supabase.functions.invoke(
+    "send-notification-email",
+    { body: { to: recipients, subject, html, tag: "qa" } },
+  );
+  if (mailError) {
+    throw new Error(
+      (mailError as Error).message ?? "send-notification-email falló",
+    );
+  }
 };
 
-/** Dispara el webhook de notificación de QA. Pensado para correr
- *  fire-and-forget desde el submit de Nueva QA — el examiner no debe
- *  esperar a que termine el GAS (10-30s para generar Doc + Sheet + mail).
+/** Dispara el envío del email de notificación de QA via Resend.
+ *  Pensado para correr fire-and-forget desde el submit de Nueva QA —
+ *  el examiner no debe esperar al round-trip a Resend (puede tardar 1-3s).
  *  Cualquier error lo expone como toast.warning, NO bloquea el flujo. */
 export const useFireQaWebhook = () =>
   useMutation({

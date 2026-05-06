@@ -24,31 +24,29 @@ import { cn } from "@/lib/utils";
 import { useQaConfig, useUpdateQaConfig } from "@/hooks/useAgencyQa";
 import { useMavenUsers } from "@/hooks/useChatterEvaluator";
 
-// AgencyQaNotifications — port del patrón de chatter evaluator
-// (AdminContent.tsx ConfigSection). Tres bloques:
+// AgencyQaNotifications — config de avisos cuando se completa una QA.
+// Dos bloques:
 //
-//   1. Apps Script URL — webhook a Google Apps Script que genera el
-//      Drive doc + Sheet + emails externos cuando llega una QA. Mismo
-//      script reusable que el de chatter (la GAS function decide qué
-//      template aplicar según el payload type).
+//   1. Emails externos — lista de destinatarios fuera del CRM
+//      (clientes, auditores, supervisores). El correo sale por Resend
+//      vía la edge function `send-notification-email`, con sender
+//      "Maven CRM <noreply@mail.maven-ai.me>".
 //
-//   2. Emails externos — lista de destinatarios fuera del CRM
-//      (clientes, auditores, supervisores externos). Se mandan vía el
-//      mismo Apps Script.
-//
-//   3. Notificaciones internas Maven — empleados del CRM que reciben
+//   2. Notificaciones internas Maven — empleados del CRM que reciben
 //      notificación in-app cuando se completa una QA (campana del
 //      header). Multi-select con typeahead sobre todos los profiles.
 //
 // Cada uno de los 4 disparos (uploaded / analyzed / low_score / failed)
 // tiene su switch independiente. El threshold de "low score" es config.
+// (Antes había además un input de Google Apps Script URL — lo retiramos
+// junto con la migración a Resend; la columna `apps_script_url` queda
+// en DB pero el frontend ya no la lee ni escribe.)
 
 const AgencyQaNotifications = () => {
   const cfgQ = useQaConfig();
   const usersQ = useMavenUsers();
   const update = useUpdateQaConfig();
 
-  const [appsUrl, setAppsUrl] = useState("");
   const [emails, setEmails] = useState<string[]>([]);
   const [newEmail, setNewEmail] = useState("");
   const [notifyUserIds, setNotifyUserIds] = useState<string[]>([]);
@@ -63,7 +61,6 @@ const AgencyQaNotifications = () => {
 
   useEffect(() => {
     if (!cfgQ.data) return;
-    setAppsUrl(cfgQ.data.apps_script_url ?? "");
     setEmails(cfgQ.data.notification_emails ?? []);
     setNotifyUserIds(cfgQ.data.notify_user_ids ?? []);
     setNotifyOnUploaded(cfgQ.data.notify_on_uploaded);
@@ -98,7 +95,6 @@ const AgencyQaNotifications = () => {
   const handleSave = async () => {
     try {
       await update.mutateAsync({
-        apps_script_url: appsUrl.trim() || null,
         notification_emails: emails,
         notify_user_ids: notifyUserIds,
         notify_on_uploaded: notifyOnUploaded,
@@ -216,32 +212,16 @@ const AgencyQaNotifications = () => {
         </CardContent>
       </Card>
 
-      {/* Apps Script + emails externos */}
+      {/* Emails externos (vía Resend) */}
       <Card>
         <CardContent className="space-y-5 p-6">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <Mail className="h-4 w-4" />
-            Canal externo (Apps Script + emails)
+            Emails externos
           </h3>
 
           <div className="space-y-1.5">
-            <Label htmlFor="apps_url">Google Apps Script URL</Label>
-            <Input
-              id="apps_url"
-              value={appsUrl}
-              onChange={(e) => setAppsUrl(e.target.value)}
-              placeholder="https://script.google.com/macros/s/..../exec"
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Webhook que recibe el payload de la QA y arma Drive doc + Sheet
-              + emails. Mismo patrón que Chatter Evaluator: podés reusar el
-              mismo Apps Script y discriminar por <code>type</code> dentro
-              del script.
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Emails externos</Label>
+            <Label>Destinatarios</Label>
             <div className="flex gap-2">
               <Input
                 value={newEmail}

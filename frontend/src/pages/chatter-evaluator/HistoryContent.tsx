@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Trash2, Loader2, Search, History as HistoryIcon } from "lucide-react";
+import { ArrowLeft, Trash2, Loader2, Search, Mail, History as HistoryIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,6 +23,7 @@ import {
   useChatterSessions,
   useChatterProfiles,
   useDeleteChatterSession,
+  useResendChatterEmail,
 } from "@/hooks/useChatterEvaluator";
 import type { ChatterSession, ChatterProfile } from "./types";
 
@@ -54,6 +55,22 @@ const HistoryContent = () => {
   const sessionsQ = useChatterSessions("all");
   const profilesQ = useChatterProfiles();
   const deleteMut = useDeleteChatterSession();
+  const resendMut = useResendChatterEmail();
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  const handleResend = async (sessionId: string) => {
+    setResendingId(sessionId);
+    try {
+      await resendMut.mutateAsync(sessionId);
+      // El toast de éxito/fallo lo emite fireWebhookInBackground.
+    } catch (e) {
+      toast.error("No se pudo reenviar", {
+        description: (e as Error).message,
+      });
+    } finally {
+      setResendingId(null);
+    }
+  };
   const qc = useQueryClient();
   const { canAccess } = usePermissions();
   const canDelete = canAccess("Chatters", "Borrar Historial");
@@ -207,6 +224,21 @@ const HistoryContent = () => {
                           </div>
                         </div>
                       </Link>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleResend(s.id)}
+                        disabled={resendingId === s.id}
+                        className="h-8 w-8 text-muted-foreground hover:bg-primary/15 hover:text-primary"
+                        title="Reenviar email del reporte"
+                        aria-label="Reenviar email"
+                      >
+                        {resendingId === s.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Mail className="h-4 w-4" />
+                        )}
+                      </Button>
                       {canDelete && (
                         <Button
                           variant="ghost"

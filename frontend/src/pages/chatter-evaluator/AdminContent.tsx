@@ -455,7 +455,6 @@ const ConfigSection = () => {
   const cfgQ = useChatterConfig();
   const update = useUpdateChatterConfig();
 
-  const [appsUrl, setAppsUrl] = useState("");
   const [emails, setEmails] = useState<string[]>([]);
   const [newEmail, setNewEmail] = useState("");
   const [fanName, setFanName] = useState("");
@@ -472,7 +471,6 @@ const ConfigSection = () => {
 
   useEffect(() => {
     if (!cfgQ.data) return;
-    setAppsUrl(cfgQ.data.apps_script_url ?? "");
     setEmails(cfgQ.data.notification_emails ?? []);
     setFanName(cfgQ.data.fan_name);
     setFanAvatar(cfgQ.data.fan_avatar_url);
@@ -501,7 +499,6 @@ const ConfigSection = () => {
   const handleSave = async () => {
     try {
       await update.mutateAsync({
-        apps_script_url: appsUrl || null,
         notification_emails: emails,
         notify_user_ids: notifyUserIds,
         fan_name: fanName,
@@ -517,19 +514,6 @@ const ConfigSection = () => {
     <Card>
       <CardContent className="space-y-5 p-6">
         <h2 className="text-lg font-semibold">Configuración global</h2>
-
-        <div>
-          <Label htmlFor="apps_url">Google Apps Script URL</Label>
-          <Input
-            id="apps_url"
-            value={appsUrl}
-            onChange={(e) => setAppsUrl(e.target.value)}
-            placeholder="https://script.google.com/macros/s/..../exec"
-          />
-          <p className="mt-1 text-xs text-muted-foreground">
-            Webhook donde se envían las evaluaciones (Drive doc + Sheet + emails).
-          </p>
-        </div>
 
         <div>
           <Label>Emails de notificación</Label>

@@ -860,11 +860,12 @@ export type SubmitEvaluationInput = {
   scorePct: number;
 };
 
-// Apps Script webhooks routinely take 10–30s to return (the script
-// generates a Drive doc, appends to a Sheet, and sends emails). We don't
-// want the examiner staring at a spinner for that long, so the webhook
-// is fired-and-forgotten in the background and announces its own outcome
-// with a sonner toast when it eventually finishes.
+// Email del reporte vía Resend (sender = Maven CRM <noreply@mail.maven-ai.me>).
+// Antes lo mandaba un Apps Script que también generaba Drive doc + Sheet,
+// pero migramos a Resend para que el remitente sea de Maven y no la cuenta
+// personal del owner del GAS. La columna `apps_script_url` ya no se usa.
+// Fire-and-forget: la mutación principal resuelve apenas guardamos en DB,
+// el correo viaja en background y se anuncia con un toast cuando termina.
 const fireWebhookInBackground = async (
   evaluation: ChatterEvaluation,
   sessionId: string,
@@ -883,13 +884,6 @@ const fireWebhookInBackground = async (
     const config = cfg as ChatterConfig | null;
     const messages = (msgs ?? []) as ChatterMessage[];
     if (!session) throw new Error("session disappeared mid-submit");
-
-    if (!config?.apps_script_url) {
-      toast.warning("Reporte no enviado", {
-        description: "Falta apps_script_url en Admin → Config.",
-      });
-      return;
-    }
 
     const { data: prof } = await sb
       .from("chatter_profiles")
@@ -931,25 +925,29 @@ const fireWebhookInBackground = async (
       })),
     };
 
-    // Build the email body + subject on the client. Apps Script uses
-    // these as-is so that future visual changes to the email ship with
-    // a normal Maven deploy (no Apps Script redeploy needed).
-    const payload = {
-      ...corePayload,
-      emails: config?.notification_emails ?? [],
-      emailSubject: buildEmailSubject(corePayload),
-      emailHtml: buildEmailHtml(corePayload),
-    };
+    // El HTML + subject del correo se arman client-side: cualquier ajuste
+    // visual viaja con el deploy normal de Maven, sin tocar nada server-side.
+    const recipients = config?.notification_emails ?? [];
+    if (recipients.length === 0) {
+      toast.warning("Reporte sin destinatarios", {
+        description: "Configurá emails en Admin → Notificaciones.",
+      });
+      return;
+    }
+    const emailSubject = buildEmailSubject(corePayload);
+    const emailHtml = buildEmailHtml(corePayload);
 
-    const res = await fetch(config.apps_script_url, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload),
-      redirect: "follow",
-    });
-    if (!res.ok) {
-      toast.warning("Reporte: webhook falló", {
-        description: `HTTP ${res.status} — la evaluación quedó guardada en la DB.`,
+    const { error: mailError } = await supabase.functions.invoke(
+      "send-notification-email",
+      {
+        body: { to: recipients, subject: emailSubject, html: emailHtml, tag: "chatter" },
+      },
+    );
+    if (mailError) {
+      toast.warning("Email no enviado", {
+        description:
+          (mailError as Error).message ??
+          "Falló send-notification-email — la evaluación quedó guardada.",
       });
       return;
     }
@@ -961,7 +959,7 @@ const fireWebhookInBackground = async (
       })
       .eq("id", evaluation.id);
     toast.success("Reporte enviado", {
-      description: "Apps Script generó el doc + Sheet + emails.",
+      description: `Email a ${recipients.length} destinatario(s) vía Maven.`,
     });
   } catch (e) {
     toast.warning("Reporte: webhook falló", {
@@ -1036,10 +1034,10 @@ export const useSubmitEvaluation = () => {
         /* swallow — toast handles webhook outcome separately */
       }
 
-      // 4) Fire the webhook in the background. The mutation resolves NOW
+      // 4) Fire the email in the background. The mutation resolves NOW
       //    so the dialog can close and the examiner moves on; the toast
       //    inside fireWebhookInBackground announces the result whenever
-      //    Apps Script finishes (typically 10–30s later).
+      //    Resend returns (typically 1-3s later).
       void fireWebhookInBackground(evaluation, input.sessionId);
 
       return { evaluation };
@@ -1050,4 +1048,25 @@ export const useSubmitEvaluation = () => {
     },
   });
 };
+
+/** Re-disparar el correo de una sesión ya cerrada — usado por el botón
+ *  "Reenviar email" en el History. Levanta la última evaluación de la
+ *  sesión y vuelve a llamar a `fireWebhookInBackground`, que respeta
+ *  los `notification_emails` configurados (si la lista está vacía,
+ *  igual no manda nada). */
+export const useResendChatterEmail = () =>
+  useMutation({
+    mutationFn: async (sessionId: string): Promise<void> => {
+      const { data, error } = await sb
+        .from("chatter_evaluations")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("No hay evaluación para esta sesión");
+      await fireWebhookInBackground(data as ChatterEvaluation, sessionId);
+    },
+  });
 
