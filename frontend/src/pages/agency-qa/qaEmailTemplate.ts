@@ -76,7 +76,7 @@ export const labelForOutcome = (outcome: string | null): string => {
 };
 
 export const buildQaEmailSubject = (p: QaEmailPayload): string =>
-  `[Maven QA] ${p.closerName} · ${p.modelName} · ${p.overallScore}/100 (${p.callOutcomeLabel})`;
+  `[Maven QA Closers] ${p.closerName} · ${p.modelName} · ${p.overallScore}/100 (${p.callOutcomeLabel})`;
 
 export const buildQaEmailHtml = (p: QaEmailPayload): string => {
   const scoreColor = scoreColorOf(p.overallScore);

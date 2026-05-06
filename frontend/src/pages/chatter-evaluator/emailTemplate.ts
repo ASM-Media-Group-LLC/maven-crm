@@ -58,7 +58,7 @@ const statusColorOf = (status: "pass" | "partial" | "fail") =>
   status === "pass" ? COLORS.green : status === "partial" ? COLORS.amber : COLORS.red;
 
 export const buildEmailSubject = (p: EmailPayload): string =>
-  `[Maven] Evaluación — ${p.verdictLabel}: ${p.chatterName} (${p.scorePct}%)`;
+  `[Maven Chatters] Evaluación — ${p.verdictLabel}: ${p.chatterName} (${p.scorePct}%)`;
 
 export const buildEmailHtml = (p: EmailPayload): string => {
   const verdictColor = verdictColorOf(p.verdict);
