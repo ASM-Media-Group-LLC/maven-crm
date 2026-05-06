@@ -15,6 +15,7 @@ import {
   Instagram as InstagramIcon,
   User,
   Calendar,
+  Mail,
 } from "lucide-react";
 import {
   Popover,
@@ -1428,7 +1429,7 @@ const CallDetailPage = ({
           {fireWebhook.isPending ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            "📧"
+            <Mail className="h-3.5 w-3.5" />
           )}
           Reenviar email
         </Button>
