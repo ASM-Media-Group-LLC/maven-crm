@@ -1,7 +1,5 @@
 import { useState, useMemo } from "react";
-import { Loader2, ClipboardList, Plus, Instagram, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Loader2, ClipboardList } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -13,14 +11,9 @@ import { DailyProgress } from "@/components/scouter/DailyProgress";
 import { TaskCard } from "@/components/scouter/TaskCard";
 import { ManagerDashboard } from "@/components/scouter/ManagerDashboard";
 import SpammerOnboarding from "@/pages/scouter/SpammerOnboarding";
-import {
-  useSpammerAccounts,
-  useInsertSpammerAccount,
-  type AccountNiche,
-} from "@/hooks/useSpammerAccounts";
+import { useSpammerAccounts } from "@/hooks/useSpammerAccounts";
 import { useDailyAssignments } from "@/hooks/useSpammerTasks";
 import { useUserRole } from "@/hooks/useUserRole";
-import { toast } from "sonner";
 import type { DailyAssignment } from "@/hooks/useSpammerTasks";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -48,18 +41,6 @@ const STRATEGY_OPTIONS = [
   { value: "re_engage",     label: "Re-engage" },
 ];
 
-// ─── Add-account constants ────────────────────────────────────────────────
-
-const MAX_ACCOUNTS = 4;
-const IG_HANDLE_RE = /^[a-zA-Z0-9_.]{1,30}$/;
-const NICHES: { value: AccountNiche; label: string }[] = [
-  { value: "lifestyle", label: "Lifestyle" },
-  { value: "fitness", label: "Fitness" },
-  { value: "adult", label: "Adulto" },
-  { value: "business", label: "Business" },
-  { value: "mixed", label: "Mixto" },
-];
-
 // ─── Component ────────────────────────────────────────────────────────────
 
 const MisTareas = () => {
@@ -68,15 +49,8 @@ const MisTareas = () => {
   const [accountFilter, setAccountFilter] = useState<string>("all");
   const [strategyFilter, setStrategyFilter] = useState<string>("all");
 
-  // Add-account inline form state
-  const [showAddAccount, setShowAddAccount] = useState(false);
-  const [newHandle, setNewHandle] = useState("");
-  const [newDisplayName, setNewDisplayName] = useState("");
-  const [newNiche, setNewNiche] = useState<AccountNiche | "">("");
-
   const accountsQ = useSpammerAccounts();
   const assignmentsQ = useDailyAssignments(selectedDate);
-  const insertAccount = useInsertSpammerAccount();
   const { isAdmin, isManager, isSupervisor, isLoading: roleLoading } = useUserRole();
 
   const accounts = accountsQ.data ?? [];
@@ -124,44 +98,6 @@ const MisTareas = () => {
 
   const isManagerRole = isAdmin || isManager || isSupervisor;
 
-  // Add-account helpers
-  const cleanedHandle = newHandle.trim().replace(/^@+/, "");
-  const handleError =
-    cleanedHandle.length > 0 && !IG_HANDLE_RE.test(cleanedHandle)
-      ? "Solo letras, números, puntos y guiones bajos (máx 30)."
-      : null;
-  const canSaveAccount =
-    cleanedHandle.length > 0 &&
-    !handleError &&
-    newDisplayName.trim().length > 0 &&
-    newNiche !== "";
-  const canAddMore = accounts.length > 0 && accounts.length < MAX_ACCOUNTS;
-
-  const handleAddAccount = async () => {
-    if (!canSaveAccount) return;
-    try {
-      await insertAccount.mutateAsync({
-        instagram_handle: cleanedHandle,
-        display_name: newDisplayName.trim(),
-        account_niche: newNiche as AccountNiche,
-      });
-      setNewHandle("");
-      setNewDisplayName("");
-      setNewNiche("");
-      setShowAddAccount(false);
-      toast.success("Cuenta agregada correctamente");
-    } catch {
-      // toast shown by mutation onError
-    }
-  };
-
-  const resetAddForm = () => {
-    setShowAddAccount(false);
-    setNewHandle("");
-    setNewDisplayName("");
-    setNewNiche("");
-  };
-
   // Loading state
   if (accountsQ.isLoading || roleLoading) {
     return (
@@ -180,106 +116,12 @@ const MisTareas = () => {
 
   return (
     <div className="space-y-5">
-      {/* DailyProgress + Add account button */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <DailyProgress
-            assignments={assignments}
-            selectedDate={selectedDate}
-            onDateChange={setSelectedDate}
-          />
-        </div>
-        {canAddMore && !showAddAccount && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 text-xs gap-1 shrink-0 mt-1"
-            onClick={() => setShowAddAccount(true)}
-          >
-            <Instagram className="h-3.5 w-3.5" />
-            Agregar cuenta
-          </Button>
-        )}
-      </div>
-
-      {/* Inline add-account form */}
-      {showAddAccount && (
-        <div className="rounded-lg border border-dashed border-amber-400/40 bg-amber-400/5 p-3 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-amber-400 flex items-center gap-1.5">
-              <Instagram className="h-3.5 w-3.5" />
-              Nueva cuenta de Instagram
-            </p>
-            <button
-              type="button"
-              onClick={resetAddForm}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          {/* Handle */}
-          <div>
-            <div className="flex items-center gap-0">
-              <div className="flex h-8 items-center rounded-l-md border border-r-0 border-input bg-muted px-2.5 text-xs text-muted-foreground select-none">
-                @
-              </div>
-              <Input
-                value={newHandle}
-                onChange={(e) => setNewHandle(e.target.value)}
-                placeholder="handle_de_instagram"
-                className={`h-8 text-xs rounded-l-none ${handleError ? "border-destructive" : ""}`}
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-              />
-            </div>
-            {handleError && (
-              <p className="mt-0.5 text-[10px] text-destructive">{handleError}</p>
-            )}
-          </div>
-
-          {/* Display name + niche + save */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Input
-              value={newDisplayName}
-              onChange={(e) => setNewDisplayName(e.target.value)}
-              placeholder="Nombre descriptivo"
-              className="h-8 text-xs flex-1 min-w-[140px]"
-            />
-            <Select value={newNiche} onValueChange={(v) => setNewNiche(v as AccountNiche)}>
-              <SelectTrigger className="h-8 text-xs w-[120px]">
-                <SelectValue placeholder="Nicho…" />
-              </SelectTrigger>
-              <SelectContent>
-                {NICHES.map((n) => (
-                  <SelectItem key={n.value} value={n.value} className="text-xs">
-                    {n.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              size="sm"
-              className="h-8 text-xs gap-1"
-              onClick={handleAddAccount}
-              disabled={!canSaveAccount || insertAccount.isPending}
-            >
-              {insertAccount.isPending ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Plus className="h-3 w-3" />
-              )}
-              Guardar
-            </Button>
-          </div>
-
-          <p className="text-[10px] text-muted-foreground">
-            {accounts.length}/{MAX_ACCOUNTS} cuentas registradas
-          </p>
-        </div>
-      )}
+      {/* DailyProgress */}
+      <DailyProgress
+        assignments={assignments}
+        selectedDate={selectedDate}
+        onDateChange={setSelectedDate}
+      />
 
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-2">
