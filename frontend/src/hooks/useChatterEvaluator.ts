@@ -555,14 +555,24 @@ export interface ChatterEvaluationStats extends RangeCounters {
   byRange: Record<StatsRange, RangeCounters>;
   /** Serie diaria últimos 30 días, label DD/MM, listo para Recharts. */
   daily: Array<{ date: string; apto: number; noApto: number }>;
-  /** Conteo de evaluaciones por profile (Top N). El nombre se resuelve
-   *  con un join a chatter_sessions → chatter_profiles. */
-  byProfile: Array<{ profile: string; apto: number; noApto: number }>;
+  /** Serie mensual últimos 12 meses, label "MMM YY" (ej: "ene 26").
+   *  El bucket es por mes calendario local. */
+  monthly: Array<{ month: string; apto: number; noApto: number }>;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const fmtDayLabel = (d: Date): string =>
   `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+// Key estable para bucketear por mes calendario local: "YYYY-MM".
+const monthKeyOf = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+// Label legible para el chart: "ene 26", "feb 26"... el año va en YY
+// para no comer ancho cuando hay 12 buckets pegados.
+const monthLabelOf = (d: Date): string => {
+  const month = d.toLocaleString("es-ES", { month: "short" }).replace(".", "");
+  return `${month} ${String(d.getFullYear()).slice(-2)}`;
+};
 
 // "Esta semana" = lunes 00:00 local hasta ahora. La elección del lunes
 // como inicio de semana es la convención local (es_AR/es_CO etc); si
@@ -587,19 +597,17 @@ export const useChatterEvaluationStats = () =>
     queryKey: ["chatter-evaluation-stats"],
     queryFn: async (): Promise<ChatterEvaluationStats> => {
       // Join inverso: cada evaluación trae su sesión y, vía la sesión,
-      // el perfil que se estaba simulando. Eso permite agrupar por
-      // perfil sin un segundo round-trip.
+      // Solo necesitamos verdict + fecha — los charts agregan por
+      // tiempo, no por perfil. score_pct se podría sacar también pero
+      // lo dejamos por si vuelve a usarse en otra métrica más adelante.
       const { data, error } = await sb
         .from("chatter_evaluations")
-        .select(
-          "verdict, score_pct, created_at, session:chatter_sessions(profile:chatter_profiles(name))",
-        );
+        .select("verdict, score_pct, created_at");
       if (error) throw error;
       type Row = {
         verdict: "apto" | "no_apto";
         score_pct: number | null;
         created_at: string;
-        session: { profile: { name: string } | null } | null;
       };
       const rows = (data ?? []) as Row[];
 
@@ -637,18 +645,35 @@ export const useChatterEvaluationStats = () =>
         dailyOrder.push(key);
       }
 
-      const byProfileMap = new Map<string, { apto: number; noApto: number }>();
+      // 12 buckets mensuales — incluye el mes actual. Pre-poblados con
+      // 0 para que meses sin evaluaciones aparezcan vacíos en el chart
+      // en lugar de saltearse y comprimir el eje X.
+      const monthlyMap = new Map<string, { label: string; apto: number; noApto: number }>();
+      const monthlyOrder: string[] = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const key = monthKeyOf(d);
+        monthlyMap.set(key, { label: monthLabelOf(d), apto: 0, noApto: 0 });
+        monthlyOrder.push(key);
+      }
+      const monthlyCutoff = new Date(
+        today.getFullYear(),
+        today.getMonth() - 11,
+        1,
+      ).getTime();
+
       const cutoff = today.getTime() - 30 * DAY_MS;
 
       for (const r of rows) {
         const ts = new Date(r.created_at).getTime();
+        const dt = new Date(ts);
         tally(accs.all, r);
         if (ts >= monthStart) tally(accs.month, r);
         if (ts >= weekStart) tally(accs.week, r);
 
         // Daily — solo dentro de la ventana de 30 días.
         if (ts >= cutoff) {
-          const key = fmtDayLabel(new Date(ts));
+          const key = fmtDayLabel(dt);
           const slot = dailyMap.get(key);
           if (slot) {
             if (r.verdict === "apto") slot.apto++;
@@ -656,14 +681,14 @@ export const useChatterEvaluationStats = () =>
           }
         }
 
-        // Por perfil — usamos el nombre del perfil (no el id) para que el
-        // chart sea legible sin lookup adicional. "(sin perfil)" para
-        // evaluaciones donde el join no devolvió nada.
-        const profileName = r.session?.profile?.name ?? "(sin perfil)";
-        const slot = byProfileMap.get(profileName) ?? { apto: 0, noApto: 0 };
-        if (r.verdict === "apto") slot.apto++;
-        else slot.noApto++;
-        byProfileMap.set(profileName, slot);
+        // Monthly — solo dentro de los 12 meses pre-poblados.
+        if (ts >= monthlyCutoff) {
+          const slot = monthlyMap.get(monthKeyOf(dt));
+          if (slot) {
+            if (r.verdict === "apto") slot.apto++;
+            else slot.noApto++;
+          }
+        }
       }
 
       const daily = dailyOrder.map((date) => ({
@@ -672,12 +697,10 @@ export const useChatterEvaluationStats = () =>
         noApto: dailyMap.get(date)!.noApto,
       }));
 
-      // Top 6 perfiles por volumen — el chart se vuelve ruidoso con
-      // más de eso, y la cola larga raramente es accionable.
-      const byProfile = Array.from(byProfileMap.entries())
-        .map(([profile, v]) => ({ profile, apto: v.apto, noApto: v.noApto }))
-        .sort((a, b) => b.apto + b.noApto - (a.apto + a.noApto))
-        .slice(0, 6);
+      const monthly = monthlyOrder.map((key) => {
+        const m = monthlyMap.get(key)!;
+        return { month: m.label, apto: m.apto, noApto: m.noApto };
+      });
 
       const finalize = (a: Acc): RangeCounters => ({
         total: a.total,
@@ -696,7 +719,7 @@ export const useChatterEvaluationStats = () =>
         ...byRange.all,
         byRange,
         daily,
-        byProfile,
+        monthly,
       };
     },
   });

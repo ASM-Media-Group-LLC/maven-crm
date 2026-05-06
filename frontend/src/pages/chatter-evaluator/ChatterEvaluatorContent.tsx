@@ -296,39 +296,29 @@ const ChatterEvaluatorContent = () => {
           <Card>
             <CardContent className="p-4">
               <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
-                Top perfiles evaluados
+                Personas evaluadas por mes
               </h3>
               <div className="h-[220px]">
                 {statsQ.isLoading || !stats ? (
                   <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                     Cargando…
                   </div>
-                ) : stats.byProfile.length === 0 ? (
+                ) : stats.total === 0 ? (
                   <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                    Sin datos
+                    Sin evaluaciones todavía
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={stats.byProfile}
-                      layout="vertical"
-                      margin={{ top: 4, right: 8, left: 8, bottom: 0 }}
+                      data={stats.monthly}
+                      margin={{ top: 4, right: 8, left: -16, bottom: 0 }}
                     >
                       <CartesianGrid
                         strokeDasharray="3 3"
                         className="stroke-border"
                       />
-                      <XAxis
-                        type="number"
-                        tick={{ fontSize: 10 }}
-                        allowDecimals={false}
-                      />
-                      <YAxis
-                        type="category"
-                        dataKey="profile"
-                        tick={{ fontSize: 10 }}
-                        width={90}
-                      />
+                      <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
                       <Tooltip
                         contentStyle={{
                           fontSize: 12,
@@ -343,12 +333,14 @@ const ChatterEvaluatorContent = () => {
                         name="Aprobados"
                         stackId="a"
                         fill="hsl(var(--primary))"
+                        radius={[2, 2, 0, 0]}
                       />
                       <Bar
                         dataKey="noApto"
                         name="Reprobados"
                         stackId="a"
                         fill="hsl(var(--destructive) / 0.7)"
+                        radius={[2, 2, 0, 0]}
                       />
                     </BarChart>
                   </ResponsiveContainer>
