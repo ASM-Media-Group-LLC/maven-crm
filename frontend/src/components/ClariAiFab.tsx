@@ -69,13 +69,15 @@ const ClariAiFab = () => {
   return (
     <>
       {/* FAB flotante. Sigue visible incluso con la ventana abierta
-          para que el usuario pueda re-clickear y minimizar (toggle). */}
+          para que el usuario pueda re-clickear y minimizar (toggle).
+          Usamos el ícono Bot (robotsito) — el avatar de Clari queda
+          reservado para el header de la ventana de chat y las burbujas. */}
       <button
         onClick={() => (open ? setOpen(false) : handleOpen())}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg ring-2 ring-primary/30 transition-all duration-200 hover:scale-110 hover:shadow-xl hover:ring-primary/60"
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg ring-2 ring-primary/30 transition-all duration-200 hover:scale-110 hover:shadow-xl hover:ring-primary/60"
         aria-label={open ? "Minimizar Clari AI" : "Abrir Clari AI"}
       >
-        <ClariAvatar size={56} />
+        <Bot className="h-6 w-6" />
         {/* Dot de actividad — visible solo cuando hay actividad y la
             ventana está cerrada. */}
         {!open && hasActivity && (
