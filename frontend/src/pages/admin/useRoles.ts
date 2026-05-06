@@ -52,7 +52,17 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   { group: "Operaciones",   module: "Tickets",       submodules: [] },
   { group: "Operaciones",   module: "Chatters",      submodules: ["Evaluator", "Workspace", "Admin", "Borrar Historial"] },
   { group: "Operaciones",   module: "Scouter Assist", submodules: ["Home", "Busquedas", "Favoritas", "Leads", "Funnel", "Mis Tareas", "Settings"] },
-  { group: "Operaciones",   module: "Agency QA",     submodules: ["Calls", "New QA", "QA History", "QA Chat", "Models", "Analytics", "Notifications", "Borrar Calls"] },
+  // Agency QA tiene dos tipos de submódulos:
+  //   1) Las 4 categorías de QA por rol (Closers / Chatters / Managers /
+  //      Spammers) que controlan qué tab del rail izquierdo ve el usuario.
+  //   2) Los submódulos funcionales adentro de Closers QA (Calls, New QA,
+  //      QA History, etc.) — estos gateaán los sub-tabs internos.
+  // Si un rol no tiene un toggle on para "Closers QA", todo el grupo
+  // izquierdo desaparece para él aunque tenga acceso a "Calls".
+  { group: "Operaciones",   module: "Agency QA",     submodules: [
+    "Closers QA", "Chatters QA", "Managers QA", "Spammers QA",
+    "Calls", "New QA", "QA History", "QA Chat", "Models", "Analytics", "Notifications", "Borrar Calls",
+  ] },
 
   // === Finanzas ===
   { group: "Finanzas",      module: "Finanzas",      submodules: ["Dashboard", "Collections", "Nómina", "Horas Variables", "Invoices", "Templates", "Control Financiero", "Reportes", "Configuración"] },

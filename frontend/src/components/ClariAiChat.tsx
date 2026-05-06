@@ -60,19 +60,20 @@ interface UserContextPayload {
 }
 
 // El welcome cambia según el backend para que el primer turno deje
-// claro qué tipo de asistente es éste.
+// claro qué tipo de asistente es éste. Mantenemos los mensajes cortos
+// — el system prompt ya cubre las reglas de redirección a otros agentes.
 const welcomeFor = (endpoint: EndpointKey): Msg => {
   if (endpoint === "clari-help") {
     return {
       role: "assistant",
       content:
-        "¡Hola! 👋 Soy Clari, tu asistente de soporte de Maven. Te ayudo con preguntas tipo:\n\n- *¿Cómo evalúo a un chatter?*\n- *¿Dónde subo una nueva QA?*\n- *¿Qué permiso necesito para borrar llamadas?*\n- *¿Cómo cambio mi contraseña?*\n\nNo manejo datos del negocio (para eso tenés a **Mike** en Agency QA o al **Sales Coach** en Finanzas → Asistente IA). ¿En qué te ayudo?",
+        "¡Hola! 👋 Soy Clari. Te ayudo a navegar Maven — preguntame cómo hacer cualquier cosa en la app.",
     };
   }
   return {
     role: "assistant",
     content:
-      "¡Hola! 👋 Soy tu asistente de ventas con IA. Puedo responder preguntas sobre las creadoras y sus ganancias. Por ejemplo:\n\n- *¿Cuál es la creadora con más ganancias esta semana?*\n- *Muéstrame un resumen de tips por creadora*\n- *¿Cuántos fans activos tiene [creadora]?*\n- *Compara las ganancias de las top 5 creadoras*\n\n¿En qué te puedo ayudar?",
+      "¡Hola! 👋 Soy tu asistente de ventas. Pedime rankings, comparativas o tendencias de tus creadoras. Ej: *¿quién factura más esta semana?*",
   };
 };
 

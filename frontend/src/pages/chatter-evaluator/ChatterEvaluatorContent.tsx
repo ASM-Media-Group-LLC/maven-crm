@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Image as ImageIcon, Video, ListChecks, Mail, Settings } from "lucide-react";
+import { Plus, Image as ImageIcon, Video, ListChecks, Mail, Settings, History as HistoryIcon } from "lucide-react";
 import {
   useChatterProfiles,
   useChatterVaultCounts,
@@ -134,6 +134,12 @@ const ChatterEvaluatorContent = () => {
                 </Link>
               </Button>
             )}
+            <Button asChild variant="outline" className="gap-2">
+              <Link to="/chatter-evaluator/history">
+                <HistoryIcon className="h-4 w-4" />
+                History
+              </Link>
+            </Button>
             <Button asChild variant="outline" className="gap-2">
               <Link to="/chatter-evaluator/admin">
                 <Settings className="h-4 w-4" />
