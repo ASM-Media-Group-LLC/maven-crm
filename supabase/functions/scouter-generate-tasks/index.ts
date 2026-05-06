@@ -76,11 +76,22 @@ serve(async (req) => {
 
   try {
     // ─── Auth check ──────────────────────────────────────────────────────────
-    // Acepta service_role key (cron) o admin JWT (botón Settings).
+    // Acepta tres mecanismos:
+    //   1. Authorization: Bearer <service_role JWT>  — uso original
+    //   2. Authorization: Bearer <admin JWT>          — botón en Settings
+    //   3. X-Cron-Token: <CRON_INTERNAL_TOKEN>        — pg_cron interno
+    //
+    // El #3 evita exponer el service_role en cron.job (que está en la DB
+    // tras vault.decrypted_secrets, complejidad innecesaria). Generamos
+    // un UUID propio y lo seteamos via `supabase secrets set
+    // CRON_INTERNAL_TOKEN=...`. Si leakea, rotamos el secret y redeploy
+    // sin tocar credenciales master.
     const authHeader = req.headers.get("authorization") ?? "";
+    const cronTokenHeader = req.headers.get("x-cron-token") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const groqKey = Deno.env.get("GROQ_API_KEY");
+    const cronInternalToken = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
 
     if (!groqKey) {
       return jsonError("GROQ_API_KEY no configurada en los secrets de Supabase.", 500);
@@ -89,9 +100,10 @@ serve(async (req) => {
     // Usamos service role para bypasear RLS en queries cross-spammer.
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Validación mínima: el caller debe enviar la service_role key o un JWT
-    // válido. Si no pasa ninguna authorization, rechazamos.
-    if (!authHeader) {
+    const cronTokenValid =
+      !!cronInternalToken && cronTokenHeader === cronInternalToken;
+
+    if (!authHeader && !cronTokenValid) {
       return jsonError("Authorization header requerido.", 401);
     }
 
