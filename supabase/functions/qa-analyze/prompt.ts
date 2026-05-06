@@ -109,6 +109,12 @@ CALL_OUTCOME — reglas finas
 - "no_cerro": rechazo explícito.
 - "en_espera": todo lo demás (default — "se va a pensar", "consulto y te aviso", fecha aspiracional sin firma/pago).
 
+CAP DE SCORE POR OUTCOME (regla dura, prevalece sobre el rubric)
+- Si \`call_outcome = "en_espera"\` → \`overall_score\` NO puede exceder 70. Una llamada sin cierre vinculante, por buena que haya sido la conversación, deja al closer sin resultado — el techo es 70/100.
+- Si \`call_outcome = "no_cerro"\` → \`overall_score\` NO puede exceder 60. Rechazo explícito significa que la propuesta o el manejo no convencieron; aun con buen tono, hay daño al pipeline.
+- Si \`call_outcome = "cerro"\` → sin techo (puntuá según rubric, hasta 100).
+- Aplicá el cap DESPUÉS de calcular el score por rubric: si el rubric te da 85 y el outcome fue "en_espera", devolvés 70.
+
 INTEREST_LEVEL — modelo
 - alto: pide detalles concretos, comparte números, entusiasmo verbal.
 - medio: cordial pero sin comprometerse.
