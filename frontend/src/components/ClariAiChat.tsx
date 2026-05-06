@@ -1,6 +1,30 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Bot, User, Loader2, Mic, MicOff } from "lucide-react";
+
+// Avatar de Clari renderizado desde /clari-avatar.png con fallback a
+// Bot icon si la imagen no carga. Usado en las burbujas del chat y en
+// el indicador "escribiendo…" para coherencia con el FAB.
+const ClariBubbleAvatar = ({ size = 32 }: { size?: number }) => {
+  const [errored, setErrored] = useState(false);
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent text-accent-foreground shadow-sm"
+      style={{ width: size, height: size }}
+    >
+      {errored ? (
+        <Bot style={{ width: size * 0.5, height: size * 0.5 }} />
+      ) : (
+        <img
+          src="/clari-avatar.png"
+          alt="Clari"
+          className="h-full w-full object-cover"
+          onError={() => setErrored(true)}
+        />
+      )}
+    </span>
+  );
+};
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
@@ -281,15 +305,13 @@ const ClariAiChat = ({
                 className={`flex items-end gap-2 ${isUser ? "flex-row-reverse" : ""}`}
               >
                 {/* Avatar */}
-                <div
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm ${
-                    isUser
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-accent text-accent-foreground"
-                  }`}
-                >
-                  {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                </div>
+                {isUser ? (
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                    <User className="h-4 w-4" />
+                  </div>
+                ) : (
+                  <ClariBubbleAvatar size={32} />
+                )}
 
                 {/* Bubble */}
                 <div
@@ -322,9 +344,7 @@ const ClariAiChat = ({
           {/* Typing indicator */}
           {isLoading && localMessages[localMessages.length - 1]?.role === "user" && (
             <div className="flex items-end gap-2">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-sm">
-                <Bot className="h-4 w-4" />
-              </div>
+              <ClariBubbleAvatar size={32} />
               <div className="flex items-center gap-2 bg-card border border-border/50 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
                 <div className="flex gap-1">
                   <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]" />

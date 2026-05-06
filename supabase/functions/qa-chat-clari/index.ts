@@ -69,10 +69,13 @@ serve(async (req) => {
         500,
       );
     }
-    // Sonnet para chat — más rápido y barato que Opus, suficiente para
-    // análisis de QAs. Override: CLAUDE_CHAT_MODEL env.
+    // Haiku 4.5 para chat — el razonamiento conversacional sobre QAs
+    // no necesita la capacidad de Sonnet, y Haiku es ~3x más barato
+    // (Input $1/MTok, Output $5/MTok vs $3/$15 de Sonnet). Si querés
+    // volver a Sonnet para mejor calidad: setear
+    // CLAUDE_CHAT_MODEL=claude-sonnet-4-20250514 en los secrets de Supabase.
     const CLAUDE_MODEL =
-      Deno.env.get("CLAUDE_CHAT_MODEL") || "claude-sonnet-4-20250514";
+      Deno.env.get("CLAUDE_CHAT_MODEL") || "claude-haiku-4-5-20251001";
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
