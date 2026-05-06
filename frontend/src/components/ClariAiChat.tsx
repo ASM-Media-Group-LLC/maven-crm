@@ -30,27 +30,64 @@ import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 import { getAiConfig } from "@/lib/ai-config";
 import { useAiMessages } from "@/hooks/useAiConversations";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useUserRole } from "@/hooks/useUserRole";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 import { supabase } from "@/integrations/supabase/client";
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-sales-chat`;
+// Endpoints disponibles para reusar este chat con distintos backends.
+//   ai-sales-chat: agente con datos del negocio (creadoras/earnings).
+//                  Lo usa el tab "Asistente IA" de Finanzas.
+//   clari-help:    asistente de soporte de Maven (how-to + permisos).
+//                  Lo usa el FAB global.
+const ENDPOINT_URLS = {
+  "ai-sales-chat": `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-sales-chat`,
+  "clari-help": `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clari-help`,
+} as const;
 
-const WELCOME: Msg = {
-  role: "assistant",
-  content:
-    "¡Hola! 👋 Soy tu asistente de ventas con IA. Puedo responder preguntas sobre las creadoras y sus ganancias. Por ejemplo:\n\n- *¿Cuál es la creadora con más ganancias esta semana?*\n- *Muéstrame un resumen de tips por creadora*\n- *¿Cuántos fans activos tiene [creadora]?*\n- *Compara las ganancias de las top 5 creadoras*\n\n¿En qué te puedo ayudar?",
+type EndpointKey = keyof typeof ENDPOINT_URLS;
+
+interface UserContextPayload {
+  role: string | null;
+  isAdmin: boolean;
+  permissions: Array<{
+    module: string;
+    submodule: string | null;
+    can_access: boolean;
+  }>;
+}
+
+// El welcome cambia según el backend para que el primer turno deje
+// claro qué tipo de asistente es éste.
+const welcomeFor = (endpoint: EndpointKey): Msg => {
+  if (endpoint === "clari-help") {
+    return {
+      role: "assistant",
+      content:
+        "¡Hola! 👋 Soy Clari, tu asistente de soporte de Maven. Te ayudo con preguntas tipo:\n\n- *¿Cómo evalúo a un chatter?*\n- *¿Dónde subo una nueva QA?*\n- *¿Qué permiso necesito para borrar llamadas?*\n- *¿Cómo cambio mi contraseña?*\n\nNo manejo datos del negocio (para eso tenés a **Mike** en Agency QA o al **Sales Coach** en Finanzas → Asistente IA). ¿En qué te ayudo?",
+    };
+  }
+  return {
+    role: "assistant",
+    content:
+      "¡Hola! 👋 Soy tu asistente de ventas con IA. Puedo responder preguntas sobre las creadoras y sus ganancias. Por ejemplo:\n\n- *¿Cuál es la creadora con más ganancias esta semana?*\n- *Muéstrame un resumen de tips por creadora*\n- *¿Cuántos fans activos tiene [creadora]?*\n- *Compara las ganancias de las top 5 creadoras*\n\n¿En qué te puedo ayudar?",
+  };
 };
 
 async function streamChat({
+  endpoint,
   messages,
+  userContext,
   onDelta,
   onDone,
   onError,
   config,
 }: {
+  endpoint: EndpointKey;
   messages: Msg[];
+  userContext: UserContextPayload | null;
   onDelta: (t: string) => void;
   onDone: () => void;
   onError: (msg: string) => void;
@@ -60,14 +97,14 @@ async function streamChat({
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-  const resp = await fetch(CHAT_URL, {
+  const resp = await fetch(ENDPOINT_URLS[endpoint], {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
       apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     },
-    body: JSON.stringify({ messages, config }),
+    body: JSON.stringify({ messages, config, userContext }),
   });
 
   if (!resp.ok) {
@@ -126,6 +163,9 @@ interface ClariAiChatProps {
   onMessageSaved?: () => void;
   onConversationTitleSet?: (title: string) => void;
   onAutoCreate?: () => Promise<string | null>;
+  /** Backend a usar. Default "ai-sales-chat" para no romper consumidores
+   *  existentes; el FAB global pasa "clari-help". */
+  endpoint?: EndpointKey;
 }
 
 const ClariAiChat = ({
@@ -134,8 +174,10 @@ const ClariAiChat = ({
   onMessageSaved,
   onConversationTitleSet,
   onAutoCreate,
+  endpoint = "ai-sales-chat",
 }: ClariAiChatProps) => {
   const { messages: dbMessages, saveMessage, updateConversationTitle } = useAiMessages(conversationId ?? null);
+  const WELCOME = welcomeFor(endpoint);
   const [localMessages, setLocalMessages] = useState<Msg[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -143,6 +185,20 @@ const ClariAiChat = ({
   const [titleSet, setTitleSet] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  // Permisos + rol del usuario para que clari-help dé respuestas
+  // role-aware. Para ai-sales-chat el backend ignora userContext.
+  const { permissions } = usePermissions();
+  const { role, isAdmin } = useUserRole();
+  const userContext: UserContextPayload = {
+    role: role ?? null,
+    isAdmin,
+    permissions: permissions.map((p) => ({
+      module: p.module,
+      submodule: p.submodule,
+      can_access: p.can_access,
+    })),
+  };
 
   // Unified sync: load messages from DB or reset
   useEffect(() => {
@@ -157,7 +213,8 @@ const ClariAiChat = ({
       setTitleSet(false);
       setLocalMessages([WELCOME]);
     }
-  }, [conversationId, dbMessages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, dbMessages, endpoint]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -252,6 +309,8 @@ const ClariAiChat = ({
     try {
       const aiConfig = getAiConfig();
       await streamChat({
+        endpoint,
+        userContext,
         messages: allMsgs,
         onDelta: upsert,
         onDone: async () => {
