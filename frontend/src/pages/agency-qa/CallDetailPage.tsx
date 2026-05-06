@@ -6,34 +6,16 @@ import { Label } from "@/components/ui/label";
 import {
   ArrowLeft,
   ChevronDown,
-  ChevronUp,
   Loader2,
-  MapPin,
-  Lightbulb,
-  AlertTriangle,
-  Star,
-  Headphones,
   Save,
   Sparkles,
   MessageSquareQuote,
   ThumbsUp,
   ThumbsDown,
   MessageSquare,
-  Calendar,
+  Instagram as InstagramIcon,
   User,
-  Quote,
-  TrendingUp,
-  Target,
-  Heart,
-  Zap,
-  CheckCircle2,
-  XCircle,
-  Mic,
-  FileText,
-  ArrowUpRight,
-  ListChecks,
-  BarChart3,
-  Activity,
+  Calendar,
 } from "lucide-react";
 import {
   Popover,
@@ -45,7 +27,15 @@ import {
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
+  PolarRadiusAxis,
   ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Cell,
+  CartesianGrid,
 } from "recharts";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -54,11 +44,11 @@ import { useMyProfile } from "@/hooks/useUserProfile";
 import {
   useQaCall,
   useQaAudioSignedUrl,
-  scoreColor,
   OUTCOME_META,
   useQaHumanFeedback,
   useCreateQaHumanFeedback,
   useAnalyzeQaCall,
+  useFireQaWebhook,
   useQaSectionFeedback,
   useUpsertQaSectionFeedback,
   useDeleteQaSectionFeedback,
@@ -68,59 +58,68 @@ import {
   type QaSectionType,
 } from "@/hooks/useAgencyQa";
 
-// CallDetailPage — modern, polished QA call detail view.
-// Visual hierarchy: gradient hero header with score circle → outcome banner →
-// content sections in a 2-column grid where possible, with colored accents,
-// icons, progress bars, and consistent card styling.
+// CallDetailPage — port directo de Kash (kash-call-qa/app/calls/[id]/page.tsx)
+// con la paleta de colores de Maven: el dorado (--gold #c9a96e) se reemplaza
+// por el primary purple de Maven (hsl(var(--primary))).
 
-const formatLevel = (lv: string) =>
-  lv.charAt(0).toUpperCase() + lv.slice(1);
+// ─── Helpers ─────────────────────────────────────────────────────
+const PRIMARY = "hsl(var(--primary))";
+const PRIMARY_SOFT = "hsl(var(--primary) / 0.12)";
 
-const fmtDate = (iso: string) => {
+const fmtDate = (iso: string): string => {
   const d = new Date(`${iso}T00:00:00`);
   return d.toLocaleDateString("es-ES", {
     day: "2-digit",
-    month: "short",
+    month: "long",
     year: "numeric",
   });
 };
 
-// ─── Avatar ─────────────────────────────────────────────────────────
-const Avatar = ({
-  name,
-  dataUrl,
-  size = 48,
-}: {
-  name: string;
-  dataUrl: string | null;
-  size?: number;
-}) => {
-  const initial = (name?.trim().charAt(0) || "?").toUpperCase();
-  let h = 0;
-  for (let i = 0; i < name.length; i++)
-    h = (h * 31 + name.charCodeAt(i)) % 360;
-  const bg = `linear-gradient(135deg, hsl(${h}, 60%, 55%) 0%, hsl(${(h + 60) % 360}, 70%, 35%) 100%)`;
-  return (
-    <span
-      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full text-base font-bold text-white shadow-md ring-2 ring-white/10"
-      style={{ width: size, height: size, background: bg }}
-    >
-      {dataUrl ? (
-        <img src={dataUrl} alt="" className="h-full w-full object-cover" />
-      ) : (
-        initial
-      )}
-    </span>
-  );
+const fmtDateTime = (d: Date | string): string => {
+  const date = typeof d === "string" ? new Date(d) : d;
+  return date.toLocaleString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
-// ─── Section feedback context ──────────────────────────────────────
+const scoreColorPct = (pct: number): string => {
+  if (pct >= 80) return "#16a34a";
+  if (pct >= 60) return "#ca8a04";
+  if (pct >= 40) return "#ea580c";
+  return "#dc2626";
+};
+
+const scoreColor10 = (s10: number): string => {
+  if (s10 >= 8) return "#16a34a";
+  if (s10 >= 6) return "#ca8a04";
+  if (s10 >= 4) return "#ea580c";
+  return "#dc2626";
+};
+
+const RED_FLAG_LABELS: Record<string, string> = {
+  trato_low_ticket: "Trato low-ticket",
+  script_rigido: "Script rígido",
+  no_deja_hablar: "No deja hablar",
+  ofrece_sin_diagnosticar: "Ofrece sin diagnosticar",
+  promesas_irreales: "Promesas irreales",
+  trato_invasivo: "Trato invasivo",
+  tono_corporativo: "Tono corporativo",
+  muletillas_excesivas: "Muletillas excesivas",
+  velocidad_inapropiada: "Velocidad inapropiada",
+  monologo_excesivo: "Monólogo excesivo",
+  otro: "Otro",
+};
+
+// ─── Section feedback ───────────────────────────────────────────
 type SectionFeedbackContext = {
   callId: string;
   feedbackByKey: Map<string, QaSectionFeedback>;
   evaluatorName: string;
 };
-
 const sectionKey = (type: QaSectionType, index: number) =>
   `${type}:${index}`;
 
@@ -211,10 +210,10 @@ const SectionThumbs = ({
         onClick={() => handleVote(1)}
         disabled={upsert.isPending || remove.isPending}
         className={cn(
-          "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
+          "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
           isUp
-            ? "bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/40"
-            : "text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground"
+            ? "bg-emerald-500/20 text-emerald-500"
+            : "text-muted-foreground hover:bg-muted/50"
         )}
         title={isUp ? "Quitar 👍" : "Marcar 👍"}
       >
@@ -225,10 +224,10 @@ const SectionThumbs = ({
         onClick={() => handleVote(-1)}
         disabled={upsert.isPending || remove.isPending}
         className={cn(
-          "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
+          "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
           isDown
-            ? "bg-rose-500/20 text-rose-400 ring-1 ring-rose-500/40"
-            : "text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground"
+            ? "bg-rose-500/20 text-rose-400"
+            : "text-muted-foreground hover:bg-muted/50"
         )}
         title={isDown ? "Quitar 👎" : "Marcar 👎"}
       >
@@ -239,10 +238,10 @@ const SectionThumbs = ({
           <button
             type="button"
             className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
+              "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
               hasNote
-                ? "bg-primary/20 text-primary ring-1 ring-primary/40"
-                : "text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground"
+                ? "bg-primary/20 text-primary"
+                : "text-muted-foreground hover:bg-muted/50"
             )}
             title={hasNote ? "Editar nota" : "Agregar nota"}
             onClick={() => {
@@ -311,132 +310,36 @@ const SectionThumbs = ({
   );
 };
 
-// ─── SectionCard: a polished section wrapper with header + body ────
-const SectionCard = ({
-  title,
-  icon,
-  iconBg,
-  hint,
-  accent,
-  children,
-  className,
+// ─── HeroAvatar ────────────────────────────────────────────────
+const HeroAvatar = ({
+  name,
+  dataUrl,
+  size = 72,
 }: {
-  title: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  hint?: string;
-  accent?: string;
-  children: React.ReactNode;
-  className?: string;
-}) => (
-  <section
-    className={cn(
-      "overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all hover:shadow-md",
-      className
-    )}
-  >
-    {accent && (
-      <div className="h-1 w-full" style={{ background: accent }} />
-    )}
-    <div className="border-b border-border/40 bg-muted/20 px-5 py-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5">
-          <span
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-sm"
-            style={{ background: iconBg }}
-          >
-            {icon}
-          </span>
-          <h3 className="text-sm font-bold tracking-tight text-foreground">
-            {title}
-          </h3>
-        </div>
-        {hint && (
-          <span className="rounded-full bg-muted/60 px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
-            {hint}
-          </span>
-        )}
-      </div>
-    </div>
-    <div className="space-y-3 p-5">{children}</div>
-  </section>
-);
-
-// ─── ScoreCircle ───────────────────────────────────────────────────
-const ScoreCircle = ({
-  score,
-  size = 160,
-}: {
-  score: number;
+  name: string;
+  dataUrl: string | null;
   size?: number;
 }) => {
-  const color = scoreColor(score);
-  const strokeWidth = size * 0.08;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
-  const center = size / 2;
+  const initial = (name?.trim().charAt(0) || "?").toUpperCase();
+  let h = 0;
+  for (let i = 0; i < name.length; i++)
+    h = (h * 31 + name.charCodeAt(i)) % 360;
+  const bg = `linear-gradient(135deg, hsl(${h}, 60%, 55%) 0%, hsl(${(h + 60) % 360}, 70%, 35%) 100%)`;
   return (
-    <div
-      className="relative flex items-center justify-center"
-      style={{ width: size, height: size }}
+    <span
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full text-base font-bold text-white shadow-md ring-2 ring-white/10"
+      style={{ width: size, height: size, background: bg }}
     >
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        className="absolute inset-0 -rotate-90"
-      >
-        <defs>
-          <linearGradient
-            id={`scoreGrad-${score}`}
-            x1="0%"
-            y1="0%"
-            x2="100%"
-            y2="100%"
-          >
-            <stop offset="0%" stopColor={color} stopOpacity="0.6" />
-            <stop offset="100%" stopColor={color} stopOpacity="1" />
-          </linearGradient>
-        </defs>
-        <circle
-          cx={center}
-          cy={center}
-          r={radius}
-          fill="none"
-          stroke="hsl(var(--border))"
-          strokeWidth={strokeWidth}
-          opacity="0.3"
-        />
-        <circle
-          cx={center}
-          cy={center}
-          r={radius}
-          fill="none"
-          stroke={`url(#scoreGrad-${score})`}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          className="transition-all duration-1000 ease-out"
-        />
-      </svg>
-      <div className="flex flex-col items-center justify-center">
-        <span
-          className="text-4xl font-black leading-none tabular-nums tracking-tight"
-          style={{ color }}
-        >
-          {score}
-        </span>
-        <span className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-          / 100
-        </span>
-      </div>
-    </div>
+      {dataUrl ? (
+        <img src={dataUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        initial
+      )}
+    </span>
   );
 };
 
-// ─── Outcome Pill ──────────────────────────────────────────────────
+// ─── OutcomePill ───────────────────────────────────────────────
 const OutcomePill = ({
   outcome,
   size = "default",
@@ -450,9 +353,7 @@ const OutcomePill = ({
     <span
       className={cn(
         "inline-flex items-center gap-2 rounded-full font-bold text-white shadow-md",
-        size === "lg"
-          ? "h-9 px-4 text-sm"
-          : "h-7 px-3 text-xs"
+        size === "lg" ? "h-9 px-4 text-sm" : "h-7 px-3 text-xs"
       )}
       style={{ background: c.bg }}
     >
@@ -464,505 +365,796 @@ const OutcomePill = ({
   );
 };
 
-// ─── Dimensions block with progress bars ──────────────────────────
-const DimensionsBlock = ({
-  dimensions,
-  ctx,
+// ─── ScoreGauge ─────────────────────────────────────────────────
+const ScoreGauge = ({
+  score,
+  size = 180,
 }: {
-  dimensions: NonNullable<CallAnalysis["dimensions"]>;
-  ctx?: SectionFeedbackContext;
+  score: number;
+  size?: number;
 }) => {
-  if (dimensions.length === 0) return null;
-  const radarData = dimensions.map((d) => ({
-    name: d.name.length > 14 ? d.name.slice(0, 14) + "…" : d.name,
-    score: d.score * 10,
-    fullMark: 100,
-  }));
-  const avgScore =
-    dimensions.reduce((s, d) => s + d.score, 0) / dimensions.length;
-  return (
-    <SectionCard
-      title="Perfil Visual — Dimensiones"
-      icon={<BarChart3 className="h-4 w-4" />}
-      iconBg="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)"
-      accent="linear-gradient(90deg, #6366f1 0%, #4338ca 100%)"
-      hint={`Promedio ${(avgScore * 10).toFixed(0)}/100`}
-    >
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
-        {/* Radar */}
-        <div className="rounded-xl border border-border/40 bg-muted/10 p-3">
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={radarData} outerRadius="75%">
-                <PolarGrid stroke="hsl(var(--border))" strokeOpacity={0.4} />
-                <PolarAngleAxis
-                  dataKey="name"
-                  tick={{
-                    fontSize: 9,
-                    fill: "hsl(var(--muted-foreground))",
-                  }}
-                />
-                <Radar
-                  dataKey="score"
-                  stroke="#6366f1"
-                  fill="#6366f1"
-                  fillOpacity={0.4}
-                  strokeWidth={2}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        {/* Dimension list with progress bars */}
-        <ul className="space-y-3">
-          {dimensions.map((d, i) => {
-            const pct = d.score * 10;
-            const color = scoreColor(pct);
-            return (
-              <li
-                key={`${d.name}-${i}`}
-                className="rounded-lg border border-border/40 bg-muted/5 p-3 transition-colors hover:bg-muted/15"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold">{d.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="rounded-md px-2 py-0.5 text-xs font-bold tabular-nums text-white"
-                      style={{ background: color }}
-                    >
-                      {d.score}/10
-                    </span>
-                    {ctx && (
-                      <SectionThumbs
-                        ctx={ctx}
-                        type="dimension"
-                        index={i}
-                        label={d.name}
-                      />
-                    )}
-                  </div>
-                </div>
-                {/* Progress bar */}
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${pct}%`,
-                      background: `linear-gradient(90deg, ${color}80 0%, ${color} 100%)`,
-                    }}
-                  />
-                </div>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  {d.feedback}
-                </p>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-    </SectionCard>
-  );
-};
+  const clamped = Math.max(0, Math.min(100, score));
+  const strokeWidth = 14;
+  const r = (size - strokeWidth) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c * (1 - clamped / 100);
+  const color = scoreColorPct(clamped);
 
-// ─── AudioMetricsBlock ─────────────────────────────────────────────
-const AudioMetricsBlock = ({
-  metrics,
-}: {
-  metrics: {
-    total_duration_s?: number;
-    speaker_count?: number;
-    speakers?: Array<{
-      id: string;
-      label: string;
-      word_count: number;
-      estimated_duration_s: number;
-      talk_ratio: number;
-    }>;
-  };
-}) => {
-  const speakers = metrics?.speakers ?? [];
-  if (speakers.length === 0) return null;
-  const totalDuration = metrics?.total_duration_s ?? 0;
-  const fmtDuration = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = Math.round(s % 60);
-    return `${m}:${sec.toString().padStart(2, "0")}`;
-  };
-
-  const SPEAKER_COLORS = ["#8b5cf6", "#06b6d4", "#10b981", "#f59e0b"];
-  const maxWords = Math.max(...speakers.map((s) => s.word_count));
-
-  return (
-    <SectionCard
-      title="Métricas de Audio"
-      icon={<Activity className="h-4 w-4" />}
-      iconBg="linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)"
-      accent="linear-gradient(90deg, #06b6d4 0%, #0e7490 100%)"
-      hint={`${fmtDuration(totalDuration)} · ${speakers.length} speakers`}
-    >
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {speakers.map((s, i) => {
-          const color = SPEAKER_COLORS[i % SPEAKER_COLORS.length];
-          const wordsPct = (s.word_count / maxWords) * 100;
-          const ratioPct = Math.round(s.talk_ratio * 100);
-          return (
-            <div
-              key={s.id}
-              className="rounded-xl border border-border/40 bg-muted/5 p-4"
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ background: color }}
-                  />
-                  <span className="text-sm font-bold">{s.label}</span>
-                </div>
-                <span
-                  className="rounded-full px-2.5 py-0.5 text-xs font-bold text-white"
-                  style={{ background: color }}
-                >
-                  {ratioPct}%
-                </span>
-              </div>
-              <div className="space-y-2">
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>Palabras</span>
-                    <span className="font-semibold tabular-nums text-foreground">
-                      {s.word_count.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
-                    <div
-                      className="h-full rounded-full transition-all duration-700"
-                      style={{ width: `${wordsPct}%`, background: color }}
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                  <span>Duración</span>
-                  <span className="font-semibold tabular-nums text-foreground">
-                    {fmtDuration(s.estimated_duration_s)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </SectionCard>
-  );
-};
-
-// ─── KeyMomentsBlock ──────────────────────────────────────────────
-const KeyMomentsBlock = ({
-  moments,
-  ctx,
-}: {
-  moments: NonNullable<CallAnalysis["key_moments"]>;
-  ctx?: SectionFeedbackContext;
-}) => {
-  if (moments.length === 0) return null;
-  const positivos = moments.filter((m) => m.kind === "positivo").length;
-  const negativos = moments.filter((m) => m.kind === "negativo").length;
-  return (
-    <SectionCard
-      title="Momentos clave"
-      icon={<Star className="h-4 w-4" />}
-      iconBg="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
-      accent="linear-gradient(90deg, #f59e0b 0%, #d97706 100%)"
-      hint={`${positivos} ✓ · ${negativos} ✗`}
-    >
-      <ul className="space-y-3">
-        {moments.map((m, i) => {
-          const isPositive = m.kind === "positivo";
-          const color = isPositive ? "#10b981" : "#ef4444";
-          return (
-            <li
-              key={i}
-              className="overflow-hidden rounded-xl border border-border/40 bg-muted/5"
-            >
-              <div
-                className="flex items-center justify-between gap-2 border-b border-border/30 px-4 py-2"
-                style={{ background: `${color}15` }}
-              >
-                <div className="flex items-center gap-1.5">
-                  {isPositive ? (
-                    <CheckCircle2 className="h-4 w-4" style={{ color }} />
-                  ) : (
-                    <XCircle className="h-4 w-4" style={{ color }} />
-                  )}
-                  <span
-                    className="text-[11px] font-bold uppercase tracking-wider"
-                    style={{ color }}
-                  >
-                    {isPositive ? "Positivo" : "Negativo"}
-                  </span>
-                </div>
-                {ctx && (
-                  <SectionThumbs
-                    ctx={ctx}
-                    type="key_moment"
-                    index={i}
-                    label={m.quote.slice(0, 60)}
-                  />
-                )}
-              </div>
-              <div className="space-y-2 p-4">
-                <blockquote
-                  className="border-l-3 pl-3 text-sm italic leading-relaxed text-foreground/90"
-                  style={{ borderLeftColor: color, borderLeftWidth: 3 }}
-                >
-                  &ldquo;{m.quote}&rdquo;
-                </blockquote>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  {m.why}
-                </p>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </SectionCard>
-  );
-};
-
-// ─── RedFlagsBlock ────────────────────────────────────────────────
-const RedFlagsBlock = ({
-  flags,
-  ctx,
-}: {
-  flags: NonNullable<CallAnalysis["red_flags"]>;
-  ctx?: SectionFeedbackContext;
-}) => {
-  if (flags.length === 0) return null;
-  return (
-    <SectionCard
-      title="Red flags"
-      icon={<AlertTriangle className="h-4 w-4" />}
-      iconBg="linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)"
-      accent="linear-gradient(90deg, #ef4444 0%, #b91c1c 100%)"
-      hint={`${flags.length}`}
-    >
-      <ul className="space-y-3">
-        {flags.map((f, i) => (
-          <li
-            key={i}
-            className="overflow-hidden rounded-xl border border-rose-500/30 bg-gradient-to-br from-rose-500/10 to-rose-500/5"
-          >
-            <div className="flex items-center justify-between gap-2 border-b border-rose-500/20 bg-rose-500/10 px-4 py-2">
-              <div className="flex items-center gap-1.5">
-                <AlertTriangle className="h-4 w-4 text-rose-400" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-rose-300">
-                  {f.type.replace(/_/g, " ")}
-                </span>
-              </div>
-              {ctx && (
-                <SectionThumbs
-                  ctx={ctx}
-                  type="red_flag"
-                  index={i}
-                  label={f.type}
-                />
-              )}
-            </div>
-            <div className="space-y-2 p-4">
-              <p className="text-sm leading-relaxed text-foreground/90">
-                {f.description}
-              </p>
-              {f.quote && (
-                <blockquote className="border-l-3 border-l-rose-500/50 pl-3 text-xs italic text-muted-foreground" style={{ borderLeftWidth: 3 }}>
-                  &ldquo;{f.quote}&rdquo;
-                </blockquote>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </SectionCard>
-  );
-};
-
-// ─── ImprovementsBlock ────────────────────────────────────────────
-const ImprovementsBlock = ({
-  improvements,
-  ctx,
-}: {
-  improvements: string[];
-  ctx?: SectionFeedbackContext;
-}) => {
-  if (improvements.length === 0) return null;
-  return (
-    <SectionCard
-      title="Acciones de mejora"
-      icon={<ListChecks className="h-4 w-4" />}
-      iconBg="linear-gradient(135deg, #10b981 0%, #047857 100%)"
-      accent="linear-gradient(90deg, #10b981 0%, #047857 100%)"
-      hint={`${improvements.length} ${improvements.length === 1 ? "acción" : "acciones"}`}
-    >
-      <ol className="space-y-2.5">
-        {improvements.map((s, i) => (
-          <li
-            key={i}
-            className="flex items-start gap-3 rounded-lg border border-border/40 bg-muted/5 p-3 transition-colors hover:bg-muted/15"
-          >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-xs font-bold text-emerald-400">
-              {i + 1}
-            </span>
-            <div className="flex flex-1 items-start justify-between gap-2">
-              <span className="text-sm leading-relaxed text-foreground/90">
-                {s}
-              </span>
-              {ctx && (
-                <SectionThumbs
-                  ctx={ctx}
-                  type="improvement"
-                  index={i}
-                  label={s.slice(0, 60)}
-                />
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
-    </SectionCard>
-  );
-};
-
-// ─── SignalCard ──────────────────────────────────────────────────
-const SignalCard = ({
-  label,
-  level,
-  reason,
-  icon,
-}: {
-  label: string;
-  level: string;
-  reason: string;
-  icon: React.ReactNode;
-}) => {
-  const levelMap = {
-    alto: { color: "#10b981", bg: "from-emerald-500/15 to-emerald-500/5" },
-    medio: { color: "#f59e0b", bg: "from-amber-500/15 to-amber-500/5" },
-    bajo: { color: "#ef4444", bg: "from-rose-500/15 to-rose-500/5" },
-    ambiguo: { color: "#6b7280", bg: "from-slate-500/15 to-slate-500/5" },
-  } as const;
-  const lv = (levelMap[level as keyof typeof levelMap] ?? levelMap.ambiguo);
   return (
     <div
-      className={cn(
-        "overflow-hidden rounded-xl border bg-gradient-to-br p-4",
-        lv.bg
-      )}
-      style={{ borderColor: `${lv.color}40` }}
+      className="relative inline-flex items-center justify-center"
+      style={{ width: size, height: size }}
     >
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-white"
-            style={{ background: lv.color }}
-          >
-            {icon}
-          </span>
-          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            {label}
-          </span>
-        </div>
+      <svg
+        width={size}
+        height={size}
+        style={{ transform: "rotate(-90deg)" }}
+      >
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="hsl(var(--border))"
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 600ms ease" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span
-          className="rounded-full px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
-          style={{ background: lv.color }}
+          className="text-4xl font-bold tabular-nums"
+          style={{ color }}
         >
-          {formatLevel(level)}
+          {clamped}
+        </span>
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">
+          Score
         </span>
       </div>
-      <p className="text-sm leading-relaxed text-foreground/85">{reason}</p>
     </div>
   );
 };
 
-// ─── ModelSignalsBlock ───────────────────────────────────────────
-const ModelSignalsBlock = ({
+// ─── FactCard ───────────────────────────────────────────────────
+const FactCard = ({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+}) => (
+  <div className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/20 p-4">
+    <div className="flex items-center gap-2">
+      <span className="text-lg" aria-hidden>
+        {icon}
+      </span>
+      <span
+        className="text-xs font-bold uppercase tracking-wider"
+        style={{ color: PRIMARY }}
+      >
+        {label}
+      </span>
+    </div>
+    <p className="text-sm font-medium leading-relaxed">{value}</p>
+  </div>
+);
+
+// ─── DimensionsRadar ────────────────────────────────────────────
+const DimensionsRadar = ({
+  dimensions,
+}: {
+  dimensions: NonNullable<CallAnalysis["dimensions"]>;
+}) => {
+  const fullByShort = new Map<string, string>();
+  const data = dimensions.map((d) => {
+    const short = d.name.length > 22 ? d.name.slice(0, 20) + "…" : d.name;
+    fullByShort.set(short, d.name);
+    return { dim: short, score: d.score };
+  });
+
+  return (
+    <div className="h-80 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart data={data} outerRadius="75%">
+          <PolarGrid stroke="#888" strokeOpacity={0.35} />
+          <PolarAngleAxis
+            dataKey="dim"
+            tick={{ fill: "currentColor", fontSize: 11 }}
+          />
+          <PolarRadiusAxis
+            angle={90}
+            domain={[0, 10]}
+            tick={{ fill: "currentColor", fontSize: 10 }}
+          />
+          <Radar
+            name="Score"
+            dataKey="score"
+            stroke={PRIMARY}
+            fill={PRIMARY}
+            fillOpacity={0.35}
+            strokeWidth={2}
+          />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
+// ─── AudioMetricsChart ──────────────────────────────────────────
+type SpeakerLike = {
+  id: string;
+  label: string;
+  word_count: number;
+  estimated_duration_s: number;
+  talk_ratio: number;
+};
+
+const tooltipStyle = {
+  background: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: 8,
+  color: "hsl(var(--foreground))",
+};
+const tooltipLabelStyle = {
+  color: "hsl(var(--foreground))",
+  fontWeight: 600,
+  marginBottom: 4,
+};
+const tooltipItemStyle = {
+  color: "hsl(var(--foreground))",
+};
+
+const interestScore = (level?: string): number => {
+  switch (level) {
+    case "alto":
+      return 100;
+    case "medio":
+      return 66;
+    case "bajo":
+      return 33;
+    case "ambiguo":
+      return 50;
+    default:
+      return 0;
+  }
+};
+const complicityScore = (level?: string): number => {
+  switch (level) {
+    case "alto":
+      return 100;
+    case "medio":
+      return 66;
+    case "bajo":
+      return 33;
+    default:
+      return 0;
+  }
+};
+const barColor = (v: number): string => {
+  if (v >= 70) return "#16a34a";
+  if (v >= 40) return "#ca8a04";
+  return "#dc2626";
+};
+
+const CloserBars = ({ closer }: { closer: SpeakerLike }) => {
+  const data = [
+    {
+      name: "% habla",
+      value: Math.round(closer.talk_ratio * 100),
+      color: "#6366f1",
+    },
+    {
+      name: "Palabras",
+      value: closer.word_count,
+      color: "#10b981",
+    },
+    {
+      name: "Duración (s)",
+      value: Math.round(closer.estimated_duration_s),
+      color: "#f59e0b",
+    },
+  ];
+  return (
+    <div className="h-72 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 10, right: 12, left: 0, bottom: 6 }}>
+          <CartesianGrid stroke="#888" strokeOpacity={0.2} vertical={false} />
+          <XAxis
+            dataKey="name"
+            tick={{ fill: "currentColor", fontSize: 11 }}
+          />
+          <YAxis tick={{ fill: "currentColor", fontSize: 11 }} />
+          <Tooltip
+            contentStyle={tooltipStyle}
+            labelStyle={tooltipLabelStyle}
+            itemStyle={tooltipItemStyle}
+          />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            {data.map((d, i) => (
+              <Cell key={i} fill={d.color} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
+const ModelBars = ({
   signals,
 }: {
   signals: NonNullable<CallAnalysis["model_signals"]>;
-}) => (
-  <SectionCard
-    title="Señales de la modelo"
-    icon={<Heart className="h-4 w-4" />}
-    iconBg="linear-gradient(135deg, #ec4899 0%, #be185d 100%)"
-    accent="linear-gradient(90deg, #ec4899 0%, #be185d 100%)"
-  >
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-      <SignalCard
-        label="Interés"
-        level={signals.interest_level}
-        reason={signals.interest_reason}
-        icon={<TrendingUp className="h-3.5 w-3.5" />}
-      />
-      <SignalCard
-        label="Complicidad"
-        level={signals.complicity_level}
-        reason={signals.complicity_reason}
-        icon={<Heart className="h-3.5 w-3.5" />}
-      />
+}) => {
+  const interest = interestScore(signals.interest_level);
+  const complicity = complicityScore(signals.complicity_level);
+  const objectionsCount = signals.objections?.length ?? 0;
+
+  const data = [
+    { name: "Interés", value: interest, color: barColor(interest) },
+    { name: "Complicidad", value: complicity, color: barColor(complicity) },
+    { name: "Objeciones", value: objectionsCount, color: "#ca8a04" },
+  ];
+  return (
+    <div className="h-72 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 10, right: 12, left: 0, bottom: 6 }}>
+          <CartesianGrid stroke="#888" strokeOpacity={0.2} vertical={false} />
+          <XAxis
+            dataKey="name"
+            tick={{ fill: "currentColor", fontSize: 11 }}
+          />
+          <YAxis tick={{ fill: "currentColor", fontSize: 11 }} />
+          <Tooltip
+            contentStyle={tooltipStyle}
+            labelStyle={tooltipLabelStyle}
+            itemStyle={tooltipItemStyle}
+          />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            {data.map((d, i) => (
+              <Cell key={i} fill={d.color} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     </div>
+  );
+};
 
-    {signals.objections.length > 0 && (
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 pt-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-500/20 text-amber-400">
-            <Target className="h-3.5 w-3.5" />
-          </span>
-          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Objeciones ({signals.objections.length})
-          </span>
-        </div>
-        <div className="space-y-2">
-          {signals.objections.map((o, i) => (
-            <div
-              key={i}
-              className="rounded-xl border border-border/40 bg-muted/10 p-4"
+const AudioMetricsChart = ({
+  metrics,
+  modelSignals,
+}: {
+  metrics: { speakers: SpeakerLike[]; total_duration_s?: number };
+  modelSignals: CallAnalysis["model_signals"] | null | undefined;
+}) => {
+  if (!metrics.speakers?.length) return null;
+  // Identify the closer/model — Maven's transcribe doesn't tag, so we
+  // treat first speaker as closer, second as model. If only 1 speaker,
+  // we just show closer.
+  const closer = metrics.speakers[0];
+  const model = metrics.speakers[1] ?? null;
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-lg" aria-hidden>
+              🎯
+            </span>
+            <span
+              className="text-xs font-bold uppercase tracking-wider"
+              style={{ color: PRIMARY }}
             >
-              <div className="mb-2 flex items-center gap-2">
-                <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
-                  {o.topic}
-                </span>
-              </div>
-              <p className="text-sm text-foreground/90">{o.description}</p>
-              {o.quote && (
-                <blockquote className="mt-2 rounded-md border-l-2 border-l-amber-500/50 bg-muted/20 px-3 py-2 text-xs italic text-muted-foreground">
-                  &ldquo;{o.quote}&rdquo;
-                </blockquote>
-              )}
-            </div>
-          ))}
+              Closer
+            </span>
+            <span className="ml-auto text-[11px] text-muted-foreground">
+              {Math.round(closer.estimated_duration_s)}s ·{" "}
+              {closer.word_count} palabras
+            </span>
+          </div>
+          <CloserBars closer={closer} />
         </div>
-      </div>
-    )}
 
-    {signals.summary_of_model && (
-      <div className="rounded-xl border border-border/40 bg-gradient-to-br from-pink-500/10 to-rose-500/5 p-4">
-        <div className="mb-1.5 flex items-center gap-2">
-          <Quote className="h-3.5 w-3.5 text-pink-400" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-pink-400">
-            Perfil de la modelo
-          </span>
+        <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-lg" aria-hidden>
+              👤
+            </span>
+            <span
+              className="text-xs font-bold uppercase tracking-wider"
+              style={{ color: PRIMARY }}
+            >
+              Modelo
+            </span>
+            {model && (
+              <span className="ml-auto text-[11px] text-muted-foreground">
+                {Math.round(model.estimated_duration_s)}s ·{" "}
+                {model.word_count} palabras
+              </span>
+            )}
+          </div>
+          {modelSignals ? (
+            <ModelBars signals={modelSignals} />
+          ) : (
+            <div className="flex h-72 w-full items-center justify-center text-center text-sm text-muted-foreground">
+              Sin señales de la modelo. Re-analiza para calcular interés,
+              complicidad y objeciones.
+            </div>
+          )}
         </div>
-        <p className="text-sm italic leading-relaxed text-foreground/85">
-          {signals.summary_of_model}
-        </p>
       </div>
-    )}
-  </SectionCard>
+
+      {modelSignals && (
+        <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-4 text-sm leading-relaxed">
+          <div>
+            <span
+              className="text-[10px] font-bold uppercase tracking-wider"
+              style={{ color: PRIMARY }}
+            >
+              Interés
+            </span>{" "}
+            <span className="text-muted-foreground">
+              — {modelSignals.interest_reason}
+            </span>
+          </div>
+          <div>
+            <span
+              className="text-[10px] font-bold uppercase tracking-wider"
+              style={{ color: PRIMARY }}
+            >
+              Complicidad
+            </span>{" "}
+            <span className="text-muted-foreground">
+              — {modelSignals.complicity_reason}
+            </span>
+          </div>
+          {modelSignals.summary_of_model && (
+            <div>
+              <span
+                className="text-[10px] font-bold uppercase tracking-wider"
+                style={{ color: PRIMARY }}
+              >
+                Global
+              </span>{" "}
+              <span className="text-muted-foreground">
+                — {modelSignals.summary_of_model}
+              </span>
+            </div>
+          )}
+          {modelSignals.objections && modelSignals.objections.length > 0 && (
+            <div className="mt-1">
+              <div
+                className="mb-1 text-[10px] font-bold uppercase tracking-wider"
+                style={{ color: PRIMARY }}
+              >
+                Objeciones ({modelSignals.objections.length})
+              </div>
+              <ul className="flex flex-col gap-2">
+                {modelSignals.objections.map((o, i) => (
+                  <li
+                    key={i}
+                    className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-2"
+                  >
+                    <span
+                      className="self-start whitespace-normal rounded-md px-2 py-1 text-[10px] font-bold uppercase leading-tight sm:max-w-[200px] sm:shrink-0"
+                      style={{
+                        background: "rgba(202,138,4,0.18)",
+                        color: "#ca8a04",
+                      }}
+                    >
+                      {o.topic}
+                    </span>
+                    <span className="flex-1 text-xs">
+                      {o.description}{" "}
+                      <span className="italic text-muted-foreground">
+                        — &ldquo;{o.quote}&rdquo;
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Collapsible (analysis sections) ────────────────────────────
+const Collapsible = ({
+  title,
+  badge,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  badge?: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) => (
+  <details
+    open={defaultOpen}
+    className="group overflow-hidden rounded-2xl border border-border bg-card transition-colors"
+  >
+    <summary className="flex cursor-pointer items-center justify-between gap-3 border-b border-transparent px-5 py-4 transition-colors hover:bg-muted/30 group-open:border-border">
+      <div className="flex items-center gap-3">
+        <h2
+          className="text-base font-semibold tracking-wide"
+          style={{ color: PRIMARY }}
+        >
+          {title}
+        </h2>
+        {typeof badge === "number" && (
+          <span
+            className="inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-semibold tabular-nums"
+            style={{ background: PRIMARY_SOFT, color: PRIMARY }}
+          >
+            {badge}
+          </span>
+        )}
+      </div>
+      <ChevronDown
+        className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180"
+        style={{ color: PRIMARY }}
+      />
+    </summary>
+    <div className="px-5 pb-5">{children}</div>
+  </details>
 );
 
-// ─── FeedbackSection ─────────────────────────────────────────────
-const FeedbackSection = ({ callId }: { callId: string }) => {
+// ─── Dimensions grouped (Puntos fuertes / mejorar / débiles) ────
+type DimensionGroup = {
+  title: string;
+  caption: string;
+  color: string;
+  bg: string;
+  items: NonNullable<CallAnalysis["dimensions"]>;
+};
+const groupDimensions = (
+  dimensions: NonNullable<CallAnalysis["dimensions"]>
+): DimensionGroup[] => {
+  const fuertes = dimensions.filter((d) => d.score >= 8);
+  const mejorar = dimensions.filter((d) => d.score >= 6 && d.score < 8);
+  const debiles = dimensions.filter((d) => d.score < 6);
+  return [
+    {
+      title: "Puntos fuertes",
+      caption: "Score ≥ 8/10",
+      color: "#16a34a",
+      bg: "rgba(22,163,74,0.08)",
+      items: fuertes,
+    },
+    {
+      title: "Puntos a mejorar",
+      caption: "Score 6–7/10",
+      color: "#ca8a04",
+      bg: "rgba(202,138,4,0.10)",
+      items: mejorar,
+    },
+    {
+      title: "Puntos débiles",
+      caption: "Score < 6/10",
+      color: "#dc2626",
+      bg: "rgba(220,38,38,0.08)",
+      items: debiles,
+    },
+  ];
+};
+
+const AnalysisSections = ({
+  analysis,
+  ctx,
+}: {
+  analysis: CallAnalysis;
+  ctx?: SectionFeedbackContext;
+}) => {
+  const dimensions = analysis.dimensions ?? [];
+  const redFlags = analysis.red_flags ?? [];
+  const keyMoments = analysis.key_moments ?? [];
+  const improvements = analysis.improvements ?? [];
+
+  const groups = groupDimensions(dimensions);
+  const dimensionIndex = new Map<string, number>(
+    dimensions.map((d, i) => [d.name, i])
+  );
+
+  return (
+    <div className="flex flex-col gap-6">
+      {dimensions.length > 0 && (
+        <Collapsible
+          title="Evaluación por categorías"
+          badge={dimensions.length}
+        >
+          <div className="flex flex-col gap-4 pt-4">
+            {groups.map((g) => (
+              <div
+                key={g.title}
+                className="overflow-hidden rounded-2xl border border-border bg-muted/20"
+              >
+                <div
+                  className="flex items-center justify-between px-5 py-4"
+                  style={{
+                    background: g.bg,
+                    borderLeft: `4px solid ${g.color}`,
+                  }}
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <span
+                      className="text-base font-semibold tracking-wide"
+                      style={{ color: g.color }}
+                    >
+                      {g.title}
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {g.caption}
+                    </span>
+                  </div>
+                  <span
+                    className="inline-flex h-8 min-w-8 items-center justify-center rounded-full px-3 text-sm font-bold text-white"
+                    style={{ background: g.color }}
+                  >
+                    {g.items.length}
+                  </span>
+                </div>
+
+                {g.items.length === 0 ? (
+                  <p className="px-5 py-5 text-sm text-muted-foreground">
+                    Ninguna dimensión cae en este grupo.
+                  </p>
+                ) : (
+                  <ul>
+                    {g.items.map((d, i) => {
+                      const originalIdx = dimensionIndex.get(d.name) ?? i;
+                      return (
+                        <li
+                          key={i}
+                          className={cn(
+                            "flex flex-col gap-3 px-5 py-5",
+                            i > 0 && "border-t border-border"
+                          )}
+                        >
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
+                            <div className="flex min-w-0 flex-1 flex-col gap-2">
+                              <div
+                                className="text-base font-semibold"
+                                style={{ color: PRIMARY }}
+                              >
+                                {d.name}
+                              </div>
+                              <p className="text-[15px] leading-relaxed">
+                                {d.feedback}
+                              </p>
+                            </div>
+                            <div className="flex items-start gap-3 self-start">
+                              <div
+                                className="inline-flex h-8 shrink-0 items-center rounded-full px-3.5 text-sm font-bold tabular-nums text-white"
+                                style={{ background: scoreColor10(d.score) }}
+                              >
+                                {d.score}/10
+                              </div>
+                              {ctx && (
+                                <SectionThumbs
+                                  ctx={ctx}
+                                  type="dimension"
+                                  index={originalIdx}
+                                  label={d.name}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </Collapsible>
+      )}
+
+      {redFlags.length > 0 && (
+        <Collapsible title="Red flags detectados" badge={redFlags.length}>
+          <div className="flex flex-col gap-3 pt-4">
+            {redFlags.map((rf, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-border bg-card p-4"
+                style={{ borderLeft: "4px solid #dc2626" }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div
+                      className="flex items-center gap-2 text-sm font-semibold"
+                      style={{ color: "#dc2626" }}
+                    >
+                      <span>⚑</span>
+                      <span>
+                        {RED_FLAG_LABELS[rf.type] ?? rf.type}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm">{rf.description}</p>
+                    {rf.quote && (
+                      <blockquote className="mt-2 border-l-2 border-border pl-3 text-sm italic text-muted-foreground">
+                        &ldquo;{rf.quote}&rdquo;
+                      </blockquote>
+                    )}
+                  </div>
+                  {ctx && (
+                    <SectionThumbs
+                      ctx={ctx}
+                      type="red_flag"
+                      index={i}
+                      label={RED_FLAG_LABELS[rf.type] ?? rf.type}
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Collapsible>
+      )}
+
+      {keyMoments.length > 0 && (
+        <Collapsible title="Momentos clave" badge={keyMoments.length}>
+          <div className="flex flex-col gap-3 pt-4">
+            {keyMoments.map((m, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-border bg-card p-4"
+                style={{
+                  borderLeft: `4px solid ${
+                    m.kind === "positivo" ? "#16a34a" : "#dc2626"
+                  }`,
+                }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div
+                      className="text-xs font-semibold uppercase tracking-wider"
+                      style={{
+                        color: m.kind === "positivo" ? "#16a34a" : "#dc2626",
+                      }}
+                    >
+                      {m.kind}
+                    </div>
+                    <blockquote className="mt-2 border-l-2 border-border pl-3 text-sm italic">
+                      &ldquo;{m.quote}&rdquo;
+                    </blockquote>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {m.why}
+                    </p>
+                  </div>
+                  {ctx && (
+                    <SectionThumbs
+                      ctx={ctx}
+                      type="key_moment"
+                      index={i}
+                      label={`${m.kind}: ${m.quote.slice(0, 60)}`}
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Collapsible>
+      )}
+
+      {improvements.length > 0 && (
+        <Collapsible
+          title="Acciones concretas de mejora"
+          badge={improvements.length}
+        >
+          <ol className="flex flex-col gap-2 pt-4">
+            {improvements.map((action, i) => (
+              <li
+                key={i}
+                className="flex items-start gap-3 rounded-xl border border-border bg-card p-4"
+              >
+                <span
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                  style={{ background: PRIMARY }}
+                >
+                  {i + 1}
+                </span>
+                <span className="flex-1 text-sm leading-relaxed">
+                  {action}
+                </span>
+                {ctx && (
+                  <SectionThumbs
+                    ctx={ctx}
+                    type="improvement"
+                    index={i}
+                    label={action.slice(0, 80)}
+                  />
+                )}
+              </li>
+            ))}
+          </ol>
+        </Collapsible>
+      )}
+    </div>
+  );
+};
+
+// ─── Transcript collapse ────────────────────────────────────────
+const TranscriptCollapse = ({ transcript }: { transcript: string }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col gap-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between text-left"
+      >
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Transcript
+        </h2>
+        <span className="text-sm text-muted-foreground">
+          {open ? "Ocultar" : "Mostrar"}
+        </span>
+      </button>
+      {open && (
+        <pre className="max-h-[500px] overflow-y-auto whitespace-pre-wrap rounded-xl border border-border bg-muted/20 p-4 text-sm leading-relaxed">
+          {transcript}
+        </pre>
+      )}
+    </div>
+  );
+};
+
+// ─── Reanalyze button ───────────────────────────────────────────
+const ReanalyzeButton = ({ callId }: { callId: string }) => {
+  const analyze = useAnalyzeQaCall();
+  const handleClick = async () => {
+    try {
+      const r = await analyze.mutateAsync({ callId, withFeedback: false });
+      toast.success(`Re-análisis listo · score ${r.score}/100`);
+    } catch (err) {
+      toast.error("Re-análisis falló", {
+        description: (err as Error).message,
+      });
+    }
+  };
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      onClick={handleClick}
+      disabled={analyze.isPending}
+      className="gap-1.5"
+    >
+      {analyze.isPending ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Sparkles className="h-3.5 w-3.5" />
+      )}
+      Re-analizar
+    </Button>
+  );
+};
+
+// ─── HumanFeedbackForm ──────────────────────────────────────────
+const HumanFeedbackForm = ({ callId }: { callId: string }) => {
   const { user } = useAuth();
   const profileQ = useMyProfile();
-  const feedbackQ = useQaHumanFeedback(callId);
-  const createFeedback = useCreateQaHumanFeedback();
+  const create = useCreateQaHumanFeedback();
   const analyze = useAnalyzeQaCall();
 
   const defaultEvaluator =
@@ -973,9 +1165,6 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
 
   const [draft, setDraft] = useState("");
   const [score, setScore] = useState("");
-  const [showHistory, setShowHistory] = useState(false);
-
-  const last = feedbackQ.data ?? null;
 
   const handleSave = async () => {
     const trimmed = draft.trim();
@@ -992,15 +1181,13 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
       return;
     }
     try {
-      await createFeedback.mutateAsync({
+      await create.mutateAsync({
         call_id: callId,
         evaluator_name: defaultEvaluator || "Sin nombre",
         feedback_text: trimmed,
         human_score: numericScore,
       });
-      toast.success("Feedback guardado", {
-        description: "Podés re-analizar la QA para que la IA lo considere.",
-      });
+      toast.success("Feedback guardado");
       setDraft("");
       setScore("");
     } catch (err) {
@@ -1011,198 +1198,102 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
   };
 
   const handleReanalyzeWithFeedback = async () => {
-    if (!last && !draft.trim()) {
-      toast.error("Primero guardá un feedback humano");
+    if (!draft.trim()) {
+      toast.error("Primero escribí un feedback");
       return;
     }
     try {
-      const result = await analyze.mutateAsync({
-        callId,
-        withFeedback: true,
+      await create.mutateAsync({
+        call_id: callId,
+        evaluator_name: defaultEvaluator || "Sin nombre",
+        feedback_text: draft.trim(),
+        human_score:
+          score.trim() === ""
+            ? null
+            : Math.max(0, Math.min(100, parseInt(score, 10))),
       });
-      toast.success(`Re-análisis listo · score ${result.score}/100`, {
-        description: "El análisis ahora incorpora tu feedback humano.",
-      });
+      const r = await analyze.mutateAsync({ callId, withFeedback: true });
+      toast.success(`Re-análisis con feedback listo · score ${r.score}/100`);
+      setDraft("");
+      setScore("");
     } catch (err) {
       toast.error("Re-análisis falló", {
         description: (err as Error).message,
       });
-    }
-  };
-
-  const handleReanalyzePlain = async () => {
-    try {
-      const result = await analyze.mutateAsync({
-        callId,
-        withFeedback: false,
-      });
-      toast.success(`Re-análisis listo · score ${result.score}/100`);
-    } catch (err) {
-      toast.error("Re-análisis falló", {
-        description: (err as Error).message,
-      });
-    }
-  };
-
-  const fmtTs = (iso: string) => {
-    try {
-      return new Date(iso).toLocaleString("es-AR", {
-        day: "2-digit",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return iso;
     }
   };
 
   return (
-    <SectionCard
-      title="Feedback humano"
-      icon={<Lightbulb className="h-4 w-4" />}
-      iconBg="linear-gradient(135deg, #eab308 0%, #a16207 100%)"
-      accent="linear-gradient(90deg, #eab308 0%, #a16207 100%)"
-    >
-      <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-400/90">
-        💡 Dejá feedback sobre el análisis (qué le faltó, qué interpretó mal).
-        Después podés re-analizar y la IA lo va a tomar en cuenta.
-      </p>
-
-      {feedbackQ.isLoading ? (
-        <div className="text-xs text-muted-foreground">
-          <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
-          Cargando feedback…
-        </div>
-      ) : last ? (
-        <div className="rounded-xl border border-border/40 bg-muted/10 p-4">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
-                {(last.evaluator_name?.[0] ?? "?").toUpperCase()}
-              </span>
-              <span className="font-semibold text-foreground/90">
-                {last.evaluator_name}
-              </span>
-              <span className="text-muted-foreground">
-                · {fmtTs(last.created_at)}
-              </span>
-            </div>
-            {typeof last.human_score === "number" && (
-              <span
-                className="rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-white"
-                style={{ background: scoreColor(last.human_score) }}
-              >
-                Humano {last.human_score}
-              </span>
-            )}
-          </div>
-          <p className="mt-2.5 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-            {last.feedback_text}
-          </p>
-          <button
-            type="button"
-            className="mt-3 text-xs font-medium text-primary underline-offset-2 hover:underline"
-            onClick={() => setShowHistory((s) => !s)}
-          >
-            {showHistory ? "Ocultar nuevo feedback" : "+ Agregar otro feedback"}
-          </button>
-        </div>
-      ) : (
-        <p className="rounded-lg border border-dashed border-border/60 bg-muted/5 px-3 py-3 text-center text-xs italic text-muted-foreground">
-          Todavía no hay feedback humano para esta QA.
-        </p>
-      )}
-
-      {(showHistory || !last) && (
-        <div className="space-y-3 rounded-xl border border-border/40 bg-muted/5 p-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="feedback-text" className="text-xs font-semibold">
-              Feedback (qué corregir / agregar)
-            </Label>
-            <Textarea
-              id="feedback-text"
-              rows={3}
-              placeholder="Ej: la IA no detectó el cierre suave al final, la modelo aceptó la propuesta entre líneas."
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              className="text-sm"
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-            <div className="space-y-1.5">
-              <Label htmlFor="human-score" className="text-xs font-semibold">
-                Score humano (opcional, 0-100)
-              </Label>
-              <Input
-                id="human-score"
-                type="number"
-                min={0}
-                max={100}
-                inputMode="numeric"
-                placeholder="ej. 85"
-                value={score}
-                onChange={(e) => setScore(e.target.value)}
-                className="h-9 text-sm"
-              />
-            </div>
-            <div className="flex items-end">
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleSave}
-                disabled={createFeedback.isPending || !draft.trim()}
-                className="h-9 w-full gap-1.5 sm:w-auto"
-              >
-                {createFeedback.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Save className="h-3.5 w-3.5" />
-                )}
-                Guardar feedback
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2 border-t border-border/40 pt-3">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={handleReanalyzePlain}
-          disabled={analyze.isPending}
-          className="gap-1.5"
-        >
-          {analyze.isPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Sparkles className="h-3.5 w-3.5" />
-          )}
-          Re-analizar
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          onClick={handleReanalyzeWithFeedback}
-          disabled={analyze.isPending || !last}
-          title={!last ? "Primero guardá feedback humano" : undefined}
-          className="gap-1.5"
-        >
-          {analyze.isPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <MessageSquareQuote className="h-3.5 w-3.5" />
-          )}
-          Re-analizar con feedback
-        </Button>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="feedback-text" className="text-xs">
+          Tu feedback (qué corregir / agregar al análisis IA)
+        </Label>
+        <Textarea
+          id="feedback-text"
+          rows={3}
+          placeholder="Ej: la IA no detectó el cierre suave al final, la modelo aceptó la propuesta entre líneas."
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          className="text-sm"
+        />
       </div>
-    </SectionCard>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[160px_1fr_auto]">
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="human-score" className="text-xs">
+            Score humano (0-100)
+          </Label>
+          <Input
+            id="human-score"
+            type="number"
+            min={0}
+            max={100}
+            inputMode="numeric"
+            placeholder="ej. 85"
+            value={score}
+            onChange={(e) => setScore(e.target.value)}
+            className="h-9 text-sm"
+          />
+        </div>
+        <div className="flex items-end">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleSave}
+            disabled={create.isPending || !draft.trim()}
+            className="h-9 w-full gap-1.5"
+          >
+            {create.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            Guardar feedback
+          </Button>
+        </div>
+        <div className="flex items-end">
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleReanalyzeWithFeedback}
+            disabled={analyze.isPending || !draft.trim()}
+            className="h-9 w-full gap-1.5"
+          >
+            {analyze.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <MessageSquareQuote className="h-3.5 w-3.5" />
+            )}
+            Guardar y re-analizar
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 };
 
-// ─── Main page ───────────────────────────────────────────────────
+// ─── Main page ──────────────────────────────────────────────────
 const CallDetailPage = ({
   callId,
   onBack,
@@ -1211,39 +1302,21 @@ const CallDetailPage = ({
   onBack: () => void;
 }) => {
   const callQ = useQaCall(callId);
-  const [showTranscript, setShowTranscript] = useState(false);
-  const call = callQ.data;
-  const a = call?.claude_analysis ?? {};
-  const audioUrlQ = useQaAudioSignedUrl(call?.audio_path ?? null);
-  const audioMetrics = (call?.audio_metrics ?? {}) as {
-    total_duration_s?: number;
-    speaker_count?: number;
-    speakers?: Array<{
-      id: string;
-      label: string;
-      word_count: number;
-      estimated_duration_s: number;
-      talk_ratio: number;
-    }>;
-  };
+  const audioUrlQ = useQaAudioSignedUrl(callQ.data?.audio_path ?? null);
+  const fireWebhook = useFireQaWebhook();
 
   const { user } = useAuth();
   const profileQ = useMyProfile();
   const sectionFeedbackQ = useQaSectionFeedback(callId);
+  const feedbackHistoryQ = useQaHumanFeedback(callId);
+
   const evaluatorName =
     profileQ.data?.full_name?.trim() ||
     user?.user_metadata?.full_name?.trim() ||
     user?.email ||
     "Sin nombre";
-  const feedbackByKey = new Map<string, QaSectionFeedback>();
-  for (const fb of sectionFeedbackQ.data ?? []) {
-    feedbackByKey.set(sectionKey(fb.section_type, fb.section_index), fb);
-  }
-  const sectionCtx: SectionFeedbackContext | undefined = call
-    ? { callId: call.id, feedbackByKey, evaluatorName }
-    : undefined;
 
-  if (callQ.isLoading || !call) {
+  if (callQ.isLoading || !callQ.data) {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -1251,53 +1324,97 @@ const CallDetailPage = ({
     );
   }
 
-  const outcome = a.call_outcome;
-  const modelName = call.model?.name ?? "Sin modelo";
-  const closerName = call.closer?.name ?? "Sin closer";
-  const score = call.claude_score;
-  const scoreClr = scoreColor(score);
+  const call = callQ.data;
+  const analysis = call.claude_analysis ?? {};
+  const audioMetrics = call.audio_metrics as
+    | { speakers?: SpeakerLike[]; total_duration_s?: number }
+    | null;
+
+  const feedbackByKey = new Map<string, QaSectionFeedback>();
+  for (const fb of sectionFeedbackQ.data ?? []) {
+    feedbackByKey.set(sectionKey(fb.section_type, fb.section_index), fb);
+  }
+  const sectionCtx: SectionFeedbackContext = {
+    callId: call.id,
+    feedbackByKey,
+    evaluatorName,
+  };
+
+  const hasDimensions = (analysis.dimensions?.length ?? 0) > 0;
+  const hasAudioMetrics =
+    audioMetrics?.speakers && audioMetrics.speakers.length > 0;
+
+  const lastFb = feedbackHistoryQ.data;
+
+  const handleResend = async () => {
+    try {
+      await fireWebhook.mutateAsync({ callId: call.id });
+      toast.success("Email reenviado");
+    } catch (err) {
+      toast.error("No se pudo reenviar el email", {
+        description: (err as Error).message,
+      });
+    }
+  };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-12">
+    <div className="mx-auto w-full max-w-6xl">
       {/* Back button */}
-      <button
-        type="button"
-        onClick={onBack}
-        className="group inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:bg-muted/40 hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-        Volver al historial
-      </button>
+      <div className="flex items-center justify-between pb-5">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex h-11 items-center gap-2 rounded-full border border-border bg-muted/20 px-4 text-sm font-medium transition-colors hover:bg-muted/40"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Historial
+        </button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleResend}
+          disabled={fireWebhook.isPending}
+          className="gap-1.5"
+        >
+          {fireWebhook.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            "📧"
+          )}
+          Reenviar email
+        </Button>
+      </div>
 
-      {/* HERO HEADER — gradient with score circle */}
-      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-primary/15 via-card to-card shadow-lg">
+      {/* HERO HEADER — gradient con nombre + outcome pill + score circle */}
+      <section className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-primary/15 via-card to-card shadow-lg">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
         <div
           className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full blur-3xl"
-          style={{ background: `${scoreClr}20` }}
+          style={{ background: `${scoreColorPct(call.claude_score)}20` }}
         />
         <div className="relative p-6 md:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            {/* Left: model + closer + date */}
+            {/* Left: avatar + nombre + outcome + meta */}
             <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
-              <Avatar
-                name={modelName}
+              <HeroAvatar
+                name={call.model?.name ?? "—"}
                 dataUrl={call.model?.avatar_data_url ?? null}
                 size={72}
               />
               <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="truncate text-2xl font-black tracking-tight">
-                    {modelName}
+                    {call.model?.name ?? "Sin modelo"}
                   </h1>
-                  <OutcomePill outcome={outcome} size="lg" />
+                  <OutcomePill outcome={analysis.call_outcome} size="lg" />
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <User className="h-3.5 w-3.5" />
                     Closer:{" "}
                     <strong className="text-foreground/90">
-                      {closerName}
+                      {call.closer?.name ?? "—"}
                     </strong>
                   </span>
                   <span className="inline-flex items-center gap-1.5">
@@ -1312,219 +1429,234 @@ const CallDetailPage = ({
                     </strong>
                   </span>
                 </div>
-                {a.call_outcome_reason && (
+                {analysis.call_outcome_reason && (
                   <p className="mt-2 max-w-xl rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-xs italic leading-relaxed text-muted-foreground">
-                    &ldquo;{a.call_outcome_reason}&rdquo;
+                    &ldquo;{analysis.call_outcome_reason}&rdquo;
                   </p>
                 )}
               </div>
             </div>
 
-            {/* Right: big score circle */}
+            {/* Right: score circle + label */}
             <div className="flex shrink-0 flex-col items-center gap-2">
-              <ScoreCircle score={score} size={150} />
+              <ScoreGauge score={call.claude_score} size={150} />
               <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                 Score IA
               </span>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* SUMMARY + FICHA RAPIDA — 2 columns */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        {a.summary && (
-          <div className="lg:col-span-3">
-            <SectionCard
-              title="Resumen ejecutivo"
-              icon={<FileText className="h-4 w-4" />}
-              iconBg="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)"
-              accent="linear-gradient(90deg, #6366f1 0%, #4338ca 100%)"
-              className="h-full"
-            >
-              <div className="rounded-xl border-l-4 border-l-primary bg-gradient-to-br from-primary/5 to-transparent p-4">
-                <p className="text-sm leading-relaxed text-foreground/90">
-                  {a.summary}
-                </p>
-              </div>
-            </SectionCard>
-          </div>
-        )}
-
-        {a.call_facts && (
-          <div className={a.summary ? "lg:col-span-2" : "lg:col-span-5"}>
-            <SectionCard
-              title="Ficha rápida"
-              icon={<Zap className="h-4 w-4" />}
-              iconBg="linear-gradient(135deg, #f59e0b 0%, #b45309 100%)"
-              accent="linear-gradient(90deg, #f59e0b 0%, #b45309 100%)"
-              className="h-full"
-            >
-              {a.call_facts.ubicacion && (
-                <div className="flex items-center gap-2 rounded-lg bg-muted/20 px-3 py-2 text-xs">
-                  <MapPin className="h-3.5 w-3.5 text-amber-400" />
-                  <span className="font-medium">
-                    {a.call_facts.ubicacion}
-                  </span>
-                </div>
-              )}
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-400">
-                  Motivo principal
-                </div>
-                <p className="text-sm font-semibold leading-snug text-foreground/95">
-                  {a.call_facts.motivo_principal}
-                </p>
-              </div>
-              {a.call_facts.observaciones_clave.length > 0 && (
-                <div>
-                  <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                    Observaciones clave
-                  </div>
-                  <ul className="space-y-1.5">
-                    {a.call_facts.observaciones_clave.map((o, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start gap-2 text-xs leading-relaxed text-foreground/85"
-                      >
-                        <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
-                        <span>{o}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </SectionCard>
-          </div>
-        )}
-      </div>
-
-      {/* DIMENSIONS */}
-      {a.dimensions && a.dimensions.length > 0 && (
-        <DimensionsBlock dimensions={a.dimensions} ctx={sectionCtx} />
-      )}
-
-      {/* AUDIO METRICS */}
-      {audioMetrics?.speakers && audioMetrics.speakers.length > 0 && (
-        <AudioMetricsBlock metrics={audioMetrics} />
-      )}
-
-      {/* MODEL SIGNALS */}
-      {a.model_signals && <ModelSignalsBlock signals={a.model_signals} />}
-
-      {/* KEY MOMENTS + RED FLAGS — 2 columns when both exist */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {a.key_moments && a.key_moments.length > 0 && (
-          <KeyMomentsBlock moments={a.key_moments} ctx={sectionCtx} />
-        )}
-        {a.red_flags && a.red_flags.length > 0 && (
-          <RedFlagsBlock flags={a.red_flags} ctx={sectionCtx} />
-        )}
-      </div>
-
-      {/* IMPROVEMENTS */}
-      {a.improvements && a.improvements.length > 0 && (
-        <ImprovementsBlock
-          improvements={a.improvements}
-          ctx={sectionCtx}
-        />
-      )}
-
-      {/* AUDIO + TRANSCRIPT — 2 columns */}
-      {(call.audio_path || call.transcript) && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {call.audio_path && (
-            <SectionCard
-              title="Audio de la llamada"
-              icon={<Headphones className="h-4 w-4" />}
-              iconBg="linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)"
-              accent="linear-gradient(90deg, #8b5cf6 0%, #6d28d9 100%)"
-            >
-              {audioUrlQ.isLoading ? (
-                <div className="flex items-center gap-1.5 rounded-lg bg-muted/20 p-4 text-xs text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Generando link…
-                </div>
-              ) : audioUrlQ.data ? (
-                <div className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-purple-500/5 p-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Mic className="h-4 w-4 text-purple-400" />
-                    <span className="text-xs font-semibold text-purple-300">
-                      Reproducir grabación
-                    </span>
-                  </div>
-                  <audio
-                    controls
-                    preload="metadata"
-                    src={audioUrlQ.data}
-                    className="w-full"
-                  >
-                    Tu navegador no soporta audio HTML5.
-                  </audio>
-                </div>
-              ) : (
-                <p className="rounded-lg border border-dashed border-border/60 bg-muted/5 p-4 text-center text-xs italic text-muted-foreground">
-                  No se pudo cargar el audio.
-                </p>
-              )}
-            </SectionCard>
-          )}
-
-          {call.transcript && (
-            <SectionCard
-              title="Transcript"
-              icon={<FileText className="h-4 w-4" />}
-              iconBg="linear-gradient(135deg, #64748b 0%, #334155 100%)"
-              accent="linear-gradient(90deg, #64748b 0%, #334155 100%)"
-              hint={`${call.transcript.length.toLocaleString()} chars`}
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowTranscript((s) => !s)}
-                className="w-full justify-between"
+      {/* Sub-row: Instagram link + Re-analyze + análisis generado */}
+      <section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {(() => {
+            const igUrl = (
+              call.model as { ig_url?: string | null } | null
+            )?.ig_url;
+            return igUrl ? (
+              <a
+                href={igUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-full border border-pink-500/40 bg-pink-500/10 px-3 py-1 text-xs font-semibold text-pink-400 transition-colors hover:bg-pink-500/20"
               >
-                <span className="flex items-center gap-1.5">
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                  {showTranscript ? "Ocultar transcript" : "Ver transcript completo"}
-                </span>
-                {showTranscript ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </Button>
-              {showTranscript && (
-                <pre className="max-h-[500px] overflow-y-auto whitespace-pre-wrap rounded-lg border border-border/40 bg-muted/10 p-4 text-xs leading-relaxed">
-                  {call.transcript}
-                </pre>
-              )}
-            </SectionCard>
+                <InstagramIcon className="h-3.5 w-3.5" />
+                Ver Instagram
+              </a>
+            ) : null;
+          })()}
+          {call.model?.category && (
+            <span
+              className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+              style={{ background: PRIMARY_SOFT, color: PRIMARY }}
+            >
+              Categoría: {call.model.category}
+            </span>
           )}
+          <span className="text-xs text-muted-foreground">
+            Análisis: {fmtDateTime(call.created_at)}
+          </span>
         </div>
+        <ReanalyzeButton callId={call.id} />
+      </section>
+
+      {/* Audio player (Maven extra — Kash no lo tenía aquí) */}
+      {call.audio_path && (
+        <section className="mt-3 rounded-2xl border border-border bg-card p-4">
+          <h2
+            className="mb-3 text-base font-semibold uppercase tracking-wide"
+            style={{ color: PRIMARY, letterSpacing: "0.08em" }}
+          >
+            Audio de la llamada
+          </h2>
+          {audioUrlQ.isLoading ? (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Generando link…
+            </div>
+          ) : audioUrlQ.data ? (
+            <audio
+              controls
+              preload="metadata"
+              src={audioUrlQ.data}
+              className="w-full"
+            >
+              Tu navegador no soporta audio HTML5.
+            </audio>
+          ) : (
+            <p className="text-xs italic text-muted-foreground">
+              No se pudo cargar el audio.
+            </p>
+          )}
+        </section>
       )}
 
-      {/* Empty-analysis fallback */}
-      {!a.summary && (!a.dimensions || a.dimensions.length === 0) && (
-        <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-500/5 p-5">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-400" />
-            <div>
-              <p className="text-sm font-semibold text-amber-400">
-                Análisis incompleto
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-amber-400/80">
-                Esta llamada no tiene un análisis IA completo. Probablemente
-                sea una entrada legacy o el análisis falló. Usá
-                &ldquo;Re-analizar&rdquo; abajo.
-              </p>
+      {/* Ficha rápida */}
+      <section className="mt-3 rounded-2xl border border-border bg-card p-4">
+        <h2
+          className="mb-3 text-base font-semibold uppercase tracking-wide"
+          style={{ color: PRIMARY, letterSpacing: "0.08em" }}
+        >
+          Ficha rápida
+        </h2>
+        {analysis.call_facts ? (
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FactCard
+                icon="🎯"
+                label="Motivo principal"
+                value={analysis.call_facts.motivo_principal}
+              />
+              {analysis.call_facts.ubicacion && (
+                <FactCard
+                  icon="📍"
+                  label="Ubicación"
+                  value={analysis.call_facts.ubicacion}
+                />
+              )}
+            </div>
+            <div className="rounded-2xl border border-border bg-muted/20 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-lg" aria-hidden>
+                  💡
+                </span>
+                <span
+                  className="text-xs font-bold uppercase tracking-wider"
+                  style={{ color: PRIMARY }}
+                >
+                  Observaciones clave
+                </span>
+              </div>
+              <ul className="flex flex-col gap-2">
+                {analysis.call_facts.observaciones_clave.map((obs, i) => (
+                  <li
+                    key={i}
+                    className="flex items-start gap-2.5 text-sm leading-relaxed"
+                  >
+                    <span
+                      className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: PRIMARY }}
+                    />
+                    <span className="flex-1">{obs}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {analysis.summary}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Este análisis se generó con el formato anterior. Usa
+              &ldquo;Re-analizar&rdquo; arriba para obtener la ficha rápida
+              estructurada.
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* Charts row — radar + audio */}
+      {(hasDimensions || hasAudioMetrics) && (
+        <div className="mt-3 flex flex-col gap-3 lg:flex-row">
+          {hasDimensions && (
+            <section className="flex-1 rounded-2xl border border-border bg-card p-4">
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                Perfil visual
+              </h2>
+              <DimensionsRadar dimensions={analysis.dimensions!} />
+            </section>
+          )}
+
+          {hasAudioMetrics && audioMetrics && (
+            <section className="flex-1 rounded-2xl border border-border bg-card p-4">
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                Métricas de audio
+              </h2>
+              <AudioMetricsChart
+                metrics={
+                  audioMetrics as {
+                    speakers: SpeakerLike[];
+                    total_duration_s?: number;
+                  }
+                }
+                modelSignals={analysis.model_signals ?? null}
+              />
+              {audioMetrics.total_duration_s && (
+                <div className="mt-3 text-xs text-muted-foreground">
+                  Duración total: {Math.round(audioMetrics.total_duration_s)}s
+                </div>
+              )}
+            </section>
+          )}
         </div>
       )}
 
-      {/* FEEDBACK */}
-      <FeedbackSection callId={call.id} />
+      {/* Analysis sections (dimensions grouped, red flags, key moments, improvements) */}
+      <section className="mt-3">
+        <AnalysisSections analysis={analysis} ctx={sectionCtx} />
+      </section>
+
+      {/* Transcript */}
+      {call.transcript && (
+        <section className="mt-3 rounded-2xl border border-border bg-card p-4">
+          <TranscriptCollapse transcript={call.transcript} />
+        </section>
+      )}
+
+      {/* Human feedback */}
+      <section className="mt-3 rounded-2xl border border-border bg-card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Feedback humano
+        </h2>
+        {lastFb && (
+          <ul className="mb-4 flex flex-col gap-3">
+            <li className="rounded-xl border border-border bg-muted/20 p-3 text-sm">
+              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  {lastFb.evaluator_name}
+                </span>
+                <span>{fmtDateTime(lastFb.created_at)}</span>
+              </div>
+              {typeof lastFb.human_score === "number" && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Score humano:{" "}
+                  <strong className="text-foreground">
+                    {lastFb.human_score}
+                  </strong>
+                </div>
+              )}
+              <p className="mt-2 whitespace-pre-wrap">
+                {lastFb.feedback_text}
+              </p>
+            </li>
+          </ul>
+        )}
+        <HumanFeedbackForm callId={call.id} />
+      </section>
     </div>
   );
 };

@@ -1124,6 +1124,7 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
     modelName: call.model?.name ?? "(sin nombre)",
     modelCategory: call.model?.category ?? null,
     modelIgUrl: call.model?.ig_url ?? null,
+    appUrl: typeof window !== "undefined" ? window.location.origin : "",
     callDate: call.call_date,
     evaluatorName: call.evaluator_name ?? "",
     overallScore: score,

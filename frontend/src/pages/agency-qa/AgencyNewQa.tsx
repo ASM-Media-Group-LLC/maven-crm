@@ -122,16 +122,16 @@ const AgencyNewQa = () => {
   const [modelCountry, setModelCountry] = useState<string>("");
   const [modelIgUrl, setModelIgUrl] = useState<string>("");
   const [callDate, setCallDate] = useState<string>(today());
-  const [evaluatorName, setEvaluatorName] = useState<string>("");
+  // Evaluador por defecto: "Claude AI" (la IA es quien hace la evaluación).
+  const [evaluatorName, setEvaluatorName] = useState<string>("Claude AI");
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitStage, setSubmitStage] = useState<string>("");
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!evaluatorName && defaultEvaluator) setEvaluatorName(defaultEvaluator);
-  }, [defaultEvaluator, evaluatorName]);
+  // (Se removió el auto-fill desde el perfil — el evaluador queda en
+  //  "Claude AI" por defecto y el usuario puede cambiarlo si quiere.)
 
   // Lock closer al usuario logueado cuando no es admin/manager/supervisor.
   useEffect(() => {

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -180,10 +181,29 @@ const ClosersQaSection = () => {
     (visibleSubs[0]?.key as ClosersQaKey) ?? "calls",
   );
   // Full-page call detail: when set, replaces the tabs with CallDetailPage.
-  const [detailCallId, setDetailCallId] = useState<string | null>(null);
+  // El deeplink desde el email (`?callId=<uuid>`) lo abre automáticamente.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlCallId = searchParams.get("callId");
+  const [detailCallId, setDetailCallId] = useState<string | null>(urlCallId);
 
-  const openCallDetail = (callId: string) => setDetailCallId(callId);
-  const closeCallDetail = () => setDetailCallId(null);
+  // Sync state cuando cambia el URL param (ej. usuario pega un link).
+  useEffect(() => {
+    if (urlCallId && urlCallId !== detailCallId) {
+      setDetailCallId(urlCallId);
+    }
+  }, [urlCallId, detailCallId]);
+
+  const openCallDetail = (callId: string) => {
+    setDetailCallId(callId);
+    setSearchParams({ callId }, { replace: false });
+  };
+  const closeCallDetail = () => {
+    setDetailCallId(null);
+    // Limpia el query param sin agregar history entry redundante.
+    const next = new URLSearchParams(searchParams);
+    next.delete("callId");
+    setSearchParams(next, { replace: true });
+  };
 
   // If a call is selected, show the full-page detail view
   if (detailCallId) {
