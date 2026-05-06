@@ -777,6 +777,74 @@ export const useEnqueueEnrichProfile = () => {
   });
 };
 
+// Manual lead creation — bypassa el discovery scrape pipeline para casos
+// donde el supervisor ya conoce el handle y quiere meterlo directo a la
+// tabla. El lead queda con status='discovery' y ai_status=null para que
+// el worker (cuando esté corriendo) lo levante con un score_lead job y
+// le asigne ai_score / ai_status. Si el worker no está corriendo, el lead
+// igual aparece en Leads tab con prefilter_score=0 y se puede aprobar
+// manualmente desde el drawer.
+export interface ManualLeadInput {
+  instagram_handle: string;
+  full_name?: string | null;
+  bio?: string | null;
+  country?: string | null;
+  followers?: number | null;
+  company_id: string;
+  notes?: string | null;
+}
+
+export const useCreateLeadManual = () => {
+  const qc = useQueryClient();
+  const tenantQ = useCurrentTenantId();
+  return useMutation({
+    mutationFn: async (input: ManualLeadInput): Promise<ScouterLead> => {
+      const tenantId = tenantQ.data;
+      if (!tenantId) throw new Error("Tenant no resuelto. Reintentá en un segundo.");
+      const handle = input.instagram_handle.trim().replace(/^@/, "").toLowerCase();
+      if (!handle) throw new Error("Pasá un @handle.");
+      if (!input.company_id) throw new Error("Seleccioná una compañía.");
+
+      const { data, error } = await sb
+        .from("scouter_leads")
+        .insert({
+          tenant_id: tenantId,
+          company_id: input.company_id,
+          instagram_handle: handle,
+          full_name: input.full_name?.trim() || null,
+          bio: input.bio?.trim() || null,
+          country: input.country?.trim() || null,
+          followers: input.followers ?? null,
+          notes: input.notes?.trim() || null,
+          status: "discovery",
+          discovery_source: "manual",
+          ai_status: null, // queda pendiente — el worker lo scoreará
+          prefilter_score: 0,
+        })
+        .select("*")
+        .single();
+      if (error) {
+        // Friendly mensaje cuando hay duplicado (UNIQUE company_id+handle).
+        if ((error.code === "23505") || /duplicate|unique/i.test(error.message)) {
+          throw new Error(`Ya existe un lead @${handle} para esta compañía.`);
+        }
+        throw error;
+      }
+      return data as ScouterLead;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-leads"] });
+      qc.invalidateQueries({ queryKey: ["scouter-stats"] });
+      toast.success("Lead agregado", {
+        description: "Pendiente de score IA — quedará en Leads → Discovery.",
+      });
+    },
+    onError: (e) => {
+      toast.error("No se pudo agregar el lead", { description: (e as Error).message });
+    },
+  });
+};
+
 interface ScouterJobsParams {
   status?: JobStatus | JobStatus[];
   kind?: JobKind | JobKind[];

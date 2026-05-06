@@ -9,9 +9,25 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Loader2 } from "lucide-react";
-import { useScouterLeads, type ScouterLead } from "@/hooks/useScouterLeads";
+import { Search, Loader2, Plus } from "lucide-react";
+import {
+  useScouterLeads,
+  useScouterCompanies,
+  useCreateLeadManual,
+  type ScouterLead,
+} from "@/hooks/useScouterLeads";
 import {
   LeadDrawer,
   STATUS_META,
@@ -38,6 +54,7 @@ const ScouterLeads = () => {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<ScouterLead | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   const leads = useScouterLeads({ status: statusFilter, search, pageSize: 200 });
   const rows = leads.data?.leads ?? [];
@@ -67,10 +84,17 @@ const ScouterLeads = () => {
             ))}
           </SelectContent>
         </Select>
+        <Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Agregar lead
+        </Button>
         <span className="text-xs text-muted-foreground">
           {leads.isLoading ? "Cargando…" : `${rows.length} de ≤200`}
         </span>
       </div>
+
+      <ManualLeadDialog open={addOpen} onOpenChange={setAddOpen} />
+
 
       {/* Table */}
       <div className="rounded-xl border border-border bg-card">
@@ -207,6 +231,180 @@ const ScouterLeads = () => {
 
       <LeadDrawer lead={selected} open={drawerOpen} onOpenChange={setDrawerOpen} />
     </div>
+  );
+};
+
+// Manual lead dialog — input @handle + compañía obligatorios + campos
+// opcionales que el supervisor ya conozca (nombre, país, followers, bio,
+// notas). El lead entra con discovery_source='manual' y ai_status=null,
+// quedando pendiente del worker para scoreo IA. Si el worker no está
+// corriendo, igual se ve en Discovery y se puede aprobar a mano desde
+// el drawer.
+const ManualLeadDialog = ({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) => {
+  const companies = useScouterCompanies();
+  const create = useCreateLeadManual();
+
+  const [handle, setHandle] = useState("");
+  const [companyId, setCompanyId] = useState<string>("");
+  const [fullName, setFullName] = useState("");
+  const [country, setCountry] = useState("");
+  const [followers, setFollowers] = useState("");
+  const [bio, setBio] = useState("");
+  const [notes, setNotes] = useState("");
+
+  // Reset cada vez que se abre — Dialog cierra programáticamente en
+  // onSuccess, así que sin esto la próxima apertura mostraba data stale.
+  const reset = () => {
+    setHandle("");
+    setCompanyId("");
+    setFullName("");
+    setCountry("");
+    setFollowers("");
+    setBio("");
+    setNotes("");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!handle.trim() || !companyId) return;
+    try {
+      const fol = followers.trim() ? parseInt(followers, 10) : null;
+      await create.mutateAsync({
+        instagram_handle: handle,
+        company_id: companyId,
+        full_name: fullName || null,
+        country: country || null,
+        followers: Number.isFinite(fol as number) ? (fol as number) : null,
+        bio: bio || null,
+        notes: notes || null,
+      });
+      reset();
+      onOpenChange(false);
+    } catch {
+      // toast ya lo emite el hook — dejamos el dialog abierto para retry.
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) reset();
+        onOpenChange(o);
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Agregar lead manualmente</DialogTitle>
+          <DialogDescription>
+            Insertá un @handle directo a la tabla de leads. Si tenés más
+            datos, completalos — sino, el worker los enriquecerá después.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="ml-handle">Instagram handle *</Label>
+            <Input
+              id="ml-handle"
+              value={handle}
+              onChange={(e) => setHandle(e.target.value)}
+              placeholder="@username"
+              required
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ml-company">Compañía *</Label>
+            <Select value={companyId} onValueChange={setCompanyId}>
+              <SelectTrigger id="ml-company">
+                <SelectValue placeholder="Seleccionar compañía…" />
+              </SelectTrigger>
+              <SelectContent>
+                {(companies.data ?? []).map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="ml-name">Nombre</Label>
+              <Input
+                id="ml-name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Opcional"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ml-country">País</Label>
+              <Input
+                id="ml-country"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                placeholder="MX, AR…"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ml-followers">Followers</Label>
+            <Input
+              id="ml-followers"
+              type="number"
+              inputMode="numeric"
+              value={followers}
+              onChange={(e) => setFollowers(e.target.value)}
+              placeholder="Opcional"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ml-bio">Bio</Label>
+            <Textarea
+              id="ml-bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              rows={2}
+              placeholder="Opcional"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ml-notes">Notas internas</Label>
+            <Textarea
+              id="ml-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Por qué la querés trackear, etc."
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={create.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={create.isPending || !handle.trim() || !companyId}
+            >
+              {create.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Agregar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
 

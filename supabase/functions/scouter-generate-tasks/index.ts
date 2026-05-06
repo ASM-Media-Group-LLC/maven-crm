@@ -203,8 +203,10 @@ async function processSpammer(
     accountByHandle[a.instagram_handle] = a.id;
   }
 
-  // 2. Rank leads via SQL scoring query
-  const rankedLeads = await rankLeads(supabase, tenantId, cooldownDays, batchSize);
+  // 2. Rank leads via SQL scoring query — pasamos spammerId para que la
+  // RPC excluya leads ya asignados a OTROS spammers del tenant en los
+  // últimos cooldown_days, evitando duplicados cross-spammer.
+  const rankedLeads = await rankLeads(supabase, tenantId, spammerId, cooldownDays, batchSize);
 
   if (rankedLeads.length === 0) {
     console.log(`No hay leads disponibles para tenant ${tenantId} (cooldown: ${cooldownDays}d).`);
@@ -334,6 +336,7 @@ async function rankLeads(
   // deno-lint-ignore no-explicit-any
   supabase: any,
   tenantId: string,
+  spammerId: string,
   cooldownDays: number,
   batchSize: number,
 ): Promise<RankedLead[]> {
@@ -407,7 +410,7 @@ async function rankLeads(
   // Use PostgREST SQL endpoint (requires pg_net or direct SQL access).
   // Supabase Edge Functions can call the DB via the REST /sql endpoint
   // with the service role key.
-  const res = await fetch(`${supabaseUrl}/rest/v1/rpc/scouter_rank_leads`, {
+  const res = await fetch(`${supabaseUrl}/rest/v1/rpc/scouter_rank_leads_for_spammer`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -416,6 +419,7 @@ async function rankLeads(
     },
     body: JSON.stringify({
       p_tenant_id: tenantId,
+      p_spammer_id: spammerId,
       p_cooldown_days: cooldownDays,
       p_batch_size: batchSize,
     }),
@@ -430,14 +434,15 @@ async function rankLeads(
   }
 
   // Fallback: fetch leads and compute rank in JS.
-  console.log("RPC scouter_rank_leads no disponible, usando fallback JS ranking.");
-  return await rankLeadsFallback(supabase, tenantId, cooldownDays, batchSize);
+  console.log("RPC scouter_rank_leads_for_spammer no disponible, usando fallback JS ranking.");
+  return await rankLeadsFallback(supabase, tenantId, spammerId, cooldownDays, batchSize);
 }
 
 async function rankLeadsFallback(
   // deno-lint-ignore no-explicit-any
   supabase: any,
   tenantId: string,
+  _spammerId: string,
   cooldownDays: number,
   batchSize: number,
 ): Promise<RankedLead[]> {
@@ -455,10 +460,14 @@ async function rankLeadsFallback(
 
   const leadIds = leads.map((l: { id: string }) => l.id);
 
-  // Fetch most recent assignment per lead
+  // Fetch most recent assignment per lead — pull tenant-scope (NO
+  // spammer filter) so we exclude leads asignados a CUALQUIER spammer
+  // del tenant en los últimos cooldownDays. Esa es la dedupción
+  // cross-spammer que la RPC oficial ya hace.
   const { data: assignments } = await supabase
     .from("scouter_daily_assignments")
     .select("lead_id, assigned_date")
+    .eq("tenant_id", tenantId)
     .in("lead_id", leadIds)
     .order("assigned_date", { ascending: false });
 
