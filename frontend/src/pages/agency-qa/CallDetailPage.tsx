@@ -12,7 +12,6 @@ import {
   MessageSquareQuote,
   ThumbsUp,
   ThumbsDown,
-  MessageSquare,
   Instagram as InstagramIcon,
   User,
   Calendar,
@@ -65,6 +64,10 @@ import {
 // ─── Helpers ─────────────────────────────────────────────────────
 const PRIMARY = "hsl(var(--primary))";
 const PRIMARY_SOFT = "hsl(var(--primary) / 0.12)";
+// Gold accent — usado en labels chiquitos (Ficha rápida, etc.) para que
+// se distingan del primary purple de los headers de sección. Mismo tono
+// que --gold del diseño Kash original.
+const GOLD = "#d4a942";
 
 const fmtDate = (iso: string): string => {
   const d = new Date(`${iso}T00:00:00`);
@@ -123,6 +126,15 @@ type SectionFeedbackContext = {
 const sectionKey = (type: QaSectionType, index: number) =>
   `${type}:${index}`;
 
+// SectionThumbs — feedback humano para la IA, una pieza por sección.
+// Comportamiento:
+//   - Sin voto previo: muestra los DOS botones (👍 y 👎) para elegir
+//   - 👍: simbólico, solo guarda el voto (no abre popup)
+//   - 👎: guarda el voto Y abre la ventana de comentario
+//   - Después de votar: solo muestra el botón seleccionado (re-click lo
+//     deselecciona y vuelve a aparecer el otro)
+// El popup permite escribir una nota explicando qué corregir + un score
+// sugerido, que la IA usará en la próxima re-analización.
 const SectionThumbs = ({
   ctx,
   type,
@@ -144,11 +156,27 @@ const SectionThumbs = ({
   );
   const isUp = existing?.thumbs === 1;
   const isDown = existing?.thumbs === -1;
+  const hasVote = isUp || isDown;
   const hasNote = !!existing?.note || existing?.suggested_score != null;
 
-  const handleVote = async (vote: 1 | -1) => {
+  const persistVote = async (vote: 1 | -1) => {
+    await upsert.mutateAsync({
+      call_id: ctx.callId,
+      section_type: type,
+      section_index: index,
+      section_label: label ?? null,
+      thumbs: vote,
+      note: existing?.note ?? null,
+      suggested_score: existing?.suggested_score ?? null,
+      evaluator_name: ctx.evaluatorName,
+    });
+  };
+
+  const handleUp = async () => {
     try {
-      if (existing && existing.thumbs === vote && !hasNote) {
+      // Si ya estaba en up y no hay nota, lo deseleccionamos para mostrar
+      // ambos botones de nuevo.
+      if (isUp && !hasNote) {
         await remove.mutateAsync({
           call_id: ctx.callId,
           section_type: type,
@@ -156,16 +184,35 @@ const SectionThumbs = ({
         });
         return;
       }
-      await upsert.mutateAsync({
-        call_id: ctx.callId,
-        section_type: type,
-        section_index: index,
-        section_label: label ?? null,
-        thumbs: vote,
-        note: existing?.note ?? null,
-        suggested_score: existing?.suggested_score ?? null,
-        evaluator_name: ctx.evaluatorName,
+      await persistVote(1);
+    } catch (err) {
+      toast.error("No se pudo guardar el voto", {
+        description: (err as Error).message,
       });
+    }
+  };
+
+  const handleDown = async () => {
+    try {
+      // Si ya estaba en down sin nota, deseleccionamos.
+      if (isDown && !hasNote) {
+        await remove.mutateAsync({
+          call_id: ctx.callId,
+          section_type: type,
+          section_index: index,
+        });
+        return;
+      }
+      // Persiste el voto y abre el popup automáticamente para que el
+      // usuario pueda explicar qué corregir.
+      await persistVote(-1);
+      setNoteDraft(existing?.note ?? "");
+      setScoreDraft(
+        existing?.suggested_score != null
+          ? String(existing.suggested_score)
+          : ""
+      );
+      setNoteOpen(true);
     } catch (err) {
       toast.error("No se pudo guardar el voto", {
         description: (err as Error).message,
@@ -195,117 +242,111 @@ const SectionThumbs = ({
         evaluator_name: ctx.evaluatorName,
       });
       setNoteOpen(false);
-      toast.success("Nota guardada");
+      toast.success("Comentario guardado");
     } catch (err) {
-      toast.error("No se pudo guardar la nota", {
+      toast.error("No se pudo guardar el comentario", {
         description: (err as Error).message,
       });
     }
   };
 
+  // Visibilidad: si no hay voto, ambos. Si votó up, solo up. Si votó down, solo down.
+  const showUp = !hasVote || isUp;
+  const showDown = !hasVote || isDown;
+
   return (
     <div className="flex shrink-0 items-center gap-1">
-      <button
-        type="button"
-        onClick={() => handleVote(1)}
-        disabled={upsert.isPending || remove.isPending}
-        className={cn(
-          "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
-          isUp
-            ? "bg-emerald-500/20 text-emerald-500"
-            : "text-muted-foreground hover:bg-muted/50"
-        )}
-        title={isUp ? "Quitar 👍" : "Marcar 👍"}
-      >
-        <ThumbsUp className="h-3.5 w-3.5" />
-      </button>
-      <button
-        type="button"
-        onClick={() => handleVote(-1)}
-        disabled={upsert.isPending || remove.isPending}
-        className={cn(
-          "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
-          isDown
-            ? "bg-rose-500/20 text-rose-400"
-            : "text-muted-foreground hover:bg-muted/50"
-        )}
-        title={isDown ? "Quitar 👎" : "Marcar 👎"}
-      >
-        <ThumbsDown className="h-3.5 w-3.5" />
-      </button>
-      <Popover open={noteOpen} onOpenChange={setNoteOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
-              hasNote
-                ? "bg-primary/20 text-primary"
-                : "text-muted-foreground hover:bg-muted/50"
-            )}
-            title={hasNote ? "Editar nota" : "Agregar nota"}
-            onClick={() => {
-              setNoteDraft(existing?.note ?? "");
-              setScoreDraft(
-                existing?.suggested_score != null
-                  ? String(existing.suggested_score)
-                  : ""
-              );
-            }}
-          >
-            <MessageSquare className="h-3.5 w-3.5" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-72 space-y-2 p-3" align="end">
-          <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-            Nota sobre esta sección
-          </Label>
-          <Textarea
-            rows={3}
-            value={noteDraft}
-            onChange={(e) => setNoteDraft(e.target.value)}
-            placeholder="Por qué corregís esto, qué le faltó al análisis…"
-            className="text-sm"
-          />
-          <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-            Score sugerido (opcional, 0-100)
-          </Label>
-          <Input
-            type="number"
-            min={0}
-            max={100}
-            inputMode="numeric"
-            placeholder="ej. 65"
-            value={scoreDraft}
-            onChange={(e) => setScoreDraft(e.target.value)}
-            className="h-8 text-sm"
-          />
-          <div className="flex justify-end gap-2 pt-1">
-            <Button
+      {showUp && (
+        <button
+          type="button"
+          onClick={handleUp}
+          disabled={upsert.isPending || remove.isPending}
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+            isUp
+              ? "bg-emerald-500/20 text-emerald-500"
+              : "text-muted-foreground hover:bg-muted/50"
+          )}
+          title={isUp ? "Quitar 👍" : "Marcar 👍 (símbolico)"}
+        >
+          <ThumbsUp className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {showDown && (
+        <Popover open={noteOpen} onOpenChange={setNoteOpen}>
+          <PopoverTrigger asChild>
+            <button
               type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setNoteOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSaveNote}
-              disabled={upsert.isPending}
-              className="gap-1.5"
-            >
-              {upsert.isPending ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Save className="h-3 w-3" />
+              onClick={handleDown}
+              disabled={upsert.isPending || remove.isPending}
+              className={cn(
+                "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+                isDown
+                  ? "bg-rose-500/20 text-rose-400"
+                  : "text-muted-foreground hover:bg-muted/50"
               )}
-              Guardar
-            </Button>
-          </div>
-        </PopoverContent>
-      </Popover>
+              title={isDown ? "Editar comentario" : "Marcar 👎 + comentar"}
+            >
+              <ThumbsDown className="h-3.5 w-3.5" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 space-y-2 p-3" align="end">
+            <div>
+              <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                ¿Qué le corregirías a la IA?
+              </Label>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Tu feedback se guarda y la IA lo va a tener en cuenta en las
+                próximas re-evaluaciones.
+              </p>
+            </div>
+            <Textarea
+              rows={4}
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              placeholder="Ej: el score es muy bajo, en realidad el closer manejó bien la objeción de privacidad…"
+              className="text-sm"
+            />
+            <Label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+              Score sugerido (opcional, 0-100)
+            </Label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              inputMode="numeric"
+              placeholder="ej. 75"
+              value={scoreDraft}
+              onChange={(e) => setScoreDraft(e.target.value)}
+              className="h-8 text-sm"
+            />
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setNoteOpen(false)}
+              >
+                Cerrar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSaveNote}
+                disabled={upsert.isPending}
+                className="gap-1.5"
+              >
+                {upsert.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Save className="h-3 w-3" />
+                )}
+                Guardar
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
     </div>
   );
 };
@@ -443,7 +484,7 @@ const FactCard = ({
       </span>
       <span
         className="text-xs font-bold uppercase tracking-wider"
-        style={{ color: PRIMARY }}
+        style={{ color: GOLD }}
       >
         {label}
       </span>
@@ -1544,7 +1585,7 @@ const CallDetailPage = ({
                 </span>
                 <span
                   className="text-xs font-bold uppercase tracking-wider"
-                  style={{ color: PRIMARY }}
+                  style={{ color: GOLD }}
                 >
                   Observaciones clave
                 </span>
@@ -1557,7 +1598,7 @@ const CallDetailPage = ({
                   >
                     <span
                       className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ background: PRIMARY }}
+                      style={{ background: GOLD }}
                     />
                     <span className="flex-1">{obs}</span>
                   </li>
