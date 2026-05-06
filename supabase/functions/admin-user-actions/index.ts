@@ -169,26 +169,37 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Intento mandar el email con el password temporal vía Resend.
-      // Si RESEND_API_KEY no está configurada, devolvemos email_sent=false
-      // y el admin tiene que comunicar el password manualmente desde la
-      // UI (que sigue mostrando el temp_password en el modal).
+      // El email viaja en background (Resend tarda 1-3s y no queremos
+      // bloquear la respuesta del modal). Devolvemos email_sent=true
+      // optimistamente cuando hay key configurada — si Resend falla
+      // queda en los logs del edge function. Si la key falta, sí
+      // bloqueamos amber para que el admin sepa que tiene que
+      // comunicar el password a mano.
+      const resendKey = Deno.env.get("RESEND_API_KEY");
       let emailSent = false;
       let emailError: string | null = null;
-      const resendKey = Deno.env.get("RESEND_API_KEY");
-      if (resendKey) {
-        try {
-          // Sacamos email + nombre del user para personalizar el mail.
-          const { data: targetUser } = await adminClient.auth.admin.getUserById(user_id);
-          const targetEmail = targetUser?.user?.email;
-          if (targetEmail) {
+
+      if (!resendKey) {
+        emailError = "RESEND_API_KEY no configurada";
+      } else {
+        emailSent = true; // optimistic — el send corre en waitUntil
+        const sendEmail = async () => {
+          try {
+            const { data: targetUser } = await adminClient.auth.admin.getUserById(user_id);
+            const targetEmail = targetUser?.user?.email;
+            if (!targetEmail) {
+              console.error("[reset_password] usuario sin email", user_id);
+              return;
+            }
             const { data: profile } = await adminClient
               .from("profiles")
               .select("full_name")
               .eq("id", user_id)
               .maybeSingle();
             const fullName = (profile as { full_name?: string } | null)?.full_name ?? "";
-            const fromEmail = Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@resend.dev";
+            const fromEmail =
+              Deno.env.get("NOTIFICATION_FROM_EMAIL") ||
+              "Maven CRM <noreply@mail.maven-ai.me>";
             const appUrl = Deno.env.get("APP_URL") || "https://v3.test.maven-ai.me";
 
             const html = `
@@ -236,22 +247,27 @@ Deno.serve(async (req) => {
                 html,
               }),
             });
-            if (resp.ok) {
-              emailSent = true;
-            } else {
+            if (!resp.ok) {
               const body = await resp.text().catch(() => "");
-              emailError = `Resend ${resp.status}: ${body.slice(0, 200)}`;
-              console.error("Resend reset_password email failed", emailError);
+              console.error(
+                "[reset_password] Resend failed",
+                resp.status,
+                body.slice(0, 300),
+              );
             }
-          } else {
-            emailError = "Usuario sin email registrado";
+          } catch (e) {
+            console.error("[reset_password] email exception", e);
           }
-        } catch (e) {
-          emailError = (e as Error).message ?? "fetch failed";
-          console.error("reset_password email exception", e);
-        }
-      } else {
-        emailError = "RESEND_API_KEY no configurada";
+        };
+
+        // EdgeRuntime.waitUntil mantiene la function viva hasta que el
+        // promise resuelva, sin retener la respuesta HTTP. Si el runtime
+        // no expone la API (entornos viejos), caemos a un fire-and-forget
+        // estándar — el isolate se mata al final del request y el send
+        // puede cortarse, pero eso lo veremos en los logs.
+        const er = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+        if (er?.waitUntil) er.waitUntil(sendEmail());
+        else void sendEmail();
       }
 
       return new Response(
