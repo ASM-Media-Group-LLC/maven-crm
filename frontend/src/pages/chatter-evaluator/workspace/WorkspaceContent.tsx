@@ -80,11 +80,13 @@ const WorkspaceContent = () => {
     }
   }, [infoHiddenByUser]);
   const isNarrow = useIsNarrow();
-  // Effective visibility = user pref OR narrow viewport. The toggle
-  // buttons keep working in either case — pressing "Mostrar" on a narrow
-  // viewport will reveal the rail temporarily even if the user later
-  // resizes wide and back.
-  const criteriaHidden = criteriaHiddenByUser || isNarrow;
+  // Visibilidad de los rails:
+  //   - Criterios: SOLO sigue el toggle manual del usuario. Pidió
+  //     explícitamente que no se oculte solo aunque el viewport sea
+  //     chico — si lo deja visible, lo dejamos visible.
+  //   - Info personaje: sigue auto-ocultándose en narrow para que el
+  //     chat tenga aire en pantallas chicas.
+  const criteriaHidden = criteriaHiddenByUser;
   const infoHidden = infoHiddenByUser || isNarrow;
 
   // Active session: priority is ?session=<id> in URL, else last from
@@ -210,7 +212,6 @@ const WorkspaceContent = () => {
             onClick={() => setCriteriaHiddenByUser((v) => !v)}
             title={criteriaHidden ? "Mostrar criterios" : "Ocultar criterios"}
             className="gap-2"
-            disabled={isNarrow && !criteriaHiddenByUser}
           >
             {criteriaHidden ? (
               <PanelLeftOpen className="h-4 w-4" />
