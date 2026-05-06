@@ -1,5 +1,5 @@
 // @supabase-functions-cron-schedule: 0 6 * * *
-// scouter-generate-tasks — genera 50 asignaciones diarias por spammer usando Groq.
+// scouter-generate-tasks — genera 50 asignaciones diarias por spammer usando Claude Haiku.
 //
 // POST body: { tenant_id: string, spammer_id?: string }
 //   - Si se omite spammer_id, genera para TODOS los spammers activos del tenant.
@@ -11,7 +11,7 @@
 //   3. Para cada spammer:
 //      a. Consultar sus cuentas de Instagram (scouter_spammer_accounts).
 //      b. Rankear leads con scoring SQL compuesto (ai_score, recency, cooldown).
-//      c. Dividir en batches de 10 y llamar a Groq llama-3.3-70b-versatile.
+//      c. Dividir en batches de 10 y llamar a Claude Haiku (Anthropic).
 //      d. Parsear respuesta JSON e insertar scouter_daily_assignments + scouter_interaction_tasks.
 //   4. Retornar resumen con totales.
 
@@ -25,11 +25,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GROQ_URL =
-  Deno.env.get("GROQ_BASE_URL") || "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const ANTHROPIC_URL =
+  Deno.env.get("ANTHROPIC_BASE_URL") || "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_MODEL =
+  Deno.env.get("ANTHROPIC_MODEL") || "claude-haiku-4-5";
+const ANTHROPIC_VERSION = "2023-06-01";
 const BATCH_SIZE_DEFAULT = 50;
-const CHUNK_SIZE = 10; // leads per Groq call
+const CHUNK_SIZE = 10; // leads per Anthropic call
 const COOLDOWN_DAYS_DEFAULT = 3;
 // Si un spammer arrastra ≥ este número de assignments pending tras el
 // rollover, no le generamos NADA nuevo hoy. Forzamos que cierre backlog
@@ -57,18 +59,18 @@ interface RankedLead {
   rank_score: number;
 }
 
-interface GroqTask {
+interface AiTask {
   from_account: string;
   type: "follow" | "like" | "comment" | "story_view" | "story_react";
   instruction: string;
   suggested_comment: string | null;
 }
 
-interface GroqLeadResult {
+interface AiLeadResult {
   lead_handle: string;
   strategy: string;
   reasoning: string;
-  tasks: GroqTask[];
+  tasks: AiTask[];
 }
 
 serve(async (req) => {
@@ -90,11 +92,11 @@ serve(async (req) => {
     const cronTokenHeader = req.headers.get("x-cron-token") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const groqKey = Deno.env.get("GROQ_API_KEY");
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     const cronInternalToken = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
 
-    if (!groqKey) {
-      return jsonError("GROQ_API_KEY no configurada en los secrets de Supabase.", 500);
+    if (!anthropicKey) {
+      return jsonError("ANTHROPIC_API_KEY no configurada en los secrets de Supabase.", 500);
     }
 
     // Usamos service role para bypasear RLS en queries cross-spammer.
@@ -158,7 +160,7 @@ serve(async (req) => {
           cooldownDays,
           batchSize,
           backlogCap,
-          groqKey,
+          anthropicKey,
         );
         totalAssignments += assignments;
         totalTasks += tasks;
@@ -192,7 +194,7 @@ async function processSpammer(
   cooldownDays: number,
   batchSize: number,
   backlogCap: number,
-  groqKey: string,
+  anthropicKey: string,
 ): Promise<{ assignments: number; tasks: number }> {
   // 1. Get spammer's IG accounts
   const { data: accounts, error: accErr } = await supabase
@@ -269,10 +271,10 @@ async function processSpammer(
     return { assignments: rolledCount, tasks: 0 };
   }
 
-  // 3. Batch Groq calls: 10 leads per call
+  // 3. Batch Anthropic calls: 10 leads per call
   const systemPrompt = buildSystemPrompt(spammerAccounts);
   const chunks = chunkArray(rankedLeads, CHUNK_SIZE);
-  const groqResults: GroqLeadResult[] = [];
+  const aiResults: AiLeadResult[] = [];
 
   for (const chunk of chunks) {
     const leadsForPrompt: LeadForPrompt[] = chunk.map((l) => ({
@@ -286,8 +288,8 @@ async function processSpammer(
       days_since_assigned: l.days_since_assigned,
     }));
     const userMessage = buildUserMessage(leadsForPrompt);
-    const results = await callGroqBatch(groqKey, systemPrompt, userMessage);
-    groqResults.push(...results);
+    const results = await callAnthropicBatch(anthropicKey, systemPrompt, userMessage);
+    aiResults.push(...results);
   }
 
   // 4. Write to DB
@@ -302,7 +304,7 @@ async function processSpammer(
     leadByHandle[l.instagram_handle] = l.id;
   }
 
-  for (const result of groqResults) {
+  for (const result of aiResults) {
     const leadId = leadByHandle[result.lead_handle] ?? leadByHandle[result.lead_handle?.replace(/^@/, "")];
     if (!leadId) {
       console.warn(`Lead no encontrado para handle: ${result.lead_handle}`);
@@ -653,31 +655,35 @@ async function rankLeadsFallback(
   return ranked.slice(0, batchSize);
 }
 
-// ─── Groq call ────────────────────────────────────────────────────────────────
+// ─── Anthropic call ───────────────────────────────────────────────────────────
+// Migrated from Groq llama-3.3-70b-versatile → Claude Haiku.
+// Groq's free-tier rate limits were starving the cron (429 errors before
+// any assignment got created). Haiku is paid but stable and the JSON
+// adherence is good enough that we don't need a forced response_format.
 
-async function callGroqBatch(
-  groqKey: string,
+async function callAnthropicBatch(
+  anthropicKey: string,
   systemPrompt: string,
   userMessage: string,
-): Promise<GroqLeadResult[]> {
-  const res = await fetch(GROQ_URL, {
+): Promise<AiLeadResult[]> {
+  const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${groqKey}`,
+      "x-api-key": anthropicKey,
+      "anthropic-version": ANTHROPIC_VERSION,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
-      response_format: { type: "json_object" },
-      temperature: 0.4,
+      model: ANTHROPIC_MODEL,
       max_tokens: 4096,
+      temperature: 0.4,
+      system: systemPrompt,
       messages: [
-        { role: "system", content: systemPrompt },
         {
           role: "user",
           content:
             userMessage +
-            '\n\nResponde SOLO con un JSON object con una key "leads" que contiene el array de resultados.',
+            '\n\nResponde SOLO con un JSON object con una key "leads" que contiene el array de resultados. Nada antes ni después del JSON. Sin ```json fences.',
         },
       ],
     }),
@@ -685,33 +691,38 @@ async function callGroqBatch(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    console.error("Groq error", res.status, errText.slice(0, 500));
-    if (res.status === 429) throw new Error("Groq: rate limit. Esperá unos segundos.");
-    if (res.status === 401 || res.status === 402) {
-      throw new Error("Groq: cuota agotada o key inválida.");
-    }
-    throw new Error(`Groq error ${res.status}`);
+    console.error("Anthropic error", res.status, errText.slice(0, 500));
+    if (res.status === 429) throw new Error("Anthropic: rate limit. Esperá unos segundos.");
+    if (res.status === 401) throw new Error("Anthropic: API key inválida.");
+    if (res.status === 402) throw new Error("Anthropic: créditos agotados.");
+    throw new Error(`Anthropic error ${res.status}`);
   }
 
   const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    content?: Array<{ type?: string; text?: string }>;
   };
-  const raw = data.choices?.[0]?.message?.content ?? "{}";
+  // Anthropic returns content as an array of blocks; we expect one text block.
+  const raw = data.content?.find((b) => b.type === "text")?.text ?? "";
+
+  // Strip optional markdown fences just in case the model adds them.
+  const cleaned = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/i, "")
+    .trim();
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(cleaned);
   } catch {
-    console.error("Groq devolvió JSON inválido:", raw.slice(0, 500));
+    console.error("Anthropic devolvió JSON inválido:", cleaned.slice(0, 500));
     return [];
   }
 
-  // Groq with json_object mode returns { leads: [...] } or just [...]
-  if (Array.isArray(parsed)) return parsed as GroqLeadResult[];
+  if (Array.isArray(parsed)) return parsed as AiLeadResult[];
   const obj = parsed as Record<string, unknown>;
-  if (Array.isArray(obj.leads)) return obj.leads as GroqLeadResult[];
+  if (Array.isArray(obj.leads)) return obj.leads as AiLeadResult[];
 
-  console.warn("Groq respuesta inesperada:", JSON.stringify(parsed).slice(0, 500));
+  console.warn("Anthropic respuesta inesperada:", JSON.stringify(parsed).slice(0, 500));
   return [];
 }
 
