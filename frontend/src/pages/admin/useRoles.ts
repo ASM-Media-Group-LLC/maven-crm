@@ -52,7 +52,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   { group: "Operaciones",   module: "Tickets",       submodules: [] },
   { group: "Operaciones",   module: "Chatters",      submodules: ["Evaluator", "Workspace", "Admin"] },
   { group: "Operaciones",   module: "Scouter Assist", submodules: ["Home", "Busquedas", "Favoritas", "Leads", "Funnel", "Mis Tareas", "Settings"] },
-  { group: "Operaciones",   module: "Agency QA",     submodules: ["Calls", "New QA", "QA History", "QA Chat", "Models", "Analytics", "Notifications"] },
+  { group: "Operaciones",   module: "Agency QA",     submodules: ["Calls", "New QA", "QA History", "QA Chat", "Models", "Analytics", "Notifications", "Borrar Calls"] },
 
   // === Finanzas ===
   { group: "Finanzas",      module: "Finanzas",      submodules: ["Dashboard", "Collections", "Nómina", "Horas Variables", "Invoices", "Templates", "Control Financiero", "Reportes", "Configuración"] },

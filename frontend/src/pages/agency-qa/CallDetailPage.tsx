@@ -42,7 +42,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
-import { useUserRole } from "@/hooks/useUserRole";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   useQaCall,
   useQaAudioSignedUrl,
@@ -1357,7 +1357,13 @@ const CallDetailPage = ({
   const audioUrlQ = useQaAudioSignedUrl(callQ.data?.audio_path ?? null);
   const fireWebhook = useFireQaWebhook();
   const deleteCall = useDeleteQaCall();
-  const { isAdmin } = useUserRole();
+  // Permiso configurable desde Settings → Usuarios → Roles → Agency QA →
+  // "Borrar Calls". Admins lo tienen always-true via canAccess; otros
+  // roles dependen del toggle. La RLS del DB también verifica el mismo
+  // permiso, así que el server rechaza intentos sin permiso aunque el
+  // botón se filtre por UI.
+  const { canAccess } = usePermissions();
+  const canDelete = canAccess("Agency QA", "Borrar Calls");
 
   const { user } = useAuth();
   const profileQ = useMyProfile();
@@ -1460,7 +1466,7 @@ const CallDetailPage = ({
             )}
             Reenviar email
           </Button>
-          {isAdmin && (
+          {canDelete && (
             <Button
               type="button"
               variant="outline"
@@ -1468,7 +1474,7 @@ const CallDetailPage = ({
               onClick={handleDelete}
               disabled={deleteCall.isPending}
               className="gap-1.5 border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
-              title="Borrar QA permanentemente (admins)"
+              title="Borrar QA permanentemente"
             >
               {deleteCall.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
