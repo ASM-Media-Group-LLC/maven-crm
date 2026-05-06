@@ -169,7 +169,9 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
 
   return (
     `<!DOCTYPE html><html><body style="margin:0;padding:0;background:${COLORS.bg};font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:${COLORS.text};">` +
-      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.bg};padding:24px 0;"><tr><td align="center">` +
+      // Outer wrapper: align left con padding lateral. En mobile la tabla
+      // interna se estira a 100% y el padding mantiene un margen cómodo.
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.bg};padding:24px 0;"><tr><td align="left" style="padding:0 24px;">` +
         `<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${COLORS.bg};">` +
 
           // Header — gradient con título + modelo
@@ -179,8 +181,8 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
             `<div style="font-size:14px;margin-top:8px;opacity:0.92;">` +
               `Modelo: <strong>${escape(p.modelName)}</strong>${p.modelCategory ? ` <span style="opacity:0.8;">"${escape(p.modelCategory)}"</span>` : ""}` +
               (p.modelIgUrl
-                ? ` <a href="${escape(p.modelIgUrl)}" style="color:#ffffff;text-decoration:none;margin-left:6px;vertical-align:middle;" target="_blank">` +
-                    `<img src="https://cdn-icons-png.flaticon.com/16/174/174855.png" alt="IG" width="14" height="14" style="vertical-align:middle;opacity:0.95;" />` +
+                ? ` <a href="${escape(p.modelIgUrl)}" target="_blank" style="display:inline-block;margin-left:8px;padding:3px 10px 3px 8px;border-radius:9999px;background:rgba(255,255,255,0.18);color:#ffffff;text-decoration:none;font-size:12px;font-weight:600;vertical-align:middle;">` +
+                    `<span style="font-size:13px;margin-right:4px;">📷</span>Instagram` +
                   `</a>`
                 : "") +
             `</div>` +

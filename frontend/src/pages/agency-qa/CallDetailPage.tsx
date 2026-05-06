@@ -15,6 +15,7 @@ import {
   Instagram as InstagramIcon,
   User,
   Calendar,
+  Mail,
 } from "lucide-react";
 import {
   Popover,
@@ -1428,7 +1429,7 @@ const CallDetailPage = ({
           {fireWebhook.isPending ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            "📧"
+            <Mail className="h-3.5 w-3.5" />
           )}
           Reenviar email
         </Button>
@@ -1444,12 +1445,50 @@ const CallDetailPage = ({
         <div className="relative p-6 md:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             {/* Left: avatar + nombre + outcome + meta */}
-            <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
-              <HeroAvatar
-                name={call.model?.name ?? "—"}
-                dataUrl={call.model?.avatar_data_url ?? null}
-                size={72}
-              />
+            <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-start">
+              {/* Avatar + IG icon (ambos linkean al mismo perfil de IG si
+                  existe). Click en la foto = abrir IG. Click en el ícono
+                  abajo de la foto también. */}
+              {(() => {
+                const igUrl = (
+                  call.model as { ig_url?: string | null } | null
+                )?.ig_url ?? null;
+                const inner = (
+                  <HeroAvatar
+                    name={call.model?.name ?? "—"}
+                    dataUrl={call.model?.avatar_data_url ?? null}
+                    size={72}
+                  />
+                );
+                return (
+                  <div className="flex shrink-0 flex-col items-center gap-1.5">
+                    {igUrl ? (
+                      <a
+                        href={igUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block transition-transform hover:scale-105"
+                        title="Ver Instagram"
+                      >
+                        {inner}
+                      </a>
+                    ) : (
+                      inner
+                    )}
+                    {igUrl && (
+                      <a
+                        href={igUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Ver Instagram"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-amber-500 text-white shadow-md transition-transform hover:scale-110"
+                      >
+                        <InstagramIcon className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                  </div>
+                );
+              })()}
               <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="truncate text-2xl font-black tracking-tight">
