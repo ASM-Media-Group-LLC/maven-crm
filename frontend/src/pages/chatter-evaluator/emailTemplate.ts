@@ -124,13 +124,13 @@ export const buildEmailHtml = (p: EmailPayload): string => {
             : "") +
 
           // Transcript CTA — el correo ya no carga la transcripción
-          // completa; el botón abre la sesión directamente en Maven, así
-          // el receptor ve el chat real (mensajes + reacciones + tip
-          // amounts) en vez de una versión recortada en HTML.
+          // completa; el botón abre la sesión en el detalle de History
+          // (read-only): la sesión ya está cerrada, así que tiene sentido
+          // mandar al historial — el workspace es para chats vivos.
           (p.appUrl
             ? `<tr><td style="padding:18px 32px 8px;">` +
-                `<a href="${escape(p.appUrl)}/chatter-evaluator/workspace?session=${escape(p.sessionId)}" target="_blank" style="display:inline-block;background:${COLORS.primary};color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;">` +
-                  `Ver transcript en Maven →` +
+                `<a href="${escape(p.appUrl)}/chatter-evaluator/history/${escape(p.sessionId)}" target="_blank" style="display:inline-block;background:${COLORS.primary};color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;">` +
+                  `Ver transcript completo →` +
                 `</a>` +
               `</td></tr>`
             : "") +

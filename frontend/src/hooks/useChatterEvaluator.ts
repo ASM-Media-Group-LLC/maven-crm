@@ -538,9 +538,12 @@ export interface RangeCounters {
   total: number;
   approved: number;
   rejected: number;
-  /** Promedio de score_pct dentro de las evaluaciones del rango que
-   *  tienen score (ignora rows con score_pct null). 0 si no hay. */
-  avgScorePct: number;
+  /** Tasa de éxito = aprobados / total, en porcentaje entero.
+   *  Ej: 1 evaluación aprobada de 1 total → 100. 0 aprobados de 1 → 0.
+   *  Es la métrica que la home muestra como "Promedio de éxito" — antes
+   *  era avg de score_pct, lo cual confundía: una sola evaluación
+   *  reprobada con 30% de score mostraba "30%" en vez de "0% éxito". */
+  successRatePct: number;
 }
 
 export type StatsRange = "week" | "month" | "all";
@@ -607,8 +610,8 @@ export const useChatterEvaluationStats = () =>
       const weekStart = startOfWeek(now).getTime();
       const monthStart = startOfMonth(now).getTime();
 
-      type Acc = { approved: number; rejected: number; scoreSum: number; scoreCount: number; total: number };
-      const blank = (): Acc => ({ approved: 0, rejected: 0, scoreSum: 0, scoreCount: 0, total: 0 });
+      type Acc = { approved: number; rejected: number; total: number };
+      const blank = (): Acc => ({ approved: 0, rejected: 0, total: 0 });
       const accs: Record<StatsRange, Acc> = {
         week: blank(),
         month: blank(),
@@ -618,10 +621,6 @@ export const useChatterEvaluationStats = () =>
         acc.total++;
         if (r.verdict === "apto") acc.approved++;
         else if (r.verdict === "no_apto") acc.rejected++;
-        if (typeof r.score_pct === "number") {
-          acc.scoreSum += r.score_pct;
-          acc.scoreCount++;
-        }
       };
 
       // 30 buckets diarios — incluye hoy. Los inicializamos primero
@@ -684,7 +683,8 @@ export const useChatterEvaluationStats = () =>
         total: a.total,
         approved: a.approved,
         rejected: a.rejected,
-        avgScorePct: a.scoreCount > 0 ? Math.round(a.scoreSum / a.scoreCount) : 0,
+        successRatePct:
+          a.total > 0 ? Math.round((a.approved / a.total) * 100) : 0,
       });
       const byRange: Record<StatsRange, RangeCounters> = {
         week: finalize(accs.week),
@@ -898,6 +898,27 @@ export const useEndChatterSession = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
   });
 };
+
+// Última evaluación de una sesión cerrada — la pesca el detail page del
+// History. Devuelve null si la sesión no tiene evaluación todavía.
+export const useChatterSessionEvaluation = (
+  sessionId: string | null | undefined,
+) =>
+  useQuery({
+    queryKey: ["chatter-session-evaluation", sessionId],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<ChatterEvaluation | null> => {
+      const { data, error } = await sb
+        .from("chatter_evaluations")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as ChatterEvaluation | null;
+    },
+  });
 
 // ---- Messages (used by chat panel; realtime wiring is Phase 4) ----------
 

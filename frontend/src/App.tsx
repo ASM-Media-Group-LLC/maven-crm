@@ -100,6 +100,7 @@ import ChatterProfileDetail from "./pages/ChatterProfileDetail";
 import ChatterProfileEdit from "./pages/ChatterProfileEdit";
 import ChatterAdmin from "./pages/ChatterAdmin";
 import ChatterHistory from "./pages/ChatterHistory";
+import ChatterHistorySessionDetail from "./pages/chatter-evaluator/HistorySessionDetail";
 import ChatterWorkspace from "./pages/ChatterWorkspace";
 import Contactos from "./pages/Contactos";
 import NuevoContacto from "./pages/NuevoContacto";
@@ -294,6 +295,7 @@ const App = () => (
                 <Route path="/chatter-evaluator" element={<PermissionRoute module="Chatters" submodule="Evaluator"><ChatterEvaluator /></PermissionRoute>} />
                 <Route path="/chatter-evaluator/admin" element={<PermissionRoute module="Chatters" submodule="Admin"><ChatterAdmin /></PermissionRoute>} />
                 <Route path="/chatter-evaluator/history" element={<PermissionRoute module="Chatters" submodule="Evaluator"><ChatterHistory /></PermissionRoute>} />
+                <Route path="/chatter-evaluator/history/:sessionId" element={<PermissionRoute module="Chatters" submodule="Evaluator"><ChatterHistorySessionDetail /></PermissionRoute>} />
                 <Route path="/chatter-evaluator/workspace" element={<PermissionRoute module="Chatters" submodule="Workspace"><ChatterWorkspace /></PermissionRoute>} />
                 <Route path="/chatter-evaluator/:profileKey" element={<PermissionRoute module="Chatters" submodule="Evaluator"><ChatterProfileDetail /></PermissionRoute>} />
                 <Route path="/chatter-evaluator/:profileKey/edit" element={<PermissionRoute module="Chatters" submodule="Admin"><ChatterProfileEdit /></PermissionRoute>} />

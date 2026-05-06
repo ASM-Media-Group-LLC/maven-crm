@@ -186,7 +186,7 @@ const HistoryContent = () => {
                       className="group flex items-center gap-3 p-3 transition-colors hover:bg-muted/40"
                     >
                       <Link
-                        to={`/chatter-evaluator/workspace?session=${s.id}`}
+                        to={`/chatter-evaluator/history/${s.id}`}
                         className="flex flex-1 items-center gap-3"
                       >
                         <div className="aspect-square h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">

@@ -224,7 +224,7 @@ const ChatterEvaluatorContent = () => {
             <StatCard
               icon={Percent}
               label="Promedio de éxito"
-              value={statsQ.isLoading ? "…" : `${counters?.avgScorePct ?? 0}%`}
+              value={statsQ.isLoading ? "…" : `${counters?.successRatePct ?? 0}%`}
             />
           </div>
         </div>
