@@ -468,6 +468,8 @@ const ScoreGauge = ({
 };
 
 // ─── FactCard ───────────────────────────────────────────────────
+// Borde sutil dorado + zoom levísimo en hover para darle vida sin
+// exagerar.
 const FactCard = ({
   icon,
   label,
@@ -477,14 +479,17 @@ const FactCard = ({
   label: string;
   value: string;
 }) => (
-  <div className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/20 p-4">
+  <div
+    className="group flex flex-col gap-2 rounded-2xl border bg-muted/20 p-4 transition-all duration-200 hover:scale-[1.01] hover:bg-muted/30 hover:shadow-md"
+    style={{ borderColor: `${GOLD}40` }}
+  >
     <div className="flex items-center gap-2">
       <span className="text-lg" aria-hidden>
         {icon}
       </span>
       <span
         className="text-xs font-bold uppercase tracking-wider"
-        style={{ color: GOLD }}
+        style={{ color: PRIMARY }}
       >
         {label}
       </span>
@@ -817,6 +822,8 @@ const AudioMetricsChart = ({
 };
 
 // ─── Collapsible (analysis sections) ────────────────────────────
+// Hover sutil: el borde se tinta de primary y el fondo se ilumina apenas,
+// para que el card "responda" cuando el cursor pasa sin ser estridente.
 const Collapsible = ({
   title,
   badge,
@@ -830,9 +837,9 @@ const Collapsible = ({
 }) => (
   <details
     open={defaultOpen}
-    className="group overflow-hidden rounded-2xl border border-border bg-card transition-colors"
+    className="group overflow-hidden rounded-2xl border border-border bg-card transition-all duration-200 hover:border-primary/40 hover:shadow-md hover:shadow-primary/5"
   >
-    <summary className="flex cursor-pointer items-center justify-between gap-3 border-b border-transparent px-5 py-4 transition-colors hover:bg-muted/30 group-open:border-border">
+    <summary className="flex cursor-pointer items-center justify-between gap-3 border-b border-transparent px-5 py-4 transition-colors hover:bg-primary/5 group-open:border-border">
       <div className="flex items-center gap-3">
         <h2
           className="text-base font-semibold tracking-wide"
@@ -1399,7 +1406,7 @@ const CallDetailPage = ({
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl">
+    <div className="w-full">
       {/* Back button */}
       <div className="flex items-center justify-between pb-5">
         <button
@@ -1578,14 +1585,17 @@ const CallDetailPage = ({
                 />
               )}
             </div>
-            <div className="rounded-2xl border border-border bg-muted/20 p-4">
+            <div
+              className="rounded-2xl border bg-muted/20 p-4 transition-all duration-200 hover:scale-[1.005] hover:bg-muted/30 hover:shadow-md"
+              style={{ borderColor: `${GOLD}40` }}
+            >
               <div className="mb-3 flex items-center gap-2">
                 <span className="text-lg" aria-hidden>
                   💡
                 </span>
                 <span
                   className="text-xs font-bold uppercase tracking-wider"
-                  style={{ color: GOLD }}
+                  style={{ color: PRIMARY }}
                 >
                   Observaciones clave
                 </span>
