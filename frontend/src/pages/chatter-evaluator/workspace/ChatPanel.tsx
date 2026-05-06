@@ -164,7 +164,7 @@ const ReactionPickerButton = ({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`absolute top-1/2 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm ring-1 ring-border hover:bg-muted hover:text-foreground group-hover/bubble:flex ${
+          className={`absolute top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground group-hover/bubble:opacity-100 data-[state=open]:opacity-100 ${
             align === "right" ? "left-[-30px]" : "right-[-30px]"
           }`}
           title="Reaccionar"
@@ -1014,41 +1014,49 @@ export const ChatPanel = ({ session }: Props) => {
               <Metric label="RESP. TIME" value={metrics.respTime} valueClass="font-mono" />
             </div>
 
-            {/* Volume + Actions (right) */}
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* Volume + Actions (right). Botones icon-only para no
+                ocupar tanto ancho — hover muestra el tooltip nativo
+                con el texto descriptivo. */}
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
               <VolumeControl />
               <Button
-                size="sm"
+                size="icon"
                 variant="outline"
                 onClick={handleCopyLink}
-                title="Copiar link público del chatter"
-                className="gap-1.5"
+                title="Copiar link para el chatter"
+                aria-label="Copiar link para el chatter"
+                className="h-8 w-8"
               >
-                {linkCopied ? <Check className="h-3.5 w-3.5" /> : <Link2 className="h-3.5 w-3.5" />}
-                {linkCopied ? "Copiado" : "Copiar link"}
+                {linkCopied ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Link2 className="h-4 w-4" />
+                )}
               </Button>
               <Button
-                size="sm"
+                size="icon"
                 variant="outline"
                 onClick={() => {
                   setAddTimeValue("10");
                   setAddTimeOpen(true);
                 }}
                 disabled={ended}
-                title="Agregar minutos a la sesión"
+                title="Añadir tiempo a la sesión"
+                aria-label="Añadir tiempo a la sesión"
+                className="h-8 w-8"
               >
-                + Tiempo
+                <Clock className="h-4 w-4" />
               </Button>
               <Button
-                size="sm"
+                size="icon"
                 variant="outline"
                 onClick={() => setEndOpen(true)}
                 disabled={ended}
-                title="Terminar la sesión"
-                className="gap-1.5 border-rose-500/60 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
+                title="Terminar la sesión de chat"
+                aria-label="Terminar la sesión de chat"
+                className="h-8 w-8 border-rose-500/60 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
               >
-                <Square className="h-3.5 w-3.5 fill-current" />
-                Terminar
+                <Square className="h-4 w-4 fill-current" />
               </Button>
             </div>
           </div>

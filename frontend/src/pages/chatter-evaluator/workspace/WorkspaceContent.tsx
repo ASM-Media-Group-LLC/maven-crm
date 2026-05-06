@@ -10,6 +10,7 @@ import {
 } from "@/hooks/useChatterEvaluator";
 import { CriteriaPanel, readScoresFromStorage, type CriteriaScores } from "./CriteriaPanel";
 import { SessionsPanel } from "./SessionsPanel";
+import { HistoryPanel } from "./HistoryPanel";
 import { ChatPanel } from "./ChatPanel";
 import { EvaluationVerdictDialog } from "./EvaluationVerdictDialog";
 import { CharacterInfoPanel } from "./CharacterInfoPanel";
@@ -58,11 +59,20 @@ const WorkspaceContent = () => {
       return false;
     }
   });
-  const [infoHiddenByUser, setInfoHiddenByUser] = useState<boolean>(() => {
+  // Info personaje tiene 3 estados:
+  //   "1"  → usuario lo ocultó manualmente (forzado oculto)
+  //   "0"  → usuario lo mostró manualmente (forzado visible, incluso en narrow)
+  //   null → sin override; cae al auto-hide por isNarrow
+  // Esto deja que el toggle funcione siempre — el usuario puede forzar
+  // mostrarlo aún en pantallas chicas si lo necesita.
+  const [infoOverride, setInfoOverride] = useState<"show" | "hide" | null>(() => {
     try {
-      return window.localStorage.getItem(INFO_HIDDEN_KEY) === "1";
+      const raw = window.localStorage.getItem(INFO_HIDDEN_KEY);
+      if (raw === "1") return "hide";
+      if (raw === "0") return "show";
+      return null;
     } catch {
-      return false;
+      return null;
     }
   });
   useEffect(() => {
@@ -74,20 +84,25 @@ const WorkspaceContent = () => {
   }, [criteriaHiddenByUser]);
   useEffect(() => {
     try {
-      window.localStorage.setItem(INFO_HIDDEN_KEY, infoHiddenByUser ? "1" : "0");
+      if (infoOverride === "hide") {
+        window.localStorage.setItem(INFO_HIDDEN_KEY, "1");
+      } else if (infoOverride === "show") {
+        window.localStorage.setItem(INFO_HIDDEN_KEY, "0");
+      } else {
+        window.localStorage.removeItem(INFO_HIDDEN_KEY);
+      }
     } catch {
       /* no-op */
     }
-  }, [infoHiddenByUser]);
+  }, [infoOverride]);
   const isNarrow = useIsNarrow();
   // Visibilidad de los rails:
-  //   - Criterios: SOLO sigue el toggle manual del usuario. Pidió
-  //     explícitamente que no se oculte solo aunque el viewport sea
-  //     chico — si lo deja visible, lo dejamos visible.
-  //   - Info personaje: sigue auto-ocultándose en narrow para que el
-  //     chat tenga aire en pantallas chicas.
+  //   - Criterios: SOLO sigue el toggle manual del usuario.
+  //   - Info personaje: 3-state — el usuario puede forzar show/hide
+  //     y eso pisa el auto-hide. Sin override, en narrow se auto-oculta.
   const criteriaHidden = criteriaHiddenByUser;
-  const infoHidden = infoHiddenByUser || isNarrow;
+  const infoHidden =
+    infoOverride === "hide" ? true : infoOverride === "show" ? false : isNarrow;
 
   // Active session: priority is ?session=<id> in URL, else last from
   // localStorage, else the first open session.
@@ -220,14 +235,23 @@ const WorkspaceContent = () => {
             )}
             <span className="hidden sm:inline text-xs">Criterios</span>
           </Button>
-          {/* Toggle the right-side character info rail. */}
+          {/* Toggle del rail de info personaje. Click siempre flippea
+              entre "show" y "hide" pisando el auto-hide por isNarrow,
+              así que el usuario puede forzar mostrarlo aún en pantallas
+              chicas. */}
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setInfoHiddenByUser((v) => !v)}
+            onClick={() =>
+              setInfoOverride((curr) => {
+                // Estado actual visible? → hide. Estado actual oculto? → show.
+                const currentlyHidden =
+                  curr === "hide" ? true : curr === "show" ? false : isNarrow;
+                return currentlyHidden ? "show" : "hide";
+              })
+            }
             title={infoHidden ? "Mostrar info personaje" : "Ocultar info personaje"}
             className="gap-2"
-            disabled={isNarrow && !infoHiddenByUser}
           >
             {infoHidden ? (
               <PanelRightOpen className="h-4 w-4" />
@@ -267,15 +291,22 @@ const WorkspaceContent = () => {
             />
           </aside>
         )}
-        <aside className="w-[240px] shrink-0 border-r border-border min-h-0">
-          <SessionsPanel selectedId={selectedId} onSelect={setSelectedId} />
+        {/* Slim sessions rail — solo el botón de "+ Nueva". El listado
+            completo de sesiones (abiertas + cerradas) vive ahora en el
+            tab History del rail derecho. */}
+        <aside className="w-[110px] shrink-0 border-r border-border min-h-0">
+          <SessionsPanel />
         </aside>
         <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <ChatPanel session={selectedSession} />
         </section>
         {!infoHidden && (
-          <aside className="w-[300px] shrink-0 border-l border-border min-h-0">
-            <CharacterInfoSidebar profileId={selectedSession?.profile_id ?? null} />
+          <aside className="w-[320px] shrink-0 border-l border-border min-h-0">
+            <RightRailTabs
+              profileId={selectedSession?.profile_id ?? null}
+              selectedSessionId={selectedId}
+              onSelectSession={setSelectedId}
+            />
           </aside>
         )}
       </div>
@@ -294,25 +325,88 @@ const WorkspaceContent = () => {
   );
 };
 
-// Lightweight wrapper that resolves the profile from the cached profiles
-// list and renders the same CharacterInfoPanel the chatter sees, in compact
-// mode so it fits the 300px rail.
-const CharacterInfoSidebar = ({ profileId }: { profileId: string | null }) => {
+// Right-rail con dos tabs: Info personaje y History (todas las sesiones).
+// Recordamos la última pestaña seleccionada en localStorage para no
+// resetearla en cada montaje.
+const RIGHT_TAB_KEY = "maven.chatter.workspace.rightTab";
+type RightTab = "info" | "history";
+
+const RightRailTabs = ({
+  profileId,
+  selectedSessionId,
+  onSelectSession,
+}: {
+  profileId: string | null;
+  selectedSessionId: string | null;
+  onSelectSession: (id: string | null) => void;
+}) => {
   const profilesQ = useChatterProfiles();
   const [lang] = useChatterLang();
   const profile = profileId
     ? (profilesQ.data ?? []).find((p) => p.id === profileId) ?? null
     : null;
+  const [tab, setTab] = useState<RightTab>(() => {
+    try {
+      const v = window.localStorage.getItem(RIGHT_TAB_KEY);
+      return v === "history" ? "history" : "info";
+    } catch {
+      return "info";
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(RIGHT_TAB_KEY, tab);
+    } catch {
+      /* no-op */
+    }
+  }, [tab]);
 
   return (
-    <aside className="h-full min-h-0 overflow-y-auto bg-card">
-      {profile ? (
-        <CharacterInfoPanel profile={profile} lang={lang} compact />
-      ) : (
-        <div className="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground">
-          Selecciona una sesión para ver la información del personaje.
-        </div>
-      )}
+    <aside className="flex h-full min-h-0 flex-col bg-card">
+      {/* Tab strip */}
+      <div className="flex shrink-0 items-stretch border-b border-border">
+        <button
+          type="button"
+          onClick={() => setTab("info")}
+          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+            tab === "info"
+              ? "border-b-2 border-primary text-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Info personaje
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("history")}
+          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
+            tab === "history"
+              ? "border-b-2 border-primary text-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          History
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {tab === "info" ? (
+          profile ? (
+            <div className="h-full overflow-y-auto">
+              <CharacterInfoPanel profile={profile} lang={lang} compact />
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground">
+              Seleccioná una sesión para ver la información del personaje.
+            </div>
+          )
+        ) : (
+          <HistoryPanel
+            selectedId={selectedSessionId}
+            onSelect={onSelectSession}
+          />
+        )}
+      </div>
     </aside>
   );
 };
