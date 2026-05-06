@@ -51,7 +51,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   { group: "Operaciones",   module: "Closers",       submodules: [] },
   { group: "Operaciones",   module: "Tickets",       submodules: [] },
   { group: "Operaciones",   module: "Chatters",      submodules: ["Evaluator", "Workspace", "Admin", "Borrar Historial"] },
-  { group: "Operaciones",   module: "Scouter Assist", submodules: ["Home", "Busquedas", "Favoritas", "Leads", "Funnel", "Mis Tareas", "Settings"] },
+  { group: "Operaciones",   module: "Scouter Assist", submodules: ["Home", "Busquedas", "Favoritas", "Leads", "Funnel", "Mis Tareas", "Alertas", "Settings"] },
   // Agency QA tiene dos tipos de submódulos:
   //   1) Las 4 categorías de QA por rol (Closers / Chatters / Managers /
   //      Spammers) que controlan qué tab del rail izquierdo ve el usuario.

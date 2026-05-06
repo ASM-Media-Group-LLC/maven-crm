@@ -203,14 +203,38 @@ async function processSpammer(
     accountByHandle[a.instagram_handle] = a.id;
   }
 
-  // 2. Rank leads via SQL scoring query — pasamos spammerId para que la
+  // 2. Rollover: si ayer quedaron assignments incompletas (status !=
+  // 'done'), las traemos al día de HOY. Eso le garantiza al spammer
+  // que sus 50 tareas NO se pierden cuando no las cierra todas — en
+  // vez de eso se acumulan al día siguiente y el quota nuevo del día
+  // solo cubre la diferencia. Si rollover llena los 50 slots (o más),
+  // la generación nueva se acorta o salta.
+  const rolledCount = await rolloverPending(supabase, tenantId, spammerId);
+  if (rolledCount > 0) {
+    console.log(
+      `Spammer ${spammerId}: ${rolledCount} assignments incompletas reolladas a hoy.`,
+    );
+  }
+
+  // Cuántas assignments NUEVAS hace falta generar para llegar al
+  // batchSize objetivo (50 default). Si ya hay rolledCount >= batchSize,
+  // no generamos nada nuevo — el spammer arrastra las pendientes.
+  const slotsRemaining = Math.max(0, batchSize - rolledCount);
+  if (slotsRemaining === 0) {
+    console.log(
+      `Spammer ${spammerId}: rollover llenó los ${batchSize} slots, sin generar nuevas hoy.`,
+    );
+    return { assignments: rolledCount, tasks: 0 };
+  }
+
+  // 3. Rank leads via SQL scoring query — pasamos spammerId para que la
   // RPC excluya leads ya asignados a OTROS spammers del tenant en los
   // últimos cooldown_days, evitando duplicados cross-spammer.
-  const rankedLeads = await rankLeads(supabase, tenantId, spammerId, cooldownDays, batchSize);
+  const rankedLeads = await rankLeads(supabase, tenantId, spammerId, cooldownDays, slotsRemaining);
 
   if (rankedLeads.length === 0) {
     console.log(`No hay leads disponibles para tenant ${tenantId} (cooldown: ${cooldownDays}d).`);
-    return { assignments: 0, tasks: 0 };
+    return { assignments: rolledCount, tasks: 0 };
   }
 
   // 3. Batch Groq calls: 10 leads per call
@@ -331,6 +355,72 @@ async function processSpammer(
 
 // ─── Lead ranking query ───────────────────────────────────────────────────────
 // Matches the composite rank_score CTE from design.md.
+
+// Rollover de assignments pendientes — antes de generar nuevas, mueve
+// las que el spammer dejó incompletas (status != 'done') del día
+// anterior (o anteriores) al día de hoy. La idea: el spammer debe
+// terminar lo asignado antes de recibir más, pero el quota de 50/día
+// es el techo, no el piso — si arrastra 30 pendientes, hoy genera 20
+// nuevas para completar 50.
+//
+// Implementación: UPDATE assigned_date = CURRENT_DATE para todas las
+// filas del spammer con assigned_date < CURRENT_DATE y status != 'done'.
+// El UNIQUE constraint (spammer_id, lead_id, assigned_date) podría
+// chocar si HOY ya existe una assignment para ese mismo lead — en ese
+// caso descartamos la antigua (ya está siendo procesada hoy).
+async function rolloverPending(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  tenantId: string,
+  spammerId: string,
+): Promise<number> {
+  // Primero, leemos las assignments incompletas históricas. Limit alto
+  // porque si hay backlog grande, queremos rollearlo todo.
+  const { data: pending, error: pErr } = await supabase
+    .from("scouter_daily_assignments")
+    .select("id, lead_id, assigned_date")
+    .eq("tenant_id", tenantId)
+    .eq("spammer_id", spammerId)
+    .lt("assigned_date", new Date().toISOString().slice(0, 10))
+    .neq("status", "done")
+    .limit(500);
+  if (pErr) {
+    console.error("rolloverPending list error", pErr);
+    return 0;
+  }
+  if (!pending || pending.length === 0) return 0;
+
+  // Si ya existe una row HOY para ese mismo lead (porque el cron corrió
+  // antes manualmente, o cualquier otra razón), descartamos la vieja
+  // para evitar el conflict del UNIQUE — la del día actual gana.
+  const today = new Date().toISOString().slice(0, 10);
+  const leadIds = pending.map((p: { lead_id: string }) => p.lead_id);
+  const { data: dupes } = await supabase
+    .from("scouter_daily_assignments")
+    .select("lead_id")
+    .eq("tenant_id", tenantId)
+    .eq("spammer_id", spammerId)
+    .eq("assigned_date", today)
+    .in("lead_id", leadIds);
+  const dupeLeadIds = new Set((dupes ?? []).map((d: { lead_id: string }) => d.lead_id));
+
+  const rollableIds = (pending as Array<{ id: string; lead_id: string }>)
+    .filter((p) => !dupeLeadIds.has(p.lead_id))
+    .map((p) => p.id);
+
+  if (rollableIds.length === 0) return 0;
+
+  // Bulk UPDATE — solo movemos las que NO chocan.
+  const { error: uErr } = await supabase
+    .from("scouter_daily_assignments")
+    .update({ assigned_date: today })
+    .in("id", rollableIds);
+  if (uErr) {
+    console.error("rolloverPending update error", uErr);
+    return 0;
+  }
+  return rollableIds.length;
+}
 
 async function rankLeads(
   // deno-lint-ignore no-explicit-any

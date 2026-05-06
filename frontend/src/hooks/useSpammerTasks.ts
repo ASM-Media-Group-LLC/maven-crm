@@ -127,6 +127,90 @@ export interface CompleteTaskInput {
   screenshotUrl?: string | null;
 }
 
+// ─── Alertas: tareas pendientes acumuladas por spammer ──────────────────
+//
+// El cron diario asigna 50 leads/spammer y cada lead tiene hasta 4 tasks
+// (follow, like, comment, story_view…). Si el spammer no completa todas
+// las tasks de un día, las assignments quedan en `pending`/`in_progress`
+// y van rolleando hacia adelante (cuando el cron rolea pendientes).
+// Este hook agrega esa data por spammer + día para el panel de Alertas:
+// quién dejó tareas sin terminar y cuántas.
+
+export interface SpammerAlertRow {
+  spammer_id: string;
+  spammer_name: string;
+  date: string;
+  total_assignments: number;
+  done: number;
+  pending: number;
+  /** Tasks pending dentro de las assignments — agregado para que el
+   *  manager vea no solo "X assignments incompletas" sino "Y tasks
+   *  totales pendientes". */
+  pending_tasks: number;
+}
+
+/** Lookback de N días por defecto (incluye hoy). Manager only — RLS
+ *  ya restringe a admin/manager/supervisor. */
+export const useSpammerAlerts = (lookbackDays = 7) =>
+  useQuery({
+    queryKey: ["spammer-alerts", lookbackDays],
+    queryFn: async (): Promise<SpammerAlertRow[]> => {
+      const since = new Date();
+      since.setHours(0, 0, 0, 0);
+      since.setDate(since.getDate() - (lookbackDays - 1));
+      const sinceIso = since.toISOString().slice(0, 10);
+
+      // Pull assignments + tasks. We aggregate client-side because the
+      // cardinality is small (50 spammers × 7 days = ~350 rows) and the
+      // join shape mirrors useDailyAssignments.
+      const { data, error } = await sb
+        .from("scouter_daily_assignments")
+        .select(
+          "id, spammer_id, assigned_date, status, tasks:scouter_interaction_tasks(id,status), spammer:profiles!scouter_daily_assignments_spammer_id_fkey(full_name)",
+        )
+        .gte("assigned_date", sinceIso)
+        .order("assigned_date", { ascending: false });
+      if (error) throw error;
+
+      type Row = {
+        id: string;
+        spammer_id: string;
+        assigned_date: string;
+        status: AssignmentStatus;
+        tasks: Array<{ id: string; status: TaskStatus }>;
+        spammer: { full_name: string | null } | null;
+      };
+      const rows = (data ?? []) as Row[];
+
+      // Agrupar por (spammer_id, date)
+      const map = new Map<string, SpammerAlertRow>();
+      for (const r of rows) {
+        const key = `${r.spammer_id}::${r.assigned_date}`;
+        const slot = map.get(key) ?? {
+          spammer_id: r.spammer_id,
+          spammer_name: r.spammer?.full_name ?? "(sin nombre)",
+          date: r.assigned_date,
+          total_assignments: 0,
+          done: 0,
+          pending: 0,
+          pending_tasks: 0,
+        };
+        slot.total_assignments++;
+        if (r.status === "done") slot.done++;
+        else slot.pending++;
+        for (const t of r.tasks ?? []) {
+          if (t.status === "pending") slot.pending_tasks++;
+        }
+        map.set(key, slot);
+      }
+
+      return Array.from(map.values()).sort((a, b) => {
+        if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+        return b.pending - a.pending;
+      });
+    },
+  });
+
 /** Mark a task as done, insert an interaction history row, and
  *  auto-complete the parent assignment if all tasks are settled. */
 export const useCompleteTask = () => {
