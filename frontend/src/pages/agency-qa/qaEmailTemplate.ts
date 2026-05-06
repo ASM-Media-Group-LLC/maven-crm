@@ -16,6 +16,7 @@ export interface QaEmailPayload {
   closerName: string;
   modelName: string;
   modelCategory: string | null;
+  modelIgUrl: string | null;
   callDate: string;
   evaluatorName: string;
   overallScore: number;
@@ -148,8 +149,15 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
           // Header
           `<tr><td style="background:linear-gradient(135deg,${COLORS.primary} 0%,${COLORS.primaryDark} 100%);padding:28px 32px;color:#ffffff;">` +
             `<div style="font-size:12px;font-weight:700;letter-spacing:1.5px;opacity:0.85;text-transform:uppercase;">Maven CRM · Agency QA</div>` +
-            `<div style="font-size:22px;font-weight:700;margin-top:4px;line-height:1.3;">QA de llamada — análisis listo</div>` +
-            `<div style="font-size:13px;margin-top:4px;opacity:0.85;">${escape(p.closerName)} · modelo ${escape(p.modelName)}${p.modelCategory ? ` (${escape(p.modelCategory)})` : ""}</div>` +
+            `<div style="font-size:22px;font-weight:700;margin-top:4px;line-height:1.3;">QA de llamada — ${escape(p.closerName)}</div>` +
+            `<div style="font-size:14px;margin-top:6px;opacity:0.9;">` +
+              `Modelo: ${escape(p.modelName)}${p.modelCategory ? ` "${escape(p.modelCategory)}"` : ""}` +
+              (p.modelIgUrl
+                ? ` <a href="${escape(p.modelIgUrl)}" style="color:#ffffff;text-decoration:none;margin-left:6px;vertical-align:middle;" target="_blank">` +
+                    `<img src="https://cdn-icons-png.flaticon.com/16/174/174855.png" alt="IG" width="14" height="14" style="vertical-align:middle;opacity:0.9;" />` +
+                  `</a>`
+                : "") +
+            `</div>` +
           `</td></tr>` +
 
           // Score + outcome

@@ -1085,7 +1085,7 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
     sb
       .from("qa_calls")
       .select(
-        "*, model:qa_models(name, category), closer:qa_closers(name)",
+        "*, model:qa_models(name, category, ig_url), closer:qa_closers(name)",
       )
       .eq("id", callId)
       .maybeSingle(),
@@ -1093,7 +1093,7 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
 
   const config = cfg as QaConfig | null;
   const call = row as (QaCall & {
-    model: { name: string; category: string | null } | null;
+    model: { name: string; category: string | null; ig_url: string | null } | null;
     closer: { name: string } | null;
   }) | null;
 
@@ -1123,6 +1123,7 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
     closerName: call.closer?.name ?? "(sin nombre)",
     modelName: call.model?.name ?? "(sin nombre)",
     modelCategory: call.model?.category ?? null,
+    modelIgUrl: call.model?.ig_url ?? null,
     callDate: call.call_date,
     evaluatorName: call.evaluator_name ?? "",
     overallScore: score,
