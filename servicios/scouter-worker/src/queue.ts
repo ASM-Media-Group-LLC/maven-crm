@@ -89,6 +89,32 @@ async function markFailed(
   if (error) console.error("markFailed error", error);
 }
 
+// Detecta el error de Apify "Monthly usage hard limit exceeded" (429
+// con ese cuerpo). En esos casos el job NO está realmente fallando — el
+// proveedor está pausado, hay que esperar al reset (1° del mes o
+// recarga manual del usuario). Si dejamos que se cuente como attempt
+// normal, los 3 reintentos del cooldown se gastan en un par de minutos
+// y el job queda failed permanente, perdiendo trabajo legítimo.
+function isApifyQuotaError(msg: string): boolean {
+  return /Monthly usage hard limit|usage limit (has been )?reached|quota.*exceeded|usage.*restricted/i
+    .test(msg);
+}
+
+// Rollback del attempt incrementado en markRunning + devuelve el job a
+// queued. El próximo tick va a re-intentarlo sin penalizar el contador.
+async function rescheduleNoAttempt(job: ScouterJob, errMsg: string): Promise<void> {
+  const { error } = await sb
+    .from("scouter_jobs")
+    .update({
+      status: "queued",
+      attempts: job.attempts, // restaura — markRunning había puesto attempts+1
+      started_at: null,
+      last_error: `apify-quota: ${errMsg.slice(0, 800)}`,
+    })
+    .eq("id", job.id);
+  if (error) console.error("rescheduleNoAttempt error", error);
+}
+
 async function dispatchJob(job: ScouterJob): Promise<JobResult> {
   const payload = (job.payload ?? {}) as Record<string, unknown>;
   switch (job.kind) {
@@ -134,14 +160,29 @@ export async function processOne(job: ScouterJob): Promise<void> {
       await markDone(job, result);
       console.log(`[${job.id}] done — ${result.message ?? ""}`);
     } else {
+      const failMsg = result.message ?? "ok=false";
+      // Apify quota: no consume attempt. Volvemos a queued. El próximo
+      // tick lo reintenta cuando vuelva el budget — por reset mensual o
+      // recarga del usuario. Sin esto, 3 reintentos rápidos consumen
+      // los attempts y el job queda failed permanente.
+      if (isApifyQuotaError(failMsg)) {
+        await rescheduleNoAttempt(job, failMsg);
+        console.warn(`[${job.id}] apify-quota — keeping queued (no attempt consumed)`);
+        return;
+      }
       const exhausted = job.attempts + 1 >= job.max_attempts;
-      await markFailed(job, result.message ?? "ok=false", exhausted);
+      await markFailed(job, failMsg, exhausted);
       console.warn(
-        `[${job.id}] ${exhausted ? "failed (exhausted)" : "retry"} — ${result.message ?? ""}`,
+        `[${job.id}] ${exhausted ? "failed (exhausted)" : "retry"} — ${failMsg}`,
       );
     }
   } catch (e) {
     const msg = (e as Error).message ?? String(e);
+    if (isApifyQuotaError(msg)) {
+      await rescheduleNoAttempt(job, msg);
+      console.warn(`[${job.id}] apify-quota — keeping queued (no attempt consumed)`);
+      return;
+    }
     const exhausted = job.attempts + 1 >= job.max_attempts;
     await markFailed(job, msg, exhausted);
     console.error(`[${job.id}] ${exhausted ? "failed (exhausted)" : "retry"} —`, msg);
