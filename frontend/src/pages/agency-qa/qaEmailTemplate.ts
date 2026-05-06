@@ -108,70 +108,64 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
     })
     .join("");
 
-  const redFlagsBlock = p.redFlags.length
-    ? `<tr><td style="padding:8px 24px;">` +
-        `<div style="background:${COLORS.card};border:1px solid ${COLORS.borderSoft};border-radius:14px;padding:18px 18px 14px;">` +
-          sectionTitle(`⚠️  Red flags · ${p.redFlags.length}`, COLORS.red) +
-          p.redFlags
-            .map(
-              (f) =>
-                `<div style="font-size:13px;background:${COLORS.redSoft};border:1px solid ${COLORS.red}33;border-radius:10px;padding:12px 14px;margin-bottom:8px;">` +
-                  `<div style="font-weight:700;color:${COLORS.red};text-transform:uppercase;font-size:11px;letter-spacing:1px;">${escape(f.type)}</div>` +
-                  (f.description
-                    ? `<div style="color:${COLORS.text};margin-top:6px;line-height:1.5;">${escape(f.description)}</div>`
-                    : "") +
-                  (f.quote
-                    ? `<div style="font-style:italic;color:${COLORS.muted};margin-top:6px;font-size:12px;border-left:3px solid ${COLORS.red}66;padding-left:10px;">"${escape(f.quote)}"</div>`
-                    : "") +
-                `</div>`,
-            )
-            .join("") +
-        `</div>` +
-      `</td></tr>`
+  // Bloques internos del white body — sin envoltorio externo (la card
+  // blanca ya está abierta cuando se renderean). El usuario los quería
+  // unidos en el cuadro principal y alineados a la izquierda.
+  const redFlagsInner = p.redFlags.length
+    ? sectionTitle(`⚠️  Red flags · ${p.redFlags.length}`, COLORS.red) +
+      p.redFlags
+        .map(
+          (f) =>
+            `<div style="font-size:13px;background:${COLORS.redSoft};border:1px solid ${COLORS.red}33;border-radius:10px;padding:12px 14px;margin-bottom:8px;text-align:left;">` +
+              `<div style="font-weight:700;color:${COLORS.red};text-transform:uppercase;font-size:11px;letter-spacing:1px;">${escape(f.type)}</div>` +
+              (f.description
+                ? `<div style="color:${COLORS.text};margin-top:6px;line-height:1.5;">${escape(f.description)}</div>`
+                : "") +
+              (f.quote
+                ? `<div style="font-style:italic;color:${COLORS.muted};margin-top:6px;font-size:12px;border-left:3px solid ${COLORS.red}66;padding-left:10px;">"${escape(f.quote)}"</div>`
+                : "") +
+            `</div>`,
+        )
+        .join("")
     : "";
 
-  const improvementsBlock = p.improvements.length
-    ? `<tr><td style="padding:8px 24px;">` +
-        `<div style="background:${COLORS.card};border:1px solid ${COLORS.borderSoft};border-radius:14px;padding:18px;">` +
-          sectionTitle(`✓ Mejoras sugeridas`, COLORS.green) +
-          `<ol style="margin:0;padding-left:0;font-size:13px;line-height:1.6;color:${COLORS.text};list-style:none;">` +
-            p.improvements
-              .map(
-                (m, i) =>
-                  `<li style="margin-bottom:8px;padding:10px 12px;background:${COLORS.greenSoft};border-radius:10px;display:block;">` +
-                    `<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:${COLORS.green};color:#ffffff;font-size:11px;font-weight:700;margin-right:10px;">${i + 1}</span>` +
-                    `<span>${escape(m)}</span>` +
-                  `</li>`,
-              )
-              .join("") +
-          `</ol>` +
-        `</div>` +
-      `</td></tr>`
+  const keyMomentsInner = p.keyMoments.length
+    ? sectionTitle(`★ Momentos clave`, COLORS.amber) +
+      p.keyMoments
+        .map((k) => {
+          const c = k.kind === "positivo" ? COLORS.green : COLORS.red;
+          const cSoft = k.kind === "positivo" ? COLORS.greenSoft : COLORS.redSoft;
+          const tag = k.kind === "positivo" ? "✓ Positivo" : "✗ Negativo";
+          return (
+            `<div style="font-size:13px;background:${cSoft};border:1px solid ${c}33;border-radius:10px;padding:12px 14px;margin-bottom:8px;text-align:left;">` +
+              `<div style="font-weight:700;color:${c};font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">${tag}</div>` +
+              `<div style="font-style:italic;color:${COLORS.text};line-height:1.5;border-left:3px solid ${c}66;padding-left:10px;">"${escape(k.quote)}"</div>` +
+              (k.why
+                ? `<div style="color:${COLORS.muted};margin-top:6px;font-size:12px;line-height:1.5;">${escape(k.why)}</div>`
+                : "") +
+            `</div>`
+          );
+        })
+        .join("")
     : "";
 
-  const keyMomentsBlock = p.keyMoments.length
-    ? `<tr><td style="padding:8px 24px;">` +
-        `<div style="background:${COLORS.card};border:1px solid ${COLORS.borderSoft};border-radius:14px;padding:18px 18px 14px;">` +
-          sectionTitle(`★ Momentos clave`, COLORS.amber) +
-          p.keyMoments
-            .map((k) => {
-              const c = k.kind === "positivo" ? COLORS.green : COLORS.red;
-              const cSoft = k.kind === "positivo" ? COLORS.greenSoft : COLORS.redSoft;
-              const tag = k.kind === "positivo" ? "✓ Positivo" : "✗ Negativo";
-              return (
-                `<div style="font-size:13px;background:${cSoft};border:1px solid ${c}33;border-radius:10px;padding:12px 14px;margin-bottom:8px;">` +
-                  `<div style="font-weight:700;color:${c};font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">${tag}</div>` +
-                  `<div style="font-style:italic;color:${COLORS.text};line-height:1.5;border-left:3px solid ${c}66;padding-left:10px;">"${escape(k.quote)}"</div>` +
-                  (k.why
-                    ? `<div style="color:${COLORS.muted};margin-top:6px;font-size:12px;line-height:1.5;">${escape(k.why)}</div>`
-                    : "") +
-                `</div>`
-              );
-            })
-            .join("") +
-        `</div>` +
-      `</td></tr>`
+  const improvementsInner = p.improvements.length
+    ? sectionTitle(`✓ Mejoras sugeridas`, COLORS.green) +
+      `<ol style="margin:0;padding-left:0;font-size:13px;line-height:1.6;color:${COLORS.text};list-style:none;text-align:left;">` +
+        p.improvements
+          .map(
+            (m, i) =>
+              `<li style="margin-bottom:8px;padding:10px 12px;background:${COLORS.greenSoft};border-radius:10px;display:block;">` +
+                `<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:${COLORS.green};color:#ffffff;font-size:11px;font-weight:700;margin-right:10px;">${i + 1}</span>` +
+                `<span>${escape(m)}</span>` +
+              `</li>`,
+          )
+          .join("") +
+      `</ol>`
     : "";
+
+  // Espaciador entre bloques internos cuando ambos existen.
+  const blockSpacer = `<div style="height:14px;"></div>`;
 
   return (
     `<!DOCTYPE html><html><body style="margin:0;padding:0;background:${COLORS.bg};font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:${COLORS.text};">` +
@@ -243,7 +237,7 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
 
             // ▶ Dimensiones
             (dimensionRows
-              ? `<div style="background:${COLORS.card};border:1px solid ${COLORS.borderSoft};border-radius:14px;padding:18px;margin-bottom:12px;">` +
+              ? `<div style="background:${COLORS.card};border:1px solid ${COLORS.borderSoft};border-radius:14px;padding:18px;margin-bottom:12px;text-align:left;">` +
                   sectionTitle("Dimensiones", COLORS.primary) +
                   `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${COLORS.borderSoft};border-radius:10px;overflow:hidden;">` +
                     dimensionRows +
@@ -251,12 +245,22 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
                 `</div>`
               : "") +
 
-          `</td></tr>` +
+            // ▶ Red flags + Momentos clave + Mejoras sugeridas — TODO
+            //   dentro del MISMO cuadro blanco, cada uno como sub-sección
+            //   alineada a la izquierda (separados por espaciadores).
+            ((redFlagsInner || keyMomentsInner || improvementsInner)
+              ? `<div style="background:${COLORS.card};border:1px solid ${COLORS.borderSoft};border-radius:14px;padding:18px;margin-bottom:12px;text-align:left;">` +
+                  redFlagsInner +
+                  (redFlagsInner && (keyMomentsInner || improvementsInner)
+                    ? blockSpacer
+                    : "") +
+                  keyMomentsInner +
+                  (keyMomentsInner && improvementsInner ? blockSpacer : "") +
+                  improvementsInner +
+                `</div>`
+              : "") +
 
-          // Bloques separados (cada uno ya tiene su propio cuadro)
-          redFlagsBlock +
-          keyMomentsBlock +
-          improvementsBlock +
+          `</td></tr>` +
 
           // ▶ CTA — botón "Ver análisis completo" en Maven
           `<tr><td style="padding:18px 24px 8px;text-align:center;">` +
