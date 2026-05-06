@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,22 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading }: AddUserModal
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState("employee");
+
+  // Resetea el form cada vez que el modal se abre. Antes solo se
+  // limpiaba cuando el usuario cerraba el diálogo (Esc / click fuera /
+  // Cancelar) — pero cuando el padre lo cierra programáticamente al
+  // guardar (`setAddUserOpen(false)` en el onSuccess), el callback
+  // onOpenChange del Dialog no dispara, entonces los campos quedaban
+  // pegados con los datos del último usuario creado y la próxima
+  // apertura mostraba el form sucio.
+  useEffect(() => {
+    if (open) {
+      setEmail("");
+      setFirstName("");
+      setLastName("");
+      setRole("employee");
+    }
+  }, [open]);
 
   const { data: roles = [] } = useQuery({
     queryKey: ["roles-config-select"],
