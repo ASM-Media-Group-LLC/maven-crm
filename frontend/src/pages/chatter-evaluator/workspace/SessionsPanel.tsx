@@ -167,12 +167,23 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center justify-between border-b p-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      {/* Header del rail (110px de ancho). Label arriba + botón abajo en
+          full-width: con el label y el botón en la misma fila el botón
+          desbordaba la columna y se metía sobre el chat. Vertical stack
+          mantiene todo dentro del rail incluso con el texto largo de
+          "Nueva sesión". */}
+      <div className="flex shrink-0 flex-col gap-2 border-b p-2">
+        <span className="text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Sesiones
         </span>
-        <Button size="sm" onClick={() => setNewOpen(true)} className="h-7 gap-1 text-xs">
-          <Plus className="h-3 w-3" /> Nueva sesión
+        <Button
+          size="sm"
+          onClick={() => setNewOpen(true)}
+          className="h-7 w-full gap-1 px-1 text-[11px]"
+          title="Nueva sesión"
+        >
+          <Plus className="h-3 w-3 shrink-0" />
+          <span className="truncate">Nueva sesión</span>
         </Button>
       </div>
 
