@@ -486,7 +486,7 @@ export const useCreateQaCall = () => {
   });
 };
 
-export type ModelCategory = "A++" | "A" | "B+" | "B" | "C+" | "C";
+export type ModelCategory = "A++" | "A+" | "A" | "B+" | "B" | "C+" | "C";
 
 /** Upsert a closer by name. If a row with that exact (case-insensitive)
  *  name exists, return its id; otherwise insert a new active closer. */
