@@ -201,7 +201,16 @@ const ClariAiChat = ({
     })),
   };
 
-  // Unified sync: load messages from DB or reset
+  // Unified sync: load messages from DB or reset.
+  //
+  // BUG fix: dbMessages venía de useAiMessages como nuevo array cada
+  // render (referencia inestable). Como estaba en el deps array, el
+  // effect corría en cada render → reseteaba localMessages a [WELCOME]
+  // borrando los mensajes que el usuario acababa de tipear. Ahora
+  // depende solo de `conversationId` y la LONGITUD de dbMessages
+  // (primitivo, estable). Si los mensajes del DB se editan in-place
+  // sin cambiar el count, igual no se rebobinan acá; suficiente para
+  // el flujo del FAB y el AiSales tab.
   useEffect(() => {
     if (!conversationId) {
       setTitleSet(false);
@@ -215,7 +224,7 @@ const ClariAiChat = ({
       setLocalMessages([WELCOME]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, dbMessages, endpoint]);
+  }, [conversationId, dbMessages.length, endpoint]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
