@@ -2,7 +2,9 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// --- PWA / Service Worker guard for Lovable preview ---
+// --- PWA / Service Worker guard ---
+// In iframes (preview hosts, embedded contexts) we disable the service
+// worker so it doesn't interfere with the parent frame.
 const isInIframe = (() => {
   try {
     return window.self !== window.top;
@@ -11,11 +13,7 @@ const isInIframe = (() => {
   }
 })();
 
-const isPreviewHost =
-  window.location.hostname.includes("id-preview--") ||
-  window.location.hostname.includes("lovableproject.com");
-
-if (isPreviewHost || isInIframe) {
+if (isInIframe) {
   // Unregister all service workers and clear caches in preview/iframe
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.getRegistrations().then((registrations) => {

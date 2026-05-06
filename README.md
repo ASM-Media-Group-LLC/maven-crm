@@ -1,73 +1,37 @@
-# Welcome to your Lovable project
+# MAVEN CRM
 
-## Project info
+All-in-one platform for creators' agency management — closers, chatters, scouter, finance, HR.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Repo layout
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+frontend/          Vite + React + TS app (Vite root is `frontend/`)
+supabase/          Edge functions (Deno) + SQL migrations
+servicios/         Standalone microservices (e.g. scouter-worker)
 ```
 
-**Edit a file directly in GitHub**
+Build output goes to `<repo-root>/dist`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Run locally
 
-**Use GitHub Codespaces**
+```bash
+# Frontend
+npm install
+npm run dev          # http://localhost:8080
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Edge functions are deployed via the Supabase CLI:
 
-## What technologies are used for this project?
+```bash
+supabase functions deploy <name>
+supabase secrets set KEY=value
+```
 
-This project is built with:
+Migrations live under `supabase/migrations/` and are applied via `supabase db push` or by hand through the SQL editor when needed.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Stack
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- React 18, Vite, Tailwind, Radix UI
+- Supabase (auth, DB, edge functions, storage)
+- Anthropic Claude (QA evaluation), Groq (lead scoring)
+- TanStack Query for data fetching

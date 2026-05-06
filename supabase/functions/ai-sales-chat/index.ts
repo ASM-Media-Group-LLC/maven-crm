@@ -176,7 +176,7 @@ serve(async (req) => {
     // ===== END AUTH VALIDATION =====
 
     const { messages, config } = await req.json();
-    // Models from older providers (Lovable gateway: google/gemini-*,
+    // Models from older providers (older gateway: google/gemini-*,
     // MiniMax: MiniMax-Text-01 / abab*) don't resolve against Groq.
     // Fall back to the default Groq model unless the saved config
     // already references a Groq one (llama / mixtral / gemma).

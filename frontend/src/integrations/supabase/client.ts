@@ -1,5 +1,5 @@
-// Originally Lovable-generated; now editable. Connection target is determined
-// at container startup by docker-entrypoint.sh which sed-replaces placeholders
+// Connection target is determined at container startup by
+// docker-entrypoint.sh which sed-replaces placeholders
 // in the bundled JS with values from the running container's env vars.
 //
 // Build-time defaults (placeholders) are detected here so that if the runtime

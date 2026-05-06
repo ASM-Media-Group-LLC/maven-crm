@@ -4,7 +4,7 @@ import type { ChatterProfile } from "./types";
 // where "user-defined" extras live. We stash them inside the profile's
 // `extra_fields` JSONB column under reserved keys (prefixed `__`).
 //
-// Legacy imports from Roleplaychatters / Lovable left arbitrary loose
+// Legacy imports from Roleplaychatters left arbitrary loose
 // key/value pairs in `extra_fields` (e.g. `fetiches` + `fetiches_en`).
 // We surface those automatically as custom sections so the user sees
 // them as proper editable cards instead of a raw JSON dump, and on the
