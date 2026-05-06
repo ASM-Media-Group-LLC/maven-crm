@@ -150,14 +150,22 @@ const ChatterEvaluatorContent = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {sessionsQ.data && sessionsQ.data.length > 0 && (
-              <Button asChild variant="outline" className="gap-2">
-                <Link to="/chatter-evaluator/workspace">
-                  <ListChecks className="h-4 w-4" />
-                  Workspace ({sessionsQ.data.length})
-                </Link>
-              </Button>
-            )}
+            {/* Workspace siempre visible — es el lugar para sesiones
+                vivas, y el usuario lo abre incluso sin sesiones abiertas
+                para crear una nueva (o continuar una de selectedId
+                pegada en localStorage). El badge con la cuenta solo
+                aparece si hay sesiones activas. */}
+            <Button asChild variant="outline" className="gap-2">
+              <Link to="/chatter-evaluator/workspace">
+                <ListChecks className="h-4 w-4" />
+                Workspace
+                {sessionsQ.data && sessionsQ.data.length > 0 && (
+                  <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                    {sessionsQ.data.length}
+                  </span>
+                )}
+              </Link>
+            </Button>
             <Button asChild variant="outline" className="gap-2">
               <Link to="/chatter-evaluator/history">
                 <HistoryIcon className="h-4 w-4" />
