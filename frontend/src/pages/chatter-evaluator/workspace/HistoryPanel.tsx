@@ -149,10 +149,10 @@ const SessionRow = ({
   );
 };
 
-// HistoryPanel — listado unificado de TODAS las sesiones (abiertas y
-// cerradas). Click en una row → se selecciona en el chat. El delete
-// de sesiones cerradas requiere permiso "Chatters → Borrar Historial"
-// (admin-only por default, configurable desde Settings → Roles).
+// HistoryPanel — listado de sesiones CERRADAS. Las abiertas siguen en
+// el SessionsPanel de la izquierda; este tab es el archivo histórico.
+// El delete requiere permiso "Chatters → Borrar Historial" (admin-only
+// por default, configurable desde Settings → Roles).
 export const HistoryPanel = ({ selectedId, onSelect }: Props) => {
   const sessionsQ = useChatterSessions("all");
   const profilesQ = useChatterProfiles();
@@ -187,18 +187,16 @@ export const HistoryPanel = ({ selectedId, onSelect }: Props) => {
     return m;
   }, [profilesQ.data]);
 
-  // Orden: abiertas primero (más reciente arriba), después cerradas.
-  const all = sessionsQ.data ?? [];
-  const sorted = useMemo(() => {
-    const copy = [...all];
-    copy.sort((a, b) => {
-      const aOpen = a.status !== "ended" ? 0 : 1;
-      const bOpen = b.status !== "ended" ? 0 : 1;
-      if (aOpen !== bOpen) return aOpen - bOpen;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
-    return copy;
-  }, [all]);
+  // Solo sesiones cerradas, más recientes arriba. Las abiertas siguen
+  // en el SessionsPanel de la izquierda.
+  const ended = useMemo(() => {
+    const closed = (sessionsQ.data ?? []).filter((s) => s.status === "ended");
+    closed.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+    return closed;
+  }, [sessionsQ.data]);
 
   const confirmEnd = async () => {
     if (!endTarget) return;
@@ -229,12 +227,12 @@ export const HistoryPanel = ({ selectedId, onSelect }: Props) => {
         {sessionsQ.isLoading && (
           <p className="p-2 text-xs text-muted-foreground">Cargando…</p>
         )}
-        {!sessionsQ.isLoading && sorted.length === 0 && (
+        {!sessionsQ.isLoading && ended.length === 0 && (
           <p className="p-4 text-center text-xs text-muted-foreground">
-            Aún no hay sesiones.
+            Aún no hay sesiones cerradas.
           </p>
         )}
-        {sorted.map((s) => (
+        {ended.map((s) => (
           <SessionRow
             key={s.id}
             session={s}
