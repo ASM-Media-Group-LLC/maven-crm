@@ -259,8 +259,8 @@ const AgencyNewQa = () => {
       });
       toast.dismiss("upload");
 
-      // 4. Transcribir vía Whisper (el edge baja desde Storage).
-      setSubmitStage("Transcribiendo con Whisper…");
+      // 4. Transcribir (el edge baja desde Storage → ElevenLabs Scribe).
+      setSubmitStage("Transcribiendo…");
       toast.loading("Transcribiendo audio…", { id: "transcribe" });
       const transcribeResult = await transcribe.mutateAsync({
         audioPath: savedAudioPath,
@@ -268,7 +268,7 @@ const AgencyNewQa = () => {
       toast.dismiss("transcribe");
       const transcriptText = transcribeResult.text.trim();
       if (transcriptText.length === 0) {
-        throw new Error("Whisper devolvió transcripción vacía. ¿El audio tiene voz audible?");
+        throw new Error("La transcripción está vacía. ¿El audio tiene voz audible?");
       }
 
       // 5. Insert qa_calls con id explícito + transcript + audio_path.
@@ -354,7 +354,7 @@ const AgencyNewQa = () => {
         <h2 className="text-base font-semibold">Nueva QA</h2>
         <p className="text-xs text-muted-foreground">
           Subí el audio crudo de la llamada. La transcripción se hace
-          server-side con Whisper (no editable). El audio queda guardado
+          server-side (no editable). El audio queda guardado
           para auditoría y se puede escuchar desde el detalle de la QA.
           Si el closer o la modelo todavía no están en el catálogo, los
           tipeás y se crean al guardar.
