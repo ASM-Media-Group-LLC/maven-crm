@@ -750,6 +750,78 @@ export type SendMessageInput = {
   fromExaminer?: boolean;
 };
 
+/** Toggle de reacción con emoji sobre un mensaje. Si el usuario actual
+ *  ya dejó esa reacción → la quita. Si no la había dejado → la agrega.
+ *  Las reacciones viven en la columna jsonb chatter_messages.reactions
+ *  (array de MessageReaction). El realtime sub a chatter_messages que
+ *  ya está montado refresca la UI cuando otra persona reacciona.
+ *
+ *  La columna requiere la migración 20260506000000_chatter_message_reactions
+ *  — si todavía no se aplicó, el UPDATE falla silenciosamente y la UI
+ *  muestra un toast con el error. */
+export const useToggleMessageReaction = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      messageId: string;
+      sessionId: string;
+      emoji: string;
+      userId: string;
+      userName: string;
+    }): Promise<void> => {
+      // Leemos la fila para tener el array actual y razonar en el client.
+      // (Una alternativa con menos roundtrips sería un RPC en Postgres,
+      // pero queremos mantener el cambio sin migración de funciones.)
+      const { data: row, error: readErr } = await sb
+        .from("chatter_messages")
+        .select("reactions")
+        .eq("id", input.messageId)
+        .maybeSingle();
+      if (readErr) throw readErr;
+      const current: Array<{
+        user_id: string;
+        user_name: string;
+        emoji: string;
+        created_at: string;
+      }> = Array.isArray((row as { reactions?: unknown } | null)?.reactions)
+        ? ((row as { reactions: unknown }).reactions as Array<{
+            user_id: string;
+            user_name: string;
+            emoji: string;
+            created_at: string;
+          }>)
+        : [];
+
+      const idx = current.findIndex(
+        (r) => r.user_id === input.userId && r.emoji === input.emoji,
+      );
+      let next: typeof current;
+      if (idx >= 0) {
+        // Toggle off
+        next = current.filter((_, i) => i !== idx);
+      } else {
+        next = [
+          ...current,
+          {
+            user_id: input.userId,
+            user_name: input.userName,
+            emoji: input.emoji,
+            created_at: new Date().toISOString(),
+          },
+        ];
+      }
+      const { error: updErr } = await sb
+        .from("chatter_messages")
+        .update({ reactions: next })
+        .eq("id", input.messageId);
+      if (updErr) throw updErr;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["chatter-messages", vars.sessionId] });
+    },
+  });
+};
+
 export const useSendChatterMessage = () => {
   const qc = useQueryClient();
   return useMutation({
