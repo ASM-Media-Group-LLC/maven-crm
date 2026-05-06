@@ -80,6 +80,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
   const callsQ = useQaCalls();
   const fireWebhook = useFireQaWebhook();
 
+  const myUserId = user?.id ?? null;
   const myName = useMemo(() => {
     return (
       profileQ.data?.full_name?.trim() ||
@@ -89,16 +90,24 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
     );
   }, [profileQ.data, user]);
 
+  // Filtramos "mis QAs":
+  //   - Si la fila tiene uploaded_by, matcheamos por ese FK (preciso).
+  //   - Para rows legacy (uploaded_by NULL) caemos al match de
+  //     evaluator_name == nombre del perfil — funciona para QAs viejas
+  //     subidas antes del cambio del default a "Claude AI".
   const myCalls = useMemo(() => {
-    if (!callsQ.data || !myName) return [];
+    if (!callsQ.data) return [];
+    const myNameLc = myName.toLowerCase().trim();
     return callsQ.data
-      .filter(
-        (c) =>
-          c.evaluator_name?.toLowerCase().trim() ===
-          myName.toLowerCase().trim()
-      )
+      .filter((c) => {
+        if (c.uploaded_by) {
+          return myUserId ? c.uploaded_by === myUserId : false;
+        }
+        if (!myNameLc) return false;
+        return c.evaluator_name?.toLowerCase().trim() === myNameLc;
+      })
       .slice(0, 30);
-  }, [callsQ.data, myName]);
+  }, [callsQ.data, myUserId, myName]);
 
   const handleResendEmail = async (
     e: React.MouseEvent,

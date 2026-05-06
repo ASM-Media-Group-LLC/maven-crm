@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, LayoutGrid, List, Shield, UserCog, Users, User, Plus } from "lucide-react";
+import { Search, LayoutGrid, List, Shield, UserCog, Users, User, Plus, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import { useAdminUsers, type AdminUser } from "./useAdminUsers";
 import UsersTable from "./UsersTable";
@@ -19,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 
 const AdminUsuarios = () => {
+  const navigate = useNavigate();
   const { users, isLoading, changeRole, isChangingRole, stats } = useAdminUsers();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"list" | "grid">("list");
@@ -87,6 +89,14 @@ const AdminUsuarios = () => {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
             {/* Fixed Header */}
             <header className="bg-background px-6 pt-6 pb-4 border-b shrink-0">
+              <button
+                type="button"
+                onClick={() => navigate("/settings")}
+                className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Volver a Settings
+              </button>
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-xl font-semibold">Gestión de Usuarios</h1>

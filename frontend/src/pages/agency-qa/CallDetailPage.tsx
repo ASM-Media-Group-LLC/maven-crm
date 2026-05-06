@@ -16,6 +16,7 @@ import {
   User,
   Calendar,
   Mail,
+  Trash2,
 } from "lucide-react";
 import {
   Popover,
@@ -41,6 +42,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   useQaCall,
   useQaAudioSignedUrl,
@@ -49,6 +51,7 @@ import {
   useCreateQaHumanFeedback,
   useAnalyzeQaCall,
   useFireQaWebhook,
+  useDeleteQaCall,
   useQaSectionFeedback,
   useUpsertQaSectionFeedback,
   useDeleteQaSectionFeedback,
@@ -1353,6 +1356,8 @@ const CallDetailPage = ({
   const callQ = useQaCall(callId);
   const audioUrlQ = useQaAudioSignedUrl(callQ.data?.audio_path ?? null);
   const fireWebhook = useFireQaWebhook();
+  const deleteCall = useDeleteQaCall();
+  const { isAdmin } = useUserRole();
 
   const { user } = useAuth();
   const profileQ = useMyProfile();
@@ -1406,6 +1411,27 @@ const CallDetailPage = ({
     }
   };
 
+  const handleDelete = async () => {
+    // Confirmación nativa — borrar es destructivo y la RLS también nos
+    // protegería de un click accidental, pero mejor pedir feedback.
+    if (
+      !window.confirm(
+        "¿Borrar esta QA permanentemente? Esto elimina la fila + sus feedbacks. No se puede deshacer."
+      )
+    ) {
+      return;
+    }
+    try {
+      await deleteCall.mutateAsync(call.id);
+      toast.success("QA borrada");
+      onBack();
+    } catch (err) {
+      toast.error("No se pudo borrar la QA", {
+        description: (err as Error).message,
+      });
+    }
+  };
+
   return (
     <div className="w-full">
       {/* Back button */}
@@ -1418,21 +1444,41 @@ const CallDetailPage = ({
           <ArrowLeft className="h-4 w-4" />
           Historial
         </button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleResend}
-          disabled={fireWebhook.isPending}
-          className="gap-1.5"
-        >
-          {fireWebhook.isPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Mail className="h-3.5 w-3.5" />
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleResend}
+            disabled={fireWebhook.isPending}
+            className="gap-1.5"
+          >
+            {fireWebhook.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Mail className="h-3.5 w-3.5" />
+            )}
+            Reenviar email
+          </Button>
+          {isAdmin && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleDelete}
+              disabled={deleteCall.isPending}
+              className="gap-1.5 border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
+              title="Borrar QA permanentemente (admins)"
+            >
+              {deleteCall.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+              Borrar
+            </Button>
           )}
-          Reenviar email
-        </Button>
+        </div>
       </div>
 
       {/* HERO HEADER — gradient con nombre + outcome pill + score circle */}
