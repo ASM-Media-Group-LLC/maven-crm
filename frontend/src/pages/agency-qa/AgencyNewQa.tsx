@@ -79,7 +79,7 @@ const isAudioFile = (file: File): boolean => {
   );
 };
 
-const MODEL_CATEGORIES: ModelCategory[] = ["A++", "A", "B+", "B", "C+", "C"];
+const MODEL_CATEGORIES: ModelCategory[] = ["A++", "A+", "A", "B+", "B", "C+", "C"];
 
 const AgencyNewQa = () => {
   const { user } = useAuth();
