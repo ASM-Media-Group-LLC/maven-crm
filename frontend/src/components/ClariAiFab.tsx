@@ -129,9 +129,10 @@ const ClariAiFab = () => {
             </div>
           </div>
 
-          {/* Body — scroll interno via ClariAiChat */}
+          {/* Body — scroll interno via ClariAiChat con el endpoint
+              clari-help (asistente de soporte global, NO de datos). */}
           <div className="flex flex-1 min-h-0 overflow-hidden">
-            <ClariAiChat mode="panel" />
+            <ClariAiChat mode="panel" endpoint="clari-help" />
           </div>
         </div>
       )}

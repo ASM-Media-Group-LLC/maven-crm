@@ -76,7 +76,7 @@ const DashboardSidebar = () => {
   const creatorSalesSubItemsAll = [
     { title: "Dashboard", url: "/sales-overview", submodule: "Dashboard" },
     { title: "Reportes", url: "/salesdashboard", submodule: "Reportes" },
-    { title: "IA Ventas", url: "/aisales", submodule: "IA Ventas" },
+    { title: "IA Ventas · Beta", url: "/aisales", submodule: "IA Ventas" },
     { title: "Auditoría", url: "/sales-audit", submodule: "Auditoría" },
   ];
   const creatorSalesSubItems = creatorSalesSubItemsAll.filter((item) =>

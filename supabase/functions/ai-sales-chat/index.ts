@@ -181,8 +181,13 @@ serve(async (req) => {
     // Fall back to the default Groq model unless the saved config
     // already references a Groq one (llama / mixtral / gemma).
     const savedModel: string | undefined = config?.model;
+    // llama-3.1-8b-instant: smaller / faster Groq model con TPM limit
+    // 30k (vs 12k del llama-3.3-70b-versatile). El system prompt + data
+    // de creadoras pesa ~30k tokens, así que el 70B se rompía con 413
+    // por TPM. Para preguntas de ranking / comparativas el 8B alcanza.
+    // Override: setear GROQ_MODEL en los secrets de Supabase para volver.
     const GROQ_MODEL_DEFAULT =
-      Deno.env.get("GROQ_MODEL") || "llama-3.3-70b-versatile";
+      Deno.env.get("GROQ_MODEL") || "llama-3.1-8b-instant";
     const isGroqModel = (m: string) =>
       /^(llama|mixtral|gemma|meta-llama|qwen|deepseek)/i.test(m);
     const userModel =
@@ -219,49 +224,52 @@ serve(async (req) => {
       creatorMap[c.id] = c.artistic_name || c.name;
     }
 
-    // Build context string
+    // Para no rebasar el TPM limit de Groq (30k para llama-3.1-8b),
+    // recortamos lo que mandamos:
+    //  - creadoras: solo activas (status === 'active')
+    //  - daily summary: últimos 30 días (no 120)
+    //  - earnings: 50 registros más recientes (no 200)
+    // Si el supervisor pide datos más viejos, le respondemos con la
+    // limitación y le pedimos que afine la pregunta.
+
+    const activeCreators = (creators ?? []).filter(
+      (c: any) => !c.status || c.status === "active",
+    );
     const creatorsJson = JSON.stringify(
-      (creators ?? []).map((c: any) => ({
+      activeCreators.map((c: any) => ({
         id: c.id,
-        name: c.name,
-        artistic_name: c.artistic_name,
-        status: c.status,
+        name: c.artistic_name || c.name,
         category: c.category,
         country: c.country,
-        city: c.city,
-      }))
+      })),
     );
 
     const dailySummaryJson = JSON.stringify(
       buildDailySummary(deduped)
-        .slice(0, 120)
+        .slice(0, 30)
         .map((d) => ({
           date: d.date,
-          total: d.total,
-          subs: d.subs,
-          messages: d.messages,
-          tips: d.tips,
+          total: Math.round(d.total),
+          subs: Math.round(d.subs),
+          messages: Math.round(d.messages),
+          tips: Math.round(d.tips),
           active_fans: d.active_fans,
           new_fans: d.new_fans,
           creators: d.creators,
-        }))
+        })),
     );
 
     const earningsJson = JSON.stringify(
-      deduped.slice(0, 200).map((e) => ({
+      deduped.slice(0, 50).map((e) => ({
         creator: e.creator_id ? creatorMap[e.creator_id] || e.creator_id : e.pending_creator,
         date: e.effective_date,
-        total: e.total_earnings_gross,
-        subs: e.subscription_gross,
-        new_subs: e.new_subscriptions_sub_gross,
-        recurring: e.recurring_sub_gross,
-        messages: e.message_gross,
-        tips: e.tips_gross,
+        total: Math.round(e.total_earnings_gross ?? 0),
+        subs: Math.round(e.subscription_gross ?? 0),
+        messages: Math.round(e.message_gross ?? 0),
+        tips: Math.round(e.tips_gross ?? 0),
         active_fans: e.active_fans,
-        new_fans: e.new_fans,
-        following: e.following,
         ranking: e.of_ranking,
-      }))
+      })),
     );
 
     const toneInstructions: Record<string, string> = {
