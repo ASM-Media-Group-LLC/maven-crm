@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, History as HistoryIcon } from "lucide-react";
+import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { toast } from "sonner";
 import {
   useChatterSessions,
@@ -10,7 +10,6 @@ import {
 } from "@/hooks/useChatterEvaluator";
 import { CriteriaPanel, readScoresFromStorage, type CriteriaScores } from "./CriteriaPanel";
 import { SessionsPanel } from "./SessionsPanel";
-import { HistoryPanel } from "./HistoryPanel";
 import { ChatPanel } from "./ChatPanel";
 import { EvaluationVerdictDialog } from "./EvaluationVerdictDialog";
 import { CharacterInfoPanel } from "./CharacterInfoPanel";
@@ -95,25 +94,6 @@ const WorkspaceContent = () => {
       /* no-op */
     }
   }, [infoOverride]);
-  // Tab activo del rail derecho (persistido). Lifted up para que los
-  // botones del topbar puedan setearlo sin tener que abrir el rail
-  // primero.
-  const [rightTab, setRightTab] = useState<"info" | "history">(() => {
-    try {
-      const v = window.localStorage.getItem(RIGHT_TAB_KEY);
-      return v === "history" ? "history" : "info";
-    } catch {
-      return "info";
-    }
-  });
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(RIGHT_TAB_KEY, rightTab);
-    } catch {
-      /* no-op */
-    }
-  }, [rightTab]);
-
   const isNarrow = useIsNarrow();
   // Visibilidad de los rails:
   //   - Criterios: SOLO sigue el toggle manual del usuario.
@@ -254,32 +234,23 @@ const WorkspaceContent = () => {
             )}
             <span className="hidden sm:inline text-xs">Criterios</span>
           </Button>
-          {/* Toggle del tab "Info personaje" del rail derecho. Si el
-              rail está oculto, lo abre. Si ya está abierto en este tab,
-              lo cierra. Si está abierto pero en History, switchea acá. */}
+          {/* Toggle del rail de info personaje (derecha). 3-state:
+              hidden por user / shown por user / auto-hide en narrow.
+              Click siempre flippea, así el botón funciona aún en
+              narrow. History ya no vive acá — está en la página
+              principal del Chatter Evaluator. */}
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              if (!infoHidden && rightTab === "info") {
-                // ya visible y activo → ocultar el rail
-                setInfoOverride("hide");
-              } else {
-                // ocultar el rail por user toggle? mostrarlo. ya
-                // visible pero en otro tab? cambiar de tab. mismo
-                // resultado: abrir + setear tab.
-                setInfoOverride("show");
-                setRightTab("info");
-              }
-            }}
-            title={
-              infoHidden
-                ? "Mostrar info personaje"
-                : rightTab === "info"
-                  ? "Ocultar info personaje"
-                  : "Cambiar a info personaje"
+            onClick={() =>
+              setInfoOverride((curr) => {
+                const currentlyHidden =
+                  curr === "hide" ? true : curr === "show" ? false : isNarrow;
+                return currentlyHidden ? "show" : "hide";
+              })
             }
-            className={`gap-2 ${!infoHidden && rightTab === "info" ? "bg-muted" : ""}`}
+            title={infoHidden ? "Mostrar info personaje" : "Ocultar info personaje"}
+            className="gap-2"
           >
             {infoHidden ? (
               <PanelRightOpen className="h-4 w-4" />
@@ -287,30 +258,6 @@ const WorkspaceContent = () => {
               <PanelRightClose className="h-4 w-4" />
             )}
             <span className="hidden sm:inline text-xs">Info personaje</span>
-          </Button>
-          {/* Toggle del tab "History" del rail derecho. */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (!infoHidden && rightTab === "history") {
-                setInfoOverride("hide");
-              } else {
-                setInfoOverride("show");
-                setRightTab("history");
-              }
-            }}
-            title={
-              infoHidden
-                ? "Mostrar historial de sesiones"
-                : rightTab === "history"
-                  ? "Ocultar historial"
-                  : "Cambiar a historial"
-            }
-            className={`gap-2 ${!infoHidden && rightTab === "history" ? "bg-muted" : ""}`}
-          >
-            <HistoryIcon className="h-4 w-4" />
-            <span className="hidden sm:inline text-xs">History</span>
           </Button>
         </div>
         <div className="text-xs text-muted-foreground">
@@ -354,12 +301,8 @@ const WorkspaceContent = () => {
         </section>
         {!infoHidden && (
           <aside className="w-[320px] shrink-0 border-l border-border min-h-0">
-            <RightRailTabs
+            <CharacterInfoSidebar
               profileId={selectedSession?.profile_id ?? null}
-              selectedSessionId={selectedId}
-              onSelectSession={setSelectedId}
-              tab={rightTab}
-              onTabChange={setRightTab}
             />
           </aside>
         )}
@@ -379,25 +322,9 @@ const WorkspaceContent = () => {
   );
 };
 
-// Right-rail con dos tabs: Info personaje y History (todas las sesiones).
-// Recordamos la última pestaña seleccionada en localStorage para no
-// resetearla en cada montaje.
-const RIGHT_TAB_KEY = "maven.chatter.workspace.rightTab";
-type RightTab = "info" | "history";
-
-const RightRailTabs = ({
-  profileId,
-  selectedSessionId,
-  onSelectSession,
-  tab,
-  onTabChange,
-}: {
-  profileId: string | null;
-  selectedSessionId: string | null;
-  onSelectSession: (id: string | null) => void;
-  tab: RightTab;
-  onTabChange: (next: RightTab) => void;
-}) => {
+// Sidebar que muestra la info del personaje seleccionado. Compacto
+// para que quepa en la columna de 320px del rail derecho.
+const CharacterInfoSidebar = ({ profileId }: { profileId: string | null }) => {
   const profilesQ = useChatterProfiles();
   const [lang] = useChatterLang();
   const profile = profileId
@@ -405,52 +332,15 @@ const RightRailTabs = ({
     : null;
 
   return (
-    <aside className="flex h-full min-h-0 flex-col bg-card">
-      {/* Tab strip */}
-      <div className="flex shrink-0 items-stretch border-b border-border">
-        <button
-          type="button"
-          onClick={() => onTabChange("info")}
-          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-            tab === "info"
-              ? "border-b-2 border-primary text-primary"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Info personaje
-        </button>
-        <button
-          type="button"
-          onClick={() => onTabChange("history")}
-          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
-            tab === "history"
-              ? "border-b-2 border-primary text-primary"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          History
-        </button>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-hidden">
-        {tab === "info" ? (
-          profile ? (
-            <div className="h-full overflow-y-auto">
-              <CharacterInfoPanel profile={profile} lang={lang} compact />
-            </div>
-          ) : (
-            <div className="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground">
-              Seleccioná una sesión para ver la información del personaje.
-            </div>
-          )
-        ) : (
-          <HistoryPanel
-            selectedId={selectedSessionId}
-            onSelect={onSelectSession}
-          />
-        )}
-      </div>
-    </aside>
+    <div className="h-full overflow-y-auto bg-card">
+      {profile ? (
+        <CharacterInfoPanel profile={profile} lang={lang} compact />
+      ) : (
+        <div className="flex h-full items-center justify-center p-6 text-center text-xs text-muted-foreground">
+          Seleccioná una sesión para ver la información del personaje.
+        </div>
+      )}
+    </div>
   );
 };
 

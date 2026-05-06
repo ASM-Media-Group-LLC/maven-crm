@@ -163,9 +163,100 @@ Deno.serve(async (req) => {
         });
       }
 
-      return new Response(JSON.stringify({ success: true, temp_password: tempPassword }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Intento mandar el email con el password temporal vía Resend.
+      // Si RESEND_API_KEY no está configurada, devolvemos email_sent=false
+      // y el admin tiene que comunicar el password manualmente desde la
+      // UI (que sigue mostrando el temp_password en el modal).
+      let emailSent = false;
+      let emailError: string | null = null;
+      const resendKey = Deno.env.get("RESEND_API_KEY");
+      if (resendKey) {
+        try {
+          // Sacamos email + nombre del user para personalizar el mail.
+          const { data: targetUser } = await adminClient.auth.admin.getUserById(user_id);
+          const targetEmail = targetUser?.user?.email;
+          if (targetEmail) {
+            const { data: profile } = await adminClient
+              .from("profiles")
+              .select("full_name")
+              .eq("id", user_id)
+              .maybeSingle();
+            const fullName = (profile as { full_name?: string } | null)?.full_name ?? "";
+            const fromEmail = Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@resend.dev";
+            const appUrl = Deno.env.get("APP_URL") || "https://v3.test.maven-ai.me";
+
+            const html = `
+              <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+                <div style="background:linear-gradient(135deg,#6d28d9,#4338ca);padding:28px 24px;color:#ffffff;">
+                  <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;opacity:0.85;text-transform:uppercase;">Maven CRM</div>
+                  <h1 style="font-size:22px;font-weight:700;margin:6px 0 0;line-height:1.3;">Tu contraseña fue restablecida</h1>
+                </div>
+                <div style="padding:24px;">
+                  <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 16px;">
+                    ${fullName ? `Hola <strong>${fullName}</strong>,` : "Hola,"}
+                    un administrador de Maven restableció tu contraseña.
+                    Esta es tu nueva contraseña temporal:
+                  </p>
+                  <div style="margin:18px 0;padding:14px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:10px;text-align:center;">
+                    <code style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:18px;font-weight:700;letter-spacing:2px;color:#111827;">${tempPassword}</code>
+                  </div>
+                  <p style="color:#6b7280;font-size:13px;line-height:1.55;margin:0 0 16px;">
+                    Iniciá sesión con esta contraseña y cambiala inmediatamente
+                    desde Settings → Cuenta. Si vos no pediste este reset,
+                    avisale al admin lo antes posible.
+                  </p>
+                  <div style="text-align:center;margin:20px 0 0;">
+                    <a href="${appUrl}" style="display:inline-block;background:linear-gradient(135deg,#6d28d9,#4338ca);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 28px;border-radius:9999px;">
+                      Entrar a Maven →
+                    </a>
+                  </div>
+                </div>
+                <div style="background:#f9fafb;padding:14px 24px;text-align:center;border-top:1px solid #e5e7eb;">
+                  <p style="color:#9ca3af;font-size:11px;margin:0;">Enviado por Maven CRM · No respondas a este correo.</p>
+                </div>
+              </div>
+            `;
+
+            const resp = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${resendKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                from: fromEmail,
+                to: [targetEmail],
+                subject: "Maven CRM · Tu contraseña fue restablecida",
+                html,
+              }),
+            });
+            if (resp.ok) {
+              emailSent = true;
+            } else {
+              const body = await resp.text().catch(() => "");
+              emailError = `Resend ${resp.status}: ${body.slice(0, 200)}`;
+              console.error("Resend reset_password email failed", emailError);
+            }
+          } else {
+            emailError = "Usuario sin email registrado";
+          }
+        } catch (e) {
+          emailError = (e as Error).message ?? "fetch failed";
+          console.error("reset_password email exception", e);
+        }
+      } else {
+        emailError = "RESEND_API_KEY no configurada";
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          temp_password: tempPassword,
+          email_sent: emailSent,
+          email_error: emailError,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     if (action === "remove_role") {

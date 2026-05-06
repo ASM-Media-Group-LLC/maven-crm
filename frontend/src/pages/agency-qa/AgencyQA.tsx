@@ -283,13 +283,35 @@ const ComingSoonSection = ({ section }: { section: RoleSection }) => (
   </div>
 );
 
+// Mapeo de RoleKey → label del submódulo de Agency QA en el sistema
+// de permisos. El admin puede prender/apagar cada uno desde Settings →
+// Usuarios → Roles → permisos → módulo "Agency QA".
+const ROLE_TO_SUBMODULE: Record<RoleKey, string> = {
+  "closers-qa": "Closers QA",
+  "chatters-qa": "Chatters QA",
+  "managers-qa": "Managers QA",
+  "spammers-qa": "Spammers QA",
+};
+
 const AgencyQA = () => {
-  const [activeRole, setActiveRole] = useState<RoleKey>("closers-qa");
+  const { canAccess } = usePermissions();
+  // Filtramos las 4 categorías por permiso. Si un rol no tiene acceso
+  // a "Closers QA" (submódulo), no aparece su tab en el rail izquierdo.
+  const visibleRoleSections = ROLE_SECTIONS.filter((sec) =>
+    canAccess("Agency QA", ROLE_TO_SUBMODULE[sec.key]),
+  );
+  // Default al primer rol al que tenga acceso. Si no tiene acceso a
+  // ninguno, mostramos un mensaje en blanco; eso indica que el admin
+  // debería habilitarle al menos uno desde Settings.
+  const [activeRole, setActiveRole] = useState<RoleKey>(() =>
+    (visibleRoleSections[0]?.key ?? "closers-qa") as RoleKey,
+  );
   const activeSection = ROLE_SECTIONS.find((s) => s.key === activeRole);
+  const activeIsAllowed = visibleRoleSections.some((s) => s.key === activeRole);
 
   return (
     <main className="flex flex-1 overflow-y-auto">
-      {/* Left rail vertical estilo Settings — 4 role categorías. */}
+      {/* Left rail vertical estilo Settings — 4 categorías de QA por rol. */}
       <aside className="w-60 shrink-0 border-r bg-card/40 p-4">
         <div className="sticky top-4 space-y-1">
           <div className="px-2 pb-2">
@@ -298,7 +320,13 @@ const AgencyQA = () => {
               Auditorías por rol.
             </p>
           </div>
-          {ROLE_SECTIONS.map((sec) => {
+          {visibleRoleSections.length === 0 && (
+            <p className="px-2 py-3 text-[11px] italic text-muted-foreground">
+              Tu rol no tiene acceso a ninguna categoría. Pedile a un admin
+              que te habilite al menos una en Settings → Usuarios → Roles.
+            </p>
+          )}
+          {visibleRoleSections.map((sec) => {
             const Icon = sec.icon;
             const isActive = activeRole === sec.key;
             return (
@@ -328,7 +356,7 @@ const AgencyQA = () => {
 
       {/* Right side — contenido de la sección activa. */}
       <section className="min-w-0 flex-1 overflow-y-auto p-6 lg:p-8">
-        {activeRole === "closers-qa" ? (
+        {!activeIsAllowed ? null : activeRole === "closers-qa" ? (
           <ClosersQaSection />
         ) : activeSection ? (
           <ComingSoonSection section={activeSection} />

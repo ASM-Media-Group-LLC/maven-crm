@@ -148,7 +148,7 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
     return m;
   }, [profilesQ.data]);
 
-  // Solo sesiones abiertas — las cerradas viven en HistoryPanel.
+  // Solo sesiones abiertas — las cerradas viven en /chatter-evaluator/history.
   const open = useMemo(
     () => (sessionsQ.data ?? []).filter((s) => s.status !== "ended"),
     [sessionsQ.data],
@@ -181,12 +181,9 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
           <p className="p-2 text-xs text-muted-foreground">Cargando…</p>
         )}
         {!sessionsQ.isLoading && open.length === 0 && (
-          <div className="flex flex-col items-center gap-2 p-6 text-center text-xs text-muted-foreground">
-            <p>Sin sesiones abiertas.</p>
-            <Button size="sm" onClick={() => setNewOpen(true)} className="gap-1">
-              <Plus className="h-3 w-3" /> Nueva sesión
-            </Button>
-          </div>
+          <p className="p-4 text-center text-xs italic text-muted-foreground">
+            Sin sesiones abiertas.
+          </p>
         )}
         {open.map((s) => (
           <SessionRow

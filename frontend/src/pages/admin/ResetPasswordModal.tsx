@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { KeyRound, Copy, Check, AlertTriangle } from "lucide-react";
+import { KeyRound, Copy, Check, AlertTriangle, Mail, MailX } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 
@@ -13,9 +13,17 @@ interface ResetPasswordModalProps {
   userId: string;
 }
 
+interface ResetPasswordResponse {
+  temp_password: string;
+  email_sent?: boolean;
+  email_error?: string | null;
+}
+
 const ResetPasswordModal = ({ open, onOpenChange, userName, userId }: ResetPasswordModalProps) => {
   const [step, setStep] = useState<"confirm" | "result">("confirm");
   const [tempPassword, setTempPassword] = useState("");
+  const [emailSent, setEmailSent] = useState<boolean | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
@@ -23,11 +31,13 @@ const ResetPasswordModal = ({ open, onOpenChange, userName, userId }: ResetPassw
   const handleReset = async () => {
     setIsLoading(true);
     try {
-      const data = await adminInvoke<{ temp_password: string }>("admin-user-actions", {
+      const data = await adminInvoke<ResetPasswordResponse>("admin-user-actions", {
         action: "reset_password",
         user_id: userId,
       });
       setTempPassword(data.temp_password);
+      setEmailSent(data.email_sent ?? false);
+      setEmailError(data.email_error ?? null);
       setStep("result");
     } catch (e: any) {
       const title = e instanceof SessionExpiredError ? "Sesión expirada" : "Error";
@@ -50,6 +60,8 @@ const ResetPasswordModal = ({ open, onOpenChange, userName, userId }: ResetPassw
       setStep("confirm");
       setTempPassword("");
       setCopied(false);
+      setEmailSent(null);
+      setEmailError(null);
     }, 200);
   };
 
@@ -93,11 +105,31 @@ const ResetPasswordModal = ({ open, onOpenChange, userName, userId }: ResetPassw
               La contraseña ha sido restablecida exitosamente.
             </p>
 
-            <div className="rounded-lg border border-green-200 bg-green-50 p-3">
-              <p className="text-sm text-green-800">
-                La contraseña fue actualizada. Comparte la contraseña temporal con el usuario de forma segura.
-              </p>
-            </div>
+            {/* Estado del email — verde si Resend respondió 2xx, amber
+                si la key no está configurada o falló el envío. En ambos
+                casos el password ya quedó cambiado en auth.users. */}
+            {emailSent ? (
+              <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3">
+                <Mail className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
+                <p className="text-sm text-green-800">
+                  Email enviado al usuario con la contraseña temporal.
+                  Como respaldo te dejamos el password abajo por si el
+                  correo no llega.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <MailX className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                <div className="text-sm text-amber-900">
+                  <p className="font-medium">No se envió el email.</p>
+                  <p className="mt-0.5 text-xs text-amber-800">
+                    {emailError === "RESEND_API_KEY no configurada"
+                      ? "Falta configurar RESEND_API_KEY en los secrets de Supabase. Mientras tanto, comparte la contraseña con el usuario manualmente desde acá."
+                      : emailError ?? "Comparte la contraseña con el usuario manualmente."}
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Contraseña temporal</label>
