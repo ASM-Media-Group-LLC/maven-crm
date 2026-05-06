@@ -24,6 +24,7 @@ import AgencyNewQa from "./AgencyNewQa";
 import AgencyQaChat from "./AgencyQaChat";
 import AgencyQaHistory from "./AgencyQaHistory";
 import AgencyQaNotifications from "./AgencyQaNotifications";
+import CallDetailPage from "./CallDetailPage";
 
 // Agency QA — 2 niveles:
 //
@@ -178,6 +179,21 @@ const ClosersQaSection = () => {
   const [active, setActive] = useState<ClosersQaKey>(
     (visibleSubs[0]?.key as ClosersQaKey) ?? "calls",
   );
+  // Full-page call detail: when set, replaces the tabs with CallDetailPage.
+  const [detailCallId, setDetailCallId] = useState<string | null>(null);
+
+  const openCallDetail = (callId: string) => setDetailCallId(callId);
+  const closeCallDetail = () => setDetailCallId(null);
+
+  // If a call is selected, show the full-page detail view
+  if (detailCallId) {
+    return (
+      <CallDetailPage
+        callId={detailCallId}
+        onBack={closeCallDetail}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -202,7 +218,7 @@ const ClosersQaSection = () => {
         {visibleSubs.map((s) => (
           <TabsContent key={s.key} value={s.key} className="mt-4">
             {s.key === "calls" ? (
-              <AgencyCalls />
+              <AgencyCalls onOpenDetail={openCallDetail} />
             ) : s.key === "models" ? (
               <AgencyModels />
             ) : s.key === "analytics" ? (
@@ -210,7 +226,7 @@ const ClosersQaSection = () => {
             ) : s.key === "new-qa" ? (
               <AgencyNewQa />
             ) : s.key === "qa-history" ? (
-              <AgencyQaHistory />
+              <AgencyQaHistory onOpenDetail={openCallDetail} />
             ) : s.key === "qa-chat" ? (
               <AgencyQaChat />
             ) : s.key === "notifications" ? (

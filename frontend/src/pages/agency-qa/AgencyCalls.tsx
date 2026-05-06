@@ -15,53 +15,63 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, Mail } from "lucide-react";
+import { toast } from "sonner";
 import {
   useQaCalls,
   useQaClosers,
   useQaModels,
+  useFireQaWebhook,
   scoreColor,
   OUTCOME_META,
   type QaCallRow,
   type CallOutcome,
 } from "@/hooks/useAgencyQa";
-import CallDetailDrawer from "./CallDetailDrawer";
 
-// Calls subtab — first real screen of Agency QA. Replaces the "En
-// migración" placeholder with a list of analyzed calls (qa_calls).
-// Mirrors the kash /calls page: dense table with model + closer +
-// outcome badge + score pill. Click a row → drawer with the
-// transcript + analysis (next slice; for now a brief preview).
-//
-// Out of scope this slice (next slices):
-//   - Full call detail panel with sections / radar / audio metrics
-//   - Human feedback form
-//   - Re-analyze button
-//   - Export / resend email
+// Calls subtab — Kash-style table with model avatar, closer, evaluator,
+// outcome badge, score pill, and resend email button.
+// Click a row → opens full-page CallDetailPage (via onOpenDetail callback).
 
 const OUTCOME_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "all",        label: "Todos los resultados" },
-  { value: "cerro",      label: "Exitoso" },
-  { value: "no_cerro",   label: "Rechazado" },
-  { value: "en_espera",  label: "En espera" },
+  { value: "all", label: "Todos los resultados" },
+  { value: "cerro", label: "Exitoso" },
+  { value: "no_cerro", label: "Rechazado" },
+  { value: "en_espera", label: "En espera" },
 ];
 
 const fmtDate = (iso: string) => {
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+  return d.toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
-const Avatar = ({ name, dataUrl, size = 28 }: { name: string; dataUrl: string | null; size?: number }) => {
+const Avatar = ({
+  name,
+  dataUrl,
+  size = 32,
+}: {
+  name: string;
+  dataUrl: string | null;
+  size?: number;
+}) => {
   const initial = (name?.trim().charAt(0) || "?").toUpperCase();
   let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  for (let i = 0; i < name.length; i++)
+    h = (h * 31 + name.charCodeAt(i)) % 360;
   const bg = `linear-gradient(135deg, hsl(${h}, 40%, 30%) 0%, hsl(${(h + 60) % 360}, 50%, 20%) 100%)`;
   return (
     <span
       className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full text-[11px] font-bold text-white/90"
       style={{ width: size, height: size, background: bg }}
     >
-      {dataUrl ? <img src={dataUrl} alt="" className="h-full w-full object-cover" /> : initial}
+      {dataUrl ? (
+        <img src={dataUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        initial
+      )}
     </span>
   );
 };
@@ -88,29 +98,35 @@ const OutcomeBadge = ({ outcome }: { outcome: CallOutcome }) => {
 
 const ScorePill = ({ score }: { score: number }) => (
   <span
-    className="inline-block min-w-10 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums text-white"
+    className="inline-flex min-w-[40px] items-center justify-center rounded-full px-2.5 py-1 text-xs font-bold tabular-nums text-white"
     style={{ background: scoreColor(score) }}
   >
     {score}
   </span>
 );
 
-const AgencyCalls = () => {
+interface AgencyCallsProps {
+  onOpenDetail?: (callId: string) => void;
+}
+
+const AgencyCalls = ({ onOpenDetail }: AgencyCallsProps) => {
   const [search, setSearch] = useState("");
   const [outcomeFilter, setOutcomeFilter] = useState<string>("all");
   const [closerFilter, setCloserFilter] = useState<string>("all");
   const [modelFilter, setModelFilter] = useState<string>("all");
-  const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const callsQ = useQaCalls({
     search,
-    outcome: outcomeFilter === "all" ? undefined : (outcomeFilter as CallOutcome),
+    outcome:
+      outcomeFilter === "all"
+        ? undefined
+        : (outcomeFilter as CallOutcome),
     closerId: closerFilter === "all" ? undefined : closerFilter,
     modelId: modelFilter === "all" ? undefined : modelFilter,
   });
   const closersQ = useQaClosers();
   const modelsQ = useQaModels();
+  const fireWebhook = useFireQaWebhook();
 
   const rows = callsQ.data ?? [];
 
@@ -118,32 +134,59 @@ const AgencyCalls = () => {
     const total = rows.length;
     let cerro = 0;
     let noCerro = 0;
-    let enEspera = 0;
     let scoreSum = 0;
     for (const r of rows) {
       const o = r.claude_analysis?.call_outcome;
       if (o === "cerro") cerro++;
       else if (o === "no_cerro") noCerro++;
-      else if (o === "en_espera") enEspera++;
       scoreSum += r.claude_score;
     }
     const avgScore = total > 0 ? scoreSum / total : 0;
     const closeRate = total > 0 ? cerro / total : 0;
-    return { total, cerro, noCerro, enEspera, avgScore, closeRate };
+    return { total, cerro, noCerro, avgScore, closeRate };
   }, [rows]);
+
+  const handleResendEmail = async (
+    e: React.MouseEvent,
+    callId: string
+  ) => {
+    e.stopPropagation();
+    try {
+      await fireWebhook.mutateAsync({ callId });
+      toast.success("Email reenviado");
+    } catch (err) {
+      toast.error("No se pudo reenviar el email", {
+        description: (err as Error).message,
+      });
+    }
+  };
 
   return (
     <div className="space-y-5">
       {/* Stats row */}
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <Stat label="Análisis" value={stats.total} hint="cargados" color="rgb(148 163 184)" />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Stat
+          label="Análisis"
+          value={stats.total}
+          hint="cargados"
+          color="rgb(148 163 184)"
+        />
         <Stat
           label="Exitosos"
           value={stats.cerro}
-          hint={stats.total ? `${(stats.closeRate * 100).toFixed(0)}% close rate` : ""}
+          hint={
+            stats.total
+              ? `${(stats.closeRate * 100).toFixed(0)}% close rate`
+              : ""
+          }
           color="rgb(22 163 74)"
         />
-        <Stat label="Rechazados" value={stats.noCerro} hint="no cerraron" color="rgb(220 38 38)" />
+        <Stat
+          label="Rechazados"
+          value={stats.noCerro}
+          hint="no cerraron"
+          color="rgb(220 38 38)"
+        />
         <Stat
           label="Score promedio"
           value={stats.total ? stats.avgScore.toFixed(0) : "—"}
@@ -207,7 +250,7 @@ const AgencyCalls = () => {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-border bg-card">
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
         {callsQ.isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -216,19 +259,35 @@ const AgencyCalls = () => {
           <div className="p-10 text-center">
             <p className="text-sm font-medium">Sin análisis para mostrar</p>
             <p className="text-xs text-muted-foreground">
-              Sube una nueva grabación desde "Nueva QA" o ajusta los filtros.
+              Sube una nueva grabación desde &ldquo;Nueva QA&rdquo; o ajusta los
+              filtros.
             </p>
           </div>
         ) : (
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Modelo</TableHead>
-                <TableHead>Closer</TableHead>
-                <TableHead>Evaluador</TableHead>
-                <TableHead>Resultado</TableHead>
-                <TableHead className="text-right">Score</TableHead>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                  Fecha
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                  Modelo
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                  Closer
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                  Evaluador
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                  Resultado
+                </TableHead>
+                <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                  Score
+                </TableHead>
+                <TableHead className="w-[80px] text-center text-[10px] font-bold uppercase tracking-widest">
+                  Reenviar
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -237,25 +296,32 @@ const AgencyCalls = () => {
                 return (
                   <TableRow
                     key={row.id}
-                    className="cursor-pointer hover:bg-muted/40"
-                    onClick={() => {
-                      setSelectedCallId(row.id);
-                      setDrawerOpen(true);
-                    }}
+                    className="cursor-pointer transition-colors hover:bg-muted/30"
+                    onClick={() => onOpenDetail?.(row.id)}
                   >
-                    <TableCell className="tabular-nums">{fmtDate(row.call_date)}</TableCell>
-                    <TableCell>
-                      {row.model ? (
-                        <div className="flex items-center gap-2">
-                          <Avatar name={row.model.name} dataUrl={row.model.avatar_data_url} size={28} />
-                          <span>{row.model.name}</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                    <TableCell className="tabular-nums text-sm">
+                      {fmtDate(row.call_date)}
                     </TableCell>
                     <TableCell>
-                      {row.closer?.name ?? <span className="text-muted-foreground">—</span>}
+                      {row.model ? (
+                        <div className="flex items-center gap-2.5">
+                          <Avatar
+                            name={row.model.name}
+                            dataUrl={row.model.avatar_data_url}
+                            size={32}
+                          />
+                          <span className="text-sm font-medium">
+                            {row.model.name}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {row.closer?.name ?? (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {row.evaluator_name}
@@ -266,6 +332,17 @@ const AgencyCalls = () => {
                     <TableCell className="text-right">
                       <ScorePill score={row.claude_score} />
                     </TableCell>
+                    <TableCell className="text-center">
+                      <button
+                        type="button"
+                        onClick={(e) => handleResendEmail(e, row.id)}
+                        disabled={fireWebhook.isPending}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50"
+                        title="Reenviar email"
+                      >
+                        <Mail className="h-4 w-4" />
+                      </button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -273,15 +350,6 @@ const AgencyCalls = () => {
           </Table>
         )}
       </div>
-
-      <CallDetailDrawer
-        callId={selectedCallId}
-        open={drawerOpen}
-        onOpenChange={(v) => {
-          setDrawerOpen(v);
-          if (!v) setSelectedCallId(null);
-        }}
-      />
     </div>
   );
 };
@@ -297,14 +365,16 @@ const Stat = ({
   hint?: string;
   color: string;
 }) => (
-  <div className="rounded-xl border border-border bg-muted/20 p-3">
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+  <div className="rounded-xl border border-border/60 bg-card p-4">
+    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
       {label}
     </div>
     <div className="mt-1 text-2xl font-bold tabular-nums" style={{ color }}>
       {value}
     </div>
-    {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
+    {hint && (
+      <div className="text-[11px] text-muted-foreground">{hint}</div>
+    )}
   </div>
 );
 
