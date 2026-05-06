@@ -20,6 +20,11 @@ export interface EmailPayload {
   criteria: { label: string; status: "pass" | "partial" | "fail"; statusLabel: string }[];
   feedback: string;
   chatHistory: { role: string; type: string; content: string | null; price: number | null; timestamp: string; from: string }[];
+  /** Base URL del frontend (ej. https://v3.test.maven-ai.me) — para
+   *  construir el deeplink al workspace en el botón "Ver transcript" del
+   *  email. El correo ya no incluye el chat completo; el receptor abre
+   *  Maven directo en la sesión. */
+  appUrl: string;
 }
 
 const COLORS = {
@@ -118,14 +123,17 @@ export const buildEmailHtml = (p: EmailPayload): string => {
               `</td></tr>`
             : "") +
 
-          // Transcript CTA — sits inside the card, below the feedback.
-          // {{DOC_URL}} is replaced by Apps Script with the Drive doc URL
-          // (or '#' if doc creation failed).
-          `<tr><td style="padding:18px 32px 8px;">` +
-            `<a href="{{DOC_URL}}" target="_blank" style="display:inline-block;background:${COLORS.primary};color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;">` +
-              `Ver transcripción del chat` +
-            `</a>` +
-          `</td></tr>` +
+          // Transcript CTA — el correo ya no carga la transcripción
+          // completa; el botón abre la sesión directamente en Maven, así
+          // el receptor ve el chat real (mensajes + reacciones + tip
+          // amounts) en vez de una versión recortada en HTML.
+          (p.appUrl
+            ? `<tr><td style="padding:18px 32px 8px;">` +
+                `<a href="${escape(p.appUrl)}/chatter-evaluator/workspace?session=${escape(p.sessionId)}" target="_blank" style="display:inline-block;background:${COLORS.primary};color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;">` +
+                  `Ver transcript en Maven →` +
+                `</a>` +
+              `</td></tr>`
+            : "") +
 
           // Footer
           `<tr><td style="padding:18px 32px 26px;border-top:1px solid ${COLORS.border};margin-top:8px;">` +

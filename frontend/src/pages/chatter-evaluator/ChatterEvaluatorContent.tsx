@@ -3,13 +3,32 @@ import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Image as ImageIcon, Video, ListChecks, Mail, Settings, History as HistoryIcon } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  Plus,
+  Image as ImageIcon,
+  Users,
+  CheckCircle2,
+  XCircle,
+  Percent,
+  ListChecks,
+  Settings,
+  History as HistoryIcon,
+} from "lucide-react";
 import {
   useChatterProfiles,
   useChatterVaultCounts,
-  useChatterCriteria,
-  useChatterConfig,
   useChatterSessions,
+  useChatterEvaluationStats,
 } from "@/hooks/useChatterEvaluator";
 import type { ChatterProfile } from "./types";
 import { NewSessionDialog } from "./NewSessionDialog";
@@ -103,15 +122,14 @@ const StatCard = ({
 const ChatterEvaluatorContent = () => {
   const profilesQ = useChatterProfiles();
   const vaultCountsQ = useChatterVaultCounts();
-  const criteriaQ = useChatterCriteria();
-  const configQ = useChatterConfig();
   const sessionsQ = useChatterSessions("active-only");
+  const statsQ = useChatterEvaluationStats();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
 
   const profiles = profilesQ.data ?? [];
   const vaultCounts = vaultCountsQ.data ?? {};
-  const totalVault = Object.values(vaultCounts).reduce((a, b) => a + b, 0);
   const totalImages = profiles.reduce((a, p) => a + (vaultCounts[p.id] ?? 0), 0);
+  const stats = statsQ.data;
 
   return (
     <main className="flex-1 overflow-y-auto p-6">
@@ -155,27 +173,159 @@ const ChatterEvaluatorContent = () => {
 
         <NewSessionDialog open={newSessionOpen} onOpenChange={setNewSessionOpen} />
 
+        {/* Stats reales del History — total de evaluaciones, aptas vs no
+            aptas, promedio de score_pct. Si statsQ está cargando mostramos
+            "…" para no hacer flicker. */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard
-            icon={ImageIcon}
-            label="Perfiles"
-            value={profilesQ.isLoading ? "…" : profiles.length}
+            icon={Users}
+            label="Personas evaluadas"
+            value={statsQ.isLoading ? "…" : (stats?.total ?? 0)}
           />
           <StatCard
-            icon={Video}
-            label="Items en vault"
-            value={vaultCountsQ.isLoading ? "…" : totalVault}
+            icon={CheckCircle2}
+            label="Aprobados"
+            value={statsQ.isLoading ? "…" : (stats?.approved ?? 0)}
           />
           <StatCard
-            icon={ListChecks}
-            label="Criterios activos"
-            value={criteriaQ.isLoading ? "…" : (criteriaQ.data ?? []).length}
+            icon={XCircle}
+            label="Reprobados"
+            value={statsQ.isLoading ? "…" : (stats?.rejected ?? 0)}
           />
           <StatCard
-            icon={Mail}
-            label="Emails de notificación"
-            value={configQ.isLoading ? "…" : (configQ.data?.notification_emails.length ?? 0)}
+            icon={Percent}
+            label="Promedio de éxito"
+            value={statsQ.isLoading ? "…" : `${stats?.avgScorePct ?? 0}%`}
           />
+        </div>
+
+        {/* Charts: tendencia diaria + top perfiles. Colores: primary
+            (apto) / muted-destructive (no apto). Si stats está cargando,
+            mostramos skeletons del mismo alto para evitar layout shift. */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
+                Evaluaciones últimos 30 días
+              </h3>
+              <div className="h-[220px]">
+                {statsQ.isLoading || !stats ? (
+                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                    Cargando…
+                  </div>
+                ) : stats.total === 0 ? (
+                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                    Sin evaluaciones todavía
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={stats.daily}
+                      margin={{ top: 4, right: 8, left: -16, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-border"
+                      />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10 }}
+                        interval={Math.ceil(stats.daily.length / 8)}
+                      />
+                      <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={{
+                          fontSize: 12,
+                          background: "hsl(var(--popover))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: 8,
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar
+                        dataKey="apto"
+                        name="Aprobados"
+                        stackId="a"
+                        fill="hsl(var(--primary))"
+                        radius={[2, 2, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="noApto"
+                        name="Reprobados"
+                        stackId="a"
+                        fill="hsl(var(--destructive) / 0.7)"
+                        radius={[2, 2, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
+                Top perfiles evaluados
+              </h3>
+              <div className="h-[220px]">
+                {statsQ.isLoading || !stats ? (
+                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                    Cargando…
+                  </div>
+                ) : stats.byProfile.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                    Sin datos
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={stats.byProfile}
+                      layout="vertical"
+                      margin={{ top: 4, right: 8, left: 8, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-border"
+                      />
+                      <XAxis
+                        type="number"
+                        tick={{ fontSize: 10 }}
+                        allowDecimals={false}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="profile"
+                        tick={{ fontSize: 10 }}
+                        width={90}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          fontSize: 12,
+                          background: "hsl(var(--popover))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: 8,
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar
+                        dataKey="apto"
+                        name="Aprobados"
+                        stackId="a"
+                        fill="hsl(var(--primary))"
+                      />
+                      <Bar
+                        dataKey="noApto"
+                        name="Reprobados"
+                        stackId="a"
+                        fill="hsl(var(--destructive) / 0.7)"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <section className="space-y-3">

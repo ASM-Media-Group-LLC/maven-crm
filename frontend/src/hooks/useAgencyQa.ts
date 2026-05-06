@@ -1034,14 +1034,13 @@ export const OUTCOME_META: Record<
 
 // ─── QA Config (notificaciones globales) ──────────────────────────────
 // Singleton (id=1) por tenant. Mismo patrón que chatter_config — un
-// solo row con apps_script_url + lista de emails externos + lista de
-// profiles.id internos + toggles por evento. La edge function
-// notification-automations lee esto y dispara cuando entran las
-// condiciones (qa_calls insert / claude_analysis update / score < threshold).
+// solo row con lista de emails externos + lista de profiles.id internos
+// + toggles por evento. La edge function notification-automations lee
+// esto y dispara cuando entran las condiciones (qa_calls insert /
+// claude_analysis update / score < threshold).
 
 export interface QaConfig {
   id: number;
-  apps_script_url: string | null;
   notification_emails: string[];
   notify_user_ids: string[];
   notify_on_uploaded: boolean;
@@ -1067,7 +1066,6 @@ export const useQaConfig = () =>
   });
 
 export interface UpdateQaConfigInput {
-  apps_script_url?: string | null;
   notification_emails?: string[];
   notify_user_ids?: string[];
   notify_on_uploaded?: boolean;

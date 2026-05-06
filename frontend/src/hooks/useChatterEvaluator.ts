@@ -525,6 +525,125 @@ const genSessionId = (): string => {
   return `${t}${r}`;
 };
 
+// Stats agregadas para los cajones + charts de la home (personas
+// evaluadas, aprobados, reprobados, promedio, serie temporal últimos
+// 30 días, distribución por perfil). Lee directamente de
+// chatter_evaluations — el verdict ya viene normalizado a "apto" /
+// "no_apto" desde el submit, así que no hay re-cálculo.
+export interface ChatterEvaluationStats {
+  total: number;
+  approved: number;
+  rejected: number;
+  /** Promedio de score_pct sobre las evaluaciones que tienen score
+   *  (ignora rows con score_pct null). 0 si no hay ninguna. */
+  avgScorePct: number;
+  /** Serie diaria últimos 30 días, label DD/MM, listo para Recharts. */
+  daily: Array<{ date: string; apto: number; noApto: number }>;
+  /** Conteo de evaluaciones por profile (Top N). El nombre se resuelve
+   *  con un join a chatter_sessions → chatter_profiles. */
+  byProfile: Array<{ profile: string; apto: number; noApto: number }>;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const fmtDayLabel = (d: Date): string =>
+  `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+export const useChatterEvaluationStats = () =>
+  useQuery({
+    queryKey: ["chatter-evaluation-stats"],
+    queryFn: async (): Promise<ChatterEvaluationStats> => {
+      // Join inverso: cada evaluación trae su sesión y, vía la sesión,
+      // el perfil que se estaba simulando. Eso permite agrupar por
+      // perfil sin un segundo round-trip.
+      const { data, error } = await sb
+        .from("chatter_evaluations")
+        .select(
+          "verdict, score_pct, created_at, session:chatter_sessions(profile:chatter_profiles(name))",
+        );
+      if (error) throw error;
+      type Row = {
+        verdict: "apto" | "no_apto";
+        score_pct: number | null;
+        created_at: string;
+        session: { profile: { name: string } | null } | null;
+      };
+      const rows = (data ?? []) as Row[];
+
+      let approved = 0;
+      let rejected = 0;
+      let scoreSum = 0;
+      let scoreCount = 0;
+
+      // 30 buckets diarios — incluye hoy. Los inicializamos primero
+      // para que días sin evaluaciones aparezcan con 0 (evita huecos
+      // raros en el bar chart).
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dailyMap = new Map<string, { apto: number; noApto: number }>();
+      const dailyOrder: string[] = [];
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(today.getTime() - i * DAY_MS);
+        const key = fmtDayLabel(d);
+        dailyMap.set(key, { apto: 0, noApto: 0 });
+        dailyOrder.push(key);
+      }
+
+      const byProfileMap = new Map<string, { apto: number; noApto: number }>();
+      const cutoff = today.getTime() - 30 * DAY_MS;
+
+      for (const r of rows) {
+        if (r.verdict === "apto") approved++;
+        else if (r.verdict === "no_apto") rejected++;
+        if (typeof r.score_pct === "number") {
+          scoreSum += r.score_pct;
+          scoreCount++;
+        }
+
+        // Daily — solo dentro de la ventana de 30 días.
+        const ts = new Date(r.created_at).getTime();
+        if (ts >= cutoff) {
+          const key = fmtDayLabel(new Date(ts));
+          const slot = dailyMap.get(key);
+          if (slot) {
+            if (r.verdict === "apto") slot.apto++;
+            else slot.noApto++;
+          }
+        }
+
+        // Por perfil — usamos el nombre del perfil (no el id) para que el
+        // chart sea legible sin lookup adicional. "(sin perfil)" para
+        // evaluaciones donde el join no devolvió nada.
+        const profileName = r.session?.profile?.name ?? "(sin perfil)";
+        const slot = byProfileMap.get(profileName) ?? { apto: 0, noApto: 0 };
+        if (r.verdict === "apto") slot.apto++;
+        else slot.noApto++;
+        byProfileMap.set(profileName, slot);
+      }
+
+      const daily = dailyOrder.map((date) => ({
+        date,
+        apto: dailyMap.get(date)!.apto,
+        noApto: dailyMap.get(date)!.noApto,
+      }));
+
+      // Top 6 perfiles por volumen — el chart se vuelve ruidoso con
+      // más de eso, y la cola larga raramente es accionable.
+      const byProfile = Array.from(byProfileMap.entries())
+        .map(([profile, v]) => ({ profile, apto: v.apto, noApto: v.noApto }))
+        .sort((a, b) => b.apto + b.noApto - (a.apto + a.noApto))
+        .slice(0, 6);
+
+      return {
+        total: rows.length,
+        approved,
+        rejected,
+        avgScorePct: scoreCount > 0 ? Math.round(scoreSum / scoreCount) : 0,
+        daily,
+        byProfile,
+      };
+    },
+  });
+
 export const useChatterSessions = (status?: "active-only" | "all") =>
   useQuery({
     queryKey: ["chatter-sessions", status ?? "all"],
@@ -899,6 +1018,7 @@ const fireWebhookInBackground = async (
       chatterName: session.chatter_name,
       modelName: profile?.name ?? session.profile_id,
       examinerName: evaluation.examiner_name ?? "(unnamed)",
+      appUrl: typeof window !== "undefined" ? window.location.origin : "",
       verdict: evaluation.verdict as "apto" | "no_apto",
       verdictLabel: evaluation.verdict === "apto" ? "APTO" : "NO APTO",
       scorePct: evaluation.score_pct ?? 0,
