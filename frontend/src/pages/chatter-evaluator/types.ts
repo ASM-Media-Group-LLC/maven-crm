@@ -87,6 +87,13 @@ export interface ChatterSession {
   created_at: string;
 }
 
+export interface MessageReaction {
+  user_id: string;
+  user_name: string;
+  emoji: string;
+  created_at: string;
+}
+
 export interface ChatterMessage {
   id: string;
   session_id: string;
@@ -100,6 +107,11 @@ export interface ChatterMessage {
   // True once the examiner has "bought" a priced (PPV) image. Mirrors the
   // `purchased` flag in the original Roleplaychatters message shape.
   purchased: boolean;
+  // Reacciones por emoji que dejaron usuarios al mensaje. Vive en una
+  // columna jsonb del mismo row para que el realtime de chatter_messages
+  // notifique cambios sin tabla extra. Si la columna todavía no existe
+  // en el DB (pre-migración), las queries devuelven `[]` por default.
+  reactions: MessageReaction[];
   created_at: string;
 }
 

@@ -4,11 +4,6 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { toast } from "sonner";
 import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable";
-import {
   useChatterSessions,
   useChatterConfig,
   useChatterCriteria,
@@ -27,9 +22,14 @@ const ACTIVE_KEY = "maven.chatter.workspace.activeSessionId";
 const CRITERIA_HIDDEN_KEY = "maven.chatter.workspace.criteriaHidden";
 const INFO_HIDDEN_KEY = "maven.chatter.workspace.infoHidden";
 
-// Breakpoint below which the side rails refuse to render — at 1100px or
-// less the criteria + info panels get squeezed too narrow to read.
-const NARROW_BREAKPOINT = 1100;
+// Breakpoint debajo del cual los rails laterales (criterios + info
+// personaje) se ocultan automáticamente. Cálculo:
+//   viewport - sidebar global (~240px) - sessions (240px) - chat min (500px)
+//   = espacio sobrante para criterios + info
+// A 1500px nos quedan ~520px que cubren los dos rails (220 + 300).
+// Debajo de 1500 sacamos los rails de los lados; el usuario los puede
+// mostrar manualmente con los toggles si quiere.
+const NARROW_BREAKPOINT = 1500;
 const useIsNarrow = (): boolean => {
   const [narrow, setNarrow] = useState(() =>
     typeof window === "undefined" ? false : window.innerWidth < NARROW_BREAKPOINT,
@@ -241,47 +241,43 @@ const WorkspaceContent = () => {
         </div>
       </div>
 
-      {/* Resizable panel layout. Each panel can be dragged via its
-          handle; criteria can be fully hidden via the toolbar toggle.
-          react-resizable-panels persists each panel's size under
-          autoSaveId so the browser remembers the layout. */}
-      <ResizablePanelGroup
-        direction="horizontal"
-        // bumped to v2 so previously-saved oversized layouts get
-        // reset to the new defaults (criteria/sessions were eating
-        // ~20% each — way wider than the old fixed grid).
-        autoSaveId="maven-chatter-workspace-v3"
-        className="min-h-0 flex-1"
-      >
+      {/* Layout fijo con flex en lugar de panels resizables. Cada rail
+          tiene un ancho fijo razonable; el chat toma el resto del
+          espacio con flex-1. Esto NO se rompe sin importar qué tan
+          chico/grande haga el viewport el usuario, y no requiere
+          guardar layouts en localStorage que después se desincronizan
+          (el problema del ResizablePanelGroup anterior).
+
+          Anchos elegidos: Criterios 220px (sus labels son cortos),
+          Sessions 240px (tiene avatares + última activity), Character
+          Info 300px (cards grandes con vault). Si el viewport es
+          narrow, los rails se ocultan automáticamente vía useIsNarrow.
+
+          Para mensajes muy largos en el chat, min-w-0 + overflow-hidden
+          previene que el chat empuje los rails fuera de la pantalla. */}
+      <div className="flex min-h-0 flex-1">
         {!criteriaHidden && (
-          <>
-            <ResizablePanel defaultSize={13} minSize={10} maxSize={25} className="min-h-0">
-              <CriteriaPanel
-                session={selectedSession}
-                scores={currentScores}
-                setScores={setScoresForCurrent}
-                onSubmitEvaluation={handleSubmit}
-              />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-          </>
+          <aside className="w-[220px] shrink-0 border-r border-border min-h-0">
+            <CriteriaPanel
+              session={selectedSession}
+              scores={currentScores}
+              setScores={setScoresForCurrent}
+              onSubmitEvaluation={handleSubmit}
+            />
+          </aside>
         )}
-        <ResizablePanel defaultSize={13} minSize={10} maxSize={25} className="min-h-0">
+        <aside className="w-[240px] shrink-0 border-r border-border min-h-0">
           <SessionsPanel selectedId={selectedId} onSelect={setSelectedId} />
-        </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={60} minSize={30} className="min-h-0">
+        </aside>
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <ChatPanel session={selectedSession} />
-        </ResizablePanel>
+        </section>
         {!infoHidden && (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={14} minSize={11} maxSize={28} className="min-h-0">
-              <CharacterInfoSidebar profileId={selectedSession?.profile_id ?? null} />
-            </ResizablePanel>
-          </>
+          <aside className="w-[300px] shrink-0 border-l border-border min-h-0">
+            <CharacterInfoSidebar profileId={selectedSession?.profile_id ?? null} />
+          </aside>
         )}
-      </ResizablePanelGroup>
+      </div>
 
       {selectedSession && (
         <EvaluationVerdictDialog

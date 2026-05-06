@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square, X as XIcon } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square, X as XIcon, Mic, MicOff, SmilePlus } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -25,7 +25,10 @@ import {
   usePurchaseChatterMessage,
   useEndChatterSession,
   useDeleteExaminerMessage,
+  useToggleMessageReaction,
 } from "@/hooks/useChatterEvaluator";
+import { useAuth } from "@/hooks/useAuth";
+import { useMyProfile } from "@/hooks/useUserProfile";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -75,6 +78,123 @@ const formatTime = (iso: string): string => {
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 };
 
+// Set chico de emojis para el picker rápido. Si el usuario quiere
+// algo distinto, lo agregamos al backend después; estos cubren ~95%
+// de las reacciones típicas en chats.
+const QUICK_REACTIONS = ["👍", "❤️", "🔥", "😂", "😮", "👀", "🙏", "🎉"] as const;
+
+// Renderea los chips de reacciones bajo una burbuja de mensaje.
+// Cada chip muestra el emoji + el conteo (si > 1). Click sobre un chip
+// togglea la reacción del user actual con ese emoji. Si el user actual
+// es uno de los que reaccionaron con ese emoji, el chip se ve activado.
+const ReactionsRow = ({
+  reactions,
+  currentUserId,
+  align,
+  onToggle,
+}: {
+  reactions: ChatterMessage["reactions"];
+  currentUserId: string | null;
+  align: "left" | "right";
+  onToggle: (emoji: string) => void;
+}) => {
+  if (!reactions || reactions.length === 0) return null;
+  // Agrupamos por emoji manteniendo el orden de primera aparición.
+  const groups = new Map<
+    string,
+    { emoji: string; count: number; userIds: Set<string>; names: string[] }
+  >();
+  for (const r of reactions) {
+    const slot = groups.get(r.emoji) ?? {
+      emoji: r.emoji,
+      count: 0,
+      userIds: new Set<string>(),
+      names: [],
+    };
+    slot.count += 1;
+    slot.userIds.add(r.user_id);
+    slot.names.push(r.user_name);
+    groups.set(r.emoji, slot);
+  }
+  const list = Array.from(groups.values());
+  return (
+    <div
+      className={`mt-0.5 flex flex-wrap gap-1 ${
+        align === "right" ? "justify-end" : "justify-start"
+      }`}
+    >
+      {list.map((g) => {
+        const mine = currentUserId ? g.userIds.has(currentUserId) : false;
+        return (
+          <button
+            key={g.emoji}
+            type="button"
+            onClick={() => onToggle(g.emoji)}
+            title={g.names.join(", ")}
+            className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs transition-colors ${
+              mine
+                ? "border-primary/40 bg-primary/15 text-primary"
+                : "border-border bg-muted/50 text-foreground hover:bg-muted"
+            }`}
+          >
+            <span>{g.emoji}</span>
+            {g.count > 1 && (
+              <span className="text-[10px] tabular-nums">{g.count}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// Botón flotante que aparece al hover en una burbuja, con popover
+// pickeable de emojis rápidos. Click → onToggle(emoji) y cierra el
+// popover.
+const ReactionPickerButton = ({
+  align,
+  onToggle,
+}: {
+  align: "left" | "right";
+  onToggle: (emoji: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={`absolute top-1/2 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm ring-1 ring-border hover:bg-muted hover:text-foreground group-hover/bubble:flex ${
+            align === "right" ? "left-[-30px]" : "right-[-30px]"
+          }`}
+          title="Reaccionar"
+          aria-label="Reaccionar"
+        >
+          <SmilePlus className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-1" align={align === "right" ? "end" : "start"}>
+        <div className="flex gap-0.5">
+          {QUICK_REACTIONS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => {
+                onToggle(e);
+                setOpen(false);
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-lg transition-colors hover:bg-muted"
+              title={`Reaccionar con ${e}`}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 const MessageBubble = ({
   msg,
   fanName,
@@ -85,6 +205,8 @@ const MessageBubble = ({
   onPurchase,
   purchasing,
   onDelete,
+  currentUserId,
+  onToggleReaction,
 }: {
   msg: ChatterMessage;
   fanName: string;
@@ -99,6 +221,11 @@ const MessageBubble = ({
   /** Examiner-side delete (sets deleted='full'). Only invoked from the
    *  ✕ button on the examiner's own (fan-role) bubbles. */
   onDelete: (msg: ChatterMessage) => void;
+  /** Auth user id del que está mirando el chat — para saber si SU
+   *  reacción está activa en cada emoji. */
+  currentUserId: string | null;
+  /** Toggle de reacción para este mensaje en particular. */
+  onToggleReaction: (msg: ChatterMessage, emoji: string) => void;
 }) => {
   if (msg.deleted === "full") return null;
 
@@ -207,6 +334,13 @@ const MessageBubble = ({
                 </button>
               </>
             )}
+            {/* Reacción rápida — flota al lado opuesto a la cola del
+                bubble. Para mensajes del fan (left-aligned) → derecha;
+                para mensajes del chatter (right-aligned) → izquierda. */}
+            <ReactionPickerButton
+              align={isFan ? "left" : "right"}
+              onToggle={(emoji) => onToggleReaction(msg, emoji)}
+            />
           </div>
         )}
         {msg.images && msg.images.length > 0 && (
@@ -293,6 +427,12 @@ const MessageBubble = ({
             )
           )}
         </span>
+        <ReactionsRow
+          reactions={msg.reactions ?? []}
+          currentUserId={currentUserId}
+          align={isFan ? "left" : "right"}
+          onToggle={(emoji) => onToggleReaction(msg, emoji)}
+        />
       </div>
     </div>
   );
@@ -322,6 +462,85 @@ export const ChatPanel = ({ session }: Props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
+
+  // Dictado por voz nativo del navegador (Web Speech API) — sin LLMs ni
+  // APIs externas. Toggleable: click → empieza a escuchar y mete los
+  // chunks reconocidos al input. Click otra vez → para. Si el usuario
+  // tipea a mano mientras dicta, el anchor sigue al texto editado para
+  // que el siguiente chunk de voz se anexe al final.
+  const [listening, setListening] = useState(false);
+  const speechAnchorRef = useRef<string>("");
+  const speechRecRef = useRef<unknown | null>(null);
+  const speechSupported = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
+    return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
+  }, []);
+  const toggleDictation = () => {
+    if (listening) {
+      const r = speechRecRef.current as { stop?: () => void } | null;
+      r?.stop?.();
+      speechRecRef.current = null;
+      setListening(false);
+      return;
+    }
+    if (!speechSupported) {
+      toast.error("Tu navegador no soporta dictado por voz", {
+        description: "Probá con Chrome, Edge o Safari.",
+      });
+      return;
+    }
+    const w = window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown };
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) return;
+    const rec = new Ctor() as {
+      continuous: boolean;
+      interimResults: boolean;
+      lang: string;
+      onresult: ((e: { results: unknown }) => void) | null;
+      onerror: ((e: { error?: string }) => void) | null;
+      onend: (() => void) | null;
+      start: () => void;
+      stop: () => void;
+    };
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = "es-ES";
+    rec.onresult = (ev) => {
+      const results = ev.results as unknown as Array<{ 0: { transcript: string }; isFinal: boolean }>;
+      let interim = "";
+      let finalText = "";
+      for (let i = 0; i < results.length; i++) {
+        const txt = results[i][0]?.transcript ?? "";
+        if (results[i].isFinal) finalText += txt;
+        else interim += txt;
+      }
+      const text = (finalText + interim).trim();
+      if (!text) return;
+      const base = speechAnchorRef.current;
+      const sep = base && !base.endsWith(" ") && !base.endsWith("\n") ? " " : "";
+      setInput(base + sep + text);
+    };
+    rec.onerror = (e) => {
+      if (e.error && e.error !== "aborted") {
+        toast.error("Dictado por voz", { description: e.error });
+      }
+      setListening(false);
+      speechRecRef.current = null;
+    };
+    rec.onend = () => {
+      setListening(false);
+      speechRecRef.current = null;
+    };
+    speechAnchorRef.current = input;
+    try {
+      rec.start();
+      speechRecRef.current = rec;
+      setListening(true);
+    } catch (e) {
+      toast.error("No se pudo iniciar el dictado", { description: (e as Error).message });
+    }
+  };
   const lastMessageIdRef = useRef<string | null>(null);
   // Tracks which session the message refs are calibrated for. Switching
   // sessions (clicking another chat in the sidebar) reloads the messages
@@ -341,6 +560,35 @@ export const ChatPanel = ({ session }: Props) => {
   const extendMut = useExtendChatterSession();
   const purchaseMut = usePurchaseChatterMessage();
   const deleteMsgMut = useDeleteExaminerMessage();
+  const reactionMut = useToggleMessageReaction();
+  const { user: authUser } = useAuth();
+  const profileQ = useMyProfile();
+  const currentUserId = authUser?.id ?? null;
+  const currentUserName =
+    profileQ.data?.full_name?.trim() ||
+    authUser?.user_metadata?.full_name?.trim() ||
+    authUser?.email ||
+    "Sin nombre";
+
+  const handleToggleReaction = (msg: ChatterMessage, emoji: string) => {
+    if (!currentUserId || !session) return;
+    reactionMut.mutate(
+      {
+        messageId: msg.id,
+        sessionId: session.id,
+        emoji,
+        userId: currentUserId,
+        userName: currentUserName,
+      },
+      {
+        onError: (e) => {
+          toast.error("No se pudo guardar la reacción", {
+            description: (e as Error).message,
+          });
+        },
+      },
+    );
+  };
   const endMut = useEndChatterSession();
   const [endOpen, setEndOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -494,6 +742,9 @@ export const ChatPanel = ({ session }: Props) => {
   const typingTimer = useRef<number | null>(null);
   const handleInputChange = (val: string) => {
     setInput(val);
+    // Si el usuario edita a mano mientras dicta, sincronizamos el anchor
+    // para que la voz se anexe al final del texto nuevo.
+    if (listening) speechAnchorRef.current = val;
     if (!session) return;
     if (val.length > 0) {
       void supabase
@@ -842,6 +1093,8 @@ export const ChatPanel = ({ session }: Props) => {
               );
             }}
             purchasing={purchaseMut.isPending}
+            currentUserId={currentUserId}
+            onToggleReaction={handleToggleReaction}
           />
         ))}
       </div>
@@ -935,6 +1188,18 @@ export const ChatPanel = ({ session }: Props) => {
               </Button>
             </PopoverContent>
           </Popover>
+          {speechSupported && (
+            <Button
+              onClick={toggleDictation}
+              disabled={session.status === "ended"}
+              size="icon"
+              variant={listening ? "default" : "outline"}
+              title={listening ? "Detener dictado" : "Dictar (Web Speech)"}
+              className={listening ? "bg-rose-500 text-white hover:bg-rose-500/90" : ""}
+            >
+              {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+          )}
           <Button
             onClick={handleSend}
             disabled={session.status === "ended" || !input.trim() || sendMut.isPending}
