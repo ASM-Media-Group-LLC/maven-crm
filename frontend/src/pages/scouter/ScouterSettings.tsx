@@ -39,6 +39,7 @@ import {
   Play,
   UserCircle2,
 } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   useScouterCompaniesAll,
   useCreateCompany,
@@ -603,7 +604,9 @@ const CompanyCard = ({
   onEdit,
 }: {
   company: ScouterCompany;
-  onEdit: () => void;
+  /** Si es undefined, la card es read-only (sin botón Editar). Lo
+   *  controla el permiso "Editar Compañías" del rol del usuario. */
+  onEdit?: () => void;
 }) => {
   const cfg = company.search_config ?? {};
   const hashtags = cfg.hashtags ?? [];
@@ -623,15 +626,17 @@ const CompanyCard = ({
               </Badge>
             )}
           </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onEdit}
-            className="opacity-60 group-hover:opacity-100 gap-1 text-xs"
-          >
-            <Pencil className="h-3 w-3" />
-            Editar
-          </Button>
+          {onEdit && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onEdit}
+              className="opacity-60 group-hover:opacity-100 gap-1 text-xs"
+            >
+              <Pencil className="h-3 w-3" />
+              Editar
+            </Button>
+          )}
         </div>
         <span className="text-[11px] font-mono text-muted-foreground">{company.slug}</span>
       </CardHeader>
@@ -1125,13 +1130,21 @@ const ScouterSettings = () => {
   const companies = companiesQ.data ?? [];
   const [showForm, setShowForm] = useState(false);
   const [editingCompany, setEditingCompany] = useState<ScouterCompany | null>(null);
+  // Gate del create/edit. Default false hasta que el rol tenga el
+  // submódulo "Editar Compañías" activado en Settings → Roles. Sin
+  // este permiso, la UI muestra las cards en read-only — el usuario
+  // todavía ve la configuración pero no la puede modificar.
+  const { canAccess } = usePermissions();
+  const canEditCompanies = canAccess("Scouter Assist", "Editar Compañías");
 
   const handleNew = () => {
+    if (!canEditCompanies) return;
     setEditingCompany(null);
     setShowForm(true);
   };
 
   const handleEdit = (c: ScouterCompany) => {
+    if (!canEditCompanies) return;
     setEditingCompany(c);
     setShowForm(true);
   };
@@ -1151,10 +1164,12 @@ const ScouterSettings = () => {
             Configurá qué busca cada compañía. Usá "Mejorar con IA" para generar filtros automáticamente.
           </p>
         </div>
-        <Button onClick={handleNew} className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          Nueva compañía
-        </Button>
+        {canEditCompanies && (
+          <Button onClick={handleNew} className="gap-1.5">
+            <Plus className="h-4 w-4" />
+            Nueva compañía
+          </Button>
+        )}
       </div>
 
       {/* Company grid */}
@@ -1166,18 +1181,30 @@ const ScouterSettings = () => {
         <div className="rounded-xl border border-dashed border-border bg-muted/20 p-10 text-center">
           <Building2 className="mx-auto h-8 w-8 text-muted-foreground mb-3" />
           <p className="text-sm font-medium">Sin compañías todavía</p>
-          <p className="text-xs text-muted-foreground mb-4">
-            Creá tu primera compañía para empezar a configurar las búsquedas.
-          </p>
-          <Button onClick={handleNew} variant="outline" className="gap-1.5">
-            <Plus className="h-4 w-4" />
-            Crear compañía
-          </Button>
+          {canEditCompanies ? (
+            <>
+              <p className="text-xs text-muted-foreground mb-4">
+                Creá tu primera compañía para empezar a configurar las búsquedas.
+              </p>
+              <Button onClick={handleNew} variant="outline" className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                Crear compañía
+              </Button>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Pedile a un admin que cree las compañías o que active tu permiso "Editar Compañías".
+            </p>
+          )}
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {companies.map((c) => (
-            <CompanyCard key={c.id} company={c} onEdit={() => handleEdit(c)} />
+            <CompanyCard
+              key={c.id}
+              company={c}
+              onEdit={canEditCompanies ? () => handleEdit(c) : undefined}
+            />
           ))}
         </div>
       )}
