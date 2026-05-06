@@ -101,6 +101,10 @@ export interface QaCall {
   claude_analysis: CallAnalysis;
   claude_score: number;
   created_at: string;
+  /** auth.users.id of who uploaded this QA. NULL for legacy rows that
+   *  predate the column. QA History falls back to evaluator_name match
+   *  when uploaded_by is NULL. */
+  uploaded_by?: string | null;
 }
 
 /** Row shape returned by the joined list query — calls + flattened
@@ -460,6 +464,11 @@ export const useCreateQaCall = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateQaCallInput): Promise<QaCall & { audio_path: string | null }> => {
+      // Capturamos el user_id actual para asociar la fila con quien la
+      // sube. Esto es lo que usa "QA History" para listar "mis QAs".
+      const { data: authData } = await supabase.auth.getUser();
+      const uploaderId = authData?.user?.id ?? null;
+
       const { data, error } = await sb
         .from("qa_calls")
         .insert({
@@ -472,6 +481,7 @@ export const useCreateQaCall = () => {
           claude_analysis: {},
           claude_score: 0,
           audio_metrics: null,
+          uploaded_by: uploaderId,
         })
         .select("*")
         .single();
@@ -480,6 +490,27 @@ export const useCreateQaCall = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["qa-calls"] });
+      qc.invalidateQueries({ queryKey: ["qa-models-with-stats"] });
+      qc.invalidateQueries({ queryKey: ["qa-analytics"] });
+    },
+  });
+};
+
+/** Borra una qa_calls row. La RLS del DB sólo deja pasar la operación
+ *  cuando el caller tiene rol admin (policy qa_calls_delete_admin), así
+ *  que el cliente puede llamar esta mutation libremente — el server la
+ *  rechaza con error si el rol no califica. La UI igualmente esconde el
+ *  botón para roles no-admin para no mostrar opciones rotas. */
+export const useDeleteQaCall = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (callId: string): Promise<void> => {
+      const { error } = await sb.from("qa_calls").delete().eq("id", callId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["qa-calls"] });
+      qc.invalidateQueries({ queryKey: ["qa-call"] });
       qc.invalidateQueries({ queryKey: ["qa-models-with-stats"] });
       qc.invalidateQueries({ queryKey: ["qa-analytics"] });
     },
