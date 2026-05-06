@@ -50,7 +50,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   { group: "Operaciones",   module: "LeadGen",       submodules: [] },
   { group: "Operaciones",   module: "Closers",       submodules: [] },
   { group: "Operaciones",   module: "Tickets",       submodules: [] },
-  { group: "Operaciones",   module: "Chatters",      submodules: ["Evaluator", "Workspace", "Admin"] },
+  { group: "Operaciones",   module: "Chatters",      submodules: ["Evaluator", "Workspace", "Admin", "Borrar Historial"] },
   { group: "Operaciones",   module: "Scouter Assist", submodules: ["Home", "Busquedas", "Favoritas", "Leads", "Funnel", "Mis Tareas", "Settings"] },
   { group: "Operaciones",   module: "Agency QA",     submodules: ["Calls", "New QA", "QA History", "QA Chat", "Models", "Analytics", "Notifications", "Borrar Calls"] },
 
