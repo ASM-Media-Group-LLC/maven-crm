@@ -74,14 +74,22 @@ const unlockAudio = () => {
   });
 };
 
-// Hook the unlock onto the first real user gesture anywhere in the app.
-// `once: true` means it fires exactly once and unbinds itself.
-if (typeof window !== "undefined") {
+// Audio unlock is now registered lazily inside the VolumeControl component
+// (via useEffect) instead of at module level. This prevents sounds from
+// playing on pages that don't use the chatter evaluator (e.g. Landing on
+// mobile, where the module-level approach was causing phantom audio).
+const registerUnlockListeners = () => {
+  if (typeof window === "undefined" || _audioUnlocked) return () => {};
   const opts = { once: true, capture: true } as const;
   window.addEventListener("click", unlockAudio, opts);
   window.addEventListener("keydown", unlockAudio, opts);
   window.addEventListener("touchstart", unlockAudio, opts);
-}
+  return () => {
+    window.removeEventListener("click", unlockAudio, opts);
+    window.removeEventListener("keydown", unlockAudio, opts);
+    window.removeEventListener("touchstart", unlockAudio, opts);
+  };
+};
 
 // Plays an mp3 from /public/sounds at the persisted volume. Mirrors the
 // original Roleplaychatters playSound (index.html line 1580). Reuses a
@@ -113,6 +121,10 @@ interface VolumeControlProps {
 
 export const VolumeControl = ({ className, onDark }: VolumeControlProps) => {
   const [volume, setVolume] = useState<number>(() => getSoundVolume());
+
+  // Register audio unlock listeners only when this component mounts
+  // (i.e. when the user is actually on a chatter evaluator page).
+  useEffect(() => registerUnlockListeners(), []);
 
   // Stay in sync with other VolumeControl instances and other tabs.
   useEffect(() => {
