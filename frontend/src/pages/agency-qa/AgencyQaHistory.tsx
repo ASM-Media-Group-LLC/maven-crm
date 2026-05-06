@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -10,11 +10,22 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Loader2,
   Sparkles,
   CheckCircle2,
   Clock,
   AlertCircle,
+  AlertTriangle,
   Mail,
   Trash2,
 } from "lucide-react";
@@ -22,6 +33,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   useQaCalls,
   useFireQaWebhook,
@@ -29,9 +41,16 @@ import {
   scoreColor,
 } from "@/hooks/useAgencyQa";
 
-// AgencyQaHistory — feed de las QAs que YO subí, en formato tabla
-// con columnas (Score · Fecha · Modelo · Cerrador · Estado · Acciones).
+// AgencyQaHistory — feed de las QAs en formato tabla con columnas
+// (Score · Fecha · Modelo · Cerrador · Estado · Acciones).
 // Click en una row → full-page detail.
+//
+// Visibilidad:
+//   - Admins ven TODAS las QAs (vista de gestión).
+//   - Otros roles solo ven las suyas: matcheamos por uploaded_by (FK a
+//     auth.users) y caemos a evaluator_name == nombre del perfil cuando
+//     uploaded_by es NULL (rows legacy que existieron antes de la
+//     migración 20260505200000).
 
 const computeStatus = (call: {
   audio_path: string | null;
@@ -94,6 +113,36 @@ const fmtDate = (iso: string) => {
   }
 };
 
+// Avatar de la modelo — mismo patrón que la tabla original de Calls
+// (gradiente HSL determinístico desde el nombre + foto si existe).
+const ModelAvatar = ({
+  name,
+  dataUrl,
+  size = 32,
+}: {
+  name: string;
+  dataUrl: string | null;
+  size?: number;
+}) => {
+  const initial = (name?.trim().charAt(0) || "?").toUpperCase();
+  let h = 0;
+  for (let i = 0; i < name.length; i++)
+    h = (h * 31 + name.charCodeAt(i)) % 360;
+  const bg = `linear-gradient(135deg, hsl(${h}, 40%, 30%) 0%, hsl(${(h + 60) % 360}, 50%, 20%) 100%)`;
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full text-[11px] font-bold text-white/90"
+      style={{ width: size, height: size, background: bg }}
+    >
+      {dataUrl ? (
+        <img src={dataUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        initial
+      )}
+    </span>
+  );
+};
+
 interface AgencyQaHistoryProps {
   onOpenDetail?: (callId: string) => void;
 }
@@ -104,11 +153,17 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
   const callsQ = useQaCalls();
   const fireWebhook = useFireQaWebhook();
   const deleteCall = useDeleteQaCall();
-  // El borrado vive acá ahora. Permiso configurable desde
-  // Settings → Usuarios → Roles → Agency QA → "Borrar Calls". Admins lo
-  // tienen always-true. La RLS del DB también filtra el DELETE.
   const { canAccess } = usePermissions();
+  const { isAdmin } = useUserRole();
   const canDelete = canAccess("Agency QA", "Borrar Calls");
+
+  // Modal de confirmación de borrado — guarda la QA target para el flow
+  // <abrir confirmación> → <click confirmar> → <DELETE> sin confiar en
+  // window.confirm.
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
 
   const myUserId = user?.id ?? null;
   const myName = useMemo(() => {
@@ -120,11 +175,14 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
     );
   }, [profileQ.data, user]);
 
-  // Filtramos "mis QAs": preferimos uploaded_by (FK a auth.users) y
-  // caemos a evaluator_name match para rows legacy donde uploaded_by
-  // todavía es NULL.
-  const myCalls = useMemo(() => {
+  const visibleCalls = useMemo(() => {
     if (!callsQ.data) return [];
+    // Admins ven todo el equipo en orden cronológico inverso (la lista
+    // ya viene ordenada del query). El cap de 30 evita que la tabla
+    // crezca infinito; si hace falta paginar lo agregamos cuando duela.
+    if (isAdmin) {
+      return callsQ.data.slice(0, 30);
+    }
     const myNameLc = myName.toLowerCase().trim();
     return callsQ.data
       .filter((c) => {
@@ -135,7 +193,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
         return c.evaluator_name?.toLowerCase().trim() === myNameLc;
       })
       .slice(0, 30);
-  }, [callsQ.data, myUserId, myName]);
+  }, [callsQ.data, isAdmin, myUserId, myName]);
 
   const handleResendEmail = async (e: React.MouseEvent, callId: string) => {
     e.stopPropagation();
@@ -149,18 +207,21 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, callId: string) => {
+  const askDelete = (
+    e: React.MouseEvent,
+    callId: string,
+    label: string
+  ) => {
     e.stopPropagation();
-    if (
-      !window.confirm(
-        "¿Borrar esta QA permanentemente? No se puede deshacer."
-      )
-    ) {
-      return;
-    }
+    setPendingDelete({ id: callId, label });
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
     try {
-      await deleteCall.mutateAsync(callId);
+      await deleteCall.mutateAsync(pendingDelete.id);
       toast.success("QA borrada");
+      setPendingDelete(null);
     } catch (err) {
       toast.error("No se pudo borrar la QA", {
         description: (err as Error).message,
@@ -171,10 +232,13 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-base font-semibold">Mis QAs recientes</h2>
+        <h2 className="text-base font-semibold">
+          {isAdmin ? "Historial de QAs" : "Mis QAs recientes"}
+        </h2>
         <p className="text-xs text-muted-foreground">
-          Las llamadas que vos subiste. Click en una fila para ver el detalle
-          completo.
+          {isAdmin
+            ? "Listado completo de todas las QAs del equipo. Click en una fila para ver el detalle."
+            : "Las llamadas que vos subiste. Click en una fila para ver el detalle completo."}
         </p>
       </div>
 
@@ -185,10 +249,12 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
               <Loader2 className="h-4 w-4 animate-spin" />
               Cargando…
             </div>
-          ) : myCalls.length === 0 ? (
+          ) : visibleCalls.length === 0 ? (
             <div className="space-y-2 p-6 text-center text-sm">
               <p className="text-muted-foreground">
-                Todavía no subiste ninguna QA.
+                {isAdmin
+                  ? "Todavía no hay QAs cargadas."
+                  : "Todavía no subiste ninguna QA."}
               </p>
               <p className="text-xs text-muted-foreground">
                 Andá al tab Nueva QA, subí el audio de una llamada y al volver
@@ -220,8 +286,12 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {myCalls.map((call) => {
+                {visibleCalls.map((call) => {
                   const status = computeStatus(call);
+                  const label =
+                    `${call.model?.name ?? "(sin modelo)"} · ${
+                      call.closer?.name ?? "(sin closer)"
+                    }`;
                   return (
                     <TableRow
                       key={call.id}
@@ -241,10 +311,21 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                       <TableCell className="tabular-nums text-sm">
                         {fmtDate(call.call_date)}
                       </TableCell>
-                      {/* Modelo */}
-                      <TableCell className="text-sm font-medium">
-                        {call.model?.name ?? (
-                          <span className="text-muted-foreground">
+                      {/* Modelo (avatar + nombre) */}
+                      <TableCell>
+                        {call.model ? (
+                          <div className="flex items-center gap-2.5">
+                            <ModelAvatar
+                              name={call.model.name}
+                              dataUrl={call.model.avatar_data_url}
+                              size={32}
+                            />
+                            <span className="text-sm font-medium">
+                              {call.model.name}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
                             (sin modelo)
                           </span>
                         )}
@@ -272,7 +353,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                           )}
                         </div>
                       </TableCell>
-                      {/* Acciones — Reenviar + Borrar (admin) */}
+                      {/* Acciones — Reenviar + Borrar */}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
@@ -287,7 +368,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                           {canDelete && (
                             <button
                               type="button"
-                              onClick={(e) => handleDelete(e, call.id)}
+                              onClick={(e) => askDelete(e, call.id, label)}
                               disabled={deleteCall.isPending}
                               className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-400 disabled:opacity-50"
                               title="Borrar QA"
@@ -305,6 +386,47 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
           )}
         </CardContent>
       </Card>
+
+      {/* Confirm delete dialog — estilo Maven (shadcn AlertDialog) */}
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Borrar QA
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Seguro que querés borrar la QA de{" "}
+              <strong>{pendingDelete?.label}</strong>?
+              <br />
+              Se eliminan también sus feedbacks y comentarios. Esta acción no
+              se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteCall.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteCall.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteCall.isPending ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Borrando…
+                </>
+              ) : (
+                "Borrar"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
