@@ -530,13 +530,26 @@ const genSessionId = (): string => {
 // 30 días, distribución por perfil). Lee directamente de
 // chatter_evaluations — el verdict ya viene normalizado a "apto" /
 // "no_apto" desde el submit, así que no hay re-cálculo.
-export interface ChatterEvaluationStats {
+//
+// Devolvemos counters separados por rango (week / month / total) para
+// que los stat cards de la home puedan mostrar cualquiera de los tres
+// con un toggle, sin dispararle al hook tres veces.
+export interface RangeCounters {
   total: number;
   approved: number;
   rejected: number;
-  /** Promedio de score_pct sobre las evaluaciones que tienen score
-   *  (ignora rows con score_pct null). 0 si no hay ninguna. */
+  /** Promedio de score_pct dentro de las evaluaciones del rango que
+   *  tienen score (ignora rows con score_pct null). 0 si no hay. */
   avgScorePct: number;
+}
+
+export type StatsRange = "week" | "month" | "all";
+
+export interface ChatterEvaluationStats extends RangeCounters {
+  /** Counters por rango — el componente elige cuál renderizar según
+   *  el toggle activo. `all` siempre coincide con los counters
+   *  top-level (que se mantienen para retrocompatibilidad). */
+  byRange: Record<StatsRange, RangeCounters>;
   /** Serie diaria últimos 30 días, label DD/MM, listo para Recharts. */
   daily: Array<{ date: string; apto: number; noApto: number }>;
   /** Conteo de evaluaciones por profile (Top N). El nombre se resuelve
@@ -547,6 +560,24 @@ export interface ChatterEvaluationStats {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const fmtDayLabel = (d: Date): string =>
   `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+// "Esta semana" = lunes 00:00 local hasta ahora. La elección del lunes
+// como inicio de semana es la convención local (es_AR/es_CO etc); si
+// algún día se internacionaliza, mover esto a Intl.Locale.weekInfo.
+const startOfWeek = (now: Date): Date => {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  const dow = d.getDay(); // 0=dom, 1=lun ... 6=sáb
+  const diff = dow === 0 ? -6 : 1 - dow;
+  d.setDate(d.getDate() + diff);
+  return d;
+};
+
+// "Este mes" = día 1 del mes en curso a las 00:00 local.
+const startOfMonth = (now: Date): Date => {
+  const d = new Date(now.getFullYear(), now.getMonth(), 1);
+  return d;
+};
 
 export const useChatterEvaluationStats = () =>
   useQuery({
@@ -569,10 +600,29 @@ export const useChatterEvaluationStats = () =>
       };
       const rows = (data ?? []) as Row[];
 
-      let approved = 0;
-      let rejected = 0;
-      let scoreSum = 0;
-      let scoreCount = 0;
+      // Buckets para los 3 rangos. Por cada eval acumulamos en los que
+      // correspondan — una eval puede estar simultáneamente en week,
+      // month y all (semana en curso ⊆ mes en curso ⊆ todo).
+      const now = new Date();
+      const weekStart = startOfWeek(now).getTime();
+      const monthStart = startOfMonth(now).getTime();
+
+      type Acc = { approved: number; rejected: number; scoreSum: number; scoreCount: number; total: number };
+      const blank = (): Acc => ({ approved: 0, rejected: 0, scoreSum: 0, scoreCount: 0, total: 0 });
+      const accs: Record<StatsRange, Acc> = {
+        week: blank(),
+        month: blank(),
+        all: blank(),
+      };
+      const tally = (acc: Acc, r: Row) => {
+        acc.total++;
+        if (r.verdict === "apto") acc.approved++;
+        else if (r.verdict === "no_apto") acc.rejected++;
+        if (typeof r.score_pct === "number") {
+          acc.scoreSum += r.score_pct;
+          acc.scoreCount++;
+        }
+      };
 
       // 30 buckets diarios — incluye hoy. Los inicializamos primero
       // para que días sin evaluaciones aparezcan con 0 (evita huecos
@@ -592,15 +642,12 @@ export const useChatterEvaluationStats = () =>
       const cutoff = today.getTime() - 30 * DAY_MS;
 
       for (const r of rows) {
-        if (r.verdict === "apto") approved++;
-        else if (r.verdict === "no_apto") rejected++;
-        if (typeof r.score_pct === "number") {
-          scoreSum += r.score_pct;
-          scoreCount++;
-        }
+        const ts = new Date(r.created_at).getTime();
+        tally(accs.all, r);
+        if (ts >= monthStart) tally(accs.month, r);
+        if (ts >= weekStart) tally(accs.week, r);
 
         // Daily — solo dentro de la ventana de 30 días.
-        const ts = new Date(r.created_at).getTime();
         if (ts >= cutoff) {
           const key = fmtDayLabel(new Date(ts));
           const slot = dailyMap.get(key);
@@ -633,11 +680,21 @@ export const useChatterEvaluationStats = () =>
         .sort((a, b) => b.apto + b.noApto - (a.apto + a.noApto))
         .slice(0, 6);
 
+      const finalize = (a: Acc): RangeCounters => ({
+        total: a.total,
+        approved: a.approved,
+        rejected: a.rejected,
+        avgScorePct: a.scoreCount > 0 ? Math.round(a.scoreSum / a.scoreCount) : 0,
+      });
+      const byRange: Record<StatsRange, RangeCounters> = {
+        week: finalize(accs.week),
+        month: finalize(accs.month),
+        all: finalize(accs.all),
+      };
+
       return {
-        total: rows.length,
-        approved,
-        rejected,
-        avgScorePct: scoreCount > 0 ? Math.round(scoreSum / scoreCount) : 0,
+        ...byRange.all,
+        byRange,
         daily,
         byProfile,
       };

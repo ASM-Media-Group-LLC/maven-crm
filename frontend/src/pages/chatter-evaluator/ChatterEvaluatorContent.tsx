@@ -29,6 +29,7 @@ import {
   useChatterVaultCounts,
   useChatterSessions,
   useChatterEvaluationStats,
+  type StatsRange,
 } from "@/hooks/useChatterEvaluator";
 import type { ChatterProfile } from "./types";
 import { NewSessionDialog } from "./NewSessionDialog";
@@ -125,11 +126,16 @@ const ChatterEvaluatorContent = () => {
   const sessionsQ = useChatterSessions("active-only");
   const statsQ = useChatterEvaluationStats();
   const [newSessionOpen, setNewSessionOpen] = useState(false);
+  // Rango activo para los stat cards — los charts ya tienen su propia
+  // ventana fija (30 días), así que el toggle solo afecta los 4 cajones
+  // de arriba.
+  const [statsRange, setStatsRange] = useState<StatsRange>("week");
 
   const profiles = profilesQ.data ?? [];
   const vaultCounts = vaultCountsQ.data ?? {};
   const totalImages = profiles.reduce((a, p) => a + (vaultCounts[p.id] ?? 0), 0);
   const stats = statsQ.data;
+  const counters = stats?.byRange[statsRange];
 
   return (
     <main className="flex-1 overflow-y-auto p-6">
@@ -173,30 +179,54 @@ const ChatterEvaluatorContent = () => {
 
         <NewSessionDialog open={newSessionOpen} onOpenChange={setNewSessionOpen} />
 
-        {/* Stats reales del History — total de evaluaciones, aptas vs no
-            aptas, promedio de score_pct. Si statsQ está cargando mostramos
-            "…" para no hacer flicker. */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard
-            icon={Users}
-            label="Personas evaluadas"
-            value={statsQ.isLoading ? "…" : (stats?.total ?? 0)}
-          />
-          <StatCard
-            icon={CheckCircle2}
-            label="Aprobados"
-            value={statsQ.isLoading ? "…" : (stats?.approved ?? 0)}
-          />
-          <StatCard
-            icon={XCircle}
-            label="Reprobados"
-            value={statsQ.isLoading ? "…" : (stats?.rejected ?? 0)}
-          />
-          <StatCard
-            icon={Percent}
-            label="Promedio de éxito"
-            value={statsQ.isLoading ? "…" : `${stats?.avgScorePct ?? 0}%`}
-          />
+        {/* Stats reales del History — toggle de rango (esta semana /
+            este mes / total) actúa solo sobre los 4 cajones; los charts
+            de abajo mantienen su ventana fija. */}
+        <div className="space-y-3">
+          <div className="inline-flex rounded-lg border border-border bg-card p-1 text-xs">
+            {(
+              [
+                { key: "week", label: "Esta semana" },
+                { key: "month", label: "Este mes" },
+                { key: "all", label: "Total" },
+              ] as Array<{ key: StatsRange; label: string }>
+            ).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setStatsRange(key)}
+                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
+                  statsRange === key
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatCard
+              icon={Users}
+              label="Personas evaluadas"
+              value={statsQ.isLoading ? "…" : (counters?.total ?? 0)}
+            />
+            <StatCard
+              icon={CheckCircle2}
+              label="Aprobados"
+              value={statsQ.isLoading ? "…" : (counters?.approved ?? 0)}
+            />
+            <StatCard
+              icon={XCircle}
+              label="Reprobados"
+              value={statsQ.isLoading ? "…" : (counters?.rejected ?? 0)}
+            />
+            <StatCard
+              icon={Percent}
+              label="Promedio de éxito"
+              value={statsQ.isLoading ? "…" : `${counters?.avgScorePct ?? 0}%`}
+            />
+          </div>
         </div>
 
         {/* Charts: tendencia diaria + top perfiles. Colores: primary
