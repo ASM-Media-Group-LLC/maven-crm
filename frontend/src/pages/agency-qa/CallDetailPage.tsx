@@ -21,8 +21,19 @@ import {
   MessageSquare,
   Calendar,
   User,
-  Instagram,
-  Tag,
+  Quote,
+  TrendingUp,
+  Target,
+  Heart,
+  Zap,
+  CheckCircle2,
+  XCircle,
+  Mic,
+  FileText,
+  ArrowUpRight,
+  ListChecks,
+  BarChart3,
+  Activity,
 } from "lucide-react";
 import {
   Popover,
@@ -34,14 +45,7 @@ import {
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
-  PolarRadiusAxis,
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Cell,
 } from "recharts";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -64,13 +68,13 @@ import {
   type QaSectionType,
 } from "@/hooks/useAgencyQa";
 
-// CallDetailPage — full-page view that replaces CallDetailDrawer.
-// Kash-style layout: back button at top, header cards, large score circle,
-// summary, Ficha Rápida, radar + audio metrics side-by-side, model signals,
-// dimensions list, red flags, key moments, improvements, transcript,
-// human feedback form.
+// CallDetailPage — modern, polished QA call detail view.
+// Visual hierarchy: gradient hero header with score circle → outcome banner →
+// content sections in a 2-column grid where possible, with colored accents,
+// icons, progress bars, and consistent card styling.
 
-const formatLevel = (lv: string) => lv.charAt(0).toUpperCase() + lv.slice(1);
+const formatLevel = (lv: string) =>
+  lv.charAt(0).toUpperCase() + lv.slice(1);
 
 const fmtDate = (iso: string) => {
   const d = new Date(`${iso}T00:00:00`);
@@ -81,10 +85,11 @@ const fmtDate = (iso: string) => {
   });
 };
 
+// ─── Avatar ─────────────────────────────────────────────────────────
 const Avatar = ({
   name,
   dataUrl,
-  size = 40,
+  size = 48,
 }: {
   name: string;
   dataUrl: string | null;
@@ -94,10 +99,10 @@ const Avatar = ({
   let h = 0;
   for (let i = 0; i < name.length; i++)
     h = (h * 31 + name.charCodeAt(i)) % 360;
-  const bg = `linear-gradient(135deg, hsl(${h}, 40%, 30%) 0%, hsl(${(h + 60) % 360}, 50%, 20%) 100%)`;
+  const bg = `linear-gradient(135deg, hsl(${h}, 60%, 55%) 0%, hsl(${(h + 60) % 360}, 70%, 35%) 100%)`;
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white/90"
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full text-base font-bold text-white shadow-md ring-2 ring-white/10"
       style={{ width: size, height: size, background: bg }}
     >
       {dataUrl ? (
@@ -109,32 +114,15 @@ const Avatar = ({
   );
 };
 
-const OutcomeBadge = ({
-  outcome,
-}: {
-  outcome: CallOutcome | undefined;
-}) => {
-  if (!outcome || !(outcome in OUTCOME_META)) return null;
-  const c = OUTCOME_META[outcome as keyof typeof OUTCOME_META];
-  return (
-    <span
-      className="inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-bold text-white"
-      style={{ background: c.bg }}
-    >
-      <span aria-hidden>{c.icon}</span>
-      {c.label}
-    </span>
-  );
-};
-
-// ─── Section thumbs ─────────────────────────────────────────────────
+// ─── Section feedback context ──────────────────────────────────────
 type SectionFeedbackContext = {
   callId: string;
   feedbackByKey: Map<string, QaSectionFeedback>;
   evaluatorName: string;
 };
 
-const sectionKey = (type: QaSectionType, index: number) => `${type}:${index}`;
+const sectionKey = (type: QaSectionType, index: number) =>
+  `${type}:${index}`;
 
 const SectionThumbs = ({
   ctx,
@@ -223,38 +211,38 @@ const SectionThumbs = ({
         onClick={() => handleVote(1)}
         disabled={upsert.isPending || remove.isPending}
         className={cn(
-          "flex h-6 w-6 items-center justify-center rounded-full transition-colors",
+          "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
           isUp
-            ? "bg-emerald-500/20 text-emerald-500"
-            : "text-muted-foreground hover:bg-muted/50"
+            ? "bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/40"
+            : "text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground"
         )}
         title={isUp ? "Quitar 👍" : "Marcar 👍"}
       >
-        <ThumbsUp className="h-3 w-3" />
+        <ThumbsUp className="h-3.5 w-3.5" />
       </button>
       <button
         type="button"
         onClick={() => handleVote(-1)}
         disabled={upsert.isPending || remove.isPending}
         className={cn(
-          "flex h-6 w-6 items-center justify-center rounded-full transition-colors",
+          "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
           isDown
-            ? "bg-rose-500/20 text-rose-400"
-            : "text-muted-foreground hover:bg-muted/50"
+            ? "bg-rose-500/20 text-rose-400 ring-1 ring-rose-500/40"
+            : "text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground"
         )}
         title={isDown ? "Quitar 👎" : "Marcar 👎"}
       >
-        <ThumbsDown className="h-3 w-3" />
+        <ThumbsDown className="h-3.5 w-3.5" />
       </button>
       <Popover open={noteOpen} onOpenChange={setNoteOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             className={cn(
-              "flex h-6 w-6 items-center justify-center rounded-full transition-colors",
+              "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
               hasNote
-                ? "bg-primary/20 text-primary"
-                : "text-muted-foreground hover:bg-muted/50"
+                ? "bg-primary/20 text-primary ring-1 ring-primary/40"
+                : "text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground"
             )}
             title={hasNote ? "Editar nota" : "Agregar nota"}
             onClick={() => {
@@ -266,7 +254,7 @@ const SectionThumbs = ({
               );
             }}
           >
-            <MessageSquare className="h-3 w-3" />
+            <MessageSquare className="h-3.5 w-3.5" />
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-72 space-y-2 p-3" align="end">
@@ -323,100 +311,124 @@ const SectionThumbs = ({
   );
 };
 
-// ─── Styled section wrapper ─────────────────────────────────────────
-const Section = ({
+// ─── SectionCard: a polished section wrapper with header + body ────
+const SectionCard = ({
   title,
-  children,
-  hint,
   icon,
+  iconBg,
+  hint,
+  accent,
+  children,
+  className,
 }: {
   title: string;
-  children: React.ReactNode;
+  icon: React.ReactNode;
+  iconBg: string;
   hint?: string;
-  icon?: React.ReactNode;
+  accent?: string;
+  children: React.ReactNode;
+  className?: string;
 }) => (
-  <section className="space-y-3 rounded-xl border border-border/60 bg-card p-4">
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex items-center gap-2">
-        {icon}
-        <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-          {title}
-        </h3>
+  <section
+    className={cn(
+      "overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all hover:shadow-md",
+      className
+    )}
+  >
+    {accent && (
+      <div className="h-1 w-full" style={{ background: accent }} />
+    )}
+    <div className="border-b border-border/40 bg-muted/20 px-5 py-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <span
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-sm"
+            style={{ background: iconBg }}
+          >
+            {icon}
+          </span>
+          <h3 className="text-sm font-bold tracking-tight text-foreground">
+            {title}
+          </h3>
+        </div>
+        {hint && (
+          <span className="rounded-full bg-muted/60 px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+            {hint}
+          </span>
+        )}
       </div>
-      {hint && (
-        <span className="text-[10px] text-muted-foreground">{hint}</span>
-      )}
     </div>
-    {children}
+    <div className="space-y-3 p-5">{children}</div>
   </section>
 );
 
-// ─── Header info card ───────────────────────────────────────────────
-const InfoCard = ({
-  icon,
-  label,
-  value,
-  sub,
+// ─── ScoreCircle ───────────────────────────────────────────────────
+const ScoreCircle = ({
+  score,
+  size = 160,
 }: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  sub?: string;
-}) => (
-  <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3">
-    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-      {icon}
-    </div>
-    <div className="min-w-0">
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-        {label}
-      </div>
-      <div className="truncate text-sm font-semibold">{value}</div>
-      {sub && (
-        <div className="truncate text-[11px] text-muted-foreground">{sub}</div>
-      )}
-    </div>
-  </div>
-);
-
-// ─── Score circle ───────────────────────────────────────────────────
-const ScoreCircle = ({ score }: { score: number }) => {
+  score: number;
+  size?: number;
+}) => {
   const color = scoreColor(score);
-  const circumference = 2 * Math.PI * 54;
+  const strokeWidth = size * 0.08;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
+  const center = size / 2;
   return (
-    <div className="relative flex flex-col items-center justify-center">
-      <svg width="130" height="130" viewBox="0 0 120 120">
+    <div
+      className="relative flex items-center justify-center"
+      style={{ width: size, height: size }}
+    >
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="absolute inset-0 -rotate-90"
+      >
+        <defs>
+          <linearGradient
+            id={`scoreGrad-${score}`}
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="100%"
+          >
+            <stop offset="0%" stopColor={color} stopOpacity="0.6" />
+            <stop offset="100%" stopColor={color} stopOpacity="1" />
+          </linearGradient>
+        </defs>
         <circle
-          cx="60"
-          cy="60"
-          r="54"
+          cx={center}
+          cy={center}
+          r={radius}
           fill="none"
           stroke="hsl(var(--border))"
-          strokeWidth="8"
+          strokeWidth={strokeWidth}
+          opacity="0.3"
         />
         <circle
-          cx="60"
-          cy="60"
-          r="54"
+          cx={center}
+          cy={center}
+          r={radius}
           fill="none"
-          stroke={color}
-          strokeWidth="8"
+          stroke={`url(#scoreGrad-${score})`}
+          strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          transform="rotate(-90 60 60)"
-          className="transition-all duration-700"
+          className="transition-all duration-1000 ease-out"
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
+      <div className="flex flex-col items-center justify-center">
         <span
-          className="text-3xl font-bold tabular-nums"
+          className="text-4xl font-black leading-none tabular-nums tracking-tight"
           style={{ color }}
         >
           {score}
         </span>
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <span className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
           / 100
         </span>
       </div>
@@ -424,7 +436,35 @@ const ScoreCircle = ({ score }: { score: number }) => {
   );
 };
 
-// ─── Analysis sub-renderers ─────────────────────────────────────────
+// ─── Outcome Pill ──────────────────────────────────────────────────
+const OutcomePill = ({
+  outcome,
+  size = "default",
+}: {
+  outcome: CallOutcome | undefined;
+  size?: "default" | "lg";
+}) => {
+  if (!outcome || !(outcome in OUTCOME_META)) return null;
+  const c = OUTCOME_META[outcome as keyof typeof OUTCOME_META];
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-2 rounded-full font-bold text-white shadow-md",
+        size === "lg"
+          ? "h-9 px-4 text-sm"
+          : "h-7 px-3 text-xs"
+      )}
+      style={{ background: c.bg }}
+    >
+      <span aria-hidden className="text-base">
+        {c.icon}
+      </span>
+      {c.label}
+    </span>
+  );
+};
+
+// ─── Dimensions block with progress bars ──────────────────────────
 const DimensionsBlock = ({
   dimensions,
   ctx,
@@ -434,73 +474,97 @@ const DimensionsBlock = ({
 }) => {
   if (dimensions.length === 0) return null;
   const radarData = dimensions.map((d) => ({
-    name: d.name,
+    name: d.name.length > 14 ? d.name.slice(0, 14) + "…" : d.name,
     score: d.score * 10,
     fullMark: 100,
   }));
+  const avgScore =
+    dimensions.reduce((s, d) => s + d.score, 0) / dimensions.length;
   return (
-    <Section title="Perfil Visual — Dimensiones">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="h-[280px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={radarData} outerRadius="78%">
-              <PolarGrid stroke="hsl(var(--border))" />
-              <PolarAngleAxis
-                dataKey="name"
-                tick={{
-                  fontSize: 10,
-                  fill: "hsl(var(--muted-foreground))",
-                }}
-              />
-              <PolarRadiusAxis
-                domain={[0, 100]}
-                tick={{
-                  fontSize: 9,
-                  fill: "hsl(var(--muted-foreground))",
-                }}
-              />
-              <Radar
-                dataKey="score"
-                stroke="hsl(var(--primary))"
-                fill="hsl(var(--primary))"
-                fillOpacity={0.35}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
+    <SectionCard
+      title="Perfil Visual — Dimensiones"
+      icon={<BarChart3 className="h-4 w-4" />}
+      iconBg="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)"
+      accent="linear-gradient(90deg, #6366f1 0%, #4338ca 100%)"
+      hint={`Promedio ${(avgScore * 10).toFixed(0)}/100`}
+    >
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[400px_1fr]">
+        {/* Radar */}
+        <div className="rounded-xl border border-border/40 bg-muted/10 p-3">
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={radarData} outerRadius="75%">
+                <PolarGrid stroke="hsl(var(--border))" strokeOpacity={0.4} />
+                <PolarAngleAxis
+                  dataKey="name"
+                  tick={{
+                    fontSize: 9,
+                    fill: "hsl(var(--muted-foreground))",
+                  }}
+                />
+                <Radar
+                  dataKey="score"
+                  stroke="#6366f1"
+                  fill="#6366f1"
+                  fillOpacity={0.4}
+                  strokeWidth={2}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-        <ul className="space-y-2">
-          {dimensions.map((d, i) => (
-            <li key={`${d.name}-${i}`} className="text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-medium">{d.name}</span>
-                <div className="flex items-center gap-2">
-                  <span
-                    className="font-bold tabular-nums"
-                    style={{ color: scoreColor(d.score * 10) }}
-                  >
-                    {d.score}/10
-                  </span>
-                  {ctx && (
-                    <SectionThumbs
-                      ctx={ctx}
-                      type="dimension"
-                      index={i}
-                      label={d.name}
-                    />
-                  )}
+        {/* Dimension list with progress bars */}
+        <ul className="space-y-3">
+          {dimensions.map((d, i) => {
+            const pct = d.score * 10;
+            const color = scoreColor(pct);
+            return (
+              <li
+                key={`${d.name}-${i}`}
+                className="rounded-lg border border-border/40 bg-muted/5 p-3 transition-colors hover:bg-muted/15"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold">{d.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="rounded-md px-2 py-0.5 text-xs font-bold tabular-nums text-white"
+                      style={{ background: color }}
+                    >
+                      {d.score}/10
+                    </span>
+                    {ctx && (
+                      <SectionThumbs
+                        ctx={ctx}
+                        type="dimension"
+                        index={i}
+                        label={d.name}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-              <p className="text-xs leading-snug text-muted-foreground">
-                {d.feedback}
-              </p>
-            </li>
-          ))}
+                {/* Progress bar */}
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{
+                      width: `${pct}%`,
+                      background: `linear-gradient(90deg, ${color}80 0%, ${color} 100%)`,
+                    }}
+                  />
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  {d.feedback}
+                </p>
+              </li>
+            );
+          })}
         </ul>
       </div>
-    </Section>
+    </SectionCard>
   );
 };
 
+// ─── AudioMetricsBlock ─────────────────────────────────────────────
 const AudioMetricsBlock = ({
   metrics,
 }: {
@@ -525,94 +589,73 @@ const AudioMetricsBlock = ({
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
-  const SPEAKER_COLORS = ["#6d28d9", "#2563eb", "#059669", "#d97706"];
-
-  const barData = speakers.map((s, i) => ({
-    name: s.label,
-    words: s.word_count,
-    duration: s.estimated_duration_s,
-    ratio: Math.round(s.talk_ratio * 100),
-    fill: SPEAKER_COLORS[i % SPEAKER_COLORS.length],
-  }));
+  const SPEAKER_COLORS = ["#8b5cf6", "#06b6d4", "#10b981", "#f59e0b"];
+  const maxWords = Math.max(...speakers.map((s) => s.word_count));
 
   return (
-    <Section title="Métricas de Audio">
-      <div className="mb-3 flex items-center gap-4 text-xs text-muted-foreground">
-        <span>
-          Duración total:{" "}
-          <strong className="text-foreground">
-            {fmtDuration(totalDuration)}
-          </strong>
-        </span>
-        <span>
-          Speakers:{" "}
-          <strong className="text-foreground">{metrics?.speaker_count ?? speakers.length}</strong>
-        </span>
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* Words per speaker */}
-        <div>
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Palabras por hablante
-          </div>
-          <div className="h-[140px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData} layout="vertical">
-                <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 10 }}
-                  width={80}
-                />
-                <Tooltip
-                  contentStyle={{
-                    fontSize: 11,
-                    background: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                  }}
-                />
-                <Bar dataKey="words" radius={[0, 4, 4, 0]}>
-                  {barData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        {/* Talk ratio */}
-        <div>
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            Proporción de habla
-          </div>
-          <div className="space-y-2">
-            {barData.map((s, i) => (
-              <div key={i}>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium">{s.name}</span>
-                  <span className="tabular-nums text-muted-foreground">
-                    {s.ratio}%
+    <SectionCard
+      title="Métricas de Audio"
+      icon={<Activity className="h-4 w-4" />}
+      iconBg="linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)"
+      accent="linear-gradient(90deg, #06b6d4 0%, #0e7490 100%)"
+      hint={`${fmtDuration(totalDuration)} · ${speakers.length} speakers`}
+    >
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {speakers.map((s, i) => {
+          const color = SPEAKER_COLORS[i % SPEAKER_COLORS.length];
+          const wordsPct = (s.word_count / maxWords) * 100;
+          const ratioPct = Math.round(s.talk_ratio * 100);
+          return (
+            <div
+              key={s.id}
+              className="rounded-xl border border-border/40 bg-muted/5 p-4"
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ background: color }}
+                  />
+                  <span className="text-sm font-bold">{s.label}</span>
+                </div>
+                <span
+                  className="rounded-full px-2.5 py-0.5 text-xs font-bold text-white"
+                  style={{ background: color }}
+                >
+                  {ratioPct}%
+                </span>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Palabras</span>
+                    <span className="font-semibold tabular-nums text-foreground">
+                      {s.word_count.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${wordsPct}%`, background: color }}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>Duración</span>
+                  <span className="font-semibold tabular-nums text-foreground">
+                    {fmtDuration(s.estimated_duration_s)}
                   </span>
                 </div>
-                <div className="mt-1 h-2.5 w-full rounded-full bg-muted/40">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${s.ratio}%`,
-                      background: s.fill,
-                    }}
-                  />
-                </div>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          );
+        })}
       </div>
-    </Section>
+    </SectionCard>
   );
 };
 
+// ─── KeyMomentsBlock ──────────────────────────────────────────────
 const KeyMomentsBlock = ({
   moments,
   ctx,
@@ -621,45 +664,71 @@ const KeyMomentsBlock = ({
   ctx?: SectionFeedbackContext;
 }) => {
   if (moments.length === 0) return null;
+  const positivos = moments.filter((m) => m.kind === "positivo").length;
+  const negativos = moments.filter((m) => m.kind === "negativo").length;
   return (
-    <Section title="Momentos clave">
-      <ul className="space-y-2">
-        {moments.map((m, i) => (
-          <li
-            key={i}
-            className="rounded-lg border border-border/60 bg-muted/10 p-3"
-          >
-            <div className="mb-1.5 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider">
-              <span
-                style={{
-                  color:
-                    m.kind === "positivo"
-                      ? "rgb(22 163 74)"
-                      : "rgb(220 38 38)",
-                }}
+    <SectionCard
+      title="Momentos clave"
+      icon={<Star className="h-4 w-4" />}
+      iconBg="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+      accent="linear-gradient(90deg, #f59e0b 0%, #d97706 100%)"
+      hint={`${positivos} ✓ · ${negativos} ✗`}
+    >
+      <ul className="space-y-3">
+        {moments.map((m, i) => {
+          const isPositive = m.kind === "positivo";
+          const color = isPositive ? "#10b981" : "#ef4444";
+          return (
+            <li
+              key={i}
+              className="overflow-hidden rounded-xl border border-border/40 bg-muted/5"
+            >
+              <div
+                className="flex items-center justify-between gap-2 border-b border-border/30 px-4 py-2"
+                style={{ background: `${color}15` }}
               >
-                {m.kind === "positivo" ? "✓ Positivo" : "✗ Negativo"}
-              </span>
-              {ctx && (
-                <SectionThumbs
-                  ctx={ctx}
-                  type="key_moment"
-                  index={i}
-                  label={m.quote.slice(0, 60)}
-                />
-              )}
-            </div>
-            <blockquote className="border-l-2 border-primary/30 pl-2.5 text-sm italic text-foreground/80">
-              &ldquo;{m.quote}&rdquo;
-            </blockquote>
-            <p className="mt-1.5 text-xs text-muted-foreground">{m.why}</p>
-          </li>
-        ))}
+                <div className="flex items-center gap-1.5">
+                  {isPositive ? (
+                    <CheckCircle2 className="h-4 w-4" style={{ color }} />
+                  ) : (
+                    <XCircle className="h-4 w-4" style={{ color }} />
+                  )}
+                  <span
+                    className="text-[11px] font-bold uppercase tracking-wider"
+                    style={{ color }}
+                  >
+                    {isPositive ? "Positivo" : "Negativo"}
+                  </span>
+                </div>
+                {ctx && (
+                  <SectionThumbs
+                    ctx={ctx}
+                    type="key_moment"
+                    index={i}
+                    label={m.quote.slice(0, 60)}
+                  />
+                )}
+              </div>
+              <div className="space-y-2 p-4">
+                <blockquote
+                  className="border-l-3 pl-3 text-sm italic leading-relaxed text-foreground/90"
+                  style={{ borderLeftColor: color, borderLeftWidth: 3 }}
+                >
+                  &ldquo;{m.quote}&rdquo;
+                </blockquote>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {m.why}
+                </p>
+              </div>
+            </li>
+          );
+        })}
       </ul>
-    </Section>
+    </SectionCard>
   );
 };
 
+// ─── RedFlagsBlock ────────────────────────────────────────────────
 const RedFlagsBlock = ({
   flags,
   ctx,
@@ -669,38 +738,53 @@ const RedFlagsBlock = ({
 }) => {
   if (flags.length === 0) return null;
   return (
-    <Section
+    <SectionCard
       title="Red flags"
+      icon={<AlertTriangle className="h-4 w-4" />}
+      iconBg="linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)"
+      accent="linear-gradient(90deg, #ef4444 0%, #b91c1c 100%)"
       hint={`${flags.length}`}
-      icon={<AlertTriangle className="h-3.5 w-3.5 text-rose-400" />}
     >
-      <ul className="space-y-2">
+      <ul className="space-y-3">
         {flags.map((f, i) => (
           <li
             key={i}
-            className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-3"
+            className="overflow-hidden rounded-xl border border-rose-500/30 bg-gradient-to-br from-rose-500/10 to-rose-500/5"
           >
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">
-                {f.type.replace(/_/g, " ")}
-              </span>
+            <div className="flex items-center justify-between gap-2 border-b border-rose-500/20 bg-rose-500/10 px-4 py-2">
+              <div className="flex items-center gap-1.5">
+                <AlertTriangle className="h-4 w-4 text-rose-400" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-rose-300">
+                  {f.type.replace(/_/g, " ")}
+                </span>
+              </div>
               {ctx && (
-                <SectionThumbs ctx={ctx} type="red_flag" index={i} label={f.type} />
+                <SectionThumbs
+                  ctx={ctx}
+                  type="red_flag"
+                  index={i}
+                  label={f.type}
+                />
               )}
             </div>
-            <p className="text-xs text-foreground/80">{f.description}</p>
-            {f.quote && (
-              <blockquote className="mt-1.5 border-l-2 border-rose-500/40 pl-2 text-xs italic text-muted-foreground">
-                &ldquo;{f.quote}&rdquo;
-              </blockquote>
-            )}
+            <div className="space-y-2 p-4">
+              <p className="text-sm leading-relaxed text-foreground/90">
+                {f.description}
+              </p>
+              {f.quote && (
+                <blockquote className="border-l-3 border-l-rose-500/50 pl-3 text-xs italic text-muted-foreground" style={{ borderLeftWidth: 3 }}>
+                  &ldquo;{f.quote}&rdquo;
+                </blockquote>
+              )}
+            </div>
           </li>
         ))}
       </ul>
-    </Section>
+    </SectionCard>
   );
 };
 
+// ─── ImprovementsBlock ────────────────────────────────────────────
 const ImprovementsBlock = ({
   improvements,
   ctx,
@@ -710,15 +794,26 @@ const ImprovementsBlock = ({
 }) => {
   if (improvements.length === 0) return null;
   return (
-    <Section title="Acciones de mejora">
-      <ol className="space-y-1.5 pl-4 text-sm leading-relaxed">
+    <SectionCard
+      title="Acciones de mejora"
+      icon={<ListChecks className="h-4 w-4" />}
+      iconBg="linear-gradient(135deg, #10b981 0%, #047857 100%)"
+      accent="linear-gradient(90deg, #10b981 0%, #047857 100%)"
+      hint={`${improvements.length} ${improvements.length === 1 ? "acción" : "acciones"}`}
+    >
+      <ol className="space-y-2.5">
         {improvements.map((s, i) => (
           <li
             key={i}
-            className="list-decimal text-foreground/90 marker:text-muted-foreground"
+            className="flex items-start gap-3 rounded-lg border border-border/40 bg-muted/5 p-3 transition-colors hover:bg-muted/15"
           >
-            <div className="flex items-start justify-between gap-2">
-              <span className="ml-1">{s}</span>
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-xs font-bold text-emerald-400">
+              {i + 1}
+            </span>
+            <div className="flex flex-1 items-start justify-between gap-2">
+              <span className="text-sm leading-relaxed text-foreground/90">
+                {s}
+              </span>
               {ctx && (
                 <SectionThumbs
                   ctx={ctx}
@@ -731,106 +826,138 @@ const ImprovementsBlock = ({
           </li>
         ))}
       </ol>
-    </Section>
+    </SectionCard>
   );
 };
 
+// ─── SignalCard ──────────────────────────────────────────────────
+const SignalCard = ({
+  label,
+  level,
+  reason,
+  icon,
+}: {
+  label: string;
+  level: string;
+  reason: string;
+  icon: React.ReactNode;
+}) => {
+  const levelMap = {
+    alto: { color: "#10b981", bg: "from-emerald-500/15 to-emerald-500/5" },
+    medio: { color: "#f59e0b", bg: "from-amber-500/15 to-amber-500/5" },
+    bajo: { color: "#ef4444", bg: "from-rose-500/15 to-rose-500/5" },
+    ambiguo: { color: "#6b7280", bg: "from-slate-500/15 to-slate-500/5" },
+  } as const;
+  const lv = (levelMap[level as keyof typeof levelMap] ?? levelMap.ambiguo);
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-xl border bg-gradient-to-br p-4",
+        lv.bg
+      )}
+      style={{ borderColor: `${lv.color}40` }}
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-white"
+            style={{ background: lv.color }}
+          >
+            {icon}
+          </span>
+          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            {label}
+          </span>
+        </div>
+        <span
+          className="rounded-full px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
+          style={{ background: lv.color }}
+        >
+          {formatLevel(level)}
+        </span>
+      </div>
+      <p className="text-sm leading-relaxed text-foreground/85">{reason}</p>
+    </div>
+  );
+};
+
+// ─── ModelSignalsBlock ───────────────────────────────────────────
 const ModelSignalsBlock = ({
   signals,
 }: {
   signals: NonNullable<CallAnalysis["model_signals"]>;
 }) => (
-  <Section title="Señales de la modelo">
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+  <SectionCard
+    title="Señales de la modelo"
+    icon={<Heart className="h-4 w-4" />}
+    iconBg="linear-gradient(135deg, #ec4899 0%, #be185d 100%)"
+    accent="linear-gradient(90deg, #ec4899 0%, #be185d 100%)"
+  >
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       <SignalCard
         label="Interés"
         level={signals.interest_level}
         reason={signals.interest_reason}
+        icon={<TrendingUp className="h-3.5 w-3.5" />}
       />
       <SignalCard
         label="Complicidad"
         level={signals.complicity_level}
         reason={signals.complicity_reason}
+        icon={<Heart className="h-3.5 w-3.5" />}
       />
     </div>
+
     {signals.objections.length > 0 && (
-      <div className="mt-3 space-y-2">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Objeciones ({signals.objections.length})
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 pt-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-500/20 text-amber-400">
+            <Target className="h-3.5 w-3.5" />
+          </span>
+          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Objeciones ({signals.objections.length})
+          </span>
         </div>
-        <div className="overflow-hidden rounded-lg border border-border/60">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border/40 bg-muted/20">
-                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Tema
-                </th>
-                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Descripción
-                </th>
-                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Cita
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {signals.objections.map((o, i) => (
-                <tr key={i} className="border-b border-border/30 last:border-0">
-                  <td className="px-3 py-2 font-medium">{o.topic}</td>
-                  <td className="px-3 py-2 text-muted-foreground">
-                    {o.description}
-                  </td>
-                  <td className="px-3 py-2 italic text-muted-foreground">
-                    &ldquo;{o.quote}&rdquo;
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-2">
+          {signals.objections.map((o, i) => (
+            <div
+              key={i}
+              className="rounded-xl border border-border/40 bg-muted/10 p-4"
+            >
+              <div className="mb-2 flex items-center gap-2">
+                <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                  {o.topic}
+                </span>
+              </div>
+              <p className="text-sm text-foreground/90">{o.description}</p>
+              {o.quote && (
+                <blockquote className="mt-2 rounded-md border-l-2 border-l-amber-500/50 bg-muted/20 px-3 py-2 text-xs italic text-muted-foreground">
+                  &ldquo;{o.quote}&rdquo;
+                </blockquote>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     )}
-    <p className="mt-2 text-xs italic text-muted-foreground">
-      {signals.summary_of_model}
-    </p>
-  </Section>
+
+    {signals.summary_of_model && (
+      <div className="rounded-xl border border-border/40 bg-gradient-to-br from-pink-500/10 to-rose-500/5 p-4">
+        <div className="mb-1.5 flex items-center gap-2">
+          <Quote className="h-3.5 w-3.5 text-pink-400" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-pink-400">
+            Perfil de la modelo
+          </span>
+        </div>
+        <p className="text-sm italic leading-relaxed text-foreground/85">
+          {signals.summary_of_model}
+        </p>
+      </div>
+    )}
+  </SectionCard>
 );
 
-const SignalCard = ({
-  label,
-  level,
-  reason,
-}: {
-  label: string;
-  level: string;
-  reason: string;
-}) => {
-  const color =
-    level === "alto"
-      ? "rgb(22 163 74)"
-      : level === "medio"
-        ? "rgb(202 138 4)"
-        : level === "bajo"
-          ? "rgb(220 38 38)"
-          : "rgb(148 163 184)";
-  return (
-    <div className="rounded-lg border border-border/60 bg-muted/10 p-3">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          {label}
-        </span>
-        <span className="rounded-full px-2.5 py-0.5 text-xs font-bold text-white" style={{ background: color }}>
-          {formatLevel(level)}
-        </span>
-      </div>
-      <p className="mt-2 text-xs leading-relaxed text-foreground/80">
-        {reason}
-      </p>
-    </div>
-  );
-};
-
-// ─── Feedback section ───────────────────────────────────────────────
+// ─── FeedbackSection ─────────────────────────────────────────────
 const FeedbackSection = ({ callId }: { callId: string }) => {
   const { user } = useAuth();
   const profileQ = useMyProfile();
@@ -889,7 +1016,10 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
       return;
     }
     try {
-      const result = await analyze.mutateAsync({ callId, withFeedback: true });
+      const result = await analyze.mutateAsync({
+        callId,
+        withFeedback: true,
+      });
       toast.success(`Re-análisis listo · score ${result.score}/100`, {
         description: "El análisis ahora incorpora tu feedback humano.",
       });
@@ -928,9 +1058,14 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
   };
 
   return (
-    <Section title="Feedback humano" icon={<Lightbulb className="h-3.5 w-3.5 text-amber-400" />}>
-      <p className="text-[11px] text-muted-foreground">
-        Dejá feedback sobre el análisis (qué le faltó, qué interpretó mal).
+    <SectionCard
+      title="Feedback humano"
+      icon={<Lightbulb className="h-4 w-4" />}
+      iconBg="linear-gradient(135deg, #eab308 0%, #a16207 100%)"
+      accent="linear-gradient(90deg, #eab308 0%, #a16207 100%)"
+    >
+      <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-400/90">
+        💡 Dejá feedback sobre el análisis (qué le faltó, qué interpretó mal).
         Después podés re-analizar y la IA lo va a tomar en cuenta.
       </p>
 
@@ -940,46 +1075,49 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
           Cargando feedback…
         </div>
       ) : last ? (
-        <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+        <div className="rounded-xl border border-border/40 bg-muted/10 p-4">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <MessageSquareQuote className="h-3 w-3" />
-              <span className="font-medium text-foreground/85">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-[11px] font-bold text-primary">
+                {(last.evaluator_name?.[0] ?? "?").toUpperCase()}
+              </span>
+              <span className="font-semibold text-foreground/90">
                 {last.evaluator_name}
               </span>
-              <span>·</span>
-              <span>{fmtTs(last.created_at)}</span>
+              <span className="text-muted-foreground">
+                · {fmtTs(last.created_at)}
+              </span>
             </div>
             {typeof last.human_score === "number" && (
               <span
-                className="rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums text-white"
+                className="rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-white"
                 style={{ background: scoreColor(last.human_score) }}
               >
-                humano {last.human_score}
+                Humano {last.human_score}
               </span>
             )}
           </div>
-          <p className="mt-1.5 whitespace-pre-wrap text-sm text-foreground/90">
+          <p className="mt-2.5 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
             {last.feedback_text}
           </p>
           <button
             type="button"
-            className="mt-2 text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+            className="mt-3 text-xs font-medium text-primary underline-offset-2 hover:underline"
             onClick={() => setShowHistory((s) => !s)}
           >
-            {showHistory ? "Ocultar nuevo feedback" : "Agregar otro feedback"}
+            {showHistory ? "Ocultar nuevo feedback" : "+ Agregar otro feedback"}
           </button>
         </div>
       ) : (
-        <p className="text-xs italic text-muted-foreground">
+        <p className="rounded-lg border border-dashed border-border/60 bg-muted/5 px-3 py-3 text-center text-xs italic text-muted-foreground">
           Todavía no hay feedback humano para esta QA.
         </p>
       )}
 
       {(showHistory || !last) && (
-        <div className="space-y-2 rounded-lg border border-border/60 bg-muted/10 p-3">
-          <div className="space-y-1">
-            <Label htmlFor="feedback-text" className="text-xs">
+        <div className="space-y-3 rounded-xl border border-border/40 bg-muted/5 p-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="feedback-text" className="text-xs font-semibold">
               Feedback (qué corregir / agregar)
             </Label>
             <Textarea
@@ -991,9 +1129,9 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
               className="text-sm"
             />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label htmlFor="human-score" className="text-xs">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+            <div className="space-y-1.5">
+              <Label htmlFor="human-score" className="text-xs font-semibold">
                 Score humano (opcional, 0-100)
               </Label>
               <Input
@@ -1005,7 +1143,7 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
                 placeholder="ej. 85"
                 value={score}
                 onChange={(e) => setScore(e.target.value)}
-                className="h-8 text-sm"
+                className="h-9 text-sm"
               />
             </div>
             <div className="flex items-end">
@@ -1014,7 +1152,7 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
                 size="sm"
                 onClick={handleSave}
                 disabled={createFeedback.isPending || !draft.trim()}
-                className="w-full gap-1.5"
+                className="h-9 w-full gap-1.5 sm:w-auto"
               >
                 {createFeedback.isPending ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1028,7 +1166,7 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 pt-1">
+      <div className="flex flex-wrap gap-2 border-t border-border/40 pt-3">
         <Button
           type="button"
           size="sm"
@@ -1060,11 +1198,11 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
           Re-analizar con feedback
         </Button>
       </div>
-    </Section>
+    </SectionCard>
   );
 };
 
-// ─── Main page component ────────────────────────────────────────────
+// ─── Main page ───────────────────────────────────────────────────
 const CallDetailPage = ({
   callId,
   onBack,
@@ -1089,7 +1227,6 @@ const CallDetailPage = ({
     }>;
   };
 
-  // Section feedback
   const { user } = useAuth();
   const profileQ = useMyProfile();
   const sectionFeedbackQ = useQaSectionFeedback(callId);
@@ -1117,183 +1254,276 @@ const CallDetailPage = ({
   const outcome = a.call_outcome;
   const modelName = call.model?.name ?? "Sin modelo";
   const closerName = call.closer?.name ?? "Sin closer";
+  const score = call.claude_score;
+  const scoreClr = scoreColor(score);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6 pb-12">
       {/* Back button */}
       <button
         type="button"
         onClick={onBack}
-        className="group flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="group inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:bg-muted/40 hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-        Historial
+        Volver al historial
       </button>
 
-      {/* Header: cards + score */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        {/* Left: info cards */}
-        <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3">
-            <Avatar name={modelName} dataUrl={call.model?.avatar_data_url ?? null} size={44} />
-            <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Modelo
+      {/* HERO HEADER — gradient with score circle */}
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-primary/15 via-card to-card shadow-lg">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
+        <div
+          className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full blur-3xl"
+          style={{ background: `${scoreClr}20` }}
+        />
+        <div className="relative p-6 md:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            {/* Left: model + closer + date */}
+            <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
+              <Avatar
+                name={modelName}
+                dataUrl={call.model?.avatar_data_url ?? null}
+                size={72}
+              />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="truncate text-2xl font-black tracking-tight">
+                    {modelName}
+                  </h1>
+                  <OutcomePill outcome={outcome} size="lg" />
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5" />
+                    Closer:{" "}
+                    <strong className="text-foreground/90">
+                      {closerName}
+                    </strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {fmtDate(call.call_date)}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Evaluado por{" "}
+                    <strong className="text-foreground/90">
+                      {call.evaluator_name}
+                    </strong>
+                  </span>
+                </div>
+                {a.call_outcome_reason && (
+                  <p className="mt-2 max-w-xl rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-xs italic leading-relaxed text-muted-foreground">
+                    &ldquo;{a.call_outcome_reason}&rdquo;
+                  </p>
+                )}
               </div>
-              <div className="truncate text-sm font-semibold">{modelName}</div>
+            </div>
+
+            {/* Right: big score circle */}
+            <div className="flex shrink-0 flex-col items-center gap-2">
+              <ScoreCircle score={score} size={150} />
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                Score IA
+              </span>
             </div>
           </div>
-          <InfoCard
-            icon={<User className="h-4 w-4" />}
-            label="Closer"
-            value={closerName}
-            sub={`Evaluado por ${call.evaluator_name}`}
-          />
-          <InfoCard
-            icon={<Calendar className="h-4 w-4" />}
-            label="Fecha"
-            value={fmtDate(call.call_date)}
-            sub={
-              outcome
-                ? undefined
-                : undefined
-            }
-          />
-        </div>
-
-        {/* Right: score circle + outcome */}
-        <div className="flex flex-col items-center gap-2">
-          <ScoreCircle score={call.claude_score} />
-          <OutcomeBadge outcome={outcome} />
         </div>
       </div>
 
-      {/* Outcome reason */}
-      {a.call_outcome_reason && (
-        <p className="rounded-xl border border-border/60 bg-card px-4 py-3 text-sm italic text-muted-foreground">
-          {a.call_outcome_reason}
-        </p>
-      )}
+      {/* SUMMARY + FICHA RAPIDA — 2 columns */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        {a.summary && (
+          <div className="lg:col-span-3">
+            <SectionCard
+              title="Resumen ejecutivo"
+              icon={<FileText className="h-4 w-4" />}
+              iconBg="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)"
+              accent="linear-gradient(90deg, #6366f1 0%, #4338ca 100%)"
+              className="h-full"
+            >
+              <div className="rounded-xl border-l-4 border-l-primary bg-gradient-to-br from-primary/5 to-transparent p-4">
+                <p className="text-sm leading-relaxed text-foreground/90">
+                  {a.summary}
+                </p>
+              </div>
+            </SectionCard>
+          </div>
+        )}
 
-      {/* Summary */}
-      {a.summary && (
-        <Section title="Resumen">
-          <p className="text-sm leading-relaxed">{a.summary}</p>
-        </Section>
-      )}
+        {a.call_facts && (
+          <div className={a.summary ? "lg:col-span-2" : "lg:col-span-5"}>
+            <SectionCard
+              title="Ficha rápida"
+              icon={<Zap className="h-4 w-4" />}
+              iconBg="linear-gradient(135deg, #f59e0b 0%, #b45309 100%)"
+              accent="linear-gradient(90deg, #f59e0b 0%, #b45309 100%)"
+              className="h-full"
+            >
+              {a.call_facts.ubicacion && (
+                <div className="flex items-center gap-2 rounded-lg bg-muted/20 px-3 py-2 text-xs">
+                  <MapPin className="h-3.5 w-3.5 text-amber-400" />
+                  <span className="font-medium">
+                    {a.call_facts.ubicacion}
+                  </span>
+                </div>
+              )}
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-400">
+                  Motivo principal
+                </div>
+                <p className="text-sm font-semibold leading-snug text-foreground/95">
+                  {a.call_facts.motivo_principal}
+                </p>
+              </div>
+              {a.call_facts.observaciones_clave.length > 0 && (
+                <div>
+                  <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Observaciones clave
+                  </div>
+                  <ul className="space-y-1.5">
+                    {a.call_facts.observaciones_clave.map((o, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 text-xs leading-relaxed text-foreground/85"
+                      >
+                        <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+                        <span>{o}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </SectionCard>
+          </div>
+        )}
+      </div>
 
-      {/* Ficha Rápida */}
-      {a.call_facts && (
-        <Section title="Ficha Rápida">
-          {a.call_facts.ubicacion && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" />
-              <span>{a.call_facts.ubicacion}</span>
-            </div>
-          )}
-          <p className="text-sm font-medium">{a.call_facts.motivo_principal}</p>
-          <ul className="space-y-1 pl-4 text-sm">
-            {a.call_facts.observaciones_clave.map((o, i) => (
-              <li
-                key={i}
-                className="list-disc text-foreground/85 marker:text-muted-foreground"
-              >
-                {o}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {/* Dimensions radar + list */}
+      {/* DIMENSIONS */}
       {a.dimensions && a.dimensions.length > 0 && (
         <DimensionsBlock dimensions={a.dimensions} ctx={sectionCtx} />
       )}
 
-      {/* Audio metrics */}
+      {/* AUDIO METRICS */}
       {audioMetrics?.speakers && audioMetrics.speakers.length > 0 && (
         <AudioMetricsBlock metrics={audioMetrics} />
       )}
 
-      {/* Model signals */}
+      {/* MODEL SIGNALS */}
       {a.model_signals && <ModelSignalsBlock signals={a.model_signals} />}
 
-      {/* Key moments */}
-      {a.key_moments && a.key_moments.length > 0 && (
-        <KeyMomentsBlock moments={a.key_moments} ctx={sectionCtx} />
-      )}
-
-      {/* Red flags */}
-      {a.red_flags && a.red_flags.length > 0 && (
-        <RedFlagsBlock flags={a.red_flags} ctx={sectionCtx} />
-      )}
-
-      {/* Improvements */}
-      {a.improvements && a.improvements.length > 0 && (
-        <ImprovementsBlock improvements={a.improvements} ctx={sectionCtx} />
-      )}
-
-      {/* Audio playback */}
-      {call.audio_path && (
-        <Section title="Audio" icon={<Headphones className="h-3.5 w-3.5 text-muted-foreground" />}>
-          {audioUrlQ.isLoading ? (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Generando link…
-            </div>
-          ) : audioUrlQ.data ? (
-            <audio
-              controls
-              preload="metadata"
-              src={audioUrlQ.data}
-              className="w-full"
-            >
-              Tu navegador no soporta audio HTML5.
-            </audio>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              No se pudo cargar el audio (signed URL falló).
-            </p>
-          )}
-        </Section>
-      )}
-
-      {/* Transcript */}
-      <Section
-        title="Transcript"
-        hint={`${call.transcript.length.toLocaleString()} chars`}
-      >
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowTranscript((s) => !s)}
-          className="w-full justify-between"
-        >
-          <span>{showTranscript ? "Ocultar" : "Ver transcript completo"}</span>
-          {showTranscript ? (
-            <ChevronUp className="h-4 w-4" />
-          ) : (
-            <ChevronDown className="h-4 w-4" />
-          )}
-        </Button>
-        {showTranscript && (
-          <pre className="mt-2 max-h-[500px] overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted/20 p-4 text-xs leading-relaxed">
-            {call.transcript}
-          </pre>
+      {/* KEY MOMENTS + RED FLAGS — 2 columns when both exist */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {a.key_moments && a.key_moments.length > 0 && (
+          <KeyMomentsBlock moments={a.key_moments} ctx={sectionCtx} />
         )}
-      </Section>
+        {a.red_flags && a.red_flags.length > 0 && (
+          <RedFlagsBlock flags={a.red_flags} ctx={sectionCtx} />
+        )}
+      </div>
 
-      {/* Empty-analysis fallback */}
-      {!a.summary && (!a.dimensions || a.dimensions.length === 0) && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-amber-400">
-          <Star className="mr-1 inline h-3.5 w-3.5" />
-          Esta llamada no tiene un análisis IA completo. Probablemente sea una
-          entrada legacy o el análisis falló — usar &ldquo;Re-analizar&rdquo;
-          abajo.
+      {/* IMPROVEMENTS */}
+      {a.improvements && a.improvements.length > 0 && (
+        <ImprovementsBlock
+          improvements={a.improvements}
+          ctx={sectionCtx}
+        />
+      )}
+
+      {/* AUDIO + TRANSCRIPT — 2 columns */}
+      {(call.audio_path || call.transcript) && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {call.audio_path && (
+            <SectionCard
+              title="Audio de la llamada"
+              icon={<Headphones className="h-4 w-4" />}
+              iconBg="linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)"
+              accent="linear-gradient(90deg, #8b5cf6 0%, #6d28d9 100%)"
+            >
+              {audioUrlQ.isLoading ? (
+                <div className="flex items-center gap-1.5 rounded-lg bg-muted/20 p-4 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Generando link…
+                </div>
+              ) : audioUrlQ.data ? (
+                <div className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-purple-500/5 p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Mic className="h-4 w-4 text-purple-400" />
+                    <span className="text-xs font-semibold text-purple-300">
+                      Reproducir grabación
+                    </span>
+                  </div>
+                  <audio
+                    controls
+                    preload="metadata"
+                    src={audioUrlQ.data}
+                    className="w-full"
+                  >
+                    Tu navegador no soporta audio HTML5.
+                  </audio>
+                </div>
+              ) : (
+                <p className="rounded-lg border border-dashed border-border/60 bg-muted/5 p-4 text-center text-xs italic text-muted-foreground">
+                  No se pudo cargar el audio.
+                </p>
+              )}
+            </SectionCard>
+          )}
+
+          {call.transcript && (
+            <SectionCard
+              title="Transcript"
+              icon={<FileText className="h-4 w-4" />}
+              iconBg="linear-gradient(135deg, #64748b 0%, #334155 100%)"
+              accent="linear-gradient(90deg, #64748b 0%, #334155 100%)"
+              hint={`${call.transcript.length.toLocaleString()} chars`}
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTranscript((s) => !s)}
+                className="w-full justify-between"
+              >
+                <span className="flex items-center gap-1.5">
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                  {showTranscript ? "Ocultar transcript" : "Ver transcript completo"}
+                </span>
+                {showTranscript ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+              {showTranscript && (
+                <pre className="max-h-[500px] overflow-y-auto whitespace-pre-wrap rounded-lg border border-border/40 bg-muted/10 p-4 text-xs leading-relaxed">
+                  {call.transcript}
+                </pre>
+              )}
+            </SectionCard>
+          )}
         </div>
       )}
 
-      {/* Feedback + re-analyze */}
+      {/* Empty-analysis fallback */}
+      {!a.summary && (!a.dimensions || a.dimensions.length === 0) && (
+        <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-500/5 p-5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-400" />
+            <div>
+              <p className="text-sm font-semibold text-amber-400">
+                Análisis incompleto
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-amber-400/80">
+                Esta llamada no tiene un análisis IA completo. Probablemente
+                sea una entrada legacy o el análisis falló. Usá
+                &ldquo;Re-analizar&rdquo; abajo.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FEEDBACK */}
       <FeedbackSection callId={call.id} />
     </div>
   );
