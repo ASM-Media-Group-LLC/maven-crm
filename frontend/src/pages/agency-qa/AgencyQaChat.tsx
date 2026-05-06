@@ -105,6 +105,40 @@ const sessionTitle = (s: {
   return "Sobre todo el equipo";
 };
 
+// MikeAvatar — el muñequito del supervisor IA. La imagen vive en
+// /mike-avatar.png (drop tu PNG en frontend/public/mike-avatar.png) y
+// hace fallback a un círculo con gradient + ícono Sparkles si la
+// imagen no carga, así el chat nunca se ve roto.
+const MikeAvatar = ({
+  size = 32,
+  className = "",
+}: {
+  size?: number;
+  className?: string;
+}) => {
+  const [errored, setErrored] = useState(false);
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-sm ring-2 ring-amber-500/20",
+        className,
+      )}
+      style={{ width: size, height: size }}
+    >
+      {errored ? (
+        <Sparkles className="h-1/2 w-1/2" />
+      ) : (
+        <img
+          src="/mike-avatar.png"
+          alt="Mike"
+          className="h-full w-full object-cover"
+          onError={() => setErrored(true)}
+        />
+      )}
+    </span>
+  );
+};
+
 // ─── Speech recognition (Web Speech API nativa, sin ElevenLabs) ──────
 // El browser expone SpeechRecognition (Firefox / WebKit). En Chrome y
 // Safari está bajo `webkitSpeechRecognition`. Lo wrapaeamos en un hook
@@ -276,11 +310,11 @@ const AgencyQaChat = () => {
     setInput("");
     try {
       const result = await sendMessage.mutateAsync({ session_id: activeId, content: trimmed });
-      // sendMessage devuelve { user, assistant, assistantError }: si Clari
+      // sendMessage devuelve { user, assistant, assistantError }: si Mike
       // falló (rate limit, LLM error), el user message igual quedó persistido
       // pero no hay respuesta. Mostramos un toast warning con la causa.
       if (result.assistantError) {
-        toast.warning("Clari no pudo responder", {
+        toast.warning("Mike no pudo responder", {
           description: result.assistantError,
         });
       }
@@ -311,13 +345,16 @@ const AgencyQaChat = () => {
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">Chat con Clari</h2>
-          <p className="text-xs text-muted-foreground">
-            Clari es tu supervisor IA — conoce a cada closer, todas las QAs, y
-            te ayuda a coachear al equipo. Hacele preguntas sobre tendencias,
-            comparativas entre closers o qué le falta a alguien.
-          </p>
+        <div className="flex items-start gap-3">
+          <MikeAvatar size={44} />
+          <div>
+            <h2 className="text-base font-semibold">Chat with Mike</h2>
+            <p className="text-xs text-muted-foreground">
+              Mike es tu supervisor IA — conoce a cada closer, todas las QAs, y
+              te ayuda a coachear al equipo. Hacele preguntas sobre tendencias,
+              comparativas entre closers o qué le falta a alguien.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -434,34 +471,47 @@ const AgencyQaChat = () => {
                     "compará [closer1] vs [closer2]".
                   </p>
                 ) : (
-                  messagesQ.data!.map((m) => (
-                    <div
-                      key={m.id}
-                      className={cn(
-                        "flex flex-col gap-1",
-                        m.role === "user" ? "items-end" : "items-start",
-                      )}
-                    >
+                  messagesQ.data!.map((m) => {
+                    const isAssistant = m.role === "assistant";
+                    return (
                       <div
+                        key={m.id}
                         className={cn(
-                          "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
-                          m.role === "user"
-                            ? "bg-primary text-primary-foreground"
-                            : "border border-border/60 bg-muted/30",
+                          "flex gap-2",
+                          isAssistant
+                            ? "flex-row items-end"
+                            : "flex-row-reverse items-end",
                         )}
                       >
-                        {m.role === "assistant" && (
-                          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-amber-500">
-                            Clari
+                        {isAssistant && <MikeAvatar size={28} />}
+                        <div
+                          className={cn(
+                            "flex max-w-[80%] flex-col gap-1",
+                            isAssistant ? "items-start" : "items-end",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "rounded-2xl px-3 py-2 text-sm",
+                              isAssistant
+                                ? "border border-border/60 bg-muted/30"
+                                : "bg-primary text-primary-foreground",
+                            )}
+                          >
+                            {isAssistant && (
+                              <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-amber-500">
+                                Mike
+                              </div>
+                            )}
+                            <div className="whitespace-pre-wrap">{m.content}</div>
                           </div>
-                        )}
-                        <div className="whitespace-pre-wrap">{m.content}</div>
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatRelative(m.created_at)}
+                          </span>
+                        </div>
                       </div>
-                      <span className="text-[10px] text-muted-foreground">
-                        {formatRelative(m.created_at)}
-                      </span>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
 
                 {/* "Clari escribiendo…" mientras la mutation está en vuelo
@@ -472,11 +522,12 @@ const AgencyQaChat = () => {
                 {sendMessage.isPending &&
                   (messagesQ.data?.length ?? 0) > 0 &&
                   messagesQ.data![messagesQ.data!.length - 1].role === "user" && (
-                    <div className="flex flex-col items-start gap-1">
-                      <div className="max-w-[85%] rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
-                        <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-500">
+                    <div className="flex items-end gap-2">
+                      <MikeAvatar size={28} />
+                      <div className="max-w-[80%] rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-500">
                           <Sparkles className="h-3 w-3 animate-pulse" />
-                          Clari escribiendo…
+                          Mike escribiendo…
                         </div>
                       </div>
                     </div>
@@ -504,7 +555,7 @@ const AgencyQaChat = () => {
                       void handleSend();
                     }
                   }}
-                  placeholder={`Pregunta a Clari sobre ${
+                  placeholder={`Pregunta a Mike sobre ${
                     activeSession.scope_type === "closer"
                       ? (activeSession.closer?.name ?? "este closer")
                       : "el equipo"
@@ -534,7 +585,7 @@ const AgencyQaChat = () => {
                         <p className="text-xs">
                           Tu mensaje se persiste en{" "}
                           <code>qa_chat_messages</code>. La respuesta la
-                          genera Clari (Anthropic) en la edge function.
+                          genera Mike (Anthropic) en la edge function.
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -587,9 +638,9 @@ const AgencyQaChat = () => {
           ) : (
             <CardContent className="flex flex-1 items-center justify-center p-8">
               <div className="flex flex-col items-center gap-2 text-center">
-                <Sparkles className="h-8 w-8 text-amber-500" />
+                <MikeAvatar size={64} />
                 <p className="text-sm font-semibold">
-                  Hola, soy Clari — supervisor del equipo.
+                  Hola, soy Mike — supervisor del equipo.
                 </p>
                 <p className="max-w-md text-xs text-muted-foreground">
                   Click "+ Nueva conversación" para arrancar. Elegí un closer
@@ -691,7 +742,7 @@ const NewSessionDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Nueva conversación con Clari</DialogTitle>
+          <DialogTitle>Nueva conversación con Mike</DialogTitle>
           <DialogDescription>
             El scope queda fijo en esta sesión. Si querés cambiar de closer
             después, abrí una sesión nueva.
