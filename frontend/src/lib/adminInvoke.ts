@@ -36,16 +36,35 @@ export async function adminInvoke<T = Record<string, unknown>>(
   // 2. Call the edge function
   const { data, error } = await supabase.functions.invoke(functionName, { body });
 
-  // 3. Classify errors
+  // 3. Classify errors. supabase-js wraps non-2xx as FunctionsHttpError
+  // and `data` queda null — pero el body de la respuesta tiene el JSON
+  // con `error: "..."` que devolvió la edge function. Lo parseamos
+  // manualmente desde error.context (la Response original) para que
+  // el llamador vea el mensaje real ("User already registered", etc.)
+  // en lugar del genérico "Edge Function returned a non-2xx status code".
   if (error) {
-    const msg = (error as any)?.message ?? String(error);
-    // Supabase client wraps non-2xx as FunctionsHttpError with context
-    if (msg.includes("401") || msg.includes("Unauthorized")) {
+    const baseMsg = (error as { message?: string })?.message ?? String(error);
+    let bodyMsg: string | null = null;
+    let status: number | null = null;
+    const ctx = (error as { context?: unknown }).context;
+    if (ctx instanceof Response) {
+      status = ctx.status;
+      try {
+        const cloned = ctx.clone();
+        const parsed = (await cloned.json()) as { error?: string };
+        if (parsed?.error) bodyMsg = parsed.error;
+      } catch {
+        // body no era JSON; nos quedamos con el message genérico.
+      }
+    }
+    const msg = bodyMsg ?? baseMsg;
+
+    if (status === 401 || msg.includes("Unauthorized")) {
       await supabase.auth.signOut();
       throw new SessionExpiredError();
     }
-    if (msg.includes("403") || msg.includes("Forbidden")) {
-      throw new ForbiddenError();
+    if (status === 403 || msg.includes("Forbidden")) {
+      throw new ForbiddenError(msg);
     }
     throw new Error(msg);
   }

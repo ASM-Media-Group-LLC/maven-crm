@@ -134,7 +134,20 @@ Deno.serve(async (req) => {
       });
 
       if (createError) {
-        return new Response(JSON.stringify({ error: createError.message }), {
+        // Mapeamos los errores comunes a español para que el modal del
+        // admin muestre algo accionable. createUser de Supabase Auth
+        // devuelve mensajes como "A user with this email address has
+        // already been registered" o "Email rate limit exceeded".
+        const raw = createError.message ?? "";
+        let friendly = raw;
+        if (/already (been )?registered|already exists|duplicate/i.test(raw)) {
+          friendly = "Ya existe un usuario con ese email.";
+        } else if (/invalid email/i.test(raw)) {
+          friendly = "Email inválido.";
+        } else if (/rate limit/i.test(raw)) {
+          friendly = "Demasiados intentos seguidos, esperá un minuto y volvé a intentar.";
+        }
+        return new Response(JSON.stringify({ error: friendly, raw }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -392,62 +405,42 @@ Deno.serve(async (req) => {
     if (action === "delete_user") {
       console.log(`[delete_user] Starting deletion for user_id=${user_id}`);
 
-      // 1. Unlink employees referencing this profile
-      const { error: unlinkEmpErr } = await adminClient
-        .from("employees")
-        .update({ profile_id: null })
-        .eq("profile_id", user_id);
-      if (unlinkEmpErr) console.warn("[delete_user] unlink employees:", unlinkEmpErr.message);
-
-      // 2. Delete project memberships
-      const { error: pmErr } = await adminClient
-        .from("project_members")
-        .delete()
-        .eq("user_id", user_id);
-      if (pmErr) console.warn("[delete_user] delete project_members:", pmErr.message);
-
-      // 3. Delete chat participations
-      const { error: cpErr } = await adminClient
-        .from("chat_participants")
-        .delete()
-        .eq("user_id", user_id);
-      if (cpErr) console.warn("[delete_user] delete chat_participants:", cpErr.message);
-
-      // 4. Delete user roles
-      const { error: rolesErr } = await adminClient
-        .from("user_roles")
-        .delete()
-        .eq("user_id", user_id);
-      if (rolesErr) console.warn("[delete_user] delete user_roles:", rolesErr.message);
-
-      // 5. Delete notifications
-      const { error: notifErr } = await adminClient
-        .from("notifications")
-        .delete()
-        .eq("user_id", user_id);
-      if (notifErr) console.warn("[delete_user] delete notifications:", notifErr.message);
-
-      // 6. Delete profile
-      const { error: profileErr } = await adminClient
-        .from("profiles")
-        .delete()
-        .eq("id", user_id);
-      if (profileErr) {
-        console.error("[delete_user] delete profile failed:", profileErr.message);
-        return new Response(JSON.stringify({ error: `Error eliminando perfil: ${profileErr.message}` }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      // 1. Limpia TODAS las refs en public.* a este user_id usando la
+      // función SQL app_purge_user_refs. Antes esto era una lista
+      // hardcoded de 6 tablas (employees, project_members,
+      // chat_participants, user_roles, notifications, profiles), pero
+      // hay 49 FKs a auth.users en public — las 43 restantes hacían
+      // que auth.deleteUser fallara con "Database error deleting user"
+      // y el frontend mostraba el delete como exitoso (porque el
+      // profile sí se borraba) dejando huérfanos en auth.users que
+      // bloqueaban recrear el usuario con el mismo email.
+      const { error: purgeErr } = await adminClient.rpc("app_purge_user_refs", {
+        p_user_id: user_id,
+      });
+      if (purgeErr) {
+        console.error("[delete_user] app_purge_user_refs failed:", purgeErr.message);
+        return new Response(
+          JSON.stringify({ error: `Error limpiando datos del usuario: ${purgeErr.message}` }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
 
-      // 7. Delete auth user
+      // 2. Delete auth user. Si esto falla (FK rara, lock, etc.) NO
+      // devolvemos éxito — el frontend tiene que ver el error para
+      // que el admin no asuma que el usuario quedó borrado.
       const { error: deleteError } = await adminClient.auth.admin.deleteUser(user_id);
       if (deleteError) {
         console.error("[delete_user] delete auth user failed:", deleteError.message);
-        return new Response(JSON.stringify({ error: `Error eliminando usuario: ${deleteError.message}` }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: `Error eliminando usuario: ${deleteError.message}` }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
 
       console.log(`[delete_user] Successfully deleted user_id=${user_id}`);
