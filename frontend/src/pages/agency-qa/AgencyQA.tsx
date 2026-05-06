@@ -56,13 +56,13 @@ interface ClosersQaSub {
 }
 
 const CLOSERS_QA_SUBS: ClosersQaSub[] = [
-  // Calls = dashboard de analytics. La lista de llamadas era redundante
+  // Dashboard = analytics agregadas. La lista de llamadas era redundante
   // con QA History, así que la fusionamos: este tab ahora muestra el
   // leaderboard / distribución / métricas, y el listado vive solo en
   // QA History.
   {
     key: "calls",
-    label: "Calls",
+    label: "Dashboard",
     submodule: "Calls",
     icon: BarChart3,
     whatsComing: "Dashboard de analytics: leaderboard, outcomes, métricas.",

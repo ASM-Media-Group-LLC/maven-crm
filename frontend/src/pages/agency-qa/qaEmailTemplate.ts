@@ -101,7 +101,7 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
             : "") +
         `</td>` +
         `<td style="padding:12px 16px;${isLast ? "" : `border-bottom:1px solid ${COLORS.borderSoft};`}text-align:right;vertical-align:top;width:70px;">` +
-          `<span style="display:inline-block;padding:4px 10px;border-radius:9999px;background:${dColor};color:#ffffff;font-size:12px;font-weight:700;">${d.score}/10</span>` +
+          `<span style="display:inline-block;padding:4px 10px;border-radius:9999px;background:${dColor};color:#ffffff;font-size:12px;font-weight:700;">${Math.round(d.score * 10)}/100</span>` +
         `</td>` +
         `</tr>`
       );

@@ -268,7 +268,7 @@ const SectionThumbs = ({
               ? "bg-emerald-500/20 text-emerald-500"
               : "text-muted-foreground hover:bg-muted/50"
           )}
-          title={isUp ? "Quitar 👍" : "Marcar 👍 (símbolico)"}
+          title={isUp ? "Quitar 👍" : "Te gusta este análisis"}
         >
           <ThumbsUp className="h-3.5 w-3.5" />
         </button>
@@ -506,10 +506,13 @@ const DimensionsRadar = ({
   dimensions: NonNullable<CallAnalysis["dimensions"]>;
 }) => {
   const fullByShort = new Map<string, string>();
+  // Mostramos las dimensiones en escala 0-100 para que sea consistente
+  // con el resto de la UI. El JSON de la IA viene en 0-10, lo
+  // multiplicamos antes de pasárselo al chart.
   const data = dimensions.map((d) => {
     const short = d.name.length > 22 ? d.name.slice(0, 20) + "…" : d.name;
     fullByShort.set(short, d.name);
-    return { dim: short, score: d.score };
+    return { dim: short, score: Math.round(d.score * 10) };
   });
 
   return (
@@ -523,7 +526,7 @@ const DimensionsRadar = ({
           />
           <PolarRadiusAxis
             angle={90}
-            domain={[0, 10]}
+            domain={[0, 100]}
             tick={{ fill: "currentColor", fontSize: 10 }}
           />
           <Radar
@@ -883,21 +886,21 @@ const groupDimensions = (
   return [
     {
       title: "Puntos fuertes",
-      caption: "Score ≥ 8/10",
+      caption: "Score ≥ 80/100",
       color: "#16a34a",
       bg: "rgba(22,163,74,0.08)",
       items: fuertes,
     },
     {
       title: "Puntos a mejorar",
-      caption: "Score 6–7/10",
+      caption: "Score 60–79/100",
       color: "#ca8a04",
       bg: "rgba(202,138,4,0.10)",
       items: mejorar,
     },
     {
       title: "Puntos débiles",
-      caption: "Score < 6/10",
+      caption: "Score < 60/100",
       color: "#dc2626",
       bg: "rgba(220,38,38,0.08)",
       items: debiles,
@@ -994,7 +997,7 @@ const AnalysisSections = ({
                                 className="inline-flex h-8 shrink-0 items-center rounded-full px-3.5 text-sm font-bold tabular-nums text-white"
                                 style={{ background: scoreColor10(d.score) }}
                               >
-                                {d.score}/10
+                                {Math.round(d.score * 10)}/100
                               </div>
                               {ctx && (
                                 <SectionThumbs
