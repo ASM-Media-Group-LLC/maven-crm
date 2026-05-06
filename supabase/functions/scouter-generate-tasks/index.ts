@@ -31,12 +31,17 @@ const GROQ_MODEL = "llama-3.3-70b-versatile";
 const BATCH_SIZE_DEFAULT = 50;
 const CHUNK_SIZE = 10; // leads per Groq call
 const COOLDOWN_DAYS_DEFAULT = 3;
+// Si un spammer arrastra ≥ este número de assignments pending tras el
+// rollover, no le generamos NADA nuevo hoy. Forzamos que cierre backlog
+// antes de seguir recibiendo. Ajustable vía body.backlog_cap.
+const BACKLOG_CAP_DEFAULT = 30;
 
 interface GenerateRequest {
   tenant_id: string;
   spammer_id?: string;
   cooldown_days?: number;
   batch_size?: number;
+  backlog_cap?: number;
 }
 
 interface RankedLead {
@@ -105,6 +110,7 @@ serve(async (req) => {
     const tenantId = body.tenant_id.trim();
     const cooldownDays = body.cooldown_days ?? COOLDOWN_DAYS_DEFAULT;
     const batchSize = body.batch_size ?? BATCH_SIZE_DEFAULT;
+    const backlogCap = body.backlog_cap ?? BACKLOG_CAP_DEFAULT;
 
     // ─── Get spammers ────────────────────────────────────────────────────────
     let spammerIds: string[];
@@ -139,6 +145,7 @@ serve(async (req) => {
           spammerId,
           cooldownDays,
           batchSize,
+          backlogCap,
           groqKey,
         );
         totalAssignments += assignments;
@@ -172,6 +179,7 @@ async function processSpammer(
   spammerId: string,
   cooldownDays: number,
   batchSize: number,
+  backlogCap: number,
   groqKey: string,
 ): Promise<{ assignments: number; tasks: number }> {
   // 1. Get spammer's IG accounts
@@ -214,6 +222,18 @@ async function processSpammer(
     console.log(
       `Spammer ${spammerId}: ${rolledCount} assignments incompletas reolladas a hoy.`,
     );
+  }
+
+  // Backlog cap (30 default): si tras el rollover el spammer ya tiene
+  // ≥ backlogCap assignments pending, no le encolamos más. Tiene que
+  // cerrar lo que arrastra antes de recibir leads frescos. Esto evita
+  // que un spammer ausente acumule cientos de assignments y la cola
+  // pierda señal de qué priorizar.
+  if (rolledCount >= backlogCap) {
+    console.log(
+      `Spammer ${spammerId}: backlog (${rolledCount}) ≥ cap (${backlogCap}), no se generan nuevas hoy.`,
+    );
+    return { assignments: rolledCount, tasks: 0 };
   }
 
   // Cuántas assignments NUEVAS hace falta generar para llegar al
