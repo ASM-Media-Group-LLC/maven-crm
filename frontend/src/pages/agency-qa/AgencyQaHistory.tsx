@@ -1,23 +1,56 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Loader2,
-  FileAudio,
-  FileText,
   Sparkles,
   CheckCircle2,
   Clock,
   AlertCircle,
+  AlertTriangle,
   Mail,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
-import { useQaCalls, useFireQaWebhook, scoreColor } from "@/hooks/useAgencyQa";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useUserRole } from "@/hooks/useUserRole";
+import {
+  useQaCalls,
+  useFireQaWebhook,
+  useDeleteQaCall,
+  scoreColor,
+} from "@/hooks/useAgencyQa";
 
-// AgencyQaHistory — feed de las QAs que YO subí, con su estado de
-// procesamiento. Click en una row → full-page detail (via onOpenDetail).
+// AgencyQaHistory — feed de las QAs en formato tabla con columnas
+// (Score · Fecha · Modelo · Cerrador · Estado · Acciones).
+// Click en una row → full-page detail.
+//
+// Visibilidad:
+//   - Admins ven TODAS las QAs (vista de gestión).
+//   - Otros roles solo ven las suyas: matcheamos por uploaded_by (FK a
+//     auth.users) y caemos a evaluator_name == nombre del perfil cuando
+//     uploaded_by es NULL (rows legacy que existieron antes de la
+//     migración 20260505200000).
 
 const computeStatus = (call: {
   audio_path: string | null;
@@ -60,13 +93,53 @@ const StatusBadge = ({
     );
   }
   return (
-    <Badge
-      variant="outline"
-      className="gap-1 border-rose-500/40 text-rose-400"
-    >
+    <Badge variant="outline" className="gap-1 border-rose-500/40 text-rose-400">
       <AlertCircle className="h-3 w-3" />
       Sin transcript
     </Badge>
+  );
+};
+
+const fmtDate = (iso: string) => {
+  try {
+    const d = new Date(`${iso}T00:00:00`);
+    return d.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+};
+
+// Avatar de la modelo — mismo patrón que la tabla original de Calls
+// (gradiente HSL determinístico desde el nombre + foto si existe).
+const ModelAvatar = ({
+  name,
+  dataUrl,
+  size = 32,
+}: {
+  name: string;
+  dataUrl: string | null;
+  size?: number;
+}) => {
+  const initial = (name?.trim().charAt(0) || "?").toUpperCase();
+  let h = 0;
+  for (let i = 0; i < name.length; i++)
+    h = (h * 31 + name.charCodeAt(i)) % 360;
+  const bg = `linear-gradient(135deg, hsl(${h}, 40%, 30%) 0%, hsl(${(h + 60) % 360}, 50%, 20%) 100%)`;
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full text-[11px] font-bold text-white/90"
+      style={{ width: size, height: size, background: bg }}
+    >
+      {dataUrl ? (
+        <img src={dataUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        initial
+      )}
+    </span>
   );
 };
 
@@ -79,6 +152,18 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
   const profileQ = useMyProfile();
   const callsQ = useQaCalls();
   const fireWebhook = useFireQaWebhook();
+  const deleteCall = useDeleteQaCall();
+  const { canAccess } = usePermissions();
+  const { isAdmin } = useUserRole();
+  const canDelete = canAccess("Agency QA", "Borrar Calls");
+
+  // Modal de confirmación de borrado — guarda la QA target para el flow
+  // <abrir confirmación> → <click confirmar> → <DELETE> sin confiar en
+  // window.confirm.
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
 
   const myUserId = user?.id ?? null;
   const myName = useMemo(() => {
@@ -90,13 +175,14 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
     );
   }, [profileQ.data, user]);
 
-  // Filtramos "mis QAs":
-  //   - Si la fila tiene uploaded_by, matcheamos por ese FK (preciso).
-  //   - Para rows legacy (uploaded_by NULL) caemos al match de
-  //     evaluator_name == nombre del perfil — funciona para QAs viejas
-  //     subidas antes del cambio del default a "Claude AI".
-  const myCalls = useMemo(() => {
+  const visibleCalls = useMemo(() => {
     if (!callsQ.data) return [];
+    // Admins ven todo el equipo en orden cronológico inverso (la lista
+    // ya viene ordenada del query). El cap de 30 evita que la tabla
+    // crezca infinito; si hace falta paginar lo agregamos cuando duela.
+    if (isAdmin) {
+      return callsQ.data.slice(0, 30);
+    }
     const myNameLc = myName.toLowerCase().trim();
     return callsQ.data
       .filter((c) => {
@@ -107,12 +193,9 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
         return c.evaluator_name?.toLowerCase().trim() === myNameLc;
       })
       .slice(0, 30);
-  }, [callsQ.data, myUserId, myName]);
+  }, [callsQ.data, isAdmin, myUserId, myName]);
 
-  const handleResendEmail = async (
-    e: React.MouseEvent,
-    callId: string
-  ) => {
+  const handleResendEmail = async (e: React.MouseEvent, callId: string) => {
     e.stopPropagation();
     try {
       await fireWebhook.mutateAsync({ callId });
@@ -124,13 +207,38 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
     }
   };
 
+  const askDelete = (
+    e: React.MouseEvent,
+    callId: string,
+    label: string
+  ) => {
+    e.stopPropagation();
+    setPendingDelete({ id: callId, label });
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    try {
+      await deleteCall.mutateAsync(pendingDelete.id);
+      toast.success("QA borrada");
+      setPendingDelete(null);
+    } catch (err) {
+      toast.error("No se pudo borrar la QA", {
+        description: (err as Error).message,
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-base font-semibold">Mis QAs recientes</h2>
+        <h2 className="text-base font-semibold">
+          {isAdmin ? "Historial de QAs" : "Mis QAs recientes"}
+        </h2>
         <p className="text-xs text-muted-foreground">
-          Las llamadas que vos subiste — con estado de transcripción y análisis
-          IA. Click en una row para ver el detalle completo.
+          {isAdmin
+            ? "Listado completo de todas las QAs del equipo. Click en una fila para ver el detalle."
+            : "Las llamadas que vos subiste. Click en una fila para ver el detalle completo."}
         </p>
       </div>
 
@@ -141,10 +249,12 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
               <Loader2 className="h-4 w-4 animate-spin" />
               Cargando…
             </div>
-          ) : myCalls.length === 0 ? (
+          ) : visibleCalls.length === 0 ? (
             <div className="space-y-2 p-6 text-center text-sm">
               <p className="text-muted-foreground">
-                Todavía no subiste ninguna QA.
+                {isAdmin
+                  ? "Todavía no hay QAs cargadas."
+                  : "Todavía no subiste ninguna QA."}
               </p>
               <p className="text-xs text-muted-foreground">
                 Andá al tab Nueva QA, subí el audio de una llamada y al volver
@@ -152,82 +262,171 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-border/50">
-              {myCalls.map((call) => {
-                const status = computeStatus(call);
-                return (
-                  <div
-                    key={call.id}
-                    className="flex w-full items-center gap-3 p-3 transition-colors hover:bg-muted/40"
-                  >
-                    {/* Clickable main content */}
-                    <button
-                      type="button"
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="w-[80px] text-[10px] font-bold uppercase tracking-widest">
+                    Score
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Fecha
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Modelo
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Cerrador
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Estado
+                  </TableHead>
+                  <TableHead className="w-[120px] text-right text-[10px] font-bold uppercase tracking-widest">
+                    Acciones
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibleCalls.map((call) => {
+                  const status = computeStatus(call);
+                  const label =
+                    `${call.model?.name ?? "(sin modelo)"} · ${
+                      call.closer?.name ?? "(sin closer)"
+                    }`;
+                  return (
+                    <TableRow
+                      key={call.id}
+                      className="cursor-pointer transition-colors hover:bg-muted/30"
                       onClick={() => onOpenDetail?.(call.id)}
-                      className="flex flex-1 items-center gap-3 text-left"
                     >
-                      <div className="flex shrink-0 flex-col items-center gap-0.5">
+                      {/* Score */}
+                      <TableCell>
                         <span
-                          className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white"
-                          style={{
-                            background: scoreColor(call.claude_score),
-                          }}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white"
+                          style={{ background: scoreColor(call.claude_score) }}
                         >
                           {call.claude_score || "—"}
                         </span>
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-0.5">
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          <span className="truncate">
-                            {call.model?.name ?? "(sin modelo)"}
-                          </span>
-                          <span className="text-muted-foreground">·</span>
-                          <span className="truncate text-xs text-muted-foreground">
-                            {call.closer?.name ?? "(sin closer)"}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                          <span>{call.call_date}</span>
-                          {call.audio_path && (
-                            <span className="flex items-center gap-0.5">
-                              <FileAudio className="h-3 w-3" />
-                              audio
+                      </TableCell>
+                      {/* Fecha */}
+                      <TableCell className="tabular-nums text-sm">
+                        {fmtDate(call.call_date)}
+                      </TableCell>
+                      {/* Modelo (avatar + nombre) */}
+                      <TableCell>
+                        {call.model ? (
+                          <div className="flex items-center gap-2.5">
+                            <ModelAvatar
+                              name={call.model.name}
+                              dataUrl={call.model.avatar_data_url}
+                              size={32}
+                            />
+                            <span className="text-sm font-medium">
+                              {call.model.name}
                             </span>
-                          )}
-                          {call.transcript && (
-                            <span className="flex items-center gap-0.5">
-                              <FileText className="h-3 w-3" />
-                              transcript
-                            </span>
-                          )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            (sin modelo)
+                          </span>
+                        )}
+                      </TableCell>
+                      {/* Cerrador */}
+                      <TableCell className="text-sm">
+                        {call.closer?.name ?? (
+                          <span className="text-muted-foreground">
+                            (sin closer)
+                          </span>
+                        )}
+                      </TableCell>
+                      {/* Estado */}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={status} />
                           {status === "ready" && (
-                            <span className="flex items-center gap-0.5 text-emerald-500">
+                            <span
+                              className="hidden items-center gap-0.5 text-[11px] text-emerald-500 lg:flex"
+                              title="Análisis IA generado"
+                            >
                               <Sparkles className="h-3 w-3" />
-                              análisis IA
+                              IA
                             </span>
                           )}
                         </div>
-                      </div>
-                      <StatusBadge status={status} />
-                    </button>
-
-                    {/* Resend email button */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleResendEmail(e, call.id)}
-                      disabled={fireWebhook.isPending}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50"
-                      title="Reenviar email"
-                    >
-                      <Mail className="h-4 w-4" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                      </TableCell>
+                      {/* Acciones — Reenviar + Borrar */}
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => handleResendEmail(e, call.id)}
+                            disabled={fireWebhook.isPending}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50"
+                            title="Reenviar email"
+                          >
+                            <Mail className="h-4 w-4" />
+                          </button>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={(e) => askDelete(e, call.id, label)}
+                              disabled={deleteCall.isPending}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-400 disabled:opacity-50"
+                              title="Borrar QA"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
+
+      {/* Confirm delete dialog — estilo Maven (shadcn AlertDialog) */}
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Borrar QA
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Seguro que querés borrar la QA de{" "}
+              <strong>{pendingDelete?.label}</strong>?
+              <br />
+              Se eliminan también sus feedbacks y comentarios. Esta acción no
+              se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteCall.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteCall.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteCall.isPending ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Borrando…
+                </>
+              ) : (
+                "Borrar"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

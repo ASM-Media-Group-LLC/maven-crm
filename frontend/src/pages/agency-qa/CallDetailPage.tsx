@@ -16,7 +16,6 @@ import {
   User,
   Calendar,
   Mail,
-  Trash2,
 } from "lucide-react";
 import {
   Popover,
@@ -42,7 +41,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
-import { usePermissions } from "@/hooks/usePermissions";
 import {
   useQaCall,
   useQaAudioSignedUrl,
@@ -51,7 +49,6 @@ import {
   useCreateQaHumanFeedback,
   useAnalyzeQaCall,
   useFireQaWebhook,
-  useDeleteQaCall,
   useQaSectionFeedback,
   useUpsertQaSectionFeedback,
   useDeleteQaSectionFeedback,
@@ -1356,14 +1353,8 @@ const CallDetailPage = ({
   const callQ = useQaCall(callId);
   const audioUrlQ = useQaAudioSignedUrl(callQ.data?.audio_path ?? null);
   const fireWebhook = useFireQaWebhook();
-  const deleteCall = useDeleteQaCall();
-  // Permiso configurable desde Settings → Usuarios → Roles → Agency QA →
-  // "Borrar Calls". Admins lo tienen always-true via canAccess; otros
-  // roles dependen del toggle. La RLS del DB también verifica el mismo
-  // permiso, así que el server rechaza intentos sin permiso aunque el
-  // botón se filtre por UI.
-  const { canAccess } = usePermissions();
-  const canDelete = canAccess("Agency QA", "Borrar Calls");
+  // El borrado vive en QA History (no acá); el server-side RLS sigue
+  // protegiendo los DELETE igualmente.
 
   const { user } = useAuth();
   const profileQ = useMyProfile();
@@ -1417,27 +1408,6 @@ const CallDetailPage = ({
     }
   };
 
-  const handleDelete = async () => {
-    // Confirmación nativa — borrar es destructivo y la RLS también nos
-    // protegería de un click accidental, pero mejor pedir feedback.
-    if (
-      !window.confirm(
-        "¿Borrar esta QA permanentemente? Esto elimina la fila + sus feedbacks. No se puede deshacer."
-      )
-    ) {
-      return;
-    }
-    try {
-      await deleteCall.mutateAsync(call.id);
-      toast.success("QA borrada");
-      onBack();
-    } catch (err) {
-      toast.error("No se pudo borrar la QA", {
-        description: (err as Error).message,
-      });
-    }
-  };
-
   return (
     <div className="w-full">
       {/* Back button */}
@@ -1466,24 +1436,6 @@ const CallDetailPage = ({
             )}
             Reenviar email
           </Button>
-          {canDelete && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleDelete}
-              disabled={deleteCall.isPending}
-              className="gap-1.5 border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
-              title="Borrar QA permanentemente"
-            >
-              {deleteCall.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Trash2 className="h-3.5 w-3.5" />
-              )}
-              Borrar
-            </Button>
-          )}
         </div>
       </div>
 

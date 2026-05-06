@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  PhoneCall,
   Plus,
   MessageSquare,
   Users,
@@ -18,7 +17,6 @@ import {
 } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
-import AgencyCalls from "./AgencyCalls";
 import AgencyModels from "./AgencyModels";
 import AgencyAnalytics from "./AgencyAnalytics";
 import AgencyNewQa from "./AgencyNewQa";
@@ -58,14 +56,17 @@ interface ClosersQaSub {
 }
 
 const CLOSERS_QA_SUBS: ClosersQaSub[] = [
+  // Calls = dashboard de analytics. La lista de llamadas era redundante
+  // con QA History, así que la fusionamos: este tab ahora muestra el
+  // leaderboard / distribución / métricas, y el listado vive solo en
+  // QA History.
   {
     key: "calls",
     label: "Calls",
     submodule: "Calls",
-    icon: PhoneCall,
-    whatsComing:
-      "Listado de llamadas analizadas con filtros y detalle por llamada (transcript, score, radar de dimensiones).",
-    source: "app/calls/* + app/calls/[id]/page.tsx",
+    icon: BarChart3,
+    whatsComing: "Dashboard de analytics: leaderboard, outcomes, métricas.",
+    source: "app/analytics/page.tsx",
   },
   {
     key: "new-qa",
@@ -102,15 +103,6 @@ const CLOSERS_QA_SUBS: ClosersQaSub[] = [
     whatsComing:
       "Catálogo de modelos con score histórico, leaderboard y trend por modelo.",
     source: "app/models/* + app/models/[id]",
-  },
-  {
-    key: "analytics",
-    label: "Analytics",
-    submodule: "Analytics",
-    icon: BarChart3,
-    whatsComing:
-      "Dashboard agregado: leaderboard de closers, distribución de outcomes, métricas.",
-    source: "app/analytics/page.tsx",
   },
   {
     key: "notifications",
@@ -238,11 +230,11 @@ const ClosersQaSection = () => {
         {visibleSubs.map((s) => (
           <TabsContent key={s.key} value={s.key} className="mt-4">
             {s.key === "calls" ? (
-              <AgencyCalls onOpenDetail={openCallDetail} />
+              // Calls ahora muestra el dashboard de Analytics (la lista
+              // se eliminó por ser redundante con QA History).
+              <AgencyAnalytics />
             ) : s.key === "models" ? (
               <AgencyModels />
-            ) : s.key === "analytics" ? (
-              <AgencyAnalytics />
             ) : s.key === "new-qa" ? (
               <AgencyNewQa />
             ) : s.key === "qa-history" ? (
