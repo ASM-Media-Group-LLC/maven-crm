@@ -169,7 +169,9 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
 
   return (
     `<!DOCTYPE html><html><body style="margin:0;padding:0;background:${COLORS.bg};font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:${COLORS.text};">` +
-      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.bg};padding:24px 0;"><tr><td align="center">` +
+      // Outer wrapper: align left con padding lateral. En mobile la tabla
+      // interna se estira a 100% y el padding mantiene un margen cómodo.
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.bg};padding:24px 0;"><tr><td align="left" style="padding:0 24px;">` +
         `<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${COLORS.bg};">` +
 
           // Header — gradient con título + modelo
