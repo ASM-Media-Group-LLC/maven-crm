@@ -1,11 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// qa-transcribe — relay de audio a Groq Whisper.
+// qa-transcribe — relay de audio a ElevenLabs Scribe v1.
 // Pattern path-based: el frontend YA subió el audio a qa-audio Storage
 // (con su JWT, vía RLS), y nos pasa solamente { audio_path } en JSON.
-// Esta función baja el archivo con service role, lo manda a Groq y
-// devuelve el texto. Sin almacenar nada extra.
+// Esta función baja el archivo con service role, lo manda a ElevenLabs
+// Scribe, y devuelve el transcript diarizado + audio metrics.
+//
+// Migrado de Groq Whisper → ElevenLabs Scribe para obtener:
+//  - Diarización nativa de speakers (no post-hoc con LLM)
+//  - Audio metrics (duración, palabras por speaker, etc.)
+//  - Mayor precisión en español rioplatense
 //
 // Por qué path en vez de multipart upload directo:
 //  - Body chico en el fetch browser→edge (KB en vez de MB) → no choca
@@ -20,64 +25,74 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25MB — límite de Groq Whisper
-const GROQ_TIMEOUT_MS = 120_000; // 2 min — debajo de los 150s de wall-clock del edge
+// ElevenLabs Scribe soporta archivos grandes (hasta 1GB), pero
+// mantenemos un límite práctico para evitar timeouts en el edge function.
+const MAX_AUDIO_BYTES = 500 * 1024 * 1024; // 500MB
+const SCRIBE_TIMEOUT_MS = 120_000; // 2 min
 
 interface TranscribeRequest {
   audio_path?: string;
   language?: string;
 }
 
+// ElevenLabs Scribe response shape
+interface ScribeWord {
+  text: string;
+  start: number;
+  end: number;
+  type: "word" | "spacing" | "audio_event";
+  speaker_id?: string;
+}
+
+interface ScribeResponse {
+  language_code: string;
+  language_probability: number;
+  text: string;
+  words: ScribeWord[];
+}
+
+// Parsed audio metrics from Scribe response
+interface AudioMetrics {
+  total_duration_s: number;
+  speaker_count: number;
+  speakers: Array<{
+    id: string;
+    label: string;
+    word_count: number;
+    estimated_duration_s: number;
+    talk_ratio: number;
+  }>;
+  filler_words: Array<{ word: string; count: number; speaker_id: string }>;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
-    if (!GROQ_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "GROQ_API_KEY no configurada en los secrets de Supabase." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+    if (!ELEVENLABS_API_KEY) {
+      return jsonError("ELEVENLABS_API_KEY no configurada en los secrets de Supabase.", 500);
     }
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-      return new Response(
-        JSON.stringify({ error: "Supabase env (URL/service role) no configurado." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonError("Supabase env (URL/service role) no configurado.", 500);
     }
-    // Whisper-large-v3 es el modelo más preciso. v3-turbo es 2-3x más
-    // rápido y barato pero con leve drop de calidad — para QA queremos
-    // calidad porque el análisis IA depende del transcript.
-    const GROQ_WHISPER_MODEL =
-      Deno.env.get("GROQ_WHISPER_MODEL") || "whisper-large-v3";
-    const GROQ_TRANSCRIBE_URL =
-      Deno.env.get("GROQ_TRANSCRIBE_URL") ||
-      "https://api.groq.com/openai/v1/audio/transcriptions";
 
     let body: TranscribeRequest;
     try {
       body = await req.json();
     } catch {
-      return new Response(
-        JSON.stringify({ error: "JSON inválido. Esperado { audio_path, language? }." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonError("JSON inválido. Esperado { audio_path, language? }.", 400);
     }
 
     const audioPath = body.audio_path?.trim();
     if (!audioPath) {
-      return new Response(
-        JSON.stringify({ error: "Falta audio_path." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonError("Falta audio_path.", 400);
     }
     const lang = body.language?.trim() || "es";
 
-    // Service role bypass-ea RLS — confiamos en el caller autenticado
-    // (verify_jwt está en true por default para qa-transcribe) y que su
-    // path apunta a un objeto que él mismo subió.
+    // Service role bypass-ea RLS — confiamos en el caller autenticado.
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     });
@@ -86,269 +101,269 @@ serve(async (req) => {
       .download(audioPath);
     if (dlErr || !blob) {
       console.error("Storage download error", dlErr);
-      return new Response(
-        JSON.stringify({ error: `No se pudo bajar el audio de Storage: ${dlErr?.message ?? "desconocido"}` }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      return jsonError(
+        `No se pudo bajar el audio de Storage: ${dlErr?.message ?? "desconocido"}`,
+        502,
       );
     }
     if (blob.size === 0) {
-      return new Response(
-        JSON.stringify({ error: "El archivo de audio en Storage está vacío." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonError("El archivo de audio en Storage está vacío.", 400);
     }
     if (blob.size > MAX_AUDIO_BYTES) {
-      return new Response(
-        JSON.stringify({
-          error: `Audio demasiado grande. Máx ${(MAX_AUDIO_BYTES / 1024 / 1024).toFixed(0)}MB.`,
-        }),
-        { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      return jsonError(
+        `Audio demasiado grande. Máx ${(MAX_AUDIO_BYTES / 1024 / 1024).toFixed(0)}MB.`,
+        413,
       );
     }
 
-    // Inferir nombre razonable del path para que Groq vea la extensión.
+    // Inferir nombre razonable del path para que Scribe vea la extensión.
     const inferredName = audioPath.split("/").pop() || "audio.mp3";
 
-    const groqForm = new FormData();
-    groqForm.append("file", blob, inferredName);
-    groqForm.append("model", GROQ_WHISPER_MODEL);
-    groqForm.append("response_format", "json");
-    // language hint mejora precisión cuando sabemos qué idioma esperamos.
-    // Para Maven el caso de uso es 99% español rioplatense.
-    groqForm.append("language", lang);
+    // Normalizar content-type. ElevenLabs es estricto con MIME types.
+    const ext = inferredName.split(".").pop()?.toLowerCase() ?? "mp3";
+    const mimeMap: Record<string, string> = {
+      mp3: "audio/mpeg",
+      m4a: "audio/mp4",
+      mp4: "audio/mp4",
+      wav: "audio/wav",
+      ogg: "audio/ogg",
+      webm: "audio/webm",
+      flac: "audio/flac",
+      mpga: "audio/mpeg",
+    };
+    const contentType = mimeMap[ext] || "audio/mpeg";
+    const audioFile = new File([blob], inferredName, { type: contentType });
 
-    // AbortController para que si Groq se cuelga, devolvamos un 504 limpio
-    // antes de que el wall-clock del edge function (150s) nos mate y el
-    // browser vea "Failed to fetch" sin razón clara.
+    const form = new FormData();
+    form.append("file", audioFile);
+    form.append("model_id", "scribe_v1");
+    // language_code mejora precisión. Para Maven el 99% es español.
+    form.append("language_code", lang === "es" ? "spa" : lang);
+    // Diarización: le pedimos que identifique speakers.
+    form.append("diarize", "true");
+    // Timestamps para métricas por speaker.
+    form.append("timestamps_granularity", "word");
+
     const ac = new AbortController();
-    const timeoutId = setTimeout(() => ac.abort(), GROQ_TIMEOUT_MS);
-    let groqRes: Response;
+    const timeoutId = setTimeout(() => ac.abort(), SCRIBE_TIMEOUT_MS);
+    let scribeRes: Response;
     try {
-      groqRes = await fetch(GROQ_TRANSCRIBE_URL, {
+      scribeRes = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
         method: "POST",
-        headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
-        body: groqForm,
+        headers: { "xi-api-key": ELEVENLABS_API_KEY },
+        body: form,
         signal: ac.signal,
       });
     } catch (fetchErr) {
       clearTimeout(timeoutId);
       const aborted = (fetchErr as Error).name === "AbortError";
-      console.error("Groq fetch failed", fetchErr);
-      return new Response(
-        JSON.stringify({
-          error: aborted
-            ? `Groq Whisper tardó más de ${GROQ_TIMEOUT_MS / 1000}s. Probá de nuevo.`
-            : `Error al contactar Groq: ${(fetchErr as Error).message}`,
-        }),
-        { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      console.error("ElevenLabs fetch failed", fetchErr);
+      return jsonError(
+        aborted
+          ? `ElevenLabs Scribe tardó más de ${SCRIBE_TIMEOUT_MS / 1000}s. Probá de nuevo.`
+          : `Error al contactar ElevenLabs: ${(fetchErr as Error).message}`,
+        504,
       );
     }
     clearTimeout(timeoutId);
 
-    if (!groqRes.ok) {
-      const status = groqRes.status;
-      const errText = await groqRes.text().catch(() => "");
-      console.error("Groq Whisper error", status, errText.slice(0, 500));
+    if (!scribeRes.ok) {
+      const status = scribeRes.status;
+      const errText = await scribeRes.text().catch(() => "");
+      console.error("ElevenLabs Scribe error", status, errText.slice(0, 500));
       if (status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Groq: rate limit en Whisper. Probá en unos segundos." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+        return jsonError("ElevenLabs: rate limit. Probá en unos segundos.", 429);
       }
-      if (status === 401 || status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Groq: cuota agotada o key inválida." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+      if (status === 401) {
+        return jsonError("ElevenLabs: API key inválida.", 402);
       }
-      if (status === 413 || status === 415) {
-        return new Response(
-          JSON.stringify({ error: "Formato de audio no soportado o demasiado grande." }),
-          { status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+      if (status === 422) {
+        return jsonError("ElevenLabs: formato de audio no soportado.", 415);
       }
-      return new Response(
-        JSON.stringify({ error: `Groq Whisper error ${status}` }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonError(`ElevenLabs Scribe error ${status}`, 502);
     }
 
-    const groqData = await groqRes.json();
-    const flatText = (groqData?.text ?? "").trim();
-    if (!flatText) {
-      return new Response(
-        JSON.stringify({ error: "Whisper devolvió transcripción vacía. ¿El audio tiene voz?" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    const scribeData = (await scribeRes.json()) as ScribeResponse;
+    const rawText = (scribeData?.text ?? "").trim();
+    if (!rawText) {
+      return jsonError("Scribe devolvió transcripción vacía. ¿El audio tiene voz?", 502);
     }
 
-    // Post-hoc diarización con LLM. Whisper no diariza; le pedimos a un
-    // LLM en Groq que lea el transcript plano y lo divida en turnos
-    // etiquetando "Hablante 1:" / "Hablante 2:". El prompt de qa-analyze
-    // ya está preparado para aprovechar esas etiquetas (regla 40/60,
-    // closer_speaker_label, atribución de quotes).
-    //
-    // Si la diarización falla por cualquier motivo (timeout, JSON
-    // malformado, output sin sentido) caemos al transcript plano sin
-    // bloquear el flujo — la QA igual queda guardada y analizable.
-    let finalText = flatText;
-    let diarized = false;
-    try {
-      finalText = await diarizeWithLlm(GROQ_API_KEY, flatText);
-      diarized = true;
-    } catch (diarizeErr) {
-      console.warn("Diarización falló, fallback a transcript plano:", (diarizeErr as Error).message);
-    }
+    // Build diarized transcript from word-level data
+    const { diarizedText, audioMetrics } = buildDiarizedOutput(scribeData);
 
     return new Response(
       JSON.stringify({
         ok: true,
-        text: finalText,
-        diarized,
-        language: groqData?.language ?? lang,
-        duration: groqData?.duration ?? null,
+        text: diarizedText || rawText,
+        diarized: !!diarizedText,
+        language: scribeData.language_code ?? lang,
+        duration: audioMetrics.total_duration_s,
+        audio_metrics: audioMetrics,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
     console.error("qa-transcribe error:", e);
-    return new Response(
-      JSON.stringify({ error: (e as Error).message ?? "Error interno." }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return jsonError((e as Error).message ?? "Error interno.", 500);
   }
 });
 
-// ─── Diarización post-hoc con LLM (Groq chat completions) ────────────
-// Le pasamos el transcript plano y nos devuelve un JSON con turnos.
-// Reformateamos a "Hablante N: texto\n\nHablante M: texto..." que es
-// el shape que qa-analyze entiende.
-//
-// Por qué JSON en vez de texto-libre:
-//  - Determinístico de parsear.
-//  - response_format: json_object fuerza al modelo a no agregar prosa.
-//  - Validamos shape sin regex frágil.
-async function diarizeWithLlm(apiKey: string, flatText: string): Promise<string> {
-  const url =
-    Deno.env.get("GROQ_BASE_URL") ||
-    "https://api.groq.com/openai/v1/chat/completions";
-  // Default a 8b-instant: la diarización es una tarea mecánica
-  // (split de turnos por speaker) que no necesita 70b, y la free tier
-  // de Groq da 30k TPM en 8b vs 6k en 70b — sin esto, transcripts
-  // medianos/largos disparan HTTP 413 "Request too large" del lado Groq
-  // y caemos al fallback de transcript plano. Si querés probar 70b:
-  // setear GROQ_DIARIZE_MODEL=llama-3.3-70b-versatile.
-  const model =
-    Deno.env.get("GROQ_DIARIZE_MODEL") || "llama-3.1-8b-instant";
+// ─── Helpers ─────────────────────────────────────────────────────────
 
-  const systemPrompt = `Sos experto en post-procesar transcripts de llamadas de venta entre dos personas. Recibís un transcript plano (sin etiquetas de hablante) y tu trabajo es DIVIDIRLO EN TURNOS asignando "Hablante 1" o "Hablante 2" a cada uno.
+function jsonError(error: string, status: number): Response {
+  return new Response(JSON.stringify({ error }), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
-CONTEXTO DE LA LLAMADA:
-La llamada es entre un CLOSER (vendedor de una agencia de OnlyFans) y una MODELO (creadora de contenido). El closer típicamente PREGUNTA y guía la conversación; la modelo RESPONDE sobre su situación, números, contenido y dudas. Hablante 1 = el primer hablante que aparece (usualmente el closer si abre con saludo/preguntas, pero si la modelo arranca, ella es Hablante 1).
+// Build diarized transcript from Scribe word-level output.
+// Groups consecutive words from the same speaker into turns, producing:
+//   "Hablante 1: texto...\n\nHablante 2: texto..."
+// Also computes per-speaker metrics.
+function buildDiarizedOutput(
+  data: ScribeResponse,
+): { diarizedText: string; audioMetrics: AudioMetrics } {
+  const words = data.words ?? [];
 
-REGLAS ESTRICTAS:
-- Devolvé EXCLUSIVAMENTE un objeto JSON con esta forma: {"turns":[{"speaker":1,"text":"..."},{"speaker":2,"text":"..."}]}
-- NO modifiques el texto. Cada "text" debe ser una porción LITERAL y consecutiva del transcript original.
-- NO inventes palabras, NO traduzcas, NO corrijas, NO agregues comentarios.
-- NO uses markdown, backticks, ni nada fuera del JSON.
-- Concatenando todos los "text" en orden con espacios debe reconstruir (casi) el transcript original.
-- Mantené consistencia: la misma persona = el mismo número durante toda la llamada.
-- Si dudás en un turno corto, asigná el más probable y seguí (no devuelvas "speaker": 0 ni nulls).
-- speaker SOLO puede ser 1 o 2.`;
-
-  const ac = new AbortController();
-  const timeoutId = setTimeout(() => ac.abort(), 60_000);
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      signal: ac.signal,
-      body: JSON.stringify({
-        model,
-        // Temperature baja porque queremos copiar el transcript, no creatividad.
-        temperature: 0.1,
-        // response_format JSON garantiza shape parseable.
-        response_format: { type: "json_object" },
-        // Output max ~8000 — alcanza para llamadas de hasta ~45 min.
-        // Llamadas más largas pueden cortar; en ese caso el catch maneja
-        // y caemos al transcript plano.
-        max_tokens: 8000,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: flatText },
-        ],
-      }),
-    });
-  } catch (e) {
-    clearTimeout(timeoutId);
-    throw new Error(
-      (e as Error).name === "AbortError"
-        ? "LLM diarización: timeout 60s."
-        : `LLM diarización: ${(e as Error).message}`,
-    );
-  }
-  clearTimeout(timeoutId);
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`LLM diarización HTTP ${res.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = data.choices?.[0]?.message?.content ?? "";
-  if (!content) throw new Error("LLM diarización: respuesta vacía.");
-
-  let parsed: { turns?: Array<{ speaker?: number; text?: string }> };
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new Error("LLM diarización: JSON inválido.");
-  }
-
-  const turns = Array.isArray(parsed.turns) ? parsed.turns : [];
-  if (turns.length === 0) throw new Error("LLM diarización: sin turnos.");
-
-  // Sanity check: la suma de longitudes de texto debe ser comparable
-  // al original — si el LLM se comió la mitad del transcript, mejor
-  // descartar y devolver el plano que tener un transcript falsamente
-  // diarizado pero incompleto.
-  const totalChars = turns.reduce((acc, t) => acc + (t.text?.length ?? 0), 0);
-  if (totalChars < flatText.length * 0.7) {
-    throw new Error(
-      `LLM diarización: output muy corto (${totalChars} chars vs ${flatText.length} originales).`,
-    );
-  }
-
-  // Agrupamos turnos consecutivos del mismo speaker — si el LLM hizo
-  // splits muy finos, los unimos en un bloque por turno completo.
-  const blocks: string[] = [];
-  let lastSpeaker = -1;
-  let buffer = "";
-  for (const t of turns) {
-    const speaker = t.speaker;
-    const text = (t.text ?? "").trim();
-    if (!text) continue;
-    if (speaker !== 1 && speaker !== 2) continue;
-    if (speaker !== lastSpeaker) {
-      if (buffer) blocks.push(buffer);
-      buffer = `Hablante ${speaker}: ${text}`;
-      lastSpeaker = speaker;
-    } else {
-      buffer += ` ${text}`;
+  // Map speaker IDs → stable labels (Hablante 1, Hablante 2, etc.)
+  const speakerIdMap = new Map<string, string>();
+  let speakerCounter = 0;
+  for (const w of words) {
+    if (w.speaker_id && !speakerIdMap.has(w.speaker_id)) {
+      speakerCounter++;
+      speakerIdMap.set(w.speaker_id, `Hablante ${speakerCounter}`);
     }
   }
-  if (buffer) blocks.push(buffer);
 
-  if (blocks.length === 0) throw new Error("LLM diarización: ningún turno válido.");
-  // Si quedó solo un bloque, no es realmente diarización (el LLM puso
-  // todo a un solo speaker) — preferible el plano.
-  if (blocks.length === 1) throw new Error("LLM diarización: un solo speaker detectado.");
+  // If no speaker info, return empty (caller will fall back to rawText)
+  if (speakerIdMap.size === 0) {
+    const lastWord = words[words.length - 1];
+    const totalDuration = lastWord ? lastWord.end : 0;
+    return {
+      diarizedText: "",
+      audioMetrics: {
+        total_duration_s: Math.round(totalDuration * 100) / 100,
+        speaker_count: 0,
+        speakers: [],
+        filler_words: [],
+      },
+    };
+  }
 
-  return blocks.join("\n\n");
+  // Group words into speaker turns
+  const turns: Array<{ speakerId: string; label: string; words: ScribeWord[] }> = [];
+  let currentSpeaker = "";
+  let currentTurn: ScribeWord[] = [];
+
+  for (const w of words) {
+    if (w.type === "audio_event") continue; // skip audio events
+    const sid = w.speaker_id ?? currentSpeaker;
+    if (sid !== currentSpeaker && w.type === "word") {
+      if (currentTurn.length > 0 && currentSpeaker) {
+        turns.push({
+          speakerId: currentSpeaker,
+          label: speakerIdMap.get(currentSpeaker) ?? "?",
+          words: currentTurn,
+        });
+      }
+      currentSpeaker = sid;
+      currentTurn = [w];
+    } else {
+      currentTurn.push(w);
+    }
+  }
+  if (currentTurn.length > 0 && currentSpeaker) {
+    turns.push({
+      speakerId: currentSpeaker,
+      label: speakerIdMap.get(currentSpeaker) ?? "?",
+      words: currentTurn,
+    });
+  }
+
+  // Build diarized text
+  const blocks = turns.map((t) => {
+    const text = t.words
+      .map((w) => w.text)
+      .join("")
+      .trim();
+    return `${t.label}: ${text}`;
+  });
+  const diarizedText = blocks.join("\n\n");
+
+  // Compute per-speaker metrics
+  const speakerStats = new Map<
+    string,
+    { id: string; label: string; wordCount: number; durationS: number }
+  >();
+  for (const t of turns) {
+    const existing = speakerStats.get(t.speakerId) ?? {
+      id: t.speakerId,
+      label: t.label,
+      wordCount: 0,
+      durationS: 0,
+    };
+    const turnWords = t.words.filter((w) => w.type === "word");
+    existing.wordCount += turnWords.length;
+    if (turnWords.length > 0) {
+      const start = turnWords[0].start;
+      const end = turnWords[turnWords.length - 1].end;
+      existing.durationS += end - start;
+    }
+    speakerStats.set(t.speakerId, existing);
+  }
+
+  const lastWord = words[words.length - 1];
+  const totalDuration = lastWord ? lastWord.end : 0;
+  const totalSpeakerDuration = Array.from(speakerStats.values()).reduce(
+    (sum, s) => sum + s.durationS,
+    0,
+  );
+
+  const speakers = Array.from(speakerStats.values()).map((s) => ({
+    id: s.id,
+    label: s.label,
+    word_count: s.wordCount,
+    estimated_duration_s: Math.round(s.durationS * 100) / 100,
+    talk_ratio:
+      totalSpeakerDuration > 0
+        ? Math.round((s.durationS / totalSpeakerDuration) * 100) / 100
+        : 0,
+  }));
+
+  // Detect filler words in Spanish
+  const FILLER_WORDS = new Set([
+    "eh", "este", "mmm", "em", "o sea", "tipo", "como que",
+    "bueno", "digamos", "nada", "claro", "dale",
+  ]);
+  const fillerCounts = new Map<string, Map<string, number>>();
+  for (const w of words) {
+    if (w.type !== "word") continue;
+    const lower = w.text.toLowerCase().trim();
+    if (FILLER_WORDS.has(lower) && w.speaker_id) {
+      const byWord = fillerCounts.get(w.speaker_id) ?? new Map<string, number>();
+      byWord.set(lower, (byWord.get(lower) ?? 0) + 1);
+      fillerCounts.set(w.speaker_id, byWord);
+    }
+  }
+  const filler_words: AudioMetrics["filler_words"] = [];
+  for (const [speakerId, byWord] of fillerCounts.entries()) {
+    for (const [word, count] of byWord.entries()) {
+      if (count >= 3) {
+        // Only report if significant (3+ occurrences)
+        filler_words.push({ word, count, speaker_id: speakerId });
+      }
+    }
+  }
+
+  return {
+    diarizedText,
+    audioMetrics: {
+      total_duration_s: Math.round(totalDuration * 100) / 100,
+      speaker_count: speakerIdMap.size,
+      speakers,
+      filler_words,
+    },
+  };
 }

@@ -3,21 +3,19 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { CLARI_SYSTEM_PROMPT } from "./prompt.ts";
 
 // qa-chat-clari — generador de la respuesta del asistente IA "Clari"
-// para una sesión de QA Chat. Pattern:
+// para una sesión de QA Chat. Migrado de Gemini/Groq → Anthropic Claude
+// para consistencia con qa-analyze y mejor razonamiento en español.
+//
+// Pattern:
 //  1. El frontend ya insertó el user message en qa_chat_messages.
-//     Esa decisión es deliberada: si esta función falla (rate limit,
-//     LLM error, lo que sea), el mensaje del user queda guardado y se
-//     puede reintentar sin perder lo escrito.
 //  2. Esta función:
 //      - Carga la sesión + verifica ownership vía RLS (user JWT).
 //      - Carga el historial de mensajes (rolling window).
 //      - Carga contexto: últimas N QAs según scope (closer / all).
-//      - Llama al LLM (Gemini > Groq dispatcher, mismo patrón que
-//        qa-analyze).
+//      - Llama a Claude (Anthropic Messages API).
 //      - Inserta la respuesta como assistant message.
 //      - Bumpea session.updated_at para que la sidebar reordene.
-//  3. Devuelve el assistant message para que el frontend lo agregue
-//     optimistically sin esperar el realtime.
+//  3. Devuelve el assistant message al frontend.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,24 +23,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Rolling window de historial — los modelos free tier de Gemini/Groq
-// tienen TPM limit, así que mantenemos las últimas 20 turns. Suficiente
-// para coherencia de conversación; si querés contexto más largo, subir
-// el límite es seguro mientras el TPM aguante.
 const MAX_HISTORY_MESSAGES = 20;
-
-// Cantidad de QAs que cargamos como contexto. 30 es un balance entre:
-// - Que Clari tenga data suficiente para responder ("quién cierra más",
-//   "tendencias del último mes").
-// - No saturar el TPM con un payload gigante en cada request.
-// Si el scope es "closer" cargamos 30 de ese closer; si "all", 30 del
-// equipo entero ordenadas por fecha desc.
 const MAX_QAS_FOR_CONTEXT = 30;
-
-// Cuántos chars del summary mantenemos por QA en el contexto. Cortar
-// libera tokens sin perder lo importante (el summary del análisis IA
-// suele caber en 200 chars).
 const MAX_SUMMARY_CHARS = 250;
+const CLAUDE_TIMEOUT_MS = 60_000; // 1 min para chat (respuestas cortas)
 
 interface ChatRequest {
   session_id?: string;
@@ -78,22 +62,18 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
-    if (!GEMINI_API_KEY && !GROQ_API_KEY) {
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) {
       return jsonError(
-        "Ningún provider configurado. Setea GEMINI_API_KEY (recomendado) o GROQ_API_KEY.",
+        "ANTHROPIC_API_KEY no configurada. Setea en los secrets de Supabase.",
         500,
       );
     }
-    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash";
-    const GROQ_URL =
-      Deno.env.get("GROQ_BASE_URL") || "https://api.groq.com/openai/v1/chat/completions";
-    const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "llama-3.1-8b-instant";
+    // Sonnet para chat — más rápido y barato que Opus, suficiente para
+    // análisis de QAs. Override: CLAUDE_CHAT_MODEL env.
+    const CLAUDE_MODEL =
+      Deno.env.get("CLAUDE_CHAT_MODEL") || "claude-sonnet-4-20250514";
 
-    // Auth: tomamos el JWT del user y todas las queries van scopadas por
-    // RLS. Clari no necesita service role — todo lo que lee/escribe está
-    // en tablas multi-tenant aisladas por current_tenant_id() + user_id.
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return jsonError("No auth header.", 401);
@@ -118,8 +98,7 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    // Cargar la sesión. Si no aparece, o es de otro user/tenant, RLS
-    // devuelve null — respondemos 404 sin filtrar info adicional.
+    // Load session (RLS-scoped)
     const { data: sessionRaw, error: sessionErr } = await sb
       .from("qa_chat_sessions")
       .select("id, user_id, scope_type, scope_closer_id")
@@ -129,10 +108,7 @@ serve(async (req) => {
     if (!sessionRaw) return jsonError("Sesión no encontrada.", 404);
     const session = sessionRaw as SessionRow;
 
-    // Cargar historial. Última ventana de mensajes; el último DEBE ser
-    // user (lo insertó el frontend antes de invocarnos). Si no es user,
-    // significa que se está reintentando sobre una sesión donde Clari
-    // ya respondió — devolvemos el último assistant para no duplicar.
+    // Load message history
     const { data: historyRaw, error: historyErr } = await sb
       .from("qa_chat_messages")
       .select("role, content, created_at")
@@ -147,12 +123,11 @@ serve(async (req) => {
     }
     const last = history[history.length - 1];
     if (last.role === "assistant") {
-      // Idempotencia: si el último ya es assistant, devolvemos eso sin
-      // generar uno nuevo. Evita gastar tokens por reintentos del cliente.
+      // Idempotencia: ya respondido → devolver sin gastar tokens
       return jsonResponse({ ok: true, alreadyAnswered: true, content: last.content });
     }
 
-    // Cargar contexto: últimas N QAs filtradas por scope.
+    // Load QA context
     let qasQuery = sb
       .from("qa_calls")
       .select(
@@ -170,11 +145,8 @@ serve(async (req) => {
 
     const contextBlock = buildContextBlock(qaCalls, session);
 
-    // Armar messages para el LLM. El primer "user" es el bloque de
-    // contexto inyectado (no proviene del usuario); luego va el historial.
-    // Insertamos contexto como user porque tanto Gemini como Groq lo
-    // tratan más naturalmente que un segundo system prompt.
-    const llmMessages: Array<{ role: "user" | "assistant"; content: string }> = [
+    // Build Claude messages. Context goes as first user message, then history.
+    const claudeMessages: Array<{ role: "user" | "assistant"; content: string }> = [
       { role: "user", content: contextBlock },
       { role: "assistant", content: "Ok, ya vi las QAs. ¿En qué te ayudo?" },
       ...history.map((m) => ({
@@ -185,28 +157,22 @@ serve(async (req) => {
 
     let responseText: string;
     let usage: unknown = null;
-    let providerLabel: "gemini" | "groq";
     try {
-      if (GEMINI_API_KEY) {
-        const r = await callGemini(GEMINI_API_KEY, GEMINI_MODEL, CLARI_SYSTEM_PROMPT, llmMessages);
-        responseText = r.text;
-        usage = r.usage;
-        providerLabel = "gemini";
-      } else {
-        const r = await callGroq(
-          GROQ_API_KEY!,
-          GROQ_URL,
-          GROQ_MODEL,
-          CLARI_SYSTEM_PROMPT,
-          llmMessages,
-        );
-        responseText = r.text;
-        usage = r.usage;
-        providerLabel = "groq";
-      }
+      const r = await callClaude(
+        ANTHROPIC_API_KEY,
+        CLAUDE_MODEL,
+        CLARI_SYSTEM_PROMPT,
+        claudeMessages,
+      );
+      responseText = r.text;
+      usage = r.usage;
     } catch (e) {
-      const msg = (e as Error).message ?? "Error de provider IA";
-      const status = /429|rate limit/i.test(msg) ? 429 : /401|402|key|cuota|quota/i.test(msg) ? 402 : 502;
+      const msg = (e as Error).message ?? "Error de Claude";
+      const status = /429|rate limit/i.test(msg)
+        ? 429
+        : /401|402|key|cuota|quota|credit/i.test(msg)
+          ? 402
+          : 502;
       return jsonError(msg, status);
     }
 
@@ -214,9 +180,7 @@ serve(async (req) => {
       return jsonError("Clari no devolvió texto. Probá reformular la pregunta.", 502);
     }
 
-    // Token tracking: ambos providers exponen counts en shapes distintos.
-    // Esto es best-effort — si no parsea, queda null y no rompemos.
-    const { tokens_in, tokens_out, cached_tokens } = extractTokenCounts(usage, providerLabel);
+    const { tokens_in, tokens_out, cached_tokens } = extractTokenCounts(usage);
 
     const { data: assistantMsg, error: insertErr } = await sb
       .from("qa_chat_messages")
@@ -232,7 +196,7 @@ serve(async (req) => {
       .single();
     if (insertErr) throw insertErr;
 
-    // Bump session.updated_at para que la sidebar reordene.
+    // Bump session.updated_at
     await sb
       .from("qa_chat_sessions")
       .update({ updated_at: new Date().toISOString() })
@@ -241,7 +205,8 @@ serve(async (req) => {
     return jsonResponse({
       ok: true,
       message: assistantMsg,
-      provider: providerLabel,
+      provider: "anthropic",
+      model: CLAUDE_MODEL,
       qaContextCount: qaCalls.length,
     });
   } catch (e) {
@@ -297,128 +262,98 @@ function buildContextBlock(calls: QaCallContextRow[], session: SessionRow): stri
   return lines.join("\n");
 }
 
-function extractTokenCounts(
-  usage: unknown,
-  provider: "gemini" | "groq",
-): { tokens_in: number | null; tokens_out: number | null; cached_tokens: number | null } {
+function extractTokenCounts(usage: unknown): {
+  tokens_in: number | null;
+  tokens_out: number | null;
+  cached_tokens: number | null;
+} {
   if (!usage || typeof usage !== "object") {
     return { tokens_in: null, tokens_out: null, cached_tokens: null };
   }
   const u = usage as Record<string, unknown>;
-  if (provider === "gemini") {
-    return {
-      tokens_in: typeof u.promptTokenCount === "number" ? u.promptTokenCount : null,
-      tokens_out: typeof u.candidatesTokenCount === "number" ? u.candidatesTokenCount : null,
-      cached_tokens: typeof u.cachedContentTokenCount === "number" ? u.cachedContentTokenCount : null,
-    };
-  }
-  // Groq usa shape OpenAI-compat: { prompt_tokens, completion_tokens }.
   return {
-    tokens_in: typeof u.prompt_tokens === "number" ? u.prompt_tokens : null,
-    tokens_out: typeof u.completion_tokens === "number" ? u.completion_tokens : null,
-    cached_tokens: null,
+    tokens_in: typeof u.input_tokens === "number" ? u.input_tokens : null,
+    tokens_out: typeof u.output_tokens === "number" ? u.output_tokens : null,
+    cached_tokens:
+      typeof u.cache_read_input_tokens === "number" ? u.cache_read_input_tokens : null,
   };
 }
 
-// ─── Provider helpers ────────────────────────────────────────────────
+// ─── Claude (Anthropic Messages API) ────────────────────────────────
 
 interface ProviderResult {
   text: string;
   usage: unknown;
 }
 
-async function callGroq(
+async function callClaude(
   apiKey: string,
-  url: string,
   model: string,
   systemPrompt: string,
   messages: Array<{ role: "user" | "assistant"; content: string }>,
 ): Promise<ProviderResult> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.5,
-      max_tokens: 1500,
-      messages: [{ role: "system", content: systemPrompt }, ...messages],
-    }),
-  });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    console.error("Groq error", res.status, errText.slice(0, 500));
-    if (res.status === 429) throw new Error("Groq: rate limit. Probá en unos segundos.");
-    if (res.status === 401 || res.status === 402) {
-      throw new Error("Groq: cuota agotada o key inválida.");
-    }
-    if (res.status === 413) throw new Error("Groq: request too large.");
-    throw new Error(`Groq error ${res.status}`);
+  const ac = new AbortController();
+  const timeoutId = setTimeout(() => ac.abort(), CLAUDE_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      signal: ac.signal,
+      body: JSON.stringify({
+        model,
+        max_tokens: 2000,
+        system: [
+          {
+            type: "text",
+            text: systemPrompt,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        messages: messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      }),
+    });
+  } catch (fetchErr) {
+    clearTimeout(timeoutId);
+    const aborted = (fetchErr as Error).name === "AbortError";
+    throw new Error(
+      aborted
+        ? `Claude tardó más de ${CLAUDE_TIMEOUT_MS / 1000}s.`
+        : `Error al contactar Anthropic: ${(fetchErr as Error).message}`,
+    );
   }
+  clearTimeout(timeoutId);
+
+  if (!res.ok) {
+    const status = res.status;
+    const errText = await res.text().catch(() => "");
+    console.error("Claude API error", status, errText.slice(0, 500));
+    if (status === 429) throw new Error("Claude: rate limit. Probá en unos segundos.");
+    if (status === 401) throw new Error("Claude: API key inválida.");
+    if (status === 402 || status === 403) {
+      throw new Error("Claude: crédito agotado o sin permisos.");
+    }
+    if (status === 529) throw new Error("Claude: API sobrecargada.");
+    throw new Error(`Claude API error ${status}`);
+  }
+
   const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    content?: Array<{ type: string; text?: string }>;
     usage?: unknown;
   };
-  return {
-    text: data.choices?.[0]?.message?.content ?? "",
-    usage: data.usage ?? null,
-  };
-}
 
-async function callGemini(
-  apiKey: string,
-  model: string,
-  systemPrompt: string,
-  messages: Array<{ role: "user" | "assistant"; content: string }>,
-): Promise<ProviderResult> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  // Gemini usa "model" en vez de "assistant" en su API.
-  const contents = messages.map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents,
-      generationConfig: {
-        temperature: 0.5,
-        maxOutputTokens: 1500,
-      },
-    }),
-  });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    console.error("Gemini error", res.status, errText.slice(0, 500));
-    if (res.status === 429) throw new Error("Gemini: rate limit. Probá en unos segundos.");
-    if (res.status === 400 && /api key/i.test(errText)) {
-      throw new Error("Gemini: API key inválida.");
-    }
-    if (res.status === 401 || res.status === 403) {
-      throw new Error("Gemini: API key inválida o sin permisos.");
-    }
-    throw new Error(`Gemini error ${res.status}`);
-  }
-  const data = (await res.json()) as {
-    candidates?: Array<{
-      content?: { parts?: Array<{ text?: string }> };
-      finishReason?: string;
-    }>;
-    usageMetadata?: unknown;
-    promptFeedback?: { blockReason?: string };
-  };
-  if (data.promptFeedback?.blockReason) {
-    throw new Error(`Gemini bloqueó el prompt: ${data.promptFeedback.blockReason}`);
-  }
-  const cand = data.candidates?.[0];
-  const finishReason = cand?.finishReason;
-  if (finishReason && finishReason !== "STOP" && finishReason !== "MAX_TOKENS") {
-    throw new Error(`Gemini finalizó con razón ${finishReason}.`);
-  }
-  const text = cand?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-  return { text, usage: data.usageMetadata ?? null };
+  const text = (data.content ?? [])
+    .filter((c) => c.type === "text" && c.text)
+    .map((c) => c.text!)
+    .join("");
+
+  return { text, usage: data.usage ?? null };
 }

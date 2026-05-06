@@ -26,4 +26,4 @@ verify_jwt = false
 
 [functions.scouter-generate-tasks]
 verify_jwt = false
-schedule = "0 6 * * *"
+# schedule = "0 6 * * *"  # Not supported by CLI config parser; set via Dashboard
