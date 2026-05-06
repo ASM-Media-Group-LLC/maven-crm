@@ -27,8 +27,15 @@ const corsHeaders = {
 
 // ElevenLabs Scribe soporta archivos grandes (hasta 1GB), pero
 // mantenemos un límite práctico para evitar timeouts en el edge function.
+// El plan Pro de Supabase permite 400s de wall-clock por request — dejamos
+// 350s para Scribe + ~30s de margen para download desde Storage + parse
+// del response. Llamadas reales de QA suelen ser 30-60 min de audio y
+// Scribe procesa a ~20s por minuto de audio (~10-20 min de proceso para
+// las más largas), así que para audios MUY largos sigue sin alcanzar —
+// pero 350s cubre el grueso de los uploads que estaban fallando con el
+// AbortError en 120s.
 const MAX_AUDIO_BYTES = 500 * 1024 * 1024; // 500MB
-const SCRIBE_TIMEOUT_MS = 120_000; // 2 min
+const SCRIBE_TIMEOUT_MS = 350_000; // 5m50s
 
 interface TranscribeRequest {
   audio_path?: string;
