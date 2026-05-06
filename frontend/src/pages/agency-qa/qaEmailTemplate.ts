@@ -75,8 +75,15 @@ export const labelForOutcome = (outcome: string | null): string => {
   return "Sin dato";
 };
 
+// Helper: la rúbrica de Claude da overall_score y dimension.score en
+// 0-100, pero los reportes a closers son más intuitivos con escala /10
+// (8.5/10 vs 85/100). Convertimos al render solo, dejando los valores
+// crudos en DB para no romper análisis históricos.
+const fmtScore10 = (score0to100: number): string =>
+  (Math.max(0, Math.min(100, score0to100)) / 10).toFixed(1);
+
 export const buildQaEmailSubject = (p: QaEmailPayload): string =>
-  `[Maven QA Closers] ${p.closerName} · ${p.modelName} · ${p.overallScore}/100 (${p.callOutcomeLabel})`;
+  `[Maven QA Closers] ${p.closerName} · ${p.modelName} · ${fmtScore10(p.overallScore)}/10 (${p.callOutcomeLabel})`;
 
 export const buildQaEmailHtml = (p: QaEmailPayload): string => {
   const scoreColor = scoreColorOf(p.overallScore);
@@ -88,9 +95,11 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
 
   const dimensionRows = p.dimensions
     .map((d, i) => {
-      // dimension scores son 0-10 en el shape del análisis.
-      const pct = Math.max(0, Math.min(100, Math.round((d.score / 10) * 100)));
-      const dColor = scoreColorOf(pct);
+      // dimension.score es 0-100 (la rúbrica de Claude). Antes el comentario
+      // decía "0-10" y se multiplicaba × 10, lo que producía pills tipo
+      // "800/100". Ahora respetamos el rango real y mostramos en /10 con
+      // un decimal — más intuitivo para los closers.
+      const dColor = scoreColorOf(d.score);
       const isLast = i === p.dimensions.length - 1;
       return (
         `<tr>` +
@@ -101,7 +110,7 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
             : "") +
         `</td>` +
         `<td style="padding:12px 16px;${isLast ? "" : `border-bottom:1px solid ${COLORS.borderSoft};`}text-align:right;vertical-align:top;width:70px;">` +
-          `<span style="display:inline-block;padding:4px 10px;border-radius:9999px;background:${dColor};color:#ffffff;font-size:12px;font-weight:700;">${Math.round(d.score * 10)}/100</span>` +
+          `<span style="display:inline-block;padding:4px 10px;border-radius:9999px;background:${dColor};color:#ffffff;font-size:12px;font-weight:700;">${fmtScore10(d.score)}/10</span>` +
         `</td>` +
         `</tr>`
       );
@@ -198,7 +207,7 @@ export const buildQaEmailHtml = (p: QaEmailPayload): string => {
                 `<td style="padding:18px 20px;vertical-align:middle;">` +
                   `<div style="font-size:11px;color:${COLORS.muted};text-transform:uppercase;letter-spacing:1.5px;font-weight:700;">Score IA</div>` +
                   `<div style="font-size:34px;font-weight:800;color:${scoreColor};margin-top:4px;line-height:1;">` +
-                    `${p.overallScore}<span style="font-size:16px;color:${COLORS.muted};font-weight:500;margin-left:2px;">/100</span>` +
+                    `${fmtScore10(p.overallScore)}<span style="font-size:16px;color:${COLORS.muted};font-weight:500;margin-left:2px;">/10</span>` +
                   `</div>` +
                 `</td>` +
                 // Divider visual
