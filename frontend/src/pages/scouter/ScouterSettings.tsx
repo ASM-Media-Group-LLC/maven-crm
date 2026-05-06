@@ -49,6 +49,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import {
   useSpammerAccounts,
+  useInsertSpammerAccount,
   useUpdateSpammerAccount,
   type SpammerAccount,
   type AccountNiche,
@@ -826,42 +827,188 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
 };
 
 // ─── Cuentas Spammer section ─────────────────────────────────────────
+
+const MAX_SPAMMER_ACCOUNTS = 4;
+const IG_HANDLE_REGEX = /^[a-zA-Z0-9_.]{1,30}$/;
+
 const SpammerAccountsSection = () => {
   const accountsQ = useSpammerAccounts();
   const accounts = accountsQ.data ?? [];
   const { isAdmin, isManager } = useUserRole();
+  const insertAccount = useInsertSpammerAccount();
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [newHandle, setNewHandle] = useState("");
+  const [newDisplayName, setNewDisplayName] = useState("");
+  const [newNiche, setNewNiche] = useState<AccountNiche | "">("");
+
+  const cleanedHandle = newHandle.trim().replace(/^@+/, "");
+  const handleError =
+    cleanedHandle.length > 0 && !IG_HANDLE_REGEX.test(cleanedHandle)
+      ? "Solo letras, números, puntos y guiones bajos (máx 30)."
+      : null;
+  const canSave =
+    cleanedHandle.length > 0 &&
+    !handleError &&
+    newDisplayName.trim().length > 0 &&
+    newNiche !== "";
+
+  const handleAddAccount = async () => {
+    if (!canSave) return;
+    try {
+      await insertAccount.mutateAsync({
+        instagram_handle: cleanedHandle,
+        display_name: newDisplayName.trim(),
+        account_niche: newNiche as AccountNiche,
+      });
+      setNewHandle("");
+      setNewDisplayName("");
+      setNewNiche("");
+      setShowAdd(false);
+      toast.success("Cuenta agregada correctamente");
+    } catch {
+      // toast shown by mutation onError
+    }
+  };
+
+  const canAddMore = accounts.length < MAX_SPAMMER_ACCOUNTS;
 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <Instagram className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">Cuentas Spammer</CardTitle>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Instagram className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">Cuentas Spammer</CardTitle>
+            </div>
+            <CardDescription className="text-xs mt-1">
+              {isAdmin || isManager
+                ? "Todas las cuentas registradas en el tenant."
+                : "Tus cuentas spammer registradas."}
+            </CardDescription>
+          </div>
+          {canAddMore && !showAdd && !accountsQ.isLoading && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1"
+              onClick={() => setShowAdd(true)}
+            >
+              <Plus className="h-3 w-3" />
+              Agregar cuenta
+            </Button>
+          )}
         </div>
-        <CardDescription className="text-xs">
-          {isAdmin || isManager
-            ? "Todas las cuentas registradas en el tenant."
-            : "Tus cuentas spammer registradas."}
-        </CardDescription>
       </CardHeader>
       <CardContent>
         {accountsQ.isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
-        ) : accounts.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center">
-            <Instagram className="mx-auto h-7 w-7 text-muted-foreground mb-2" />
-            <p className="text-sm font-medium">No hay cuentas registradas</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Completá el asistente de bienvenida en la pestaña "Mis Tareas" para agregar cuentas.
-            </p>
-          </div>
         ) : (
           <div className="space-y-2">
-            {accounts.map((acc) => (
-              <SpammerAccountRow key={acc.id} account={acc} />
-            ))}
+            {accounts.length === 0 && !showAdd ? (
+              <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center">
+                <Instagram className="mx-auto h-7 w-7 text-muted-foreground mb-2" />
+                <p className="text-sm font-medium">No hay cuentas registradas</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Completá el asistente de bienvenida en "Mis Tareas" o usá el botón "Agregar cuenta".
+                </p>
+              </div>
+            ) : (
+              accounts.map((acc) => (
+                <SpammerAccountRow key={acc.id} account={acc} />
+              ))
+            )}
+
+            {/* Inline add-account form */}
+            {showAdd && (
+              <div className="rounded-lg border border-dashed border-amber-400/40 bg-amber-400/5 p-3 space-y-2.5">
+                <p className="text-xs font-medium text-amber-400">Nueva cuenta</p>
+
+                {/* Handle */}
+                <div>
+                  <div className="flex items-center gap-0">
+                    <div className="flex h-8 items-center rounded-l-md border border-r-0 border-input bg-muted px-2.5 text-xs text-muted-foreground select-none">
+                      @
+                    </div>
+                    <Input
+                      value={newHandle}
+                      onChange={(e) => setNewHandle(e.target.value)}
+                      placeholder="handle_de_instagram"
+                      className={`h-8 text-xs rounded-l-none ${handleError ? "border-destructive" : ""}`}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
+                  </div>
+                  {handleError && (
+                    <p className="mt-0.5 text-[10px] text-destructive">{handleError}</p>
+                  )}
+                </div>
+
+                {/* Display name + niche */}
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={newDisplayName}
+                    onChange={(e) => setNewDisplayName(e.target.value)}
+                    placeholder="Nombre descriptivo"
+                    className="h-8 text-xs flex-1"
+                  />
+                  <Select value={newNiche} onValueChange={(v) => setNewNiche(v as AccountNiche)}>
+                    <SelectTrigger className="h-8 text-xs w-[120px]">
+                      <SelectValue placeholder="Nicho…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(["lifestyle", "fitness", "adult", "business", "mixed"] as AccountNiche[]).map((n) => (
+                        <SelectItem key={n} value={n} className="text-xs capitalize">
+                          {n}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-1.5 pt-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      setShowAdd(false);
+                      setNewHandle("");
+                      setNewDisplayName("");
+                      setNewNiche("");
+                    }}
+                    disabled={insertAccount.isPending}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs gap-1"
+                    onClick={handleAddAccount}
+                    disabled={!canSave || insertAccount.isPending}
+                  >
+                    {insertAccount.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Plus className="h-3 w-3" />
+                    )}
+                    Guardar
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Capacity indicator */}
+            {accounts.length > 0 && (
+              <p className="text-[10px] text-muted-foreground pt-1">
+                {accounts.length}/{MAX_SPAMMER_ACCOUNTS} cuentas registradas
+              </p>
+            )}
           </div>
         )}
       </CardContent>
