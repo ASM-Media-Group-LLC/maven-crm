@@ -7,11 +7,17 @@ const corsHeaders = {
 };
 
 function generateTempPassword(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
-  const buf = new Uint32Array(12);
+  // Solo letras+números (sin I/O/0/l/1 para evitar confusiones), sin
+  // símbolos. Algunos clientes de email/chat re-codifican `!@#$%` o se
+  // pierden en copy/paste manual (caracter invisible, autocorrect).
+  // 14 chars de [A-HJ-NP-Z][a-hj-km-z][2-9] = ~83 bits de entropía,
+  // suficiente para una contraseña temporal que el usuario cambia al
+  // primer login.
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const buf = new Uint32Array(14);
   crypto.getRandomValues(buf);
   let result = "";
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 14; i++) {
     result += chars[buf[i] % chars.length];
   }
   return result;
