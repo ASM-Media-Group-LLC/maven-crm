@@ -10,6 +10,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -31,6 +41,9 @@ import {
   Trash2,
   Users,
   User as UserIcon,
+  Mic,
+  MicOff,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -92,6 +105,107 @@ const sessionTitle = (s: {
   return "Sobre todo el equipo";
 };
 
+// ─── Speech recognition (Web Speech API nativa, sin ElevenLabs) ──────
+// El browser expone SpeechRecognition (Firefox / WebKit). En Chrome y
+// Safari está bajo `webkitSpeechRecognition`. Lo wrapaeamos en un hook
+// minimal: start() comienza a escuchar y los resultados van apareciendo
+// como callback `onResult(text)`. Cuando hace stop() o termina la
+// oración, dispara onResult con el texto final.
+
+type SpeechRecLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((e: { results: { transcript: string }[][] & { isFinal?: boolean }[] }) => void) | null;
+  onerror: ((e: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+};
+
+type SpeechRecCtor = new () => SpeechRecLike;
+
+const getSpeechRecognitionCtor = (): SpeechRecCtor | null => {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecCtor;
+    webkitSpeechRecognition?: SpeechRecCtor;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+};
+
+const useSpeechRecognition = ({
+  onTranscript,
+  onError,
+  lang = "es-ES",
+}: {
+  onTranscript: (text: string, isFinal: boolean) => void;
+  onError?: (msg: string) => void;
+  lang?: string;
+}) => {
+  const Ctor = useMemo(() => getSpeechRecognitionCtor(), []);
+  const recRef = useRef<SpeechRecLike | null>(null);
+  const [listening, setListening] = useState(false);
+  const supported = !!Ctor;
+
+  const start = () => {
+    if (!Ctor) {
+      onError?.("Tu navegador no soporta dictado por voz. Usá Chrome o Safari.");
+      return;
+    }
+    if (recRef.current) {
+      // Ya está corriendo — toggle no-op.
+      return;
+    }
+    const rec = new Ctor();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = lang;
+    rec.onresult = (ev) => {
+      // recorremos todos los chunks: el navegador acumula resultados
+      // parciales hasta que la oración cierra (isFinal=true).
+      const results = ev.results as unknown as Array<{
+        0: { transcript: string };
+        isFinal: boolean;
+      }>;
+      let interim = "";
+      let finalText = "";
+      for (let i = 0; i < results.length; i++) {
+        const chunk = results[i];
+        const txt = chunk[0]?.transcript ?? "";
+        if (chunk.isFinal) finalText += txt;
+        else interim += txt;
+      }
+      const text = (finalText + interim).trim();
+      if (text) onTranscript(text, !!finalText && !interim);
+    };
+    rec.onerror = (e) => {
+      onError?.(e.error || "Error de reconocimiento de voz.");
+      setListening(false);
+      recRef.current = null;
+    };
+    rec.onend = () => {
+      setListening(false);
+      recRef.current = null;
+    };
+    try {
+      rec.start();
+      recRef.current = rec;
+      setListening(true);
+    } catch (e) {
+      onError?.((e as Error).message ?? "No se pudo iniciar el dictado.");
+    }
+  };
+
+  const stop = () => {
+    recRef.current?.stop();
+    recRef.current = null;
+    setListening(false);
+  };
+
+  return { listening, supported, start, stop };
+};
+
 const AgencyQaChat = () => {
   const sessionsQ = useQaChatSessions();
   const closersQ = useQaClosers();
@@ -102,6 +216,38 @@ const AgencyQaChat = () => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [input, setInput] = useState("");
+  // Modal estilo Maven para confirmar el borrado de una conversación.
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+
+  // Dictado por voz: cuando el usuario activa el mic, los chunks
+  // reconocidos se anexan al input en vez de reemplazarlo, así puede
+  // mezclar tipeo + voz. Guardamos el "anchor" del input cuando arranca
+  // el dictado para poder reemplazar solo lo dictado en ese ciclo.
+  const dictationAnchorRef = useRef<string>("");
+  const speech = useSpeechRecognition({
+    onTranscript: (text, _isFinal) => {
+      const base = dictationAnchorRef.current;
+      const sep = base && !base.endsWith(" ") && !base.endsWith("\n") ? " " : "";
+      setInput(base + sep + text);
+    },
+    onError: (msg) => {
+      toast.error("Dictado por voz", { description: msg });
+    },
+    lang: "es-ES",
+  });
+
+  const toggleDictation = () => {
+    if (speech.listening) {
+      speech.stop();
+      return;
+    }
+    // Anchor en el contenido actual para que la voz no piese lo escrito.
+    dictationAnchorRef.current = input;
+    speech.start();
+  };
 
   const messagesQ = useQaChatMessages(activeId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -145,14 +291,16 @@ const AgencyQaChat = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (
-      !window.confirm("¿Borrar esta conversación? No se puede deshacer.")
-    )
-      return;
+  const askDelete = (id: string, title: string) => {
+    setPendingDelete({ id, title });
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
     try {
-      await deleteSession.mutateAsync(id);
-      if (activeId === id) setActiveId(null);
+      await deleteSession.mutateAsync(pendingDelete.id);
+      if (activeId === pendingDelete.id) setActiveId(null);
+      setPendingDelete(null);
     } catch (err) {
       toast.error("No se pudo borrar la conversación", {
         description: (err as Error).message,
@@ -218,13 +366,13 @@ const AgencyQaChat = () => {
                         tabIndex={0}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDelete(s.id);
+                          askDelete(s.id, sessionTitle(s));
                         }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
                             e.stopPropagation();
-                            handleDelete(s.id);
+                            askDelete(s.id, sessionTitle(s));
                           }
                         }}
                         className="cursor-pointer text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
@@ -340,7 +488,16 @@ const AgencyQaChat = () => {
               <div className="flex gap-2 border-t border-border/60 p-3">
                 <Textarea
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    // Si el usuario edita manualmente mientras dicta,
+                    // movemos el anchor para que el siguiente chunk de
+                    // voz se anexe al final del nuevo texto en vez de
+                    // pisarlo.
+                    if (speech.listening) {
+                      dictationAnchorRef.current = e.target.value;
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -355,32 +512,76 @@ const AgencyQaChat = () => {
                   rows={2}
                   className="resize-none text-sm"
                 />
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        onClick={handleSend}
-                        disabled={!input.trim() || sendMessage.isPending}
-                        className="gap-1.5"
-                      >
-                        {sendMessage.isPending ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Send className="h-3.5 w-3.5" />
-                        )}
-                        Enviar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[220px]">
-                      <p className="text-xs">
-                        Tu mensaje se persiste en{" "}
-                        <code>qa_chat_messages</code>. La respuesta de Clari
-                        queda pendiente hasta wirear Groq.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <div className="flex flex-col gap-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          onClick={handleSend}
+                          disabled={!input.trim() || sendMessage.isPending}
+                          className="gap-1.5"
+                        >
+                          {sendMessage.isPending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Send className="h-3.5 w-3.5" />
+                          )}
+                          Enviar
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[220px]">
+                        <p className="text-xs">
+                          Tu mensaje se persiste en{" "}
+                          <code>qa_chat_messages</code>. La respuesta la
+                          genera Clari (Anthropic) en la edge function.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  {/* Mic / dictado nativo del navegador (Web Speech API).
+                      Solo se muestra si el navegador lo soporta. */}
+                  {speech.supported && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant={speech.listening ? "default" : "outline"}
+                            onClick={toggleDictation}
+                            className={cn(
+                              "gap-1.5",
+                              speech.listening &&
+                                "bg-rose-500 text-white hover:bg-rose-500/90",
+                            )}
+                            aria-pressed={speech.listening}
+                          >
+                            {speech.listening ? (
+                              <>
+                                <MicOff className="h-3.5 w-3.5" />
+                                Detener
+                              </>
+                            ) : (
+                              <>
+                                <Mic className="h-3.5 w-3.5" />
+                                Dictar
+                              </>
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[220px]">
+                          <p className="text-xs">
+                            Dictado por voz nativo del navegador (Web
+                            Speech API, español).{" "}
+                            {speech.listening
+                              ? "Hablá ahora — el texto aparece en el cuadro."
+                              : "Click para dictar tu pregunta."}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
               </div>
             </>
           ) : (
@@ -420,6 +621,47 @@ const AgencyQaChat = () => {
         }}
         creating={createSession.isPending}
       />
+
+      {/* Confirm delete — estilo Maven (shadcn AlertDialog) */}
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Borrar conversación
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Seguro que querés borrar la conversación{" "}
+              <strong>&ldquo;{pendingDelete?.title}&rdquo;</strong>?
+              <br />
+              Se eliminan todos sus mensajes. Esta acción no se puede
+              deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteSession.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteSession.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteSession.isPending ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Borrando…
+                </>
+              ) : (
+                "Borrar"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
