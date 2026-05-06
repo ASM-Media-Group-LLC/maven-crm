@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, History as HistoryIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   useChatterSessions,
@@ -95,6 +95,25 @@ const WorkspaceContent = () => {
       /* no-op */
     }
   }, [infoOverride]);
+  // Tab activo del rail derecho (persistido). Lifted up para que los
+  // botones del topbar puedan setearlo sin tener que abrir el rail
+  // primero.
+  const [rightTab, setRightTab] = useState<"info" | "history">(() => {
+    try {
+      const v = window.localStorage.getItem(RIGHT_TAB_KEY);
+      return v === "history" ? "history" : "info";
+    } catch {
+      return "info";
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(RIGHT_TAB_KEY, rightTab);
+    } catch {
+      /* no-op */
+    }
+  }, [rightTab]);
+
   const isNarrow = useIsNarrow();
   // Visibilidad de los rails:
   //   - Criterios: SOLO sigue el toggle manual del usuario.
@@ -235,23 +254,32 @@ const WorkspaceContent = () => {
             )}
             <span className="hidden sm:inline text-xs">Criterios</span>
           </Button>
-          {/* Toggle del rail de info personaje. Click siempre flippea
-              entre "show" y "hide" pisando el auto-hide por isNarrow,
-              así que el usuario puede forzar mostrarlo aún en pantallas
-              chicas. */}
+          {/* Toggle del tab "Info personaje" del rail derecho. Si el
+              rail está oculto, lo abre. Si ya está abierto en este tab,
+              lo cierra. Si está abierto pero en History, switchea acá. */}
           <Button
             variant="ghost"
             size="sm"
-            onClick={() =>
-              setInfoOverride((curr) => {
-                // Estado actual visible? → hide. Estado actual oculto? → show.
-                const currentlyHidden =
-                  curr === "hide" ? true : curr === "show" ? false : isNarrow;
-                return currentlyHidden ? "show" : "hide";
-              })
+            onClick={() => {
+              if (!infoHidden && rightTab === "info") {
+                // ya visible y activo → ocultar el rail
+                setInfoOverride("hide");
+              } else {
+                // ocultar el rail por user toggle? mostrarlo. ya
+                // visible pero en otro tab? cambiar de tab. mismo
+                // resultado: abrir + setear tab.
+                setInfoOverride("show");
+                setRightTab("info");
+              }
+            }}
+            title={
+              infoHidden
+                ? "Mostrar info personaje"
+                : rightTab === "info"
+                  ? "Ocultar info personaje"
+                  : "Cambiar a info personaje"
             }
-            title={infoHidden ? "Mostrar info personaje" : "Ocultar info personaje"}
-            className="gap-2"
+            className={`gap-2 ${!infoHidden && rightTab === "info" ? "bg-muted" : ""}`}
           >
             {infoHidden ? (
               <PanelRightOpen className="h-4 w-4" />
@@ -259,6 +287,30 @@ const WorkspaceContent = () => {
               <PanelRightClose className="h-4 w-4" />
             )}
             <span className="hidden sm:inline text-xs">Info personaje</span>
+          </Button>
+          {/* Toggle del tab "History" del rail derecho. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (!infoHidden && rightTab === "history") {
+                setInfoOverride("hide");
+              } else {
+                setInfoOverride("show");
+                setRightTab("history");
+              }
+            }}
+            title={
+              infoHidden
+                ? "Mostrar historial de sesiones"
+                : rightTab === "history"
+                  ? "Ocultar historial"
+                  : "Cambiar a historial"
+            }
+            className={`gap-2 ${!infoHidden && rightTab === "history" ? "bg-muted" : ""}`}
+          >
+            <HistoryIcon className="h-4 w-4" />
+            <span className="hidden sm:inline text-xs">History</span>
           </Button>
         </div>
         <div className="text-xs text-muted-foreground">
@@ -306,6 +358,8 @@ const WorkspaceContent = () => {
               profileId={selectedSession?.profile_id ?? null}
               selectedSessionId={selectedId}
               onSelectSession={setSelectedId}
+              tab={rightTab}
+              onTabChange={setRightTab}
             />
           </aside>
         )}
@@ -335,31 +389,20 @@ const RightRailTabs = ({
   profileId,
   selectedSessionId,
   onSelectSession,
+  tab,
+  onTabChange,
 }: {
   profileId: string | null;
   selectedSessionId: string | null;
   onSelectSession: (id: string | null) => void;
+  tab: RightTab;
+  onTabChange: (next: RightTab) => void;
 }) => {
   const profilesQ = useChatterProfiles();
   const [lang] = useChatterLang();
   const profile = profileId
     ? (profilesQ.data ?? []).find((p) => p.id === profileId) ?? null
     : null;
-  const [tab, setTab] = useState<RightTab>(() => {
-    try {
-      const v = window.localStorage.getItem(RIGHT_TAB_KEY);
-      return v === "history" ? "history" : "info";
-    } catch {
-      return "info";
-    }
-  });
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(RIGHT_TAB_KEY, tab);
-    } catch {
-      /* no-op */
-    }
-  }, [tab]);
 
   return (
     <aside className="flex h-full min-h-0 flex-col bg-card">
@@ -367,7 +410,7 @@ const RightRailTabs = ({
       <div className="flex shrink-0 items-stretch border-b border-border">
         <button
           type="button"
-          onClick={() => setTab("info")}
+          onClick={() => onTabChange("info")}
           className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
             tab === "info"
               ? "border-b-2 border-primary text-primary"
@@ -378,7 +421,7 @@ const RightRailTabs = ({
         </button>
         <button
           type="button"
-          onClick={() => setTab("history")}
+          onClick={() => onTabChange("history")}
           className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${
             tab === "history"
               ? "border-b-2 border-primary text-primary"

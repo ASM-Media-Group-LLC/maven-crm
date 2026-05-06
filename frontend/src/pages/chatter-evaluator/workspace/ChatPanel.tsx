@@ -52,6 +52,11 @@ import type { ChatterSession, ChatterMessage, ChatterProfile } from "../types";
 
 interface Props {
   session: ChatterSession | null;
+  /** Callback opcional para deseleccionar la sesión actual y dejar el
+   *  panel del chat vacío. Si se pasa, renderea un botón X en el header
+   *  del chat. Útil cuando hay una sesión cerrada "trabada" en la
+   *  vista y el usuario quiere volver al estado vacío. */
+  onClose?: () => void;
 }
 
 // Tiny header metric — label on top in muted uppercase, value below in
