@@ -82,7 +82,7 @@ serve(async (req) => {
       return jsonError("GROQ_API_KEY no configurada.", 500);
     }
     const GEMINI_MODEL =
-      Deno.env.get("MIKE_MODEL_GEMINI") || "gemini-2.0-flash";
+      Deno.env.get("MIKE_MODEL_GEMINI") || "gemini-2.5-flash";
     // llama-3.3-70b-versatile es el default Groq. Override via GROQ_CHAT_MODEL.
     const GROQ_MODEL =
       Deno.env.get("GROQ_CHAT_MODEL") || "llama-3.3-70b-versatile";

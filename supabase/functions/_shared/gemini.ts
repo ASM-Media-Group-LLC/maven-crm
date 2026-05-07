@@ -17,7 +17,10 @@
 // deprecado, ahora es nombre directo. 2.0-flash tiene free tier amplio
 // (15 RPM, 1M tokens contexto) y sigue siendo el más barato/rápido
 // para asistentes conversacionales.
-const DEFAULT_MODEL = "gemini-2.0-flash";
+// Free tier de Google AI Studio (mid-2026) solo deja entrar a 2.5-flash;
+// 1.5/2.0 quedaron en 0/0 RPM (quota 0). 2.5-flash da 5 RPM / 250K TPM —
+// suficiente para asistentes conversacionales con tráfico bajo.
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 export interface GeminiMessage {
   role: "user" | "assistant";
@@ -172,15 +175,21 @@ export async function streamGeminiAsOpenAI(opts: {
     const status = upstream.status;
     const errText = await upstream.text().catch(() => "");
     console.error("Gemini stream error", status, errText.slice(0, 500));
-    let message = "Error en el proveedor IA";
-    let outStatus = 500;
-    if (status === 429) {
-      message = "Estoy saturado, probá en unos segundos.";
-      outStatus = 429;
-    } else if (status === 401 || status === 403) {
-      message = "Cuota agotada o key inválida.";
-      outStatus = 402;
+    // Surface the real Gemini error for diagnosis (status reason +
+    // first 240 chars del body). Sin esto el frontend ve un genérico
+    // "saturado" y no podés saber si es quota, modelo inválido,
+    // billing, etc.
+    let parsedReason = "";
+    try {
+      const j = JSON.parse(errText) as { error?: { message?: string; status?: string } };
+      parsedReason = j.error?.message ?? j.error?.status ?? "";
+    } catch {
+      parsedReason = errText.slice(0, 240);
     }
+    let message = `Gemini error ${status}: ${parsedReason || "sin detalle"}`;
+    let outStatus = 502;
+    if (status === 429) outStatus = 429;
+    else if (status === 401 || status === 403) outStatus = 402;
     return new Response(JSON.stringify({ error: message }), {
       status: outStatus,
       headers: { ...opts.corsHeaders, "Content-Type": "application/json" },
