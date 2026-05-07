@@ -33,13 +33,14 @@ const GROQ_URL =
   Deno.env.get("GROQ_BASE_URL") || "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "llama-3.1-8b-instant";
 const BATCH_SIZE_DEFAULT = 50;
-// Procesamos los leads de a 1 por call para respetar el TPM de Groq
-// free tier sin spikes. La throttle entre calls (THROTTLE_MS) mantiene
-// la tasa por debajo del RPM. Si una call rebota con 429, solo
-// reintentamos esa, no el batch entero.
-const CHUNK_SIZE = 1;
-// 2500ms = 24 RPM, safe debajo del límite de 30 RPM del free tier.
-const THROTTLE_MS = 2500;
+// Procesamos los leads en chunks de 10 con throttle 2s entre calls.
+// 50/10 = 5 calls × 2s = 10s de throttle + procesamiento ≈ 25-40s total.
+// Respeta el RPM de Groq free tier (5 calls < 30 RPM) y deja margen
+// debajo del timeout de 150s del edge runtime de Supabase.
+// Si una call rebota con 429, solo reintentamos esa (MAX_RETRIES_429).
+const CHUNK_SIZE = 10;
+// 2000ms entre calls = 30 RPM peak. Suficiente buffer al límite del free tier.
+const THROTTLE_MS = 2000;
 // Retries cuando Groq devuelve 429 (rate limit). Backoff lineal.
 const MAX_RETRIES_429 = 3;
 const COOLDOWN_DAYS_DEFAULT = 3;

@@ -29,3 +29,5 @@ supabase/.temp/
 *.sln
 *.sw?
 scripts/migrate-chatters/node_modules/
+.sdd/
+.claude/scheduled_tasks.lock

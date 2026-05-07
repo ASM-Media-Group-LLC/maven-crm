@@ -109,11 +109,17 @@ CALL_OUTCOME — reglas finas
 - "no_cerro": rechazo explícito.
 - "en_espera": todo lo demás (default — "se va a pensar", "consulto y te aviso", fecha aspiracional sin firma/pago).
 
-CAP DE SCORE POR OUTCOME (regla dura, prevalece sobre el rubric)
-- Si \`call_outcome = "en_espera"\` → \`overall_score\` NO puede exceder 70. Una llamada sin cierre vinculante, por buena que haya sido la conversación, deja al closer sin resultado — el techo es 70/100.
-- Si \`call_outcome = "no_cerro"\` → \`overall_score\` NO puede exceder 60. Rechazo explícito significa que la propuesta o el manejo no convencieron; aun con buen tono, hay daño al pipeline.
-- Si \`call_outcome = "cerro"\` → sin techo (puntuá según rubric, hasta 100).
-- Aplicá el cap DESPUÉS de calcular el score por rubric: si el rubric te da 85 y el outcome fue "en_espera", devolvés 70.
+CAP / FLOOR DE SCORE POR OUTCOME (regla dura, prevalece sobre el rubric)
+Lo único que importa al final es que la modelo CIERRE. Por bien hecho que esté el procedimiento, sin cierre el closer no entrega resultado.
+
+- Si \`call_outcome = "cerro"\` → APROBADO SEGURO. \`overall_score\` MÍNIMO 75 (floor) y sin techo. Aunque el rubric detecte fallas, si la modelo cerró el closer aprueba — el resultado manda. Puntúa según rubric pero no bajes de 75.
+- Si \`call_outcome = "en_espera"\` → \`overall_score\` NO puede exceder 55. "En espera" es prácticamente un NO con un poco de cortesía: "lo pienso", "te aviso", "consulto". Las probabilidades de cierre real desde ese estado son bajas. Aun con buen procedimiento, sin cierre vinculante el techo es 55/100.
+- Si \`call_outcome = "no_cerro"\` → \`overall_score\` NO puede exceder 50. Rechazo explícito: la propuesta o el manejo no convencieron; daño al pipeline.
+
+- Aplicá el cap/floor DESPUÉS de calcular el score por rubric:
+  - Rubric da 85 + outcome "en_espera" → devolvés 55.
+  - Rubric da 60 + outcome "cerro" → devolvés 75.
+  - Rubric da 90 + outcome "cerro" → devolvés 90.
 
 INTEREST_LEVEL — modelo
 - alto: pide detalles concretos, comparte números, entusiasmo verbal.
