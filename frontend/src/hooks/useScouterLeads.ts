@@ -114,6 +114,11 @@ interface ListParams {
   aiQuality?: AiQualityFilter;
   page?: number;
   pageSize?: number;
+  /** When true, restrict the result to leads that are assigned to the
+   *  current authenticated user via scouter_daily_assignments (any date).
+   *  Use this for spammer-role views so they only see "their" models
+   *  in Home. Admins/managers leave this off to see the full pool. */
+  onlyAssignedToMe?: boolean;
 }
 
 export interface ScouterLeadsResult {
@@ -131,9 +136,10 @@ export const useScouterLeads = (params: ListParams = {}) => {
     aiQuality = "approved",
     page = 1,
     pageSize = 60,
+    onlyAssignedToMe = false,
   } = params;
   return useQuery({
-    queryKey: ["scouter-leads", { status, search, favoritesOnly, company, country, aiQuality, page, pageSize }],
+    queryKey: ["scouter-leads", { status, search, favoritesOnly, company, country, aiQuality, page, pageSize, onlyAssignedToMe }],
     queryFn: async (): Promise<ScouterLeadsResult> => {
       // When favoritesOnly is on, fetch the current user's favorite ids
       // first and constrain the leads query with `id IN (...)`. RLS on
@@ -147,6 +153,25 @@ export const useScouterLeads = (params: ListParams = {}) => {
         if (favErr) throw favErr;
         favoriteIds = ((favRows ?? []) as { lead_id: string }[]).map((r) => r.lead_id);
         if (favoriteIds.length === 0) return { leads: [], total: 0 };
+      }
+
+      // Spammer view: pre-fetch the lead_ids assigned to me and use them
+      // as a narrower id-IN constraint. RLS on scouter_daily_assignments
+      // already scopes rows to spammer_id = auth.uid() for spammer users
+      // (or shows all to admins), so this is naturally per-user.
+      let assignedIds: string[] | null = null;
+      if (onlyAssignedToMe) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id) return { leads: [], total: 0 };
+        const { data: assignRows, error: assignErr } = await sb
+          .from("scouter_daily_assignments")
+          .select("lead_id")
+          .eq("spammer_id", user.id);
+        if (assignErr) throw assignErr;
+        assignedIds = [
+          ...new Set(((assignRows ?? []) as { lead_id: string }[]).map((r) => r.lead_id)),
+        ];
+        if (assignedIds.length === 0) return { leads: [], total: 0 };
       }
 
       const from = (page - 1) * pageSize;
@@ -178,6 +203,7 @@ export const useScouterLeads = (params: ListParams = {}) => {
         );
       }
       if (favoriteIds) q = q.in("id", favoriteIds);
+      if (assignedIds) q = q.in("id", assignedIds);
 
       const { data, error, count } = await q;
       if (error) throw error;

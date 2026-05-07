@@ -311,7 +311,15 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
   const [managerDate, setManagerDate] = useState<string>(
     new Date().toISOString().slice(0, 10),
   );
-  const { isAdmin, isManager, isSupervisor } = useUserRole();
+  const { isAdmin, isManager, isSupervisor, isSpammer } = useUserRole();
+  // Spammers ven SOLO sus leads asignadas en Home — no el pool
+  // completo del tenant. Admins/managers/supervisors siguen viendo
+  // todo. Esto evita que un spammer vea modelos que la IA está
+  // asignando a otros spammers (cross-spammer dedup ya las separa
+  // a nivel data, pero el Home era el único lugar donde el spammer
+  // las podía ver igual).
+  const isManagerLikeRole = isAdmin || isManager || isSupervisor;
+  const onlyAssignedToMe = isSpammer && !isManagerLikeRole;
   const pageSize = 60;
   const [selected, setSelected] = useState<ScouterLead | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -333,6 +341,7 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
     aiQuality,
     page,
     pageSize,
+    onlyAssignedToMe,
   });
   const favoriteIdsQ = useLeadFavoriteIds();
   const favoriteIds = favoriteIdsQ.data ?? new Set<string>();
