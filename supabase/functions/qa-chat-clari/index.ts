@@ -2,9 +2,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { CLARI_SYSTEM_PROMPT } from "./prompt.ts";
 
-// qa-chat-clari — generador de la respuesta del asistente IA "Clari"
-// para una sesión de QA Chat. Migrado de Gemini/Groq → Anthropic Claude
-// para consistencia con qa-analyze y mejor razonamiento en español.
+// qa-chat-clari — generador de la respuesta del asistente IA "Mike"
+// (UI label) para una sesión de QA Chat. Histórico:
+// Gemini → Anthropic Claude → Groq llama-3.3-70b-versatile.
+// El razonamiento conversacional sobre QAs no necesita la calidad de
+// Claude y Groq es ~gratis para chat corto. Se mantiene en Anthropic
+// la pieza de qa-analyze (la pesada con rubric).
 //
 // Pattern:
 //  1. El frontend ya insertó el user message en qa_chat_messages.
@@ -12,7 +15,7 @@ import { CLARI_SYSTEM_PROMPT } from "./prompt.ts";
 //      - Carga la sesión + verifica ownership vía RLS (user JWT).
 //      - Carga el historial de mensajes (rolling window).
 //      - Carga contexto: últimas N QAs según scope (closer / all).
-//      - Llama a Claude (Anthropic Messages API).
+//      - Llama a Groq (OpenAI-compatible chat completions).
 //      - Inserta la respuesta como assistant message.
 //      - Bumpea session.updated_at para que la sidebar reordene.
 //  3. Devuelve el assistant message al frontend.
@@ -26,7 +29,9 @@ const corsHeaders = {
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_QAS_FOR_CONTEXT = 30;
 const MAX_SUMMARY_CHARS = 250;
-const CLAUDE_TIMEOUT_MS = 60_000; // 1 min para chat (respuestas cortas)
+const GROQ_TIMEOUT_MS = 60_000; // 1 min para chat (respuestas cortas)
+const GROQ_URL =
+  Deno.env.get("GROQ_BASE_URL") || "https://api.groq.com/openai/v1/chat/completions";
 
 interface ChatRequest {
   session_id?: string;
@@ -62,20 +67,16 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) {
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+    if (!GROQ_API_KEY) {
       return jsonError(
-        "ANTHROPIC_API_KEY no configurada. Setea en los secrets de Supabase.",
+        "GROQ_API_KEY no configurada. Setea en los secrets de Supabase.",
         500,
       );
     }
-    // Haiku 4.5 para chat — el razonamiento conversacional sobre QAs
-    // no necesita la capacidad de Sonnet, y Haiku es ~3x más barato
-    // (Input $1/MTok, Output $5/MTok vs $3/$15 de Sonnet). Si querés
-    // volver a Sonnet para mejor calidad: setear
-    // CLAUDE_CHAT_MODEL=claude-sonnet-4-20250514 en los secrets de Supabase.
-    const CLAUDE_MODEL =
-      Deno.env.get("CLAUDE_CHAT_MODEL") || "claude-haiku-4-5-20251001";
+    // llama-3.3-70b-versatile es el default. Override via GROQ_CHAT_MODEL.
+    const GROQ_MODEL =
+      Deno.env.get("GROQ_CHAT_MODEL") || "llama-3.3-70b-versatile";
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -148,8 +149,8 @@ serve(async (req) => {
 
     const contextBlock = buildContextBlock(qaCalls, session);
 
-    // Build Claude messages. Context goes as first user message, then history.
-    const claudeMessages: Array<{ role: "user" | "assistant"; content: string }> = [
+    // Build chat messages. Context goes as first user message, then history.
+    const chatMessages: Array<{ role: "user" | "assistant"; content: string }> = [
       { role: "user", content: contextBlock },
       { role: "assistant", content: "Ok, ya vi las QAs. ¿En qué te ayudo?" },
       ...history.map((m) => ({
@@ -161,16 +162,16 @@ serve(async (req) => {
     let responseText: string;
     let usage: unknown = null;
     try {
-      const r = await callClaude(
-        ANTHROPIC_API_KEY,
-        CLAUDE_MODEL,
+      const r = await callGroq(
+        GROQ_API_KEY,
+        GROQ_MODEL,
         CLARI_SYSTEM_PROMPT,
-        claudeMessages,
+        chatMessages,
       );
       responseText = r.text;
       usage = r.usage;
     } catch (e) {
-      const msg = (e as Error).message ?? "Error de Claude";
+      const msg = (e as Error).message ?? "Error de Groq";
       const status = /429|rate limit/i.test(msg)
         ? 429
         : /401|402|key|cuota|quota|credit/i.test(msg)
@@ -180,7 +181,7 @@ serve(async (req) => {
     }
 
     if (!responseText.trim()) {
-      return jsonError("Clari no devolvió texto. Probá reformular la pregunta.", 502);
+      return jsonError("Mike no devolvió texto. Probá reformular la pregunta.", 502);
     }
 
     const { tokens_in, tokens_out, cached_tokens } = extractTokenCounts(usage);
@@ -208,8 +209,8 @@ serve(async (req) => {
     return jsonResponse({
       ok: true,
       message: assistantMsg,
-      provider: "anthropic",
-      model: CLAUDE_MODEL,
+      provider: "groq",
+      model: GROQ_MODEL,
       qaContextCount: qaCalls.length,
     });
   } catch (e) {
@@ -274,54 +275,49 @@ function extractTokenCounts(usage: unknown): {
     return { tokens_in: null, tokens_out: null, cached_tokens: null };
   }
   const u = usage as Record<string, unknown>;
+  // Groq exposes OpenAI-style `prompt_tokens` / `completion_tokens`.
+  // Groq doesn't return a cache stat; we keep the column nullable.
   return {
-    tokens_in: typeof u.input_tokens === "number" ? u.input_tokens : null,
-    tokens_out: typeof u.output_tokens === "number" ? u.output_tokens : null,
-    cached_tokens:
-      typeof u.cache_read_input_tokens === "number" ? u.cache_read_input_tokens : null,
+    tokens_in: typeof u.prompt_tokens === "number" ? u.prompt_tokens : null,
+    tokens_out: typeof u.completion_tokens === "number" ? u.completion_tokens : null,
+    cached_tokens: null,
   };
 }
 
-// ─── Claude (Anthropic Messages API) ────────────────────────────────
+// ─── Groq (OpenAI-compatible chat completions) ───────────────────────
 
 interface ProviderResult {
   text: string;
   usage: unknown;
 }
 
-async function callClaude(
+async function callGroq(
   apiKey: string,
   model: string,
   systemPrompt: string,
   messages: Array<{ role: "user" | "assistant"; content: string }>,
 ): Promise<ProviderResult> {
   const ac = new AbortController();
-  const timeoutId = setTimeout(() => ac.abort(), CLAUDE_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => ac.abort(), GROQ_TIMEOUT_MS);
 
   let res: Response;
   try {
-    res = await fetch("https://api.anthropic.com/v1/messages", {
+    res = await fetch(GROQ_URL, {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       signal: ac.signal,
       body: JSON.stringify({
         model,
         max_tokens: 2000,
-        system: [
-          {
-            type: "text",
-            text: systemPrompt,
-            cache_control: { type: "ephemeral" },
-          },
+        temperature: 0.7,
+        // OpenAI shape — system goes as the first message.
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages.map((m) => ({ role: m.role, content: m.content })),
         ],
-        messages: messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
       }),
     });
   } catch (fetchErr) {
@@ -329,8 +325,8 @@ async function callClaude(
     const aborted = (fetchErr as Error).name === "AbortError";
     throw new Error(
       aborted
-        ? `Claude tardó más de ${CLAUDE_TIMEOUT_MS / 1000}s.`
-        : `Error al contactar Anthropic: ${(fetchErr as Error).message}`,
+        ? `Groq tardó más de ${GROQ_TIMEOUT_MS / 1000}s.`
+        : `Error al contactar Groq: ${(fetchErr as Error).message}`,
     );
   }
   clearTimeout(timeoutId);
@@ -338,25 +334,20 @@ async function callClaude(
   if (!res.ok) {
     const status = res.status;
     const errText = await res.text().catch(() => "");
-    console.error("Claude API error", status, errText.slice(0, 500));
-    if (status === 429) throw new Error("Claude: rate limit. Probá en unos segundos.");
-    if (status === 401) throw new Error("Claude: API key inválida.");
+    console.error("Groq API error", status, errText.slice(0, 500));
+    if (status === 429) throw new Error("Groq: rate limit. Probá en unos segundos.");
+    if (status === 401) throw new Error("Groq: API key inválida.");
     if (status === 402 || status === 403) {
-      throw new Error("Claude: crédito agotado o sin permisos.");
+      throw new Error("Groq: crédito agotado o sin permisos.");
     }
-    if (status === 529) throw new Error("Claude: API sobrecargada.");
-    throw new Error(`Claude API error ${status}`);
+    throw new Error(`Groq API error ${status}`);
   }
 
   const data = (await res.json()) as {
-    content?: Array<{ type: string; text?: string }>;
+    choices?: Array<{ message?: { content?: string } }>;
     usage?: unknown;
   };
 
-  const text = (data.content ?? [])
-    .filter((c) => c.type === "text" && c.text)
-    .map((c) => c.text!)
-    .join("");
-
+  const text = data.choices?.[0]?.message?.content ?? "";
   return { text, usage: data.usage ?? null };
 }

@@ -409,3 +409,61 @@ export const useUploadScreenshot = () => {
     },
   });
 };
+
+// ─── Top-up generator ─────────────────────────────────────────────────────
+// Manual "fill to N" trigger for the spammer. Calls the same edge function
+// that the cron uses but for a single spammer with batch_size sized to the
+// gap between current pending and the target. Bypasses the backlog cap so
+// the user can re-fill at any time without waiting for the cron.
+
+export const TOP_UP_TARGET = 50;
+
+export const useGenerateTasks = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (currentPending: number): Promise<{ created: number; target: number }> => {
+      const missing = Math.max(0, TOP_UP_TARGET - currentPending);
+      if (missing === 0) {
+        return { created: 0, target: TOP_UP_TARGET };
+      }
+
+      const { data: userRes, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userRes.user) throw userErr ?? new Error("No hay sesión activa.");
+
+      const { data: tenantId, error: tenantErr } = await (
+        supabase.rpc as unknown as (fn: string) => Promise<{ data: string | null; error: unknown }>
+      )("current_tenant_id");
+      if (tenantErr) throw tenantErr;
+      if (!tenantId) throw new Error("Tenant no resuelto.");
+
+      const { data, error } = await supabase.functions.invoke("scouter-generate-tasks", {
+        body: {
+          tenant_id: tenantId,
+          spammer_id: userRes.user.id,
+          batch_size: missing,
+          // bypass cap — manual top-up explicitly wants to refill regardless of backlog
+          backlog_cap: 9999,
+        },
+      });
+      if (error) throw error;
+      const result = data as { assignments_created?: number; errors?: string[] };
+      if (result.errors?.length) {
+        throw new Error(result.errors.join("; "));
+      }
+      return { created: result.assignments_created ?? 0, target: TOP_UP_TARGET };
+    },
+    onSuccess: (data) => {
+      const date = new Date().toISOString().slice(0, 10);
+      qc.invalidateQueries({ queryKey: ["daily-assignments", date] });
+      qc.invalidateQueries({ queryKey: ["spammer-progress"] });
+      if (data.created > 0) {
+        toast.success(`Se generaron ${data.created} tareas nuevas`);
+      } else {
+        toast.info(`Ya tenés ${data.target} tareas pendientes — no hace falta generar`);
+      }
+    },
+    onError: (e) => {
+      toast.error("No se pudieron generar tareas", { description: (e as Error).message });
+    },
+  });
+};

@@ -160,6 +160,40 @@ Deno.serve(async (req) => {
           .eq("user_id", newUser.user.id);
       }
 
+      // Tenant membership: el usuario nuevo hereda el tenant del admin
+      // que lo creó. Sin esta fila, current_tenant_id() devuelve NULL
+      // y RLS le filtra TODA la data tenant-scoped a 0 (ese era el bug
+      // que vimos cuando un admin recién creado entraba a Scouter Assist
+      // y veía 0 leads). ON CONFLICT DO NOTHING por si una migration o
+      // trigger ya creó la fila.
+      if (newUser?.user?.id) {
+        const { data: callerMembership } = await adminClient
+          .from("tenant_members")
+          .select("tenant_id")
+          .eq("user_id", callerId)
+          .maybeSingle();
+
+        const callerTenantId = (callerMembership as { tenant_id?: string } | null)?.tenant_id;
+        if (callerTenantId) {
+          const { error: tmErr } = await adminClient
+            .from("tenant_members")
+            .upsert(
+              { user_id: newUser.user.id, tenant_id: callerTenantId },
+              { onConflict: "user_id,tenant_id", ignoreDuplicates: true },
+            );
+          if (tmErr) {
+            console.error(
+              "[admin-user-actions] tenant_members insert failed:",
+              tmErr.message,
+            );
+          }
+        } else {
+          console.warn(
+            "[admin-user-actions] caller has no tenant_members row — new user created without tenant",
+          );
+        }
+      }
+
       // Email de bienvenida con el password temporal vía Resend.
       // ANTES estaba en EdgeRuntime.waitUntil para no bloquear la
       // respuesta, pero los logs mostraban que el isolate moría antes

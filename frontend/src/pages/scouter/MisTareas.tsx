@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Loader2, ClipboardList } from "lucide-react";
+import { Loader2, ClipboardList, RefreshCw } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -7,12 +7,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { DailyProgress } from "@/components/scouter/DailyProgress";
 import { TaskCard } from "@/components/scouter/TaskCard";
 import { ManagerDashboard } from "@/components/scouter/ManagerDashboard";
 import SpammerOnboarding from "@/pages/scouter/SpammerOnboarding";
 import { useSpammerAccounts } from "@/hooks/useSpammerAccounts";
-import { useDailyAssignments } from "@/hooks/useSpammerTasks";
+import { useDailyAssignments, useGenerateTasks, TOP_UP_TARGET } from "@/hooks/useSpammerTasks";
 import { useUserRole } from "@/hooks/useUserRole";
 import type { DailyAssignment } from "@/hooks/useSpammerTasks";
 
@@ -98,6 +99,19 @@ const MisTareas = () => {
 
   const isManagerRole = isAdmin || isManager || isSupervisor;
 
+  // Top-up: count assignments not finished yet (pending + in_progress).
+  // We only show the button on today's date — no point topping up a past day.
+  const pendingCount = useMemo(
+    () =>
+      assignments.filter(
+        (a) => a.status === "pending" || a.status === "in_progress",
+      ).length,
+    [assignments],
+  );
+  const isToday = selectedDate === todayIso();
+  const generateTasks = useGenerateTasks();
+  const canTopUp = isToday && pendingCount < TOP_UP_TARGET;
+
   // Loading state
   if (accountsQ.isLoading || roleLoading) {
     return (
@@ -176,6 +190,38 @@ const MisTareas = () => {
             ? "Cargando..."
             : `${filtered.length} tarea${filtered.length === 1 ? "" : "s"}`}
         </span>
+
+        {/* Top-up button — only visible to non-managers (a manager
+            looking at this view typically isn't the assignee), only on
+            today's date, and disabled when already at target. The
+            mutation passes the current pending count and asks the edge
+            function to generate (TOP_UP_TARGET - pending) new assignments. */}
+        {!isManagerRole && isToday && (
+          <Button
+            size="sm"
+            variant={canTopUp ? "default" : "outline"}
+            disabled={!canTopUp || generateTasks.isPending}
+            onClick={() => generateTasks.mutate(pendingCount)}
+            className="ml-auto gap-2"
+            title={
+              !canTopUp
+                ? `Ya tenés ${pendingCount}/${TOP_UP_TARGET} tareas pendientes`
+                : `Generar ${TOP_UP_TARGET - pendingCount} tareas más`
+            }
+          >
+            {generateTasks.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            <span className="text-xs">
+              Llenar a {TOP_UP_TARGET}
+              <span className="ml-1 opacity-70">
+                ({pendingCount}/{TOP_UP_TARGET})
+              </span>
+            </span>
+          </Button>
+        )}
       </div>
 
       {/* Task list */}

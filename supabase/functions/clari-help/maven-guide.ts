@@ -1,234 +1,207 @@
 // Guía estructurada de Maven CRM — la inyectamos como contexto en el
-// system prompt de Clari. Es texto plano (no JSON ni markdown estricto)
-// para que el LLM lo mastique fácil y dé respuestas naturales.
+// system prompt de Clari. Texto plano, telegráfico, optimizado para
+// pocos tokens (Groq free tier — chequear cada cambio que sume).
 //
-// Convención: cada módulo lleva ruta, qué hace, cómo se accede, y los
-// permisos típicos. Si Maven gana un módulo nuevo, lo agregás acá.
+// Convención: cada módulo lleva ruta + permiso + qué hace + flujo
+// breve si aplica. Si Maven gana un módulo nuevo, agregalo con
+// 2-3 líneas máximo.
 //
-// IMPORTANTE: Clari NO conoce los datos del negocio (creadoras, QAs,
-// tickets concretos). Solo conoce LA APP — cómo usarla, dónde está
-// cada cosa, y los flujos típicos. Si te preguntan data, los deriva
-// al agente especializado correspondiente.
+// Clari NO conoce datos del negocio. Solo conoce LA APP — cómo
+// usarla, dónde está cada cosa, flujos típicos. Si te preguntan
+// data, deriva al agente correcto (Mike / Sales Coach).
 
 export const MAVEN_GUIDE = `
-═══════════════════════════════════════════════════════════
-GUÍA DE MAVEN CRM — funciones, rutas y flujos comunes
-═══════════════════════════════════════════════════════════
+GUÍA MAVEN CRM — funciones y flujos
 
-Maven CRM es la plataforma interna de gestión de una agencia de
-creadoras de OnlyFans. Cubre operaciones, ventas, ticketing,
-finanzas, recursos humanos y QA.
+Maven CRM = plataforma de gestión de agencia de creadoras OF.
+Cubre operaciones, ventas, ticketing, finanzas, RRHH, QA.
 
-──────────────────────────────────────────────────────────
-SECCIÓN: NAVEGACIÓN GENERAL
-──────────────────────────────────────────────────────────
+Sidebar = menú agrupado en MENÚ / OPERACIONES / FINANZAS / RRHH /
+CONFIGURACIÓN. Si no ves un módulo, tu rol no lo tiene.
+Topbar = búsqueda global (⌘K) + notificaciones + avatar.
+Botón flotante purple abajo-derecha = yo (Clari).
 
-• Sidebar izquierdo = menú principal, agrupado en MENÚ /
-  OPERACIONES / FINANZAS / RECURSOS HUMANOS.
-• Topbar arriba = búsqueda global (atajo ⌘K) + notificaciones
-  + avatar de usuario.
-• El botón flotante abajo a la derecha (Bot ícono purple) soy yo:
-  Clari, asistente de soporte. Para preguntas tipo "¿cómo hago X?".
+== AGENCY QA ==
+Ruta: /agency-qa · Permiso: "Agency QA"
+Auditoría de llamadas closer↔modelo.
 
-──────────────────────────────────────────────────────────
-SECCIÓN: AGENCY QA (auditorías de llamadas)
-──────────────────────────────────────────────────────────
+Submódulos:
+- Calls: leaderboards, métricas team. Permiso "Calls".
+- New QA: subir audio. Permiso "New QA".
+  Flujo: New QA → seleccionar closer + modelo + fecha → subir
+  audio (mp3/m4a/wav, ≤200MB) → "Subir y analizar" → ElevenLabs
+  Scribe transcribe + Claude analiza → score 0-100 con 11
+  dimensiones, red flags, key moments, 3 mejoras.
+- QA History: listado, click fila → detalle. Re-analizar y
+  Borrar (este último requiere "Borrar Calls"). Permiso
+  "QA History". Admins ven todo, otros solo lo suyo.
+- Chat with Mike: asistente IA de QAs. "¿quién cierra más?",
+  "¿qué le falta a Juan?". Tiene historial. Permiso "QA Chat".
+- Models: catálogo modelos + leaderboard. Permiso "Models".
+- Notifications: emails de QA. Permiso "Notifications".
+- Borrar Calls: solo admin por defecto.
 
-Ruta: /agency-qa  · Permiso: módulo "Agency QA"
+Cap automático de score: si call_outcome = en_espera → max 70.
+Si no_cerro → max 60. Si cerro → sin cap.
 
-• Dashboard (sub-tab "Calls"): leaderboards, distribución de
-  outcomes, métricas agregadas del equipo. Permiso: "Calls".
-• Nueva QA: subir el audio de una llamada de un closer a una
-  modelo. La IA transcribe (ElevenLabs Scribe) y analiza
-  (Claude Sonnet 4) la calidad de la venta. Permiso: "New QA".
-• QA History: listado de todas las QAs subidas, con score, fecha,
-  modelo, cerrador y estado. Click en una fila → detalle completo.
-  Admins ven todas; otros roles solo las suyas. Permiso: "QA History".
-• Chat with Mike: chat con un asistente IA especializado en QAs
-  ("Mike"). Hace preguntas tipo "¿quién cierra más?", "¿qué le falta
-  a Juan?", "compará x vs y". Permiso: "QA Chat".
-• Modelos: catálogo de modelos con score histórico, leaderboard.
-  Permiso: "Models".
-• Notificaciones: configurar emails (cuando se analiza una QA, score
-  bajo, fallo). Permiso: "Notifications".
-• Borrar QAs: para borrar una llamada, abrí QA History y hacé click
-  en el ícono basura de la fila. Permiso: "Borrar Calls" — por
-  default solo admin. Si necesitás como otro rol, pedile a un admin
-  que te habilite "Agency QA → Borrar Calls" en Settings → Roles.
+== CHATTERS ==
+Ruta: /chatter-evaluator · Permiso: "Chatters"
+Evaluar trabajo de chatters (los que escriben con fans en DM).
 
-──────────────────────────────────────────────────────────
-SECCIÓN: CHATTERS (evaluación de chatters)
-──────────────────────────────────────────────────────────
+Submódulos:
+- Evaluator: evaluar conversación. Permiso "Evaluator".
+  Flujo: lista chatters → "+ Nuevo perfil" si es nuevo (nombre,
+  modelo, idioma) → click chatter → "Nueva evaluación" → pegar
+  o subir conversación → seleccionar modelo + tipo → "Evaluar"
+  → IA (Groq llama-3.3-70b ~10-30s) arma reporte (score,
+  tono, upsell, manejo objeciones, monetización, recomendaciones,
+  quotes literales). Queda en historial del perfil.
+- Workspace: asistencia en vivo. Pegás último mensaje del fan
+  → IA sugiere 3 respuestas (frío/neutro/agresivo upsell) con
+  explicación. Permiso "Workspace".
+- Admin: rúbrica/prompts/perfiles. Permiso "Admin".
+- Borrar Historial: solo admins.
 
-Ruta: /chatter-evaluator  · Permiso: módulo "Chatters"
+== SCOUTER ASSIST ==
+Ruta: /scouter · Permiso: "Scouter Assist"
+Prospección IA de modelos en redes + asignación de tareas a
+spammers (outreach via DM).
 
-• Evaluator: pegás o subís el chat de un chatter con un fan, la IA
-  lo evalúa (tono, upsell, manejo de objeciones, monetización).
-  Permiso: submódulo "Evaluator".
-• Workspace: zona de trabajo del chatter en vivo, asistencia IA
-  durante el chat. Permiso: "Workspace".
-• Admin: configuración del módulo (rúbrica, prompts, perfiles).
-  Permiso: "Admin".
+Sub-tabs:
+- Home: panel discovery, filtros país/categoría/seguidores.
+- Búsquedas: botón "Escanear" → worker Apify + ranking IA.
+- Favoritas: leads marcadas con estrella.
+- Leads: tabla CRM completa con drawer lateral, edición inline,
+  asignar a closer, export Excel.
+- Funnel: pipeline nuevos→contactados→respondieron→convertidos.
+- Mis Tareas: panel diario del SPAMMER con ~50 tareas.
+  Cada lead tiene 1-4 micro-tareas (follow/like/comment/
+  story_view/story_react). Botón "Llenar a 50" si quedó corto.
+  Comments requieren screenshot. Backlog ≥30 frena cron.
+  Tareas pendientes hacen rollover automático al día siguiente.
+- Alertas: vista manager con backlog acumulado por spammer.
+  Filtro lookback 1/3/7/30 días.
+- Settings: gestión compañías, config búsqueda IA, presupuesto
+  Apify.
+- Editar Compañías: permiso para crear/editar/borrar compañías
+  (sin esto solo VES, no MODIFICAS).
 
-Cómo evaluar a un chatter:
-  1. Andá a Chatters → Evaluator (si tenés permiso).
-  2. Pegá la conversación o subila como archivo.
-  3. Click en "Evaluar". La IA arma el reporte en ~10-30s.
-  4. El reporte queda guardado para review posterior.
+Onboarding spammer: admin lo crea con rol "spammer" → login →
+Mis Tareas pide registrar cuenta IG (handle + nicho + followers)
+→ cron diario 06:00 UTC le asigna 50 leads/día.
 
-──────────────────────────────────────────────────────────
-SECCIÓN: CLOSERS / LEADGEN / PROMOLOG
-──────────────────────────────────────────────────────────
+== CLOSERS / LEADGEN / PROMOLOG / COWORK ==
+- /closers: registro closers, KPIs. Permiso "Closers".
+- /leadgen: pipeline manual de modelos. Permiso "LeadGen".
+- /promolog: registro promos outbound (DMs, posts, bumps).
+  Permiso "Promolog".
+- /cowork: room status del equipo. Permiso "Cowork".
 
-• /closers — registro de closers, asignación a modelos.
-  Permiso: módulo "Closers".
-• /leadgen — pipeline de captación de modelos nuevas.
-  Permiso: módulo "LeadGen".
-• /promolog — registro de promociones outbound (DMs, posts, bumps).
-  Permiso: módulo "Promolog".
+== CREADORAS ==
+Ruta: /creadores · Permiso: "Creadores"
+Roster de modelos.
 
-──────────────────────────────────────────────────────────
-SECCIÓN: CREADORAS
-──────────────────────────────────────────────────────────
+Sub-tabs: Lista, Dashboard, Onboarding, Offboarding,
+Personalizados, Perfil, Nuevo (cada uno es submódulo).
 
-Ruta: /creadores  · Permiso: módulo "Creadores"
+Onboarding: Creadoras → "+ Nueva creadora" → wizard (datos
+básicos → contrato → redes → equipo → branding) → Crear.
+Estado "Onboarding" hasta cerrar checklist (KYC, contrato,
+accesos) → pasa a "Activa".
 
-• Lista: todas las creadoras (activas e inactivas). Permiso: "Lista".
-• Dashboard de creadoras: KPIs agregados. Permiso: "Dashboard".
-• Onboarding: wizard para sumar una modelo nueva al roster, sus
-  contratos, accesos, redes. Permiso: "Onboarding".
-• Offboarding: cierre formal cuando una modelo deja la agencia.
-  Permiso: "Offboarding".
-• Personalizados: campos custom por modelo. Permiso: "Personalizados".
-• Perfil de modelo: detalle individual con earnings, fans, tips
-  acumulados, ranking. Permiso: "Perfil".
-• Nuevo: botón "Nueva creadora" desde la lista. Permiso: "Nuevo".
+== CREATOR SALES ==
+Ruta: /sales-overview · Permiso: "Creator Sales"
+Reportes financieros + IA de ventas.
 
-──────────────────────────────────────────────────────────
-SECCIÓN: CREATOR SALES (ventas y reportes financieros de modelos)
-──────────────────────────────────────────────────────────
+Sub-tabs:
+- Dashboard, Reportes, Auditoría.
+- IA Ventas (Beta): /aisales. Sales Coach con historial.
+  Permiso "IA Ventas".
 
-Ruta: /sales-overview  · Permiso: módulo "Creator Sales"
+== DASHBOARD / MESSENGER / TICKETS / TAREAS / EVENTOS / CONTACTOS / WISHLIST ==
+- /dashboard: landing con métricas.
+- /messenger: chat interno team.
+- /tickets: incidentes operativos.
+- /tareas: to-do personal/team.
+- /eventos: calendario agencia.
+- /contactos: directorio externo (proveedores, partners).
+- /super-contactos (label "Wishlist"): contactos VIP/leads alta
+  prioridad con ficha enriquecida.
 
-• Dashboard / Reportes / Auditoría: vistas de ganancias, comparativas,
-  top-N, modelos en riesgo, etc.
-• IA Ventas (Beta): chat con asistente especializado en datos de
-  ventas ("Sales Coach"). Para preguntas tipo "¿quién factura más
-  esta semana?", "compará top 5 modelos". Tiene historial de
-  conversaciones a la izquierda. Ruta: \`/aisales\`. Permiso: "IA Ventas".
+== FINANZAS ==
+Ruta: /finanzas · Permiso: "Finanzas"
+Submódulos: Dashboard, Collections (cuentas por cobrar), Nómina,
+Horas Variables, Invoices, Templates, Control Financiero,
+Reportes, Configuración.
+(IA de ventas vive en Creator Sales → IA Ventas, no acá.)
 
-──────────────────────────────────────────────────────────
-SECCIÓN: TICKETS / TAREAS / EVENTOS
-──────────────────────────────────────────────────────────
+== RRHH ==
+Ruta: /hr · Permiso: "HR"
+Submódulos (cada uno es permiso): Dashboard, Candidatos,
+Onboarding, Offboarding, Empleados Activos, Asistencia, Horarios,
+Horarios Chatters, Horas Extra, Banco de Horas, Vacaciones,
+Permisos, Monitoreo, Incidentes, Desempeño, Capacitación,
+Directorio, Organigrama, Deducciones, Anuncios.
 
-• /tickets — incidentes operativos del equipo. Permiso: "Tickets".
-• /tareas — to-do list personal y del equipo. Permiso: "Tareas".
-• /eventos — calendario de la agencia. Permiso: "Eventos".
+== ADMINISTRACIÓN (Settings) ==
+Ruta: /settings · Permiso: "Administración"
 
-──────────────────────────────────────────────────────────
-SECCIÓN: SCOUTER ASSIST
-──────────────────────────────────────────────────────────
+Sub-tabs: Usuarios, Roles, Auditoría.
 
-Ruta: /scouter  · Permiso: módulo "Scouter Assist"
+Crear usuario: Settings → Usuarios → "+ Agregar usuario" →
+email/nombre/apellido/rol → Crear → Maven manda email con
+password temporal (Resend).
 
-Herramienta de prospección de modelos potenciales. Sub-tabs: Home,
-Búsquedas, Favoritas, Leads, Funnel, Mis Tareas, Settings.
+Resetear password ajeno (admin): fila usuario → ícono llave →
+confirma → password reset + email.
 
-──────────────────────────────────────────────────────────
-SECCIÓN: FINANZAS
-──────────────────────────────────────────────────────────
+Cambiar mi password: avatar arriba-derecha → Settings → Cuenta
+→ Cambiar contraseña.
 
-Ruta: /finanzas  · Permiso: módulo "Finanzas"
+Editar permisos de un rol (admin): Settings → Roles → "Editar
+permisos" → toggles por módulo+submódulo+data_scope → Guardar.
+Usuarios ven cambio en próximo refresh.
 
-• Dashboard: vista general financiera. Submódulo "Dashboard".
-• Collections: cuentas por cobrar. Submódulo "Collections".
-• Nómina: pagos al equipo. Submódulo "Nómina".
-• Horas & Variables: horas trabajadas + variables de nómina.
-  Submódulo "Horas Variables".
-• Invoices / Templates: facturación. Submódulos "Invoices",
-  "Templates".
-• Control Financiero / Reportes Avanzados: análisis. Submódulos
-  "Control Financiero", "Reportes".
-• Configuración: config del módulo. Submódulo "Configuración".
+Eliminar usuario (admin): fila → ícono basura → confirma. Maven
+limpia 49 FK refs antes de borrar auth.users (irreversible — toda
+data del usuario se pierde).
 
-(El asistente IA de ventas vive en Creator Sales → IA Ventas, no en
-Finanzas — \`/aisales\`.)
+== PROYECTO MP ==
+Ruta: /proyectomp · Permiso "ProyectoMP". Módulo interno.
 
-──────────────────────────────────────────────────────────
-SECCIÓN: RECURSOS HUMANOS
-──────────────────────────────────────────────────────────
+== ASISTENTES IA ==
+3 asistentes:
+1. CLARI (yo): FAB global. Soporte/how-to/permisos. SIN datos.
+2. MIKE: Agency QA → Chat with Mike. Datos de QAs/closers/scores
+   (Groq llama-3.3-70b).
+3. SALES COACH: /aisales. Datos de creadoras/earnings/rankings.
 
-Ruta: /hr  · Permiso: módulo "HR"
+Derivación:
+- "¿Quién factura más?" → Sales Coach.
+- "¿Qué le falta al closer X?" → Mike.
+- "¿Cómo creo una QA?" → yo.
+- "Dato de modelo X" → Sales Coach.
 
-Gestión de empleados de la agencia: directorio, asistencia, horarios,
-horas extra, vacaciones, permisos, monitoreo, incidentes, desempeño,
-capacitación, organigrama, candidatos, onboarding/offboarding,
-deducciones, anuncios. Cada uno es un submódulo.
+== SISTEMA DE PERMISOS ==
+Cada usuario = 1 ROL primario (admin/manager/supervisor/closer/
+chatter/spammer/employee/etc). Cada rol = lista de permisos
+(módulo + submódulo + can_access + data_scope). Sin permiso al
+módulo, no aparece en sidebar.
 
-──────────────────────────────────────────────────────────
-SECCIÓN: ADMINISTRACIÓN (Settings)
-──────────────────────────────────────────────────────────
+Data scopes: all (todo), team (equipo), own (sus propios), self
+(spammer ve solo sus tareas).
 
-Ruta: /settings  · Permiso: módulo "Administración"
+Si te preguntan cómo hacer X y su rol no tiene el permiso:
+decile qué permiso falta y "pedile a un admin que te lo habilite
+en Settings → Roles". Si ya es admin, que lo edite él mismo.
 
-• Usuarios: lista de usuarios, cambiar rol, agregar nuevo, resetear
-  password. Permiso: submódulo "Usuarios".
-• Roles: definir roles custom y qué módulos/submódulos pueden ver.
-  Permiso: submódulo "Roles".
-• Auditoría: log de acciones sensibles. Permiso: submódulo "Auditoría".
-
-Cómo cambiar mi password:
-  1. Click en tu avatar arriba a la derecha → Settings → Cuenta →
-     Cambiar contraseña.
-
-Cómo otorgar un permiso a otro rol (solo admins):
-  1. Settings → Usuarios → tab "Roles".
-  2. Buscá el rol que querés modificar y click en "Editar permisos".
-  3. Activás/desactivás los toggles por módulo y submódulo.
-  4. Guardá. Los usuarios con ese rol ven el cambio al siguiente login.
-
-──────────────────────────────────────────────────────────
-SECCIÓN: ASISTENTES IA EN MAVEN
-──────────────────────────────────────────────────────────
-
-Hay tres asistentes con personalidades distintas:
-
-1. CLARI (yo) — botón flotante global abajo a la derecha. Soy
-   asistente de soporte: te explico cómo usar Maven, te llevo a la
-   sección correcta, te aviso si tu rol no tiene un permiso. NO
-   tengo acceso a datos del negocio.
-
-2. MIKE — vive dentro de Agency QA → Chat with Mike. Sabe sobre
-   QAs, closers, scores, dimensiones, red flags. Para coaching del
-   equipo de ventas a modelos.
-
-3. SALES COACH — vive en Creator Sales → IA Ventas (\`/aisales\`).
-   Sabe sobre creadoras, earnings, rankings, fans. Tiene historial
-   de conversaciones. Etiqueta Beta.
-
-Si te preguntan datos del negocio, derivalos al agente correcto:
-   • "¿Quién factura más?" → Sales Coach.
-   • "¿Qué le falta a este closer?" → Mike.
-   • "¿Cómo creo una QA?" → te respondo yo (es how-to).
-
-──────────────────────────────────────────────────────────
-SECCIÓN: SISTEMA DE PERMISOS — CÓMO FUNCIONA
-──────────────────────────────────────────────────────────
-
-• Cada usuario tiene un ROL (admin, manager, supervisor, closer,
-  chatter, etc.).
-• Cada rol tiene una lista de PERMISOS (combinación de módulo +
-  submódulo + can_access).
-• Si un rol no tiene permiso a un módulo o submódulo, esa sección
-  no aparece en el sidebar para ese usuario.
-• El admin puede editar los permisos de cualquier rol desde
-  Settings → Usuarios → Roles.
-
-Si un usuario te pregunta cómo hacer algo y SU rol no tiene el
-permiso requerido:
-  • Decile claramente qué permiso le falta y para qué módulo.
-  • Sugerí: "Pedile a un admin que te habilite Módulo → Submódulo
-    desde Settings → Usuarios → Roles."
-  • Si el usuario ya es admin pero igual le falta el permiso, decile
-    que abra Settings y se lo agregue él mismo.
+== GOTCHAS / FAQ ==
+- No llegan emails: Settings → Notificaciones → toggles ON.
+  Sender Resend notifications@maven-ai.me.
+- Sidebar vacío: tu rol no tiene módulos asignados.
+- Audio QA cargando infinito: archivo grande/formato no soportado.
+  mp3/m4a/wav ≤200MB.
+- Cambié rol y veo lo mismo: logout/login (rol se cachea en JWT).
+- Quiero data del negocio: deriva a Mike o Sales Coach.
+- Borrar mi cuenta: pedir a admin (no se hace solo).
 `.trim();
