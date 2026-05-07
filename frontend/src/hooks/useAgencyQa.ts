@@ -1204,7 +1204,7 @@ export const useFireQaWebhook = () =>
 //
 // This slice ships the UI + persistence only. The AI dispatch (Clari's
 // streaming response with cached context) lives in edge function
-// qa-chat-clari and lands in the next slice when GROQ_API_KEY is wired.
+// qa-chat-mike and lands in the next slice when GROQ_API_KEY is wired.
 // Until then, sending a message persists the user turn but the
 // assistant response stays at "pendiente".
 
@@ -1313,7 +1313,7 @@ export const useDeleteQaChatSession = () => {
 };
 
 /** Persist a user message to qa_chat_messages. Returns the row.
- *  No AI dispatch yet — the assistant turn lands when the qa-chat-clari
+ *  No AI dispatch yet — the assistant turn lands when the qa-chat-mike
  *  edge function is wired. */
 export const useSendQaChatMessage = () => {
   const qc = useQueryClient();
@@ -1323,7 +1323,7 @@ export const useSendQaChatMessage = () => {
       content: string;
     }): Promise<{ user: QaChatMessage; assistant: QaChatMessage | null; assistantError?: string }> => {
       // 1. Insertamos el mensaje del user PRIMERO. Si la edge function
-      // qa-chat-clari falla después (rate limit, LLM error), el user
+      // qa-chat-mike falla después (rate limit, LLM error), el user
       // message ya quedó persistido y la UI muestra "Clari pendiente"
       // como antes — el supervisor puede reintentar pidiendo otra cosa
       // o esperando a que pase el rate limit.
@@ -1338,14 +1338,14 @@ export const useSendQaChatMessage = () => {
         .single();
       if (userErr) throw userErr;
 
-      // 2. Disparamos qa-chat-clari. La edge function genera la respuesta
+      // 2. Disparamos qa-chat-mike. La edge function genera la respuesta
       // del assistant, la inserta en qa_chat_messages, y bumpea
       // session.updated_at — frontend solo invalida la query.
       let assistant: QaChatMessage | null = null;
       let assistantError: string | undefined;
       try {
         const { data: invokeData, error: invokeErr } = await supabase.functions.invoke(
-          "qa-chat-clari",
+          "qa-chat-mike",
           { body: { session_id: input.session_id } },
         );
         if (invokeErr) {

@@ -1,6 +1,6 @@
 // Mike — supervisor IA de QAs en Maven Agency QA.
 // (Antes "Clari" — renombrado a Mike para volver al naming original
-//  de Kash. Edge function y tabla siguen llamándose qa-chat-clari /
+//  de Kash. Edge function y tabla siguen llamándose qa-chat-mike /
 //  qa_chat_* para no romper migraciones; solo cambia el persona.)
 //
 // Tono: misma vibra que el rubric de qa-analyze (cercanía, picardía

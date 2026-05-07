@@ -62,7 +62,7 @@ import {
 // del user, lista sesiones del usuario actual ordenadas por última actividad.
 //
 // El response del asistente NO se genera todavía — falta la edge function
-// qa-chat-clari + GROQ_API_KEY. Mientras tanto, después de mandar un mensaje,
+// qa-chat-mike + GROQ_API_KEY. Mientras tanto, después de mandar un mensaje,
 // aparece una nota "Clari pendiente — falta GROQ_API_KEY" en lugar de la
 // respuesta. Cuando se conecte el backend, esa nota se reemplaza por la
 // llamada a la edge function que streamea tokens.

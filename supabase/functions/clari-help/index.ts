@@ -4,7 +4,7 @@ import { MAVEN_GUIDE } from "./maven-guide.ts";
 
 // clari-help — asistente de soporte global de Maven CRM.
 //
-// Diferencia con ai-sales-chat (Sales Coach) y qa-chat-clari (Mike):
+// Diferencia con ai-sales-chat (Sales Coach) y qa-chat-mike (Mike):
 //   - Clari NO consulta tablas del negocio.
 //   - Clari conoce LA APP: rutas, módulos, flujos, sistema de permisos.
 //   - Recibe el rol y permisos del usuario y los usa para dar

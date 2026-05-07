@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { CLARI_SYSTEM_PROMPT } from "./prompt.ts";
 
-// qa-chat-clari — generador de la respuesta del asistente IA "Mike"
+// qa-chat-mike — generador de la respuesta del asistente IA "Mike"
 // (UI label) para una sesión de QA Chat. Histórico:
 // Gemini → Anthropic Claude → Groq llama-3.3-70b-versatile.
 // El razonamiento conversacional sobre QAs no necesita la calidad de
@@ -214,7 +214,7 @@ serve(async (req) => {
       qaContextCount: qaCalls.length,
     });
   } catch (e) {
-    console.error("qa-chat-clari error:", e);
+    console.error("qa-chat-mike error:", e);
     return jsonError((e as Error).message ?? "Error interno.", 500);
   }
 });
