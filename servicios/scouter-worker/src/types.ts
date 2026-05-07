@@ -6,7 +6,8 @@ export type JobKind =
   | "discover_seed"
   | "discover_hashtag"
   | "score_lead"
-  | "enrich_profile";
+  | "enrich_profile"
+  | "refresh_posts";
 
 export type JobStatus = "queued" | "running" | "done" | "failed";
 
@@ -53,11 +54,17 @@ export interface EnrichProfilePayload {
   leadId: string;
 }
 
+export interface RefreshPostsPayload {
+  /** scouter_leads.id (debe ser high_fit) a enriquecer con recent_posts. */
+  leadId: string;
+}
+
 export type JobPayloadByKind = {
   discover_seed: DiscoverSeedPayload;
   discover_hashtag: DiscoverHashtagPayload;
   score_lead: ScoreLeadPayload;
   enrich_profile: EnrichProfilePayload;
+  refresh_posts: RefreshPostsPayload;
 };
 
 // Resultado normalizado que el handler devuelve al dispatcher. Lo que

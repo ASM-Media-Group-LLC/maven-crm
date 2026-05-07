@@ -16,6 +16,7 @@ import {
 } from "./handlers/discover.ts";
 import { handleEnrichProfile } from "./handlers/enrich.ts";
 import { handleScoreLead } from "./handlers/score.ts";
+import { handleRefreshPosts } from "./handlers/refreshPosts.ts";
 import type { JobResult, ScouterJob } from "./types.ts";
 
 const BATCH_SIZE = parseInt(process.env.WORKER_BATCH_SIZE ?? "3", 10);
@@ -126,6 +127,8 @@ async function dispatchJob(job: ScouterJob): Promise<JobResult> {
       return handleScoreLead(job, payload as never);
     case "enrich_profile":
       return handleEnrichProfile(job, payload as never);
+    case "refresh_posts":
+      return handleRefreshPosts(job, payload as never);
     default:
       return { ok: false, message: `Job kind desconocido: ${job.kind}` };
   }

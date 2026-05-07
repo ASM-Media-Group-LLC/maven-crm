@@ -18,7 +18,11 @@ const client = APIFY_TOKEN ? new ApifyClient({ token: APIFY_TOKEN }) : null;
 
 const PROFILE_ACTOR = process.env.APIFY_PROFILE_ACTOR ?? "apify/instagram-profile-scraper";
 const HASHTAG_ACTOR = process.env.APIFY_HASHTAG_ACTOR ?? "apify/instagram-hashtag-scraper";
+const POSTS_ACTOR = process.env.APIFY_POSTS_ACTOR ?? "apify/instagram-post-scraper";
 const MAX_ITEMS_PER_RUN = parseInt(process.env.APIFY_MAX_ITEMS_PER_RUN ?? "50", 10);
+// Cuántos posts por lead trae el scraper de high_fit. 5 alcanza para
+// que la IA genere comments contextuales sin inflar el prompt.
+const POSTS_PER_LEAD = parseInt(process.env.APIFY_POSTS_PER_LEAD ?? "5", 10);
 
 // Costo estimado por item — varía por actor, ajustar con datos reales.
 // Apify oficial cobra ~$0.0023/item para Instagram Profile Scraper.
@@ -58,6 +62,53 @@ export async function runProfileScrape(
   const estSpend = itemsCount * COST_PER_ITEM_USD;
   await recordSpend(tenantId, estSpend, itemsCount);
   return items as IgProfileItem[];
+}
+
+/** Estructura del post devuelta al handler. Mismo shape que el JSONB
+ *  scouter_leads.recent_posts, listo para JSON.stringify y guardar. */
+export interface PostItem {
+  url: string;
+  caption: string | null;
+  like_count: number | null;
+  posted_at: string | null;
+  is_video: boolean | null;
+}
+
+/** Trae los últimos N posts de un username via Apify Instagram
+ *  Post Scraper. Solo se llama para leads ai_status='high_fit' —
+ *  los medium/approved no justifican el costo extra de scraping. */
+export async function runPostScrape(
+  username: string,
+  tenantId: string,
+  limit = POSTS_PER_LEAD,
+): Promise<PostItem[]> {
+  if (!client) throw new Error("Apify client no inicializado (falta APIFY_API_TOKEN).");
+  const cleanHandle = username.replace(/^@/, "");
+  const run = await client.actor(POSTS_ACTOR).call({
+    username: [cleanHandle],
+    resultsType: "posts",
+    resultsLimit: limit,
+    addParentData: false,
+  });
+  const { items } = await client.dataset(run.defaultDatasetId).listItems();
+  await recordSpend(tenantId, items.length * COST_PER_ITEM_USD, items.length);
+
+  // Normalización defensiva — los actors devuelven shapes ligeramente
+  // distintos según versión. Tomamos lo que tengamos y caemos a valores
+  // razonables si falta info.
+  return (items as Array<Record<string, unknown>>)
+    .slice(0, limit)
+    .map((it) => {
+      const url =
+        (it.url as string) ??
+        (it.shortcode ? `https://instagram.com/p/${it.shortcode}` : "");
+      const caption = (it.caption ?? it.text ?? null) as string | null;
+      const like_count = (it.likesCount ?? it.like_count ?? null) as number | null;
+      const posted_at = (it.timestamp ?? it.posted_at ?? null) as string | null;
+      const is_video = (it.isVideo ?? it.is_video ?? false) as boolean;
+      return { url, caption, like_count, posted_at, is_video };
+    })
+    .filter((p) => !!p.url);
 }
 
 /** Discovery por hashtag. Devuelve los autores de los posts top del

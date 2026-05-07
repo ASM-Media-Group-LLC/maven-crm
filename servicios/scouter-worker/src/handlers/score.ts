@@ -65,7 +65,10 @@ export async function handleScoreLead(
     .eq("id", lead.id);
   if (updateErr) throw updateErr;
 
-  // Side effect: si quedó high_fit, broadcast a la inbox del tenant.
+  // Side effect: si quedó high_fit, broadcast a la inbox del tenant
+  // y encolamos un refresh_posts para enriquecer recent_posts via
+  // Apify. El handler refresh_posts se asegura de skip si el lead
+  // perdió el status high_fit antes de que se ejecute.
   if (result.status === "high_fit") {
     const { error: notifErr } = await sb.from("scouter_notifications").insert({
       kind: "lead_high_fit",
@@ -78,6 +81,16 @@ export async function handleScoreLead(
       },
     });
     if (notifErr) console.error("notif insert error", notifErr);
+
+    const { error: enqueueErr } = await sb.from("scouter_jobs").insert({
+      kind: "refresh_posts",
+      tenant_id: lead.tenant_id,
+      payload: { leadId: lead.id },
+      // Prioridad media — no urgente como un score nuevo, pero antes
+      // que un discovery batch.
+      priority: 3,
+    });
+    if (enqueueErr) console.error("refresh_posts enqueue error", enqueueErr);
   }
 
   return {
