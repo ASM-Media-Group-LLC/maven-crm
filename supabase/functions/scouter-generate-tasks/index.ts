@@ -25,13 +25,23 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const ANTHROPIC_URL =
-  Deno.env.get("ANTHROPIC_BASE_URL") || "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_MODEL =
-  Deno.env.get("ANTHROPIC_MODEL") || "claude-haiku-4-5";
-const ANTHROPIC_VERSION = "2023-06-01";
+// Groq free tier — usamos el modelo más chico para que el TPM diario
+// (100k tokens) alcance para múltiples top-ups por día. El 70b tiene
+// más calidad pero quema cuota rápido. Override via env si querés
+// volver al 70b.
+const GROQ_URL =
+  Deno.env.get("GROQ_BASE_URL") || "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "llama-3.1-8b-instant";
 const BATCH_SIZE_DEFAULT = 50;
-const CHUNK_SIZE = 10; // leads per Anthropic call
+// Procesamos los leads de a 1 por call para respetar el TPM de Groq
+// free tier sin spikes. La throttle entre calls (THROTTLE_MS) mantiene
+// la tasa por debajo del RPM. Si una call rebota con 429, solo
+// reintentamos esa, no el batch entero.
+const CHUNK_SIZE = 1;
+// 2500ms = 24 RPM, safe debajo del límite de 30 RPM del free tier.
+const THROTTLE_MS = 2500;
+// Retries cuando Groq devuelve 429 (rate limit). Backoff lineal.
+const MAX_RETRIES_429 = 3;
 const COOLDOWN_DAYS_DEFAULT = 3;
 // Si un spammer arrastra ≥ este número de assignments pending tras el
 // rollover, no le generamos NADA nuevo hoy. Forzamos que cierre backlog
@@ -92,11 +102,11 @@ serve(async (req) => {
     const cronTokenHeader = req.headers.get("x-cron-token") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const groqKey = Deno.env.get("GROQ_API_KEY");
     const cronInternalToken = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
 
-    if (!anthropicKey) {
-      return jsonError("ANTHROPIC_API_KEY no configurada en los secrets de Supabase.", 500);
+    if (!groqKey) {
+      return jsonError("GROQ_API_KEY no configurada en los secrets de Supabase.", 500);
     }
 
     // Usamos service role para bypasear RLS en queries cross-spammer.
@@ -160,7 +170,7 @@ serve(async (req) => {
           cooldownDays,
           batchSize,
           backlogCap,
-          anthropicKey,
+          groqKey,
         );
         totalAssignments += assignments;
         totalTasks += tasks;
@@ -194,7 +204,7 @@ async function processSpammer(
   cooldownDays: number,
   batchSize: number,
   backlogCap: number,
-  anthropicKey: string,
+  groqKey: string,
 ): Promise<{ assignments: number; tasks: number }> {
   // 1. Get spammer's IG accounts
   const { data: accounts, error: accErr } = await supabase
@@ -271,12 +281,14 @@ async function processSpammer(
     return { assignments: rolledCount, tasks: 0 };
   }
 
-  // 3. Batch Anthropic calls: 10 leads per call
+  // 3. Groq calls — de a 1 lead, con throttle entre calls para respetar
+  // RPM del free tier. Si una call rebota con 429, solo reintenta esa.
   const systemPrompt = buildSystemPrompt(spammerAccounts);
   const chunks = chunkArray(rankedLeads, CHUNK_SIZE);
   const aiResults: AiLeadResult[] = [];
 
-  for (const chunk of chunks) {
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
     const leadsForPrompt: LeadForPrompt[] = chunk.map((l) => ({
       instagram_handle: l.instagram_handle,
       ai_score: l.ai_score,
@@ -288,8 +300,17 @@ async function processSpammer(
       days_since_assigned: l.days_since_assigned,
     }));
     const userMessage = buildUserMessage(leadsForPrompt);
-    const results = await callAnthropicBatch(anthropicKey, systemPrompt, userMessage);
-    aiResults.push(...results);
+    try {
+      const results = await callGroqWithRetry(groqKey, systemPrompt, userMessage);
+      aiResults.push(...results);
+    } catch (e) {
+      console.warn(`Lead ${chunk[0]?.instagram_handle} falló tras retries:`, (e as Error).message);
+      // continuar con los demás — no abortamos el spammer entero por 1 fallo
+    }
+    // Throttle entre calls (excepto después de la última).
+    if (i < chunks.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, THROTTLE_MS));
+    }
   }
 
   // 4. Write to DB
@@ -655,35 +676,58 @@ async function rankLeadsFallback(
   return ranked.slice(0, batchSize);
 }
 
-// ─── Anthropic call ───────────────────────────────────────────────────────────
-// Migrated from Groq llama-3.3-70b-versatile → Claude Haiku.
-// Groq's free-tier rate limits were starving the cron (429 errors before
-// any assignment got created). Haiku is paid but stable and the JSON
-// adherence is good enough that we don't need a forced response_format.
+// ─── Groq call (OpenAI-compatible chat completions) ──────────────────────────
+// Free-tier friendly: 1 lead por call, throttle 2.5s entre calls.
+// Si Groq devuelve 429, esperamos más y reintentamos solo esa call.
 
-async function callAnthropicBatch(
-  anthropicKey: string,
+async function callGroqWithRetry(
+  groqKey: string,
   systemPrompt: string,
   userMessage: string,
 ): Promise<AiLeadResult[]> {
-  const res = await fetch(ANTHROPIC_URL, {
+  let lastErr: Error | null = null;
+  for (let attempt = 0; attempt <= MAX_RETRIES_429; attempt++) {
+    try {
+      return await callGroq(groqKey, systemPrompt, userMessage);
+    } catch (e) {
+      lastErr = e as Error;
+      const msg = lastErr.message ?? "";
+      // Solo reintentamos en 429. Otros errores fallan rápido.
+      if (!/429|rate limit/i.test(msg)) throw lastErr;
+      if (attempt === MAX_RETRIES_429) break;
+      // Backoff lineal: 5s, 10s, 15s. Suficiente para que se libere
+      // el bucket de RPM del free tier sin volar el timeout total.
+      const waitMs = 5000 * (attempt + 1);
+      console.warn(`Groq 429 — reintento ${attempt + 1}/${MAX_RETRIES_429} en ${waitMs}ms`);
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+  throw lastErr ?? new Error("Groq retries agotados");
+}
+
+async function callGroq(
+  groqKey: string,
+  systemPrompt: string,
+  userMessage: string,
+): Promise<AiLeadResult[]> {
+  const res = await fetch(GROQ_URL, {
     method: "POST",
     headers: {
-      "x-api-key": anthropicKey,
-      "anthropic-version": ANTHROPIC_VERSION,
+      Authorization: `Bearer ${groqKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 4096,
+      model: GROQ_MODEL,
+      response_format: { type: "json_object" },
       temperature: 0.4,
-      system: systemPrompt,
+      max_tokens: 1024,
       messages: [
+        { role: "system", content: systemPrompt },
         {
           role: "user",
           content:
             userMessage +
-            '\n\nResponde SOLO con un JSON object con una key "leads" que contiene el array de resultados. Nada antes ni después del JSON. Sin ```json fences.',
+            '\n\nResponde SOLO con un JSON object con una key "leads" que contiene el array de resultados.',
         },
       ],
     }),
@@ -691,38 +735,32 @@ async function callAnthropicBatch(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    console.error("Anthropic error", res.status, errText.slice(0, 500));
-    if (res.status === 429) throw new Error("Anthropic: rate limit. Esperá unos segundos.");
-    if (res.status === 401) throw new Error("Anthropic: API key inválida.");
-    if (res.status === 402) throw new Error("Anthropic: créditos agotados.");
-    throw new Error(`Anthropic error ${res.status}`);
+    console.error("Groq error", res.status, errText.slice(0, 500));
+    if (res.status === 429) throw new Error("Groq: rate limit. Esperá unos segundos.");
+    if (res.status === 401) throw new Error("Groq: API key inválida.");
+    if (res.status === 402) throw new Error("Groq: cuota agotada o key inválida.");
+    throw new Error(`Groq error ${res.status}`);
   }
 
   const data = (await res.json()) as {
-    content?: Array<{ type?: string; text?: string }>;
+    choices?: Array<{ message?: { content?: string } }>;
   };
-  // Anthropic returns content as an array of blocks; we expect one text block.
-  const raw = data.content?.find((b) => b.type === "text")?.text ?? "";
-
-  // Strip optional markdown fences just in case the model adds them.
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```\s*$/i, "")
-    .trim();
+  const raw = data.choices?.[0]?.message?.content ?? "{}";
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(cleaned);
+    parsed = JSON.parse(raw);
   } catch {
-    console.error("Anthropic devolvió JSON inválido:", cleaned.slice(0, 500));
+    console.error("Groq devolvió JSON inválido:", raw.slice(0, 500));
     return [];
   }
 
+  // Groq con json_object devuelve { leads: [...] } o solo [...]
   if (Array.isArray(parsed)) return parsed as AiLeadResult[];
   const obj = parsed as Record<string, unknown>;
   if (Array.isArray(obj.leads)) return obj.leads as AiLeadResult[];
 
-  console.warn("Anthropic respuesta inesperada:", JSON.stringify(parsed).slice(0, 500));
+  console.warn("Groq respuesta inesperada:", JSON.stringify(parsed).slice(0, 500));
   return [];
 }
 
