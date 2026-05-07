@@ -42,25 +42,76 @@ interface TableConfig {
   timestamp_col: "created_at" | "updated_at";
   add_tenant_id: boolean;
   chunk_size: number;
-  // PK column(s) para el ON CONFLICT. PostgREST infers desde el schema
-  // pero le ayudamos con `Prefer: resolution=merge-duplicates`.
+  // Estrategia de conflict resolution:
+  //   "merge" → UPDATE on conflict (default, para data que cambia)
+  //   "ignore" → DO NOTHING on conflict (para tablas con UNIQUE
+  //     constraints separadas de la PK donde no queremos pisar rows
+  //     que ya existen en v3, ej: scouter_companies por slug,
+  //     closer_creators por (closer_id, creator_id))
+  conflict_strategy?: "merge" | "ignore";
+  // Columnas para el `on_conflict` de PostgREST. Por default usa la
+  // PK, pero cuando hay UNIQUE constraints separados (ej. slug,
+  // composites) hay que apuntar explícitamente. Formato: "col1,col2".
+  on_conflict_columns?: string;
+  // Columnas FK que pueden tener huérfanos (apuntar a IDs que no
+  // existen en v3). Si sí, NULLificamos antes del upsert.
+  // Solo aplica si la columna es nullable en v3.
+  nullify_orphan_fks?: Array<{
+    column: string;
+    parent_table: "auth.users" | "scouter_companies" | "creators" | "scouter_leads";
+  }>;
 }
 
 const TABLES: TableConfig[] = [
-  // Las legacy con tenant_id que agregamos en v3 — son las críticas
-  // del input de usuarios.
-  { name: "leadgen_entries",                       timestamp_col: "created_at", add_tenant_id: true,  chunk_size: 1000 },
-  { name: "promolog_entries",                      timestamp_col: "created_at", add_tenant_id: true,  chunk_size: 1000 },
-  { name: "of_gross_earnings",                     timestamp_col: "created_at", add_tenant_id: true,  chunk_size: 1000 },
-  { name: "missing_creatos_id_of_gross_earnings",  timestamp_col: "created_at", add_tenant_id: true,  chunk_size: 1000 },
-  // scouter_leads ya tiene tenant_id en v2 también (lo usamos para el
-  // scouter desde temprano en la branch).
-  { name: "scouter_leads",                         timestamp_col: "updated_at", add_tenant_id: false, chunk_size: 500  },
-  // Tablas más chicas — relaciones de closer.
-  { name: "closers_contacts",                      timestamp_col: "created_at", add_tenant_id: false, chunk_size: 500  },
-  { name: "closer_creators",                       timestamp_col: "created_at", add_tenant_id: false, chunk_size: 500  },
-  { name: "notifications",                         timestamp_col: "created_at", add_tenant_id: false, chunk_size: 500  },
-  { name: "audit_log",                             timestamp_col: "created_at", add_tenant_id: false, chunk_size: 500  },
+  // ── PADRES PRIMERO ────────────────────────────────────────────────────
+  { name: "creators",                              timestamp_col: "created_at", add_tenant_id: false, chunk_size: 500, conflict_strategy: "merge"  },
+  // scouter_companies puede chocar UNIQUE en slug — usamos "ignore"
+  // así si la row ya existe en v3 (vino con la branch original) no
+  // intenta updatearla, simplemente skipea. on_conflict_columns="id"
+  // fuerza el conflict sobre la PK; PostgREST necesita el hint cuando
+  // hay UNIQUEs separadas.
+  { name: "scouter_companies",                     timestamp_col: "created_at", add_tenant_id: false, chunk_size: 500, conflict_strategy: "ignore", on_conflict_columns: "id" },
+
+  // ── HIJAS ─────────────────────────────────────────────────────────────
+  // leadgen_entries: lg_user_id apunta a v2.auth.users — esos users no
+  // existen en v3 (cada proyecto Supabase tiene su propio auth).
+  // NULLificamos huérfanos antes del upsert. La columna ya es nullable
+  // en v3 (la migration de cleanup_orphan_fks).
+  {
+    name: "leadgen_entries",
+    timestamp_col: "created_at",
+    add_tenant_id: true,
+    chunk_size: 1000,
+    conflict_strategy: "merge",
+    nullify_orphan_fks: [
+      { column: "lg_user_id", parent_table: "auth.users" },
+      { column: "created_creator_id", parent_table: "creators" },
+    ],
+  },
+  { name: "promolog_entries",                      timestamp_col: "created_at", add_tenant_id: true,  chunk_size: 1000, conflict_strategy: "merge"  },
+  { name: "of_gross_earnings",                     timestamp_col: "created_at", add_tenant_id: true,  chunk_size: 1000, conflict_strategy: "merge"  },
+  { name: "missing_creatos_id_of_gross_earnings",  timestamp_col: "created_at", add_tenant_id: true,  chunk_size: 1000, conflict_strategy: "merge"  },
+  // scouter_leads referencia scouter_companies por company_id. Ya
+  // sincronizamos scouter_companies arriba, pero por las dudas
+  // NULLificamos orphans también (column es nullable).
+  // scouter_leads en v3 tiene tenant_id NOT NULL. v2 no tiene la
+  // columna, así que add_tenant_id=true mete ASM Tech en cada row.
+  {
+    name: "scouter_leads",
+    timestamp_col: "updated_at",
+    add_tenant_id: true,
+    chunk_size: 500,
+    conflict_strategy: "merge",
+    nullify_orphan_fks: [
+      { column: "company_id", parent_table: "scouter_companies" },
+    ],
+  },
+  { name: "closers_contacts",                      timestamp_col: "created_at", add_tenant_id: false, chunk_size: 500, conflict_strategy: "merge"  },
+  // closer_creators choca UNIQUE en (closer_id, creator_id) cuando
+  // intenta re-insertar pares ya existentes — "ignore" los skipea.
+  { name: "closer_creators",                       timestamp_col: "created_at", add_tenant_id: false, chunk_size: 500, conflict_strategy: "ignore", on_conflict_columns: "id" },
+  { name: "notifications",                         timestamp_col: "created_at", add_tenant_id: false, chunk_size: 500, conflict_strategy: "merge"  },
+  { name: "audit_log",                             timestamp_col: "created_at", add_tenant_id: false, chunk_size: 500, conflict_strategy: "merge"  },
 ];
 
 interface SyncResult {
@@ -107,11 +158,22 @@ serve(async (req) => {
     auth: { persistSession: false },
   });
 
+  // Pre-fetch de IDs válidos en v3 para NULLificar huérfanos. Solo
+  // levantamos los sets de tablas referenciadas por algún
+  // nullify_orphan_fks de la config; las demás se saltean.
+  const referencedParents = new Set<string>();
+  for (const t of TABLES) {
+    for (const fk of t.nullify_orphan_fks ?? []) {
+      referencedParents.add(fk.parent_table);
+    }
+  }
+  const validIds = await prefetchValidIds(referencedParents, V3_URL, V3_KEY);
+
   const results: SyncResult[] = [];
   const overallStart = Date.now();
 
   for (const config of TABLES) {
-    const result = await syncTable(config, V2_URL, V2_KEY, V3_URL, V3_KEY, v3);
+    const result = await syncTable(config, V2_URL, V2_KEY, V3_URL, V3_KEY, v3, validIds);
     results.push(result);
 
     // Persistir en sync_log inmediatamente (no esperar al final, así si
@@ -145,6 +207,7 @@ async function syncTable(
   v3Url: string,
   v3Key: string,
   v3Client: ReturnType<typeof createClient>,
+  validIds: Map<string, Set<string>>,
 ): Promise<SyncResult> {
   const start = Date.now();
   const syncedThrough = new Date().toISOString();
@@ -192,18 +255,45 @@ async function syncTable(
     if (rows.length === 0) break;
 
     // Inyectar tenant_id si la tabla v3 lo requiere.
-    const transformed = config.add_tenant_id
+    let transformed: Record<string, unknown>[] = config.add_tenant_id
       ? rows.map((r) => ({ ...r, tenant_id: DEFAULT_TENANT_ID }))
-      : rows;
+      : rows.slice();
 
-    // Upsert a v3 con merge-duplicates (resuelve conflicts de PK como UPDATE).
-    const v3Resp = await fetch(`${v3Url}/rest/v1/${config.name}`, {
+    // NULLificar FKs huérfanas: para cada column configurada, si su
+    // valor no existe en el set de IDs válidos en v3, lo ponemos NULL.
+    // Esto evita el error 23503 (foreign_key_violation) al upsertar.
+    for (const fk of config.nullify_orphan_fks ?? []) {
+      const validSet = validIds.get(fk.parent_table);
+      if (!validSet) continue; // si no pudimos pre-fetchearlos, dejamos pasar
+      transformed = transformed.map((r) => {
+        const v = r[fk.column];
+        if (v && typeof v === "string" && !validSet.has(v)) {
+          return { ...r, [fk.column]: null };
+        }
+        return r;
+      });
+    }
+
+    // Upsert a v3. Estrategia de conflict según config:
+    //   "merge"  → UPDATE on conflict (default)
+    //   "ignore" → DO NOTHING on conflict (skip rows duplicados)
+    // on_conflict_columns: cuando hay UNIQUEs separadas de la PK,
+    // PostgREST necesita un hint del column. Por default usa la PK
+    // y los UNIQUEs separados explotan con 23505.
+    const conflictPref =
+      config.conflict_strategy === "ignore"
+        ? "resolution=ignore-duplicates"
+        : "resolution=merge-duplicates";
+    const onConflictParam = config.on_conflict_columns
+      ? `?on_conflict=${encodeURIComponent(config.on_conflict_columns)}`
+      : "";
+    const v3Resp = await fetch(`${v3Url}/rest/v1/${config.name}${onConflictParam}`, {
       method: "POST",
       headers: {
         apikey: v3Key,
         Authorization: `Bearer ${v3Key}`,
         "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates,return=minimal",
+        Prefer: `${conflictPref},return=minimal`,
       },
       body: JSON.stringify(transformed),
     });
@@ -256,4 +346,81 @@ function jsonError(message: string, status: number): Response {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+// Pre-fetch de IDs válidos en v3 para cada tabla "padre" referenciada
+// por algún FK que querramos NULLificar. Devuelve un Map { tableName →
+// Set<id> }. Se llama UNA vez al inicio del sync; los sets se pasan a
+// cada syncTable para que NULLifique huérfanos antes del upsert.
+//
+// Casos especiales:
+//   - "auth.users" no es accesible vía PostgREST (schema oculto).
+//     Usamos la Admin API de Supabase Auth (/auth/v1/admin/users).
+//   - Tablas en schema "public" usan el REST normal con paginación.
+async function prefetchValidIds(
+  tables: Set<string>,
+  v3Url: string,
+  v3Key: string,
+): Promise<Map<string, Set<string>>> {
+  const map = new Map<string, Set<string>>();
+
+  for (const table of tables) {
+    const set = new Set<string>();
+
+    if (table === "auth.users") {
+      // Admin API: pagina con ?page=N&per_page=1000.
+      let page = 1;
+      while (true) {
+        const r = await fetch(
+          `${v3Url}/auth/v1/admin/users?page=${page}&per_page=1000`,
+          {
+            headers: {
+              apikey: v3Key,
+              Authorization: `Bearer ${v3Key}`,
+            },
+          },
+        );
+        if (!r.ok) {
+          console.error(`prefetch auth.users page ${page}:`, r.status);
+          break;
+        }
+        const body = (await r.json()) as { users?: Array<{ id: string }> };
+        const users = body.users ?? [];
+        for (const u of users) set.add(u.id);
+        if (users.length < 1000) break;
+        page++;
+        if (page > 50) break; // hard cap 50k users por seguridad
+      }
+    } else {
+      // Tabla pública. PostgREST con offset.
+      let offset = 0;
+      const CHUNK = 1000;
+      while (true) {
+        const r = await fetch(
+          `${v3Url}/rest/v1/${table}?select=id&limit=${CHUNK}&offset=${offset}`,
+          {
+            headers: {
+              apikey: v3Key,
+              Authorization: `Bearer ${v3Key}`,
+              Prefer: "count=none",
+            },
+          },
+        );
+        if (!r.ok) {
+          console.error(`prefetch ${table} offset ${offset}:`, r.status);
+          break;
+        }
+        const rows = (await r.json()) as Array<{ id: string }>;
+        for (const row of rows) set.add(row.id);
+        if (rows.length < CHUNK) break;
+        offset += CHUNK;
+        if (offset > 200_000) break; // hard cap 200k rows por tabla
+      }
+    }
+
+    map.set(table, set);
+    console.log(`prefetch ${table}: ${set.size} IDs cargados`);
+  }
+
+  return map;
 }
