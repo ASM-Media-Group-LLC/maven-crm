@@ -28,9 +28,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const MAX_HISTORY_MESSAGES = 20;
-const MAX_QAS_FOR_CONTEXT = 30;
-const MAX_SUMMARY_CHARS = 250;
+// Tamaño del contexto que le mandamos a Mike por call. Para que Mike
+// pueda dar coaching útil ahora le pasamos la QA ENTERA (summary
+// completo + red_flags + improvements + dimensiones), así puede
+// rastrear puntos a mejorar concretos. Para no inflar demasiado:
+//   - closer  → 5 QAs (foco fino, contexto chico)
+//   - all     → 12 QAs (vista de equipo)
+const MAX_HISTORY_MESSAGES = 12;
+const MAX_QAS_FOR_CONTEXT_CLOSER = 5;
+const MAX_QAS_FOR_CONTEXT_ALL = 12;
 const GROQ_TIMEOUT_MS = 60_000; // 1 min para chat (respuestas cortas)
 const GROQ_URL =
   Deno.env.get("GROQ_BASE_URL") || "https://api.groq.com/openai/v1/chat/completions";
@@ -53,7 +59,10 @@ interface QaCallContextRow {
     overall_score?: number;
     summary?: string;
     call_outcome?: string;
-    red_flags?: Array<{ type?: string }>;
+    call_outcome_reason?: string;
+    red_flags?: Array<{ type?: string; description?: string; quote?: string }>;
+    improvements?: string[];
+    dimensions?: Array<{ name?: string; score?: number; feedback?: string }>;
   } | null;
   closer: { name: string } | null;
   model: { name: string; category: string | null } | null;
@@ -140,7 +149,13 @@ serve(async (req) => {
       return jsonResponse({ ok: true, alreadyAnswered: true, content: last.content });
     }
 
-    // Load QA context
+    // Load QA context — limite distinto según scope para no inflar el
+    // prompt cuando solo se pregunta por un closer puntual.
+    const isCloserScope =
+      session.scope_type === "closer" && session.scope_closer_id;
+    const qaLimit = isCloserScope
+      ? MAX_QAS_FOR_CONTEXT_CLOSER
+      : MAX_QAS_FOR_CONTEXT_ALL;
     let qasQuery = sb
       .from("qa_calls")
       .select(
@@ -148,8 +163,8 @@ serve(async (req) => {
       )
       .order("call_date", { ascending: false })
       .order("created_at", { ascending: false })
-      .limit(MAX_QAS_FOR_CONTEXT);
-    if (session.scope_type === "closer" && session.scope_closer_id) {
+      .limit(qaLimit);
+    if (isCloserScope) {
       qasQuery = qasQuery.eq("closer_id", session.scope_closer_id);
     }
     const { data: qaCallsRaw, error: qaErr } = await qasQuery;
@@ -272,22 +287,51 @@ function buildContextBlock(calls: QaCallContextRow[], session: SessionRow): stri
     return lines.join("\n");
   }
   for (const c of calls) {
-    const score = c.claude_score ?? c.claude_analysis?.overall_score ?? "?";
-    const outcome = c.claude_analysis?.call_outcome ?? "?";
-    const summary = (c.claude_analysis?.summary ?? "").slice(0, MAX_SUMMARY_CHARS).trim();
-    const redFlagTypes =
-      c.claude_analysis?.red_flags
-        ?.map((f) => f?.type)
-        .filter((t): t is string => typeof t === "string" && !!t)
-        .slice(0, 3)
-        .join(", ") ?? "";
+    const a = c.claude_analysis ?? {};
+    const score = c.claude_score ?? a.overall_score ?? "?";
+    const outcome = a.call_outcome ?? "?";
     const closer = c.closer?.name ?? "?";
     const modelName = c.model?.name ?? "?";
     const cat = c.model?.category ? ` (${c.model.category})` : "";
-    const flagsPart = redFlagTypes ? ` · flags: ${redFlagTypes}` : "";
+    const summary = (a.summary ?? "").trim();
+
+    // Header de la QA
+    lines.push("");
     lines.push(
-      `${c.call_date} · ${closer} · ${modelName}${cat} · score ${score}/100 · ${outcome}${flagsPart} · ${summary}`,
+      `─── ${c.call_date} · ${closer} → ${modelName}${cat} · score ${score}/100 · outcome: ${outcome}`,
     );
+    if (a.call_outcome_reason) lines.push(`Motivo outcome: ${a.call_outcome_reason}`);
+    if (summary) lines.push(`Resumen: ${summary}`);
+
+    // Red flags con descripción + cita literal
+    const flags = (a.red_flags ?? []).filter(Boolean);
+    if (flags.length > 0) {
+      lines.push("Red flags:");
+      for (const f of flags) {
+        const t = f.type ?? "?";
+        const d = f.description ? ` — ${f.description}` : "";
+        const q = f.quote ? ` («${f.quote}»)` : "";
+        lines.push(`  • ${t}${d}${q}`);
+      }
+    }
+
+    // Dimensiones bajas (score < 60) — donde más importa coachear
+    const lowDims = (a.dimensions ?? []).filter(
+      (d) => typeof d.score === "number" && d.score < 60,
+    );
+    if (lowDims.length > 0) {
+      lines.push("Dimensiones bajas (<60):");
+      for (const d of lowDims) {
+        lines.push(`  • ${d.name ?? "?"} ${d.score}/100 — ${d.feedback ?? ""}`);
+      }
+    }
+
+    // Mejoras sugeridas (action items específicos del rubric)
+    const imps = (a.improvements ?? []).filter(Boolean);
+    if (imps.length > 0) {
+      lines.push("Mejoras sugeridas:");
+      for (const i of imps) lines.push(`  • ${i}`);
+    }
   }
   return lines.join("\n");
 }

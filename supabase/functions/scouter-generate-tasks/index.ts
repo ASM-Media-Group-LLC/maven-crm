@@ -18,6 +18,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildSystemPrompt, buildUserMessage, type LeadForPrompt, type SpammerAccount } from "./prompt.ts";
+import { callGeminiOnce } from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,24 +26,17 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Groq free tier — usamos el modelo más chico para que el TPM diario
-// (100k tokens) alcance para múltiples top-ups por día. El 70b tiene
-// más calidad pero quema cuota rápido. Override via env si querés
-// volver al 70b.
-const GROQ_URL =
-  Deno.env.get("GROQ_BASE_URL") || "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "llama-3.1-8b-instant";
+// Migrado de Groq → Gemini 2.5 Flash. Free tier de Gemini = 5 RPM /
+// 250K TPM — el TPM ya no es el problema (el prompt + lead chunk pesa
+// ~3k tokens), pero el RPM sí: 5 calls/min. Por eso bajamos el chunk
+// a 5 leads (no 10) y subimos el throttle a 12s — queda bajo el RPM
+// con margen. 50 leads / 5 = 10 chunks × 12s = ~120s, todavía bajo
+// el timeout de 150s de la edge function. Si un spammer tiene >50
+// leads asignables se reduce el batch_size por body.
+const GEMINI_MODEL = Deno.env.get("SCOUTER_GEMINI_MODEL") || "gemini-2.5-flash";
 const BATCH_SIZE_DEFAULT = 50;
-// Procesamos los leads en chunks de 10 con throttle 2s entre calls.
-// 50/10 = 5 calls × 2s = 10s de throttle + procesamiento ≈ 25-40s total.
-// Respeta el RPM de Groq free tier (5 calls < 30 RPM) y deja margen
-// debajo del timeout de 150s del edge runtime de Supabase.
-// Si una call rebota con 429, solo reintentamos esa (MAX_RETRIES_429).
-const CHUNK_SIZE = 10;
-// 2000ms entre calls = 30 RPM peak. Suficiente buffer al límite del free tier.
-const THROTTLE_MS = 2000;
-// Retries cuando Groq devuelve 429 (rate limit). Backoff lineal.
-const MAX_RETRIES_429 = 3;
+const CHUNK_SIZE = 5;
+const THROTTLE_MS = 12_000;
 const COOLDOWN_DAYS_DEFAULT = 3;
 // Si un spammer arrastra ≥ este número de assignments pending tras el
 // rollover, no le generamos NADA nuevo hoy. Forzamos que cierre backlog
@@ -75,6 +69,10 @@ interface AiTask {
   type: "follow" | "like" | "comment" | "story_view" | "story_react";
   instruction: string;
   suggested_comment: string | null;
+  // Campos nuevos del prompt enriquecido. Pueden venir undefined si el
+  // modelo retorna el shape viejo (compat backward).
+  task_reasoning?: string | null;
+  post_url?: string | null;
 }
 
 interface AiLeadResult {
@@ -103,11 +101,11 @@ serve(async (req) => {
     const cronTokenHeader = req.headers.get("x-cron-token") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const groqKey = Deno.env.get("GROQ_API_KEY");
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
     const cronInternalToken = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
 
-    if (!groqKey) {
-      return jsonError("GROQ_API_KEY no configurada en los secrets de Supabase.", 500);
+    if (!geminiKey) {
+      return jsonError("GEMINI_API_KEY no configurada en los secrets de Supabase.", 500);
     }
 
     // Usamos service role para bypasear RLS en queries cross-spammer.
@@ -171,7 +169,7 @@ serve(async (req) => {
           cooldownDays,
           batchSize,
           backlogCap,
-          groqKey,
+          geminiKey,
         );
         totalAssignments += assignments;
         totalTasks += tasks;
@@ -205,7 +203,7 @@ async function processSpammer(
   cooldownDays: number,
   batchSize: number,
   backlogCap: number,
-  groqKey: string,
+  geminiKey: string,
 ): Promise<{ assignments: number; tasks: number }> {
   // 1. Get spammer's IG accounts
   const { data: accounts, error: accErr } = await supabase
@@ -333,7 +331,7 @@ async function processSpammer(
     });
     const userMessage = buildUserMessage(leadsForPrompt);
     try {
-      const results = await callGroqWithRetry(groqKey, systemPrompt, userMessage);
+      const results = await callGroqWithRetry(geminiKey, systemPrompt, userMessage);
       aiResults.push(...results);
     } catch (e) {
       console.warn(`Lead ${chunk[0]?.instagram_handle} falló tras retries:`, (e as Error).message);
@@ -413,13 +411,22 @@ async function processSpammer(
         continue;
       }
 
+      // Componemos la instrucción final con post_url y task_reasoning
+      // embebidos. Esto evita una migration nueva — el UI consume el
+      // texto entero. Si más adelante queremos campos dedicados,
+      // agregamos columnas y splittamos.
+      const parts = [t.instruction?.trim() ?? ""];
+      if (t.post_url) parts.push(`\n📎 ${t.post_url}`);
+      if (t.task_reasoning) parts.push(`\n💡 ${t.task_reasoning}`);
+      const fullInstruction = parts.join("");
+
       const { error: taskErr } = await supabase
         .from("scouter_interaction_tasks")
         .insert({
           assignment_id: assignment.id,
           from_account_id: fromAccountId,
           task_type: t.type,
-          instruction: t.instruction ?? "",
+          instruction: fullInstruction,
           suggested_comment: t.type === "comment" ? (t.suggested_comment ?? null) : null,
           sort_order: i,
           status: "pending",
@@ -708,91 +715,62 @@ async function rankLeadsFallback(
   return ranked.slice(0, batchSize);
 }
 
-// ─── Groq call (OpenAI-compatible chat completions) ──────────────────────────
-// Free-tier friendly: 1 lead por call, throttle 2.5s entre calls.
-// Si Groq devuelve 429, esperamos más y reintentamos solo esa call.
+// ─── Gemini call ──────────────────────────────────────────────────────────────
+// Pide JSON estructurado a Gemini 2.5 Flash. callGeminiOnce ya tiene
+// retry interno para 503 (model overloaded) con backoff exponencial,
+// así que acá solo concentramos el parsing del JSON. El throttle entre
+// chunks (THROTTLE_MS) lo maneja el caller para respetar el RPM del
+// free tier.
 
 async function callGroqWithRetry(
-  groqKey: string,
+  geminiKey: string,
   systemPrompt: string,
   userMessage: string,
 ): Promise<AiLeadResult[]> {
-  let lastErr: Error | null = null;
-  for (let attempt = 0; attempt <= MAX_RETRIES_429; attempt++) {
-    try {
-      return await callGroq(groqKey, systemPrompt, userMessage);
-    } catch (e) {
-      lastErr = e as Error;
-      const msg = lastErr.message ?? "";
-      // Solo reintentamos en 429. Otros errores fallan rápido.
-      if (!/429|rate limit/i.test(msg)) throw lastErr;
-      if (attempt === MAX_RETRIES_429) break;
-      // Backoff lineal: 5s, 10s, 15s. Suficiente para que se libere
-      // el bucket de RPM del free tier sin volar el timeout total.
-      const waitMs = 5000 * (attempt + 1);
-      console.warn(`Groq 429 — reintento ${attempt + 1}/${MAX_RETRIES_429} en ${waitMs}ms`);
-      await new Promise((r) => setTimeout(r, waitMs));
-    }
-  }
-  throw lastErr ?? new Error("Groq retries agotados");
-}
-
-async function callGroq(
-  groqKey: string,
-  systemPrompt: string,
-  userMessage: string,
-): Promise<AiLeadResult[]> {
-  const res = await fetch(GROQ_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${groqKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      response_format: { type: "json_object" },
-      temperature: 0.4,
-      max_tokens: 1024,
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content:
-            userMessage +
-            '\n\nResponde SOLO con un JSON object con una key "leads" que contiene el array de resultados.',
-        },
-      ],
-    }),
+  // Nombre legacy (lo deja el caller); por dentro corre Gemini.
+  const result = await callGeminiOnce({
+    apiKey: geminiKey,
+    model: GEMINI_MODEL,
+    systemPrompt,
+    messages: [
+      {
+        role: "user",
+        content:
+          userMessage +
+          '\n\nDevolvé SOLO el JSON con la clave "leads" — sin texto antes, sin markdown, sin backticks.',
+      },
+    ],
+    temperature: 0.4,
+    maxOutputTokens: 4096,
+    timeoutMs: 60_000,
   });
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    console.error("Groq error", res.status, errText.slice(0, 500));
-    if (res.status === 429) throw new Error("Groq: rate limit. Esperá unos segundos.");
-    if (res.status === 401) throw new Error("Groq: API key inválida.");
-    if (res.status === 402) throw new Error("Groq: cuota agotada o key inválida.");
-    throw new Error(`Groq error ${res.status}`);
-  }
-
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const raw = data.choices?.[0]?.message?.content ?? "{}";
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    console.error("Groq devolvió JSON inválido:", raw.slice(0, 500));
+  const raw = result.text.trim();
+  if (!raw) {
+    console.warn("Gemini devolvió texto vacío para chunk de", userMessage.slice(0, 60));
     return [];
   }
 
-  // Groq con json_object devuelve { leads: [...] } o solo [...]
+  // Gemini puede devolver el JSON envuelto en ```json ... ``` aún cuando
+  // se lo pidamos sin markdown. Limpiamos ambos casos.
+  const cleaned = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    console.error("Gemini JSON inválido:", cleaned.slice(0, 500));
+    return [];
+  }
+
   if (Array.isArray(parsed)) return parsed as AiLeadResult[];
   const obj = parsed as Record<string, unknown>;
   if (Array.isArray(obj.leads)) return obj.leads as AiLeadResult[];
 
-  console.warn("Groq respuesta inesperada:", JSON.stringify(parsed).slice(0, 500));
+  console.warn("Gemini respuesta inesperada:", JSON.stringify(parsed).slice(0, 500));
   return [];
 }
 

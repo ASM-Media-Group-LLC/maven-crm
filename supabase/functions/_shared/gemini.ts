@@ -77,9 +77,31 @@ export interface GeminiResult {
   };
 }
 
-// Non-streaming Gemini call. Devuelve text + usage en shape OpenAI-ish
-// para que los callers no se enteren de quién está atrás.
+// Non-streaming Gemini call con retry/backoff para 503 (model overloaded).
+// El free tier de 2.5-flash devuelve 503 con frecuencia cuando hay
+// pico de demanda — los reintentos con backoff lineal (1s, 2s, 4s)
+// suelen alcanzar para que la siguiente toque un instante de capacidad
+// libre. Si al 4to intento sigue 503, tiramos el error real.
 export async function callGeminiOnce(opts: GeminiCallOptions): Promise<GeminiResult> {
+  const MAX_503_RETRIES = 3;
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= MAX_503_RETRIES; attempt++) {
+    try {
+      return await callGeminiOnceInner(opts);
+    } catch (e) {
+      const msg = (e as Error).message ?? "";
+      const is503 = /\b503\b|overload|high demand|UNAVAILABLE/i.test(msg);
+      lastError = e as Error;
+      if (!is503 || attempt === MAX_503_RETRIES) throw e;
+      const delayMs = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
+      console.warn(`Gemini 503 attempt ${attempt + 1}, retrying in ${delayMs}ms`);
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw lastError ?? new Error("Gemini retry loop exhausted");
+}
+
+async function callGeminiOnceInner(opts: GeminiCallOptions): Promise<GeminiResult> {
   const model = opts.model || DEFAULT_MODEL;
   const ac = new AbortController();
   const timeoutId = setTimeout(() => ac.abort(), opts.timeoutMs ?? 60_000);
@@ -99,6 +121,12 @@ export async function callGeminiOnce(opts: GeminiCallOptions): Promise<GeminiRes
         generationConfig: {
           temperature: opts.temperature ?? 0.7,
           maxOutputTokens: opts.maxOutputTokens ?? 2000,
+          // 2.5-flash hace "thinking" por default — los chunks iniciales
+          // del stream son partes con `thought:true` y sin `.text` real,
+          // entonces el frontend ve nada llegando hasta que termina el
+          // thinking. Para asistentes conversacionales no aporta valor
+          // suficiente para justificar el delay; lo desactivamos.
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
     });
@@ -117,16 +145,49 @@ export async function callGeminiOnce(opts: GeminiCallOptions): Promise<GeminiRes
     console.error("Gemini error", status, errText.slice(0, 500));
     if (status === 429) throw new Error("Gemini: rate limit. Probá en unos segundos.");
     if (status === 401 || status === 403) throw new Error("Gemini: API key inválida o sin permisos.");
-    throw new Error(`Gemini API error ${status}`);
+    if (status === 503) {
+      // Mensaje específico para que el retry loop arriba lo agarre.
+      throw new Error(`Gemini 503: ${errText.slice(0, 120) || "model overloaded"}`);
+    }
+    throw new Error(`Gemini API error ${status}: ${errText.slice(0, 120)}`);
   }
 
-  const data = (await res.json()) as GeminiResponse;
+  const data = (await res.json()) as GeminiResponse & {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string; thought?: boolean }> };
+      finishReason?: string;
+    }>;
+  };
   if (data.error) throw new Error(`Gemini: ${data.error.message ?? "error"}`);
 
+  // Filtramos parts marcadas como `thought:true` (chain of thought
+  // interno de 2.5-flash) — solo queremos el texto de salida.
   const text =
     data.candidates?.[0]?.content?.parts
+      ?.filter((p) => !p.thought)
       ?.map((p) => p.text ?? "")
       .join("") ?? "";
+
+  // Diagnóstico: si Gemini devolvió 200 pero sin texto, dejamos
+  // un log estructurado con finishReason + usage para que aparezca
+  // en los logs de la edge function. Casos comunes: MAX_TOKENS
+  // (thinking se comió el budget), SAFETY (filtros bloquearon),
+  // RECITATION, OTHER.
+  if (!text) {
+    const finishReason = data.candidates?.[0]?.finishReason;
+    const partsCount = data.candidates?.[0]?.content?.parts?.length ?? 0;
+    console.error(
+      "Gemini empty response",
+      JSON.stringify({
+        finishReason,
+        partsCount,
+        usage: data.usageMetadata,
+        firstPartKeys: Object.keys(
+          data.candidates?.[0]?.content?.parts?.[0] ?? {},
+        ),
+      }),
+    );
+  }
 
   const u = data.usageMetadata ?? {};
   return {
@@ -143,8 +204,13 @@ export async function callGeminiOnce(opts: GeminiCallOptions): Promise<GeminiRes
 // (cada chunk = `data: {choices:[{delta:{content:""}}]}\\n\\n`) para que
 // el frontend que parsea ese formato (ClariAiChat) no necesite cambios.
 //
-// Usage:
-//   return streamGeminiAsOpenAI({ apiKey, systemPrompt, messages, corsHeaders })
+// Estrategia actual: pedimos la respuesta COMPLETA a Gemini (non-stream)
+// y después la troceamos en chunks de ~12 chars que emitimos con un
+// pequeño delay para que el frontend siga viendo el efecto "tipeando".
+// Razón: el SSE nativo de Gemini cambió shape entre versiones (2.5 con
+// thinking, parts con `thought:true`, etc.) y mantenerse al día rompía
+// más de lo que ayudaba. Una sola call + faux-stream es robusto y la
+// latencia extra es marginal para respuestas cortas (clari/mike).
 export async function streamGeminiAsOpenAI(opts: {
   apiKey: string;
   model?: string;
@@ -154,103 +220,58 @@ export async function streamGeminiAsOpenAI(opts: {
   maxOutputTokens?: number;
   corsHeaders: Record<string, string>;
 }): Promise<Response> {
-  const model = opts.model || DEFAULT_MODEL;
-  const upstream = await fetch(geminiUrl(model, true), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": opts.apiKey,
-    },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: opts.systemPrompt }] },
-      contents: toGeminiContents(opts.messages),
-      generationConfig: {
-        temperature: opts.temperature ?? 0.7,
-        maxOutputTokens: opts.maxOutputTokens ?? 2000,
-      },
-    }),
-  });
-
-  if (!upstream.ok || !upstream.body) {
-    const status = upstream.status;
-    const errText = await upstream.text().catch(() => "");
-    console.error("Gemini stream error", status, errText.slice(0, 500));
-    // Surface the real Gemini error for diagnosis (status reason +
-    // first 240 chars del body). Sin esto el frontend ve un genérico
-    // "saturado" y no podés saber si es quota, modelo inválido,
-    // billing, etc.
-    let parsedReason = "";
-    try {
-      const j = JSON.parse(errText) as { error?: { message?: string; status?: string } };
-      parsedReason = j.error?.message ?? j.error?.status ?? "";
-    } catch {
-      parsedReason = errText.slice(0, 240);
-    }
-    let message = `Gemini error ${status}: ${parsedReason || "sin detalle"}`;
+  let result: GeminiResult;
+  try {
+    result = await callGeminiOnce({
+      apiKey: opts.apiKey,
+      model: opts.model,
+      systemPrompt: opts.systemPrompt,
+      messages: opts.messages,
+      temperature: opts.temperature,
+      maxOutputTokens: opts.maxOutputTokens,
+      timeoutMs: 60_000,
+    });
+  } catch (e) {
+    const message = (e as Error).message ?? "Gemini error";
     let outStatus = 502;
-    if (status === 429) outStatus = 429;
-    else if (status === 401 || status === 403) outStatus = 402;
+    if (/429|rate limit|quota/i.test(message)) outStatus = 429;
+    else if (/401|403|key|cuota/i.test(message)) outStatus = 402;
     return new Response(JSON.stringify({ error: message }), {
       status: outStatus,
       headers: { ...opts.corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  // Re-emit Gemini's SSE as OpenAI-shaped SSE.
-  // Gemini emite: data: {"candidates":[{"content":{"parts":[{"text":"..."}]}}]}
-  // OpenAI shape:  data: {"choices":[{"delta":{"content":"..."}}]}
-  const decoder = new TextDecoder();
+  if (!result.text) {
+    return new Response(
+      JSON.stringify({ error: "Gemini devolvió respuesta vacía." }),
+      { status: 502, headers: { ...opts.corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
   const encoder = new TextEncoder();
-  const reader = upstream.body.getReader();
-  let buffer = "";
+  const fullText = result.text;
+  const CHUNK = 12;
+  // No usamos buffer del SSE upstream — generamos los chunks acá.
+  let cursor = 0;
 
   const stream = new ReadableStream({
     async pull(controller) {
-      try {
-        const { value, done } = await reader.read();
-        if (done) {
-          // OpenAI clients suelen esperar el sentinel [DONE]
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-          return;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        // Process complete SSE events (separated by \n\n)
-        let idx: number;
-        while ((idx = buffer.indexOf("\n\n")) >= 0) {
-          const event = buffer.slice(0, idx);
-          buffer = buffer.slice(idx + 2);
-          for (const line of event.split("\n")) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const payload = trimmed.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
-            try {
-              const parsed = JSON.parse(payload) as GeminiResponse;
-              const text =
-                parsed.candidates?.[0]?.content?.parts
-                  ?.map((p) => p.text ?? "")
-                  .join("") ?? "";
-              if (text) {
-                const openAiChunk = {
-                  choices: [{ delta: { content: text }, index: 0 }],
-                };
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify(openAiChunk)}\n\n`),
-                );
-              }
-            } catch (e) {
-              console.warn("gemini chunk parse error", (e as Error).message);
-            }
-          }
-        }
-      } catch (e) {
-        console.error("gemini stream pump error", e);
-        controller.error(e);
+      if (cursor >= fullText.length) {
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+        return;
       }
-    },
-    cancel() {
-      reader.cancel().catch(() => {});
+      const piece = fullText.slice(cursor, cursor + CHUNK);
+      cursor += CHUNK;
+      const openAiChunk = {
+        choices: [{ delta: { content: piece }, index: 0 }],
+      };
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify(openAiChunk)}\n\n`),
+      );
+      // Pequeño delay para mantener el efecto "tipeando" visible.
+      await new Promise((r) => setTimeout(r, 18));
     },
   });
 

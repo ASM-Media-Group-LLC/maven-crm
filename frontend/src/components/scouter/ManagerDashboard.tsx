@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2, Users } from "lucide-react";
 import {
   Table,
@@ -10,6 +11,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { useSpammerProgress } from "@/hooks/useSpammerProgress";
 import { useUserRole } from "@/hooks/useUserRole";
+import { SpammerDetailModal } from "./SpammerDetailModal";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -38,6 +40,10 @@ interface ManagerDashboardProps {
 export const ManagerDashboard = ({ date, onDateChange }: ManagerDashboardProps) => {
   const { role, isLoading: roleLoading } = useUserRole();
   const { data: rows, isLoading } = useSpammerProgress(date);
+  const [selectedSpammer, setSelectedSpammer] = useState<{
+    id: string;
+    name: string | null;
+  } | null>(null);
 
   const isToday = date === new Date().toISOString().slice(0, 10);
 
@@ -105,7 +111,16 @@ export const ManagerDashboard = ({ date, onDateChange }: ManagerDashboardProps) 
             {rows.map((row) => {
               const pct = Math.round(row.completion_rate * 100);
               return (
-                <TableRow key={row.spammer_id}>
+                <TableRow
+                  key={row.spammer_id}
+                  className="cursor-pointer hover:bg-muted/40 transition-colors"
+                  onClick={() =>
+                    setSelectedSpammer({
+                      id: row.spammer_id,
+                      name: row.spammer_name,
+                    })
+                  }
+                >
                   <TableCell className="text-sm font-medium">
                     {row.spammer_name ?? (
                       <span className="text-muted-foreground italic text-xs">Sin nombre</span>
@@ -144,6 +159,15 @@ export const ManagerDashboard = ({ date, onDateChange }: ManagerDashboardProps) 
           </TableBody>
         </Table>
       )}
+
+      {/* Drill-down modal */}
+      <SpammerDetailModal
+        open={!!selectedSpammer}
+        onOpenChange={(o) => !o && setSelectedSpammer(null)}
+        spammerId={selectedSpammer?.id ?? null}
+        spammerName={selectedSpammer?.name ?? null}
+        date={date}
+      />
     </div>
   );
 };
