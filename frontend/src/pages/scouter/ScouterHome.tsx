@@ -300,9 +300,26 @@ interface ScouterHomeProps {
 }
 
 const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
-  const [statusFilter, setStatusFilter] = useState<string>(
-    favoritesOnly ? "all" : "discovery",
-  );
+  // Spammers ven SOLO sus leads asignadas en Home — no el pool
+  // completo del tenant. Admins/managers/supervisors siguen viendo
+  // todo. Computamos el rol arriba porque el defaultStatus depende
+  // de él (sin esto el spammer arrancaba con statusFilter="discovery"
+  // y la grilla quedaba vacía aunque tuviera asignaciones).
+  const { isAdmin, isManager, isSupervisor, isSpammer } = useUserRole();
+  const isManagerLikeRole = isAdmin || isManager || isSupervisor;
+  const onlyAssignedToMe = isSpammer && !isManagerLikeRole;
+
+  // Default del status filter:
+  //   - favoritesOnly: "all" (todos los favoritos sin importar status).
+  //   - spammer (sin manager): "all" — sus leads pueden estar en
+  //     cualquier status (contacting, confirmed, etc).
+  //   - resto: "discovery" — flujo de descubrimiento por defecto.
+  const defaultStatus = favoritesOnly || onlyAssignedToMe ? "all" : "discovery";
+  const [statusFilter, setStatusFilter] = useState<string>(defaultStatus);
+  // Visual highlight de la card seleccionada — independiente del
+  // statusFilter porque varias cards mapean a status="all" y antes se
+  // prendían las 3 al mismo tiempo. Default = "total".
+  const [selectedCardKey, setSelectedCardKey] = useState<string>("total");
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [countryFilter, setCountryFilter] = useState<string>("all");
@@ -311,15 +328,6 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
   const [managerDate, setManagerDate] = useState<string>(
     new Date().toISOString().slice(0, 10),
   );
-  const { isAdmin, isManager, isSupervisor, isSpammer } = useUserRole();
-  // Spammers ven SOLO sus leads asignadas en Home — no el pool
-  // completo del tenant. Admins/managers/supervisors siguen viendo
-  // todo. Esto evita que un spammer vea modelos que la IA está
-  // asignando a otros spammers (cross-spammer dedup ya las separa
-  // a nivel data, pero el Home era el único lugar donde el spammer
-  // las podía ver igual).
-  const isManagerLikeRole = isAdmin || isManager || isSupervisor;
-  const onlyAssignedToMe = isSpammer && !isManagerLikeRole;
   const pageSize = 60;
   const [selected, setSelected] = useState<ScouterLead | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -361,32 +369,60 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
     return map;
   }, [companies.data]);
 
-  // Stat cards: 5 cards matching kash style
-  const byStatus = stats.data?.byStatus ?? {};
+  // Stat cards — rediseño 2026-05. Reemplazamos los 4 contadores legacy
+  // (Activas / Contactando / Cierres fallidos / Descartes) por métricas
+  // de outreach reales: Contactadas (interaction_history.comment),
+  // Interesadas (status=confirmed), No responden (≥7 días sin marcar
+  // confirmed/active). Total scouteadas se mantiene.
   const statBlocks = useMemo(() => {
-    const total = stats.data?.total ?? 0;
     return [
-      { label: "Total",            big: total,                      color: "rgb(var(--foreground) / 1)", statusVal: "all" as const,       dotColor: "currentColor" },
-      { label: "Activas",          big: byStatus["active"] ?? 0,    color: "#22c55e", statusVal: "active" as const,    dotColor: "#22c55e" },
-      { label: "Contactando",      big: byStatus["contacting"] ?? 0, color: "#fbbf24", statusVal: "contacting" as const, dotColor: "#fbbf24" },
-      { label: "Cierres fallidos", big: byStatus["rejected"] ?? 0,  color: "#f87171", statusVal: "rejected" as const,  dotColor: "#f87171" },
-      { label: "Descartes",        big: byStatus["discarded"] ?? 0, color: "#a1a1aa", statusVal: "discarded" as const, dotColor: "#a1a1aa" },
+      {
+        key: "total",
+        label: "Total scouteadas",
+        big: stats.data?.total ?? 0,
+        statusVal: "all" as const,
+        dotColor: "currentColor",
+      },
+      {
+        key: "contacted",
+        label: "Contactadas",
+        big: stats.data?.contactedDistinct ?? 0,
+        statusVal: "all" as const,
+        dotColor: "#fbbf24",
+      },
+      {
+        key: "interested",
+        label: "Interesadas",
+        big: stats.data?.interested ?? 0,
+        statusVal: "confirmed" as const,
+        dotColor: "#22c55e",
+      },
+      {
+        key: "noResponse",
+        label: "No responden",
+        big: stats.data?.noResponse ?? 0,
+        statusVal: "all" as const,
+        dotColor: "#f87171",
+      },
     ];
-  }, [stats.data, byStatus]);
+  }, [stats.data]);
 
   return (
     <div className="space-y-5">
       {/* Stats row */}
       {!favoritesOnly && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {statBlocks.map((b) => (
             <StatCard
-              key={b.label}
+              key={b.key}
               label={b.label}
               big={b.big}
               color={b.dotColor}
-              active={statusFilter === b.statusVal}
-              onClick={() => setStatusFilter(b.statusVal)}
+              active={selectedCardKey === b.key}
+              onClick={() => {
+                setSelectedCardKey(b.key);
+                setStatusFilter(b.statusVal);
+              }}
             />
           ))}
         </div>

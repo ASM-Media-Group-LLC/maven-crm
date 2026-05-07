@@ -96,6 +96,15 @@ export interface ScouterStats {
   pendingAi: number;
   byStatus: Record<string, number>;
   total: number;
+  // Métricas de outreach derivadas de scouter_interaction_history.
+  // contactedDistinct: leads que recibieron al menos una tarea de
+  //   comentario completada por el spammer (interaction_type='comment').
+  // interested: leads marcados "Se interesó" (status='confirmed').
+  // noResponse: leads con primer comentario hace ≥7 días, sin marcar
+  //   "se interesó" todavía (status no es 'confirmed' ni 'active').
+  contactedDistinct: number;
+  interested: number;
+  noResponse: number;
 }
 
 // The `scouter_*` tables aren't in the generated Supabase types yet —
@@ -184,7 +193,9 @@ export const useScouterLeads = (params: ListParams = {}) => {
         .range(from, to);
       if (status !== "all") q = q.eq("status", status);
       if (company) q = q.eq("company_id", company);
-      if (country) q = q.eq("country", country);
+      // "Sin país" es el bucket sintético para NULL — lo traduce a IS NULL.
+      if (country === "Sin país") q = q.is("country", null);
+      else if (country) q = q.eq("country", country);
 
       // AI quality filter
       if (aiQuality === "approved") {
@@ -212,26 +223,47 @@ export const useScouterLeads = (params: ListParams = {}) => {
   });
 };
 
-/** Returns unique countries with counts for the country filter dropdown. */
+/** Returns unique countries with counts for the country filter dropdown.
+ *  Pagina en chunks de 1000 para abarcar todos los leads (con .limit(5000)
+ *  perdíamos rows cuando el pool superaba ese tamaño y la suma de países
+ *  no daba el total). Incluye una fila "Sin país" para los NULL, que
+ *  antes se ocultaban con .not("country", "is", null) y hacían que el
+ *  conteo total no cuadrara con la card de Total scouteadas. */
 export const useScouterCountries = () =>
   useQuery({
     queryKey: ["scouter-countries"],
     queryFn: async (): Promise<Array<{ country: string; count: number }>> => {
-      const { data, error } = await sb
-        .from("scouter_leads")
-        .select("country")
-        .not("country", "is", null)
-        .limit(5000);
-      if (error) throw error;
+      const CHUNK = 1000;
       const map = new Map<string, number>();
-      for (const row of (data ?? []) as { country: string | null }[]) {
-        if (row.country) {
-          map.set(row.country, (map.get(row.country) ?? 0) + 1);
+      let nullCount = 0;
+      let from = 0;
+      // Loop hasta que un chunk vuelva con menos de CHUNK filas → fin.
+      // Hard cap a 100 chunks (100k rows) por seguridad.
+      for (let i = 0; i < 100; i++) {
+        const to = from + CHUNK - 1;
+        const { data, error } = await sb
+          .from("scouter_leads")
+          .select("country")
+          .range(from, to);
+        if (error) throw error;
+        const rows = (data ?? []) as { country: string | null }[];
+        for (const row of rows) {
+          if (row.country) {
+            map.set(row.country, (map.get(row.country) ?? 0) + 1);
+          } else {
+            nullCount += 1;
+          }
         }
+        if (rows.length < CHUNK) break;
+        from += CHUNK;
       }
-      return Array.from(map.entries())
+      const out = Array.from(map.entries())
         .map(([country, count]) => ({ country, count }))
         .sort((a, b) => b.count - a.count);
+      if (nullCount > 0) {
+        out.push({ country: "Sin país", count: nullCount });
+      }
+      return out;
     },
     staleTime: 60_000,
   });
@@ -355,9 +387,13 @@ export const useScouterStats = () =>
         { count: highFit7d },
         { count: pendingAi },
         { count: total },
-        // Per-status counts via lightweight select (status only) so we
-        // can derive byStatus without N+1 queries.
-        { data: statusRows },
+        // Para byStatus + cross-reference con interactions traemos id y
+        // status de cada lead. 5k cubre el pool actual; si crece sube.
+        { data: leadRows },
+        // Cada fila = una tarea de comentario completada por un spammer.
+        // Agregamos client-side para sacar contactedDistinct +
+        // first_comment_at por lead.
+        { data: commentInteractions },
       ] = await Promise.all([
         head((q: any) => q.gte("created_at", since24h)),
         head((q: any) => q.gte("created_at", since7d)),
@@ -365,12 +401,44 @@ export const useScouterStats = () =>
         head((q: any) => q.gte("created_at", since7d).eq("ai_status", "high_fit")),
         head((q: any) => q.is("ai_status", null)),
         head((q: any) => q),
-        sb.from("scouter_leads").select("status").limit(2000),
+        sb.from("scouter_leads").select("id, status").limit(5000),
+        sb
+          .from("scouter_interaction_history")
+          .select("lead_id, created_at")
+          .eq("interaction_type", "comment")
+          .order("created_at", { ascending: true })
+          .limit(10000),
       ]);
 
       const byStatus: Record<string, number> = {};
-      for (const row of (statusRows ?? []) as { status: string }[]) {
+      const statusByLead = new Map<string, string>();
+      for (const row of (leadRows ?? []) as { id: string; status: string }[]) {
         byStatus[row.status] = (byStatus[row.status] ?? 0) + 1;
+        statusByLead.set(row.id, row.status);
+      }
+
+      // Primer comentario por lead — order asc + map sólo guarda el primero.
+      const firstCommentByLead = new Map<string, string>();
+      for (const row of (commentInteractions ?? []) as {
+        lead_id: string;
+        created_at: string;
+      }[]) {
+        if (!firstCommentByLead.has(row.lead_id)) {
+          firstCommentByLead.set(row.lead_id, row.created_at);
+        }
+      }
+
+      const sevenDaysAgo = now - 7 * 24 * 3600 * 1000;
+      let noResponseCount = 0;
+      for (const [leadId, firstAt] of firstCommentByLead) {
+        const firstAtMs = Date.parse(firstAt);
+        if (Number.isNaN(firstAtMs) || firstAtMs > sevenDaysAgo) continue;
+        const status = statusByLead.get(leadId);
+        // No responde = contactado hace ≥7 días y nunca marcado como
+        // "se interesó" (confirmed) ni convertido a active.
+        if (status !== "confirmed" && status !== "active") {
+          noResponseCount += 1;
+        }
       }
 
       return {
@@ -381,6 +449,9 @@ export const useScouterStats = () =>
         pendingAi: pendingAi ?? 0,
         byStatus,
         total: total ?? 0,
+        contactedDistinct: firstCommentByLead.size,
+        interested: byStatus["confirmed"] ?? 0,
+        noResponse: noResponseCount,
       };
     },
   });
