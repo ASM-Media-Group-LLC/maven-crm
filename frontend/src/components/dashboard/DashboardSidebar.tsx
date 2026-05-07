@@ -48,6 +48,11 @@ const DashboardSidebar = () => {
   const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
     { title: "Dashboard v2", url: "/dashboard2", icon: BarChart3, module: "Dashboard" },
+    // Panel de control: dashboard ejecutivo del funnel operativo
+    // (LLG → número → llamada → cierre → ingreso al CRM). Permiso
+    // controlado por canAccess("Panel de control") — el admin
+    // puede prenderlo/apagarlo por rol desde Settings → Roles.
+    { title: "Panel de control", url: "/panel-de-control", icon: BarChart3, module: "Panel de control" },
     { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined },
     { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },

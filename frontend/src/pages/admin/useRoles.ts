@@ -36,6 +36,10 @@ export interface ModuleConfig {
 export const MODULES_CONFIG: ModuleConfig[] = [
   // === Menú principal ===
   { group: "Menú",          module: "Dashboard",     submodules: [] },
+  // Panel de control: dashboard ejecutivo con KPIs del funnel completo
+  // (LLG → número → llamada → cierre → ingreso al CRM). Acceso típico:
+  // admin/manager/supervisor.
+  { group: "Menú",          module: "Panel de control", submodules: [] },
   { group: "Menú",          module: "Messenger",     submodules: [] },
   { group: "Menú",          module: "Cowork",        submodules: [] },
   { group: "Menú",          module: "Contactos",     submodules: [] },

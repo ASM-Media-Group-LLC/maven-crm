@@ -56,6 +56,7 @@ import DesignSystem from "./pages/DesignSystem";
 import Docs from "./pages/Docs";
 import Dashboard from "./pages/Dashboard";
 import Dashboard2 from "./pages/Dashboard2";
+import PanelDeControl from "./pages/PanelDeControl";
 
 // Sales
 import SalesDashboard from "./pages/SalesDashboard";
@@ -251,6 +252,7 @@ const App = () => (
               <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/dashboard2" element={<AdminRoute><Dashboard2 /></AdminRoute>} />
+                <Route path="/panel-de-control" element={<PermissionRoute module="Panel de control"><PanelDeControl /></PermissionRoute>} />
                 <Route path="/design-system" element={<DesignSystem />} />
                 <Route path="/docs" element={<Docs />} />
                 <Route path="/contactos" element={<PermissionRoute module="Contactos"><Contactos /></PermissionRoute>} />

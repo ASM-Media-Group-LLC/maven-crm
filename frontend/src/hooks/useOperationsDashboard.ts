@@ -1,0 +1,245 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+const sb = supabase as unknown as { from: (table: string) => any };
+
+export interface OperationsKpis {
+  contacted: number;       // 1. LLG contacta IG (rows en leadgen_entries)
+  numbersObtained: number; // 2. Número en cualquiera de las 2 tablas
+  closerCalls: number;     // 3. Llamadas para cierre (qa_calls)
+  closes: number;          // 4. Cerró (call_outcome=cerro)
+  onHold: number;          // 5. En espera (call_outcome=en_espera)
+  rejections: number;      // 6. Rechazos (call_outcome=no_cerro)
+  enteredCrm: number;      // 7. Ingresada al CRM (creators.entered_crm_at)
+}
+
+export type MetricKey =
+  | "contacted"
+  | "numbersObtained"
+  | "closerCalls"
+  | "closes"
+  | "onHold"
+  | "rejections"
+  | "enteredCrm";
+
+export interface DashboardRange {
+  from: Date | undefined;
+  to: Date | undefined;
+}
+
+const toIso = (d: Date | undefined): string | null =>
+  d ? d.toISOString() : null;
+
+/** KPIs del dashboard. Si from/to son undefined, sin filtro de fecha. */
+export const useOperationsDashboard = (range: DashboardRange) =>
+  useQuery({
+    queryKey: ["ops-dashboard", toIso(range.from), toIso(range.to)],
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<OperationsKpis> => {
+      const fromIso = toIso(range.from);
+      const toIsoVal = toIso(range.to);
+
+      const head = (table: string, dateCol: string, filter?: (q: any) => any) => {
+        let q = sb.from(table).select("*", { count: "exact", head: true });
+        if (fromIso) q = q.gte(dateCol, fromIso);
+        if (toIsoVal) q = q.lte(dateCol, toIsoVal);
+        if (filter) q = filter(q);
+        return q;
+      };
+
+      const [
+        { count: contacted },
+        { count: leadgenWithPhone },
+        { count: scouterWithPhone },
+        { count: closerCalls },
+        { count: closes },
+        { count: onHold },
+        { count: rejections },
+        { count: enteredCrm },
+      ] = await Promise.all([
+        head("leadgen_entries", "created_at"),
+        head("leadgen_entries", "created_at", (q) => q.not("phone_e164", "is", null)),
+        head("scouter_leads",   "created_at", (q) => q.not("phone", "is", null)),
+        head("qa_calls", "call_date"),
+        head("qa_calls", "call_date", (q) =>
+          q.eq("claude_analysis->>call_outcome", "cerro"),
+        ),
+        head("qa_calls", "call_date", (q) =>
+          q.eq("claude_analysis->>call_outcome", "en_espera"),
+        ),
+        head("qa_calls", "call_date", (q) =>
+          q.eq("claude_analysis->>call_outcome", "no_cerro"),
+        ),
+        head("creators", "entered_crm_at", (q) =>
+          q.not("entered_crm_at", "is", null),
+        ),
+      ]);
+
+      return {
+        contacted: contacted ?? 0,
+        numbersObtained: (leadgenWithPhone ?? 0) + (scouterWithPhone ?? 0),
+        closerCalls: closerCalls ?? 0,
+        closes: closes ?? 0,
+        onHold: onHold ?? 0,
+        rejections: rejections ?? 0,
+        enteredCrm: enteredCrm ?? 0,
+      };
+    },
+  });
+
+// ─── Detalle por métrica (para el popup al hacer click en la card) ───────
+
+export interface DetailRow {
+  id: string;
+  primary: string;   // texto principal (handle, modelo, etc)
+  secondary?: string; // texto secundario (closer, fecha, etc)
+  date?: string;
+  badge?: string;
+}
+
+/** Fetch de los items detrás de una métrica. Hasta 100 rows.
+ *  Misma lógica de fechas que useOperationsDashboard. */
+export const useMetricDetails = (
+  metric: MetricKey,
+  range: DashboardRange,
+  enabled: boolean,
+) =>
+  useQuery({
+    queryKey: ["ops-dashboard-details", metric, toIso(range.from), toIso(range.to)],
+    enabled,
+    staleTime: 30_000,
+    queryFn: async (): Promise<DetailRow[]> => {
+      const fromIso = toIso(range.from);
+      const toIsoVal = toIso(range.to);
+
+      const dateGte = (q: any, col: string) => (fromIso ? q.gte(col, fromIso) : q);
+      const dateLte = (q: any, col: string) => (toIsoVal ? q.lte(col, toIsoVal) : q);
+
+      const limit = 100;
+
+      switch (metric) {
+        case "contacted": {
+          const q = sb
+            .from("leadgen_entries")
+            .select("id, model_handle, lg_user_id, phone_e164, status, created_at")
+            .order("created_at", { ascending: false })
+            .limit(limit);
+          const { data, error } = await dateLte(dateGte(q, "created_at"), "created_at");
+          if (error) throw error;
+          return (data ?? []).map((r: any) => ({
+            id: r.id,
+            primary: `@${r.model_handle ?? "?"}`,
+            secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
+            date: r.created_at,
+            badge: r.status,
+          }));
+        }
+        case "numbersObtained": {
+          const q1 = sb
+            .from("leadgen_entries")
+            .select("id, model_handle, phone_e164, created_at")
+            .not("phone_e164", "is", null)
+            .order("created_at", { ascending: false })
+            .limit(50);
+          const q2 = sb
+            .from("scouter_leads")
+            .select("id, instagram_handle, phone, created_at")
+            .not("phone", "is", null)
+            .order("created_at", { ascending: false })
+            .limit(50);
+          const [{ data: a }, { data: b }] = await Promise.all([
+            dateLte(dateGte(q1, "created_at"), "created_at"),
+            dateLte(dateGte(q2, "created_at"), "created_at"),
+          ]);
+          const aRows = (a ?? []).map((r: any) => ({
+            id: r.id,
+            primary: `@${r.model_handle ?? "?"}`,
+            secondary: `📞 ${r.phone_e164}`,
+            date: r.created_at,
+            badge: "leadgen",
+          }));
+          const bRows = (b ?? []).map((r: any) => ({
+            id: r.id,
+            primary: `@${r.instagram_handle ?? "?"}`,
+            secondary: `📞 ${r.phone}`,
+            date: r.created_at,
+            badge: "scouter",
+          }));
+          return [...aRows, ...bRows].sort((x, y) =>
+            (y.date ?? "") < (x.date ?? "") ? -1 : 1,
+          );
+        }
+        case "closerCalls":
+        case "closes":
+        case "onHold":
+        case "rejections": {
+          let q = sb
+            .from("qa_calls")
+            .select(
+              "id, call_date, closer:qa_closers(name), model:qa_models(name), claude_analysis",
+            )
+            .order("call_date", { ascending: false })
+            .limit(limit);
+          if (metric === "closes")
+            q = q.eq("claude_analysis->>call_outcome", "cerro");
+          if (metric === "onHold")
+            q = q.eq("claude_analysis->>call_outcome", "en_espera");
+          if (metric === "rejections")
+            q = q.eq("claude_analysis->>call_outcome", "no_cerro");
+          const { data, error } = await dateLte(dateGte(q, "call_date"), "call_date");
+          if (error) throw error;
+          return (data ?? []).map((r: any) => ({
+            id: r.id,
+            primary: r.model?.name ?? "Modelo",
+            secondary: r.closer?.name
+              ? `Closer: ${r.closer.name}`
+              : "Closer: ?",
+            date: r.call_date,
+            badge: r.claude_analysis?.call_outcome ?? "—",
+          }));
+        }
+        case "enteredCrm": {
+          const q = sb
+            .from("creators")
+            .select("id, name, entered_crm_at, entered_crm_by, entered_crm_notes")
+            .not("entered_crm_at", "is", null)
+            .order("entered_crm_at", { ascending: false })
+            .limit(limit);
+          const { data, error } = await dateLte(
+            dateGte(q, "entered_crm_at"),
+            "entered_crm_at",
+          );
+          if (error) throw error;
+          return (data ?? []).map((r: any) => ({
+            id: r.id,
+            primary: r.name ?? "(sin nombre)",
+            secondary: r.entered_crm_notes ?? "",
+            date: r.entered_crm_at,
+            badge: "ingresada",
+          }));
+        }
+      }
+    },
+  });
+
+/** Marcar/desmarcar una creator como "ingresada al CRM externo". */
+export const useMarkCreatorEnteredCrm = () => {
+  return async (creatorId: string, mark: boolean, notes?: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("No hay sesión activa");
+    const updates = mark
+      ? {
+          entered_crm_at: new Date().toISOString(),
+          entered_crm_by: user.id,
+          entered_crm_notes: notes ?? null,
+        }
+      : {
+          entered_crm_at: null,
+          entered_crm_by: null,
+          entered_crm_notes: null,
+        };
+    const { error } = await sb.from("creators").update(updates).eq("id", creatorId);
+    if (error) throw error;
+  };
+};
