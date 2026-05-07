@@ -13,7 +13,11 @@
 //    Response con SSE OpenAI-compatible (data: {choices:[{delta:{content}}]})
 //    para que el frontend (ClariAiChat) la consuma sin cambios.
 
-const DEFAULT_MODEL = "gemini-1.5-flash-latest";
+// Modelos actuales de Gemini Flash (mid-2026): el suffix -latest fue
+// deprecado, ahora es nombre directo. 2.0-flash tiene free tier amplio
+// (15 RPM, 1M tokens contexto) y sigue siendo el más barato/rápido
+// para asistentes conversacionales.
+const DEFAULT_MODEL = "gemini-2.0-flash";
 
 export interface GeminiMessage {
   role: "user" | "assistant";

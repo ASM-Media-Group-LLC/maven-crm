@@ -168,7 +168,7 @@ serve(async (req) => {
         );
       }
       const geminiModel =
-        Deno.env.get("CLARI_HELP_MODEL_GEMINI") || "gemini-1.5-flash-latest";
+        Deno.env.get("CLARI_HELP_MODEL_GEMINI") || "gemini-2.0-flash";
       return streamGeminiAsOpenAI({
         apiKey: GEMINI_API_KEY,
         model: geminiModel,
