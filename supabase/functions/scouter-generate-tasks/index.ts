@@ -281,7 +281,20 @@ async function processSpammer(
     return { assignments: rolledCount, tasks: 0 };
   }
 
-  // 3. Groq calls — de a 1 lead, con throttle entre calls para respetar
+  // 3.5 Para los high_fit, traemos recent_posts (Apify-scraped) y
+  // ai_status en una sola query. Solo los que tengan ai_status='high_fit'
+  // se enriquecen con posts; el resto pasa a la IA con bio solamente.
+  const leadIds = rankedLeads.map((l) => l.id);
+  const { data: enrichRows } = await supabase
+    .from("scouter_leads")
+    .select("id, ai_status, recent_posts")
+    .in("id", leadIds);
+  const enrichByLead: Record<string, { ai_status: string | null; recent_posts: unknown }> = {};
+  for (const row of (enrichRows ?? []) as Array<{ id: string; ai_status: string | null; recent_posts: unknown }>) {
+    enrichByLead[row.id] = { ai_status: row.ai_status, recent_posts: row.recent_posts };
+  }
+
+  // 4. Groq calls — de a 1 lead, con throttle entre calls para respetar
   // RPM del free tier. Si una call rebota con 429, solo reintenta esa.
   const systemPrompt = buildSystemPrompt(spammerAccounts);
   const chunks = chunkArray(rankedLeads, CHUNK_SIZE);
@@ -289,16 +302,34 @@ async function processSpammer(
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
-    const leadsForPrompt: LeadForPrompt[] = chunk.map((l) => ({
-      instagram_handle: l.instagram_handle,
-      ai_score: l.ai_score,
-      followers: l.followers,
-      country: l.country,
-      bio: l.bio,
-      status: l.status,
-      interaction_count: l.interaction_count,
-      days_since_assigned: l.days_since_assigned,
-    }));
+    const leadsForPrompt: LeadForPrompt[] = chunk.map((l) => {
+      const enrich = enrichByLead[l.id];
+      // Solo high_fit consume posts (los medium/approved se quedan
+      // con bio para no inflar prompt ni gastar Apify).
+      const includesPosts =
+        enrich?.ai_status === "high_fit" &&
+        Array.isArray(enrich?.recent_posts) &&
+        (enrich!.recent_posts as unknown[]).length > 0;
+      return {
+        instagram_handle: l.instagram_handle,
+        ai_score: l.ai_score,
+        followers: l.followers,
+        country: l.country,
+        bio: l.bio,
+        status: l.status,
+        interaction_count: l.interaction_count,
+        days_since_assigned: l.days_since_assigned,
+        recent_posts: includesPosts
+          ? (enrich!.recent_posts as Array<{
+              url: string;
+              caption: string | null;
+              like_count?: number | null;
+              posted_at?: string | null;
+              is_video?: boolean | null;
+            }>)
+          : undefined,
+      };
+    });
     const userMessage = buildUserMessage(leadsForPrompt);
     try {
       const results = await callGroqWithRetry(groqKey, systemPrompt, userMessage);
