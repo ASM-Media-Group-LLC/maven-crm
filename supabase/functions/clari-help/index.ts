@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { MAVEN_GUIDE } from "./maven-guide.ts";
+import { streamGeminiAsOpenAI } from "../_shared/gemini.ts";
 
 // clari-help — asistente de soporte global de Maven CRM.
 //
@@ -11,9 +12,11 @@ import { MAVEN_GUIDE } from "./maven-guide.ts";
 //     respuestas role-aware ("tu rol no te lo permite, pedile a un
 //     admin que te habilite X").
 //
-// Modelo: Groq Llama 3.1 8B (rápido, barato, suficiente para how-to).
-// El system prompt + la guía pesa ~3-4k tokens, sobra dentro del TPM
-// limit de Groq (30k para 8B).
+// Modelo: Gemini 1.5 Flash por default (free tier 15 RPM, 1500 req/día,
+// 1M tokens contexto). Fallback a Groq Llama 3.1 8B si no hay
+// GEMINI_API_KEY. Se puede forzar Groq con CLARI_HELP_PROVIDER=groq.
+// El frontend espera SSE en shape OpenAI; el helper de Gemini traduce
+// el stream para que el cliente no se entere del cambio.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -147,11 +150,41 @@ serve(async (req) => {
       });
     }
 
-    // ───── Groq call ─────
+    // ───── Provider selection: Gemini (default) → Groq fallback ─────
+    const systemPrompt = buildSystemPrompt(userContext);
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const provider =
+      (Deno.env.get("CLARI_HELP_PROVIDER") || "").toLowerCase() ||
+      (GEMINI_API_KEY ? "gemini" : "groq");
+
+    if (provider === "gemini") {
+      if (!GEMINI_API_KEY) {
+        return new Response(
+          JSON.stringify({ error: "GEMINI_API_KEY no configurada." }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      const geminiModel =
+        Deno.env.get("CLARI_HELP_MODEL_GEMINI") || "gemini-1.5-flash-latest";
+      return streamGeminiAsOpenAI({
+        apiKey: GEMINI_API_KEY,
+        model: geminiModel,
+        systemPrompt,
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        temperature: 0.7,
+        maxOutputTokens: 1024,
+        corsHeaders,
+      });
+    }
+
+    // ───── Groq fallback ─────
     const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
     if (!GROQ_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "GROQ_API_KEY no configurada." }),
+        JSON.stringify({ error: "Ni GEMINI_API_KEY ni GROQ_API_KEY configurada." }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -163,8 +196,6 @@ serve(async (req) => {
     const GROQ_URL =
       Deno.env.get("GROQ_BASE_URL") ||
       "https://api.groq.com/openai/v1/chat/completions";
-
-    const systemPrompt = buildSystemPrompt(userContext);
 
     const groqResp = await fetch(GROQ_URL, {
       method: "POST",

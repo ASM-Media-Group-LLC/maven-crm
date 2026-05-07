@@ -1,13 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { CLARI_SYSTEM_PROMPT } from "./prompt.ts";
+import { callGeminiOnce } from "../_shared/gemini.ts";
 
 // qa-chat-mike — generador de la respuesta del asistente IA "Mike"
 // (UI label) para una sesión de QA Chat. Histórico:
-// Gemini → Anthropic Claude → Groq llama-3.3-70b-versatile.
+// Gemini → Anthropic Claude → Groq llama-3.3-70b-versatile → Gemini 1.5 Flash.
 // El razonamiento conversacional sobre QAs no necesita la calidad de
-// Claude y Groq es ~gratis para chat corto. Se mantiene en Anthropic
-// la pieza de qa-analyze (la pesada con rubric).
+// Claude y Gemini Flash da mejor instruction-following que llama-8b
+// y free tier generoso. Groq queda como fallback si falta la key.
+// Se mantiene Anthropic en qa-analyze (la pesada con rubric).
 //
 // Pattern:
 //  1. El frontend ya insertó el user message en qa_chat_messages.
@@ -67,14 +69,21 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
-    if (!GROQ_API_KEY) {
-      return jsonError(
-        "GROQ_API_KEY no configurada. Setea en los secrets de Supabase.",
-        500,
-      );
+    const provider =
+      (Deno.env.get("MIKE_PROVIDER") || "").toLowerCase() ||
+      (GEMINI_API_KEY ? "gemini" : "groq");
+
+    if (provider === "gemini" && !GEMINI_API_KEY) {
+      return jsonError("GEMINI_API_KEY no configurada.", 500);
     }
-    // llama-3.3-70b-versatile es el default. Override via GROQ_CHAT_MODEL.
+    if (provider === "groq" && !GROQ_API_KEY) {
+      return jsonError("GROQ_API_KEY no configurada.", 500);
+    }
+    const GEMINI_MODEL =
+      Deno.env.get("MIKE_MODEL_GEMINI") || "gemini-1.5-flash-latest";
+    // llama-3.3-70b-versatile es el default Groq. Override via GROQ_CHAT_MODEL.
     const GROQ_MODEL =
       Deno.env.get("GROQ_CHAT_MODEL") || "llama-3.3-70b-versatile";
 
@@ -161,17 +170,34 @@ serve(async (req) => {
 
     let responseText: string;
     let usage: unknown = null;
+    let usedModel = "";
     try {
-      const r = await callGroq(
-        GROQ_API_KEY,
-        GROQ_MODEL,
-        CLARI_SYSTEM_PROMPT,
-        chatMessages,
-      );
-      responseText = r.text;
-      usage = r.usage;
+      if (provider === "gemini") {
+        const r = await callGeminiOnce({
+          apiKey: GEMINI_API_KEY!,
+          model: GEMINI_MODEL,
+          systemPrompt: CLARI_SYSTEM_PROMPT,
+          messages: chatMessages,
+          temperature: 0.7,
+          maxOutputTokens: 2000,
+          timeoutMs: GROQ_TIMEOUT_MS,
+        });
+        responseText = r.text;
+        usage = r.usage;
+        usedModel = GEMINI_MODEL;
+      } else {
+        const r = await callGroq(
+          GROQ_API_KEY!,
+          GROQ_MODEL,
+          CLARI_SYSTEM_PROMPT,
+          chatMessages,
+        );
+        responseText = r.text;
+        usage = r.usage;
+        usedModel = GROQ_MODEL;
+      }
     } catch (e) {
-      const msg = (e as Error).message ?? "Error de Groq";
+      const msg = (e as Error).message ?? "Error del proveedor IA";
       const status = /429|rate limit/i.test(msg)
         ? 429
         : /401|402|key|cuota|quota|credit/i.test(msg)
@@ -209,8 +235,8 @@ serve(async (req) => {
     return jsonResponse({
       ok: true,
       message: assistantMsg,
-      provider: "groq",
-      model: GROQ_MODEL,
+      provider,
+      model: usedModel,
       qaContextCount: qaCalls.length,
     });
   } catch (e) {
@@ -275,12 +301,13 @@ function extractTokenCounts(usage: unknown): {
     return { tokens_in: null, tokens_out: null, cached_tokens: null };
   }
   const u = usage as Record<string, unknown>;
-  // Groq exposes OpenAI-style `prompt_tokens` / `completion_tokens`.
-  // Groq doesn't return a cache stat; we keep the column nullable.
+  // Tanto Groq (OpenAI-style) como nuestro helper de Gemini exponen
+  // prompt_tokens / completion_tokens; cached_tokens existe solo en
+  // Gemini cuando hay context cache hit.
   return {
     tokens_in: typeof u.prompt_tokens === "number" ? u.prompt_tokens : null,
     tokens_out: typeof u.completion_tokens === "number" ? u.completion_tokens : null,
-    cached_tokens: null,
+    cached_tokens: typeof u.cached_tokens === "number" ? u.cached_tokens : null,
   };
 }
 
