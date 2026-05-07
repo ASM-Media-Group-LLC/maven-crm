@@ -32,3 +32,16 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+// Cliente paralelo, SIN sesión, para páginas públicas (link de chatter,
+// invitaciones, etc) que deben consultar la DB como anon aunque el
+// visitante esté logueado en otra parte de Maven. Si reutilizáramos el
+// cliente global, el JWT del user logueado se mandaría con cada request
+// y RLS lo evaluaría como `authenticated` — bloqueando políticas pensadas
+// solo para `anon`.
+export const supabaseAnon = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
+});

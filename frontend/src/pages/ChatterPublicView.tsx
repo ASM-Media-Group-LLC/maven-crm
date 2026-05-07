@@ -25,7 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseAnon } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -45,7 +45,14 @@ import type {
   ChatterVaultItem,
 } from "@/pages/chatter-evaluator/types";
 
-const sb = supabase as unknown as { from: (t: string) => any };
+// IMPORTANTE: usamos supabaseAnon (cliente sin sesión) y NO el global,
+// para que las queries del link público se evalúen como anon aunque el
+// visitante esté logueado en otra parte de Maven. Las políticas RLS de
+// chatter_sessions / chatter_messages / chatter_profiles para anon ya
+// están escritas con USING (status <> 'ended'); con el cliente global
+// + JWT autenticado, esas policies no aplican y el user solo ve sus
+// propias sesiones, dando "Sesión no disponible".
+const sb = supabaseAnon as unknown as { from: (t: string) => any };
 
 const DEVICE_KEY = "maven.chatter.deviceId";
 
@@ -97,7 +104,11 @@ const formatTime = (iso: string): string => {
 };
 
 const callChatterApi = async (action: string, payload: Record<string, unknown>) => {
-  const { data, error } = await supabase.functions.invoke("chatter-public", {
+  // supabaseAnon en vez del global por la misma razón que las queries:
+  // si un Maven user abre el link logueado, su JWT NO debe viajar a una
+  // edge function pensada para acceso público. La función internamente
+  // usa service role y valida por sessionId.
+  const { data, error } = await supabaseAnon.functions.invoke("chatter-public", {
     body: { action, ...payload },
   });
   if (error) throw error;
@@ -553,7 +564,7 @@ const ChatterPublicView = () => {
   // Realtime subscription on messages
   useEffect(() => {
     if (!sessionId || !claimed) return;
-    const channel = supabase
+    const channel = supabaseAnon
       .channel(`chatter-public-messages:${sessionId}`)
       .on(
         "postgres_changes",
@@ -577,7 +588,7 @@ const ChatterPublicView = () => {
       )
       .subscribe();
     return () => {
-      supabase.removeChannel(channel);
+      supabaseAnon.removeChannel(channel);
     };
   }, [sessionId, claimed, qc]);
 
