@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -125,6 +126,11 @@ const ChatterEvaluatorContent = () => {
   const vaultCountsQ = useChatterVaultCounts();
   const sessionsQ = useChatterSessions("active-only");
   const statsQ = useChatterEvaluationStats();
+  const { canAccess } = usePermissions();
+  // Si el rol no tiene acceso al submódulo "Admin" del módulo Chatters,
+  // ocultamos el botón en vez de dejar que el click los rebote a otra
+  // ruta (la guard del routing los redirigía silenciosamente).
+  const canSeeAdmin = canAccess("Chatters", "Admin");
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   // Rango activo para los stat cards — los charts ya tienen su propia
   // ventana fija (30 días), así que el toggle solo afecta los 4 cajones
@@ -172,12 +178,14 @@ const ChatterEvaluatorContent = () => {
                 History
               </Link>
             </Button>
-            <Button asChild variant="outline" className="gap-2">
-              <Link to="/chatter-evaluator/admin">
-                <Settings className="h-4 w-4" />
-                Admin
-              </Link>
-            </Button>
+            {canSeeAdmin && (
+              <Button asChild variant="outline" className="gap-2">
+                <Link to="/chatter-evaluator/admin">
+                  <Settings className="h-4 w-4" />
+                  Admin
+                </Link>
+              </Button>
+            )}
             <Button onClick={() => setNewSessionOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" />
               Nueva sesión
