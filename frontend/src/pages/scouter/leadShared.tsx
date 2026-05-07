@@ -4,6 +4,16 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -19,23 +29,28 @@ import {
 } from "@/hooks/useScouterLeads";
 
 // ─── Status palette (shared by Home grid + Leads table) ────────────────
+// Nota: a partir de la simplificación del popup (2026-05), los closer
+// y spammer manejan solo 3 outcomes: Descartar / Se interesó / No
+// responde. Los statuses internos (discovery, candidate, contacting,
+// active) los siguen usando los workflows automáticos del worker y de
+// IA — no los exponemos como botones del popup.
 export const STATUS_META: Record<string, { label: string; dot: string }> = {
-  discovery:  { label: "Discovery",       dot: "#6366f1" },
-  candidate:  { label: "Candidate",       dot: "#0ea5e9" },
-  contacting: { label: "Contacting",      dot: "#fbbf24" },
-  confirmed:  { label: "Confirmed",       dot: "#22c55e" },
-  active:     { label: "Active",          dot: "#10b981" },
-  rejected:   { label: "Cierre fallido",  dot: "#f87171" },
-  discarded:  { label: "Descarte",        dot: "#a1a1aa" },
+  discovery:  { label: "Discovery",   dot: "#6366f1" },
+  candidate:  { label: "Candidate",   dot: "#0ea5e9" },
+  contacting: { label: "Contactando", dot: "#fbbf24" },
+  confirmed:  { label: "Se interesó", dot: "#22c55e" },
+  active:     { label: "Active",      dot: "#10b981" },
+  rejected:   { label: "No responde", dot: "#f87171" },
+  discarded:  { label: "Descarte",    dot: "#a1a1aa" },
 };
 
 export const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "discovery",  label: "Discovery" },
   { value: "candidate",  label: "Candidate" },
-  { value: "contacting", label: "Contacting" },
-  { value: "confirmed",  label: "Confirmed" },
+  { value: "contacting", label: "Contactando" },
+  { value: "confirmed",  label: "Se interesó" },
   { value: "active",     label: "Active" },
-  { value: "rejected",   label: "Cierre fallido" },
+  { value: "rejected",   label: "No responde" },
   { value: "discarded",  label: "Descarte" },
   { value: "all",        label: "Todos" },
 ];
@@ -99,11 +114,13 @@ export const VerifiedBadge = ({ size = 14 }: { size?: number }) => (
 );
 
 // ─── Quick-action statuses for modal footer ─────────────────────────────
+// Reducido a los 3 outcomes que un closer/spammer realmente marca tras
+// un intento de contacto. "Active" y "contacting" se asignan
+// automáticamente y no se exponen como botón.
 const QUICK_ACTIONS: Array<{ status: string; label: string; color: string }> = [
-  { status: "active",     label: "Activa",      color: "#22c55e" },
-  { status: "contacting", label: "Contactando", color: "#eab308" },
-  { status: "rejected",   label: "No cerró",    color: "#ef4444" },
-  { status: "discarded",  label: "Descartar",   color: "#71717a" },
+  { status: "discarded",  label: "Descartar",    color: "#71717a" },
+  { status: "confirmed",  label: "Se interesó",  color: "#22c55e" },
+  { status: "rejected",   label: "No responde",  color: "#f87171" },
 ];
 
 // ─── Lead modal (centered dialog, replaces old Sheet drawer) ────────────
@@ -122,6 +139,12 @@ export const LeadDrawer = ({
   const favoriteIds = favoriteIdsQ.data ?? new Set<string>();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<LeadPatch>({});
+  // Confirmación para Descartar — los otros 2 quick actions
+  // (Se interesó / No responde) no requieren confirmación porque
+  // son fácilmente revertibles y se accionan mucho. Descartar es
+  // más permanente y borra el lead del flujo activo, así que pide
+  // que el usuario lo piense un segundo.
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -141,6 +164,16 @@ export const LeadDrawer = ({
     lead.instagram_handle.charAt(0) ||
     "?"
   ).toUpperCase();
+
+  // Best-effort URL al perfil de Instagram. Preferimos la columna
+  // explícita (lead.instagram_url) si está; si no, derivamos del
+  // handle. Lo usamos en 3 lugares: avatar clickeable, nombre/handle
+  // clickeable, y el botón "Contactar" del footer.
+  const instagramUrl =
+    lead.instagram_url ??
+    (lead.instagram_handle
+      ? `https://instagram.com/${lead.instagram_handle.replace(/^@/, "")}`
+      : null);
 
   const setField = <K extends keyof LeadPatch>(key: K, value: LeadPatch[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
@@ -181,42 +214,89 @@ export const LeadDrawer = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-h-[92vh] w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden bg-card p-0 gap-0"
+        className="flex max-h-[92vh] w-full max-w-lg flex-col rounded-2xl border shadow-2xl overflow-hidden bg-card p-0 gap-0"
       >
         {/* Accessible title (visually hidden) */}
         <DialogTitle className="sr-only">
           @{lead.instagram_handle}
         </DialogTitle>
 
-        {/* Scrollable body */}
-        <div className="overflow-y-auto max-h-[calc(92vh-80px)]">
+        {/* Scrollable body — flex-1 hace que tome todo el espacio
+            disponible entre el top y el footer sticky. Antes usábamos
+            max-h fijo (calc(92vh-80px)) pero el footer creció con el
+            botón "Contactar" y se cortaban filas. */}
+        <div className="flex-1 overflow-y-auto">
           {/* ── Header ── */}
           <div className="flex items-center gap-3 p-4 pr-12 pb-2">
-            {/* Avatar */}
-            <div
-              className="h-14 w-14 shrink-0 overflow-hidden rounded-full"
-              style={{ background: initialsBg(lead.instagram_handle) }}
-            >
-              {lead.photo_data_url ? (
-                <img
-                  src={lead.photo_data_url}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-lg font-bold text-white/90">
-                  {initial}
-                </div>
-              )}
-            </div>
+            {/* Avatar — clickeable para abrir IG si hay URL */}
+            {instagramUrl ? (
+              <a
+                href={instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-14 w-14 shrink-0 overflow-hidden rounded-full transition-all hover:ring-2 hover:ring-primary hover:opacity-90"
+                style={{ background: initialsBg(lead.instagram_handle) }}
+                title="Abrir perfil de Instagram"
+              >
+                {lead.photo_data_url ? (
+                  <img
+                    src={lead.photo_data_url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-lg font-bold text-white/90">
+                    {initial}
+                  </div>
+                )}
+              </a>
+            ) : (
+              <div
+                className="h-14 w-14 shrink-0 overflow-hidden rounded-full"
+                style={{ background: initialsBg(lead.instagram_handle) }}
+              >
+                {lead.photo_data_url ? (
+                  <img
+                    src={lead.photo_data_url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-lg font-bold text-white/90">
+                    {initial}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="truncate text-sm font-semibold">@{lead.instagram_handle}</span>
-                {lead.verified && <VerifiedBadge size={16} />}
-              </div>
-              <div className="text-xs text-muted-foreground truncate">
-                {lead.name || "Sin nombre"}
-              </div>
+              {/* Handle + nombre — también linkean a IG si hay URL */}
+              {instagramUrl ? (
+                <a
+                  href={instagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block hover:underline"
+                  title="Abrir perfil de Instagram"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold">@{lead.instagram_handle}</span>
+                    {lead.verified && <VerifiedBadge size={16} />}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {lead.name || "Sin nombre"}
+                  </div>
+                </a>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold">@{lead.instagram_handle}</span>
+                    {lead.verified && <VerifiedBadge size={16} />}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {lead.name || "Sin nombre"}
+                  </div>
+                </>
+              )}
             </div>
             {/* Score */}
             {aiScore != null && (
@@ -471,13 +551,20 @@ export const LeadDrawer = ({
         {/* ── Sticky footer ── */}
         <div className="border-t bg-card px-4 py-3 space-y-2">
           {/* Quick-action status buttons */}
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             {QUICK_ACTIONS.map((qa) => (
               <button
                 key={qa.status}
                 type="button"
                 disabled={update.isPending}
-                onClick={() => handleQuickStatus(qa.status)}
+                onClick={() => {
+                  if (qa.status === "discarded") {
+                    // Descartar pide confirmación antes — el resto va directo.
+                    setConfirmDiscard(true);
+                  } else {
+                    handleQuickStatus(qa.status);
+                  }
+                }}
                 className="rounded-lg border px-1 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors hover:opacity-80 disabled:opacity-50"
                 style={{
                   borderColor: qa.color + "50",
@@ -489,7 +576,22 @@ export const LeadDrawer = ({
               </button>
             ))}
           </div>
-          {/* Favorite + Guardar + IG link row */}
+          {/* Contactar — full-width, lleva al perfil de Instagram en
+              una pestaña nueva. Es la acción primaria que un closer
+              hace después de revisar el lead. Sale arriba de Guardar
+              porque es lo más usado. */}
+          {instagramUrl && (
+            <a
+              href={instagramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Contactar
+            </a>
+          )}
+          {/* Favorite + Guardar */}
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -519,20 +621,37 @@ export const LeadDrawer = ({
               )}
               Guardar
             </Button>
-            {lead.instagram_url && (
-              <a
-                href={lead.instagram_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex h-8 w-8 items-center justify-center rounded-md border transition-colors hover:bg-muted"
-                aria-label="Abrir perfil de Instagram"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            )}
           </div>
         </div>
       </DialogContent>
+
+      {/* Confirmación al descartar — usamos AlertDialog (Maven UI), no
+          window.confirm() del navegador. Cierra el modal del lead
+          también después del descarte exitoso (mismo flujo que el
+          handleQuickStatus normal). */}
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Descartar este lead?</AlertDialogTitle>
+            <AlertDialogDescription>
+              @{lead.instagram_handle} se va a marcar como descartado y deja
+              de aparecer en tu cola activa. Podés revertirlo después
+              cambiando el estado manualmente desde la tabla de Leads.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmDiscard(false);
+                handleQuickStatus("discarded");
+              }}
+            >
+              Sí, descartar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };
