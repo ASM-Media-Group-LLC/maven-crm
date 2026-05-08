@@ -24,7 +24,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useDepartments } from "@/hooks/useEmployees";
@@ -135,6 +136,8 @@ export default function HROffboarding() {
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
+  type KpiKey = "total" | "inProgress" | "completed" | "pendingPayment";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [deptTab, setDeptTab] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
@@ -237,10 +240,10 @@ export default function HROffboarding() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total Offboarding" value={String(offboardings.length)} icon={Users} subtitle="Todos los procesos" color="muted" />
-              <DashboardMetricCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} subtitle={offboardings.length > 0 ? `${((totalInProgress / offboardings.length) * 100).toFixed(0)}% del total` : "—"} color="warning" />
-              <DashboardMetricCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} subtitle={offboardings.length > 0 ? `${((totalCompleted / offboardings.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
-              <DashboardMetricCard label="Pago Pendiente" value={String(totalPendingPayment)} icon={DollarSign} subtitle={offboardings.length > 0 ? `${((totalPendingPayment / offboardings.length) * 100).toFixed(0)}% del total` : "—"} color="destructive" />
+              <KpiCard label="Total Offboarding" value={String(offboardings.length)} icon={Users} color="bg-blue-500" subtitle="Todos los procesos" onClick={() => setKpiPopup("total")} />
+              <KpiCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} color="bg-amber-500" subtitle={offboardings.length > 0 ? `${((totalInProgress / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <KpiCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} color="bg-emerald-500" subtitle={offboardings.length > 0 ? `${((totalCompleted / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
+              <KpiCard label="Pago Pendiente" value={String(totalPendingPayment)} icon={DollarSign} color="bg-rose-500" subtitle={offboardings.length > 0 ? `${((totalPendingPayment / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pendingPayment")} />
             </>
           )}
         </div>
@@ -552,6 +555,35 @@ export default function HROffboarding() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Offboarding — ${offboardings.length}`;
+            case "inProgress": return `En Progreso — ${totalInProgress}`;
+            case "completed": return `Completados — ${totalCompleted}`;
+            case "pendingPayment": return `Pago Pendiente — ${totalPendingPayment}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = offboardings;
+          if (kpiPopup === "inProgress") list = offboardings.filter((o: any) => o.status === "in_progress");
+          else if (kpiPopup === "completed") list = offboardings.filter((o: any) => o.status === "completed");
+          else if (kpiPopup === "pendingPayment") list = offboardings.filter((o: any) => o.final_payment_status === "pending");
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "completed" ? "success" : status === "in_progress" ? "warning" : "default";
+          return list.slice(0, 100).map((o: any): KpiRow => ({
+            primary: o.employees ? `${o.employees.first_name ?? ""} ${o.employees.last_name ?? ""}`.trim() : "Sin nombre",
+            secondary: o.exit_reason ?? o.exit_date ? format(new Date(o.exit_date), "dd MMM yyyy") : undefined,
+            right: o.status ?? "—",
+            rightTone: tone(o.status ?? ""),
+          }));
+        })()}
+      />
     </div>
   );
 }

@@ -9,7 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -137,6 +138,8 @@ export default function HRVacations() {
   const [activeType, setActiveType] = useState<VacationType>("vacaciones");
   const [activeView, setActiveView] = useState<"solicitudes" | "balances" | "historial" | "calendario">("solicitudes");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  type KpiKey = "total" | "pending" | "approved" | "rejected" | "upcoming" | "thisMonth" | "available";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -368,19 +371,21 @@ export default function HRVacations() {
             Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : activeType === "vacaciones" ? (
             <>
-              <DashboardMetricCard label="Total Solicitudes" value={String(totalRequests)} icon={CalendarDays} subtitle={`${currentYear}`} color="primary" />
-              <DashboardMetricCard label="Pendientes" value={String(pending)} icon={Clock} subtitle="Por aprobar" color="warning" />
-              <DashboardMetricCard label="Aprobadas" value={String(approved)} icon={CheckCircle2} subtitle="Confirmadas" color="success" />
-              <DashboardMetricCard label="Rechazadas" value={String(rejected)} icon={XCircle} subtitle="Denegadas" color="destructive" />
-              <DashboardMetricCard label="Próximas" value={String(upcoming)} icon={CalendarClock} subtitle="Programadas" color="primary" />
+              <KpiCard label="Total Solicitudes" value={String(totalRequests)} icon={CalendarDays} color="bg-blue-500" subtitle={`${currentYear}`} onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Pendientes" value={String(pending)} icon={Clock} color="bg-amber-500" subtitle="Por aprobar" onClick={() => setKpiPopup("pending")} />
+              <KpiCard label="Aprobadas" value={String(approved)} icon={CheckCircle2} color="bg-emerald-500" subtitle="Confirmadas" onClick={() => setKpiPopup("approved")} />
+              <KpiCard label="Rechazadas" value={String(rejected)} icon={XCircle} color="bg-rose-500" subtitle="Denegadas" onClick={() => setKpiPopup("rejected")} />
+              <KpiCard label="Próximas" value={String(upcoming)} icon={CalendarClock} color="bg-violet-500" subtitle="Programadas" onClick={() => setKpiPopup("upcoming")} />
             </>
           ) : (
             <>
-              <DashboardMetricCard label="Días Usados" value={String(approvedThisYear)} icon={CalendarDays} subtitle={`De ${maxDays} anuales`} color="primary" />
-              <DashboardMetricCard label="Disponibles" value={String(availableDays)} icon={CheckCircle2} subtitle="Restantes" color="success" />
-              <DashboardMetricCard label="Pendientes" value={String(pending)} icon={Clock} subtitle="Por aprobar" color="warning" />
-              <DashboardMetricCard label="Este Mes" value={String(approvedThisMonth)} icon={CalendarClock} subtitle={format(new Date(), "MMMM yyyy", { locale: es })} color="primary" />
-              <DashboardMetricCard label="Rechazadas" value={String(rejected)} icon={XCircle} subtitle="Denegadas" color="destructive" />
+              {/* "Días Usados / Disponibles" son métricas agregadas sin
+                  lista propia: las dejamos estáticas (sin onClick). */}
+              <KpiCard label="Días Usados" value={String(approvedThisYear)} icon={CalendarDays} color="bg-blue-500" subtitle={`De ${maxDays} anuales`} />
+              <KpiCard label="Disponibles" value={String(availableDays)} icon={CheckCircle2} color="bg-emerald-500" subtitle="Restantes" />
+              <KpiCard label="Pendientes" value={String(pending)} icon={Clock} color="bg-amber-500" subtitle="Por aprobar" onClick={() => setKpiPopup("pending")} />
+              <KpiCard label="Este Mes" value={String(approvedThisMonth)} icon={CalendarClock} color="bg-violet-500" subtitle={format(new Date(), "MMMM yyyy", { locale: es })} onClick={() => setKpiPopup("thisMonth")} />
+              <KpiCard label="Rechazadas" value={String(rejected)} icon={XCircle} color="bg-rose-500" subtitle="Denegadas" onClick={() => setKpiPopup("rejected")} />
             </>
           )}
         </div>
@@ -820,6 +825,42 @@ export default function HRVacations() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Solicitudes — ${totalRequests}`;
+            case "pending": return `Pendientes — ${pending}`;
+            case "approved": return `Aprobadas — ${approved}`;
+            case "rejected": return `Rechazadas — ${rejected}`;
+            case "upcoming": return `Próximas — ${upcoming}`;
+            case "thisMonth": return `Este Mes — ${approvedThisMonth}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = typeAbsences;
+          if (kpiPopup === "pending") list = typeAbsences.filter((a: any) => a.status === "pending");
+          else if (kpiPopup === "approved") list = typeAbsences.filter((a: any) => a.status === "approved");
+          else if (kpiPopup === "rejected") list = typeAbsences.filter((a: any) => a.status === "rejected");
+          else if (kpiPopup === "upcoming") list = typeAbsences.filter((a: any) => a.status === "approved" && new Date(a.start_date) > new Date());
+          else if (kpiPopup === "thisMonth") {
+            const now = new Date();
+            list = typeAbsences.filter((a: any) => a.status === "approved" && new Date(a.start_date).getFullYear() === now.getFullYear() && new Date(a.start_date).getMonth() === now.getMonth());
+          }
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "approved" ? "success" : status === "rejected" ? "destructive" : "warning";
+          return list.slice(0, 100).map((a: any): KpiRow => ({
+            primary: a.employee_name ?? `Empleado ${a.employee_id?.slice?.(0, 8) ?? "—"}`,
+            secondary: a.start_date && a.end_date ? `${format(new Date(a.start_date), "dd MMM")} → ${format(new Date(a.end_date), "dd MMM yyyy")}` : undefined,
+            right: a.status ?? "—",
+            rightTone: tone(a.status ?? ""),
+          }));
+        })()}
+      />
     </div>
   );
 }

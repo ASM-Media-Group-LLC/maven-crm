@@ -28,7 +28,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PERMISSION_TYPES = [
@@ -332,6 +333,8 @@ export default function HRPermisos() {
   const [statusFilter, setStatusFilter] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  type KpiKey = "total" | "pendientes" | "aprobados" | "esteMes";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -437,10 +440,10 @@ export default function HRPermisos() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total" value={String(total)} icon={FileText} color="primary" />
-              <DashboardMetricCard label="Pendientes" value={String(pendientes)} icon={Clock} color="warning" />
-              <DashboardMetricCard label="Aprobados" value={String(aprobados)} icon={CheckCircle2} color="success" />
-              <DashboardMetricCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} color="muted" />
+              <KpiCard label="Total" value={String(total)} icon={FileText} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-amber-500" onClick={() => setKpiPopup("pendientes")} />
+              <KpiCard label="Aprobados" value={String(aprobados)} icon={CheckCircle2} color="bg-emerald-500" onClick={() => setKpiPopup("aprobados")} />
+              <KpiCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} color="bg-violet-500" onClick={() => setKpiPopup("esteMes")} />
             </>
           )}
         </div>
@@ -741,6 +744,39 @@ export default function HRPermisos() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Permisos — ${total}`;
+            case "pendientes": return `Pendientes — ${pendientes}`;
+            case "aprobados": return `Aprobados — ${aprobados}`;
+            case "esteMes": return `Este Mes — ${esteMes}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = permisos;
+          if (kpiPopup === "pendientes") list = permisos.filter((p: any) => p.status === "pending");
+          else if (kpiPopup === "aprobados") list = permisos.filter((p: any) => p.status === "approved");
+          else if (kpiPopup === "esteMes") {
+            const ms = startOfMonth(new Date());
+            const me = endOfMonth(new Date());
+            list = permisos.filter((p: any) => p.permission_date && new Date(p.permission_date) >= ms && new Date(p.permission_date) <= me);
+          }
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "approved" ? "success" : status === "rejected" ? "destructive" : "warning";
+          return list.slice(0, 100).map((p: any): KpiRow => ({
+            primary: p.employee_name ?? `Empleado ${p.employee_id?.slice?.(0, 8) ?? "—"}`,
+            secondary: `${p.permission_type ?? ""} · ${p.permission_date ? format(new Date(p.permission_date), "dd MMM yyyy") : "—"}`,
+            right: p.status ?? "—",
+            rightTone: tone(p.status ?? ""),
+          }));
+        })()}
+      />
     </div>
   );
 }

@@ -19,7 +19,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { PERFORMANCE_EVALUATION_STATUSES } from "@/lib/hrConstants";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -140,6 +141,8 @@ export default function HRPerformance() {
   const [statusFilter, setStatusFilter] = useState("");
   const [deptTab, setDeptTab] = useState("");
   const [statusTab, setStatusTab] = useState("");
+  type KpiKey = "avg" | "total" | "completed" | "withGoals";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
@@ -279,10 +282,10 @@ export default function HRPerformance() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Calif. Promedio" value={avgScore ? avgScore.toFixed(1) : "—"} icon={Star} subtitle="Score general" color="warning" />
-              <DashboardMetricCard label="Evaluaciones" value={String(evals.length)} icon={TrendingUp} subtitle="Total registradas" color="primary" />
-              <DashboardMetricCard label="Completadas" value={String(completedCount)} icon={CheckCircle2} subtitle={evals.length > 0 ? `${((completedCount / evals.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
-              <DashboardMetricCard label="Con Objetivos" value={String(withGoals)} icon={Target} subtitle={evals.length > 0 ? `${((withGoals / evals.length) * 100).toFixed(0)}% del total` : "—"} color="primary" />
+              <KpiCard label="Calif. Promedio" value={avgScore ? avgScore.toFixed(1) : "—"} icon={Star} color="bg-amber-500" subtitle="Score general" onClick={() => setKpiPopup("avg")} />
+              <KpiCard label="Evaluaciones" value={String(evals.length)} icon={TrendingUp} color="bg-blue-500" subtitle="Total registradas" onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Completadas" value={String(completedCount)} icon={CheckCircle2} color="bg-emerald-500" subtitle={evals.length > 0 ? `${((completedCount / evals.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
+              <KpiCard label="Con Objetivos" value={String(withGoals)} icon={Target} color="bg-violet-500" subtitle={evals.length > 0 ? `${((withGoals / evals.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("withGoals")} />
             </>
           )}
         </div>
@@ -564,6 +567,32 @@ export default function HRPerformance() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "avg": return `Calificación Promedio — ${avgScore ? avgScore.toFixed(1) : "—"}`;
+            case "total": return `Total Evaluaciones — ${evals.length}`;
+            case "completed": return `Completadas — ${completedCount}`;
+            case "withGoals": return `Con Objetivos — ${withGoals}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = evals;
+          if (kpiPopup === "completed") list = evals.filter((e: any) => e.status === "completed");
+          else if (kpiPopup === "withGoals") list = evals.filter((e: any) => e.goals_next_period);
+          return list.slice(0, 100).map((e: any): KpiRow => ({
+            primary: e.employee_name ?? `Empleado ${e.employee_id?.slice?.(0, 8) ?? "—"}`,
+            secondary: e.period ?? e.review_date ? format(new Date(e.review_date), "dd MMM yyyy") : undefined,
+            right: e.overall_score ? `${e.overall_score}/5` : e.status ?? "—",
+            rightTone: e.status === "completed" ? "success" : "default",
+          }));
+        })()}
+      />
     </div>
   );
 }

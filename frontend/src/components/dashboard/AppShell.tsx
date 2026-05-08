@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
+import BackToDashboardBar from "@/components/dashboard/BackToDashboardBar";
 import ClariAiFab from "@/components/ClariAiFab";
 import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
 import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
@@ -25,6 +26,7 @@ const AppShell = () => {
         <DashboardSidebar />
         <div className="flex flex-1 flex-col min-w-0">
           <DashboardTopbar />
+          <BackToDashboardBar />
           <Outlet />
         </div>
       </div>

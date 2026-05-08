@@ -25,7 +25,8 @@ import { format, differenceInMinutes } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AttendanceRecord {
@@ -453,6 +454,8 @@ export default function HRAttendance() {
   const [statusFilter, setStatusFilter] = useState("");
   const [shiftFilter, setShiftFilter] = useState("");
   const [deptTab, setDeptTab] = useState("");
+  type KpiKey = "total" | "presentes" | "tardanzas" | "ausentes";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [dateFromOpen, setDateFromOpen] = useState(false);
@@ -515,10 +518,10 @@ export default function HRAttendance() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total Registros" value={String(total)} icon={Users} subtitle="Todos los registros" color="primary" />
-              <DashboardMetricCard label="Presentes" value={String(presentes)} icon={UserCheck} subtitle={total > 0 ? `${((presentes / total) * 100).toFixed(0)}% del total` : "—"} color="success" />
-              <DashboardMetricCard label="Tardanzas" value={String(tardanzas)} icon={Clock} subtitle={total > 0 ? `${((tardanzas / total) * 100).toFixed(0)}% del total` : "—"} color="warning" />
-              <DashboardMetricCard label="Ausentes" value={String(ausentes)} icon={UserX} subtitle={total > 0 ? `${((ausentes / total) * 100).toFixed(0)}% del total` : "—"} color="destructive" />
+              <KpiCard label="Total Registros" value={String(total)} icon={Users} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Presentes" value={String(presentes)} icon={UserCheck} color="bg-emerald-500" subtitle={total > 0 ? `${((presentes / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("presentes")} />
+              <KpiCard label="Tardanzas" value={String(tardanzas)} icon={Clock} color="bg-amber-500" subtitle={total > 0 ? `${((tardanzas / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("tardanzas")} />
+              <KpiCard label="Ausentes" value={String(ausentes)} icon={UserX} color="bg-rose-500" subtitle={total > 0 ? `${((ausentes / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("ausentes")} />
             </>
           )}
         </div>
@@ -709,6 +712,35 @@ export default function HRAttendance() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Registros — ${total}`;
+            case "presentes": return `Presentes — ${presentes}`;
+            case "tardanzas": return `Tardanzas — ${tardanzas}`;
+            case "ausentes": return `Ausentes — ${ausentes}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = records;
+          if (kpiPopup === "presentes") list = records.filter((r: any) => r.status === "presente");
+          else if (kpiPopup === "tardanzas") list = records.filter((r: any) => r.status === "tardanza");
+          else if (kpiPopup === "ausentes") list = records.filter((r: any) => r.status === "ausente");
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "presente" ? "success" : status === "ausente" ? "destructive" : status === "tardanza" ? "warning" : "default";
+          return list.slice(0, 100).map((r: any): KpiRow => ({
+            primary: r.employee_name ?? `Empleado ${r.employee_id?.slice?.(0, 8) ?? "—"}`,
+            secondary: r.date ? format(new Date(r.date), "dd MMM yyyy") : undefined,
+            right: r.status ?? "—",
+            rightTone: tone(r.status ?? ""),
+          }));
+        })()}
+      />
     </div>
   );
 }

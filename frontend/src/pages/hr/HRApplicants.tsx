@@ -23,7 +23,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { APPLICANT_STATUSES, APPLICANT_SOURCES } from "@/lib/hrConstants";
 import { APPLICANT_STATUS_COLORS } from "@/lib/hrAreaUtils";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,8 @@ export default function HRApplicants() {
   const [statusFilter, setStatusFilter] = useState("");
   const [deptTab, setDeptTab] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  type KpiKey = "total" | "pending" | "interview" | "hired";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [appPage, setAppPage] = useState(1);
   const [appPageSize, setAppPageSize] = useState(25);
 
@@ -184,10 +187,10 @@ export default function HRApplicants() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total Candidatos" value={String(applicants.length)} icon={Users} subtitle="Todos los registros" color="muted" />
-              <DashboardMetricCard label="Pendientes" value={String(totalPending)} icon={Clock} subtitle={applicants.length > 0 ? `${((totalPending / applicants.length) * 100).toFixed(0)}% del total` : "—"} color="primary" />
-              <DashboardMetricCard label="En Entrevista" value={String(totalInterview)} icon={UserCheck} subtitle={applicants.length > 0 ? `${((totalInterview / applicants.length) * 100).toFixed(0)}% del total` : "—"} color="warning" />
-              <DashboardMetricCard label="Contratados" value={String(totalHired)} icon={CheckCircle} subtitle={applicants.length > 0 ? `${((totalHired / applicants.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
+              <KpiCard label="Total Candidatos" value={String(applicants.length)} icon={Users} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Pendientes" value={String(totalPending)} icon={Clock} color="bg-amber-500" subtitle={applicants.length > 0 ? `${((totalPending / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
+              <KpiCard label="En Entrevista" value={String(totalInterview)} icon={UserCheck} color="bg-violet-500" subtitle={applicants.length > 0 ? `${((totalInterview / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("interview")} />
+              <KpiCard label="Contratados" value={String(totalHired)} icon={CheckCircle} color="bg-emerald-500" subtitle={applicants.length > 0 ? `${((totalHired / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("hired")} />
             </>
           )}
         </div>
@@ -475,6 +478,35 @@ export default function HRApplicants() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Candidatos — ${applicants.length}`;
+            case "pending": return `Pendientes — ${totalPending}`;
+            case "interview": return `En Entrevista — ${totalInterview}`;
+            case "hired": return `Contratados — ${totalHired}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = applicants;
+          if (kpiPopup === "pending") list = applicants.filter((a: any) => a.status === "pending" || a.status === "applied");
+          else if (kpiPopup === "interview") list = applicants.filter((a: any) => a.status === "interview" || a.status === "interviewing");
+          else if (kpiPopup === "hired") list = applicants.filter((a: any) => a.status === "hired");
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "hired" ? "success" : status === "rejected" ? "destructive" : status === "interview" || status === "interviewing" ? "warning" : "default";
+          return list.slice(0, 100).map((a: any): KpiRow => ({
+            primary: a.full_name ?? "Sin nombre",
+            secondary: a.position_applied ?? a.email ?? undefined,
+            right: a.status ?? "—",
+            rightTone: tone(a.status ?? ""),
+          }));
+        })()}
+      />
     </div>
   );
 }

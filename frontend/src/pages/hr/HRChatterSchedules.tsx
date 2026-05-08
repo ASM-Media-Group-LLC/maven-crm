@@ -25,7 +25,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, isWithinInterval, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 const SCHEDULE_TYPES = [
   { value: "manana", label: "Mañana", icon: Sun, color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
@@ -57,6 +58,8 @@ const HRChatterSchedules = () => {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid" | "calendar">("list");
+  type KpiKey = "week" | "today";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editData, setEditData] = useState<any | null>(null);
   const [viewData, setViewData] = useState<any | null>(null);
@@ -309,8 +312,8 @@ const HRChatterSchedules = () => {
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <DashboardMetricCard label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={CalendarDays} color="primary" />
-          <DashboardMetricCard label="Turnos Hoy" value={String(turnosToday)} icon={Clock} color="accent" />
+          <KpiCard label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={CalendarDays} color="bg-blue-500" onClick={() => setKpiPopup("week")} />
+          <KpiCard label="Turnos Hoy" value={String(turnosToday)} icon={Clock} color="bg-violet-500" onClick={() => setKpiPopup("today")} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -498,6 +501,29 @@ const HRChatterSchedules = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={kpiPopup === "week" ? `Turnos Esta Semana — ${turnosThisWeek}` : `Turnos Hoy — ${turnosToday}`}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          const now = new Date();
+          let list = schedules;
+          if (kpiPopup === "week") {
+            const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+            const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+            list = schedules.filter((s: any) => s.start_at && isWithinInterval(new Date(s.start_at), { start: weekStart, end: weekEnd }));
+          } else {
+            list = schedules.filter((s: any) => s.start_at && isSameDay(new Date(s.start_at), now));
+          }
+          return list.slice(0, 100).map((s: any): KpiRow => ({
+            primary: s.title ?? s.employee_name ?? "Sin título",
+            secondary: s.start_at ? format(new Date(s.start_at), "EEEE dd MMM HH:mm", { locale: es }) : undefined,
+            right: s.shift_type ?? "—",
+          }));
+        })()}
+      />
     </div>
   );
 };

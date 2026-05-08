@@ -27,7 +27,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { CalendarIcon } from "lucide-react";
 
 const OVERTIME_TYPES = [
@@ -56,6 +57,8 @@ const HROvertimeDetail = () => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  type KpiKey = "total" | "pending" | "approved" | "paid";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editData, setEditData] = useState<any | null>(null);
   const [viewData, setViewData] = useState<any | null>(null);
@@ -186,10 +189,10 @@ const HROvertimeDetail = () => {
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <DashboardMetricCard label="Total Horas" value={`${totalHours}h`} icon={Timer} color="primary" />
-          <DashboardMetricCard label="Pendientes" value={String(pendingCount)} icon={AlertCircle} color="warning" />
-          <DashboardMetricCard label="Aprobadas" value={String(approvedCount)} icon={CheckCircle2} color="success" />
-          <DashboardMetricCard label="Pagadas" value={String(paidCount)} icon={Banknote} color="accent" />
+          <KpiCard label="Total Horas" value={`${totalHours}h`} icon={Timer} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
+          <KpiCard label="Pendientes" value={String(pendingCount)} icon={AlertCircle} color="bg-amber-500" onClick={() => setKpiPopup("pending")} />
+          <KpiCard label="Aprobadas" value={String(approvedCount)} icon={CheckCircle2} color="bg-emerald-500" onClick={() => setKpiPopup("approved")} />
+          <KpiCard label="Pagadas" value={String(paidCount)} icon={Banknote} color="bg-violet-500" onClick={() => setKpiPopup("paid")} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -407,6 +410,35 @@ const HROvertimeDetail = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Horas Extra — ${totalHours}h`;
+            case "pending": return `Pendientes — ${pendingCount}`;
+            case "approved": return `Aprobadas — ${approvedCount}`;
+            case "paid": return `Pagadas — ${paidCount}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = overtime;
+          if (kpiPopup === "pending") list = overtime.filter((r: any) => r.status === "pending");
+          else if (kpiPopup === "approved") list = overtime.filter((r: any) => r.status === "approved");
+          else if (kpiPopup === "paid") list = overtime.filter((r: any) => r.status === "paid");
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "paid" ? "success" : status === "approved" ? "default" : status === "pending" ? "warning" : "default";
+          return list.slice(0, 100).map((r: any): KpiRow => ({
+            primary: r.employees ? `${r.employees.first_name ?? ""} ${r.employees.last_name ?? ""}`.trim() : "Sin nombre",
+            secondary: r.date ? format(new Date(r.date), "dd MMM yyyy") : undefined,
+            right: `${r.hours}h`,
+            rightTone: tone(r.status ?? ""),
+          }));
+        })()}
+      />
     </div>
   );
 };

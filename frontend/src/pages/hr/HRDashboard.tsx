@@ -22,7 +22,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface QuickAction {
@@ -162,6 +163,8 @@ export default function HRDashboard() {
   const [selectedIds, setSelectedIds] = useState<string[]>(loadShortcuts);
   const [configOpen, setConfigOpen] = useState(false);
   const [draftIds, setDraftIds] = useState<string[]>([]);
+  type KpiKey = "total" | "ausencias" | "onboarding";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
 
   function openConfig() {
     setDraftIds([...selectedIds]);
@@ -259,40 +262,17 @@ export default function HRDashboard() {
       {/* ── Scrollable content ────────────────────────────────────────── */}
       <div className="flex-1 overflow-auto p-6 space-y-5">
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* KPI Cards — Total/Ausencias/Onboarding tienen data → clickeables.
+            Check-ins Hoy es estático (no hay sistema de asistencia integrado). */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {isLoading ? (
-            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
+            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)
           ) : (
             <>
-              <DashboardMetricCard
-                label="Total Empleados"
-                value={String(total)}
-                icon={Users}
-                subtitle="En nómina"
-                color="primary"
-              />
-              <DashboardMetricCard
-                label="Check-ins Hoy"
-                value="0"
-                icon={UserCheck}
-                subtitle="Sin sistema de asistencia"
-                color="success"
-              />
-              <DashboardMetricCard
-                label="Ausencias Pend."
-                value={String(pendingAbsences.length)}
-                icon={AlertTriangle}
-                subtitle="Pendientes de revisión"
-                color="warning"
-              />
-              <DashboardMetricCard
-                label="En Onboarding"
-                value={String(nuevos30d)}
-                icon={UserPlus}
-                subtitle="Ingresos últimos 30d"
-                color="primary"
-              />
+              <KpiCard label="Total Empleados" value={String(total)} icon={Users} color="bg-blue-500" subtitle="En nómina" onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Check-ins Hoy" value="0" icon={UserCheck} color="bg-slate-500" subtitle="Sin sistema de asistencia" />
+              <KpiCard label="Ausencias Pend." value={String(pendingAbsences.length)} icon={AlertTriangle} color="bg-amber-500" subtitle="Pendientes de revisión" onClick={() => setKpiPopup("ausencias")} />
+              <KpiCard label="En Onboarding" value={String(nuevos30d)} icon={UserPlus} color="bg-emerald-500" subtitle="Ingresos últimos 30d" onClick={() => setKpiPopup("onboarding")} />
             </>
           )}
         </div>
@@ -514,6 +494,59 @@ export default function HRDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Empleados — ${total}`;
+            case "ausencias": return `Ausencias Pendientes — ${pendingAbsences.length}`;
+            case "onboarding": return `En Onboarding — ${nuevos30d}`;
+            default: return "";
+          }
+        })()}
+        subtitle={(() => {
+          switch (kpiPopup) {
+            case "total": return "Empleados activos en nómina";
+            case "ausencias": return "Esperando revisión del manager";
+            case "onboarding": return "Ingresos de los últimos 30 días";
+            default: return undefined;
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          if (kpiPopup === "total") {
+            return employees.slice(0, 100).map((e: any): KpiRow => ({
+              primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || e.full_name || "Sin nombre",
+              secondary: e.position ?? e.department_name ?? undefined,
+              right: e.status ?? "—",
+              rightTone: e.status === "activo" ? "success" : "default",
+            }));
+          }
+          if (kpiPopup === "ausencias") {
+            return pendingAbsences.slice(0, 100).map((a: any): KpiRow => ({
+              primary: a.employee_name ?? a.full_name ?? `Empleado ${a.employee_id?.slice?.(0, 8) ?? "—"}`,
+              secondary: a.absence_type ? `${a.absence_type} · ${a.start_date ? new Date(a.start_date).toLocaleDateString("es") : "—"}` : a.start_date ? new Date(a.start_date).toLocaleDateString("es") : undefined,
+              right: a.status ?? "Pendiente",
+              rightTone: "warning",
+            }));
+          }
+          if (kpiPopup === "onboarding") {
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            return employees
+              .filter((e: any) => e.hire_date && new Date(e.hire_date) >= thirtyDaysAgo)
+              .slice(0, 100)
+              .map((e: any): KpiRow => ({
+                primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || "Sin nombre",
+                secondary: e.position ?? undefined,
+                right: e.hire_date ? new Date(e.hire_date).toLocaleDateString("es") : "—",
+              }));
+          }
+          return [];
+        })()}
+      />
     </div>
   );
 }

@@ -26,7 +26,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, isWithinInterval, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SCHEDULE_TYPES = [
@@ -61,6 +62,8 @@ const HRSchedules = () => {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid" | "calendar">("list");
+  type KpiKey = "week" | "today";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editData, setEditData] = useState<any | null>(null);
   const [viewData, setViewData] = useState<any | null>(null);
@@ -369,12 +372,12 @@ const HRSchedules = () => {
       <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <DashboardMetricCard label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={CalendarDays} color="primary" />
-          <DashboardMetricCard label="Turnos Hoy" value={String(turnosToday)} icon={Clock} color="accent" />
-          <DashboardMetricCard label="Horas Extra" value={String(overtimeCount)} icon={Timer}
-            subtitle="Click para ver detalle" color="warning" />
-          <DashboardMetricCard label="Banco de Horas" value={`${hourBankTotal}h`} icon={Banknote}
-            subtitle="Click para ver detalle" color="success" />
+          {/* Turnos clickeables (lista propia). Las dos últimas siguen
+              navegando porque tienen su propia ruta detallada. */}
+          <KpiCard label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={CalendarDays} color="bg-blue-500" onClick={() => setKpiPopup("week")} />
+          <KpiCard label="Turnos Hoy" value={String(turnosToday)} icon={Clock} color="bg-violet-500" onClick={() => setKpiPopup("today")} />
+          <KpiCard label="Horas Extra" value={String(overtimeCount)} icon={Timer} color="bg-amber-500" subtitle="Ver detalle" onClick={() => navigate("/hr/horarios/horas-extras")} />
+          <KpiCard label="Banco de Horas" value={`${hourBankTotal}h`} icon={Banknote} color="bg-emerald-500" subtitle="Ver detalle" onClick={() => navigate("/hr/horarios/banco-horas")} />
         </div>
 
         {/* Navigation Cards */}
@@ -605,6 +608,32 @@ const HRSchedules = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={kpiPopup === "week" ? `Turnos Esta Semana — ${turnosThisWeek}` : `Turnos Hoy — ${turnosToday}`}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          const now = new Date();
+          let list = schedules;
+          if (kpiPopup === "week") {
+            const ws = new Date(now);
+            ws.setDate(now.getDate() - now.getDay() + 1);
+            ws.setHours(0, 0, 0, 0);
+            const we = new Date(ws);
+            we.setDate(ws.getDate() + 7);
+            list = schedules.filter((s: any) => s.start_at && new Date(s.start_at) >= ws && new Date(s.start_at) < we);
+          } else {
+            list = schedules.filter((s: any) => s.start_at && new Date(s.start_at).toDateString() === now.toDateString());
+          }
+          return list.slice(0, 100).map((s: any): KpiRow => ({
+            primary: s.title ?? s.employee_name ?? "Sin título",
+            secondary: s.start_at ? new Date(s.start_at).toLocaleString("es") : undefined,
+            right: s.shift_type ?? "—",
+          }));
+        })()}
+      />
     </div>
   );
 };

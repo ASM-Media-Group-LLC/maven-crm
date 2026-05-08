@@ -26,7 +26,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 function getInitials(first: string, last: string) {
   return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
@@ -40,6 +41,8 @@ const HRHourBank = () => {
   const queryClient = useQueryClient();
 
   const [tab, setTab] = useState("balances");
+  type KpiKey = "total" | "avg" | "high" | "low";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
@@ -221,10 +224,10 @@ const HRHourBank = () => {
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <DashboardMetricCard label="Total Acumulado" value={`${totalAccumulated.toFixed(1)}h`} icon={Banknote} color="primary" />
-          <DashboardMetricCard label="Promedio/Empleado" value={`${avgPerEmployee.toFixed(1)}h`} icon={Users} color="accent" />
-          <DashboardMetricCard label="Balance Alto (+30h)" value={String(highBalance)} icon={TrendingUp} color="success" />
-          <DashboardMetricCard label="Balance Bajo (<10h)" value={String(lowBalance)} icon={TrendingDown} color="warning" />
+          <KpiCard label="Total Acumulado" value={`${totalAccumulated.toFixed(1)}h`} icon={Banknote} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
+          <KpiCard label="Promedio/Empleado" value={`${avgPerEmployee.toFixed(1)}h`} icon={Users} color="bg-violet-500" onClick={() => setKpiPopup("avg")} />
+          <KpiCard label="Balance Alto (+30h)" value={String(highBalance)} icon={TrendingUp} color="bg-emerald-500" onClick={() => setKpiPopup("high")} />
+          <KpiCard label="Balance Bajo (<10h)" value={String(lowBalance)} icon={TrendingDown} color="bg-amber-500" onClick={() => setKpiPopup("low")} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -376,6 +379,32 @@ const HRHourBank = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Acumulado — ${totalAccumulated.toFixed(1)}h`;
+            case "avg": return `Promedio por Empleado — ${avgPerEmployee.toFixed(1)}h`;
+            case "high": return `Balance Alto (+30h) — ${highBalance}`;
+            case "low": return `Balance Bajo (<10h) — ${lowBalance}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = balances;
+          if (kpiPopup === "high") list = balances.filter((b: any) => b.balance > 30);
+          else if (kpiPopup === "low") list = balances.filter((b: any) => b.balance < 10 && b.balance >= 0);
+          return list.slice(0, 100).map((b: any): KpiRow => ({
+            primary: `${b.first_name ?? ""} ${b.last_name ?? ""}`.trim() || "Sin nombre",
+            secondary: b.position ?? undefined,
+            right: `${b.balance.toFixed(1)}h`,
+            rightTone: b.balance > 30 ? "success" : b.balance < 10 ? "warning" : "default",
+          }));
+        })()}
+      />
     </div>
   );
 };

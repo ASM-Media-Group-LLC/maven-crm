@@ -356,7 +356,7 @@ const DashboardContent = () => {
                 <div
                   key={action.id}
                   className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 cursor-pointer hover:border-primary/40 hover:bg-primary/5 hover:-translate-y-[1px] transition-all duration-200 group"
-                  onClick={() => navigate(action.url)}
+                  onClick={() => navigate(action.url, { state: { fromDashboard: true } })}
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                     <action.icon className="h-5 w-5 text-primary" />

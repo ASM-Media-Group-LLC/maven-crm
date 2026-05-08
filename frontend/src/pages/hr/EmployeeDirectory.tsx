@@ -13,6 +13,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -20,12 +22,12 @@ import { format } from "date-fns";
 import { EMPLOYEE_STATUS_OPTIONS, CONTRACT_TYPES, WORK_MODALITIES } from "@/lib/hrConstants";
 import { useAuth } from "@/hooks/useAuth";
 
-/* ── KPI Cards ── */
+/* ── KPI Cards ── usan KpiCard estándar (gradient + hover lift) */
 const kpiCards = [
-  { label: "Total Activos", subtitle: "En operación", icon: UserCheck, key: "active" as const, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40" },
-  { label: "Remotos", subtitle: "Trabajo remoto", icon: Wifi, key: "remote" as const, colorClass: "text-primary", bgClass: "bg-primary/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
-  { label: "Híbridos", subtitle: "Modalidad híbrida", icon: Laptop, key: "hybrid" as const, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
-  { label: "Presenciales", subtitle: "En oficina", icon: Building2, key: "onsite" as const, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
+  { label: "Total Activos", subtitle: "En operación", icon: UserCheck, key: "active" as const, color: "bg-emerald-500" },
+  { label: "Remotos", subtitle: "Trabajo remoto", icon: Wifi, key: "remote" as const, color: "bg-blue-500" },
+  { label: "Híbridos", subtitle: "Modalidad híbrida", icon: Laptop, key: "hybrid" as const, color: "bg-amber-500" },
+  { label: "Presenciales", subtitle: "En oficina", icon: Building2, key: "onsite" as const, color: "bg-violet-500" },
 ];
 
 const MODALITY_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
@@ -250,6 +252,8 @@ export default function EmployeeDirectory() {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [statusEmployee, setStatusEmployee] = useState<any>(null);
+  type KpiKey = "active" | "remote" | "hybrid" | "onsite";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
 
   const filtered = employees.filter((e) => {
     const fullName = `${e.first_name} ${e.last_name}`.toLowerCase();
@@ -295,21 +299,18 @@ export default function EmployeeDirectory() {
 
       {/* ── Scrollable content ── */}
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* KPI Cards — clickeables, abren modal con la lista filtrada */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {kpiCards.map((card) => (
-            <Card key={card.key} className={`transition-all duration-200 ${card.hoverClass}`}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <p className="text-sm text-muted-foreground">{card.label}</p>
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-md ${card.bgClass}`}>
-                    <card.icon className={`h-4 w-4 ${card.colorClass}`} />
-                  </div>
-                </div>
-                <p className={`mt-2 text-2xl font-bold ${card.colorClass}`}>{kpiValues[card.key]}</p>
-                <p className="text-xs text-muted-foreground">{card.subtitle}</p>
-              </CardContent>
-            </Card>
+            <KpiCard
+              key={card.key}
+              label={card.label}
+              value={kpiValues[card.key]}
+              icon={card.icon}
+              color={card.color}
+              subtitle={card.subtitle}
+              onClick={() => setKpiPopup(card.key)}
+            />
           ))}
         </div>
 
@@ -393,6 +394,32 @@ export default function EmployeeDirectory() {
 
       {/* Change status modal */}
       <ChangeStatusModal employee={statusEmployee} open={!!statusEmployee} onClose={() => setStatusEmployee(null)} />
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "active": return `Total Activos — ${activeEmps.length}`;
+            case "remote": return `Remotos — ${totalRemote}`;
+            case "hybrid": return `Híbridos — ${totalHybrid}`;
+            case "onsite": return `Presenciales — ${totalOnsite}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = activeEmps;
+          if (kpiPopup === "remote") list = activeEmps.filter((e: any) => e.work_modality === "remoto");
+          else if (kpiPopup === "hybrid") list = activeEmps.filter((e: any) => e.work_modality === "hibrido");
+          else if (kpiPopup === "onsite") list = activeEmps.filter((e: any) => e.work_modality === "presencial");
+          return list.slice(0, 100).map((e: any): KpiRow => ({
+            primary: `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() || e.full_name || "Sin nombre",
+            secondary: e.position ?? e.department_name ?? undefined,
+            right: e.work_modality ?? "—",
+          }));
+        })()}
+      />
     </main>
   );
 }

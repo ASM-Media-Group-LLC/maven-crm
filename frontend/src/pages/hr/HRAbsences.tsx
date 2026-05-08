@@ -29,7 +29,8 @@ import { ABSENCE_TYPES, ABSENCE_STATUSES } from "@/lib/hrConstants";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface AbsenceRecord {
@@ -412,6 +413,8 @@ export default function HRAbsences() {
   const [editAbsence, setEditAbsence] = useState<AbsenceRecord | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  type KpiKey = "total" | "pendientes" | "esteMes";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
@@ -490,11 +493,11 @@ export default function HRAbsences() {
       {/* ── Scrollable content ───────────────────────────────────────────────── */}
       <div className="flex-1 overflow-auto p-6 space-y-5">
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <DashboardMetricCard label="Total Faltas" value={String(totalFaltas)} icon={AlertTriangle} color="primary" />
-          <DashboardMetricCard label="Pendientes" value={String(pendientes)} icon={Clock} color="warning" />
-          <DashboardMetricCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} color="muted" />
+        {/* KPI Cards — clickeables, abren modal con la lista filtrada */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <KpiCard label="Total Faltas" value={String(totalFaltas)} icon={AlertTriangle} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
+          <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-amber-500" onClick={() => setKpiPopup("pendientes")} />
+          <KpiCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} color="bg-violet-500" onClick={() => setKpiPopup("esteMes")} />
         </div>
 
         {/* Department Tabs */}
@@ -694,6 +697,37 @@ export default function HRAbsences() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Faltas — ${totalFaltas}`;
+            case "pendientes": return `Faltas Pendientes — ${pendientes}`;
+            case "esteMes": return `Faltas Este Mes — ${esteMes}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = absences;
+          if (kpiPopup === "pendientes") list = absences.filter(a => a.status === "pending");
+          else if (kpiPopup === "esteMes") {
+            const now = new Date();
+            const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            list = absences.filter((a: any) => a.start_date && new Date(a.start_date) >= startMonth);
+          }
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "approved" ? "success" : status === "rejected" ? "destructive" : "warning";
+          return list.slice(0, 100).map((a: any): KpiRow => ({
+            primary: a.employee_name ?? `Empleado ${a.employee_id?.slice?.(0, 8) ?? "—"}`,
+            secondary: `${a.absence_type ?? ""} · ${a.start_date ? new Date(a.start_date).toLocaleDateString("es") : "—"}`,
+            right: a.status ?? "—",
+            rightTone: tone(a.status ?? ""),
+          }));
+        })()}
+      />
     </div>
   );
 }

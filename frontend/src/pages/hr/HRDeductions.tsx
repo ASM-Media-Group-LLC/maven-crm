@@ -22,7 +22,8 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { DEDUCTION_DISPLAY_TYPES, DEDUCTION_STATUSES, INFRACTION_CATEGORIES } from "@/lib/hrConstants";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -116,6 +117,8 @@ export default function HRDeductions() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  type KpiKey = "total" | "pending" | "applied" | "amount";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
 
   // Modals
   const [viewItem, setViewItem] = useState<DeductionRecord | null>(null);
@@ -187,10 +190,10 @@ export default function HRDeductions() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total Deducciones" value={String(deductions.length)} icon={DollarSign} subtitle="Todos los registros" color="primary" />
-              <DashboardMetricCard label="Pendientes" value={String(totalPending)} icon={Clock} subtitle={deductions.length > 0 ? `${((totalPending / deductions.length) * 100).toFixed(0)}% del total` : "—"} color="warning" />
-              <DashboardMetricCard label="Aplicadas" value={String(totalApplied)} icon={CheckCircle} subtitle={deductions.length > 0 ? `${((totalApplied / deductions.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
-              <DashboardMetricCard label="Monto Total" value={formatAmount(totalAmount)} icon={Wallet} subtitle="Suma de todas las deducciones" color="destructive" />
+              <KpiCard label="Total Deducciones" value={String(deductions.length)} icon={DollarSign} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Pendientes" value={String(totalPending)} icon={Clock} color="bg-amber-500" subtitle={deductions.length > 0 ? `${((totalPending / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
+              <KpiCard label="Aplicadas" value={String(totalApplied)} icon={CheckCircle} color="bg-emerald-500" subtitle={deductions.length > 0 ? `${((totalApplied / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("applied")} />
+              <KpiCard label="Monto Total" value={formatAmount(totalAmount)} icon={Wallet} color="bg-rose-500" subtitle="Suma de todas las deducciones" onClick={() => setKpiPopup("amount")} />
             </>
           )}
         </div>
@@ -443,6 +446,34 @@ export default function HRDeductions() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Deducciones — ${deductions.length}`;
+            case "pending": return `Pendientes — ${totalPending}`;
+            case "applied": return `Aplicadas — ${totalApplied}`;
+            case "amount": return `Monto Total — ${formatAmount(totalAmount)}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = deductions;
+          if (kpiPopup === "pending") list = deductions.filter((d: any) => d.status === "pending");
+          else if (kpiPopup === "applied") list = deductions.filter((d: any) => d.status === "applied");
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "applied" ? "success" : status === "pending" ? "warning" : "default";
+          return list.slice(0, 100).map((d: any): KpiRow => ({
+            primary: d.employee_name ?? d.reason ?? "Sin concepto",
+            secondary: d.month_year ?? d.deduction_type ?? undefined,
+            right: formatAmount(d.amount || 0),
+            rightTone: tone(d.status ?? ""),
+          }));
+        })()}
+      />
     </div>
   );
 }

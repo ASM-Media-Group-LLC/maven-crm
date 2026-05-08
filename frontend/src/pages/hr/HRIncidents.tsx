@@ -23,7 +23,8 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { INCIDENT_TYPES, INCIDENT_SEVERITIES, INCIDENT_STATUSES } from "@/lib/hrConstants";
 import { SEVERITY_COLORS } from "@/lib/hrAreaUtils";
 import { cn } from "@/lib/utils";
@@ -94,6 +95,8 @@ export default function HRIncidents() {
 
   // Filters
   const [search, setSearch] = useState("");
+  type KpiKey = "total" | "open" | "inProgress" | "critical";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [severityFilter, setSeverityFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [deptTab, setDeptTab] = useState("");
@@ -193,10 +196,10 @@ export default function HRIncidents() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total Incidentes" value={String(incidents.length)} icon={AlertTriangle} subtitle="Todos los registros" color="primary" />
-              <DashboardMetricCard label="Abiertos" value={String(totalOpen)} icon={AlertCircle} subtitle={incidents.length > 0 ? `${((totalOpen / incidents.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
-              <DashboardMetricCard label="En Proceso" value={String(totalInProgress)} icon={Clock} subtitle={incidents.length > 0 ? `${((totalInProgress / incidents.length) * 100).toFixed(0)}% del total` : "—"} color="warning" />
-              <DashboardMetricCard label="Críticos" value={String(totalCritical)} icon={ShieldAlert} subtitle={incidents.length > 0 ? `${((totalCritical / incidents.length) * 100).toFixed(0)}% del total` : "—"} color="destructive" />
+              <KpiCard label="Total Incidentes" value={String(incidents.length)} icon={AlertTriangle} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Abiertos" value={String(totalOpen)} icon={AlertCircle} color="bg-violet-500" subtitle={incidents.length > 0 ? `${((totalOpen / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("open")} />
+              <KpiCard label="En Proceso" value={String(totalInProgress)} icon={Clock} color="bg-amber-500" subtitle={incidents.length > 0 ? `${((totalInProgress / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <KpiCard label="Críticos" value={String(totalCritical)} icon={ShieldAlert} color="bg-rose-500" subtitle={incidents.length > 0 ? `${((totalCritical / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("critical")} />
             </>
           )}
         </div>
@@ -499,6 +502,35 @@ export default function HRIncidents() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Incidentes — ${incidents.length}`;
+            case "open": return `Abiertos — ${totalOpen}`;
+            case "inProgress": return `En Proceso — ${totalInProgress}`;
+            case "critical": return `Críticos — ${totalCritical}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = incidents;
+          if (kpiPopup === "open") list = incidents.filter((i: any) => i.status === "open");
+          else if (kpiPopup === "inProgress") list = incidents.filter((i: any) => i.status === "in_progress");
+          else if (kpiPopup === "critical") list = incidents.filter((i: any) => i.severity === "critical");
+          const tone = (severity: string): KpiRow["rightTone"] =>
+            severity === "critical" ? "destructive" : severity === "high" ? "warning" : "default";
+          return list.slice(0, 100).map((i: any): KpiRow => ({
+            primary: i.title ?? i.description ?? "Sin título",
+            secondary: i.employee_name ?? i.incident_type ?? undefined,
+            right: i.severity ?? i.status ?? "—",
+            rightTone: tone(i.severity ?? ""),
+          }));
+        })()}
+      />
     </div>
   );
 }

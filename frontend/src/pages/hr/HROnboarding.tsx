@@ -23,7 +23,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useDepartments } from "@/hooks/useEmployees";
@@ -128,6 +129,8 @@ export default function HROnboarding() {
   const [statusFilter, setStatusFilter] = useState("");
   const [deptTab, setDeptTab] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  type KpiKey = "total" | "pending" | "inProgress" | "completed";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
 
   const [viewItem, setViewItem] = useState<OnboardingRecord | null>(null);
   const [editItem, setEditItem] = useState<OnboardingRecord | null>(null);
@@ -216,10 +219,10 @@ export default function HROnboarding() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total Onboarding" value={String(onboardings.length)} icon={Users} subtitle="Todos los procesos" color="muted" />
-              <DashboardMetricCard label="Pendientes" value={String(totalPending)} icon={Clock} subtitle={onboardings.length > 0 ? `${((totalPending / onboardings.length) * 100).toFixed(0)}% del total` : "—"} color="primary" />
-              <DashboardMetricCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} subtitle={onboardings.length > 0 ? `${((totalInProgress / onboardings.length) * 100).toFixed(0)}% del total` : "—"} color="warning" />
-              <DashboardMetricCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} subtitle={onboardings.length > 0 ? `${((totalCompleted / onboardings.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
+              <KpiCard label="Total Onboarding" value={String(onboardings.length)} icon={Users} color="bg-blue-500" subtitle="Todos los procesos" onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Pendientes" value={String(totalPending)} icon={Clock} color="bg-violet-500" subtitle={onboardings.length > 0 ? `${((totalPending / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
+              <KpiCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} color="bg-amber-500" subtitle={onboardings.length > 0 ? `${((totalInProgress / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <KpiCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} color="bg-emerald-500" subtitle={onboardings.length > 0 ? `${((totalCompleted / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
             </>
           )}
         </div>
@@ -492,6 +495,35 @@ export default function HROnboarding() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Onboarding — ${onboardings.length}`;
+            case "pending": return `Pendientes — ${totalPending}`;
+            case "inProgress": return `En Progreso — ${totalInProgress}`;
+            case "completed": return `Completados — ${totalCompleted}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = onboardings;
+          if (kpiPopup === "pending") list = onboardings.filter((o: any) => o.status === "pending");
+          else if (kpiPopup === "inProgress") list = onboardings.filter((o: any) => o.status === "in_progress");
+          else if (kpiPopup === "completed") list = onboardings.filter((o: any) => o.status === "completed");
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "completed" ? "success" : status === "in_progress" ? "warning" : "default";
+          return list.slice(0, 100).map((o: any): KpiRow => ({
+            primary: o.employees ? `${o.employees.first_name ?? ""} ${o.employees.last_name ?? ""}`.trim() : "Sin nombre",
+            secondary: o.position ?? o.start_date ? format(new Date(o.start_date), "dd MMM yyyy") : undefined,
+            right: o.status ?? "—",
+            rightTone: tone(o.status ?? ""),
+          }));
+        })()}
+      />
     </div>
   );
 }
