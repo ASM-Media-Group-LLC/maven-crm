@@ -1,5 +1,5 @@
 import * as React from "react";
-import { format, startOfToday, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, parse, isValid } from "date-fns";
+import { format, startOfToday, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, parse, isValid, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
@@ -138,7 +138,13 @@ function DateRangePicker({
   };
 
   const handleApply = () => {
-    onApply(range?.from, range?.to);
+    // Las fechas que vienen del calendario están en hora 00:00 — si el
+    // user pickeó "Hoy" o un solo día, from y to quedan en el mismo
+    // midnight, y la query SQL `created_at <= midnight` matchea 0 rows.
+    // Normalizamos `to` a fin de día (23:59:59.999) para que el rango
+    // sea inclusivo del día completo.
+    const normalizedTo = range?.to ? endOfDay(range.to) : range?.to;
+    onApply(range?.from, normalizedTo);
     setOpen(false);
   };
 
