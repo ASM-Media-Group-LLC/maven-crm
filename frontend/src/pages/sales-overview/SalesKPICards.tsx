@@ -81,7 +81,7 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
               <card.icon className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{card.title}</p>
+              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{card.title}</p>
               <p className="text-3xl font-bold tabular-nums leading-tight">{card.value}</p>
               {card.change !== 0 && (
                 <p className={`text-[10px] mt-1 ${card.change >= 0 ? "text-emerald-500" : "text-destructive"}`}>

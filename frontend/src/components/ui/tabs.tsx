@@ -12,7 +12,9 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
+      // bg-muted/50 + border para igualar el container de las subtabs
+      // custom de /creadores. Antes bg-muted era demasiado opaco.
+      "inline-flex h-10 items-center justify-center rounded-lg border border-border bg-muted/50 p-1 text-muted-foreground",
       className,
     )}
     {...props}
@@ -27,10 +29,11 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      // Hover sutil para tabs inactivas (data-[state=inactive]) para
-      // que el usuario vea que son interactuables — igual que las
-      // subtabs custom basadas en Button con variant="ghost".
-      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all data-[state=inactive]:hover:bg-background/50 data-[state=inactive]:hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+      // Hover visible para tabs inactivas — bg-background/80 + shadow
+      // sutil para que se distinga del bg-muted/50 de TabsList. Mismo
+      // nivel de contraste que las subtabs custom basadas en Button
+      // ghost en /creadores.
+      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all data-[state=inactive]:hover:bg-background/80 data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:shadow-sm data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
       className,
     )}
     {...props}

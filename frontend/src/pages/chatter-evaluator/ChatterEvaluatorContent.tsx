@@ -153,13 +153,20 @@ const ChatterEvaluatorContent = () => {
               Evalúa chatters con perfiles, vault y criterios compartidos.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Workspace siempre visible — es el lugar para sesiones
-                vivas, y el usuario lo abre incluso sin sesiones abiertas
-                para crear una nueva (o continuar una de selectedId
-                pegada en localStorage). El badge con la cuenta solo
-                aparece si hay sesiones activas. */}
-            <Button asChild variant="outline" className="gap-2">
+          <Button onClick={() => setNewSessionOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nueva sesión
+          </Button>
+        </div>
+
+        <NewSessionDialog open={newSessionOpen} onOpenChange={setNewSessionOpen} />
+
+        {/* Subtabs Workspace / History / Admin — reemplazaron el toggle
+            de rango (esta semana / este mes / total) por pedido del
+            usuario. Mismo patrón ghost-button con bg activo que /creadores. */}
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+            <Button asChild variant="ghost" size="sm" className="gap-1.5">
               <Link to="/chatter-evaluator/workspace">
                 <ListChecks className="h-4 w-4" />
                 Workspace
@@ -170,54 +177,20 @@ const ChatterEvaluatorContent = () => {
                 )}
               </Link>
             </Button>
-            <Button asChild variant="outline" className="gap-2">
+            <Button asChild variant="ghost" size="sm" className="gap-1.5">
               <Link to="/chatter-evaluator/history">
                 <HistoryIcon className="h-4 w-4" />
                 History
               </Link>
             </Button>
             {canSeeAdmin && (
-              <Button asChild variant="outline" className="gap-2">
+              <Button asChild variant="ghost" size="sm" className="gap-1.5">
                 <Link to="/chatter-evaluator/admin">
                   <Settings className="h-4 w-4" />
                   Admin
                 </Link>
               </Button>
             )}
-            <Button onClick={() => setNewSessionOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nueva sesión
-            </Button>
-          </div>
-        </div>
-
-        <NewSessionDialog open={newSessionOpen} onOpenChange={setNewSessionOpen} />
-
-        {/* Stats reales del History — toggle de rango (esta semana /
-            este mes / total) actúa solo sobre los 4 cajones; los charts
-            de abajo mantienen su ventana fija. */}
-        <div className="space-y-3">
-          <div className="inline-flex rounded-lg border border-border bg-card p-1 text-xs">
-            {(
-              [
-                { key: "week", label: "Esta semana" },
-                { key: "month", label: "Este mes" },
-                { key: "all", label: "Total" },
-              ] as Array<{ key: StatsRange; label: string }>
-            ).map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setStatsRange(key)}
-                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
-                  statsRange === key
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard

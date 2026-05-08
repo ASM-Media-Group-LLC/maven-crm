@@ -702,7 +702,7 @@ const Dashboard2 = () => {
                         <Repeat className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Retención</p>
+                        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Retención</p>
                         <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.renewalRate.toFixed(1)}%</p>
                         <p className="text-[10px] text-muted-foreground mt-1">Tasa de renovación</p>
                       </div>
@@ -721,7 +721,7 @@ const Dashboard2 = () => {
                         <Users className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Creadoras</p>
+                        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Creadoras</p>
                         <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.activeCount}</p>
                         <p className="text-[10px] text-muted-foreground mt-1">
                           {hlKpis.zeroCreators} inactivas
@@ -739,7 +739,7 @@ const Dashboard2 = () => {
                         <TrendingUp className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">ARPC</p>
+                        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">ARPC</p>
                         <p className="text-3xl font-bold tabular-nums leading-tight">{fmtK(hlKpis.avgPerCreator)}</p>
                         <p className="text-[10px] text-muted-foreground mt-1">Avg Revenue / Creator</p>
                       </div>
@@ -754,7 +754,7 @@ const Dashboard2 = () => {
                         <Heart className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">$/Fan</p>
+                        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">$/Fan</p>
                         <p className="text-3xl font-bold tabular-nums leading-tight">${hlKpis.avgPerFanGlobal.toFixed(2)}</p>
                         <p className="text-[10px] text-muted-foreground mt-1">{hlKpis.totalFansAll.toLocaleString()} fans</p>
                       </div>
@@ -788,7 +788,7 @@ const Dashboard2 = () => {
                           que la card iguale en altura a Eficiencia sin
                           dejar un hueco vacío abajo. */}
                       <div className="flex-1 flex flex-col justify-center mt-3">
-                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Revenue Bruto</p>
+                        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Revenue Bruto</p>
                         <p className="text-5xl font-bold tabular-nums leading-tight tracking-tight">{fmtK(grandTotal)}</p>
                       </div>
                       <div className="flex items-center justify-between gap-2 pt-3 mt-auto border-t border-border/50 text-xs">
@@ -1494,7 +1494,7 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${item.color}`}>{item.icon}</div>
                             <div>
-                              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{item.label}</p>
+                              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{item.label}</p>
                               <p className="text-3xl font-bold tabular-nums leading-tight">{item.value}</p>
                               <p className="text-[10px] text-muted-foreground mt-1">{item.sub}</p>
                             </div>
@@ -1519,7 +1519,7 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500"><Crown className="h-5 w-5 text-white" /></div>
                             <div>
-                              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Top creadora</p>
+                              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Top creadora</p>
                               <p className="text-sm font-bold truncate">{hlKpis.topCreator?.name || "—"}</p>
                               <p className="text-2xl font-bold tabular-nums text-amber-500 leading-tight">{hlKpis.topCreator ? fmt(hlKpis.topCreator.total) : "$0"}</p>
                             </div>
@@ -1531,7 +1531,7 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500"><Target className="h-5 w-5 text-white" /></div>
                             <div>
-                              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Promedio</p>
+                              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Promedio</p>
                               <p className="text-3xl font-bold tabular-nums leading-tight">{fmt(hlKpis.avgPerCreator)}</p>
                               <p className="text-[10px] text-muted-foreground mt-1">{hlKpis.activeCount} activas</p>
                             </div>
@@ -1543,7 +1543,7 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive"><AlertTriangle className="h-5 w-5 text-white" /></div>
                             <div>
-                              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Inactivas</p>
+                              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Inactivas</p>
                               <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.zeroCreators}</p>
                               <p className="text-[10px] text-muted-foreground mt-1">$0 en ventas</p>
                             </div>
@@ -1555,7 +1555,7 @@ const Dashboard2 = () => {
                           <div className="relative space-y-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500"><TrendingUp className="h-5 w-5 text-white" /></div>
                             <div>
-                              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Distribución</p>
+                              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Distribución</p>
                               <p className="text-base font-bold tabular-nums leading-tight">{hlKpis.creatorsOver10k} <span className="text-muted-foreground font-normal text-xs">{'>'} $10k</span></p>
                               <p className="text-base font-bold tabular-nums leading-tight">{hlKpis.creatorsUnder1k} <span className="text-muted-foreground font-normal text-xs">{'<'} $1k</span></p>
                             </div>

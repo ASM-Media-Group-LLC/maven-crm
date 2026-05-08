@@ -202,7 +202,7 @@ const CreadorasDashboardContent = () => {
                     <Icon className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
+                    <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{label}</p>
                     <p className="text-3xl font-bold tabular-nums leading-tight">{count}</p>
                     <p className="text-[10px] text-muted-foreground mt-1">{pct}% del total</p>
                   </div>

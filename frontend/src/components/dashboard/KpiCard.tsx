@@ -25,9 +25,13 @@ const KpiCard = ({ label, value, subtitle, icon: Icon, color = "bg-blue-500", on
           <Icon className="h-5 w-5 text-white" />
         </div>
         <div>
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
+          {/* Label visible — antes era text-[11px] muted que se perdía
+              en cards densos. Ahora text-xs + foreground/80 con peso
+              semibold para destacar como título de la card sin competir
+              con el value. */}
+          <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{label}</p>
           <p className="text-3xl font-bold tabular-nums leading-tight">{value}</p>
-          {subtitle && <p className="text-[10px] text-muted-foreground mt-1">{subtitle}</p>}
+          {subtitle && <p className="text-[11px] text-muted-foreground mt-1">{subtitle}</p>}
         </div>
       </div>
     </>

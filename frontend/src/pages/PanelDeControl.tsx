@@ -94,7 +94,7 @@ const KpiCard = ({
         {icon}
       </div>
       <div>
-        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
           {label}
         </p>
         {loading ? (
@@ -567,7 +567,7 @@ const PanelDeControl = () => {
         >
           <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-30 bg-indigo-500 transition-opacity group-hover:opacity-50" />
           <div className="relative">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+            <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
               Total leads generados
             </p>
             <div className="flex items-end gap-3 mt-2">
@@ -589,7 +589,7 @@ const PanelDeControl = () => {
         >
           <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-30 bg-cyan-500 transition-opacity group-hover:opacity-50" />
           <div className="relative">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+            <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
               Tasa de números obtenidos por lead
             </p>
             <div className="flex items-end gap-3 mt-2">
@@ -630,7 +630,7 @@ const PanelDeControl = () => {
               <TrendingUp className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
                 Tasa de números obtenidos
               </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">
@@ -652,7 +652,7 @@ const PanelDeControl = () => {
               <TrendingUp className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
                 Tasa de cierre
               </p>
               <p className="text-3xl font-bold tabular-nums leading-tight">
