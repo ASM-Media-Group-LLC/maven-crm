@@ -707,10 +707,12 @@ const Dashboard2 = () => {
                 </div>
               )}
 
-              {/* Row 2: Retención (1/3) + Revenue Mix (2/3) — Mix tiene
-                  el chart estiled con más espacio que antes. */}
+              {/* Row 2: Retención (1/3) + Eficiencia de Monetización (2/3).
+                  items-start evita que Retención se estire para emparejar
+                  la altura de la card de Eficiencia (que es bastante más
+                  alta por las barras + nuevas/recurrentes). */}
               {!isLoading && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
                   {/* Retention — derived metric */}
                   <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
                     <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-cyan-500" />
