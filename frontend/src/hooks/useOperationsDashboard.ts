@@ -4,14 +4,24 @@ import { supabase } from "@/integrations/supabase/client";
 const sb = supabase as unknown as { from: (table: string) => any };
 
 export interface OperationsKpis {
-  contacted: number;       // 1. LLG contacta IG (rows en leadgen_entries)
-  numbersObtained: number; // 2. Número en cualquiera de las 2 tablas
-  closerCalls: number;     // 3. Llamadas para cierre (qa_calls)
-  closes: number;          // 4. Cerró (call_outcome=cerro)
-  onHold: number;          // 5. En espera (call_outcome=en_espera)
-  rejections: number;      // 6. Rechazos (call_outcome=no_cerro)
-  enteredCrm: number;      // 7. Ingresada al CRM (creators.entered_crm_at)
-  totalLeads: number;      // 8. Total leads = leadgen + scouter (sum)
+  // LLG team contactó (solo `leadgen_entries`).
+  contacted: number;
+  // Scouter team encontró (solo `scouter_leads`).
+  scouterContacts: number;
+  // LLG con teléfono capturado.
+  llgWithPhone: number;
+  // Scouter con teléfono capturado.
+  scouterWithPhone: number;
+  // Cross-team (leadgen+phone + scouter+phone). Subset estricto de
+  // `totalLeads` — todo modelo contactado por cualquier equipo cuyo
+  // teléfono ya fue capturado.
+  numbersObtained: number;
+  closerCalls: number;     // Llamadas para cierre (qa_calls — closer crea New QA)
+  closes: number;          // Cerró (call_outcome=cerro)
+  onHold: number;          // En espera (call_outcome=en_espera)
+  rejections: number;      // Rechazos (call_outcome=no_cerro)
+  enteredCrm: number;      // Ingresada al CRM (creators.entered_crm_at)
+  totalLeads: number;      // LLG + Scouter — el verdadero "total contactadas"
 }
 
 export type MetricKey =
@@ -50,6 +60,12 @@ export const useOperationsDashboard = (range: DashboardRange) =>
         return q;
       };
 
+      // "Números obtenidos" = primera captura de teléfono dentro del
+      // rango. Filtramos por `phone_first_set_at` (seteado por trigger
+      // sólo en la transición NULL→no-NULL, jamás sobrescrito) en lugar
+      // de `created_at` + phone IS NOT NULL — eso conflaciona la
+      // creación del lead con la captura del número y cuenta de más
+      // cuando se edita o se borra-y-reagrega el teléfono.
       const [
         { count: contacted },
         { count: leadgenWithPhone },
@@ -62,9 +78,13 @@ export const useOperationsDashboard = (range: DashboardRange) =>
         { count: enteredCrm },
       ] = await Promise.all([
         head("leadgen_entries", "created_at"),
-        head("leadgen_entries", "created_at", (q) => q.not("phone_e164", "is", null)),
+        head("leadgen_entries", "phone_first_set_at", (q) =>
+          q.not("phone_first_set_at", "is", null),
+        ),
         head("scouter_leads",   "created_at"),
-        head("scouter_leads",   "created_at", (q) => q.not("phone", "is", null)),
+        head("scouter_leads",   "phone_first_set_at", (q) =>
+          q.not("phone_first_set_at", "is", null),
+        ),
         head("qa_calls", "call_date"),
         head("qa_calls", "call_date", (q) =>
           q.eq("claude_analysis->>call_outcome", "cerro"),
@@ -82,6 +102,9 @@ export const useOperationsDashboard = (range: DashboardRange) =>
 
       return {
         contacted: contacted ?? 0,
+        scouterContacts: scouterTotal ?? 0,
+        llgWithPhone: leadgenWithPhone ?? 0,
+        scouterWithPhone: scouterWithPhone ?? 0,
         numbersObtained: (leadgenWithPhone ?? 0) + (scouterWithPhone ?? 0),
         closerCalls: closerCalls ?? 0,
         closes: closes ?? 0,
@@ -184,27 +207,30 @@ export const useMetricDetails = (
           );
         }
         case "numbersObtained": {
+          // Listamos por phone_first_set_at (primera captura) — coincide
+          // con el conteo del KPI. La fecha mostrada es la captura del
+          // número, NO la creación del lead.
           const q1 = sb
             .from("leadgen_entries")
-            .select("id, model_handle, phone_e164, created_at")
-            .not("phone_e164", "is", null)
-            .order("created_at", { ascending: false })
+            .select("id, model_handle, phone_e164, phone_first_set_at")
+            .not("phone_first_set_at", "is", null)
+            .order("phone_first_set_at", { ascending: false })
             .limit(50);
           const q2 = sb
             .from("scouter_leads")
-            .select("id, instagram_handle, phone, created_at")
-            .not("phone", "is", null)
-            .order("created_at", { ascending: false })
+            .select("id, instagram_handle, phone, phone_first_set_at")
+            .not("phone_first_set_at", "is", null)
+            .order("phone_first_set_at", { ascending: false })
             .limit(50);
           const [{ data: a }, { data: b }] = await Promise.all([
-            dateLte(dateGte(q1, "created_at"), "created_at"),
-            dateLte(dateGte(q2, "created_at"), "created_at"),
+            dateLte(dateGte(q1, "phone_first_set_at"), "phone_first_set_at"),
+            dateLte(dateGte(q2, "phone_first_set_at"), "phone_first_set_at"),
           ]);
           const aRows = (a ?? []).map((r: any) => ({
             id: r.id,
             primary: `@${r.model_handle ?? "?"}`,
             secondary: `📞 ${r.phone_e164}`,
-            date: r.created_at,
+            date: r.phone_first_set_at,
             badge: "leadgen",
             leadSource: "leadgen" as const,
           }));
@@ -212,7 +238,7 @@ export const useMetricDetails = (
             id: r.id,
             primary: `@${r.instagram_handle ?? "?"}`,
             secondary: `📞 ${r.phone}`,
-            date: r.created_at,
+            date: r.phone_first_set_at,
             badge: "scouter",
             leadSource: "scouter" as const,
           }));

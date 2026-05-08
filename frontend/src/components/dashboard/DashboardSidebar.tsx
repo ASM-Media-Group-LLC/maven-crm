@@ -24,6 +24,7 @@ import {
   Sidebar, SidebarContent,
   SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub,
   SidebarMenuSubItem, SidebarMenuSubButton, SidebarFooter, SidebarSeparator, useSidebar,
+  SidebarGroup, SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -735,33 +736,29 @@ const DashboardSidebar = () => {
             the left rail focused on day-to-day operational tabs. */}
 
         {/* Panel de control — top-level tab justo después de RRHH.
-            Match exacto al estilo de los CollapsibleSidebarGroup labels
-            (text-[11px] font-semibold uppercase tracking-wider) para
-            que visualmente sea otro "tab" y no se vea más grande/bold. */}
+            Mismo DOM que un SidebarGroupLabel de CollapsibleSidebarGroup
+            (no SidebarMenuButton) para que el peso visual coincida con
+            los headers de sección (MENU / OPERACIONES / FINANZAS / RRHH)
+            y no se vea más bold/brighter. */}
         {canAccess("Panel de control") && (
-          <SidebarMenu className="px-2 py-0.5">
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                tooltip="Panel de control"
-                className="h-auto py-1.5"
+          <SidebarGroup>
+            <SidebarGroupLabel asChild>
+              <NavLink
+                to="/panel-de-control"
+                title="Panel de control"
+                className={({ isActive }) =>
+                  `group/label flex w-full cursor-pointer items-center gap-2 rounded-md text-[11px] font-semibold uppercase tracking-wider transition-colors hover:!text-foreground hover:bg-foreground/5 ${
+                    isActive
+                      ? "!text-foreground bg-foreground/5"
+                      : "!text-foreground/80"
+                  }`
+                }
               >
-                <NavLink
-                  to="/panel-de-control"
-                  className={({ isActive }) =>
-                    `flex items-center gap-2 rounded-md text-[11px] font-semibold uppercase tracking-wider transition-colors hover:bg-foreground/5 ${
-                      isActive
-                        ? "!text-foreground bg-foreground/5"
-                        : "!text-foreground/80 hover:!text-foreground"
-                    }`
-                  }
-                >
-                  <BarChart3 className="h-4 w-4 shrink-0" />
-                  <span>Panel de control</span>
-                </NavLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
+                <BarChart3 className="h-3.5 w-3.5 shrink-0 opacity-70 transition-opacity group-hover/label:opacity-100" />
+                <span className="flex-1 text-left">Panel de control</span>
+              </NavLink>
+            </SidebarGroupLabel>
+          </SidebarGroup>
         )}
       </SidebarContent>
 

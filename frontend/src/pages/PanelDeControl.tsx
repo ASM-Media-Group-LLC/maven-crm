@@ -47,6 +47,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   useOperationsDashboard,
   useMetricDetails,
@@ -582,6 +583,9 @@ const PanelDeControl = () => {
 
   const k = data ?? {
     contacted: 0,
+    scouterContacts: 0,
+    llgWithPhone: 0,
+    scouterWithPhone: 0,
     numbersObtained: 0,
     closerCalls: 0,
     closes: 0,
@@ -597,10 +601,12 @@ const PanelDeControl = () => {
       ? Math.round((k.numbersObtained / k.totalLeads) * 1000) / 10
       : 0;
 
-  // Data para el bar chart del funnel
+  // Bar chart del funnel — todo cross-team. "Contactadas" = LLG+Scouter
+  // (= totalLeads). "Núm. obtenidos" = numbersObtained (combinado). La
+  // cadena queda monotónicamente decreciente porque numbersObtained es
+  // subset de totalLeads, closerCalls subset de numbersObtained, etc.
   const funnelChartData = [
-    { stage: "Total Leads",     value: k.totalLeads,       fill: "#6366f1" },
-    { stage: "LLG Contactó",    value: k.contacted,        fill: "#3b82f6" },
+    { stage: "Contactadas",     value: k.totalLeads,       fill: "#3b82f6" },
     { stage: "Núm. obtenidos",  value: k.numbersObtained,  fill: "#06b6d4" },
     { stage: "Llamadas",        value: k.closerCalls,      fill: "#8b5cf6" },
     { stage: "Cierres",         value: k.closes,           fill: "#10b981" },
@@ -616,12 +622,12 @@ const PanelDeControl = () => {
     hint: string;
   }> = [
     {
-      key: "contacted",
-      label: "Contactados por LLGs",
-      value: k.contacted,
+      key: "totalLeads",
+      label: "Modelos contactadas",
+      value: k.totalLeads,
       icon: <Users className="h-5 w-5 text-white" />,
       gradient: "bg-blue-500",
-      hint: "Leads que un LLG cargó manualmente",
+      hint: `LLG: ${k.contacted.toLocaleString("es")} · Scouter: ${k.scouterContacts.toLocaleString("es")}`,
     },
     {
       key: "numbersObtained",
@@ -629,7 +635,7 @@ const PanelDeControl = () => {
       value: k.numbersObtained,
       icon: <Phone className="h-5 w-5 text-white" />,
       gradient: "bg-cyan-500",
-      hint: "LLG o scouter cargó el teléfono",
+      hint: `LLG: ${k.llgWithPhone.toLocaleString("es")} · Scouter: ${k.scouterWithPhone.toLocaleString("es")}`,
     },
     {
       key: "closerCalls",
@@ -673,8 +679,12 @@ const PanelDeControl = () => {
     },
   ];
 
+  // Tasa de cierre = cierres / total de llamadas. "En espera" y "rechazos"
+  // ambos cuentan como NO cerrado, así que el denominador correcto es
+  // closerCalls (el universo de llamadas) — no `contacted` (que es el
+  // funnel arriba, mucho más ancho y produce % engañosamente bajo).
   const conversionRate =
-    k.contacted > 0 ? Math.round((k.closes / k.contacted) * 1000) / 10 : 0;
+    k.closerCalls > 0 ? Math.round((k.closes / k.closerCalls) * 1000) / 10 : 0;
 
   const activeMetricLabel =
     cards.find((c) => c.key === openMetric)?.label ?? "";
@@ -683,60 +693,36 @@ const PanelDeControl = () => {
 
   return (
     <div className="space-y-5 p-6">
-      {/* Header + tabs row + date range */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Panel de control</h1>
-            <p className="text-sm text-muted-foreground">
-              Funnel operativo en tiempo real — desde el contacto LLG hasta ingresos al CRM.
-            </p>
-          </div>
-          <DateRangeButton range={range} onChange={setRange} />
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Panel de control</h1>
+          <p className="text-sm text-muted-foreground">
+            Funnel operativo en tiempo real — desde el contacto LLG hasta ingresos al CRM.
+          </p>
         </div>
-
-        {/* Subtabs — estilo similar al pattern de Scouter Assist */}
-        <div className="flex items-center gap-1 border-b border-border">
-          <button
-            type="button"
-            onClick={() => setTab("modelos")}
-            className={cn(
-              "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
-              tab === "modelos"
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            Reclutamiento modelos
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("chatters")}
-            className={cn(
-              "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
-              tab === "chatters"
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            Reclutamiento chatters
-          </button>
-        </div>
+        <DateRangeButton range={range} onChange={setRange} />
       </div>
 
-      {tab === "chatters" ? (
-        <Card className="p-12 text-center space-y-3">
-          <div className="mx-auto h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-            <Building2 className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h2 className="text-lg font-semibold">Reclutamiento de chatters</h2>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Pantalla en construcción. Acá vamos a mostrar el funnel de
-            reclutamiento de chatters — contactos, entrevistas, contrataciones.
-          </p>
-        </Card>
-      ) : (
-        <>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "modelos" | "chatters")}>
+        <TabsList>
+          <TabsTrigger value="modelos">Reclutamiento modelos</TabsTrigger>
+          <TabsTrigger value="chatters">Reclutamiento chatters</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="chatters" className="mt-4">
+          <Card className="p-12 text-center space-y-3">
+            <div className="mx-auto h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+              <Building2 className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h2 className="text-lg font-semibold">Reclutamiento de chatters</h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Pantalla en construcción. Acá vamos a mostrar el funnel de
+              reclutamiento de chatters — contactos, entrevistas, contrataciones.
+            </p>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="modelos" className="mt-4 space-y-5">
       {/* Hero metrics: Total leads + phone rate — destacadas + clickeables */}
       <div className="grid gap-3 sm:grid-cols-2">
         <button
@@ -817,20 +803,18 @@ const PanelDeControl = () => {
                 <span className="text-lg text-muted-foreground">%</span>
               </p>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Cierres / Contactados
+                Cierres / Llamadas ({k.closes}/{k.closerCalls})
               </p>
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Funnel visual flow */}
+      {/* Funnel visual flow — cross-team. "Contactadas" = LLG+Scouter. */}
       <Card className="p-4">
         <h2 className="text-sm font-semibold mb-3">Flujo del funnel</h2>
         <div className="flex items-center gap-2 flex-wrap text-xs">
-          <FunnelStep label="Total leads" value={k.totalLeads} color="text-indigo-400" />
-          <ArrowRight className="h-3 w-3 text-muted-foreground" />
-          <FunnelStep label="Contactados" value={k.contacted} color="text-blue-400" />
+          <FunnelStep label="Contactadas" value={k.totalLeads} color="text-blue-400" />
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
           <FunnelStep label="Con número" value={k.numbersObtained} color="text-cyan-400" />
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
@@ -890,8 +874,8 @@ const PanelDeControl = () => {
         metricLabel={activeMetricLabel}
         range={range}
       />
-        </>
-      )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
