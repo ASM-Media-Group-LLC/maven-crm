@@ -59,86 +59,52 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useCurrentTenantId } from "@/hooks/useAgencyQa";
 import { toast } from "sonner";
 
-// ─── AI Enhancement via Groq (through Supabase edge fn or direct) ────
-// We call Groq directly from the frontend using the same pattern as the
-// worker scorer — but with a different prompt that generates search config
-// from the company description.
+// ─── Asistente conversacional via edge fn `scouter-company-fill` ─────
+// Reemplaza el one-shot Groq llama-3.1-8b que daba siempre la misma
+// config genérica. Ahora la edge function (Gemini 2.5 flash) puede
+// devolver una pregunta hacia el admin si le falta info crítica, o el
+// config final cuando tiene suficiente.
 
-const AI_SEARCH_CONFIG_PROMPT = `Sos un experto en discovery de creadores de contenido para agencias de management.
-
-Te doy el nombre y descripción de una compañía/marca. Tu trabajo es generar la configuración de búsqueda óptima para encontrar leads en Instagram que encajen con esta compañía.
-
-Devuelve EXCLUSIVAMENTE un JSON sin markdown:
-{
-  "hashtags": ["hashtag1", "hashtag2", ...],      // 5-10 hashtags relevantes (sin #)
-  "seed_accounts": ["@handle1", "@handle2", ...],  // 3-5 cuentas semilla de referencia del nicho
-  "followers_min": 10000,                           // mínimo de followers
-  "followers_max": 500000,                          // máximo de followers
-  "content_type": "adult" | "fitness" | "lifestyle" | "mixed",
-  "profile_tier": "micro" | "mid" | "macro" | "mega",
-  "geo_targets": ["LATAM", "US", ...],             // regiones objetivo
-  "bio_keywords": ["keyword1", "keyword2", ...],    // palabras clave a buscar en bios
-  "exclude_keywords": ["bot", "spam", ...],         // palabras a excluir
-  "scoring_notes": "Notas adicionales para el scorer IA (max 50 palabras)"
+interface AssistantTurn {
+  role: "user" | "assistant";
+  content: string;
 }
 
-Profile tiers: micro=10k-50k, mid=50k-500k, macro=500k-2M, mega=2M+
-Si la compañía busca "perfil bajo" o "emergentes", usa micro o mid con followers_max bajo.
-Si busca "premium" o "top", usa macro o mega.`;
+interface AssistantResponse {
+  ready: boolean;
+  question?: string;
+  missing_field?: string;
+  config?: CompanySearchConfig;
+  summary?: string;
+}
 
-async function generateSearchConfig(
-  companyName: string,
-  description: string,
-): Promise<CompanySearchConfig> {
-  // Try to get Groq key from Supabase app_settings or use a fallback
-  // For now we'll call through a simple RPC or use the key from env
-  // In production this should be a Supabase Edge Function
-  const { data: settings } = await (supabase as any)
-    .from("app_settings")
-    .select("value")
-    .eq("key", "groq_api_key")
-    .maybeSingle();
-
-  const groqKey = settings?.value || import.meta.env.VITE_GROQ_API_KEY;
-
-  if (!groqKey) {
-    throw new Error(
-      "No se encontró GROQ_API_KEY. Configurá VITE_GROQ_API_KEY en el .env del frontend o agregá 'groq_api_key' en app_settings.",
-    );
-  }
-
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${groqKey}`,
-      "Content-Type": "application/json",
+async function callFillAssistant(args: {
+  name: string;
+  description: string;
+  current_config: CompanySearchConfig;
+  messages: AssistantTurn[];
+}): Promise<AssistantResponse> {
+  const { data, error } = await supabase.functions.invoke<AssistantResponse>(
+    "scouter-company-fill",
+    {
+      body: {
+        name: args.name,
+        description: args.description,
+        current_config: args.current_config,
+        messages: args.messages,
+      },
     },
-    body: JSON.stringify({
-      model: "llama-3.1-8b-instant",
-      response_format: { type: "json_object" },
-      temperature: 0.3,
-      max_tokens: 800,
-      messages: [
-        { role: "system", content: AI_SEARCH_CONFIG_PROMPT },
-        {
-          role: "user",
-          content: `Compañía: ${companyName}\nDescripción: ${description}`,
-        },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Groq error ${res.status}: ${body.slice(0, 200)}`);
+  );
+  if (error) {
+    const detail = (error as any)?.context?.body
+      ? await (error as any).context.body
+          .text()
+          .catch(() => null)
+      : null;
+    throw new Error(detail || error.message || "Error invocando asistente");
   }
-
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const raw = data.choices?.[0]?.message?.content ?? "";
-  const parsed = JSON.parse(raw) as CompanySearchConfig;
-  return { ...parsed, ai_generated_at: new Date().toISOString() };
+  if (!data) throw new Error("Respuesta vacía del asistente");
+  return data;
 }
 
 // ─── Tag input helper ────────────────────────────────────────────────
@@ -213,6 +179,12 @@ const CompanyFormModal = ({
   const [newTag, setNewTag] = useState("");
   const [newSeed, setNewSeed] = useState("");
 
+  // Conversacional fill state
+  const [chatMessages, setChatMessages] = useState<AssistantTurn[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+
   const createCompany = useCreateCompany();
   const updateCompany = useUpdateCompany();
   const isEditing = !!companyId;
@@ -224,34 +196,123 @@ const CompanyFormModal = ({
     setForm((f) => ({ ...f, search_config: { ...f.search_config, ...patch } }));
   };
 
-  const handleAiEnhance = useCallback(async () => {
-    if (!form.description.trim()) return;
+  // Procesa la respuesta del asistente: si vino una pregunta, la
+  // acumula en el chat; si vino el config final, popula el form.
+  const processAssistantResponse = useCallback(
+    (resp: AssistantResponse) => {
+      if (resp.ready && resp.config) {
+        setForm((f) => ({
+          ...f,
+          search_config: {
+            ...resp.config,
+            ai_generated_at: new Date().toISOString(),
+          } as CompanySearchConfig,
+        }));
+        setAiSummary(resp.summary || "Configuración generada.");
+        setChatMessages((m) => [
+          ...m,
+          {
+            role: "assistant",
+            content: resp.summary
+              ? `✓ Listo. ${resp.summary}`
+              : "✓ Configuración generada.",
+          },
+        ]);
+        toast.success("Configuración generada por IA");
+      } else if (resp.question) {
+        setChatMessages((m) => [
+          ...m,
+          { role: "assistant", content: resp.question! },
+        ]);
+      }
+    },
+    [],
+  );
+
+  const startAiChat = useCallback(async () => {
+    if (!form.description.trim() && !form.name.trim()) {
+      toast.error("Escribí al menos el nombre o descripción de la compañía");
+      return;
+    }
+    setChatOpen(true);
+    setChatMessages([]);
+    setAiSummary(null);
     setAiLoading(true);
     try {
-      const config = await generateSearchConfig(form.name, form.description);
-      setForm((f) => ({ ...f, search_config: config }));
-    } catch (e) {
-      console.error("AI enhancement failed:", e);
-      // Fallback: fill with reasonable defaults based on description
-      const desc = form.description.toLowerCase();
-      const isAdult = desc.includes("adulto") || desc.includes("onlyfans") || desc.includes("of ");
-      const isLowProfile = desc.includes("bajo perfil") || desc.includes("emergente") || desc.includes("micro");
-      updateConfig({
-        content_type: isAdult ? "adult" : "mixed",
-        profile_tier: isLowProfile ? "micro" : "mid",
-        followers_min: isLowProfile ? 5000 : 50000,
-        followers_max: isLowProfile ? 100000 : 500000,
-        hashtags: isAdult
-          ? ["onlyfansmodel", "contentcreator", "linkinbio", "fansly", "exclusivecontent"]
-          : ["influencer", "contentcreator", "model", "lifestyle"],
-        geo_targets: ["LATAM", "US"],
-        scoring_notes: `Generado por fallback para: ${form.name}`,
-        ai_generated_at: new Date().toISOString(),
+      const resp = await callFillAssistant({
+        name: form.name,
+        description: form.description,
+        current_config: form.search_config,
+        messages: [],
       });
+      processAssistantResponse(resp);
+    } catch (e) {
+      const msg = (e as Error).message || "Error invocando asistente";
+      console.error("AI assistant failed:", e);
+      toast.error(msg);
+      setChatMessages([{ role: "assistant", content: `Error: ${msg}` }]);
     } finally {
       setAiLoading(false);
     }
-  }, [form.name, form.description]);
+  }, [form.name, form.description, form.search_config, processAssistantResponse]);
+
+  const sendChatReply = useCallback(async () => {
+    const reply = chatInput.trim();
+    if (!reply || aiLoading) return;
+    const next: AssistantTurn[] = [
+      ...chatMessages,
+      { role: "user", content: reply },
+    ];
+    setChatMessages(next);
+    setChatInput("");
+    setAiLoading(true);
+    try {
+      const resp = await callFillAssistant({
+        name: form.name,
+        description: form.description,
+        current_config: form.search_config,
+        messages: next,
+      });
+      processAssistantResponse(resp);
+    } catch (e) {
+      const msg = (e as Error).message || "Error invocando asistente";
+      console.error("AI assistant failed:", e);
+      toast.error(msg);
+      setChatMessages((m) => [...m, { role: "assistant", content: `Error: ${msg}` }]);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [chatInput, chatMessages, aiLoading, form.name, form.description, form.search_config, processAssistantResponse]);
+
+  const finalizeWithBestEffort = useCallback(async () => {
+    if (aiLoading) return;
+    const next: AssistantTurn[] = [
+      ...chatMessages,
+      {
+        role: "user",
+        content: "Llená la config con la mejor inferencia que tengas con la info actual; no preguntes más. Si dudás, dejá las dudas en scoring_notes.",
+      },
+    ];
+    setChatMessages(next);
+    setAiLoading(true);
+    try {
+      const resp = await callFillAssistant({
+        name: form.name,
+        description: form.description,
+        current_config: form.search_config,
+        messages: next,
+      });
+      processAssistantResponse(resp);
+    } catch (e) {
+      const msg = (e as Error).message || "Error invocando asistente";
+      toast.error(msg);
+      setChatMessages((m) => [...m, { role: "assistant", content: `Error: ${msg}` }]);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [aiLoading, chatMessages, form.name, form.description, form.search_config, processAssistantResponse]);
+
+  const handleAiEnhance = startAiChat; // backward-compat para el botón existente
 
   const handleSave = async () => {
     const slug = form.slug.trim() || form.name.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
@@ -362,6 +423,91 @@ const CompanyFormModal = ({
               className="min-h-[80px]"
             />
           </div>
+
+          {/* Chat conversacional con el asistente IA */}
+          {chatOpen && (
+            <div className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                  <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider">
+                    Asistente IA · Gemini 2.5 Flash
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-[11px]"
+                  onClick={() => setChatOpen(false)}
+                  disabled={aiLoading}
+                >
+                  Cerrar
+                </Button>
+              </div>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {chatMessages.map((m, i) => (
+                  <div
+                    key={i}
+                    className={`text-xs px-3 py-2 rounded-md ${
+                      m.role === "assistant"
+                        ? "bg-card border border-border"
+                        : "bg-amber-400/10 border border-amber-400/20 ml-6"
+                    }`}
+                  >
+                    <span className="font-medium opacity-70 text-[10px] uppercase tracking-wider mr-2">
+                      {m.role === "assistant" ? "IA" : "Vos"}
+                    </span>
+                    {m.content}
+                  </div>
+                ))}
+                {aiLoading && (
+                  <div className="text-xs px-3 py-2 rounded-md bg-card border border-border opacity-60">
+                    <Loader2 className="h-3 w-3 animate-spin inline mr-2" />
+                    Pensando…
+                  </div>
+                )}
+              </div>
+
+              {!aiSummary && (
+                <div className="flex items-end gap-2">
+                  <Textarea
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendChatReply();
+                      }
+                    }}
+                    placeholder="Respondé la pregunta…"
+                    className="min-h-[40px] max-h-[120px] text-xs"
+                    disabled={aiLoading}
+                  />
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      onClick={sendChatReply}
+                      disabled={aiLoading || !chatInput.trim()}
+                      className="h-7 text-xs"
+                    >
+                      Enviar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={finalizeWithBestEffort}
+                      disabled={aiLoading || chatMessages.length === 0}
+                      className="h-7 text-[11px]"
+                      title="Llenar con la mejor inferencia disponible"
+                    >
+                      Llená igual
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* AI-generated search config (visible after enhancement) */}
           {cfg.ai_generated_at && (

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bot, Minus, X } from "lucide-react";
 import ClariAiChat from "./ClariAiChat";
+import { useAiConversations } from "@/hooks/useAiConversations";
 
 // ClariAvatar — círculo con la imagen del personaje en /clari-avatar.png.
 // Si la imagen falla a cargar (404, network), cae a un Bot icon sobre
@@ -54,6 +55,32 @@ const ClariAiFab = () => {
   // de unread events todavía.
   const [open, setOpen] = useState(false);
   const [hasActivity, setHasActivity] = useState(false);
+  // Persistir el historial conversacional. La conversación se auto-crea
+  // al abrir Clari por primera vez en esta sesión y los mensajes
+  // quedan en `ai_messages`. Un cron de Postgres limpia conversations
+  // de más de 14 días (ver migration). NO usamos el historial para
+  // alargar el prompt — Clari arranca cada respuesta sin recordar
+  // mensajes pasados; la persistencia es solo para que el user pueda
+  // releerlos.
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const { createConversation } = useAiConversations();
+
+  useEffect(() => {
+    if (!open || conversationId) return;
+    let cancelled = false;
+    createConversation
+      .mutateAsync("Clari · soporte")
+      .then((conv) => {
+        if (!cancelled) setConversationId(conv.id);
+      })
+      .catch((e) => {
+        console.error("clari: no se pudo crear conversación", e);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleOpen = () => {
     setOpen(true);
@@ -132,7 +159,11 @@ const ClariAiFab = () => {
           {/* Body — scroll interno via ClariAiChat con el endpoint
               clari-help (asistente de soporte global, NO de datos). */}
           <div className="flex flex-1 min-h-0 overflow-hidden">
-            <ClariAiChat mode="panel" endpoint="clari-help" />
+            <ClariAiChat
+              mode="panel"
+              endpoint="clari-help"
+              conversationId={conversationId ?? undefined}
+            />
           </div>
         </div>
       )}
