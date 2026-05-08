@@ -364,6 +364,7 @@ const DashboardSidebar = () => {
             </SidebarMenu>
         </CollapsibleSidebarGroup>
 
+        {operationsMenu.length > 0 && (
         <CollapsibleSidebarGroup
           label={t("sidebar.operations")}
           storageKey="operations"
@@ -389,6 +390,7 @@ const DashboardSidebar = () => {
               ))}
             </SidebarMenu>
         </CollapsibleSidebarGroup>
+        )}
 
         {/* ── Finanzas ────────────────────────────────────────────── */}
         {canAccess("Finanzas") && (() => {
