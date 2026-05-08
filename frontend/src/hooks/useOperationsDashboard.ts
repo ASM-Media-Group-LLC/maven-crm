@@ -11,6 +11,7 @@ export interface OperationsKpis {
   onHold: number;          // 5. En espera (call_outcome=en_espera)
   rejections: number;      // 6. Rechazos (call_outcome=no_cerro)
   enteredCrm: number;      // 7. Ingresada al CRM (creators.entered_crm_at)
+  totalLeads: number;      // 8. Total leads = leadgen + scouter (sum)
 }
 
 export type MetricKey =
@@ -20,7 +21,8 @@ export type MetricKey =
   | "closes"
   | "onHold"
   | "rejections"
-  | "enteredCrm";
+  | "enteredCrm"
+  | "totalLeads";
 
 export interface DashboardRange {
   from: Date | undefined;
@@ -51,6 +53,7 @@ export const useOperationsDashboard = (range: DashboardRange) =>
       const [
         { count: contacted },
         { count: leadgenWithPhone },
+        { count: scouterTotal },
         { count: scouterWithPhone },
         { count: closerCalls },
         { count: closes },
@@ -60,6 +63,7 @@ export const useOperationsDashboard = (range: DashboardRange) =>
       ] = await Promise.all([
         head("leadgen_entries", "created_at"),
         head("leadgen_entries", "created_at", (q) => q.not("phone_e164", "is", null)),
+        head("scouter_leads",   "created_at"),
         head("scouter_leads",   "created_at", (q) => q.not("phone", "is", null)),
         head("qa_calls", "call_date"),
         head("qa_calls", "call_date", (q) =>
@@ -84,6 +88,7 @@ export const useOperationsDashboard = (range: DashboardRange) =>
         onHold: onHold ?? 0,
         rejections: rejections ?? 0,
         enteredCrm: enteredCrm ?? 0,
+        totalLeads: (contacted ?? 0) + (scouterTotal ?? 0),
       };
     },
   });
@@ -96,6 +101,11 @@ export interface DetailRow {
   secondary?: string; // texto secundario (closer, fecha, etc)
   date?: string;
   badge?: string;
+  /** Si está, la fila se vuelve clickable y navega a esa ruta. */
+  linkUrl?: string;
+  /** Si está, la fila abre LeadDetailDialog con la info completa
+   *  de la fila desde la tabla source. */
+  leadSource?: "leadgen" | "scouter" | "creator";
 }
 
 /** Fetch de los items detrás de una métrica. Hasta 100 rows.
@@ -133,7 +143,45 @@ export const useMetricDetails = (
             secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
             date: r.created_at,
             badge: r.status,
+            leadSource: "leadgen" as const,
           }));
+        }
+        case "totalLeads": {
+          // Combina leadgen + scouter — todos los leads del sistema
+          // (con o sin teléfono). 50 de cada tabla, mezclados por fecha.
+          const q1 = sb
+            .from("leadgen_entries")
+            .select("id, model_handle, phone_e164, status, created_at")
+            .order("created_at", { ascending: false })
+            .limit(50);
+          const q2 = sb
+            .from("scouter_leads")
+            .select("id, instagram_handle, phone, status, created_at")
+            .order("created_at", { ascending: false })
+            .limit(50);
+          const [{ data: a }, { data: b }] = await Promise.all([
+            dateLte(dateGte(q1, "created_at"), "created_at"),
+            dateLte(dateGte(q2, "created_at"), "created_at"),
+          ]);
+          const aRows = (a ?? []).map((r: any) => ({
+            id: r.id,
+            primary: `@${r.model_handle ?? "?"}`,
+            secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
+            date: r.created_at,
+            badge: "leadgen",
+            leadSource: "leadgen" as const,
+          }));
+          const bRows = (b ?? []).map((r: any) => ({
+            id: r.id,
+            primary: `@${r.instagram_handle ?? "?"}`,
+            secondary: r.phone ? `📞 ${r.phone}` : "Sin número",
+            date: r.created_at,
+            badge: "scouter",
+            leadSource: "scouter" as const,
+          }));
+          return [...aRows, ...bRows].sort((x, y) =>
+            (y.date ?? "") < (x.date ?? "") ? -1 : 1,
+          );
         }
         case "numbersObtained": {
           const q1 = sb
@@ -158,6 +206,7 @@ export const useMetricDetails = (
             secondary: `📞 ${r.phone_e164}`,
             date: r.created_at,
             badge: "leadgen",
+            leadSource: "leadgen" as const,
           }));
           const bRows = (b ?? []).map((r: any) => ({
             id: r.id,
@@ -165,6 +214,7 @@ export const useMetricDetails = (
             secondary: `📞 ${r.phone}`,
             date: r.created_at,
             badge: "scouter",
+            leadSource: "scouter" as const,
           }));
           return [...aRows, ...bRows].sort((x, y) =>
             (y.date ?? "") < (x.date ?? "") ? -1 : 1,
@@ -197,6 +247,9 @@ export const useMetricDetails = (
               : "Closer: ?",
             date: r.call_date,
             badge: r.claude_analysis?.call_outcome ?? "—",
+            // Click → abre la página del detalle de la QA call
+            // (AgencyQA usa ?callId=<id> para deeplinkear).
+            linkUrl: `/agency-qa?callId=${r.id}`,
           }));
         }
         case "enteredCrm": {
@@ -217,9 +270,40 @@ export const useMetricDetails = (
             secondary: r.entered_crm_notes ?? "",
             date: r.entered_crm_at,
             badge: "ingresada",
+            leadSource: "creator" as const,
           }));
         }
       }
+    },
+  });
+
+/** Detalle completo de un lead — usado por LeadDetailDialog que se
+ *  abre cuando el user clickea una fila en el modal del dashboard.
+ *  Trae TODOS los campos de la tabla source para mostrarlos en el popup.
+ */
+export const useLeadDetail = (
+  source: "leadgen" | "scouter" | "creator" | undefined,
+  id: string | null,
+) =>
+  useQuery({
+    queryKey: ["lead-detail", source, id],
+    enabled: !!source && !!id,
+    staleTime: 60_000,
+    queryFn: async (): Promise<Record<string, unknown> | null> => {
+      if (!source || !id) return null;
+      const table =
+        source === "leadgen"
+          ? "leadgen_entries"
+          : source === "scouter"
+            ? "scouter_leads"
+            : "creators";
+      const { data, error } = await sb
+        .from(table)
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw error;
+      return data ?? null;
     },
   });
 

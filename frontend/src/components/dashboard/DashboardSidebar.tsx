@@ -48,11 +48,6 @@ const DashboardSidebar = () => {
   const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
     { title: "Dashboard v2", url: "/dashboard2", icon: BarChart3, module: "Dashboard" },
-    // Panel de control: dashboard ejecutivo del funnel operativo
-    // (LLG → número → llamada → cierre → ingreso al CRM). Permiso
-    // controlado por canAccess("Panel de control") — el admin
-    // puede prenderlo/apagarlo por rol desde Settings → Roles.
-    { title: "Panel de control", url: "/panel-de-control", icon: BarChart3, module: "Panel de control" },
     { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined },
     { title: "Cowork", url: "/cowork", icon: Users2, module: "Cowork" },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
@@ -739,6 +734,35 @@ const DashboardSidebar = () => {
             Settings page (reachable from the user dropdown), keeping
             the left rail focused on day-to-day operational tabs. */}
 
+        {/* Panel de control — top-level tab justo después de RRHH.
+            Match exacto al estilo de los CollapsibleSidebarGroup labels
+            (text-[11px] font-semibold uppercase tracking-wider) para
+            que visualmente sea otro "tab" y no se vea más grande/bold. */}
+        {canAccess("Panel de control") && (
+          <SidebarMenu className="px-2 py-0.5">
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                tooltip="Panel de control"
+                className="h-auto py-1.5"
+              >
+                <NavLink
+                  to="/panel-de-control"
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 rounded-md text-[11px] font-semibold uppercase tracking-wider transition-colors hover:bg-foreground/5 ${
+                      isActive
+                        ? "!text-foreground bg-foreground/5"
+                        : "!text-foreground/80 hover:!text-foreground"
+                    }`
+                  }
+                >
+                  <BarChart3 className="h-4 w-4 shrink-0" />
+                  <span>Panel de control</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-border p-3">
