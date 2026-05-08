@@ -26,6 +26,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
@@ -130,6 +131,28 @@ const Dashboard2 = () => {
   const [paretoView, setParetoView] = useState<"list" | "chart">("list");
   const [paretoGroup, setParetoGroup] = useState<"80" | "20">("80");
   const [showDeepDive, setShowDeepDive] = useState(false);
+
+  // Subtabs del dashboard. "resumen" = vista por default (dashboard
+  // completo). Los otros valores abren sus respectivos modals/panels y
+  // cierran los demás. Reemplaza los botones tooltip-icon viejos para
+  // matchear el patrón de Panel de Control (Reclutamiento modelos /
+  // Reclutamiento chatters).
+  type DashTab = "resumen" | "metrics" | "pareto" | "alerts" | "projection" | "deepdive";
+  const [dashTab, setDashTab] = useState<DashTab>("resumen");
+  const switchDashTab = (next: DashTab) => {
+    setDashTab(next);
+    setShowMetrics(next === "metrics");
+    setShowPareto(next === "pareto");
+    setShowAlerts(next === "alerts");
+    setShowProjection(next === "projection");
+    setShowDeepDive(next === "deepdive");
+  };
+
+  // Popup que muestra una lista de creadoras ordenada por una métrica
+  // específica. Triggered por click en las KPI cards (Revenue Bruto,
+  // Creadoras, etc). null = cerrado.
+  type KpiList = "revenue" | "creators" | null;
+  const [kpiListOpen, setKpiListOpen] = useState<KpiList>(null);
   const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
 
   const monthOptions = useMemo(getMonthOptions, []);
@@ -547,148 +570,167 @@ const Dashboard2 = () => {
                   </TooltipProvider>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <TooltipProvider delayDuration={200}>
-                    <UITooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowMetrics(true)}>
-                          <BarChart3 className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="z-50">Métricas detalladas</TooltipContent>
-                    </UITooltip>
-                    <UITooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowPareto(true)}>
-                          <PieChart className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="z-50">Análisis 80/20</TooltipContent>
-                    </UITooltip>
-                    <UITooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant={showAlerts ? "default" : "ghost"} size="icon" className="h-8 w-8 relative" onClick={() => setShowAlerts(!showAlerts)}>
-                          <AlertTriangle className="h-4 w-4" />
-                          {alerts.length > 0 && (
-                            <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground flex items-center justify-center">
-                              {alerts.length}
-                            </span>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="z-50">Red Flags</TooltipContent>
-                    </UITooltip>
-                    <UITooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant={showProjection ? "default" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setShowProjection(!showProjection)}>
-                          <Target className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="z-50">Proyección del mes</TooltipContent>
-                    </UITooltip>
-                    <div className="w-px h-5 bg-border mx-0.5" />
-                    <UITooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs px-3" onClick={() => setShowDeepDive(true)}>
-                          <Telescope className="h-3.5 w-3.5" />
-                          Más análisis
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="z-50">Análisis ejecutivo completo</TooltipContent>
-                    </UITooltip>
-                    {isAdmin && (
-                      <UITooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={exportPdf} disabled={isLoading || creators.length === 0}>
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="z-50">Exportar PDF</TooltipContent>
-                      </UITooltip>
-                    )}
-                  </TooltipProvider>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs px-3"
+                      onClick={exportPdf}
+                      disabled={isLoading || creators.length === 0}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Exportar PDF
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
 
             <div className="p-6 space-y-5">
+              {/* Subtabs — el dashboard principal sigue siempre visible
+                  arriba; al pickear una tab distinta de "Resumen" se
+                  abre el modal/panel correspondiente. Replica el patrón
+                  de Panel de Control (Reclutamiento modelos / chatters). */}
+              <Tabs value={dashTab} onValueChange={(v) => switchDashTab(v as DashTab)}>
+                <TabsList className="flex-wrap h-auto">
+                  <TabsTrigger value="resumen">Resumen</TabsTrigger>
+                  <TabsTrigger value="metrics" className="gap-1.5">
+                    <BarChart3 className="h-3.5 w-3.5" /> Métricas detalladas
+                  </TabsTrigger>
+                  <TabsTrigger value="pareto" className="gap-1.5">
+                    <PieChart className="h-3.5 w-3.5" /> Análisis 80/20
+                  </TabsTrigger>
+                  <TabsTrigger value="alerts" className="gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5" /> Red Flags
+                    {alerts.length > 0 && (
+                      <span className="ml-1 px-1.5 rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+                        {alerts.length}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="projection" className="gap-1.5">
+                    <Target className="h-3.5 w-3.5" /> Proyección del mes
+                  </TabsTrigger>
+                  <TabsTrigger value="deepdive" className="gap-1.5">
+                    <Telescope className="h-3.5 w-3.5" /> Más análisis
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
               {/* ══════ EXECUTIVE KPI STRIP ══════ */}
               {!isLoading && (
                 <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
-                  {/* Revenue */}
-                  <div className="rounded-xl border border-border bg-card p-3 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Revenue Bruto</span>
-                      <DollarSign className="h-3.5 w-3.5 text-muted-foreground/50" />
+                  {/* Revenue Bruto — clickable */}
+                  <button
+                    type="button"
+                    onClick={() => setKpiListOpen("revenue")}
+                    className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 ease-out hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
+                  >
+                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-emerald-500 transition-opacity group-hover:opacity-50" />
+                    <div className="relative space-y-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500">
+                        <DollarSign className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Revenue Bruto</p>
+                        <p className="text-3xl font-bold tabular-nums leading-tight">{fmtK(grandTotal)}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          Net {fmtK(grandTotal * 0.8)}
+                          {prevMonthTotal > 0 && (
+                            <span className={`ml-1.5 font-semibold ${totalChangePercent >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                              {totalChangePercent >= 0 ? "↑" : "↓"}{Math.abs(totalChangePercent).toFixed(1)}%
+                            </span>
+                          )}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xl font-bold tabular-nums tracking-tight">{fmtK(grandTotal)}</p>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-muted-foreground">Net {fmtK(grandTotal * 0.8)}</span>
-                      {prevMonthTotal > 0 && (
-                        <span className={`text-[10px] font-semibold ${totalChangePercent >= 0 ? "text-emerald-500" : "text-destructive"}`}>
-                          {totalChangePercent >= 0 ? "↑" : "↓"}{Math.abs(totalChangePercent).toFixed(1)}%
-                        </span>
-                      )}
+                  </button>
+
+                  {/* Creadoras — clickable */}
+                  <button
+                    type="button"
+                    onClick={() => setKpiListOpen("creators")}
+                    className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 ease-out hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
+                  >
+                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-blue-500 transition-opacity group-hover:opacity-50" />
+                    <div className="relative space-y-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500">
+                        <Users className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Creadoras</p>
+                        <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.activeCount}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {hlKpis.zeroCreators} inactivas
+                          {hlKpis.zeroCreators > 0 && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-destructive/60 align-middle" />}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* ARPC — derived metric, no popup */}
+                  <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
+                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-violet-500" />
+                    <div className="relative space-y-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-500">
+                        <TrendingUp className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">ARPC</p>
+                        <p className="text-3xl font-bold tabular-nums leading-tight">{fmtK(hlKpis.avgPerCreator)}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">Avg Revenue / Creator</p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Creators */}
-                  <div className="rounded-xl border border-border bg-card p-3 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Creadoras</span>
-                      <Users className="h-3.5 w-3.5 text-muted-foreground/50" />
-                    </div>
-                    <p className="text-xl font-bold tabular-nums">{hlKpis.activeCount}</p>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-muted-foreground">{hlKpis.zeroCreators} inactivas</span>
-                      {hlKpis.zeroCreators > 0 && <span className="h-1.5 w-1.5 rounded-full bg-destructive/60" />}
+                  {/* $/Fan — derived metric */}
+                  <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
+                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-rose-500" />
+                    <div className="relative space-y-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-500">
+                        <Heart className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">$/Fan</p>
+                        <p className="text-3xl font-bold tabular-nums leading-tight">${hlKpis.avgPerFanGlobal.toFixed(2)}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">{hlKpis.totalFansAll.toLocaleString()} fans</p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* ARPC */}
-                  <div className="rounded-xl border border-border bg-card p-3 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">ARPC</span>
-                      <TrendingUp className="h-3.5 w-3.5 text-muted-foreground/50" />
+                  {/* Retention — derived metric */}
+                  <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
+                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-cyan-500" />
+                    <div className="relative space-y-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500">
+                        <Repeat className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Retención</p>
+                        <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.renewalRate.toFixed(1)}%</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">Tasa de renovación</p>
+                      </div>
                     </div>
-                    <p className="text-xl font-bold tabular-nums">{fmtK(hlKpis.avgPerCreator)}</p>
-                    <span className="text-[10px] text-muted-foreground">Avg Revenue / Creator</span>
                   </div>
 
-                  {/* $/Fan */}
-                  <div className="rounded-xl border border-border bg-card p-3 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">$/Fan</span>
-                      <Heart className="h-3.5 w-3.5 text-muted-foreground/50" />
-                    </div>
-                    <p className="text-xl font-bold tabular-nums">${hlKpis.avgPerFanGlobal.toFixed(2)}</p>
-                    <span className="text-[10px] text-muted-foreground">{hlKpis.totalFansAll.toLocaleString()} fans</span>
-                  </div>
-
-                  {/* Retention */}
-                  <div className="rounded-xl border border-border bg-card p-3 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Retención</span>
-                      <Repeat className="h-3.5 w-3.5 text-muted-foreground/50" />
-                    </div>
-                    <p className="text-xl font-bold tabular-nums">{hlKpis.renewalRate.toFixed(1)}%</p>
-                    <span className="text-[10px] text-muted-foreground">Tasa de renovación</span>
-                  </div>
-
-                  {/* Revenue Mix */}
-                  <div className="rounded-xl border border-border bg-card p-3 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Revenue Mix</span>
-                      <BarChart className="h-3.5 w-3.5 text-muted-foreground/50" />
-                    </div>
-                    <div className="flex h-2 w-full rounded-full overflow-hidden bg-muted">
-                      <div className="h-full bg-blue-500 transition-all" style={{ width: `${hlKpis.msgsPct}%` }} title={`Msgs ${hlKpis.msgsPct.toFixed(0)}%`} />
-                      <div className="h-full bg-rose-500 transition-all" style={{ width: `${hlKpis.tipsPct}%` }} title={`Tips ${hlKpis.tipsPct.toFixed(0)}%`} />
-                      <div className="h-full bg-emerald-500 transition-all" style={{ width: `${hlKpis.subsPct}%` }} title={`Subs ${hlKpis.subsPct.toFixed(0)}%`} />
-                    </div>
-                    <div className="flex items-center justify-between text-[9px] text-muted-foreground">
-                      <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-blue-500 inline-block" />Msg {hlKpis.msgsPct.toFixed(0)}%</span>
-                      <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-rose-500 inline-block" />Tip {hlKpis.tipsPct.toFixed(0)}%</span>
-                      <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />Sub {hlKpis.subsPct.toFixed(0)}%</span>
+                  {/* Revenue Mix — stacked bar, no popup */}
+                  <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
+                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-amber-500" />
+                    <div className="relative space-y-2">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500">
+                        <BarChart className="h-5 w-5 text-white" />
+                      </div>
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Revenue Mix</p>
+                      <div className="flex h-2 w-full rounded-full overflow-hidden bg-muted">
+                        <div className="h-full bg-blue-500 transition-all" style={{ width: `${hlKpis.msgsPct}%` }} title={`Msgs ${hlKpis.msgsPct.toFixed(0)}%`} />
+                        <div className="h-full bg-rose-500 transition-all" style={{ width: `${hlKpis.tipsPct}%` }} title={`Tips ${hlKpis.tipsPct.toFixed(0)}%`} />
+                        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${hlKpis.subsPct}%` }} title={`Subs ${hlKpis.subsPct.toFixed(0)}%`} />
+                      </div>
+                      <div className="flex items-center justify-between text-[9px] text-muted-foreground">
+                        <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-blue-500 inline-block" />Msg {hlKpis.msgsPct.toFixed(0)}%</span>
+                        <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-rose-500 inline-block" />Tip {hlKpis.tipsPct.toFixed(0)}%</span>
+                        <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />Sub {hlKpis.subsPct.toFixed(0)}%</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1003,8 +1045,68 @@ const Dashboard2 = () => {
               )}
             </div>
 
+            {/* ══════ KPI LIST POPUP — click en cards Revenue/Creadoras ══════ */}
+            <Dialog open={kpiListOpen !== null} onOpenChange={(o) => !o && setKpiListOpen(null)}>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    {kpiListOpen === "revenue" ? (
+                      <>
+                        <DollarSign className="h-5 w-5 text-emerald-500" />
+                        Revenue por Creadora · {selectedPeriod?.label}
+                      </>
+                    ) : (
+                      <>
+                        <Users className="h-5 w-5 text-blue-500" />
+                        Creadoras ({creators.length}) · {selectedPeriod?.label}
+                      </>
+                    )}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-1 mt-2">
+                  {creators.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-12">
+                      Sin datos para este período.
+                    </p>
+                  ) : (
+                    [...creators]
+                      .sort((a, b) =>
+                        kpiListOpen === "revenue" ? b.total - a.total : a.name.localeCompare(b.name),
+                      )
+                      .map((c, idx) => (
+                        <button
+                          key={c.creatorId}
+                          type="button"
+                          onClick={() => {
+                            navigate(`/creadores/${c.creatorId}`);
+                            setKpiListOpen(null);
+                          }}
+                          className="flex items-center justify-between w-full gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors cursor-pointer hover:bg-accent hover:border-primary/40 text-left"
+                        >
+                          <div className="min-w-0 flex-1 flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground tabular-nums w-6 shrink-0">
+                              {idx + 1}.
+                            </span>
+                            <span className="font-medium truncate">{c.name}</span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-xs font-bold tabular-nums text-emerald-500">
+                              {fmtK(c.total)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground tabular-nums w-12 text-right">
+                              {c.activeFans?.toLocaleString() ?? 0} fans
+                            </span>
+                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          </div>
+                        </button>
+                      ))
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+
             {/* ══════ METRICS DIALOG ══════ */}
-            <Dialog open={showMetrics} onOpenChange={setShowMetrics}>
+            <Dialog open={showMetrics} onOpenChange={(o) => { setShowMetrics(o); if (!o && dashTab === "metrics") setDashTab("resumen"); }}>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
                 <div className="p-6 pb-0">
                   <DialogHeader>
@@ -1096,7 +1198,7 @@ const Dashboard2 = () => {
             </Dialog>
 
             {/* ══════ PARETO DIALOG ══════ */}
-            <Dialog open={showPareto} onOpenChange={setShowPareto}>
+            <Dialog open={showPareto} onOpenChange={(o) => { setShowPareto(o); if (!o && dashTab === "pareto") setDashTab("resumen"); }}>
               <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
                 <div className="p-6 pb-0">
                   <DialogHeader>
@@ -1228,7 +1330,7 @@ const Dashboard2 = () => {
             </Dialog>
 
             {/* ══════ DEEP DIVE DIALOG ══════ */}
-            <Dialog open={showDeepDive} onOpenChange={setShowDeepDive}>
+            <Dialog open={showDeepDive} onOpenChange={(o) => { setShowDeepDive(o); if (!o && dashTab === "deepdive") setDashTab("resumen"); }}>
               <DialogContent className="max-w-6xl max-h-[92vh] overflow-hidden p-0 flex flex-col">
                 <div className="px-6 pt-5 pb-3 border-b border-border shrink-0">
                    <DialogHeader>
