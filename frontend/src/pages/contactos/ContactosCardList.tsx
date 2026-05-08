@@ -1,0 +1,144 @@
+import { ArrowRight, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Trash2 } from "lucide-react";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
+import type { Contacto } from "./ContactosContent";
+
+const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
+  "A+": "success-soft",
+  A: "primary-soft",
+  "B+": "warning-soft",
+  B: "secondary-soft",
+  C: "destructive-soft",
+};
+
+interface Props {
+  contactos: Contacto[];
+  onView?: (contacto: Contacto) => void;
+  onEdit?: (contacto: Contacto) => void;
+  onConvert?: (contacto: Contacto) => void;
+  onDelete?: (contacto: Contacto) => void;
+}
+
+// Lista de cajones clickeables — mismo patrón que Pareto / Creator Reports
+// en Dashboard 2. Cada card muestra avatar IG, nombre, badge categoría,
+// fecha y links rápidos. Click abre popup detalle.
+const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onDelete }: Props) => {
+  if (contactos.length === 0) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
+        No se encontraron contactos.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {contactos.map((c) => {
+        const cleanHandle = c.instagram.replace(/^@/, "");
+        const initials = c.nombre
+          .split(/\s+/)
+          .map((p) => p[0])
+          .filter(Boolean)
+          .slice(0, 2)
+          .join("")
+          .toUpperCase() || "?";
+        const recordType = (c as unknown as { record_type?: string }).record_type;
+        return (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => onView?.(c)}
+            className="group w-full rounded-xl border border-border bg-card p-3 text-left transition-all duration-200 ease-out hover:scale-[1.005] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.12)]"
+          >
+            <div className="flex items-center gap-3">
+              <Avatar className="h-12 w-12 shrink-0">
+                {c.profile_picture_url && <AvatarImage src={c.profile_picture_url} alt={c.nombre} />}
+                <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
+              </Avatar>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  {c.pais && <span className="text-base shrink-0">{getCountryFlag(c.pais)}</span>}
+                  <p className="font-medium text-sm truncate">{c.nombre}</p>
+                  <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="font-normal text-[10px] px-1.5 py-0 shrink-0">
+                    {c.categoria}
+                  </Badge>
+                  {recordType === "reactivado" && (
+                    <Badge variant="warning-soft" className="font-normal text-[10px] px-1.5 py-0 shrink-0">
+                      Reactivado
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                  {cleanHandle && (
+                    <span className="flex items-center gap-1 truncate">
+                      <InstagramIcon className="h-3 w-3 shrink-0" />
+                      @{cleanHandle}
+                    </span>
+                  )}
+                  {c.creadoPor && <span className="truncate">· {c.creadoPor}</span>}
+                </div>
+              </div>
+
+              <div className="hidden md:flex items-center gap-4 text-right shrink-0">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Ciudad</p>
+                  <p className="text-xs font-medium truncate max-w-[100px]">{c.city || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">País</p>
+                  <p className="text-xs font-medium">{c.pais ? getCountryShortDisplay(c.pais) : "—"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Creación</p>
+                  <p className="text-xs font-medium whitespace-nowrap">{c.creacion}</p>
+                </div>
+              </div>
+
+              <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0 hidden sm:block" />
+
+              <div onClick={(e) => e.stopPropagation()}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onView?.(c)}>
+                      <Eye className="mr-2 h-4 w-4" /> Ver detalle
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onEdit?.(c)}>
+                      <Pencil className="mr-2 h-4 w-4" /> Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onConvert?.(c)}>
+                      <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
+                    </DropdownMenuItem>
+                    {cleanHandle && (
+                      <DropdownMenuItem onClick={() => window.open(`https://instagram.com/${cleanHandle}`, "_blank", "noopener,noreferrer")}>
+                        <ExternalLink className="mr-2 h-4 w-4" /> Abrir Instagram
+                      </DropdownMenuItem>
+                    )}
+                    {onDelete && (
+                      <DropdownMenuItem onClick={() => onDelete(c)} className="text-destructive focus:text-destructive">
+                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+export default ContactosCardList;

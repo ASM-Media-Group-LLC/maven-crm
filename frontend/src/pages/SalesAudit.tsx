@@ -3,6 +3,7 @@ import { Upload, FileSpreadsheet, History } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AuditComparisonTable from "./sales-audit/AuditComparisonTable";
 import AuditHistory from "./sales-audit/AuditHistory";
+import VentasSubtabs from "./sales-overview/VentasSubtabs";
 
 const SalesAudit = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -22,6 +23,7 @@ const SalesAudit = () => {
 
   return (
     <main className="flex-1 p-4 md:p-6 space-y-6 overflow-auto">
+            <VentasSubtabs />
             <div>
               <h1 className="text-2xl font-bold">Auditoría de Ventas</h1>
               <p className="text-sm text-muted-foreground mt-1">

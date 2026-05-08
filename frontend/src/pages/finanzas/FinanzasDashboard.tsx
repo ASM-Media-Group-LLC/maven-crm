@@ -1,18 +1,16 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import {
   DollarSign, FileText, Users, TrendingUp, TrendingDown, AlertTriangle,
-  ListChecks, BarChart3, X, Wallet,
+  ListChecks, BarChart3, X, Wallet, Building2, ArrowDown, Briefcase,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, Legend } from "recharts";
 import { startOfMonth, endOfMonth, subMonths, format, isWithinInterval } from "date-fns";
 import { es } from "date-fns/locale";
@@ -26,77 +24,40 @@ function pctChange(current: number, previous: number) {
   return ((current - previous) / previous) * 100;
 }
 
-function HRPersonnelCards() {
-  const navigate = useNavigate();
-
-  const { data: hrData } = useQuery({
-    queryKey: ["fin-hr-personnel"],
-    queryFn: async () => {
-      const { data: emps, error: e1 } = await supabase.from("employees").select("id, status, department_id, base_salary");
-      if (e1) throw e1;
-      const activos = (emps ?? []).filter(e => e.status === "activo");
-      const depts = new Set(activos.map(e => e.department_id).filter(Boolean));
-
-      const now = new Date();
-      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      const { data: deductions, error: e2 } = await supabase.from("employee_deductions").select("amount").ilike("month_year", `%${monthYear}%`);
-      if (e2) throw e2;
-      const dedTotal = (deductions ?? []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
-
-      const { data: payroll, error: e3 } = await supabase.from("payroll_periods").select("net_total").ilike("period_name", `%${monthYear}%`);
-      if (e3) throw e3;
-      const netTotal = (payroll ?? []).reduce((s, p) => s + (Number(p.net_total) || 0), 0);
-      const costPerEmp = activos.length > 0 ? netTotal / activos.length : 0;
-
-      return { headcount: activos.length, costPerEmp, dedTotal, deptCount: depts.size };
-    },
-  });
-
-  const cards = [
-    { label: "Empleados Activos", value: String(hrData?.headcount ?? 0), icon: Users, sub: "Headcount", path: "/hr" },
-    { label: "Costo Prom/Emp", value: fmt(hrData?.costPerEmp ?? 0), icon: Users, sub: "Nómina / headcount", path: "/finanzas/nomina" },
-    { label: "Deducciones Mes", value: fmt(hrData?.dedTotal ?? 0), icon: TrendingDown, sub: "Acumuladas", path: "/hr/deducciones" },
-    { label: "Departamentos", value: String(hrData?.deptCount ?? 0), icon: Users, sub: "Con empleados activos", path: "/hr/organigrama" },
-  ];
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Users className="h-4 w-4 text-muted-foreground" />Headcount y Costos de Personal
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {cards.map(c => (
-            <DashboardMetricCard
-              key={c.label}
-              label={c.label}
-              value={c.value}
-              icon={c.icon}
-              subtitle={c.sub}
-              color="primary"
-            />
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+// Todas las posibles vistas del dialog detalle. Cada uno tiene su propio
+// título + lista (alimentada por los datos ya cargados, sin queries extra).
+type KpiKey =
+  | "ingresos"
+  | "costos"
+  | "margen"
+  | "nominaProy"
+  | "comisiones"
+  | "facturasPend"
+  | "facturasVenc"
+  | "variacion"
+  | "headcount"
+  | "costoEmp"
+  | "deducciones"
+  | "departamentos"
+  | "alertas"
+  | "accion-nomina"
+  | "accion-comisiones"
+  | "accion-invoices"
+  | "accion-archivos";
 
 export default function FinanzasDashboard() {
-  const navigate = useNavigate();
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
   const [costCenter, setCostCenter] = useState("");
   const [area, setArea] = useState("");
   const [tipo, setTipo] = useState("ambos");
   const [chartRange, setChartRange] = useState<"3M" | "6M" | "12M">("6M");
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
 
   const { data: payroll = [], isLoading: lp } = useQuery({
     queryKey: ["fin-dash-payroll"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("payroll_periods").select("status, gross_total, net_total, cost_center, created_at").limit(1000);
+      const { data, error } = await supabase.from("payroll_periods").select("id, period_name, status, gross_total, net_total, cost_center, created_at").limit(1000);
       if (error) throw error;
       return data ?? [];
     },
@@ -105,7 +66,7 @@ export default function FinanzasDashboard() {
   const { data: invoices = [], isLoading: li } = useQuery({
     queryKey: ["fin-dash-invoices"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("invoices").select("status, amount, fee_amount, net_amount, created_at, payment_method").limit(1000);
+      const { data, error } = await supabase.from("invoices").select("id, invoice_number, status, amount, fee_amount, net_amount, created_at, payment_method, due_date, recipient_name").limit(1000);
       if (error) throw error;
       return data ?? [];
     },
@@ -114,9 +75,44 @@ export default function FinanzasDashboard() {
   const { data: commissions = [], isLoading: lc } = useQuery({
     queryKey: ["fin-dash-commissions"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("commissions").select("status, estimated_amount, final_amount, area, cost_center, created_at").limit(1000);
+      const { data, error } = await supabase.from("commissions").select("id, status, estimated_amount, final_amount, area, cost_center, created_at, employee_name").limit(1000);
       if (error) throw error;
       return data ?? [];
+    },
+  });
+
+  const { data: hrData } = useQuery({
+    queryKey: ["fin-hr-personnel"],
+    queryFn: async () => {
+      const { data: emps, error: e1 } = await supabase.from("employees").select("id, full_name, status, department_id, base_salary, position");
+      if (e1) throw e1;
+      const activos = (emps ?? []).filter(e => e.status === "activo");
+      const depts = new Map<string, number>();
+      activos.forEach(e => {
+        const d = e.department_id ?? "Sin departamento";
+        depts.set(d, (depts.get(d) ?? 0) + 1);
+      });
+
+      const now = new Date();
+      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const { data: deductions, error: e2 } = await supabase.from("employee_deductions").select("id, employee_id, amount, reason, month_year").ilike("month_year", `%${monthYear}%`);
+      if (e2) throw e2;
+      const dedTotal = (deductions ?? []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+
+      const { data: payrollMonth, error: e3 } = await supabase.from("payroll_periods").select("net_total").ilike("period_name", `%${monthYear}%`);
+      if (e3) throw e3;
+      const netTotal = (payrollMonth ?? []).reduce((s, p) => s + (Number(p.net_total) || 0), 0);
+      const costPerEmp = activos.length > 0 ? netTotal / activos.length : 0;
+
+      return {
+        headcount: activos.length,
+        costPerEmp,
+        dedTotal,
+        deptCount: depts.size,
+        empleados: activos,
+        deducciones: deductions ?? [],
+        departamentos: Array.from(depts.entries()).map(([name, count]) => ({ name, count })),
+      };
     },
   });
 
@@ -135,9 +131,12 @@ export default function FinanzasDashboard() {
   // Current month
   const curInvoicesPaid = invoices.filter(i => i.status === "pagada" && inRange(i.created_at, currentMonthStart, currentMonthEnd));
   const curIngresos = curInvoicesPaid.reduce((s, i) => s + (Number(i.amount) || 0), 0);
-  const curNomina = payroll.filter(p => inRange(p.created_at, currentMonthStart, currentMonthEnd)).reduce((s, p) => s + (Number(p.net_total) || 0), 0);
-  const curComisiones = commissions.filter(c => inRange(c.created_at, currentMonthStart, currentMonthEnd)).reduce((s, c) => s + (Number(c.estimated_amount) || 0), 0);
-  const curCostos = curNomina + commissions.filter(c => c.status === "pagado" && inRange(c.created_at, currentMonthStart, currentMonthEnd)).reduce((s, c) => s + (Number(c.final_amount) || 0), 0);
+  const curPayroll = payroll.filter(p => inRange(p.created_at, currentMonthStart, currentMonthEnd));
+  const curNomina = curPayroll.reduce((s, p) => s + (Number(p.net_total) || 0), 0);
+  const curCommissions = commissions.filter(c => inRange(c.created_at, currentMonthStart, currentMonthEnd));
+  const curComisiones = curCommissions.reduce((s, c) => s + (Number(c.estimated_amount) || 0), 0);
+  const curCommissionsPaid = commissions.filter(c => c.status === "pagado" && inRange(c.created_at, currentMonthStart, currentMonthEnd));
+  const curCostos = curNomina + curCommissionsPaid.reduce((s, c) => s + (Number(c.final_amount) || 0), 0);
   const curMargen = curIngresos - curCostos;
   const curMargenPct = curIngresos > 0 ? (curMargen / curIngresos) * 100 : 0;
 
@@ -145,16 +144,22 @@ export default function FinanzasDashboard() {
   const prevIngresos = invoices.filter(i => i.status === "pagada" && inRange(i.created_at, prevMonthStart, prevMonthEnd)).reduce((s, i) => s + (Number(i.amount) || 0), 0);
   const prevCostos = payroll.filter(p => inRange(p.created_at, prevMonthStart, prevMonthEnd)).reduce((s, p) => s + (Number(p.net_total) || 0), 0);
 
-  const nominaProyectada = payroll.filter(p => (p.status === "borrador" || p.status === "calculado") && inRange(p.created_at, currentMonthStart, currentMonthEnd)).reduce((s, p) => s + (Number(p.net_total) || 0), 0);
-  const facturasPendientes = invoices.filter(i => i.status === "enviada").length;
-  const facturasVencidas = invoices.filter(i => i.status === "vencida").length;
+  const nominaProyectadaList = payroll.filter(p => (p.status === "borrador" || p.status === "calculado") && inRange(p.created_at, currentMonthStart, currentMonthEnd));
+  const nominaProyectada = nominaProyectadaList.reduce((s, p) => s + (Number(p.net_total) || 0), 0);
+  const facturasPendientesList = invoices.filter(i => i.status === "enviada");
+  const facturasVencidasList = invoices.filter(i => i.status === "vencida");
+  const facturasPendientes = facturasPendientesList.length;
+  const facturasVencidas = facturasVencidasList.length;
   const variacion = pctChange(curIngresos, prevIngresos);
 
   // Alerts
-  const nominaSinCerrar = payroll.filter(p => p.status === "borrador" || p.status === "calculado").length;
+  const nominaSinCerrarList = payroll.filter(p => p.status === "borrador" || p.status === "calculado");
+  const comisionesPorAprobarList = commissions.filter(c => c.status === "proyectado");
+  const invoicesPorEnviarList = invoices.filter(i => i.status === "borrador");
+  const nominaSinCerrar = nominaSinCerrarList.length;
   const comisionFueraRango = commissions.filter(c => (Number(c.estimated_amount) || 0) > 50000).length;
-  const comisionesPorAprobar = commissions.filter(c => c.status === "proyectado").length;
-  const invoicesPorEnviar = invoices.filter(i => i.status === "borrador").length;
+  const comisionesPorAprobar = comisionesPorAprobarList.length;
+  const invoicesPorEnviar = invoicesPorEnviarList.length;
 
   const alerts = useMemo(() => {
     const list: { label: string; count: number; severity: "destructive" | "warning" | "default" }[] = [];
@@ -181,12 +186,184 @@ export default function FinanzasDashboard() {
 
   const hasFilters = costCenter || area || tipo !== "ambos";
 
-  const actions = [
-    { label: "Nómina por cerrar", count: nominaSinCerrar, path: "/finanzas/nomina" },
-    { label: "Comisiones por aprobar", count: comisionesPorAprobar, path: "/finanzas/horas-variables" },
-    { label: "Invoices por enviar", count: invoicesPorEnviar, path: "/finanzas/facturacion/invoices" },
-    { label: "Archivos bancarios por generar", count: 0, path: "/finanzas/nomina" },
-  ];
+  // Resolver datos del popup según el KPI
+  const popup = useMemo(() => {
+    if (!kpiPopup) return null;
+    let title = "";
+    let subtitle = "";
+    let rows: KpiRow[] = [];
+
+    switch (kpiPopup) {
+      case "ingresos":
+        title = `Ingresos del Mes — ${fmt(curIngresos)}`;
+        subtitle = `${curInvoicesPaid.length} facturas pagadas en ${format(now, "MMMM yyyy", { locale: es })}`;
+        rows = curInvoicesPaid.map(i => ({
+          primary: i.recipient_name || `Invoice ${i.invoice_number ?? i.id.slice(0, 8)}`,
+          secondary: i.payment_method ? `${i.payment_method} · ${format(new Date(i.created_at), "dd MMM", { locale: es })}` : format(new Date(i.created_at), "dd MMM", { locale: es }),
+          right: fmt(Number(i.amount) || 0),
+          rightTone: "success",
+        }));
+        break;
+      case "costos":
+        title = `Costos del Mes — ${fmt(curCostos)}`;
+        subtitle = `Nómina (${fmt(curNomina)}) + Comisiones pagadas (${fmt(curCostos - curNomina)})`;
+        rows = [
+          ...curPayroll.map(p => ({
+            primary: `Nómina · ${p.period_name ?? "Sin nombre"}`,
+            secondary: `${p.status} · ${p.cost_center ?? "Sin CC"}`,
+            right: fmt(Number(p.net_total) || 0),
+            rightTone: "destructive" as const,
+          })),
+          ...curCommissionsPaid.map(c => ({
+            primary: `Comisión · ${c.employee_name ?? "Sin nombre"}`,
+            secondary: `${c.area ?? "Sin área"} · ${c.cost_center ?? "Sin CC"}`,
+            right: fmt(Number(c.final_amount) || 0),
+            rightTone: "destructive" as const,
+          })),
+        ];
+        break;
+      case "margen":
+        title = `Margen Operativo — ${fmt(curMargen)} (${curMargenPct.toFixed(1)}%)`;
+        subtitle = `Ingresos ${fmt(curIngresos)} − Costos ${fmt(curCostos)}`;
+        rows = [
+          { primary: "Ingresos", right: fmt(curIngresos), rightTone: "success" },
+          { primary: "Costos", right: fmt(curCostos), rightTone: "destructive" },
+          { primary: "Margen", right: fmt(curMargen), rightTone: curMargen >= 0 ? "success" : "destructive" },
+          { primary: "Margen %", right: `${curMargenPct.toFixed(1)}%`, rightTone: curMargenPct >= 0 ? "success" : "destructive" },
+        ];
+        break;
+      case "nominaProy":
+        title = `Nómina Proyectada — ${fmt(nominaProyectada)}`;
+        subtitle = `${nominaProyectadaList.length} batches en borrador o calculado`;
+        rows = nominaProyectadaList.map(p => ({
+          primary: p.period_name ?? "Sin nombre",
+          secondary: `${p.status} · ${p.cost_center ?? "Sin CC"}`,
+          right: fmt(Number(p.net_total) || 0),
+          rightTone: "warning",
+        }));
+        break;
+      case "comisiones":
+        title = `Comisiones Acumuladas — ${fmt(curComisiones)}`;
+        subtitle = `${curCommissions.length} registros este mes`;
+        rows = curCommissions.map(c => ({
+          primary: c.employee_name ?? "Sin nombre",
+          secondary: `${c.area ?? "Sin área"} · ${c.status}`,
+          right: fmt(Number(c.estimated_amount) || 0),
+        }));
+        break;
+      case "facturasPend":
+        title = `Facturas Pendientes — ${facturasPendientes}`;
+        subtitle = "Estatus 'enviada', esperando pago";
+        rows = facturasPendientesList.map(i => ({
+          primary: i.recipient_name || `Invoice ${i.invoice_number ?? i.id.slice(0, 8)}`,
+          secondary: i.due_date ? `Vence ${format(new Date(i.due_date), "dd MMM yyyy", { locale: es })}` : format(new Date(i.created_at), "dd MMM", { locale: es }),
+          right: fmt(Number(i.amount) || 0),
+          rightTone: "warning",
+        }));
+        break;
+      case "facturasVenc":
+        title = `Facturas Vencidas — ${facturasVencidas}`;
+        subtitle = "Requieren atención inmediata";
+        rows = facturasVencidasList.map(i => ({
+          primary: i.recipient_name || `Invoice ${i.invoice_number ?? i.id.slice(0, 8)}`,
+          secondary: i.due_date ? `Vencida ${format(new Date(i.due_date), "dd MMM yyyy", { locale: es })}` : format(new Date(i.created_at), "dd MMM", { locale: es }),
+          right: fmt(Number(i.amount) || 0),
+          rightTone: "destructive",
+        }));
+        break;
+      case "variacion":
+        title = `Variación vs Mes Anterior — ${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`;
+        subtitle = `Mes actual ${fmt(curIngresos)} vs Mes anterior ${fmt(prevIngresos)}`;
+        rows = [
+          { primary: format(now, "MMMM yyyy", { locale: es }), right: fmt(curIngresos), rightTone: "success" },
+          { primary: format(subMonths(now, 1), "MMMM yyyy", { locale: es }), right: fmt(prevIngresos) },
+          { primary: "Diferencia", right: fmt(curIngresos - prevIngresos), rightTone: curIngresos - prevIngresos >= 0 ? "success" : "destructive" },
+        ];
+        break;
+      case "headcount":
+        title = `Empleados Activos — ${hrData?.headcount ?? 0}`;
+        subtitle = "Headcount con status 'activo'";
+        rows = (hrData?.empleados ?? []).map(e => ({
+          primary: e.full_name ?? "Sin nombre",
+          secondary: e.position ?? "Sin posición",
+          right: e.base_salary ? fmt(Number(e.base_salary)) : "—",
+        }));
+        break;
+      case "costoEmp":
+        title = `Costo Promedio por Empleado — ${fmt(hrData?.costPerEmp ?? 0)}`;
+        subtitle = `Nómina mensual / ${hrData?.headcount ?? 0} empleados activos`;
+        rows = [
+          { primary: "Headcount", right: String(hrData?.headcount ?? 0) },
+          { primary: "Costo promedio mensual", right: fmt(hrData?.costPerEmp ?? 0), rightTone: "default" },
+          { primary: "Costo anualizado estimado", right: fmt((hrData?.costPerEmp ?? 0) * 12) },
+        ];
+        break;
+      case "deducciones":
+        title = `Deducciones del Mes — ${fmt(hrData?.dedTotal ?? 0)}`;
+        subtitle = `${hrData?.deducciones.length ?? 0} deducciones registradas`;
+        rows = (hrData?.deducciones ?? []).map(d => ({
+          primary: d.reason ?? "Sin concepto",
+          secondary: d.month_year ?? "—",
+          right: fmt(Number(d.amount) || 0),
+          rightTone: "destructive",
+        }));
+        break;
+      case "departamentos":
+        title = `Departamentos — ${hrData?.deptCount ?? 0}`;
+        subtitle = "Departamentos con empleados activos";
+        rows = (hrData?.departamentos ?? []).map(d => ({
+          primary: d.name,
+          right: `${d.count} emp${d.count === 1 ? "" : "s"}`,
+        }));
+        break;
+      case "alertas":
+        title = `Alertas Operativas — ${alerts.length}`;
+        subtitle = "Issues activos que requieren atención";
+        rows = alerts.map(a => ({
+          primary: a.label,
+          right: String(a.count),
+          rightTone: a.severity,
+        }));
+        break;
+      case "accion-nomina":
+        title = `Nómina por Cerrar — ${nominaSinCerrar}`;
+        subtitle = "Batches en borrador o calculado";
+        rows = nominaSinCerrarList.map(p => ({
+          primary: p.period_name ?? "Sin nombre",
+          secondary: `${p.status} · ${p.cost_center ?? "Sin CC"}`,
+          right: fmt(Number(p.net_total) || 0),
+          rightTone: "warning",
+        }));
+        break;
+      case "accion-comisiones":
+        title = `Comisiones por Aprobar — ${comisionesPorAprobar}`;
+        subtitle = "Status 'proyectado'";
+        rows = comisionesPorAprobarList.map(c => ({
+          primary: c.employee_name ?? "Sin nombre",
+          secondary: `${c.area ?? "Sin área"}`,
+          right: fmt(Number(c.estimated_amount) || 0),
+          rightTone: "warning",
+        }));
+        break;
+      case "accion-invoices":
+        title = `Invoices por Enviar — ${invoicesPorEnviar}`;
+        subtitle = "Status 'borrador'";
+        rows = invoicesPorEnviarList.map(i => ({
+          primary: i.recipient_name || `Invoice ${i.invoice_number ?? i.id.slice(0, 8)}`,
+          secondary: format(new Date(i.created_at), "dd MMM yyyy", { locale: es }),
+          right: fmt(Number(i.amount) || 0),
+          rightTone: "warning",
+        }));
+        break;
+      case "accion-archivos":
+        title = "Archivos Bancarios por Generar";
+        subtitle = "No hay archivos pendientes";
+        rows = [];
+        break;
+    }
+
+    return { title, subtitle, rows };
+  }, [kpiPopup, curInvoicesPaid, curIngresos, curPayroll, curCommissionsPaid, curNomina, curCostos, curMargen, curMargenPct, nominaProyectadaList, nominaProyectada, curCommissions, curComisiones, facturasPendientesList, facturasPendientes, facturasVencidasList, facturasVencidas, variacion, prevIngresos, hrData, alerts, nominaSinCerrarList, nominaSinCerrar, comisionesPorAprobarList, comisionesPorAprobar, invoicesPorEnviarList, invoicesPorEnviar, now]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -232,100 +409,98 @@ export default function FinanzasDashboard() {
           )}
         </div>
 
-        {/* 8 KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+        {/* 8 KPI Cards — todas con el patrón estándar y onClick → modal */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <DashboardMetricCard label="Ingresos del Mes" value={fmt(curIngresos)} icon={TrendingUp} subtitle={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs mes anterior`} color="accent" />
-              <DashboardMetricCard label="Costos del Mes" value={fmt(curCostos)} icon={TrendingDown} subtitle={`${pctChange(curCostos, prevCostos) >= 0 ? "+" : ""}${pctChange(curCostos, prevCostos).toFixed(1)}% vs anterior`} color="destructive" />
-              <DashboardMetricCard label="Margen Operativo" value={fmt(curMargen)} icon={BarChart3} subtitle={`${curMargenPct.toFixed(1)}% margen`} color={curMargen >= 0 ? "accent" : "destructive"} />
-              <DashboardMetricCard label="Nómina Proyectada" value={fmt(nominaProyectada)} icon={Users} subtitle="Borrador + calculado" color="warning" />
-              <DashboardMetricCard label="Comisiones Acumuladas" value={fmt(curComisiones)} icon={DollarSign} subtitle={`${commissions.filter(c => inRange(c.created_at, currentMonthStart, currentMonthEnd)).length} registros`} color="primary" />
-              <DashboardMetricCard label="Facturas Pendientes" value={String(facturasPendientes)} icon={FileText} subtitle="Enviadas" color="warning" />
-              <DashboardMetricCard label="Facturas Vencidas" value={String(facturasVencidas)} icon={AlertTriangle} subtitle="Requieren atención" color="destructive" />
-              <DashboardMetricCard label="Variación vs Anterior" value={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`} icon={TrendingUp} subtitle="Ingresos mes a mes" color={variacion >= 0 ? "accent" : "destructive"} />
+              <KpiCard label="Ingresos del Mes" value={fmt(curIngresos)} icon={TrendingUp} color="bg-emerald-500" subtitle={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs anterior`} onClick={() => setKpiPopup("ingresos")} />
+              <KpiCard label="Costos del Mes" value={fmt(curCostos)} icon={TrendingDown} color="bg-rose-500" subtitle={`${pctChange(curCostos, prevCostos) >= 0 ? "+" : ""}${pctChange(curCostos, prevCostos).toFixed(1)}% vs anterior`} onClick={() => setKpiPopup("costos")} />
+              <KpiCard label="Margen Operativo" value={fmt(curMargen)} icon={BarChart3} color={curMargen >= 0 ? "bg-emerald-500" : "bg-rose-500"} subtitle={`${curMargenPct.toFixed(1)}% margen`} onClick={() => setKpiPopup("margen")} />
+              <KpiCard label="Nómina Proyectada" value={fmt(nominaProyectada)} icon={Users} color="bg-amber-500" subtitle="Borrador + calculado" onClick={() => setKpiPopup("nominaProy")} />
+              <KpiCard label="Comisiones Acumuladas" value={fmt(curComisiones)} icon={DollarSign} color="bg-blue-500" subtitle={`${curCommissions.length} registros`} onClick={() => setKpiPopup("comisiones")} />
+              <KpiCard label="Facturas Pendientes" value={String(facturasPendientes)} icon={FileText} color="bg-amber-500" subtitle="Enviadas" onClick={() => setKpiPopup("facturasPend")} />
+              <KpiCard label="Facturas Vencidas" value={String(facturasVencidas)} icon={AlertTriangle} color="bg-rose-500" subtitle="Requieren atención" onClick={() => setKpiPopup("facturasVenc")} />
+              <KpiCard label="Variación vs Anterior" value={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`} icon={TrendingUp} color={variacion >= 0 ? "bg-emerald-500" : "bg-rose-500"} subtitle="Ingresos mes a mes" onClick={() => setKpiPopup("variacion")} />
             </>
           )}
         </div>
 
-        {/* Headcount y Costos de Personal */}
-        <HRPersonnelCards />
+        {/* Headcount y Costos de Personal — 4 cards estándar */}
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            Headcount y Costos de Personal
+          </h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <KpiCard label="Empleados Activos" value={String(hrData?.headcount ?? 0)} icon={Users} color="bg-blue-500" subtitle="Headcount" onClick={() => setKpiPopup("headcount")} />
+            <KpiCard label="Costo Prom/Emp" value={fmt(hrData?.costPerEmp ?? 0)} icon={Briefcase} color="bg-violet-500" subtitle="Nómina / headcount" onClick={() => setKpiPopup("costoEmp")} />
+            <KpiCard label="Deducciones Mes" value={fmt(hrData?.dedTotal ?? 0)} icon={ArrowDown} color="bg-rose-500" subtitle="Acumuladas" onClick={() => setKpiPopup("deducciones")} />
+            <KpiCard label="Departamentos" value={String(hrData?.deptCount ?? 0)} icon={Building2} color="bg-emerald-500" subtitle="Con empleados activos" onClick={() => setKpiPopup("departamentos")} />
+          </div>
+        </div>
 
-        {/* Flujo de Dinero */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-muted-foreground" />Flujo de Dinero
-              </CardTitle>
-              <div className="inline-flex items-center gap-1 rounded-md border border-border p-0.5">
-                {(["3M", "6M", "12M"] as const).map(r => (
-                  <Button key={r} variant={chartRange === r ? "secondary" : "ghost"} size="sm" className="h-6 text-xs px-2" onClick={() => setChartRange(r)}>{r}</Button>
-                ))}
-              </div>
+        {/* Flujo de Dinero — chart se queda como está, no es un KPI clickeable */}
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+              <Wallet className="h-4 w-4 text-muted-foreground" />Flujo de Dinero
+            </h2>
+            <div className="inline-flex items-center gap-1 rounded-md border border-border p-0.5">
+              {(["3M", "6M", "12M"] as const).map(r => (
+                <Button key={r} variant={chartRange === r ? "secondary" : "ghost"} size="sm" className="h-6 text-xs px-2" onClick={() => setChartRange(r)}>{r}</Button>
+              ))}
             </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-64 w-full" /> : (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={chartData} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-                  <RTooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }} />
-                  <Legend />
-                  <Bar dataKey="Ingresos" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Costos" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+          {isLoading ? <Skeleton className="h-64 w-full" /> : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={chartData} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                <RTooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }} />
+                <Legend />
+                <Bar dataKey="Ingresos" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Costos" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Alertas Operativas */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-warning" />Alertas Operativas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {alerts.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Sin alertas activas ✓</p>
-              ) : (
-                <div className="space-y-2">
-                  {alerts.map((a, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-                      <span className="text-sm">{a.label}</span>
-                      <Badge variant={a.severity === "destructive" ? "destructive" : a.severity === "warning" ? "secondary" : "outline"}>{a.count}</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Alertas Operativas — card resumen clickeable */}
+          <KpiCard
+            label="Alertas Operativas"
+            value={String(alerts.length)}
+            icon={AlertTriangle}
+            color={alerts.length > 0 ? "bg-amber-500" : "bg-slate-500"}
+            subtitle={alerts.length === 0 ? "Sin alertas activas" : "Click para ver detalle"}
+            onClick={() => setKpiPopup("alertas")}
+            className="lg:col-span-1"
+          />
 
-          {/* Próximas Acciones */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <ListChecks className="h-4 w-4 text-primary" />Próximas Acciones
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {actions.map((a, i) => (
-                  <button key={i} onClick={() => navigate(a.path)} className="w-full flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/50 transition-colors text-left">
-                    <span className="text-sm">{a.label}</span>
-                    <Badge variant={a.count > 0 ? "default" : "outline"}>{a.count}</Badge>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Próximas Acciones — 4 cards en mini grid */}
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+              <ListChecks className="h-4 w-4 text-primary" />
+              Próximas Acciones
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              <KpiCard label="Nómina por cerrar" value={String(nominaSinCerrar)} icon={Users} color="bg-amber-500" onClick={() => setKpiPopup("accion-nomina")} />
+              <KpiCard label="Comisiones por aprobar" value={String(comisionesPorAprobar)} icon={DollarSign} color="bg-blue-500" onClick={() => setKpiPopup("accion-comisiones")} />
+              <KpiCard label="Invoices por enviar" value={String(invoicesPorEnviar)} icon={FileText} color="bg-violet-500" onClick={() => setKpiPopup("accion-invoices")} />
+              <KpiCard label="Archivos bancarios" value="0" icon={FileText} color="bg-slate-500" subtitle="Por generar" onClick={() => setKpiPopup("accion-archivos")} />
+            </div>
+          </div>
         </div>
       </div>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={popup?.title ?? ""}
+        subtitle={popup?.subtitle}
+        rows={popup?.rows ?? []}
+      />
     </div>
   );
 }

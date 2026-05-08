@@ -35,8 +35,8 @@ interface CreatorOption {
 interface Props {
   filters: ContactoFilters;
   onChange: (patch: Partial<ContactoFilters>) => void;
-  view: "table" | "grid";
-  onViewChange: (v: "table" | "grid") => void;
+  view?: "table" | "grid";
+  onViewChange?: (v: "table" | "grid") => void;
   hasActiveFilters?: boolean;
   onClear?: () => void;
   creators?: CreatorOption[];
@@ -149,22 +149,24 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
         </Button>
       )}
 
-      <div className="ml-auto flex gap-1 shrink-0">
-        <Button
-          variant={view === "table" ? "secondary" : "ghost"}
-          size="icon"
-          onClick={() => onViewChange("table")}
-        >
-          <List className="h-4 w-4" />
-        </Button>
-        <Button
-          variant={view === "grid" ? "secondary" : "ghost"}
-          size="icon"
-          onClick={() => onViewChange("grid")}
-        >
-          <LayoutGrid className="h-4 w-4" />
-        </Button>
-      </div>
+      {view !== undefined && onViewChange && (
+        <div className="ml-auto flex gap-1 shrink-0">
+          <Button
+            variant={view === "table" ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => onViewChange("table")}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={view === "grid" ? "secondary" : "ghost"}
+            size="icon"
+            onClick={() => onViewChange("grid")}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

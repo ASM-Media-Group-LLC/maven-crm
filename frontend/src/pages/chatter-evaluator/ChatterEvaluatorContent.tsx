@@ -4,6 +4,8 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import {
   Bar,
   BarChart,
@@ -99,27 +101,21 @@ const ProfileCard = ({
   );
 };
 
+// StatCard — wrapper sobre KpiCard estándar para consistencia con
+// dashboards globales.
 const StatCard = ({
-  icon: Icon,
+  icon,
   label,
   value,
+  color = "bg-blue-500",
+  onClick,
 }: {
   icon: typeof ImageIcon;
   label: string;
   value: string | number;
-}) => (
-  <Card>
-    <CardContent className="flex items-center gap-3 p-4">
-      <div className="rounded-lg bg-primary/10 p-2 text-primary">
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="min-w-0">
-        <p className="truncate text-xs text-muted-foreground">{label}</p>
-        <p className="text-xl font-semibold">{value}</p>
-      </div>
-    </CardContent>
-  </Card>
-);
+  color?: string;
+  onClick?: () => void;
+}) => <KpiCard label={label} value={value} icon={icon as any} color={color} onClick={onClick} />;
 
 const ChatterEvaluatorContent = () => {
   const profilesQ = useChatterProfiles();
@@ -132,6 +128,8 @@ const ChatterEvaluatorContent = () => {
   // ruta (la guard del routing los redirigía silenciosamente).
   const canSeeAdmin = canAccess("Chatters", "Admin");
   const [newSessionOpen, setNewSessionOpen] = useState(false);
+  type KpiKey = "total" | "approved" | "rejected" | "rate";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   // Rango activo para los stat cards — los charts ya tienen su propia
   // ventana fija (30 días), así que el toggle solo afecta los 4 cajones
   // de arriba.
@@ -226,21 +224,29 @@ const ChatterEvaluatorContent = () => {
               icon={Users}
               label="Personas evaluadas"
               value={statsQ.isLoading ? "…" : (counters?.total ?? 0)}
+              color="bg-blue-500"
+              onClick={() => setKpiPopup("total")}
             />
             <StatCard
               icon={CheckCircle2}
               label="Aprobados"
               value={statsQ.isLoading ? "…" : (counters?.approved ?? 0)}
+              color="bg-emerald-500"
+              onClick={() => setKpiPopup("approved")}
             />
             <StatCard
               icon={XCircle}
               label="Reprobados"
               value={statsQ.isLoading ? "…" : (counters?.rejected ?? 0)}
+              color="bg-rose-500"
+              onClick={() => setKpiPopup("rejected")}
             />
             <StatCard
               icon={Percent}
               label="Promedio de éxito"
               value={statsQ.isLoading ? "…" : `${counters?.successRatePct ?? 0}%`}
+              color="bg-violet-500"
+              onClick={() => setKpiPopup("rate")}
             />
           </div>
         </div>
@@ -411,6 +417,49 @@ const ChatterEvaluatorContent = () => {
           )}
         </section>
       </div>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Personas Evaluadas — ${counters?.total ?? 0}`;
+            case "approved": return `Aprobados — ${counters?.approved ?? 0}`;
+            case "rejected": return `Reprobados — ${counters?.rejected ?? 0}`;
+            case "rate": return `Tasa de éxito — ${counters?.successRatePct ?? 0}%`;
+            default: return "";
+          }
+        })()}
+        subtitle={(() => {
+          if (kpiPopup === "rate") return `${counters?.approved ?? 0} aprobados de ${counters?.total ?? 0} totales`;
+          if (kpiPopup === "total") return "Total de evaluaciones registradas";
+          return undefined;
+        })()}
+        rows={(() => {
+          if (!kpiPopup || !counters) return [];
+          if (kpiPopup === "rate") {
+            const rate = counters.successRatePct ?? 0;
+            return [
+              { primary: "Total evaluados", right: String(counters.total) },
+              { primary: "Aprobados", right: String(counters.approved), rightTone: "success" as const },
+              { primary: "Reprobados", right: String(counters.rejected), rightTone: "destructive" as const },
+              { primary: "Tasa de éxito", right: `${rate}%`, rightTone: rate >= 50 ? "success" as const : "warning" as const },
+            ];
+          }
+          const profiles = profilesQ.data ?? [];
+          let list: any[] = profiles;
+          if (kpiPopup === "approved") list = profiles.filter((p: any) => p.last_status === "apto" || p.status === "apto");
+          else if (kpiPopup === "rejected") list = profiles.filter((p: any) => p.last_status === "no_apto" || p.status === "no_apto");
+          const tone = (status?: string): KpiRow["rightTone"] =>
+            status === "apto" ? "success" : status === "no_apto" ? "destructive" : "default";
+          return list.slice(0, 100).map((p: any): KpiRow => ({
+            primary: p.full_name ?? p.name ?? "Sin nombre",
+            secondary: p.role ?? p.position ?? undefined,
+            right: p.last_status ?? p.status ?? "—",
+            rightTone: tone(p.last_status ?? p.status),
+          }));
+        })()}
+      />
     </main>
   );
 };

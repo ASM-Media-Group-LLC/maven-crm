@@ -10,6 +10,7 @@ import OnboardingTable from "./OnboardingTable";
 import OnboardingGrid from "./OnboardingGrid";
 import { useOnboarding, calculateCurrentStep, type OnboardingCreator } from "./useOnboarding";
 import { useUserRole } from "@/hooks/useUserRole";
+import CreadoresSubtabs from "../CreadoresSubtabs";
 
 const agencyOptions = ["Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "Otra"];
 
@@ -101,6 +102,8 @@ const OnboardingContent = () => {
       </div>
 
       <div className="flex-1 overflow-auto px-6 pb-6 space-y-4">
+        <CreadoresSubtabs />
+
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
           {kpiCards.map((kpi) => (

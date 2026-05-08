@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Users, UserPlus, MessageCircle, UserCheck, Instagram } from "lucide-react";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { useSuperContacts } from "./useSuperContacts";
 import { getCountryDisplay } from "@/lib/country-utils";
 import ImportModal from "./ImportModal";
@@ -66,29 +68,29 @@ const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAdd
     return map;
   }, [contacts]);
 
+  type KpiKey = "total" | "nuevo" | "contactado" | "convertido";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
+
   const kpis = [
-    { label: "Total", value: counts.total, icon: Users, color: "text-primary" },
-    { label: "Nuevos", value: counts.nuevo, icon: UserPlus, color: "text-blue-400" },
-    { label: "Contactados", value: counts.contactado, icon: MessageCircle, color: "text-amber-400" },
-    { label: "Convertidos", value: counts.convertido, icon: UserCheck, color: "text-emerald-400" },
+    { key: "total" as KpiKey, label: "Total", value: counts.total, icon: Users, color: "bg-blue-500" },
+    { key: "nuevo" as KpiKey, label: "Nuevos", value: counts.nuevo, icon: UserPlus, color: "bg-violet-500" },
+    { key: "contactado" as KpiKey, label: "Contactados", value: counts.contactado, icon: MessageCircle, color: "bg-amber-500" },
+    { key: "convertido" as KpiKey, label: "Convertidos", value: counts.convertido, icon: UserCheck, color: "bg-emerald-500" },
   ];
 
   return (
     <div className="space-y-6">
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPIs — clickeables, abren modal */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {kpis.map((k) => (
-          <Card key={k.label} className="group hover:scale-[1.03] transition-transform">
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">{k.label}</p>
-                <p className="text-2xl font-bold">{k.value}</p>
-              </div>
-              <div className={`rounded-lg bg-muted p-2 ${k.color}`}>
-                <k.icon className="h-5 w-5" />
-              </div>
-            </CardContent>
-          </Card>
+          <KpiCard
+            key={k.label}
+            label={k.label}
+            value={k.value}
+            icon={k.icon}
+            color={k.color}
+            onClick={() => setKpiPopup(k.key)}
+          />
         ))}
       </div>
 
@@ -181,6 +183,47 @@ const SuperContactsContent = ({ importOpen, setImportOpen, addSingleOpen, setAdd
 
       <ImportModal open={importOpen} onOpenChange={setImportOpen} />
       <AddSingleContactModal open={addSingleOpen} onOpenChange={setAddSingleOpen} />
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Contactos — ${counts.total}`;
+            case "nuevo": return `Nuevos — ${counts.nuevo}`;
+            case "contactado": return `Contactados — ${counts.contactado}`;
+            case "convertido": return `Convertidos — ${counts.convertido}`;
+            default: return "";
+          }
+        })()}
+        subtitle={(() => {
+          switch (kpiPopup) {
+            case "total": return "Wishlist completa";
+            case "nuevo": return "Sin interacción aún";
+            case "contactado": return "Con seguimiento iniciado";
+            case "convertido": return "Pasaron a creadoras";
+            default: return undefined;
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = contacts;
+          if (kpiPopup === "nuevo") list = contacts.filter(c => c.status === "nuevo");
+          else if (kpiPopup === "contactado") list = contacts.filter(c => c.status === "contactado");
+          else if (kpiPopup === "convertido") list = contacts.filter(c => c.status === "convertido");
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "convertido" ? "success" :
+            status === "no_interesado" ? "destructive" :
+            status === "contactado" || status === "interesado" ? "default" :
+            "warning";
+          return list.slice(0, 100).map((c): KpiRow => ({
+            primary: c.full_name || `@${c.instagram_handle}`,
+            secondary: c.city ? `${c.city}${c.followers_count ? ` · ${c.followers_count.toLocaleString()} followers` : ""}` : c.followers_count ? `${c.followers_count.toLocaleString()} followers` : undefined,
+            right: statusConfig[c.status]?.label ?? c.status,
+            rightTone: tone(c.status),
+          }));
+        })()}
+      />
     </div>
   );
 };

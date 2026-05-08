@@ -21,7 +21,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
@@ -70,6 +71,8 @@ export default function CollectionsPage() {
   const [editFile, setEditFile] = useState<File | null>(null);
   const editFileRef = useRef<HTMLInputElement>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  type KpiKey = "total" | "pagadas" | "pendientes" | "vencidas" | "sinCobro";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["collections-invoices"],
@@ -273,15 +276,15 @@ export default function CollectionsPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
-        {/* KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          {isLoading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+        {/* KPIs estilo estándar — cada uno abre modal con detalle */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {isLoading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <DashboardMetricCard label="Total" value={String(invoices.length)} icon={Users} subtitle={`Bruto: ${fmt(totalCobrado + totalPendiente + totalVencido)}`} color="primary" />
-              <DashboardMetricCard label="Pagadas" value={String(cobrados.length)} icon={CheckCircle} subtitle={fmt(totalCobrado)} color="accent" />
-              <DashboardMetricCard label="Pendientes" value={String(pendientes.length)} icon={Clock} subtitle={fmt(totalPendiente)} color="warning" />
-              <DashboardMetricCard label="Vencidas" value={String(vencidos.length)} icon={AlertTriangle} subtitle={fmt(totalVencido)} color="destructive" />
-              <DashboardMetricCard label="Sin Cobro" value={String(sinCobro.length)} icon={Ban} subtitle="$0" color="muted" />
+              <KpiCard label="Total" value={String(invoices.length)} icon={Users} color="bg-blue-500" subtitle={`Bruto: ${fmt(totalCobrado + totalPendiente + totalVencido)}`} onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Pagadas" value={String(cobrados.length)} icon={CheckCircle} color="bg-emerald-500" subtitle={fmt(totalCobrado)} onClick={() => setKpiPopup("pagadas")} />
+              <KpiCard label="Pendientes" value={String(pendientes.length)} icon={Clock} color="bg-amber-500" subtitle={fmt(totalPendiente)} onClick={() => setKpiPopup("pendientes")} />
+              <KpiCard label="Vencidas" value={String(vencidos.length)} icon={AlertTriangle} color="bg-rose-500" subtitle={fmt(totalVencido)} onClick={() => setKpiPopup("vencidas")} />
+              <KpiCard label="Sin Cobro" value={String(sinCobro.length)} icon={Ban} color="bg-slate-500" subtitle="$0" onClick={() => setKpiPopup("sinCobro")} />
             </>
           )}
         </div>
@@ -312,11 +315,11 @@ export default function CollectionsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <DashboardMetricCard label="Ventas Último Mes" value={fmt(ventasUltimoMes)} icon={TrendingUp} subtitle="Total invoices" color="accent" />
-              <DashboardMetricCard label="Promedio 6 Meses" value={fmt(promedio6)} icon={BarChart3} subtitle="Promedio histórico" color="primary" />
-              <DashboardMetricCard label="Comisión Socios" value={fmt(comisionSocios)} icon={DollarSign} subtitle="Fees acumulados" color="warning" />
-              <DashboardMetricCard label="Facturación Neta" value={fmt(facturacionNeta)} icon={DollarSign} subtitle="Neto real" color="accent" />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <KpiCard label="Ventas Último Mes" value={fmt(ventasUltimoMes)} icon={TrendingUp} subtitle="Total invoices" color="bg-emerald-500" />
+              <KpiCard label="Promedio 6 Meses" value={fmt(promedio6)} icon={BarChart3} subtitle="Promedio histórico" color="bg-blue-500" />
+              <KpiCard label="Comisión Socios" value={fmt(comisionSocios)} icon={DollarSign} subtitle="Fees acumulados" color="bg-amber-500" />
+              <KpiCard label="Facturación Neta" value={fmt(facturacionNeta)} icon={DollarSign} subtitle="Neto real" color="bg-violet-500" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -671,6 +674,52 @@ export default function CollectionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Todas las Facturas — ${invoices.length}`;
+            case "pagadas": return `Facturas Pagadas — ${cobrados.length} (${fmt(totalCobrado)})`;
+            case "pendientes": return `Facturas Pendientes — ${pendientes.length} (${fmt(totalPendiente)})`;
+            case "vencidas": return `Facturas Vencidas — ${vencidos.length} (${fmt(totalVencido)})`;
+            case "sinCobro": return `Sin Cobro — ${sinCobro.length}`;
+            default: return "";
+          }
+        })()}
+        subtitle={(() => {
+          switch (kpiPopup) {
+            case "total": return "Listado completo de invoices";
+            case "pagadas": return "Cobradas exitosamente";
+            case "pendientes": return "Enviadas, esperando pago";
+            case "vencidas": return "Pasaron fecha límite";
+            case "sinCobro": return "Sin creator asignado o monto $0";
+            default: return undefined;
+          }
+        })()}
+        rows={(() => {
+          let list: typeof invoices = [];
+          switch (kpiPopup) {
+            case "total": list = invoices; break;
+            case "pagadas": list = cobrados; break;
+            case "pendientes": list = pendientes; break;
+            case "vencidas": list = vencidos; break;
+            case "sinCobro": list = sinCobro; break;
+            default: list = [];
+          }
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "pagada" ? "success" :
+            status === "vencida" ? "destructive" :
+            status === "enviada" ? "warning" : "default";
+          return list.map((i) => ({
+            primary: (i as any).creators?.artistic_name || (i as any).creators?.name || (i as any).recipient_name || `Invoice ${(i as any).invoice_number ?? i.id.slice(0, 8)}`,
+            secondary: `${i.status} · ${i.created_at ? format(new Date(i.created_at), "dd MMM yyyy", { locale: es }) : "—"}`,
+            right: fmt(Number(i.amount) || 0),
+            rightTone: tone(i.status as string),
+          }));
+        })()}
+      />
     </div>
   );
 }

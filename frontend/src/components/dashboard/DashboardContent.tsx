@@ -20,7 +20,8 @@ import {
   PieChart, Pie, Cell,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import DashboardMetricCard from "./DashboardMetricCard";
+import KpiCard from "./KpiCard";
+import KpiDetailDialog, { type KpiRow } from "./KpiDetailDialog";
 import { useEarningsData } from "@/pages/sales-performance/useEarningsData";
 import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -195,6 +196,7 @@ const DashboardContent = () => {
   const recordView = useRecordAnnouncementView();
   const recordOpen = useRecordAnnouncementOpen();
   const [detailAnnouncement, setDetailAnnouncement] = useState<Announcement | null>(null);
+  const [kpiPopup, setKpiPopup] = useState<"creators" | "tickets" | "leads" | "employees" | "overdue" | null>(null);
 
   const handleOpenDetail = useCallback((a: Announcement) => {
     setDetailAnnouncement(a);
@@ -246,44 +248,50 @@ const DashboardContent = () => {
     return "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5";
   };
 
+  type KpiKey = "creators" | "tickets" | "leads" | "employees" | "overdue";
   const kpis = [
     {
+      key: "creators" as KpiKey,
       label: "Total Creators",
       value: creatorsLoading ? loading : String(creatorsData?.total ?? 0),
       icon: Users,
-      color: "primary" as const,
+      color: "bg-blue-500",
       subtitle: creatorsLoading ? "" : `${creatorsData?.active ?? 0} activas / ${creatorsData?.inactive ?? 0} inactivas`,
       show: canAccess("Creadores"),
     },
     {
+      key: "tickets" as KpiKey,
       label: "Active Tickets",
       value: ticketsLoading ? loading : String(ticketsData?.active ?? 0),
       icon: Ticket,
-      color: "destructive" as const,
+      color: "bg-rose-500",
       subtitle: ticketsLoading ? "" : `${ticketsData?.resolved ?? 0} resueltos`,
       show: canAccess("Tickets"),
     },
     {
+      key: "leads" as KpiKey,
       label: "New Leads Today",
       value: leadsLoading ? loading : String(leadsData?.todayCount ?? 0),
       icon: MessageSquare,
-      color: "accent" as const,
+      color: "bg-violet-500",
       subtitle: leadsLoading ? "" : `${leadsData?.interestedCount ?? 0} interesados`,
       show: canAccess("LeadGen"),
     },
     {
+      key: "employees" as KpiKey,
       label: "Empleados Activos",
       value: String(opKPIs?.totalEmployees ?? 0),
       icon: Users,
-      color: "success" as const,
+      color: "bg-emerald-500",
       subtitle: `${opKPIs?.absencesToday ?? 0} ausencias hoy`,
       show: canAccess("HR"),
     },
     {
+      key: "overdue" as KpiKey,
       label: "Tareas Vencidas",
       value: String(opKPIs?.overdueTasks ?? 0),
       icon: Clock,
-      color: "warning" as const,
+      color: "bg-amber-500",
       subtitle: `${opKPIs?.eventsToday ?? 0} eventos hoy`,
       show: true,
     },
@@ -311,10 +319,18 @@ const DashboardContent = () => {
 
       {/* Scrollable Content */}
       <main className="flex-1 overflow-auto p-6 space-y-6">
-        {/* KPI Cards */}
-        <div className={`grid gap-4 ${getGridCols(kpis.length)}`}>
+        {/* KPI Cards — patrón estándar; click abre modal */}
+        <div className={`grid gap-3 ${getGridCols(kpis.length)}`}>
           {kpis.map((k) => (
-            <DashboardMetricCard key={k.label} label={k.label} value={k.value} icon={k.icon} color={k.color} subtitle={k.subtitle} />
+            <KpiCard
+              key={k.label}
+              label={k.label}
+              value={k.value}
+              icon={k.icon}
+              color={k.color}
+              subtitle={k.subtitle}
+              onClick={() => setKpiPopup(k.key)}
+            />
           ))}
         </div>
 
@@ -726,6 +742,68 @@ const DashboardContent = () => {
         open={!!detailAnnouncement}
         onOpenChange={(open) => !open && setDetailAnnouncement(null)}
         onOpened={handleRecordOpen}
+      />
+
+      {/* KPI Detail — desglose del KPI clickeado */}
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "creators": return `Total Creators — ${creatorsData?.total ?? 0}`;
+            case "tickets": return `Active Tickets — ${ticketsData?.active ?? 0}`;
+            case "leads": return `New Leads Today — ${leadsData?.todayCount ?? 0}`;
+            case "employees": return `Empleados Activos — ${opKPIs?.totalEmployees ?? 0}`;
+            case "overdue": return `Tareas Vencidas — ${opKPIs?.overdueTasks ?? 0}`;
+            default: return "";
+          }
+        })()}
+        subtitle={(() => {
+          switch (kpiPopup) {
+            case "creators": return "Estado de las creadoras del directorio";
+            case "tickets": return "Tickets abiertos vs resueltos";
+            case "leads": return "Leads ingresados hoy";
+            case "employees": return "Headcount activo y ausencias del día";
+            case "overdue": return "Tareas con due_date vencido + eventos del día";
+            default: return undefined;
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          if (kpiPopup === "creators") {
+            return [
+              { primary: "Activas", right: String(creatorsData?.active ?? 0), rightTone: "success" as const },
+              { primary: "Inactivas", right: String(creatorsData?.inactive ?? 0), rightTone: "default" as const },
+              { primary: "Total", right: String(creatorsData?.total ?? 0) },
+            ];
+          }
+          if (kpiPopup === "tickets") {
+            return [
+              { primary: "Activos", right: String(ticketsData?.active ?? 0), rightTone: "warning" as const },
+              { primary: "Resueltos", right: String(ticketsData?.resolved ?? 0), rightTone: "success" as const },
+            ];
+          }
+          if (kpiPopup === "leads") {
+            return [
+              { primary: "Ingresados hoy", right: String(leadsData?.todayCount ?? 0), rightTone: "default" as const },
+              { primary: "Interesados", right: String(leadsData?.interestedCount ?? 0), rightTone: "success" as const },
+            ];
+          }
+          if (kpiPopup === "employees") {
+            const rows: KpiRow[] = [
+              { primary: "Total empleados activos", right: String(opKPIs?.totalEmployees ?? 0) },
+              { primary: "Ausencias hoy", right: String(opKPIs?.absencesToday ?? 0), rightTone: "warning" as const },
+            ];
+            return rows;
+          }
+          if (kpiPopup === "overdue") {
+            return [
+              { primary: "Tareas vencidas", right: String(opKPIs?.overdueTasks ?? 0), rightTone: "destructive" as const },
+              { primary: "Eventos hoy", right: String(opKPIs?.eventsToday ?? 0), rightTone: "default" as const },
+            ];
+          }
+          return [];
+        })()}
       />
     </div>
   );

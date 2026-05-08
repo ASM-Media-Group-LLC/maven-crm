@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const viewTabs = ["Vista General", "Rendimiento por Creadora"] as const;
-const timePeriods = ["Ayer", "Hoy", "Esta semana", "Este mes", "Últimos 7 días", "Últimos 30 días", "Últimos 90 días"] as const;
 
 type ViewTab = (typeof viewTabs)[number];
-type TimePeriod = (typeof timePeriods)[number] | "Personalizado";
+// Sin presets — DateRangePicker es la única forma de cambiar el rango.
+type TimePeriod = "Personalizado";
 
 export type EarningsMode = "net" | "gross";
 
@@ -74,22 +74,8 @@ const DashboardFilters = ({
         ))}
       </div>
 
-      {/* Time filters + date range + compare */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="inline-flex rounded-lg bg-muted/50 p-1">
-          {timePeriods.map((period) => (
-            <Button
-              key={period}
-              variant={activePeriod === period ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => onPeriodChange(period)}
-            >
-              {period}
-            </Button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-3">
+      {/* Date range + compare (sin presets — el usuario pidió quitar todos los botones rápidos) */}
+      <div className="flex items-center justify-end flex-wrap gap-3">
           {compareMode ? (
             <>
               <div className="flex items-center gap-2">
@@ -153,7 +139,6 @@ const DashboardFilters = ({
               )}
             </Button>
           )}
-        </div>
       </div>
     </div>
   );

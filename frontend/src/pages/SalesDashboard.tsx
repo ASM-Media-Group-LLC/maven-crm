@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { startOfDay, endOfDay, startOfWeek, startOfMonth, subDays, format } from "date-fns";
+import { startOfDay, endOfDay, format } from "date-fns";
 import { Download } from "lucide-react";
 import DashboardFilters from "./sales-dashboard/DashboardFilters";
 import EarningsTrendChart from "./sales-dashboard/EarningsTrendChart";
@@ -13,31 +13,18 @@ import { ALL_COLUMNS } from "./sales-performance/types";
 import { Button } from "@/components/ui/button";
 import type { ViewTab, TimePeriod, EarningsMode } from "./sales-dashboard/DashboardFilters";
 import type { EarningsRow } from "./sales-performance/types";
+import VentasSubtabs from "./sales-overview/VentasSubtabs";
 
-const getDateRange = (period: TimePeriod): { from: Date; to: Date } => {
-  const now = new Date();
-  const today = startOfDay(now);
-  switch (period) {
-    case "Ayer":
-      return { from: subDays(today, 1), to: subDays(today, 1) };
-    case "Hoy":
-      return { from: today, to: today };
-    case "Esta semana":
-      return { from: startOfWeek(today, { weekStartsOn: 1 }), to: today };
-    case "Este mes":
-      return { from: startOfMonth(today), to: today };
-    case "Últimos 7 días":
-      return { from: subDays(today, 6), to: today };
-    case "Últimos 30 días":
-      return { from: subDays(today, 29), to: today };
-    case "Últimos 90 días":
-      return { from: subDays(today, 89), to: today };
-  }
+const getDateRange = (_period: TimePeriod): { from: Date; to: Date } => {
+  // Sin presets de período — fallback al día de hoy hasta que el usuario
+  // pickee algo en el DateRangePicker (estado "Personalizado").
+  const today = startOfDay(new Date());
+  return { from: today, to: today };
 };
 
 const SalesDashboard = () => {
   const [activeView, setActiveView] = useState<ViewTab>("Vista General");
-  const [activePeriod, setActivePeriod] = useState<TimePeriod>("Últimos 7 días");
+  const [activePeriod, setActivePeriod] = useState<TimePeriod>("Personalizado");
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [compareMode, setCompareMode] = useState(false);
   const [compareRange, setCompareRange] = useState<{ from?: Date; to?: Date }>({});
@@ -126,6 +113,7 @@ const SalesDashboard = () => {
             </Button>
           </div>
           <main className="flex-1 overflow-auto p-6 space-y-8">
+            <VentasSubtabs />
             <DashboardFilters
               activeView={activeView}
               onViewChange={setActiveView}

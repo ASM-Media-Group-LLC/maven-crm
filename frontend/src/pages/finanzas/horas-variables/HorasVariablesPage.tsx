@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import NuevaComisionModal from "../comisiones/NuevaComisionModal";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 
@@ -45,6 +46,9 @@ export default function HorasVariablesPage() {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const { params: payrollParams } = usePayrollParams();
   const hourValue = payrollParams?.hour_bank?.hour_value ?? 15;
+
+  type KpiKey = "horasExtra" | "banco" | "comisiones" | "empleados";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
 
   // Banco de Horas modals
   const [payItem, setPayItem] = useState<any>(null);
@@ -527,14 +531,14 @@ export default function HorasVariablesPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
-        {/* KPIs globales */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {(loadingHoras || loadingCommissions) ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+        {/* KPIs globales — clickeables, abren modal */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {(loadingHoras || loadingCommissions) ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <DashboardMetricCard label="Total Horas Extra" value={`${totalOvertimeHours}h`} icon={Clock} subtitle={`${uniqueEmps} empleados`} color="primary" />
-              <DashboardMetricCard label="Banco de Horas" value={`${totalBankHours}h`} icon={Wallet} subtitle={fmt(totalBankAmount)} color="accent" />
-              <DashboardMetricCard label="Total Comisiones" value={fmt(commissions.reduce((s, c) => s + (Number(c.final_amount) || 0), 0))} icon={DollarSign} subtitle={`${commissions.length} registros`} color="warning" />
-              <DashboardMetricCard label="Empleados Activos" value={String(uniqueEmps)} icon={TrendingUp} subtitle="Con registros" color="muted" />
+              <KpiCard label="Total Horas Extra" value={`${totalOvertimeHours}h`} icon={Clock} color="bg-blue-500" subtitle={`${uniqueEmps} empleados`} onClick={() => setKpiPopup("horasExtra")} />
+              <KpiCard label="Banco de Horas" value={`${totalBankHours}h`} icon={Wallet} color="bg-emerald-500" subtitle={fmt(totalBankAmount)} onClick={() => setKpiPopup("banco")} />
+              <KpiCard label="Total Comisiones" value={fmt(commissions.reduce((s, c) => s + (Number(c.final_amount) || 0), 0))} icon={DollarSign} color="bg-amber-500" subtitle={`${commissions.length} registros`} onClick={() => setKpiPopup("comisiones")} />
+              <KpiCard label="Empleados Activos" value={String(uniqueEmps)} icon={TrendingUp} color="bg-violet-500" subtitle="Con registros" onClick={() => setKpiPopup("empleados")} />
             </>
           )}
         </div>
@@ -637,6 +641,77 @@ export default function HorasVariablesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "horasExtra": return `Total Horas Extra — ${totalOvertimeHours}h`;
+            case "banco": return `Banco de Horas — ${totalBankHours}h (${fmt(totalBankAmount)})`;
+            case "comisiones": return `Comisiones — ${commissions.length}`;
+            case "empleados": return `Empleados con Registros — ${uniqueEmps}`;
+            default: return "";
+          }
+        })()}
+        subtitle={(() => {
+          switch (kpiPopup) {
+            case "horasExtra": return `Monto total: ${fmt(totalOvertimeAmount)}`;
+            case "banco": return `${horasDetails.filter(d => Number(d.hour_bank_hours) > 0).length} empleados con saldo`;
+            case "comisiones": return `Total: ${fmt(commissions.reduce((s, c) => s + (Number(c.final_amount) || 0), 0))}`;
+            case "empleados": return "Empleados únicos con horas extra o banco";
+            default: return undefined;
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          if (kpiPopup === "horasExtra") {
+            return horasDetails.filter(d => Number(d.overtime_hours) > 0).map((d): KpiRow => ({
+              primary: (d as any).employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : `Empleado ${d.employee_id?.slice(0, 8) ?? "—"}`,
+              secondary: `${d.overtime_hours}h extra`,
+              right: fmt(Number(d.overtime_amount) || 0),
+              rightTone: "default",
+            }));
+          }
+          if (kpiPopup === "banco") {
+            return horasDetails.filter(d => Number(d.hour_bank_hours) > 0).map((d): KpiRow => ({
+              primary: (d as any).employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : `Empleado ${d.employee_id?.slice(0, 8) ?? "—"}`,
+              secondary: `${d.hour_bank_hours}h en banco`,
+              right: fmt(Number(d.hour_bank_amount) || 0),
+              rightTone: "success",
+            }));
+          }
+          if (kpiPopup === "comisiones") {
+            const tone = (status: string): KpiRow["rightTone"] =>
+              status === "pagado" ? "success" : status === "confirmado" ? "default" : "warning";
+            return commissions.map((c): KpiRow => ({
+              primary: (c as any).employees ? `${(c as any).employees.first_name} ${(c as any).employees.last_name}` : `Empleado ${c.employee_id?.slice(0, 8) ?? "—"}`,
+              secondary: `${c.area ?? "Sin área"} · ${c.status}`,
+              right: fmt(Number(c.final_amount) || 0),
+              rightTone: tone(c.status as string),
+            }));
+          }
+          if (kpiPopup === "empleados") {
+            const map = new Map<string, { name: string; hours: number; amount: number }>();
+            horasDetails.forEach(d => {
+              const key = d.employee_id ?? "—";
+              const existing = map.get(key);
+              const name = (d as any).employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : `Empleado ${key.slice(0, 8)}`;
+              map.set(key, {
+                name,
+                hours: (existing?.hours ?? 0) + (Number(d.overtime_hours) || 0) + (Number(d.hour_bank_hours) || 0),
+                amount: (existing?.amount ?? 0) + (Number(d.overtime_amount) || 0) + (Number(d.hour_bank_amount) || 0),
+              });
+            });
+            return Array.from(map.values()).map((e): KpiRow => ({
+              primary: e.name,
+              secondary: `${e.hours}h totales`,
+              right: fmt(e.amount),
+            }));
+          }
+          return [];
+        })()}
+      />
     </div>
   );
 }

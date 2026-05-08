@@ -25,7 +25,8 @@ import {
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import CrearInvoiceModal from "./CrearInvoiceModal";
 import ReversarInvoiceModal from "./ReversarInvoiceModal";
 import InvoiceA4Preview from "./InvoiceA4Preview";
@@ -67,6 +68,8 @@ export default function FacturacionPage() {
   const queryClient = useQueryClient();
   const { methods: configuredPaymentMethods } = usePaymentMethods();
   const [crearOpen, setCrearOpen] = useState(false);
+  type KpiKey = "total" | "pendientes" | "monto" | "fee";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["invoices"],
@@ -607,14 +610,14 @@ export default function FacturacionPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
-        {/* KPIs globales */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+        {/* KPIs globales — clickeables, abren modal con detalle */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <DashboardMetricCard label="Total Invoices" value={String(invoices.length)} icon={FileText} subtitle="Todos" color="primary" />
-              <DashboardMetricCard label="Pendientes" value={String(totalPendientes)} icon={Clock} subtitle="Enviadas + vencidas" color="warning" />
-              <DashboardMetricCard label="Monto Total" value={fmt(totalMonto)} icon={DollarSign} subtitle="Suma" color="accent" />
-              <DashboardMetricCard label="Fee Total" value={fmt(totalFee)} icon={DollarSign} subtitle="Fees cobrados" color="destructive" />
+              <KpiCard label="Total Invoices" value={String(invoices.length)} icon={FileText} color="bg-blue-500" subtitle="Todos" onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Pendientes" value={String(totalPendientes)} icon={Clock} color="bg-amber-500" subtitle="Enviadas + vencidas" onClick={() => setKpiPopup("pendientes")} />
+              <KpiCard label="Monto Total" value={fmt(totalMonto)} icon={DollarSign} color="bg-emerald-500" subtitle="Suma" onClick={() => setKpiPopup("monto")} />
+              <KpiCard label="Fee Total" value={fmt(totalFee)} icon={DollarSign} color="bg-rose-500" subtitle="Fees cobrados" onClick={() => setKpiPopup("fee")} />
             </>
           )}
         </div>
@@ -679,6 +682,41 @@ export default function FacturacionPage() {
         onClose={() => setCrearOpen(false)}
         onSubmit={(data) => { createInvoice.mutate(data); setCrearOpen(false); }}
         isPending={createInvoice.isPending}
+      />
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Invoices — ${invoices.length}`;
+            case "pendientes": return `Invoices Pendientes — ${totalPendientes}`;
+            case "monto": return `Monto Total — ${fmt(totalMonto)}`;
+            case "fee": return `Fees Cobrados — ${fmt(totalFee)}`;
+            default: return "";
+          }
+        })()}
+        subtitle={(() => {
+          switch (kpiPopup) {
+            case "total": return "Listado completo";
+            case "pendientes": return "Status enviada o vencida";
+            case "monto": return "Sumatoria del campo amount";
+            case "fee": return "Sumatoria del campo fee_amount";
+            default: return undefined;
+          }
+        })()}
+        rows={(() => {
+          let list = invoices;
+          if (kpiPopup === "pendientes") list = invoices.filter(i => i.status === "enviada" || i.status === "vencida");
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "pagada" ? "success" : status === "vencida" ? "destructive" : status === "enviada" ? "warning" : "default";
+          return list.map((i): KpiRow => ({
+            primary: (i as any).recipient_name || `Invoice ${(i as any).invoice_number ?? i.id.slice(0, 8)}`,
+            secondary: `${i.status} · ${i.created_at ? format(new Date(i.created_at), "dd MMM yyyy") : "—"}`,
+            right: kpiPopup === "fee" ? fmt(Number((i as any).fee_amount) || 0) : fmt(Number(i.amount) || 0),
+            rightTone: tone(i.status as string),
+          }));
+        })()}
       />
     </div>
   );

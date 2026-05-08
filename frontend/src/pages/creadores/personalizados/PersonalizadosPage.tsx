@@ -13,6 +13,7 @@ import { es } from "date-fns/locale";
 import { useCustomRequests, type CustomContentRequest } from "./useCustomRequests";
 import NewRequestModal from "./NewRequestModal";
 import ViewRequestModal from "./ViewRequestModal";
+import CreadoresSubtabs from "../CreadoresSubtabs";
 import TrackingDrawer from "./TrackingDrawer";
 
 const TYPE_COLORS: Record<string, string> = {
@@ -92,6 +93,8 @@ const PersonalizadosPage = () => {
   return (
     <>
       <main className="flex-1 overflow-auto px-6 py-6 space-y-6">
+            <CreadoresSubtabs />
+
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-semibold">Contenido Personalizado</h1>

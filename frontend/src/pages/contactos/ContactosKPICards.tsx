@@ -1,37 +1,91 @@
 import { Users, UserPlus, CheckSquare, CalendarDays } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 
 interface Props {
   total: number;
   nuevos: number;
   convertidos: number;
   esteMes: number;
+  onClick?: (key: "total" | "nuevos" | "convertidos" | "esteMes") => void;
 }
 
-const ContactosKPICards = ({ total, nuevos, convertidos, esteMes }: Props) => {
+// KPI cards estilo Panel de Control / Dashboard v2 — gradient corner
+// accent + hover lift + colored icon square. Cuando se pase `onClick`
+// las cards se vuelven botones interactivos.
+const ContactosKPICards = ({ total, nuevos, convertidos, esteMes, onClick }: Props) => {
   const cards = [
-    { label: "Total Contactos", count: total, subtitle: "Registrados", icon: Users, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
-    { label: "Nuevos", count: nuevos, subtitle: "Sin contactar", icon: UserPlus, colorClass: "text-primary", bgClass: "bg-primary/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
-    { label: "Convertidos", count: convertidos, subtitle: "A creadores", icon: CheckSquare, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40" },
-    { label: "Este Mes", count: esteMes, subtitle: "Agregados", icon: CalendarDays, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
+    {
+      key: "total" as const,
+      label: "Total Contactos",
+      count: total,
+      subtitle: "Registrados en directorio",
+      icon: Users,
+      bg: "bg-blue-500",
+    },
+    {
+      key: "nuevos" as const,
+      label: "Nuevos",
+      count: nuevos,
+      subtitle: "Sin contactar todavía",
+      icon: UserPlus,
+      bg: "bg-emerald-500",
+    },
+    {
+      key: "convertidos" as const,
+      label: "Convertidos",
+      count: convertidos,
+      subtitle: "Pasaron a creadores",
+      icon: CheckSquare,
+      bg: "bg-violet-500",
+    },
+    {
+      key: "esteMes" as const,
+      label: "Este Mes",
+      count: esteMes,
+      subtitle: "Agregados en este mes",
+      icon: CalendarDays,
+      bg: "bg-amber-500",
+    },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-      {cards.map((card) => (
-        <Card key={card.label} className={`transition-all duration-200 ${card.hoverClass}`}>
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <p className="text-sm text-muted-foreground">{card.label}</p>
-              <div className={`flex h-8 w-8 items-center justify-center rounded-md ${card.bgClass}`}>
-                <card.icon className={`h-4 w-4 ${card.colorClass}`} />
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {cards.map((card) => {
+        const inner = (
+          <>
+            <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 ${card.bg} transition-opacity group-hover:opacity-50`} />
+            <div className="relative space-y-3">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${card.bg}`}>
+                <card.icon className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{card.label}</p>
+                <p className="text-3xl font-bold tabular-nums leading-tight">{card.count.toLocaleString("es")}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{card.subtitle}</p>
               </div>
             </div>
-            <p className={`mt-2 text-2xl font-bold ${card.colorClass}`}>{card.count}</p>
-            <p className="text-xs text-muted-foreground">{card.subtitle}</p>
-          </CardContent>
-        </Card>
-      ))}
+          </>
+        );
+        if (onClick) {
+          return (
+            <button
+              key={card.label}
+              type="button"
+              onClick={() => onClick(card.key)}
+              className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 ease-out hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
+            >
+              {inner}
+            </button>
+          );
+        }
+        return (
+          <div
+            key={card.label}
+            className="group relative overflow-hidden rounded-xl border border-border bg-card p-4"
+          >
+            {inner}
+          </div>
+        );
+      })}
     </div>
   );
 };

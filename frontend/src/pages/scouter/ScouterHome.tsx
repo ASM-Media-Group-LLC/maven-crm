@@ -3,7 +3,8 @@ import { ManagerDashboard } from "@/components/scouter/ManagerDashboard";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Star, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Search, Star, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Activity } from "lucide-react";
+import KpiCard from "@/components/dashboard/KpiCard";
 import {
   useLeadFavoriteIds,
   useScouterLeads,
@@ -25,37 +26,32 @@ import {
   countryToFlag,
 } from "./leadShared";
 
-// ─── Stat card (clickable) ─────────────────────────────────────────────
+// ─── Stat card — wrapper sobre KpiCard estándar para mantener
+// consistencia con dashboards globales. Click toggles el filtro de
+// status (sigue sin navegar a otra ventana).
 const StatCard = ({
   label,
   big,
   color,
   active,
+  icon,
   onClick,
 }: {
   label: string;
   big: string | number;
   color: string;
   active?: boolean;
+  icon?: typeof Activity;
   onClick?: () => void;
 }) => (
-  <button
-    type="button"
+  <KpiCard
+    label={label}
+    value={big}
+    icon={icon ?? Activity}
+    color={color}
     onClick={onClick}
-    className="rounded-xl border p-3 text-left transition-all"
-    style={{
-      borderColor: active ? color : undefined,
-      backgroundColor: active ? color + "12" : undefined,
-      boxShadow: active ? `0 0 12px ${color}30` : undefined,
-    }}
-  >
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-      {label}
-    </div>
-    <div className="mt-1 text-2xl font-bold tabular-nums" style={{ color }}>
-      {big}
-    </div>
-  </button>
+    className={active ? "ring-2 ring-primary" : undefined}
+  />
 );
 
 // ─── Lead card ──────────────────────────────────────────────────────────
@@ -376,48 +372,24 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
   // confirmed/active). Total scouteadas se mantiene.
   const statBlocks = useMemo(() => {
     return [
-      {
-        key: "total",
-        label: "Total scouteadas",
-        big: stats.data?.total ?? 0,
-        statusVal: "all" as const,
-        dotColor: "currentColor",
-      },
-      {
-        key: "contacted",
-        label: "Contactadas",
-        big: stats.data?.contactedDistinct ?? 0,
-        statusVal: "all" as const,
-        dotColor: "#fbbf24",
-      },
-      {
-        key: "interested",
-        label: "Interesadas",
-        big: stats.data?.interested ?? 0,
-        statusVal: "confirmed" as const,
-        dotColor: "#22c55e",
-      },
-      {
-        key: "noResponse",
-        label: "No responden",
-        big: stats.data?.noResponse ?? 0,
-        statusVal: "all" as const,
-        dotColor: "#f87171",
-      },
+      { key: "total", label: "Total scouteadas", big: stats.data?.total ?? 0, statusVal: "all" as const, color: "bg-blue-500" },
+      { key: "contacted", label: "Contactadas", big: stats.data?.contactedDistinct ?? 0, statusVal: "all" as const, color: "bg-amber-500" },
+      { key: "interested", label: "Interesadas", big: stats.data?.interested ?? 0, statusVal: "confirmed" as const, color: "bg-emerald-500" },
+      { key: "noResponse", label: "No responden", big: stats.data?.noResponse ?? 0, statusVal: "all" as const, color: "bg-rose-500" },
     ];
   }, [stats.data]);
 
   return (
     <div className="space-y-5">
-      {/* Stats row */}
+      {/* Stats row — KpiCard estándar */}
       {!favoritesOnly && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {statBlocks.map((b) => (
             <StatCard
               key={b.key}
               label={b.label}
               big={b.big}
-              color={b.dotColor}
+              color={b.color}
               active={selectedCardKey === b.key}
               onClick={() => {
                 setSelectedCardKey(b.key);

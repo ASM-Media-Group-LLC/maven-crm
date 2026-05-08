@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Save, ArrowLeft, FileText, CreditCard, Building2, Percent, Calculator } from "lucide-react";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Plus, Trash2, Save, FileText, CreditCard, Building2, Percent, Calculator } from "lucide-react";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -366,6 +367,8 @@ type SectionKey = typeof SECTIONS[number]["key"];
 // ─── Main Page ────────────────────────────────────────────────
 export default function ConfiguracionPage() {
   const [activeSection, setActiveSection] = useState<SectionKey | null>(null);
+  type KpiKey = "qb" | "methods" | "centers" | "commissions" | "payroll";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
 
   const { mappings } = useQuickBooksTemplates();
   const { methods } = usePaymentMethods();
@@ -390,33 +393,7 @@ export default function ConfiguracionPage() {
 
   const activeTitle = SECTIONS.find(s => s.key === activeSection)?.title;
 
-  // ── Detail view ──
-  if (activeSection) {
-    return (
-      <div className="flex flex-col h-full overflow-hidden">
-        <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setActiveSection(null)}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Configuración Financiera</span>
-                <span>/</span>
-                <span className="text-foreground font-medium">{activeTitle}</span>
-              </div>
-              <h1 className="text-xl font-semibold text-foreground">{activeTitle}</h1>
-            </div>
-          </div>
-        </header>
-        <div className="flex-1 overflow-auto p-6">
-          {renderDetail()}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Main cards view ──
+  // ── Main view (sin redirección — secciones abren modal) ──
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
@@ -425,13 +402,13 @@ export default function ConfiguracionPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* KPI Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <DashboardMetricCard label="Mapeos QB" value={String(mappings.length)} icon={FileText} subtitle="cuentas configuradas" color="primary" />
-          <DashboardMetricCard label="Métodos de Pago" value={String(activeMethods)} icon={CreditCard} subtitle="métodos activos" color="accent" />
-          <DashboardMetricCard label="Centros de Costo" value={String(centers.length)} icon={Building2} subtitle={fmt(totalBudget) + " presupuesto"} color="primary" />
-          <DashboardMetricCard label="Comisiones" value={`${defaults?.creator_pct ?? 0}%`} icon={Percent} subtitle={`${exceptionsCount} excepciones`} color="accent" />
-          <DashboardMetricCard label="Parámetros Nómina" value={`$${params?.hour_bank?.hour_value ?? 0}/h`} icon={Calculator} subtitle={`HE: ${params?.overtime_multipliers?.daytime ?? 0}x / ${params?.overtime_multipliers?.nighttime ?? 0}x / ${params?.overtime_multipliers?.holiday ?? 0}x`} color="primary" />
+        {/* KPI Summary — clickeables */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <KpiCard label="Mapeos QB" value={String(mappings.length)} icon={FileText} color="bg-blue-500" subtitle="cuentas configuradas" onClick={() => setKpiPopup("qb")} />
+          <KpiCard label="Métodos de Pago" value={String(activeMethods)} icon={CreditCard} color="bg-emerald-500" subtitle="métodos activos" onClick={() => setKpiPopup("methods")} />
+          <KpiCard label="Centros de Costo" value={String(centers.length)} icon={Building2} color="bg-violet-500" subtitle={fmt(totalBudget) + " presupuesto"} onClick={() => setKpiPopup("centers")} />
+          <KpiCard label="Comisiones" value={`${defaults?.creator_pct ?? 0}%`} icon={Percent} color="bg-amber-500" subtitle={`${exceptionsCount} excepciones`} onClick={() => setKpiPopup("commissions")} />
+          <KpiCard label="Parámetros Nómina" value={`$${params?.hour_bank?.hour_value ?? 0}/h`} icon={Calculator} color="bg-rose-500" subtitle={`HE: ${params?.overtime_multipliers?.daytime ?? 0}x / ${params?.overtime_multipliers?.nighttime ?? 0}x / ${params?.overtime_multipliers?.holiday ?? 0}x`} onClick={() => setKpiPopup("payroll")} />
         </div>
 
         {/* Section Cards */}
@@ -444,29 +421,105 @@ export default function ConfiguracionPage() {
               s.key === "commissions" ? `${exceptionsCount} excepciones` :
               `${params?.hour_bank?.validity_months ?? 0} meses vigencia`;
 
+            const sectionColor = (key: string) =>
+              key === "quickbooks" ? "bg-blue-500" :
+              key === "payment_methods" ? "bg-emerald-500" :
+              key === "cost_centers" ? "bg-violet-500" :
+              key === "commissions" ? "bg-amber-500" :
+              "bg-rose-500";
             return (
-              <Card
+              <KpiCard
                 key={s.key}
-                className="cursor-pointer transition-all duration-200 hover:translate-y-[-2px] hover:border-primary/30 hover:shadow-md"
+                label={s.title}
+                value={count}
+                icon={s.icon}
+                color={sectionColor(s.key)}
+                subtitle={s.description}
                 onClick={() => setActiveSection(s.key)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <s.icon className="h-4.5 w-4.5 text-muted-foreground" />
-                    </div>
-                    <CardTitle className="text-base">{s.title}</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-2">{s.description}</p>
-                  <Badge variant="secondary" className="text-xs">{count}</Badge>
-                </CardContent>
-              </Card>
+              />
             );
           })}
         </div>
       </div>
+
+      {/* MODAL — sección activa (en lugar de re-render página completa) */}
+      <Dialog open={activeSection !== null} onOpenChange={(o) => !o && setActiveSection(null)}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{activeTitle}</DialogTitle>
+          </DialogHeader>
+          {renderDetail()}
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL — detalle de KPI (lista de items) */}
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "qb": return `Mapeos QuickBooks — ${mappings.length}`;
+            case "methods": return `Métodos de Pago — ${activeMethods} activos / ${methods.length} totales`;
+            case "centers": return `Centros de Costo — ${centers.length}`;
+            case "commissions": return `Configuración de Comisiones — ${defaults?.creator_pct ?? 0}%`;
+            case "payroll": return `Parámetros de Nómina`;
+            default: return "";
+          }
+        })()}
+        subtitle={(() => {
+          switch (kpiPopup) {
+            case "qb": return "Mapeo de categorías a cuentas contables";
+            case "methods": return "Métodos de pago configurados";
+            case "centers": return `Presupuesto total: ${fmt(totalBudget)}`;
+            case "commissions": return `${exceptionsCount} excepciones · default ${defaults?.creator_pct ?? 0}%`;
+            case "payroll": return "Banco de horas y multiplicadores HE";
+            default: return undefined;
+          }
+        })()}
+        rows={(() => {
+          if (kpiPopup === "qb") {
+            return mappings.map((m): KpiRow => ({
+              primary: (m as any).category ?? (m as any).name ?? "Sin categoría",
+              secondary: (m as any).qb_account ?? (m as any).account ?? "Sin cuenta",
+            }));
+          }
+          if (kpiPopup === "methods") {
+            return methods.map((m): KpiRow => ({
+              primary: (m as any).name ?? "Sin nombre",
+              secondary: (m as any).fee_pct !== undefined ? `Comisión: ${(m as any).fee_pct}%` : undefined,
+              right: m.active ? "Activo" : "Inactivo",
+              rightTone: m.active ? "success" : "default",
+            }));
+          }
+          if (kpiPopup === "centers") {
+            return centers.map((c): KpiRow => ({
+              primary: c.name,
+              secondary: (c as any).code ?? undefined,
+              right: fmt(c.monthly_budget),
+            }));
+          }
+          if (kpiPopup === "commissions") {
+            const baseRow: KpiRow = { primary: "Default creadores", right: `${defaults?.creator_pct ?? 0}%`, rightTone: "default" };
+            const excRows: KpiRow[] = (defaults?.exceptions ?? []).map((e: any) => ({
+              primary: e.creator_name ?? `Creator ${e.creator_id?.slice?.(0, 8) ?? "—"}`,
+              secondary: "Excepción",
+              right: `${e.pct ?? 0}%`,
+              rightTone: "warning",
+            }));
+            return [baseRow, ...excRows];
+          }
+          if (kpiPopup === "payroll") {
+            return [
+              { primary: "Hora banco", right: fmt(params?.hour_bank?.hour_value ?? 0) },
+              { primary: "Vigencia banco", right: `${params?.hour_bank?.validity_months ?? 0} meses` },
+              { primary: "HE diurnas", right: `${params?.overtime_multipliers?.daytime ?? 0}x` },
+              { primary: "HE nocturnas", right: `${params?.overtime_multipliers?.nighttime ?? 0}x` },
+              { primary: "HE festivos", right: `${params?.overtime_multipliers?.holiday ?? 0}x` },
+            ];
+          }
+          return [];
+        })()}
+      />
     </div>
   );
 }

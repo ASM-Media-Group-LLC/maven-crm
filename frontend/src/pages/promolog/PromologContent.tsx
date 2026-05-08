@@ -34,7 +34,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -622,15 +622,13 @@ const PromologContent = () => {
         </div>
       </header>
 
-      {/* KPI Cards */}
-      <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0 pb-0" : "max-h-[200px] opacity-100 pb-2"}`}>
+      {/* KPI Cards — todos clickeables, abren modal con detalle */}
+      <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0 pb-0" : "max-h-[240px] opacity-100 pb-2"}`}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <DashboardMetricCard label="Total Promos" value={String(filteredEntries.length)} icon={Table2} color="accent" />
-          <DashboardMetricCard label="Tasa de éxito" value={filteredEntries.length > 0 ? `${Math.round((filteredEntries.filter(e => e.result === "Sí").length / filteredEntries.length) * 100)}%` : "0%"} icon={TrendingUp} color="primary" />
-          <div className="cursor-pointer" onClick={() => setKpiModalType("no_chequeadas")}>
-            <DashboardMetricCard label="Sin revisar" value={String(dedupedEntries.filter(e => e.result === "Pendiente").length)} icon={AlertTriangle} color="destructive" />
-          </div>
-          <DashboardMetricCard label="Creadoras" value={String(new Set(filteredEntries.map(e => e.creator_id)).size)} icon={Users} color="success" />
+          <KpiCard label="Total Promos" value={String(filteredEntries.length)} icon={Table2} color="bg-blue-500" onClick={() => setKpiModalType("ingresados")} />
+          <KpiCard label="Tasa de éxito" value={filteredEntries.length > 0 ? `${Math.round((filteredEntries.filter(e => e.result === "Sí").length / filteredEntries.length) * 100)}%` : "0%"} icon={TrendingUp} color="bg-emerald-500" onClick={() => setKpiModalType("completadas")} />
+          <KpiCard label="Sin revisar" value={String(dedupedEntries.filter(e => e.result === "Pendiente").length)} icon={AlertTriangle} color="bg-rose-500" onClick={() => setKpiModalType("no_chequeadas")} />
+          <KpiCard label="Creadoras" value={String(new Set(filteredEntries.map(e => e.creator_id)).size)} icon={Users} color="bg-violet-500" />
         </div>
       </div>
 

@@ -1,29 +1,41 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, UserCheck, Clock, PauseCircle, LogOut, XCircle, TrendingUp, Globe, Tag, DollarSign, AlertTriangle } from "lucide-react";
+import { Users, UserCheck, Clock, PauseCircle, LogOut, XCircle, TrendingUp, Globe, Tag, DollarSign, AlertTriangle, ArrowRight, Instagram, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { useCreadores } from "./useCreadores";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useCreadores, type CreatorWithBusiness } from "./useCreadores";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import CreadoresSubtabs from "./CreadoresSubtabs";
 
 const emptyFilters = { search: "", agency: "", status: "", category: "", country: "", city: "", manager: "" };
 
+// Estilo Panel de Control / Dashboard v2 — gradient corner blur + icono
+// con cuadrado coloreado + hover lift. La key se usa para navegar al
+// listado filtrado o al onboarding.
 const statusConfig = [
-  { key: "active",     label: "Activas",     icon: UserCheck,   color: "text-success",      border: "border-t-success",      bg: "hover:from-success/10",      iconBg: "bg-success/10" },
-  { key: "onboarding", label: "En Onboarding",  icon: Clock,       color: "text-primary",      border: "border-t-primary",      bg: "hover:from-primary/10",      iconBg: "bg-primary/10" },
-  { key: "paused",     label: "Pausadas",    icon: PauseCircle, color: "text-warning",      border: "border-t-warning",      bg: "hover:from-warning/10",      iconBg: "bg-warning/10" },
-  { key: "leaving",    label: "En retiro",   icon: LogOut,      color: "text-destructive",  border: "border-t-destructive",  bg: "hover:from-destructive/10",  iconBg: "bg-destructive/10" },
-  { key: "terminated", label: "Terminadas",  icon: XCircle,     color: "text-muted-foreground", border: "border-t-border",   bg: "hover:from-muted/30",        iconBg: "bg-muted" },
+  { key: "active",     label: "Activas",     icon: UserCheck,   bg: "bg-emerald-500" },
+  { key: "onboarding", label: "En Onboarding", icon: Clock,     bg: "bg-blue-500" },
+  { key: "paused",     label: "Pausadas",    icon: PauseCircle, bg: "bg-amber-500" },
+  { key: "leaving",    label: "En retiro",   icon: LogOut,      bg: "bg-rose-500" },
+  { key: "terminated", label: "Terminadas",  icon: XCircle,     bg: "bg-slate-500" },
 ];
 
 const CreadorasDashboardContent = () => {
   const navigate = useNavigate();
   const { allCreators, isLoading } = useCreadores(emptyFilters);
+  type StatusKey = "active" | "onboarding" | "paused" | "leaving" | "terminated";
+  const [statusPopup, setStatusPopup] = useState<StatusKey | null>(null);
+  // Ficha técnica de la creadora — abierta desde Últimas Incorporaciones
+  // y al clickar dentro del popup de status. Muestra foto + IG + perfil.
+  const [creatorDetail, setCreatorDetail] = useState<CreatorWithBusiness | null>(null);
 
   // Offboarding metrics
   const offboardingQuery = useQuery({
@@ -69,6 +81,17 @@ const CreadorasDashboardContent = () => {
   }, [allCreators]);
 
   const total = allCreators.length;
+
+  // Filtramos las creadoras del popup según el status seleccionado.
+  // "onboarding" agrupa también pendiente y pendiente_verificacion.
+  const popupCreators = useMemo(() => {
+    if (!statusPopup) return [];
+    return allCreators.filter((c) => {
+      const s = c.status ?? "";
+      if (statusPopup === "onboarding") return s === "onboarding" || s === "pendiente" || s === "pendiente_verificacion";
+      return s === statusPopup;
+    });
+  }, [statusPopup, allCreators]);
 
   // Distribution by agency
   const byAgency = useMemo(() => {
@@ -145,18 +168,22 @@ const CreadorasDashboardContent = () => {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* Section 1 — Status KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {statusConfig.map(({ key, label, icon: Icon, color, border, bg, iconBg }) => {
+        <CreadoresSubtabs />
+
+        {/* Section 1 — Status KPIs estilo Panel de Control / Dashboard v2 */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          {statusConfig.map(({ key, label, icon: Icon, bg }) => {
             const count = statusCounts[key] ?? 0;
             const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+            const isOnboarding = key === "onboarding";
             return (
-              <Card
+              <button
                 key={key}
-                className={`${key === "onboarding" ? "relative " : ""}border-t-[3px] ${border} cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br ${bg} hover:to-transparent hover:border-b hover:border-x ${key === "onboarding" ? "group" : ""}`}
-                onClick={() => navigate(key === "onboarding" ? "/creadores/onboarding" : `/creadores?status=${key}`)}
+                type="button"
+                onClick={() => setStatusPopup(key as StatusKey)}
+                className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 ease-out hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
               >
-                {key === "onboarding" && pendingCount > 0 && (
+                {isOnboarding && pendingCount > 0 && (
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -169,24 +196,18 @@ const CreadorasDashboardContent = () => {
                     </Tooltip>
                   </TooltipProvider>
                 )}
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                      <p className={`text-3xl font-bold mt-1 ${color}`}>{count}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{pct}% del total</p>
-                      {key === "onboarding" && (
-                        <p className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity mt-1">
-                          Ver listado →
-                        </p>
-                      )}
-                    </div>
-                    <div className={`p-2 rounded-lg ${iconBg} shrink-0`}>
-                      <Icon className={`h-5 w-5 ${color}`} />
-                    </div>
+                <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 ${bg} transition-opacity group-hover:opacity-50`} />
+                <div className="relative space-y-3">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${bg}`}>
+                    <Icon className="h-5 w-5 text-white" />
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
+                    <p className="text-3xl font-bold tabular-nums leading-tight">{count}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">{pct}% del total</p>
+                  </div>
+                </div>
+              </button>
             );
           })}
         </div>
@@ -288,43 +309,69 @@ const CreadorasDashboardContent = () => {
         </div>
 
         {/* Section 3 — Recent Activity */}
-        <div className="grid grid-cols-1 gap-4">
-          {/* Latest registrations */}
-          <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" />
-                Últimas Incorporaciones
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1">
-              {latestCreators.length === 0 && <p className="text-xs text-muted-foreground">Sin datos</p>}
-              {latestCreators.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => navigate(`/creadores/${c.id}`)}
-                  className="w-full flex items-center justify-between gap-3 rounded-md px-2 py-2 hover:bg-muted/60 transition-colors text-left group"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
-                      {c.artistic_name ?? c.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {c.creator_business?.assigned_agency ?? "Sin agencia"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant="outline" className={`text-[10px] ${statusBadgeClass[c.status ?? ""] ?? ""}`}>
-                      {c.status}
-                    </Badge>
-                    <span className="text-[10px] text-muted-foreground">
-                      {c.created_at ? format(new Date(c.created_at), "dd MMM", { locale: es }) : ""}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+            <Users className="h-4 w-4 text-primary" />
+            Últimas Incorporaciones
+          </h3>
+          {latestCreators.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+              Sin datos
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {latestCreators.map((c) => {
+                const handle = (c.instagram_handle || "").replace(/^@/, "");
+                const initials = (c.artistic_name || c.name || "")
+                  .split(/\s+/)
+                  .map((p) => p[0])
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase() || "?";
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCreatorDetail(c)}
+                    className="group w-full rounded-xl border border-border bg-card p-3 text-left transition-all duration-200 ease-out hover:scale-[1.005] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.12)]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10 shrink-0">
+                        {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} alt={c.artistic_name || c.name || ""} />}
+                        <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{c.artistic_name ?? c.name}</p>
+                        {handle && (
+                          <p className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
+                            <Instagram className="h-3 w-3 shrink-0" />
+                            @{handle}
+                          </p>
+                        )}
+                      </div>
+                      <div className="hidden sm:flex items-center gap-4 text-right shrink-0">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Agencia</p>
+                          <p className="text-xs font-medium truncate max-w-[120px]">{c.creator_business?.assigned_agency ?? "—"}</p>
+                        </div>
+                        <Badge variant="outline" className={`text-[10px] ${statusBadgeClass[c.status ?? ""] ?? ""}`}>
+                          {c.status}
+                        </Badge>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Registro</p>
+                          <p className="text-xs font-medium whitespace-nowrap">
+                            {c.created_at ? format(new Date(c.created_at), "dd MMM", { locale: es }) : "—"}
+                          </p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Section 4 — Offboarding Metrics */}
@@ -382,6 +429,185 @@ const CreadorasDashboardContent = () => {
           </Card>
         </div>
       </div>
+
+      {/* CREATOR DETAIL — ficha técnica con foto + IG + ver perfil */}
+      <Dialog open={creatorDetail !== null} onOpenChange={(o) => !o && setCreatorDetail(null)}>
+        <DialogContent className="max-w-xl">
+          {creatorDetail && (() => {
+            const c = creatorDetail;
+            const handle = (c.instagram_handle || "").replace(/^@/, "");
+            const igUrl = handle ? `https://instagram.com/${handle}` : null;
+            const initials = (c.artistic_name || c.name || "")
+              .split(/\s+/)
+              .map((p) => p[0])
+              .filter(Boolean)
+              .slice(0, 2)
+              .join("")
+              .toUpperCase() || "?";
+            const stats: { label: string; value: string }[] = [
+              { label: "Estado", value: c.status ?? "—" },
+              { label: "Agencia", value: c.creator_business?.assigned_agency ?? "—" },
+              { label: "País", value: c.country ?? "—" },
+              { label: "Categoría", value: c.category ?? "—" },
+              { label: "Registro", value: c.created_at ? format(new Date(c.created_at), "dd MMM yyyy", { locale: es }) : "—" },
+              { label: "Manager", value: c.creator_business?.manager_type ?? "—" },
+            ];
+            return (
+              <>
+                <DialogHeader>
+                  <div className="flex items-start gap-4">
+                    <Avatar className="h-20 w-20 shrink-0">
+                      {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} alt={c.artistic_name || c.name || ""} />}
+                      <AvatarFallback className="text-lg font-semibold">{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <DialogTitle className="text-2xl mb-1 truncate">{c.artistic_name ?? c.name}</DialogTitle>
+                      {handle && (
+                        <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                          <Instagram className="h-3.5 w-3.5" />
+                          @{handle}
+                        </p>
+                      )}
+                      <Badge variant="outline" className={`mt-2 text-[10px] ${statusBadgeClass[c.status ?? ""] ?? ""}`}>
+                        {c.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </DialogHeader>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                  {stats.map((s) => (
+                    <div key={s.label} className="rounded-lg border border-border bg-card p-3">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{s.label}</p>
+                      <p className="text-sm font-medium truncate">{s.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
+                  {igUrl && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => window.open(igUrl, "_blank", "noopener,noreferrer")}
+                    >
+                      <Instagram className="h-3.5 w-3.5" />
+                      Abrir Instagram
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => {
+                      navigate(`/creadores/${c.id}`);
+                      setCreatorDetail(null);
+                    }}
+                  >
+                    Ver perfil completo
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* STATUS POPUP — abierto al clickar un cuadro de status */}
+      <Dialog open={statusPopup !== null} onOpenChange={(o) => !o && setStatusPopup(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {statusPopup === "active" && `Creadoras Activas (${popupCreators.length})`}
+              {statusPopup === "onboarding" && `En Onboarding (${popupCreators.length})`}
+              {statusPopup === "paused" && `Creadoras Pausadas (${popupCreators.length})`}
+              {statusPopup === "leaving" && `En Retiro (${popupCreators.length})`}
+              {statusPopup === "terminated" && `Creadoras Terminadas (${popupCreators.length})`}
+            </DialogTitle>
+          </DialogHeader>
+
+          {popupCreators.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
+              Sin creadoras en este estado.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {popupCreators.map((c) => {
+                const handle = (c.instagram_handle || "").replace(/^@/, "");
+                const initials = (c.artistic_name || c.name || "")
+                  .split(/\s+/)
+                  .map((p) => p[0])
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase() || "?";
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setStatusPopup(null);
+                      navigate(`/creadores/${c.id}`);
+                    }}
+                    className="group w-full rounded-xl border border-border bg-card p-3 text-left transition-all duration-200 ease-out hover:scale-[1.005] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.12)]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10 shrink-0">
+                        {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} alt={c.artistic_name || c.name || ""} />}
+                        <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{c.artistic_name || c.name || "Sin nombre"}</p>
+                        {handle && (
+                          <p className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
+                            <Instagram className="h-3 w-3 shrink-0" />
+                            @{handle}
+                          </p>
+                        )}
+                      </div>
+                      <div className="hidden sm:flex items-center gap-4 text-right shrink-0">
+                        {c.creator_business?.assigned_agency && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Agencia</p>
+                            <p className="text-xs font-medium truncate max-w-[110px]">{c.creator_business.assigned_agency}</p>
+                          </div>
+                        )}
+                        {c.country && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">País</p>
+                            <p className="text-xs font-medium truncate max-w-[80px]">{c.country}</p>
+                          </div>
+                        )}
+                        {c.category && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Categoría</p>
+                            <p className="text-xs font-medium">{c.category}</p>
+                          </div>
+                        )}
+                      </div>
+                      {handle && (
+                        <a
+                          href={`https://instagram.com/${handle}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"
+                          title="Abrir Instagram"
+                        >
+                          <Instagram className="h-4 w-4" />
+                        </a>
+                      )}
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };

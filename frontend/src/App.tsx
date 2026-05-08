@@ -62,12 +62,6 @@ import PanelDeControl from "./pages/PanelDeControl";
 import SalesDashboard from "./pages/SalesDashboard";
 import SalesAudit from "./pages/SalesAudit";
 import SalesOverview from "./pages/SalesOverview";
-import ComparativasPage from "./pages/sales-overview/ComparativasPage";
-import Top10Page from "./pages/sales-overview/Top10Page";
-import SubiendoPage from "./pages/sales-overview/SubiendoPage";
-import BajandoPage from "./pages/sales-overview/BajandoPage";
-import AltoPotencialPage from "./pages/sales-overview/AltoPotencialPage";
-import EnRiesgoPage from "./pages/sales-overview/EnRiesgoPage";
 import AiSales from "./pages/AiSales";
 import AiSalesConfig from "./pages/AiSalesConfig";
 
@@ -248,7 +242,7 @@ const App = () => (
               {/* Protected routes that share the AppShell — Sidebar +
                   Topbar mount once and persist across nav between these
                   routes. Only ProyectoMP (its own MP-specific layout)
-                  and the full-screen video/cowork pages stay outside. */}
+                  and the full-screen video pages stay outside. */}
               <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/dashboard2" element={<AdminRoute><Dashboard2 /></AdminRoute>} />
@@ -279,14 +273,8 @@ const App = () => (
                 {/* Migrated areas from kash-call-qa — placeholders for now */}
                 <Route path="/scouter-assist" element={<PermissionRoute module="Scouter Assist"><ScouterAssist /></PermissionRoute>} />
                 <Route path="/agency-qa" element={<PermissionRoute module="Agency QA"><AgencyQA /></PermissionRoute>} />
-                {/* Sales Overview */}
+                {/* Sales Overview — sub-rutas eliminadas; ahora vive todo en modales */}
                 <Route path="/sales-overview" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><SalesOverview /></PermissionRoute>} />
-                <Route path="/sales-overview/comparativas" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><ComparativasPage /></PermissionRoute>} />
-                <Route path="/sales-overview/top10" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><Top10Page /></PermissionRoute>} />
-                <Route path="/sales-overview/subiendo" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><SubiendoPage /></PermissionRoute>} />
-                <Route path="/sales-overview/bajando" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><BajandoPage /></PermissionRoute>} />
-                <Route path="/sales-overview/alto-potencial" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><AltoPotencialPage /></PermissionRoute>} />
-                <Route path="/sales-overview/en-riesgo" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><EnRiesgoPage /></PermissionRoute>} />
                 <Route path="/salesdashboard" element={<PermissionRoute module="Creator Sales" submodule="Reportes"><SalesDashboard /></PermissionRoute>} />
                 <Route path="/sales-audit" element={<PermissionRoute module="Creator Sales" submodule="Auditoría"><SalesAudit /></PermissionRoute>} />
                 <Route path="/aisales" element={<PermissionRoute module="Creator Sales" submodule="IA Ventas"><AiSales /></PermissionRoute>} />
@@ -305,6 +293,7 @@ const App = () => (
                 <Route path="/tareas/:projectId" element={<PermissionRoute module="Tareas"><TareaProject /></PermissionRoute>} />
                 <Route path="/roadmap" element={<Roadmap />} />
                 <Route path="/messenger" element={<PermissionRoute module="Messenger"><Messenger /></PermissionRoute>} />
+                <Route path="/cowork" element={<PermissionRoute module="Cowork"><CoworkPage /></PermissionRoute>} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/notificaciones" element={<Notificaciones />} />
                 <Route path="/ajustes/notificaciones" element={<NotificacionesSettings />} />
@@ -363,7 +352,6 @@ const App = () => (
 
               {/* Full-screen routes that intentionally bypass the shell */}
               <Route path="/call/:roomName" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
-              <Route path="/cowork" element={<PermissionRoute module="Cowork"><CoworkPage /></PermissionRoute>} />
 
               {/* Proyecto MP routes (own custom MPSidebar + MPTopbar) */}
               <Route path="/proyectomp" element={<PermissionRoute module="ProyectoMP"><ProyectoMPLayout><ProyectoMPDashboard /></ProyectoMPLayout></PermissionRoute>} />

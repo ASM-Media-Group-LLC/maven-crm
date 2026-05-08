@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 
 const TABS = ["Ingresos vs Costos", "Costos por CC", "Costos por Departamento", "Productividad por Empleado", "Márgenes Operativos"] as const;
 type Tab = typeof TABS[number];
@@ -21,6 +22,8 @@ export default function ControlFinancieroPage() {
   const [activeTab, setActiveTab] = useState<Tab>("Ingresos vs Costos");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
+  type KpiKey = "ingresos" | "egresos" | "balance" | "margen";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
@@ -292,14 +295,14 @@ export default function ControlFinancieroPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
-        {/* Global KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+        {/* Global KPIs — clickeables, abren modal */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <DashboardMetricCard label="Ingresos Totales" value={fmt(ingresos)} icon={TrendingUp} subtitle="Invoices pagados" color="accent" />
-              <DashboardMetricCard label="Egresos Totales" value={fmt(egresos)} icon={TrendingDown} subtitle="Nómina + comisiones" color="destructive" />
-              <DashboardMetricCard label="Balance" value={fmt(balance)} icon={DollarSign} subtitle={balance >= 0 ? "Positivo" : "Negativo"} color={balance < 0 ? "destructive" : "accent"} />
-              <DashboardMetricCard label="Margen" value={`${margenPct}%`} icon={BarChart3} subtitle="Sobre ingresos" color="warning" />
+              <KpiCard label="Ingresos Totales" value={fmt(ingresos)} icon={TrendingUp} color="bg-emerald-500" subtitle="Invoices pagados" onClick={() => setKpiPopup("ingresos")} />
+              <KpiCard label="Egresos Totales" value={fmt(egresos)} icon={TrendingDown} color="bg-rose-500" subtitle="Nómina + comisiones" onClick={() => setKpiPopup("egresos")} />
+              <KpiCard label="Balance" value={fmt(balance)} icon={DollarSign} color={balance < 0 ? "bg-rose-500" : "bg-emerald-500"} subtitle={balance >= 0 ? "Positivo" : "Negativo"} onClick={() => setKpiPopup("balance")} />
+              <KpiCard label="Margen" value={`${margenPct}%`} icon={BarChart3} color="bg-amber-500" subtitle="Sobre ingresos" onClick={() => setKpiPopup("margen")} />
             </>
           )}
         </div>
@@ -335,6 +338,65 @@ export default function ControlFinancieroPage() {
 
         {renderTab()}
       </div>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "ingresos": return `Ingresos Totales — ${fmt(ingresos)}`;
+            case "egresos": return `Egresos Totales — ${fmt(egresos)}`;
+            case "balance": return `Balance — ${fmt(balance)}`;
+            case "margen": return `Margen — ${margenPct}%`;
+            default: return "";
+          }
+        })()}
+        subtitle={(() => {
+          switch (kpiPopup) {
+            case "ingresos": return "Invoices con status 'pagada'";
+            case "egresos": return "Nómina (net_total) + comisiones pagadas";
+            case "balance": return `Ingresos − Egresos = ${fmt(balance)}`;
+            case "margen": return "Balance / Ingresos · 100";
+            default: return undefined;
+          }
+        })()}
+        rows={(() => {
+          if (kpiPopup === "ingresos") {
+            const paid = invoices.filter(i => i.status === "pagada");
+            return paid.map((i): KpiRow => ({
+              primary: (i as any).recipient_name || `Invoice ${(i as any).invoice_number ?? i.id.slice(0, 8)}`,
+              secondary: i.created_at ? new Date(i.created_at).toLocaleDateString("es") : "—",
+              right: fmt(Number(i.amount) || 0),
+              rightTone: "success",
+            }));
+          }
+          if (kpiPopup === "egresos") {
+            const payRows: KpiRow[] = payroll.map(p => ({
+              primary: `Nómina · ${(p as any).period_name ?? "Sin nombre"}`,
+              secondary: `${p.status} · ${(p as any).cost_center ?? "Sin CC"}`,
+              right: fmt(Number(p.net_total) || 0),
+              rightTone: "destructive",
+            }));
+            const commPaid = commissions.filter(c => c.status === "pagado");
+            const commRows: KpiRow[] = commPaid.map(c => ({
+              primary: `Comisión · ${(c as any).employee_name ?? "—"}`,
+              secondary: `${(c as any).area ?? "Sin área"}`,
+              right: fmt(Number(c.final_amount) || 0),
+              rightTone: "destructive",
+            }));
+            return [...payRows, ...commRows];
+          }
+          if (kpiPopup === "balance" || kpiPopup === "margen") {
+            return [
+              { primary: "Ingresos", right: fmt(ingresos), rightTone: "success" },
+              { primary: "Egresos", right: fmt(egresos), rightTone: "destructive" },
+              { primary: "Balance", right: fmt(balance), rightTone: balance >= 0 ? "success" : "destructive" },
+              { primary: "Margen %", right: `${margenPct}%`, rightTone: Number(margenPct) >= 0 ? "success" : "destructive" },
+            ];
+          }
+          return [];
+        })()}
+      />
     </div>
   );
 }

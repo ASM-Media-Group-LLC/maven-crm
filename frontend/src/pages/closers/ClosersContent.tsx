@@ -2,10 +2,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, X, UserPlus, LayoutGrid, List } from "lucide-react";
+import { Search, X, UserPlus, LayoutGrid, List, LayoutDashboard, ListChecks } from "lucide-react";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useCloserLeads, PLATFORMS, type DateFieldType, type CloserCreatorRow } from "./hooks/useCloserLeads";
 import ClosersKPICards from "./components/ClosersKPICards";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import CloserTable from "./components/LeadTable";
 import AssignCloserDialog from "./components/AssignCloserDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -41,6 +42,11 @@ const ClosersContent = () => {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  type KpiPopupState = { kind: "pipeline"; key: "total" | "asignadas" | "confirmadas" | "completadas" | "cerradas" | "no_interesadas" } | { kind: "revenue"; platform: string };
+  const [kpiPopup, setKpiPopup] = useState<KpiPopupState | null>(null);
+  // Subtab top-level — Dashboard (KPI cards) vs Operaciones (tabs/filtros/tabla)
+  const [viewTab, setViewTab] = useState<"dashboard" | "operaciones">("dashboard");
+
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null; source: string } | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
@@ -107,11 +113,44 @@ const ClosersContent = () => {
         </div>
       ) : (
         <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setStatsCollapsed(false); }} className="flex-1 flex flex-col overflow-hidden min-h-0">
-          {/* KPI Cards — collapse on table scroll */}
-          <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[200px] opacity-100 pb-2"}`}>
-            <ClosersKPICards statusCounts={statusCounts} platformRevenue={platformRevenue} ofMonetizationTotal={ofMonetizationTotal} />
+          {/* Subtabs top-level — Dashboard vs Operaciones */}
+          <div className="shrink-0 px-6 pt-4 pb-2">
+            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+              <Button
+                variant={viewTab === "dashboard" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setViewTab("dashboard")}
+              >
+                <LayoutDashboard className="mr-1.5 h-4 w-4" />
+                Dashboard
+              </Button>
+              <Button
+                variant={viewTab === "operaciones" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setViewTab("operaciones")}
+              >
+                <ListChecks className="mr-1.5 h-4 w-4" />
+                Operaciones
+              </Button>
+            </div>
           </div>
 
+          {/* DASHBOARD — KPI cards (pipeline + revenue) */}
+          {viewTab === "dashboard" && (
+            <div className="shrink-0 px-6 pb-6 overflow-auto">
+              <ClosersKPICards
+                statusCounts={statusCounts}
+                platformRevenue={platformRevenue}
+                ofMonetizationTotal={ofMonetizationTotal}
+                onPipelineClick={(key) => setKpiPopup({ kind: "pipeline", key })}
+                onRevenueClick={(platform) => setKpiPopup({ kind: "revenue", platform })}
+              />
+            </div>
+          )}
+
+          {/* OPERACIONES — tabs + filtros + tabla */}
+          {viewTab === "operaciones" && (
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="shrink-0 px-6 pt-2 pb-2 space-y-4 bg-background border-b border-border">
             <TabsList className="flex-wrap">
               {TABS.map((tab) => (
@@ -256,6 +295,8 @@ const ClosersContent = () => {
               />
             </DataTableShell>
           </div>
+          </div>
+          )}
         </Tabs>
       )}
 
@@ -268,6 +309,55 @@ const ClosersContent = () => {
           assignCreator.mutate({ id, assigned_to: assignedTo });
           setAssignDialogOpen(false);
         }}
+      />
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          if (!kpiPopup) return "";
+          if (kpiPopup.kind === "pipeline") {
+            const labels: Record<string, string> = { total: "Pipeline Total", asignadas: "Asignadas", confirmadas: "Confirmadas", completadas: "Completadas", cerradas: "Cerradas (Confirmadas + Completadas)", no_interesadas: "No Interesadas" };
+            return labels[kpiPopup.key] ?? "";
+          }
+          return `Revenue ${kpiPopup.platform}`;
+        })()}
+        subtitle={kpiPopup?.kind === "revenue" ? "Detalle por creadora" : undefined}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          if (kpiPopup.kind === "pipeline") {
+            const filterByStatus = (statuses: string[]): CloserCreatorRow[] => creators.filter((c: CloserCreatorRow) => statuses.includes(c.status ?? ""));
+            let list: CloserCreatorRow[] = [];
+            switch (kpiPopup.key) {
+              case "total": list = creators; break;
+              case "asignadas": list = filterByStatus(["Asignada"]); break;
+              case "confirmadas": list = filterByStatus(["Confirmada"]); break;
+              case "completadas": list = filterByStatus(["Completada"]); break;
+              case "cerradas": list = filterByStatus(["Confirmada", "Completada"]); break;
+              case "no_interesadas": list = filterByStatus(["No interesada"]); break;
+            }
+            const tone = (status: string): KpiRow["rightTone"] =>
+              status === "Completada" || status === "Confirmada" ? "success" :
+              status === "No interesada" ? "destructive" :
+              status === "Asignada" ? "warning" : "default";
+            return list.map((c): KpiRow => ({
+              primary: c.artistic_name ?? c.name ?? "Sin nombre",
+              secondary: c.assigned_to ?? "Sin asignar",
+              right: c.status ?? "—",
+              rightTone: tone(c.status ?? ""),
+            }));
+          }
+          if (kpiPopup.kind === "revenue") {
+            const platformKey = kpiPopup.platform;
+            const sales = (platformSalesByCreator?.[platformKey] ?? []) as Array<{ creator_name?: string; amount?: number }>;
+            return sales.map((s): KpiRow => ({
+              primary: s.creator_name ?? "Sin creador",
+              right: `$${(Number(s.amount) || 0).toLocaleString()}`,
+              rightTone: "success",
+            }));
+          }
+          return [];
+        })()}
       />
     </main>
   );

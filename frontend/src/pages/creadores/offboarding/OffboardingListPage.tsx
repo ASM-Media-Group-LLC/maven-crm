@@ -37,6 +37,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import InitiateOffboardingDialog from "./InitiateOffboardingDialog";
+import CreadoresSubtabs from "../CreadoresSubtabs";
 
 const STATUS_LABELS: Record<string, { label: string; variant: string }> = {
   en_proceso: { label: "En Proceso", variant: "bg-primary/15 text-primary border-primary/30" },
@@ -116,6 +117,8 @@ const OffboardingListPage = () => {
   return (
     <>
       <main className="flex-1 overflow-y-auto p-6 space-y-6">
+            <CreadoresSubtabs />
+
             {/* Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

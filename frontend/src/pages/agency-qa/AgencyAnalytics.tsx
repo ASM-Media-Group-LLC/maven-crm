@@ -7,6 +7,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Trophy, Users, BarChart3, TrendingUp } from "lucide-react";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import {
   BarChart,
   Bar,
@@ -65,39 +67,30 @@ const fmtWeekShort = (iso: string) => {
   return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
 };
 
-// ─── KPI card ──────────────────────────────────────────────────────────
+// ─── KPI card — wrapper sobre KpiCard estándar ──────────────────────
 const Kpi = ({
   label,
   value,
   hint,
   color,
-  icon: Icon,
+  icon,
+  onClick,
 }: {
   label: string;
   value: string | number;
   hint?: string;
   color: string;
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  icon: typeof BarChart3;
+  onClick?: () => void;
 }) => (
-  <div className="rounded-xl border border-border bg-muted/20 p-3">
-    <div className="flex items-start justify-between gap-2">
-      <div className="min-w-0">
-        <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-          {label}
-        </div>
-        <div className="mt-1 text-2xl font-bold tabular-nums" style={{ color }}>
-          {value}
-        </div>
-        {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
-      </div>
-      <Icon className="h-5 w-5 shrink-0" style={{ color, opacity: 0.6 }} />
-    </div>
-  </div>
+  <KpiCard label={label} value={value} icon={icon} color={color} subtitle={hint} onClick={onClick} />
 );
 
 // ─── Main ──────────────────────────────────────────────────────────────
 const AgencyAnalytics = () => {
   const [window, setWindow] = useState<QaWindow>("30d");
+  type KpiKey = "totales" | "close_rate" | "score" | "closers";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const q = useQaAnalytics(window);
   const data = q.data;
 
@@ -169,35 +162,39 @@ const AgencyAnalytics = () => {
         </div>
       ) : (
         <>
-          {/* KPI strip */}
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          {/* KPI strip — clickeables, abren modal */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <Kpi
               label="Análisis totales"
               value={data.total_calls}
               hint={`en ${WINDOW_OPTIONS.find((w) => w.value === data.window)?.label.toLowerCase()}`}
-              color="rgb(99 102 241)"
+              color="bg-blue-500"
               icon={BarChart3}
+              onClick={() => setKpiPopup("totales")}
             />
             <Kpi
               label="Close rate"
               value={formatPct(data.close_rate)}
               hint={`${data.cerro} cerros`}
-              color="rgb(22 163 74)"
+              color="bg-emerald-500"
               icon={Trophy}
+              onClick={() => setKpiPopup("close_rate")}
             />
             <Kpi
               label="Score promedio"
               value={data.avg_score}
               hint={`/ 100`}
-              color={scoreColor(data.avg_score)}
+              color={data.avg_score >= 70 ? "bg-emerald-500" : data.avg_score >= 50 ? "bg-amber-500" : "bg-rose-500"}
               icon={TrendingUp}
+              onClick={() => setKpiPopup("score")}
             />
             <Kpi
               label="Closers activos"
               value={data.active_closers}
               hint={`${data.active_models} modelos con calls`}
-              color="rgb(148 163 184)"
+              color="bg-violet-500"
               icon={Users}
+              onClick={() => setKpiPopup("closers")}
             />
           </div>
 
@@ -407,6 +404,55 @@ const AgencyAnalytics = () => {
           </div>
         </>
       )}
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          if (!kpiPopup || !data) return "";
+          switch (kpiPopup) {
+            case "totales": return `Análisis Totales — ${data.total_calls}`;
+            case "close_rate": return `Close Rate — ${formatPct(data.close_rate)}`;
+            case "score": return `Score Promedio — ${data.avg_score} / 100`;
+            case "closers": return `Closers Activos — ${data.active_closers}`;
+          }
+        })()}
+        subtitle={`Ventana: ${WINDOW_OPTIONS.find((w) => w.value === window)?.label}`}
+        rows={(() => {
+          if (!kpiPopup || !data) return [];
+          if (kpiPopup === "close_rate") {
+            return [
+              { primary: "Total análisis", right: String(data.total_calls) },
+              { primary: "Cerros", right: String(data.cerro), rightTone: "success" as const },
+              { primary: "Close rate", right: formatPct(data.close_rate), rightTone: "default" as const },
+            ];
+          }
+          if (kpiPopup === "score") {
+            return [
+              { primary: "Score promedio", right: String(data.avg_score), rightTone: data.avg_score >= 70 ? "success" as const : "warning" as const },
+              { primary: "Análisis incluidos", right: String(data.total_calls) },
+            ];
+          }
+          if (kpiPopup === "closers") {
+            const top = (data as any).top_closers ?? [];
+            return top.map((c: any): KpiRow => ({
+              primary: c.name ?? c.closer_name ?? "Sin nombre",
+              secondary: c.calls !== undefined ? `${c.calls} análisis` : undefined,
+              right: c.score !== undefined ? String(c.score) : undefined,
+            }));
+          }
+          if (kpiPopup === "totales") {
+            return [
+              { primary: "Total análisis", right: String(data.total_calls), rightTone: "default" as const },
+              { primary: "Cerros", right: String(data.cerro), rightTone: "success" as const },
+              { primary: "Closers activos", right: String(data.active_closers) },
+              { primary: "Modelos con calls", right: String(data.active_models) },
+              { primary: "Score promedio", right: String(data.avg_score) },
+            ];
+          }
+          return [];
+        })()}
+      />
     </div>
   );
 };

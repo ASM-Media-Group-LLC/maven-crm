@@ -1,7 +1,4 @@
-import { useNavigate } from "react-router-dom";
 import { DollarSign, Wallet, Users, TrendingUp, AlertTriangle } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import type { PeriodComparisonResult } from "./usePeriodComparison";
 
 interface Props {
@@ -12,9 +9,10 @@ interface Props {
 const fmt = (n: number) =>
   n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${n.toFixed(0)}`;
 
+// KPI cards estilo Panel de Control / Dashboard v2 — gradient corner
+// + icono cuadrado coloreado + hover lift. Todos los clicks abren el
+// modal CardDetailModal, ya no navegan a otras rutas.
 const SalesKPICards = ({ data, onCardClick }: Props) => {
-  const navigate = useNavigate();
-
   const cards = [
     {
       id: "gross",
@@ -24,11 +22,7 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       previousValue: fmt(data.totalPrevious),
       subtitle: null,
       icon: DollarSign,
-      color: "text-primary",
-      bgColor: "bg-primary/20",
-      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40",
-      progress: 100,
-      route: null,
+      bg: "bg-blue-500",
     },
     {
       id: "net",
@@ -38,11 +32,7 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       previousValue: fmt(data.totalPrevious * 0.8),
       subtitle: null,
       icon: Wallet,
-      color: "text-success",
-      bgColor: "bg-success/20",
-      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40",
-      progress: 80,
-      route: null,
+      bg: "bg-emerald-500",
     },
     {
       id: "creators",
@@ -50,13 +40,9 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       value: data.creators.length.toString(),
       change: 0,
       previousValue: null,
-      subtitle: `${data.activeCreators} activas / ${data.creators.length - data.activeCreators} inactivas`,
+      subtitle: `${data.activeCreators} activas`,
       icon: Users,
-      color: "text-accent",
-      bgColor: "bg-accent/20",
-      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:to-transparent hover:border-accent/40",
-      progress: Math.min((data.activeCreators / Math.max(data.creators.length, 1)) * 100, 100),
-      route: null,
+      bg: "bg-violet-500",
     },
     {
       id: "rising",
@@ -66,11 +52,7 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       previousValue: null,
       subtitle: "crecimiento positivo",
       icon: TrendingUp,
-      color: "text-success",
-      bgColor: "bg-success/20",
-      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40",
-      progress: Math.min((data.rising.length / Math.max(data.activeCreators, 1)) * 100, 100),
-      route: "/sales-overview/subiendo",
+      bg: "bg-emerald-500",
     },
     {
       id: "at_risk",
@@ -80,46 +62,41 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       previousValue: null,
       subtitle: "necesitan atención",
       icon: AlertTriangle,
-      color: "text-destructive",
-      bgColor: "bg-destructive/20",
-      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40",
-      progress: Math.min((data.atRisk.length / Math.max(data.activeCreators, 1)) * 100, 100),
-      route: "/sales-overview/en-riesgo",
+      bg: "bg-rose-500",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
       {cards.map((card) => (
-        <Card
+        <button
           key={card.id}
-          className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${card.hoverClass}`}
-          onClick={() => card.route ? navigate(card.route) : onCardClick(card.id)}
+          type="button"
+          onClick={() => onCardClick(card.id)}
+          className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 ease-out hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
         >
-          <CardContent className="p-5 space-y-3">
-            <div className="flex items-start justify-between">
-              <span className="text-xs font-medium text-muted-foreground">{card.title}</span>
-              <div className={`flex h-9 w-9 items-center justify-center rounded-md ${card.bgColor}`}>
-                <card.icon className={`h-5 w-5 ${card.color}`} />
-              </div>
+          <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 ${card.bg} transition-opacity group-hover:opacity-50`} />
+          <div className="relative space-y-3">
+            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${card.bg}`}>
+              <card.icon className="h-5 w-5 text-white" />
             </div>
-            <div className="space-y-1">
-              <p className={`text-3xl font-bold ${card.color}`}>{card.value}</p>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{card.title}</p>
+              <p className="text-3xl font-bold tabular-nums leading-tight">{card.value}</p>
               {card.change !== 0 && (
-                <p className={`text-xs ${card.change >= 0 ? "text-success" : "text-destructive"}`}>
+                <p className={`text-[10px] mt-1 ${card.change >= 0 ? "text-emerald-500" : "text-destructive"}`}>
                   {card.change >= 0 ? "+" : ""}{card.change.toFixed(1)}% vs anterior
                 </p>
               )}
-              {card.previousValue && (
-                <p className="text-xs text-muted-foreground">Anterior: {card.previousValue}</p>
+              {card.previousValue && card.change === 0 && (
+                <p className="text-[10px] text-muted-foreground mt-1">Anterior: {card.previousValue}</p>
               )}
               {card.subtitle && (
-                <p className="text-xs text-muted-foreground">{card.subtitle}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{card.subtitle}</p>
               )}
             </div>
-            <Progress value={card.progress} className="h-1" />
-          </CardContent>
-        </Card>
+          </div>
+        </button>
       ))}
     </div>
   );

@@ -8,6 +8,8 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -45,6 +47,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [viewMode, setViewMode] = useState<"kanban" | "list" | "analytics" | "docs">("list");
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [editProjectOpen, setEditProjectOpen] = useState(false);
+  type KpiKey = "pending" | "in_progress" | "paused" | "overdue" | "completed";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -143,12 +147,13 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
     updateTaskStatus.mutate({ taskId, status });
   };
 
+  type KpiKey = "pending" | "in_progress" | "paused" | "overdue" | "completed";
   const kpis = [
-    { label: "Pendientes", value: counts.pending, icon: Clock, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
-    { label: "En curso", value: counts.in_progress, icon: Play, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
-    { label: "Pausadas", value: counts.paused, icon: Pause, color: "text-yellow-400", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-yellow-500/15 hover:to-transparent hover:border-yellow-500/40" },
-    { label: "Vencidas", value: counts.overdue, icon: AlertTriangle, color: "text-destructive", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40" },
-    { label: "Completadas", value: counts.completed, icon: CheckSquare, color: "text-emerald-400", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-emerald-500/15 hover:to-transparent hover:border-emerald-500/40" },
+    { key: "pending" as KpiKey, label: "Pendientes", value: counts.pending, icon: Clock, color: "bg-blue-500" },
+    { key: "in_progress" as KpiKey, label: "En curso", value: counts.in_progress, icon: Play, color: "bg-violet-500" },
+    { key: "paused" as KpiKey, label: "Pausadas", value: counts.paused, icon: Pause, color: "bg-amber-500" },
+    { key: "overdue" as KpiKey, label: "Vencidas", value: counts.overdue, icon: AlertTriangle, color: "bg-rose-500" },
+    { key: "completed" as KpiKey, label: "Completadas", value: counts.completed, icon: CheckSquare, color: "bg-emerald-500" },
   ];
 
   return (
@@ -423,15 +428,14 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             </CardContent>
           </Card>
           {kpis.map((kpi) => (
-            <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
-              <CardContent className="flex items-center gap-3 p-4">
-                <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
-                <div>
-                  <p className="text-2xl font-bold">{kpi.value}</p>
-                  <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                </div>
-              </CardContent>
-            </Card>
+            <KpiCard
+              key={kpi.label}
+              label={kpi.label}
+              value={kpi.value}
+              icon={kpi.icon}
+              color={kpi.color}
+              onClick={() => setKpiPopup(kpi.key)}
+            />
           ))}
         </div>
 
@@ -664,6 +668,55 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
           if (!error) navigate("/tareas");
         }}
         isLoading={false}
+      />
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "pending": return `Pendientes — ${counts.pending}`;
+            case "in_progress": return `En curso — ${counts.in_progress}`;
+            case "paused": return `Pausadas — ${counts.paused}`;
+            case "overdue": return `Vencidas — ${counts.overdue}`;
+            case "completed": return `Completadas — ${counts.completed}`;
+            default: return "";
+          }
+        })()}
+        subtitle={(() => {
+          switch (kpiPopup) {
+            case "pending": return "Tareas sin iniciar";
+            case "in_progress": return "Tareas activas";
+            case "paused": return "Pausadas temporalmente";
+            case "overdue": return "Pasaron su due_date";
+            case "completed": return "Finalizadas";
+            default: return undefined;
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = tasks;
+          if (kpiPopup === "pending") list = tasks.filter(t => t.status === "pending");
+          else if (kpiPopup === "in_progress") list = tasks.filter(t => t.status === "in_progress");
+          else if (kpiPopup === "paused") list = tasks.filter(t => t.status === "paused");
+          else if (kpiPopup === "completed") list = tasks.filter(t => t.status === "completed");
+          else if (kpiPopup === "overdue") list = tasks.filter(t => {
+            if (t.status === "completed") return false;
+            if (!t.due_date) return false;
+            return new Date(t.due_date) < new Date();
+          });
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "completed" ? "success" :
+            status === "in_progress" ? "default" :
+            status === "paused" ? "warning" :
+            "default";
+          return list.slice(0, 100).map((t): KpiRow => ({
+            primary: t.title ?? "Sin título",
+            secondary: t.due_date ? `Vence ${new Date(t.due_date).toLocaleDateString("es")}` : undefined,
+            right: t.status,
+            rightTone: tone(t.status as string),
+          }));
+        })()}
       />
     </main>
     </div>

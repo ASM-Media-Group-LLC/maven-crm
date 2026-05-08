@@ -20,7 +20,8 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import CalcularNominaModal from "./CalcularNominaModal";
 import CrearBatchModal from "./CrearBatchModal";
 import { useNomina } from "./useNomina";
@@ -114,6 +115,8 @@ export default function NominaPage() {
   const [showCalcModal, setShowCalcModal] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showCloseMonthDialog, setShowCloseMonthDialog] = useState(false);
+  type KpiKey = "total" | "borradores" | "bruto" | "neto";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
 
   const totalBorradores = periods.filter(p => p.status === "borrador").length;
   const totalBruto = periods.reduce((s, p) => s + (Number(p.gross_total) || 0), 0);
@@ -399,13 +402,13 @@ export default function NominaPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {loadingPeriods ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {loadingPeriods ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <DashboardMetricCard label="Total Periodos" value={String(periods.length)} icon={DollarSign} subtitle="Todos los registros" color="primary" />
-              <DashboardMetricCard label="Borradores" value={String(totalBorradores)} icon={Clock} subtitle={periods.length > 0 ? `${((totalBorradores / periods.length) * 100).toFixed(0)}% del total` : "—"} color="warning" />
-              <DashboardMetricCard label="Monto Bruto Total" value={fmt(totalBruto)} icon={DollarSign} subtitle="Suma bruta" color="accent" />
-              <DashboardMetricCard label="Monto Neto Total" value={fmt(totalNeto)} icon={CheckCircle} subtitle="Suma neta" color="destructive" />
+              <KpiCard label="Total Periodos" value={String(periods.length)} icon={DollarSign} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Borradores" value={String(totalBorradores)} icon={Clock} color="bg-amber-500" subtitle={periods.length > 0 ? `${((totalBorradores / periods.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("borradores")} />
+              <KpiCard label="Monto Bruto Total" value={fmt(totalBruto)} icon={DollarSign} color="bg-emerald-500" subtitle="Suma bruta" onClick={() => setKpiPopup("bruto")} />
+              <KpiCard label="Monto Neto Total" value={fmt(totalNeto)} icon={CheckCircle} color="bg-violet-500" subtitle="Suma neta" onClick={() => setKpiPopup("neto")} />
             </>
           )}
         </div>
@@ -464,6 +467,43 @@ export default function NominaPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Todos los Periodos — ${periods.length}`;
+            case "borradores": return `Periodos en Borrador — ${totalBorradores}`;
+            case "bruto": return `Monto Bruto Total — ${fmt(totalBruto)}`;
+            case "neto": return `Monto Neto Total — ${fmt(totalNeto)}`;
+            default: return "";
+          }
+        })()}
+        subtitle={(() => {
+          switch (kpiPopup) {
+            case "total": return "Listado completo de periodos de nómina";
+            case "borradores": return "Pendientes de cerrar";
+            case "bruto": return "Sumatoria de gross_total por periodo";
+            case "neto": return "Sumatoria de net_total por periodo";
+            default: return undefined;
+          }
+        })()}
+        rows={(() => {
+          let list = periods;
+          if (kpiPopup === "borradores") list = periods.filter(p => p.status === "borrador");
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "pagado" || status === "cerrado" ? "success" :
+            status === "borrador" ? "warning" : "default";
+          const rightField = kpiPopup === "neto" ? "net_total" : "gross_total";
+          return list.map((p) => ({
+            primary: p.period_name ?? "Sin nombre",
+            secondary: `${p.status} · ${p.cost_center ?? "Sin CC"}`,
+            right: fmt(Number((p as any)[rightField]) || 0),
+            rightTone: tone(p.status as string),
+          }));
+        })()}
+      />
     </div>
   );
 }

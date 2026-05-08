@@ -1,13 +1,23 @@
-import { Users, CheckCircle, Trophy, XCircle, DollarSign } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Users, CheckCircle, Trophy, XCircle, DollarSign, TrendingUp, Layers, Crown } from "lucide-react";
+import KpiCard from "@/components/dashboard/KpiCard";
 
 interface Props {
   statusCounts: Record<string, number>;
   platformRevenue: Record<string, number>;
   ofMonetizationTotal: number;
+  onPipelineClick?: (key: "total" | "asignadas" | "confirmadas" | "completadas" | "cerradas" | "no_interesadas") => void;
+  onRevenueClick?: (platform: string) => void;
 }
 
-const ClosersKPICards = ({ statusCounts, platformRevenue, ofMonetizationTotal }: Props) => {
+// Compact money formatter — evita truncamiento en cards angostas.
+const fmtMoney = (n: number) => {
+  if (n === 0) return "$0";
+  if (Math.abs(n) >= 1000000) return `$${(n / 1000000).toFixed(1)}M`;
+  if (Math.abs(n) >= 1000) return `$${(n / 1000).toFixed(1)}k`;
+  return `$${Math.round(n)}`;
+};
+
+const ClosersKPICards = ({ statusCounts, platformRevenue, ofMonetizationTotal, onPipelineClick, onRevenueClick }: Props) => {
   const asignadas = statusCounts["Asignada"] || 0;
   const confirmadas = statusCounts["Confirmada"] || 0;
   const completadas = statusCounts["Completada"] || 0;
@@ -16,68 +26,103 @@ const ClosersKPICards = ({ statusCounts, platformRevenue, ofMonetizationTotal }:
   const total = asignadas + confirmadas + completadas + noInteresadas;
 
   const salePlatforms = ["Trafix", "Blu", "Piclink", "LeakHunter", "ORA"];
-  const revTrafix = platformRevenue["Trafix"] || 0;
-  const revBlu = platformRevenue["Blu"] || 0;
-  const revPiclink = platformRevenue["Piclink"] || 0;
-  const revLeakHunter = platformRevenue["LeakHunter"] || 0;
-  const revORA = platformRevenue["ORA"] || 0;
   const revPlataformas = salePlatforms.reduce((s, p) => s + (platformRevenue[p] || 0), 0);
   const revTotal = ofMonetizationTotal + revPlataformas;
 
   const pipelineCards = [
-    { label: "Total", count: total, icon: Users, colorClass: "text-muted-foreground", bgClass: "bg-muted" },
-    { label: "Asignadas", count: asignadas, icon: Users, colorClass: "text-primary", bgClass: "bg-primary/20" },
-    { label: "Confirmadas", count: confirmadas, icon: CheckCircle, colorClass: "text-green-600 dark:text-green-400", bgClass: "bg-green-500/20" },
-    { label: "Completadas", count: completadas, icon: Trophy, colorClass: "text-green-700 dark:text-green-300", bgClass: "bg-green-600/20" },
-    { label: "Cerradas", count: cerradas, icon: CheckCircle, colorClass: "text-accent-foreground", bgClass: "bg-accent/20" },
-    { label: "No interesadas", count: noInteresadas, icon: XCircle, colorClass: "text-destructive", bgClass: "bg-destructive/20" },
+    { key: "total" as const, label: "Total", count: total, icon: Users, color: "bg-slate-500" },
+    { key: "asignadas" as const, label: "Asignadas", count: asignadas, icon: Users, color: "bg-blue-500" },
+    { key: "confirmadas" as const, label: "Confirmadas", count: confirmadas, icon: CheckCircle, color: "bg-emerald-500" },
+    { key: "completadas" as const, label: "Completadas", count: completadas, icon: Trophy, color: "bg-emerald-600" },
+    { key: "cerradas" as const, label: "Cerradas", count: cerradas, icon: CheckCircle, color: "bg-violet-500" },
+    { key: "no_interesadas" as const, label: "No interesadas", count: noInteresadas, icon: XCircle, color: "bg-rose-500" },
   ];
 
-  const revenueCards = [
-    { label: "LeakHunter", amount: revLeakHunter },
-    { label: "Blu", amount: revBlu },
-    { label: "Trafix", amount: revTrafix },
-    { label: "ORA", amount: revORA },
-    { label: "Piclink", amount: revPiclink },
-    { label: "Rev. Plataformas", amount: revPlataformas, highlight: true },
-    { label: "Rev. OF", amount: ofMonetizationTotal, highlight: true },
-    { label: "Rev. Total", amount: revTotal, highlight: true },
+  // Hero del revenue — 3 cards grandes y prominentes (lo que importa).
+  const heroRevenue = [
+    { label: "Rev. Plataformas", amount: revPlataformas, icon: Layers, color: "bg-violet-500" },
+    { label: "Rev. OnlyFans", amount: ofMonetizationTotal, icon: TrendingUp, color: "bg-emerald-500" },
+    { label: "Rev. Total", amount: revTotal, icon: Crown, color: "bg-blue-600" },
+  ];
+
+  // Breakdown por plataforma — compacto, secundario.
+  const platformBreakdown = [
+    { label: "LeakHunter", key: "LeakHunter" },
+    { label: "Blu", key: "Blu" },
+    { label: "Trafix", key: "Trafix" },
+    { label: "ORA", key: "ORA" },
+    { label: "Piclink", key: "Piclink" },
   ];
 
   return (
-    <div className="space-y-3">
-      {/* Pipeline */}
-      <div className="grid grid-cols-3 gap-3 md:grid-cols-6">
-        {pipelineCards.map((card) => (
-          <Card key={card.label} className="transition-all duration-200 hover:scale-[1.02]">
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">{card.label}</p>
-                <div className={`flex h-6 w-6 items-center justify-center rounded-md ${card.bgClass}`}>
-                  <card.icon className={`h-3 w-3 ${card.colorClass}`} />
-                </div>
-              </div>
-              <p className={`mt-1 text-xl font-bold ${card.colorClass}`}>{card.count}</p>
-            </CardContent>
-          </Card>
-        ))}
+    <div className="space-y-6">
+      {/* Pipeline — primera sección */}
+      <div className="space-y-3">
+        <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+          Pipeline
+        </h3>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+          {pipelineCards.map((card) => (
+            <KpiCard
+              key={card.label}
+              label={card.label}
+              value={card.count}
+              icon={card.icon}
+              color={card.color}
+              onClick={onPipelineClick ? () => onPipelineClick(card.key) : undefined}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Revenue */}
-      <div className="grid grid-cols-3 gap-3 md:grid-cols-8">
-        {revenueCards.map((card) => (
-          <Card key={card.label} className={`transition-all duration-200 hover:scale-[1.02] ${card.highlight ? "border-primary/30" : ""}`}>
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">{card.label}</p>
-                <DollarSign className={`h-3 w-3 ${card.highlight ? "text-primary" : "text-muted-foreground"}`} />
-              </div>
-              <p className={`mt-1 text-lg font-bold ${card.highlight ? "text-primary" : "text-foreground"}`}>
-                ${card.amount.toLocaleString()}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Revenue Hero — 3 cards grandes con los totales relevantes */}
+      <div className="space-y-3">
+        <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+          Revenue
+        </h3>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {heroRevenue.map((card) => (
+            <KpiCard
+              key={card.label}
+              label={card.label}
+              value={fmtMoney(card.amount)}
+              icon={card.icon}
+              color={card.color}
+              onClick={onRevenueClick ? () => onRevenueClick(card.label) : undefined}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Breakdown por plataforma — fila compacta de pills clickeables.
+          No usamos KpiCard aquí porque ocupan demasiado espacio para
+          5 ítems secundarios. Estilo minimalista con el mismo lift. */}
+      <div className="space-y-3">
+        <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+          Por plataforma
+        </h3>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+          {platformBreakdown.map((p) => {
+            const amount = platformRevenue[p.key] || 0;
+            return (
+              <button
+                key={p.key}
+                type="button"
+                onClick={onRevenueClick ? () => onRevenueClick(p.label) : undefined}
+                disabled={!onRevenueClick}
+                className="group flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-all duration-200 ease-out hover:scale-[1.015] hover:border-primary/40 hover:shadow-[0_0_16px_-6px_rgba(255,255,255,0.15)] disabled:cursor-default disabled:hover:scale-100"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium truncate">{p.label}</p>
+                  <p className="text-base font-bold tabular-nums leading-tight truncate">{fmtMoney(amount)}</p>
+                </div>
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted shrink-0">
+                  <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

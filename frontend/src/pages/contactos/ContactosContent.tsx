@@ -1,9 +1,16 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Users, Building2, BarChart3, ShieldAlert, ChevronDown, DollarSign, TrendingUp } from "lucide-react";
+import { Plus, Users, Building2, BarChart3, ShieldAlert, ChevronDown, DollarSign, TrendingUp, LayoutDashboard, ArrowRight } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -11,11 +18,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import ContactosKPICards from "./ContactosKPICards";
 import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
-import ContactosTable from "./ContactosTable";
-import ContactosGrid from "./ContactosGrid";
+import ContactosCardList from "./ContactosCardList";
 import ContactosAnalyticsModal from "./ContactosAnalyticsModal";
 
-import ViewContactoModal from "./ViewContactoModal";
+import ContactoDetailDialog from "./ContactoDetailDialog";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
 import ConvertContactoModal from "./ConvertContactoModal";
@@ -73,10 +79,11 @@ const normalizeHandleKey = (value: string | null | undefined) =>
   (value ?? "").trim().replace(/^@+/, "").toLowerCase();
 
 const ContactosContent = () => {
-  const [activeTab, setActiveTab] = useState<"contactos" | "agencias">("contactos");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "contactos" | "agencias">("dashboard");
   const [filters, setFilters] = useState<ContactoFilters>(emptyFilters);
-  const [view, setView] = useState<"table" | "grid">("table");
   const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
+  type KpiKey = "total" | "nuevos" | "convertidos" | "esteMes";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -134,6 +141,53 @@ const ContactosContent = () => {
   const dbContactos = queryResult?.data ?? [];
   const totalCount = queryResult?.total ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  // KPI counts — separados del query paginado para que reflejen el total
+  // global, no solo la página actual. count head queries baratas.
+  const { data: kpiCounts = { nuevos: 0, convertidos: 0, esteMes: 0 } } = useQuery({
+    queryKey: ["closers_contacts_kpi"],
+    queryFn: async () => {
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      const [nuevosRes, convertidosRes, esteMesRes] = await Promise.all([
+        supabase.from("closers_contacts").select("id", { count: "exact", head: true }).eq("status", "new"),
+        supabase.from("closers_contacts").select("id", { count: "exact", head: true }).eq("status", "converted"),
+        supabase.from("closers_contacts").select("id", { count: "exact", head: true }).gte("created_at", startOfMonth.toISOString()),
+      ]);
+      return {
+        nuevos: nuevosRes.count ?? 0,
+        convertidos: convertidosRes.count ?? 0,
+        esteMes: esteMesRes.count ?? 0,
+      };
+    },
+  });
+
+  // Lista de contactos para el popup de KPI — query lazy: solo dispara
+  // cuando el usuario abre uno de los 4 cards. Limitado a 100 filas para
+  // no saturar el dialog (los conteos siguen siendo globales).
+  const { data: kpiPopupContacts = [], isLoading: kpiPopupLoading } = useQuery({
+    queryKey: ["closers_contacts_kpi_popup", kpiPopup],
+    enabled: kpiPopup !== null,
+    queryFn: async () => {
+      let q = supabase
+        .from("closers_contacts")
+        .select("id, name, handle, city, country_code, physical_appearance, status, created_at, profile_picture_url")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (kpiPopup === "nuevos") q = q.eq("status", "new");
+      else if (kpiPopup === "convertidos") q = q.eq("status", "converted");
+      else if (kpiPopup === "esteMes") {
+        const start = new Date();
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+        q = q.gte("created_at", start.toISOString());
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
   // Resolve created_by UUIDs to profile names
   const creatorIds = useMemo(() => {
@@ -339,16 +393,15 @@ const ContactosContent = () => {
       </header>
 
       <div className="flex-1 flex flex-col overflow-hidden p-6 gap-4">
-        <div className="shrink-0">
-          <ContactosKPICards
-            total={totalCount}
-            nuevos={0}
-            convertidos={0}
-            esteMes={0}
-          />
-        </div>
-
         <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 shrink-0">
+          <Button
+            variant={activeTab === "dashboard" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab("dashboard")}
+          >
+            <LayoutDashboard className="mr-1.5 h-4 w-4" />
+            Dashboard
+          </Button>
           <Button
             variant={activeTab === "contactos" ? "secondary" : "ghost"}
             size="sm"
@@ -367,26 +420,36 @@ const ContactosContent = () => {
           </Button>
         </div>
 
-        {activeTab === "contactos" ? (
+        {activeTab === "dashboard" && (
+          <div className="space-y-4 overflow-auto">
+            <ContactosKPICards
+              total={totalCount}
+              nuevos={kpiCounts.nuevos}
+              convertidos={kpiCounts.convertidos}
+              esteMes={kpiCounts.esteMes}
+              onClick={(key) => setKpiPopup(key)}
+            />
+          </div>
+        )}
+
+        {activeTab === "contactos" && (
           <>
             <div className="shrink-0">
               <ContactosFilters
-              filters={filters}
-              onChange={updateFilters}
-              view={view}
-              onViewChange={setView}
-              hasActiveFilters={hasActiveFilters}
-              onClear={() => setFilters(emptyFilters)}
-              creators={creatorsList}
-              cities={citiesList}
-            />
+                filters={filters}
+                onChange={updateFilters}
+                hasActiveFilters={hasActiveFilters}
+                onClear={() => setFilters(emptyFilters)}
+                creators={creatorsList}
+                cities={citiesList}
+              />
             </div>
 
             {isLoading ? (
               <div className="flex-1 flex items-center justify-center">
                 <p className="text-sm text-muted-foreground">Cargando...</p>
               </div>
-            ) : view === "table" ? (
+            ) : (
               <DataTableShell
                 className="flex-1 min-h-0"
                 currentPage={page}
@@ -395,25 +458,29 @@ const ContactosContent = () => {
                 pageSize={50}
                 onPageChange={setPage}
               >
-                <ContactosTable contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} onDelete={isAdmin ? (c) => { setSelectedContacto(c); setDeleteOpen(true); } : undefined} />
+                <ContactosCardList
+                  contactos={filtered}
+                  onView={handleView}
+                  onEdit={handleEdit}
+                  onConvert={handleConvert}
+                  onDelete={isAdmin ? (c) => { setSelectedContacto(c); setDeleteOpen(true); } : undefined}
+                />
               </DataTableShell>
-            ) : (
-              <div className="flex-1 min-h-0 overflow-auto">
-                <ContactosGrid contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} onDelete={isAdmin ? (c) => { setSelectedContacto(c); setDeleteOpen(true); } : undefined} />
-              </div>
             )}
           </>
-        ) : (
-          <AgenciasContent />
         )}
+
+        {activeTab === "agencias" && <AgenciasContent />}
       </div>
 
-      <ViewContactoModal
+      <ContactoDetailDialog
         open={viewOpen}
         onOpenChange={setViewOpen}
         contacto={selectedContacto}
         onEdit={() => { setViewOpen(false); setEditOpen(true); }}
+        onConvert={selectedContacto ? () => { setViewOpen(false); handleConvert(selectedContacto); } : undefined}
         onDelete={() => { setViewOpen(false); setDeleteOpen(true); }}
+        canDelete={isAdmin}
       />
       <EditContactoModal open={editOpen} onOpenChange={setEditOpen} contacto={selectedContacto} />
       <DeleteContactoDialog open={deleteOpen} onOpenChange={setDeleteOpen} contacto={selectedContacto} />
@@ -425,6 +492,134 @@ const ContactosContent = () => {
         onConverted={() => setConvertOpen(false)}
       />
       <ContactosAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} defaultTab={analyticsTab} />
+
+      {/* KPI POPUP — al clickar un cuadro del Dashboard de Contactos */}
+      <Dialog open={kpiPopup !== null} onOpenChange={(o) => !o && setKpiPopup(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {kpiPopup === "total" && `Todos los Contactos (${totalCount})`}
+              {kpiPopup === "nuevos" && `Contactos Nuevos (${kpiCounts.nuevos})`}
+              {kpiPopup === "convertidos" && `Contactos Convertidos (${kpiCounts.convertidos})`}
+              {kpiPopup === "esteMes" && `Contactos de Este Mes (${kpiCounts.esteMes})`}
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground">
+              {kpiPopup === "total" && "Mostrando los 100 más recientes"}
+              {kpiPopup === "nuevos" && "Contactos sin interacción aún · 100 más recientes"}
+              {kpiPopup === "convertidos" && "Pasaron a creadores · 100 más recientes"}
+              {kpiPopup === "esteMes" && "Agregados desde el inicio del mes · 100 más recientes"}
+            </p>
+          </DialogHeader>
+
+          {kpiPopupLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <p className="text-sm text-muted-foreground">Cargando…</p>
+            </div>
+          ) : kpiPopupContacts.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
+              Sin contactos.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {kpiPopupContacts.map((c) => {
+                const cleanHandle = (c.handle || "").replace(/^@/, "");
+                const initials = (c.name || "")
+                  .split(/\s+/)
+                  .map((p) => p[0])
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase() || "?";
+                const created = c.created_at
+                  ? new Date(c.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
+                  : "—";
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      const fullContacto = allContactos.find((x) => x.id === c.id);
+                      if (fullContacto) {
+                        setKpiPopup(null);
+                        handleView(fullContacto);
+                      } else {
+                        // Si no está en la página actual, abrir popup minimal con lo que hay
+                        const minimal: Contacto = {
+                          id: c.id,
+                          rawCreatedAt: c.created_at || "",
+                          creacion: created,
+                          ticket: "",
+                          nombre: c.name || "",
+                          estado: statusMap[c.status || ""] || c.status || "",
+                          instagram: c.handle || "",
+                          platform: "Instagram",
+                          pais: c.country_code || "",
+                          city: c.city || "",
+                          categoria: c.physical_appearance || "",
+                          whatsapp: "",
+                          interacciones: 0,
+                          creadoPor: "",
+                          email: "",
+                          phone: "",
+                          country_code: c.country_code || "",
+                          company: "",
+                          notes: "",
+                          source: "",
+                          profile_picture_url: c.profile_picture_url || "",
+                          assigned_to: "",
+                          onlyfans_url: "",
+                        };
+                        setKpiPopup(null);
+                        handleView(minimal);
+                      }
+                    }}
+                    className="group w-full rounded-xl border border-border bg-card p-3 text-left transition-all duration-200 ease-out hover:scale-[1.005] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.12)]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10 shrink-0">
+                        {c.profile_picture_url && <AvatarImage src={c.profile_picture_url} alt={c.name || ""} />}
+                        <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          {c.country_code && <span className="text-sm shrink-0">{getCountryFlag(c.country_code)}</span>}
+                          <p className="font-medium text-sm truncate">{c.name || "—"}</p>
+                          {c.physical_appearance && (
+                            <Badge variant="secondary-soft" className="font-normal text-[10px] px-1.5 py-0 shrink-0">
+                              {c.physical_appearance}
+                            </Badge>
+                          )}
+                        </div>
+                        {cleanHandle && (
+                          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                            <InstagramIcon className="h-3 w-3" />
+                            @{cleanHandle}
+                          </p>
+                        )}
+                      </div>
+                      <div className="hidden sm:flex items-center gap-3 text-right shrink-0">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Ciudad</p>
+                          <p className="text-xs font-medium truncate max-w-[100px]">{c.city || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">País</p>
+                          <p className="text-xs font-medium">{c.country_code ? getCountryShortDisplay(c.country_code) : "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Creación</p>
+                          <p className="text-xs font-medium whitespace-nowrap">{created}</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };

@@ -8,6 +8,7 @@ import CreadoresFilters from "./CreadoresFilters";
 import CreadoresTable from "./CreadoresTable";
 import CreadoresGrid from "./CreadoresGrid";
 import CreadoresKPICards from "./CreadoresKPICards";
+import CreadoresSubtabs from "./CreadoresSubtabs";
 import { useCreadores, type CreadorFilters } from "./useCreadores";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
@@ -67,6 +68,8 @@ const CreadoresContent = () => {
         </div>
       ) : (
         <div className="flex-1 flex flex-col min-h-0 p-6 gap-4">
+          <CreadoresSubtabs />
+
           <div className="shrink-0">
             <CreadoresKPICards counts={statusCounts} isCloser={isCloser} />
           </div>

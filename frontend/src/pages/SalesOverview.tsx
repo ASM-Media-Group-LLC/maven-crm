@@ -4,6 +4,7 @@ import SalesOverviewHeader from "./sales-overview/SalesOverviewHeader";
 import SalesKPICards from "./sales-overview/SalesKPICards";
 import SalesOperationalCards from "./sales-overview/SalesOperationalCards";
 import CardDetailModal from "./sales-overview/CardDetailModal";
+import VentasSubtabs from "./sales-overview/VentasSubtabs";
 import EarningsTrendChart from "./sales-dashboard/EarningsTrendChart";
 import EarningsByChannelChart from "./sales-dashboard/EarningsByChannelChart";
 import TopCreatorsTable from "./sales-overview/TopCreatorsTable";
@@ -85,6 +86,7 @@ const SalesOverview = () => {
             </div>
            )}
            <main className="flex-1 overflow-auto p-6 space-y-6">
+            <VentasSubtabs />
             {isLoading ? (
               <div className="p-8 text-center text-sm text-muted-foreground">Cargando datos…</div>
             ) : (
