@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import KpiCard from "@/components/dashboard/KpiCard";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import {
   Bar,
   BarChart,
@@ -24,6 +25,7 @@ import {
   XCircle,
   Percent,
   ListChecks,
+  LayoutDashboard,
   Settings,
   History as HistoryIcon,
 } from "lucide-react";
@@ -128,6 +130,7 @@ const ChatterEvaluatorContent = () => {
   // ruta (la guard del routing los redirigía silenciosamente).
   const canSeeAdmin = canAccess("Chatters", "Admin");
   const [newSessionOpen, setNewSessionOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   type KpiKey = "total" | "approved" | "rejected" | "rate";
   const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   // Rango activo para los stat cards — los charts ya tienen su propia
@@ -161,36 +164,55 @@ const ChatterEvaluatorContent = () => {
 
         <NewSessionDialog open={newSessionOpen} onOpenChange={setNewSessionOpen} />
 
-        {/* Subtabs Workspace / History / Admin — reemplazaron el toggle
-            de rango (esta semana / este mes / total) por pedido del
-            usuario. Mismo patrón ghost-button con bg activo que /creadores. */}
+        {/* Subtabs Dashboard / Workspace / History / Admin +
+            DateRangePicker — calendario alineado a la derecha (mismo
+            layout que Panel de Control). Range filtra los stats vía
+            statsRange (cuando hay rango custom usamos byRange.all). */}
         <div className="space-y-3">
-          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-            <Button asChild variant="ghost" size="sm" className="gap-1.5">
-              <Link to="/chatter-evaluator/workspace">
-                <ListChecks className="h-4 w-4" />
-                Workspace
-                {sessionsQ.data && sessionsQ.data.length > 0 && (
-                  <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                    {sessionsQ.data.length}
-                  </span>
-                )}
-              </Link>
-            </Button>
-            <Button asChild variant="ghost" size="sm" className="gap-1.5">
-              <Link to="/chatter-evaluator/history">
-                <HistoryIcon className="h-4 w-4" />
-                History
-              </Link>
-            </Button>
-            {canSeeAdmin && (
-              <Button asChild variant="ghost" size="sm" className="gap-1.5">
-                <Link to="/chatter-evaluator/admin">
-                  <Settings className="h-4 w-4" />
-                  Admin
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+              <Button asChild variant="secondary" size="sm" className="gap-1.5">
+                <Link to="/chatter-evaluator">
+                  <LayoutDashboard className="h-4 w-4" />
+                  Dashboard
                 </Link>
               </Button>
-            )}
+              <Button asChild variant="ghost" size="sm" className="gap-1.5">
+                <Link to="/chatter-evaluator/workspace">
+                  <ListChecks className="h-4 w-4" />
+                  Workspace
+                  {sessionsQ.data && sessionsQ.data.length > 0 && (
+                    <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                      {sessionsQ.data.length}
+                    </span>
+                  )}
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm" className="gap-1.5">
+                <Link to="/chatter-evaluator/history">
+                  <HistoryIcon className="h-4 w-4" />
+                  History
+                </Link>
+              </Button>
+              {canSeeAdmin && (
+                <Button asChild variant="ghost" size="sm" className="gap-1.5">
+                  <Link to="/chatter-evaluator/admin">
+                    <Settings className="h-4 w-4" />
+                    Admin
+                  </Link>
+                </Button>
+              )}
+            </div>
+            <DateRangePicker
+              from={dateRange.from}
+              to={dateRange.to}
+              onApply={(from, to) => {
+                setDateRange({ from, to });
+                if (from && to) setStatsRange("all");
+                else setStatsRange("week");
+              }}
+              placeholder="Seleccionar fechas"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard

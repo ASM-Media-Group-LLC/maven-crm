@@ -94,7 +94,7 @@ const HistorySessionDetail = () => {
 
   return (
     <main className="flex-1 overflow-y-auto p-6">
-      <div className="mx-auto max-w-4xl space-y-5">
+      <div className="space-y-5">
         <div className="flex items-center justify-between">
           <Button asChild variant="ghost" size="sm" className="gap-2">
             <Link to="/chatter-evaluator/history">

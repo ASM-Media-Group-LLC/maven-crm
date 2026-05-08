@@ -81,7 +81,7 @@ const ChatterProfileDetailContent = () => {
 
   return (
     <main className="flex-1 overflow-y-auto p-6">
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="space-y-6">
         <div className="flex items-center justify-between gap-3">
           <Button asChild variant="ghost" size="sm">
             <Link to="/chatter-evaluator"><ArrowLeft className="mr-2 h-4 w-4" /> Perfiles</Link>

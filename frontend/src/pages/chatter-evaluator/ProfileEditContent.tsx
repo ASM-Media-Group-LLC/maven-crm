@@ -284,7 +284,7 @@ const ChatterProfileEditContent = () => {
 
   return (
     <main className="flex-1 overflow-y-auto p-6">
-      <div className="mx-auto max-w-5xl space-y-6">
+      <div className="space-y-6">
         <div className="flex items-center justify-between gap-3">
           {/* Use the browser history so we land on whichever screen
               the user came from (admin list, profile detail, or
