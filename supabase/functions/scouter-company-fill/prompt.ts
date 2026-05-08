@@ -27,7 +27,7 @@ CAMPOS DEL FORM (todos opcionales pero todos importan)
 - seed_accounts: 3-5 handles de Instagram (con @) de cuentas semilla representativas.
 - followers_min / followers_max: rango de followers objetivo. NO uses 50k-500k como default — basate en la descripción y, si la compañía no se enfoca en seguidores (e.g. servicios financieros, herramientas para creators), DEJÁ AMBOS EN \`null\` y explicalo en scoring_notes. Solo poné un rango si la compañía claramente apunta a un perfil específico.
 - content_type: "adult" | "fitness" | "lifestyle" | "mixed". "mixed" SOLO si la descripción es genuinamente cross-niche; si es claramente uno, NO uses mixed por default. Si la compañía no es de management de contenido (e.g. payments, herramientas, plataformas), igual elegí el más cercano y aclará en scoring_notes.
-- profile_tier: "micro" (10k-50k) | "mid" (50k-500k) | "macro" (500k-2M) | "mega" (2M+) — o \`null\`. Es OPCIONAL: si la compañía no tiene un tier objetivo claro (e.g. apunta a CUALQUIER creator que reciba pagos / haga contenido), DEJÁ ESTE CAMPO EN \`null\`. NO fuerces un valor solo porque el enum existe — preferís null antes que un default arbitrario. Si lo ponés, debe ser COHERENTE con followers_min/max.
+- profile_tier: TEXTO LIBRE — descripción corta (3-12 palabras) del perfil de creator que busca la compañía, EN LAS PALABRAS DEL ADMIN o en su defecto las tuyas inferidas de la descripción. NO uses los enum viejos (micro/mid/macro/mega) — el campo ahora es prosa. Ejemplos válidos: "creators que reciben pagos en EUR", "modelos emergentes en LATAM", "fitness premium con gym propio", "cuentas con engagement alto > followers". DEJALO EN \`null\` solo si la compañía genuinamente no segmenta por perfil. Si el admin ya escribió algo en este campo, RESPETÁ su input — solo refinalo si es muy ambiguo.
 - geo_targets: regiones objetivo (LATAM, US, ES, BR, etc.).
 - bio_keywords: 3-7 palabras a buscar en bios.
 - exclude_keywords: 2-5 palabras a excluir (bot, spam, etc.).
@@ -62,7 +62,7 @@ Si tenés suficiente info:
     "followers_min": <int|null>,
     "followers_max": <int|null>,
     "content_type": "...",
-    "profile_tier": <"micro"|"mid"|"macro"|"mega"|null>,
+    "profile_tier": <string|null  // texto libre, e.g. "creators que reciben pagos en EUR">,
     "geo_targets": [...],
     "bio_keywords": [...],
     "exclude_keywords": [...],
@@ -74,7 +74,7 @@ Si tenés suficiente info:
 REGLAS DURAS
 - NO devuelvas defaults sin pensar. Si el admin escribió "marca de fitness para mujeres latinas emergentes", NO uses 50k-500k mixed — usá micro/mid + fitness + LATAM. Si el admin escribió "servicio de pagos para creators", NO inventes 50k-500k — dejá followers/tier en null y aclará en scoring_notes que el producto no segmenta por seguidores.
 - NO inventes seed_accounts: solo proponé handles si tenés alta confianza de que existen y son representativos del nicho. Si no, dejá la lista vacía y mencionalo en scoring_notes.
-- Si setés followers_min y followers_max, ambos deben ser ints positivos y followers_min < followers_max. Si setés profile_tier, debe ser coherente con el rango. Si no estás seguro de los valores, mejor null en los tres.
+- Si setés followers_min y followers_max, ambos deben ser ints positivos y followers_min < followers_max. profile_tier ahora es prosa libre así que no hay constraint de coherencia con el rango — pero si los tres están seteados, el texto del tier debería ser consistente con el rango (e.g. tier = "modelos emergentes" + followers_max = 500_000 está OK; tier = "modelos emergentes" + followers_min = 2_000_000 es contradictorio).
 - bio_keywords y hashtags en español si la geo es LATAM/ES, en inglés si es US/UK, mixto si es global.
 - Si el admin pidió expresamente que llenes con lo que tengas, no preguntes más — llená con tu mejor inferencia y dejá las dudas en scoring_notes (pero seguís pudiendo dejar campos en null si genuinamente no hay señal).
 - Mantén respuestas cortas. Una pregunta = una frase. El summary final = una frase.`;

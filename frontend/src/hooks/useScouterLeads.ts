@@ -67,10 +67,15 @@ export interface ScouterLead {
 export interface CompanySearchConfig {
   hashtags?: string[];
   seed_accounts?: string[];
-  followers_min?: number;
-  followers_max?: number;
+  followers_min?: number | null;
+  followers_max?: number | null;
   content_type?: "adult" | "fitness" | "lifestyle" | "mixed";
-  profile_tier?: "micro" | "mid" | "macro" | "mega";
+  // profile_tier es texto libre — el admin describe en sus palabras qué
+  // perfil de creator busca (e.g. "creators que reciben pagos en EUR",
+  // "modelos emergentes LATAM", "fitness premium"). Antes era un enum
+  // fijo (micro/mid/macro/mega) que forzaba defaults arbitrarios cuando
+  // la compañía no segmentaba por tamaño.
+  profile_tier?: string | null;
   geo_targets?: string[];
   bio_keywords?: string[];
   exclude_keywords?: string[];

@@ -350,13 +350,6 @@ const CompanyFormModal = ({
     updateConfig({ [key]: list.filter((_, i) => i !== idx) });
   };
 
-  const TIERS = [
-    { value: "micro", label: "Micro (10k-50k)" },
-    { value: "mid", label: "Mid (50k-500k)" },
-    { value: "macro", label: "Macro (500k-2M)" },
-    { value: "mega", label: "Mega (2M+)" },
-  ] as const;
-
   const CONTENT_TYPES = [
     { value: "adult", label: "Adulto" },
     { value: "fitness", label: "Fitness" },
@@ -551,24 +544,17 @@ const CompanyFormModal = ({
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                 <Users className="inline h-3 w-3 mr-1" />
-                Tier de perfil
+                Tier / perfil objetivo (libre)
               </label>
-              <div className="flex flex-wrap gap-1.5">
-                {TIERS.map((t) => (
-                  <button
-                    key={t.value}
-                    type="button"
-                    onClick={() => updateConfig({ profile_tier: t.value })}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                      cfg.profile_tier === t.value
-                        ? "border-emerald-400 bg-emerald-400/15 text-emerald-400"
-                        : "border-border text-muted-foreground hover:border-primary/40"
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
+              <Input
+                value={cfg.profile_tier ?? ""}
+                onChange={(e) => updateConfig({ profile_tier: e.target.value || null })}
+                placeholder="Ej: creators que reciben pagos en EUR, modelos emergentes LATAM, fitness premium, etc."
+                className="text-sm"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Describí en tus palabras qué perfil de creator buscás. Dejá vacío si la compañía no segmenta por tipo.
+              </p>
             </div>
           </div>
 
