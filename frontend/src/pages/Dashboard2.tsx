@@ -27,6 +27,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ExternalLink } from "lucide-react";
 import {
   Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
@@ -44,6 +46,7 @@ interface CreatorSummary {
   creatorId: string;
   name: string;
   instagramHandle: string | null;
+  profilePhotoUrl: string | null;
   platform: string;
   total: number;
   net: number;
@@ -149,6 +152,11 @@ const Dashboard2 = () => {
   // Creadoras, etc). null = cerrado.
   type KpiList = "revenue" | "creators" | null;
   const [kpiListOpen, setKpiListOpen] = useState<KpiList>(null);
+
+  // Dialog de ficha técnica de una creadora — se abre desde los
+  // cajones de Pareto y de Creator Reports. Muestra foto, todas las
+  // métricas + botón para abrir IG.
+  const [creatorDetail, setCreatorDetail] = useState<CreatorSummary | null>(null);
   const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
 
   const monthOptions = useMemo(getMonthOptions, []);
@@ -163,17 +171,19 @@ const Dashboard2 = () => {
     queryFn: async () => {
       const [{ data: biz }, { data: crs }] = await Promise.all([
         supabase.from("creator_business").select("creator_id, main_platform"),
-        supabase.from("creators").select("id, instagram_handle"),
+        supabase.from("creators").select("id, instagram_handle, profile_photo_url, name"),
       ]);
-      const map: Record<string, { platform: string; ig: string | null }> = {};
+      const map: Record<string, { platform: string; ig: string | null; photo: string | null; name: string | null }> = {};
       for (const r of biz ?? []) {
-        if (r.creator_id) map[r.creator_id] = { platform: r.main_platform || "", ig: null };
+        if (r.creator_id) map[r.creator_id] = { platform: r.main_platform || "", ig: null, photo: null, name: null };
       }
       for (const c of crs ?? []) {
         if (map[c.id]) {
           map[c.id].ig = c.instagram_handle || null;
+          map[c.id].photo = c.profile_photo_url || null;
+          map[c.id].name = c.name || null;
         } else {
-          map[c.id] = { platform: "", ig: c.instagram_handle || null };
+          map[c.id] = { platform: "", ig: c.instagram_handle || null, photo: c.profile_photo_url || null, name: c.name || null };
         }
       }
       return map;
@@ -210,6 +220,7 @@ const Dashboard2 = () => {
           creatorId: key,
           name: r.artistic_name || r.pending_creator || "Sin nombre",
           instagramHandle: info?.ig || null,
+          profilePhotoUrl: info?.photo || null,
           platform: plat || "OnlyFans",
           total: r.total_earnings_gross ?? 0,
           net: (r.total_earnings_gross ?? 0) * 0.8,
@@ -629,25 +640,19 @@ const Dashboard2 = () => {
                   {/* Revenue Bruto — clickable */}
                   <button
                     type="button"
-                    onClick={() => setKpiListOpen("revenue")}
-                    className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 ease-out hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
+                    onClick={() => {/* Retención no tiene popup todavía */}}
+                    disabled
+                    className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left disabled:cursor-default"
                   >
-                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-emerald-500 transition-opacity group-hover:opacity-50" />
+                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-cyan-500" />
                     <div className="relative space-y-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500">
-                        <DollarSign className="h-5 w-5 text-white" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500">
+                        <Repeat className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Revenue Bruto</p>
-                        <p className="text-3xl font-bold tabular-nums leading-tight">{fmtK(grandTotal)}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          Net {fmtK(grandTotal * 0.8)}
-                          {prevMonthTotal > 0 && (
-                            <span className={`ml-1.5 font-semibold ${totalChangePercent >= 0 ? "text-emerald-500" : "text-destructive"}`}>
-                              {totalChangePercent >= 0 ? "↑" : "↓"}{Math.abs(totalChangePercent).toFixed(1)}%
-                            </span>
-                          )}
-                        </p>
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Retención</p>
+                        <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.renewalRate.toFixed(1)}%</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">Tasa de renovación</p>
                       </div>
                     </div>
                   </button>
@@ -707,26 +712,43 @@ const Dashboard2 = () => {
                 </div>
               )}
 
-              {/* Row 2: Retención (1/3) + Eficiencia de Monetización (2/3).
-                  items-start evita que Retención se estire para emparejar
-                  la altura de la card de Eficiencia (que es bastante más
-                  alta por las barras + nuevas/recurrentes). */}
+              {/* Row 2: Revenue Bruto (1/3) + Distribución de la
+                  Monetización (2/3). Sin items-start — Revenue Bruto
+                  ahora usa flex internamente para llenar la altura sin
+                  dejar espacio negro al fondo cuando se estira para
+                  emparejar la card más alta. */}
               {!isLoading && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
-                  {/* Retention — derived metric */}
-                  <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
-                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-cyan-500" />
-                    <div className="relative space-y-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500">
-                        <Repeat className="h-5 w-5 text-white" />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                  {/* Revenue Bruto — hero card grande, ahora en Row 2
+                      donde antes vivía Retención. Más espacio + número
+                      más grande para que tenga el peso visual de hero. */}
+                  <button
+                    type="button"
+                    onClick={() => setKpiListOpen("revenue")}
+                    className="group relative overflow-hidden rounded-xl border-2 border-emerald-500/30 bg-card p-5 text-left transition-all duration-200 ease-out hover:scale-[1.015] hover:border-emerald-500/60 hover:shadow-[0_0_24px_-4px_rgba(16,185,129,0.4)] flex flex-col"
+                  >
+                    <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl opacity-30 bg-emerald-500 transition-opacity group-hover:opacity-50" />
+                    <div className="relative flex flex-col flex-1">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500">
+                        <DollarSign className="h-6 w-6 text-white" />
                       </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Retención</p>
-                        <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.renewalRate.toFixed(1)}%</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">Tasa de renovación</p>
+                      {/* Bloque de número centrado en el espacio sobrante para
+                          que la card iguale en altura a Eficiencia sin
+                          dejar un hueco vacío abajo. */}
+                      <div className="flex-1 flex flex-col justify-center mt-3">
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Revenue Bruto</p>
+                        <p className="text-5xl font-bold tabular-nums leading-tight tracking-tight">{fmtK(grandTotal)}</p>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 pt-3 mt-auto border-t border-border/50 text-xs">
+                        <span className="text-muted-foreground">Net <span className="font-semibold text-foreground tabular-nums">{fmtK(grandTotal * 0.8)}</span></span>
+                        {prevMonthTotal > 0 && (
+                          <span className={`font-bold ${totalChangePercent >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                            {totalChangePercent >= 0 ? "↑" : "↓"}{Math.abs(totalChangePercent).toFixed(1)}%
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  </button>
 
                   {/* Eficiencia de Monetización — wide card (2/3 width).
                       Reemplaza al viejo Revenue Mix; barras gruesas con
@@ -739,8 +761,7 @@ const Dashboard2 = () => {
                           <Zap className="h-5 w-5 text-white" />
                         </div>
                         <div>
-                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Eficiencia de Monetización</p>
-                          <p className="text-xs text-muted-foreground">Revenue por canal del mes</p>
+                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Distribución de la Monetización</p>
                         </div>
                       </div>
                       <div className="space-y-2.5">
@@ -1017,46 +1038,101 @@ const Dashboard2 = () => {
                 </div>
               )}
 
-              {/* ══════ TABLE ══════ */}
+              {/* ══════ SORTING TOOLBAR ══════ */}
+              {!isLoading && creators.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider mr-1">Ordenar:</span>
+                  {[
+                    { col: "total" as SortKey, label: "Bruto" },
+                    { col: "net" as SortKey, label: "Neto" },
+                    { col: "subs" as SortKey, label: "Subs" },
+                    { col: "tips" as SortKey, label: "Tips" },
+                    { col: "messages" as SortKey, label: "Mensajería" },
+                    { col: "activeFans" as SortKey, label: "Fans" },
+                    { col: "name" as SortKey, label: "Nombre" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.col}
+                      type="button"
+                      onClick={() => {
+                        if (sortKey === opt.col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                        else { setSortKey(opt.col); setSortDir("desc"); }
+                      }}
+                      className={`px-2.5 py-1 rounded-md text-[11px] border transition-colors ${
+                        sortKey === opt.col
+                          ? "bg-primary/10 border-primary/40 text-primary font-semibold"
+                          : "bg-card border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                      }`}
+                    >
+                      {opt.label}
+                      {sortKey === opt.col && (sortDir === "asc" ? " ↑" : " ↓")}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* ══════ CREATOR CARDS LIST ══════ */}
               {isLoading ? (
                 <div className="space-y-2">
-                  {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+                  {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+                </div>
+              ) : creators.length === 0 ? (
+                <div className="rounded-lg border border-border bg-card text-center py-12 text-muted-foreground text-sm">
+                  {rawCreators.length > 0 ? "No hay resultados con los filtros actuales" : `Sin datos para ${selectedPeriod?.label}`}
                 </div>
               ) : (
-                <div className="rounded-lg border border-border bg-card overflow-x-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-card">
-                      <TableRow>
-                        <TableHead className="w-10">#</TableHead>
-                        <SortableHead col="name" label="Creadora" />
-                        <SortableHead col="total" label="Bruto" right />
-                        <SortableHead col="net" label="Neto" right />
-                        <TableHead className="text-right whitespace-nowrap text-xs">vs Ant.</TableHead>
-                        <SortableHead col="subs" label="Subs" right />
-                        <SortableHead col="newSubs" label="Nuevas" right />
-                        <SortableHead col="recurringSubs" label="Recur." right />
-                        <SortableHead col="tips" label="Tips" right />
-                        <SortableHead col="messages" label="Msgs" right />
-                        <SortableHead col="activeFans" label="Fans" right />
-                        <SortableHead col="newFans" label="New" right />
-                        <SortableHead col="avgPerDay" label="$/Día" right />
-                        <SortableHead col="avgPerFan" label="$/Fan" right />
-                        <SortableHead col="daysWithData" label="Días" right />
-                        <SortableHead col="lastDate" label="Última" />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {creators.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={16} className="text-center py-12 text-muted-foreground">
-                            {rawCreators.length > 0 ? "No hay resultados con los filtros actuales" : `Sin datos para ${selectedPeriod?.label}`}
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        creators.map((c, i) => <CreatorRow key={c.creatorId} c={c} i={i} />)
-                      )}
-                    </TableBody>
-                  </Table>
+                <div className="space-y-2">
+                  {creators.map((c, i) => {
+                    const initials = c.name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+                    return (
+                      <button
+                        key={c.creatorId}
+                        type="button"
+                        onClick={() => setCreatorDetail(c)}
+                        className="w-full flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-muted/40 hover:border-primary/40 hover:shadow-[0_0_18px_-4px_rgba(255,255,255,0.12)] transition-all duration-150"
+                      >
+                        <span className="text-xs font-bold text-muted-foreground w-7 shrink-0 tabular-nums">{i + 1}</span>
+                        <Avatar className="h-11 w-11 shrink-0">
+                          {c.profilePhotoUrl && <AvatarImage src={c.profilePhotoUrl} alt={c.name} />}
+                          <AvatarFallback className="text-xs">{initials || "?"}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-[140px] flex-1">
+                          <p className="font-medium text-sm truncate">{c.name}</p>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            {c.instagramHandle && (
+                              <span className="flex items-center gap-1">
+                                <Instagram className="h-3 w-3" />@{c.instagramHandle.replace(/^@/, "")}
+                              </span>
+                            )}
+                            <span>·</span>
+                            <span>{c.activeFans.toLocaleString()} fans</span>
+                            <span>·</span>
+                            <span>{c.daysWithData}d</span>
+                          </div>
+                        </div>
+                        <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground">
+                          <div className="text-right w-20">
+                            <p className="text-[10px] uppercase tracking-wider">Subs</p>
+                            <p className="text-sm font-semibold tabular-nums text-foreground">{fmtK(c.subs)}</p>
+                          </div>
+                          <div className="text-right w-20">
+                            <p className="text-[10px] uppercase tracking-wider">Tips</p>
+                            <p className="text-sm font-semibold tabular-nums text-foreground">{fmtK(c.tips)}</p>
+                          </div>
+                          <div className="text-right w-20">
+                            <p className="text-[10px] uppercase tracking-wider">Msgs</p>
+                            <p className="text-sm font-semibold tabular-nums text-foreground">{fmtK(c.messages)}</p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 w-[110px]">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Bruto</p>
+                          <p className="text-base font-bold tabular-nums">{fmt(c.total)}</p>
+                          <p className="text-[10px] tabular-nums text-emerald-500">{fmt(c.net)} <span className="text-muted-foreground">net</span></p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                      </button>
+                    );
+                  })}
                 </div>
               )}
               </TabsContent>
@@ -1127,6 +1203,94 @@ const Dashboard2 = () => {
               </DialogContent>
             </Dialog>
 
+            {/* ══════ CREATOR DETAIL DIALOG — ficha técnica con foto ══════ */}
+            <Dialog open={creatorDetail !== null} onOpenChange={(o) => !o && setCreatorDetail(null)}>
+              <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                {creatorDetail && (() => {
+                  const c = creatorDetail;
+                  const igHandle = c.instagramHandle?.replace(/^@/, "") || "";
+                  const igUrl = igHandle ? `https://instagram.com/${igHandle}` : null;
+                  const initials = c.name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+                  const stats = [
+                    { label: "Bruto", value: fmt(c.total), highlight: true },
+                    { label: "Neto (80%)", value: fmt(c.net), highlight: true, color: "text-emerald-500" },
+                    { label: "Subs", value: fmt(c.subs) },
+                    { label: "Nuevas Subs", value: fmt(c.newSubs) },
+                    { label: "Recurrentes", value: fmt(c.recurringSubs) },
+                    { label: "Tips", value: fmt(c.tips) },
+                    { label: "Mensajería", value: fmt(c.messages) },
+                    { label: "Fans activos", value: c.activeFans.toLocaleString() },
+                    { label: "Fans nuevos", value: c.newFans.toLocaleString() },
+                    { label: "$/Día", value: fmt(c.avgPerDay) },
+                    { label: "$/Fan", value: fmt(c.avgPerFan) },
+                    { label: "Días activos", value: c.daysWithData.toString() },
+                  ];
+                  return (
+                    <>
+                      <DialogHeader>
+                        <div className="flex items-start gap-4">
+                          <Avatar className="h-20 w-20 shrink-0">
+                            {c.profilePhotoUrl && <AvatarImage src={c.profilePhotoUrl} alt={c.name} />}
+                            <AvatarFallback className="text-lg font-semibold">{initials || "?"}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <DialogTitle className="text-2xl mb-1 truncate">{c.name}</DialogTitle>
+                            {c.instagramHandle && (
+                              <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                                <Instagram className="h-3.5 w-3.5" />
+                                @{igHandle}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {selectedPeriod?.label} · {c.platform}
+                            </p>
+                          </div>
+                        </div>
+                      </DialogHeader>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                        {stats.map((s) => (
+                          <div
+                            key={s.label}
+                            className={`rounded-lg border ${s.highlight ? "border-primary/30 bg-primary/5" : "border-border bg-card"} p-3`}
+                          >
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{s.label}</p>
+                            <p className={`text-lg font-bold tabular-nums ${s.color || ""}`}>{s.value}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
+                        {igUrl && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => window.open(igUrl, "_blank", "noopener,noreferrer")}
+                          >
+                            <Instagram className="h-3.5 w-3.5" />
+                            Abrir Instagram
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => {
+                            navigate(`/creadores/${c.creatorId}`);
+                            setCreatorDetail(null);
+                          }}
+                        >
+                          Ver perfil completo
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </DialogContent>
+            </Dialog>
+
             {/* ══════ METRICS — inline tab section ══════ */}
             {dashTab === "metrics" && !isLoading && (
               <div className="px-6 pb-6 -mt-1 space-y-6">
@@ -1134,82 +1298,91 @@ const Dashboard2 = () => {
                   <BarChart3 className="h-5 w-5 text-primary" />
                   Métricas — {selectedPeriod?.label}
                 </h2>
-                <div className="space-y-8">
+                <div className="space-y-6">
+                  {/* Retención & Fans — 4 cards estilo Panel de Control */}
                   <div>
-                    <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-4">Distribución de Revenue</h3>
-                    <div className="space-y-4">
+                    <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Retención & Fans</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[
-                        { icon: <MessageSquare className="h-4 w-4" />, pct: hlKpis.msgsPct, label: "Mensajería", amount: hlKpis.totalMsgs, color: "bg-blue-500" },
-                        { icon: <Heart className="h-4 w-4" />, pct: hlKpis.tipsPct, label: "Tips", amount: hlKpis.totalTips, color: "bg-rose-500" },
-                        { icon: <Eye className="h-4 w-4" />, pct: hlKpis.subsPct, label: "Suscripciones", amount: hlKpis.totalSubs, color: "bg-emerald-500" },
+                        { icon: <Repeat className="h-5 w-5 text-white" />, value: `${hlKpis.renewalRate.toFixed(1)}%`, label: "Retención", sub: "tasa de renovación", color: "bg-cyan-500" },
+                        { icon: <DollarSign className="h-5 w-5 text-white" />, value: fmt(hlKpis.avgPerFanGlobal), label: "$/Fan", sub: "promedio por fan", color: "bg-rose-500" },
+                        { icon: <Users className="h-5 w-5 text-white" />, value: hlKpis.totalNewSubs.toLocaleString(), label: "Nuevas Subs", sub: "este período", color: "bg-emerald-500" },
+                        { icon: <Repeat className="h-5 w-5 text-white" />, value: hlKpis.totalRecurring.toLocaleString(), label: "Recurrentes", sub: "renovaciones", color: "bg-violet-500" },
                       ].map((item, idx) => (
-                        <div key={idx} className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-sm font-medium text-foreground">{item.icon} {item.label}</div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-semibold tabular-nums">{fmt(item.amount)}</span>
-                              <span className="text-xs font-bold tabular-nums text-muted-foreground w-14 text-right">{item.pct.toFixed(1)}%</span>
+                        <div key={idx} className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
+                          <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 ${item.color}`} />
+                          <div className="relative space-y-3">
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${item.color}`}>{item.icon}</div>
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{item.label}</p>
+                              <p className="text-3xl font-bold tabular-nums leading-tight">{item.value}</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">{item.sub}</p>
                             </div>
                           </div>
-                          <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-                            <div className={`h-full rounded-full ${item.color} transition-all duration-500`} style={{ width: `${Math.min(item.pct, 100)}%` }} />
-                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <div className="h-px bg-border" />
-                  <div>
-                    <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-4">Retención & Fans</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {[
-                        { icon: <Repeat className="h-4 w-4" />, value: `${hlKpis.renewalRate.toFixed(1)}%`, label: "Retención", sub: "tasa de renovación" },
-                        { icon: <DollarSign className="h-4 w-4" />, value: fmt(hlKpis.avgPerFanGlobal), label: "$/Fan", sub: "promedio por fan" },
-                        { icon: <Users className="h-4 w-4" />, value: hlKpis.totalNewSubs.toLocaleString(), label: "Nuevas Subs", sub: "este período" },
-                        { icon: <Repeat className="h-4 w-4" />, value: hlKpis.totalRecurring.toLocaleString(), label: "Recurrentes", sub: "renovaciones" },
-                      ].map((item, idx) => (
-                        <div key={idx} className="rounded-xl border border-border bg-gradient-to-b from-card to-muted/30 p-4 space-y-2 text-center">
-                          <div className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary/10 text-primary mx-auto">{item.icon}</div>
-                          <p className="text-2xl font-bold tabular-nums">{item.value}</p>
-                          <p className="text-xs font-medium text-foreground">{item.label}</p>
-                          <p className="text-[10px] text-muted-foreground">{item.sub}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+
                   {isAdmin && (
-                    <>
-                      <div className="h-px bg-border" />
-                      <div>
-                        <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-4">CEO Insights</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 to-primary/5 p-4 space-y-2 text-center">
-                            <div className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-primary/20 text-primary mx-auto"><Crown className="h-4 w-4" /></div>
-                            <p className="text-sm font-bold truncate">{hlKpis.topCreator?.name || "—"}</p>
-                            <p className="text-xl font-bold tabular-nums text-primary">{hlKpis.topCreator ? fmt(hlKpis.topCreator.total) : "$0"}</p>
-                            <p className="text-[10px] text-muted-foreground">top creadora</p>
+                    <div>
+                      <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">CEO Insights</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {/* Top creadora — clickable, abre ficha técnica */}
+                        <button
+                          type="button"
+                          onClick={() => hlKpis.topCreator && setCreatorDetail(hlKpis.topCreator)}
+                          disabled={!hlKpis.topCreator}
+                          className="group rounded-xl border-2 border-amber-500/40 bg-card p-4 relative overflow-hidden text-left transition-all duration-200 hover:scale-[1.015] hover:border-amber-500/70 hover:shadow-[0_0_24px_-4px_rgba(245,158,11,0.4)] disabled:cursor-default"
+                        >
+                          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-amber-500 transition-opacity group-hover:opacity-50" />
+                          <div className="relative space-y-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500"><Crown className="h-5 w-5 text-white" /></div>
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Top creadora</p>
+                              <p className="text-sm font-bold truncate">{hlKpis.topCreator?.name || "—"}</p>
+                              <p className="text-2xl font-bold tabular-nums text-amber-500 leading-tight">{hlKpis.topCreator ? fmt(hlKpis.topCreator.total) : "$0"}</p>
+                            </div>
                           </div>
-                          <div className="rounded-xl border border-border bg-gradient-to-b from-card to-muted/30 p-4 space-y-2 text-center">
-                            <div className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-muted text-muted-foreground mx-auto"><Target className="h-4 w-4" /></div>
-                            <p className="text-xl font-bold tabular-nums">{fmt(hlKpis.avgPerCreator)}</p>
-                            <p className="text-xs font-medium text-foreground">Promedio</p>
-                            <p className="text-[10px] text-muted-foreground">{hlKpis.activeCount} activas</p>
+                        </button>
+
+                        <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
+                          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-blue-500" />
+                          <div className="relative space-y-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500"><Target className="h-5 w-5 text-white" /></div>
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Promedio</p>
+                              <p className="text-3xl font-bold tabular-nums leading-tight">{fmt(hlKpis.avgPerCreator)}</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">{hlKpis.activeCount} activas</p>
+                            </div>
                           </div>
-                          <div className="rounded-xl border border-destructive/30 bg-gradient-to-b from-destructive/10 to-destructive/5 p-4 space-y-2 text-center">
-                            <div className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-destructive/20 text-destructive mx-auto"><AlertTriangle className="h-4 w-4" /></div>
-                            <p className="text-2xl font-bold tabular-nums">{hlKpis.zeroCreators}</p>
-                            <p className="text-xs font-medium text-foreground">Inactivas</p>
-                            <p className="text-[10px] text-muted-foreground">$0 en ventas</p>
+                        </div>
+
+                        <div className="rounded-xl border border-destructive/40 bg-card p-4 relative overflow-hidden">
+                          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-destructive" />
+                          <div className="relative space-y-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive"><AlertTriangle className="h-5 w-5 text-white" /></div>
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Inactivas</p>
+                              <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.zeroCreators}</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">$0 en ventas</p>
+                            </div>
                           </div>
-                          <div className="rounded-xl border border-border bg-gradient-to-b from-card to-muted/30 p-4 space-y-2 text-center">
-                            <div className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-muted text-muted-foreground mx-auto"><TrendingUp className="h-4 w-4" /></div>
-                            <p className="text-sm font-bold tabular-nums">{hlKpis.creatorsOver10k} <span className="text-muted-foreground font-normal">{'>'} $10k</span></p>
-                            <p className="text-sm font-bold tabular-nums">{hlKpis.creatorsUnder1k} <span className="text-muted-foreground font-normal">{'<'} $1k</span></p>
-                            <p className="text-[10px] text-muted-foreground">distribución</p>
+                        </div>
+
+                        <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
+                          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-emerald-500" />
+                          <div className="relative space-y-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500"><TrendingUp className="h-5 w-5 text-white" /></div>
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Distribución</p>
+                              <p className="text-base font-bold tabular-nums leading-tight">{hlKpis.creatorsOver10k} <span className="text-muted-foreground font-normal text-xs">{'>'} $10k</span></p>
+                              <p className="text-base font-bold tabular-nums leading-tight">{hlKpis.creatorsUnder1k} <span className="text-muted-foreground font-normal text-xs">{'<'} $1k</span></p>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1281,17 +1454,31 @@ const Dashboard2 = () => {
                       {paretoGroup === "80" && (
                       <div>
                         <p className="text-[11px] font-semibold text-muted-foreground mb-3 uppercase tracking-widest">🔥 Top {paretoAnalysis.topCount} — BRUTO</p>
-                        <div className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
+                        <div className="space-y-2">
                           {paretoAnalysis.top.map((c, i) => {
                             const pctOfTop = paretoAnalysis.topRevenue > 0 ? (c.total / paretoAnalysis.topRevenue) * 100 : 0;
                             const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0;
+                            const initials = c.name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
                             return (
-                              <div key={c.creatorId} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 hover:bg-muted/50 transition-colors">
-                                <span className="text-xs font-bold text-primary w-5 shrink-0 tabular-nums">{i + 1}</span>
-                                {c.instagramHandle && (
-                                  <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"><Instagram className="h-3.5 w-3.5" /></a>
-                                )}
-                                <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
+                              <button
+                                key={c.creatorId}
+                                type="button"
+                                onClick={() => setCreatorDetail(c)}
+                                className="w-full flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-muted/40 hover:border-primary/40 hover:shadow-[0_0_18px_-4px_rgba(255,255,255,0.12)] transition-all duration-150"
+                              >
+                                <span className="text-xs font-bold text-primary w-6 shrink-0 tabular-nums">{i + 1}</span>
+                                <Avatar className="h-10 w-10 shrink-0">
+                                  {c.profilePhotoUrl && <AvatarImage src={c.profilePhotoUrl} alt={c.name} />}
+                                  <AvatarFallback className="text-xs">{initials || "?"}</AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-[140px]">
+                                  <p className="font-medium text-sm truncate">{c.name}</p>
+                                  {c.instagramHandle && (
+                                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                      <Instagram className="h-3 w-3" />@{c.instagramHandle.replace(/^@/, "")}
+                                    </p>
+                                  )}
+                                </div>
                                 <div className="flex-1 mx-2">
                                   <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
                                     <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(pctOfTop, 100)}%` }} />
@@ -1300,7 +1487,7 @@ const Dashboard2 = () => {
                                 <span className="text-sm font-bold tabular-nums w-[60px] text-right text-primary">{pctOfTop.toFixed(1)}%</span>
                                 <span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">({pctOfTotal.toFixed(1)}%)</span>
                                 <span className="text-sm font-semibold tabular-nums w-[100px] text-right">{fmt(c.total)}</span>
-                              </div>
+                              </button>
                             );
                           })}
                         </div>
@@ -1310,18 +1497,32 @@ const Dashboard2 = () => {
                       <div>
                         <p className="text-[11px] font-semibold text-muted-foreground mb-3 uppercase tracking-widest">📉 Resto ({paretoAnalysis.rest.length})</p>
                         {paretoAnalysis.rest.length > 0 ? (
-                          <div className="space-y-1 max-h-[350px] overflow-y-auto pr-1">
+                          <div className="space-y-2">
                             {paretoAnalysis.rest.map((c, i) => {
                               const restRevenue = paretoAnalysis.totalRevenue - paretoAnalysis.topRevenue;
                               const pctOfRest = restRevenue > 0 ? (c.total / restRevenue) * 100 : 0;
                               const pctOfTotal = paretoAnalysis.totalRevenue > 0 ? (c.total / paretoAnalysis.totalRevenue) * 100 : 0;
+                              const initials = c.name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
                               return (
-                                <div key={c.creatorId} className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-1.5 hover:bg-muted/40 transition-colors">
-                                  <span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums">{paretoAnalysis.topCount + i + 1}</span>
-                                  {c.instagramHandle && (
-                                    <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"><Instagram className="h-3.5 w-3.5" /></a>
-                                  )}
-                                  <button className="text-sm text-muted-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
+                                <button
+                                  key={c.creatorId}
+                                  type="button"
+                                  onClick={() => setCreatorDetail(c)}
+                                  className="w-full flex items-center gap-3 rounded-xl border border-border/50 bg-muted/15 px-4 py-2.5 text-left hover:bg-muted/35 hover:border-primary/30 hover:shadow-[0_0_18px_-4px_rgba(255,255,255,0.08)] transition-all duration-150"
+                                >
+                                  <span className="text-xs text-muted-foreground w-6 shrink-0 tabular-nums">{paretoAnalysis.topCount + i + 1}</span>
+                                  <Avatar className="h-9 w-9 shrink-0 opacity-80">
+                                    {c.profilePhotoUrl && <AvatarImage src={c.profilePhotoUrl} alt={c.name} />}
+                                    <AvatarFallback className="text-xs">{initials || "?"}</AvatarFallback>
+                                  </Avatar>
+                                  <div className="min-w-[140px]">
+                                    <p className="text-sm text-muted-foreground truncate">{c.name}</p>
+                                    {c.instagramHandle && (
+                                      <p className="text-[10px] text-muted-foreground/70 flex items-center gap-1">
+                                        <Instagram className="h-3 w-3" />@{c.instagramHandle.replace(/^@/, "")}
+                                      </p>
+                                    )}
+                                  </div>
                                   <div className="flex-1 mx-2">
                                     <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
                                       <div className="h-full rounded-full bg-muted-foreground/40 transition-all" style={{ width: `${Math.min(pctOfRest, 100)}%` }} />
@@ -1330,7 +1531,7 @@ const Dashboard2 = () => {
                                   <span className="text-sm font-bold tabular-nums w-[60px] text-right text-muted-foreground">{pctOfRest.toFixed(1)}%</span>
                                   <span className="text-xs tabular-nums text-muted-foreground w-[50px] text-right">({pctOfTotal.toFixed(1)}%)</span>
                                   <span className="text-sm tabular-nums text-muted-foreground w-[100px] text-right">{fmt(c.total)}</span>
-                                </div>
+                                </button>
                               );
                             })}
                           </div>
