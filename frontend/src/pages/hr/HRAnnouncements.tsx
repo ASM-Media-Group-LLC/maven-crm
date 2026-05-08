@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Pencil, Trash2, Copy, Archive, Eye, Megaphone, MoreHorizontal } from "lucide-react";
+import { Plus, Pencil, Trash2, Copy, Archive, Eye, Megaphone, MoreHorizontal, FileText, CheckCircle, Clock, Edit3, Eye as EyeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -64,6 +66,8 @@ const HRAnnouncements = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [statusTab, setStatusTab] = useState("all");
+  type KpiKey = "total" | "active" | "scheduled" | "draft" | "views";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
@@ -124,22 +128,13 @@ const HRAnnouncements = () => {
       </header>
 
       <main className="flex-1 overflow-auto p-6 space-y-5">
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          {[
-            { label: "Total", value: stats.total, color: "text-foreground" },
-            { label: "Activos", value: stats.active, color: "text-success" },
-            { label: "Programados", value: stats.scheduled, color: "text-warning" },
-            { label: "Borradores", value: stats.draft, color: "text-muted-foreground" },
-            { label: "Visualizaciones", value: stats.totalViews, color: "text-primary" },
-          ].map((s) => (
-            <Card key={s.label}>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">{s.label}</p>
-                <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-              </CardContent>
-            </Card>
-          ))}
+        {/* KPIs estilo estándar — clickeables (excepto Visualizaciones que es métrica agregada) */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <KpiCard label="Total" value={stats.total} icon={FileText} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
+          <KpiCard label="Activos" value={stats.active} icon={CheckCircle} color="bg-emerald-500" onClick={() => setKpiPopup("active")} />
+          <KpiCard label="Programados" value={stats.scheduled} icon={Clock} color="bg-amber-500" onClick={() => setKpiPopup("scheduled")} />
+          <KpiCard label="Borradores" value={stats.draft} icon={Edit3} color="bg-slate-500" onClick={() => setKpiPopup("draft")} />
+          <KpiCard label="Visualizaciones" value={stats.totalViews} icon={EyeIcon} color="bg-violet-500" />
         </div>
 
         {/* Tabs */}
@@ -261,6 +256,35 @@ const HRAnnouncements = () => {
       <EditAnnouncementModal open={!!editTarget} onOpenChange={(v) => !v && setEditTarget(null)} announcement={editTarget} />
       <AnnouncementDetailModal open={!!detailTarget} onOpenChange={(v) => !v && setDetailTarget(null)} announcement={detailTarget} />
       <DeleteAnnouncementDialog open={!!deleteId} onOpenChange={(v) => !v && setDeleteId(null)} announcementId={deleteId} />
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Anuncios — ${stats.total}`;
+            case "active": return `Activos — ${stats.active}`;
+            case "scheduled": return `Programados — ${stats.scheduled}`;
+            case "draft": return `Borradores — ${stats.draft}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = announcements;
+          if (kpiPopup === "active") list = announcements.filter((a) => a.status === "active");
+          else if (kpiPopup === "scheduled") list = announcements.filter((a) => a.status === "scheduled");
+          else if (kpiPopup === "draft") list = announcements.filter((a) => a.status === "draft");
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "active" ? "success" : status === "scheduled" ? "warning" : "default";
+          return list.slice(0, 100).map((a): KpiRow => ({
+            primary: a.title ?? "Sin título",
+            secondary: audienceLabel(a),
+            right: a.status ?? "—",
+            rightTone: tone(a.status ?? ""),
+          }));
+        })()}
+      />
     </div>
   );
 };

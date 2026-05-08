@@ -1,6 +1,5 @@
 import { LucideIcon } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import KpiCard from "@/components/dashboard/KpiCard";
 
 interface HRMetricCardProps {
   title: string;
@@ -10,45 +9,47 @@ interface HRMetricCardProps {
   trend?: { value: number; label: string };
   color?: "primary" | "success" | "warning" | "destructive" | "default";
   className?: string;
+  onClick?: () => void;
 }
 
-const colorMap = {
-  primary: "bg-primary/10 text-primary",
-  success: "bg-green-500/10 text-green-600 dark:text-green-400",
-  warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  destructive: "bg-destructive/10 text-destructive",
-  default: "bg-muted text-muted-foreground",
+// Mapeo de los colores semánticos viejos a las clases bg-* que usa
+// KpiCard. Mantener este mapping permite que todas las páginas HR
+// (Training/Chatters/Tech/Performance/Organigrama, etc.) hereden el
+// nuevo diseño sin modificar cada llamada.
+const colorMap: Record<NonNullable<HRMetricCardProps["color"]>, string> = {
+  primary: "bg-blue-500",
+  success: "bg-emerald-500",
+  warning: "bg-amber-500",
+  destructive: "bg-rose-500",
+  default: "bg-slate-500",
 };
 
 export function HRMetricCard({
   title,
   value,
   subtitle,
-  icon: Icon,
+  icon,
   trend,
   color = "default",
   className,
+  onClick,
 }: HRMetricCardProps) {
+  // El "trend" del API viejo se renderiza como subtitle anexado, ya que
+  // KpiCard solo tiene 1 línea de subtitle.
+  const sub = trend
+    ? `${subtitle ? subtitle + " · " : ""}${trend.value >= 0 ? "+" : ""}${trend.value} ${trend.label}`
+    : subtitle;
+
   return (
-    <Card className={cn("", className)}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-muted-foreground truncate">{title}</p>
-            <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
-            {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
-            {trend && (
-              <p className={cn("text-xs mt-1 font-medium", trend.value >= 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-                {trend.value >= 0 ? "+" : ""}{trend.value} {trend.label}
-              </p>
-            )}
-          </div>
-          <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", colorMap[color])}>
-            <Icon className="h-5 w-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <KpiCard
+      label={title}
+      value={value}
+      icon={icon}
+      color={colorMap[color]}
+      subtitle={sub}
+      onClick={onClick}
+      className={className}
+    />
   );
 }
 

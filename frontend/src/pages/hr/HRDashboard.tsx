@@ -128,26 +128,23 @@ function FinancialSummaryCards() {
     : 0;
 
   const cards = [
-    { label: "Costo Nómina (mes)", value: `$${(payrollTotal ?? 0).toLocaleString("es-CO")}`, icon: DollarSignIcon, color: "bg-primary/10 border-primary/20", textColor: "text-primary", path: "/finanzas/nomina" },
-    { label: "Salario Promedio", value: `$${Math.round(avgSalary).toLocaleString("es-CO")}`, icon: Wallet, color: "bg-accent/10 border-accent/20", textColor: "text-accent", path: "/finanzas/control" },
-    { label: "Deducciones Pend.", value: String(pendingDeductions ?? 0), icon: AlertTriangle, color: "bg-warning/10 border-warning/20", textColor: "text-warning", path: "/hr/deducciones" },
-    { label: "Horas Extra Acum.", value: `${(overtimeHours ?? 0).toFixed(1)}h`, icon: Clock, color: "bg-muted border-border", textColor: "text-muted-foreground", path: "/finanzas/horas-variables" },
+    { label: "Costo Nómina (mes)", value: `$${(payrollTotal ?? 0).toLocaleString("es-CO")}`, icon: DollarSignIcon, color: "bg-blue-500", path: "/finanzas/nomina" },
+    { label: "Salario Promedio", value: `$${Math.round(avgSalary).toLocaleString("es-CO")}`, icon: Wallet, color: "bg-violet-500", path: "/finanzas/control" },
+    { label: "Deducciones Pend.", value: String(pendingDeductions ?? 0), icon: AlertTriangle, color: "bg-amber-500", path: "/hr/deducciones" },
+    { label: "Horas Extra Acum.", value: `${(overtimeHours ?? 0).toFixed(1)}h`, icon: Clock, color: "bg-emerald-500", path: "/finanzas/horas-variables" },
   ];
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {cards.map(c => (
-        <div
+        <KpiCard
           key={c.label}
-          className={cn("rounded-lg border p-3 flex flex-col gap-1 cursor-pointer hover:opacity-80 transition-opacity", c.color)}
-          onClick={() => navigate(c.path)}
-        >
-          <div className="flex items-center gap-1.5">
-            <c.icon className={cn("h-3.5 w-3.5", c.textColor)} />
-            <span className="text-xs text-muted-foreground">{c.label}</span>
-          </div>
-          <span className={cn("text-xl font-bold", c.textColor)}>{c.value}</span>
-        </div>
+          label={c.label}
+          value={c.value}
+          icon={c.icon}
+          color={c.color}
+          onClick={() => navigate(c.path, { state: { fromHR: true } })}
+        />
       ))}
     </div>
   );
@@ -322,7 +319,7 @@ export default function HRDashboard() {
                 <div
                   key={action.id}
                   className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 cursor-pointer hover:border-primary/40 hover:bg-primary/5 hover:-translate-y-[1px] transition-all duration-200 group"
-                  onClick={() => action.url && navigate(action.url)}
+                  onClick={() => action.url && navigate(action.url, { state: { fromHR: true } })}
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                     <action.icon className="h-5 w-5 text-primary" />
@@ -396,7 +393,7 @@ export default function HRDashboard() {
                 {hrModules.map((mod) => (
                   <button
                     key={mod.label}
-                    onClick={() => mod.url && navigate(mod.url)}
+                    onClick={() => mod.url && navigate(mod.url, { state: { fromHR: true } })}
                     disabled={!mod.url}
                     className={cn(
                       "flex flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors",

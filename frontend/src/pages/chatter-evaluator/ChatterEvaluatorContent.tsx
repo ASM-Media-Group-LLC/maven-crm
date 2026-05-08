@@ -143,7 +143,7 @@ const ChatterEvaluatorContent = () => {
 
   return (
     <main className="flex-1 overflow-y-auto p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
