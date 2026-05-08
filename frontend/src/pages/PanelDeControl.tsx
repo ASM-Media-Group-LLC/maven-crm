@@ -369,6 +369,8 @@ const PanelDeControl = () => {
   const k = data ?? {
     contacted: 0,
     scouterContacts: 0,
+    scouterGenerated: 0,
+    totalGenerated: 0,
     llgWithPhone: 0,
     scouterWithPhone: 0,
     numbersObtained: 0,
@@ -380,10 +382,11 @@ const PanelDeControl = () => {
     totalLeads: 0,
   };
 
-  // Tasa de números obtenidos / total leads (todos los canales)
+  // Tasa de números obtenidos / total leads generados (incluye scouter
+  // pool — la métrica mide qué % del descubrimiento total tiene número).
   const phoneRate =
-    k.totalLeads > 0
-      ? Math.round((k.numbersObtained / k.totalLeads) * 1000) / 10
+    k.totalGenerated > 0
+      ? Math.round((k.numbersObtained / k.totalGenerated) * 1000) / 10
       : 0;
 
   // Bar chart del funnel — todo cross-team. "Contactadas" = LLG+Scouter
@@ -471,6 +474,15 @@ const PanelDeControl = () => {
   const conversionRate =
     k.closerCalls > 0 ? Math.round((k.closes / k.closerCalls) * 1000) / 10 : 0;
 
+  // Tasa de números obtenidos sobre CONTACTADAS — qué % de las modelos
+  // que efectivamente contactamos terminó con teléfono capturado.
+  // Distinto de la hero card "por lead" que usa totalGenerated (pool de
+  // descubrimiento). Acá medimos eficiencia del equipo activo.
+  const phoneRateContacted =
+    k.totalLeads > 0
+      ? Math.round((k.numbersObtained / k.totalLeads) * 1000) / 10
+      : 0;
+
   const activeMetricLabel =
     cards.find((c) => c.key === openMetric)?.label ?? "";
 
@@ -527,11 +539,11 @@ const PanelDeControl = () => {
             </p>
             <div className="flex items-end gap-3 mt-2">
               <p className="text-4xl font-bold tabular-nums leading-none">
-                {k.totalLeads.toLocaleString("es")}
+                {k.totalGenerated.toLocaleString("es")}
               </p>
               <p className="text-xs text-muted-foreground pb-1">
                 LLG ({k.contacted.toLocaleString("es")}) + Scouter (
-                {(k.totalLeads - k.contacted).toLocaleString("es")})
+                {k.scouterGenerated.toLocaleString("es")})
               </p>
             </div>
           </div>
@@ -554,7 +566,7 @@ const PanelDeControl = () => {
               </p>
               <p className="text-xs text-muted-foreground pb-1">
                 {k.numbersObtained.toLocaleString("es")} de{" "}
-                {k.totalLeads.toLocaleString("es")} leads
+                {k.totalGenerated.toLocaleString("es")} leads
               </p>
             </div>
           </div>
@@ -576,6 +588,28 @@ const PanelDeControl = () => {
             onClick={() => setOpenMetric(c.key)}
           />
         ))}
+
+        {/* Tasa de números obtenidos — derived metric, no popup */}
+        <Card className="p-4 border-2 border-cyan-500/30 relative overflow-hidden">
+          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-cyan-500" />
+          <div className="relative space-y-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500">
+              <TrendingUp className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                Tasa de números obtenidos
+              </p>
+              <p className="text-3xl font-bold tabular-nums leading-tight">
+                {phoneRateContacted}
+                <span className="text-lg text-muted-foreground">%</span>
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Números / Contactadas ({k.numbersObtained.toLocaleString("es")}/{k.totalLeads.toLocaleString("es")})
+              </p>
+            </div>
+          </div>
+        </Card>
 
         {/* Conversion rate — derived metric, no popup */}
         <Card className="p-4 border-2 border-fuchsia-500/30 relative overflow-hidden">

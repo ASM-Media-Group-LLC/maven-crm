@@ -12,6 +12,12 @@ export interface OperationsKpis {
   // NO cuenta como contactada — esos son leads descubiertos, pool de
   // prospección.
   scouterContacts: number;
+  // Scouter team GENERÓ — todas las leads en scouter_leads (pool de
+  // prospección). Útil para la hero card "Total leads generados" que
+  // mide volumen de descubrimiento, no de contacto.
+  scouterGenerated: number;
+  // contacted + scouterGenerated (LLG contactadas + scouter pool).
+  totalGenerated: number;
   // LLG con teléfono capturado.
   llgWithPhone: number;
   // Scouter con teléfono capturado.
@@ -72,6 +78,7 @@ export const useOperationsDashboard = (range: DashboardRange) =>
       const [
         { count: contacted },
         { count: scouterTotal },
+        { count: scouterRaw },
         { count: numbersObtainedCount },
         { count: closerCalls },
         { count: closes },
@@ -86,6 +93,10 @@ export const useOperationsDashboard = (range: DashboardRange) =>
         head("scouter_leads",   "first_scouter_contact_at", (q) =>
           q.not("first_scouter_contact_at", "is", null),
         ),
+        // Scouter "generadas" — pool entero de descubrimiento. Útil
+        // para la card "Total leads generados" que mide volumen, no
+        // contacto efectivo.
+        head("scouter_leads", "created_at"),
         head("v_model_phone_captures", "captured_at"),
         head("qa_calls", "call_date"),
         head("qa_calls", "call_date", (q) =>
@@ -105,6 +116,8 @@ export const useOperationsDashboard = (range: DashboardRange) =>
       return {
         contacted: contacted ?? 0,
         scouterContacts: scouterTotal ?? 0,
+        scouterGenerated: scouterRaw ?? 0,
+        totalGenerated: (contacted ?? 0) + (scouterRaw ?? 0),
         // llgWithPhone / scouterWithPhone se mantienen por compat de la
         // interfaz pero ya no se usan en el dashboard — la view dedupea
         // todo. Los reportamos como 0 para simplicidad.
