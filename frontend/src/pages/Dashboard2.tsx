@@ -26,7 +26,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
@@ -123,30 +123,26 @@ const Dashboard2 = () => {
   const [showZeros, setShowZeros] = useState(false);
   const [minTotal, setMinTotal] = useState("");
   const [maxTotal, setMaxTotal] = useState("");
-  const [showPareto, setShowPareto] = useState(false);
-  const [showAlerts, setShowAlerts] = useState(false);
+  // Estados del Resumen — el highlight de top80% en la tabla solo se
+  // aplica cuando el user está en la tab "pareto" (era el viejo
+  // showPareto que controlaba un modal).
   const [alertTab, setAlertTab] = useState<"zero" | "drop" | "fanLoss" | null>(null);
-  const [showMetrics, setShowMetrics] = useState(false);
-  const [showProjection, setShowProjection] = useState(false);
   const [paretoView, setParetoView] = useState<"list" | "chart">("list");
   const [paretoGroup, setParetoGroup] = useState<"80" | "20">("80");
-  const [showDeepDive, setShowDeepDive] = useState(false);
 
-  // Subtabs del dashboard. "resumen" = vista por default (dashboard
-  // completo). Los otros valores abren sus respectivos modals/panels y
-  // cierran los demás. Reemplaza los botones tooltip-icon viejos para
-  // matchear el patrón de Panel de Control (Reclutamiento modelos /
-  // Reclutamiento chatters).
-  type DashTab = "resumen" | "metrics" | "pareto" | "alerts" | "projection" | "deepdive";
+  // Subtabs del dashboard. Cada tab renderiza su contenido inline (no
+  // como overlay/dialog) — mismo patrón que Panel de Control y Scouter
+  // Assist. Resumen = KPIs + insights, Creator Reports = filter + tabla
+  // de creadoras, los otros = secciones de análisis.
+  type DashTab =
+    | "resumen"
+    | "creator-reports"
+    | "metrics"
+    | "pareto"
+    | "alerts"
+    | "projection"
+    | "deepdive";
   const [dashTab, setDashTab] = useState<DashTab>("resumen");
-  const switchDashTab = (next: DashTab) => {
-    setDashTab(next);
-    setShowMetrics(next === "metrics");
-    setShowPareto(next === "pareto");
-    setShowAlerts(next === "alerts");
-    setShowProjection(next === "projection");
-    setShowDeepDive(next === "deepdive");
-  };
 
   // Popup que muestra una lista de creadoras ordenada por una métrica
   // específica. Triggered por click en las KPI cards (Revenue Bruto,
@@ -493,11 +489,11 @@ const Dashboard2 = () => {
     const isZero = c.total === 0;
     const isTop = paretoAnalysis.top.some((t) => t.creatorId === c.creatorId);
     return (
-      <TableRow key={c.creatorId} className={`${isZero ? "opacity-50" : ""} ${showPareto && isTop ? "bg-primary/5" : ""}`}>
+      <TableRow key={c.creatorId} className={`${isZero ? "opacity-50" : ""} ${dashTab === "pareto" && isTop ? "bg-primary/5" : ""}`}>
         <TableCell className="text-muted-foreground tabular-nums text-xs">{i + 1}</TableCell>
         <TableCell className="whitespace-nowrap">
           <div className="flex items-center gap-1.5">
-            {showPareto && isTop && <span className="inline-block h-2 w-2 rounded-full bg-primary shrink-0" title="Top 80/20" />}
+            {dashTab === "pareto" && isTop && <span className="inline-block h-2 w-2 rounded-full bg-primary shrink-0" title="Top 80/20" />}
             {c.instagramHandle && (
               <a href={`https://instagram.com/${c.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0" onClick={(e) => e.stopPropagation()}>
                 <Instagram className="h-3.5 w-3.5" />
@@ -591,9 +587,12 @@ const Dashboard2 = () => {
                   arriba; al pickear una tab distinta de "Resumen" se
                   abre el modal/panel correspondiente. Replica el patrón
                   de Panel de Control (Reclutamiento modelos / chatters). */}
-              <Tabs value={dashTab} onValueChange={(v) => switchDashTab(v as DashTab)}>
+              <Tabs value={dashTab} onValueChange={(v) => setDashTab(v as DashTab)}>
                 <TabsList className="flex-wrap h-auto">
                   <TabsTrigger value="resumen">Resumen</TabsTrigger>
+                  <TabsTrigger value="creator-reports" className="gap-1.5">
+                    <Users className="h-3.5 w-3.5" /> Creator Reports
+                  </TabsTrigger>
                   <TabsTrigger value="metrics" className="gap-1.5">
                     <BarChart3 className="h-3.5 w-3.5" /> Métricas detalladas
                   </TabsTrigger>
@@ -615,11 +614,18 @@ const Dashboard2 = () => {
                     <Telescope className="h-3.5 w-3.5" /> Más análisis
                   </TabsTrigger>
                 </TabsList>
-              </Tabs>
 
-              {/* ══════ EXECUTIVE KPI STRIP ══════ */}
+                {/* Resumen — KPI strip rediseñado + insights estratégicos */}
+                <TabsContent value="resumen" className="mt-4 space-y-5">
+
+              {/* ══════ EXECUTIVE KPI STRIP — 2 rows redesign ══════ */}
+              {/* Row 1: 4 stat cards (Revenue Bruto + Creadoras
+                  clickeables, ARPC + $/Fan derivados).
+                  Row 2: Retención (1/3) + Revenue Mix (2/3) — Mix tiene
+                  bar chart con 3 legends, antes quedaba apretado al
+                  competir con 5 stats en una sola fila. */}
               {!isLoading && (
-                <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* Revenue Bruto — clickable */}
                   <button
                     type="button"
@@ -698,6 +704,13 @@ const Dashboard2 = () => {
                     </div>
                   </div>
 
+                </div>
+              )}
+
+              {/* Row 2: Retención (1/3) + Revenue Mix (2/3) — Mix tiene
+                  el chart estiled con más espacio que antes. */}
+              {!isLoading && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                   {/* Retention — derived metric */}
                   <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
                     <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-cyan-500" />
@@ -713,23 +726,46 @@ const Dashboard2 = () => {
                     </div>
                   </div>
 
-                  {/* Revenue Mix — stacked bar, no popup */}
-                  <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden">
-                    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-amber-500" />
-                    <div className="relative space-y-2">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500">
-                        <BarChart className="h-5 w-5 text-white" />
+                  {/* Revenue Mix — wide card (2/3 width) */}
+                  <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden lg:col-span-2">
+                    <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-25 bg-amber-500" />
+                    <div className="relative space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500 shrink-0">
+                          <BarChart className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Revenue Mix</p>
+                          <p className="text-xs text-muted-foreground">Cómo se compone el ingreso del mes</p>
+                        </div>
                       </div>
-                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Revenue Mix</p>
-                      <div className="flex h-2 w-full rounded-full overflow-hidden bg-muted">
+                      <div className="flex h-3 w-full rounded-full overflow-hidden bg-muted">
                         <div className="h-full bg-blue-500 transition-all" style={{ width: `${hlKpis.msgsPct}%` }} title={`Msgs ${hlKpis.msgsPct.toFixed(0)}%`} />
                         <div className="h-full bg-rose-500 transition-all" style={{ width: `${hlKpis.tipsPct}%` }} title={`Tips ${hlKpis.tipsPct.toFixed(0)}%`} />
                         <div className="h-full bg-emerald-500 transition-all" style={{ width: `${hlKpis.subsPct}%` }} title={`Subs ${hlKpis.subsPct.toFixed(0)}%`} />
                       </div>
-                      <div className="flex items-center justify-between text-[9px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-blue-500 inline-block" />Msg {hlKpis.msgsPct.toFixed(0)}%</span>
-                        <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-rose-500 inline-block" />Tip {hlKpis.tipsPct.toFixed(0)}%</span>
-                        <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />Sub {hlKpis.subsPct.toFixed(0)}%</span>
+                      <div className="grid grid-cols-3 gap-3 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-blue-500 inline-block" />
+                          <div>
+                            <span className="font-semibold tabular-nums">{hlKpis.msgsPct.toFixed(1)}%</span>
+                            <span className="text-muted-foreground ml-1">Msgs</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-rose-500 inline-block" />
+                          <div>
+                            <span className="font-semibold tabular-nums">{hlKpis.tipsPct.toFixed(1)}%</span>
+                            <span className="text-muted-foreground ml-1">Tips</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
+                          <div>
+                            <span className="font-semibold tabular-nums">{hlKpis.subsPct.toFixed(1)}%</span>
+                            <span className="text-muted-foreground ml-1">Subs</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -839,8 +875,11 @@ const Dashboard2 = () => {
               )}
 
 
-              {/* ══════ ALERTS PANEL ══════ */}
-              {showAlerts && !isLoading && (() => {
+              </TabsContent>
+
+              {/* ══════ ALERTS / RED FLAGS TAB ══════ */}
+              <TabsContent value="alerts" className="mt-4">
+              {!isLoading && (() => {
                 const zeros = alerts.filter((a) => a.type === "zero");
                 const drops = alerts.filter((a) => a.type === "drop");
                 const fanLoss = alerts.filter((a) => a.type === "fanLoss");
@@ -915,9 +954,11 @@ const Dashboard2 = () => {
                   </div>
                 );
               })()}
+              </TabsContent>
 
-              {/* ══════ PROJECTION PANEL ══════ */}
-              {showProjection && !isLoading && (
+              {/* ══════ PROJECTION TAB ══════ */}
+              <TabsContent value="projection" className="mt-4">
+              {!isLoading && (
                 <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -978,7 +1019,10 @@ const Dashboard2 = () => {
                 </div>
               )}
 
-              {/* ══════ FILTERS ══════ */}
+              </TabsContent>
+
+              {/* ══════ CREATOR REPORTS TAB — filters + table ══════ */}
+              <TabsContent value="creator-reports" className="mt-4 space-y-3">
               {!isLoading && (
                 <div className="flex flex-wrap items-center gap-2.5 text-xs">
                   <div className="relative flex-1 min-w-[160px] max-w-[220px]">
@@ -1007,7 +1051,7 @@ const Dashboard2 = () => {
                   {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
                 </div>
               ) : (
-                <div className="rounded-lg border border-border bg-card overflow-auto max-h-[calc(100vh-480px)]">
+                <div className="rounded-lg border border-border bg-card overflow-auto">
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-card">
                       <TableRow>
@@ -1043,6 +1087,12 @@ const Dashboard2 = () => {
                   </Table>
                 </div>
               )}
+              </TabsContent>
+              </Tabs>
+              {/* Métricas / Análisis 80/20 / Más análisis se renderizan
+                  como secciones inline debajo (antes eran Dialogs/popups
+                  que tapaban la pantalla). Cada una se monta condicional
+                  por el dashTab activo. */}
             </div>
 
             {/* ══════ KPI LIST POPUP — click en cards Revenue/Creadoras ══════ */}
@@ -1105,16 +1155,15 @@ const Dashboard2 = () => {
               </DialogContent>
             </Dialog>
 
-            {/* ══════ METRICS DIALOG ══════ */}
-            <Dialog open={showMetrics} onOpenChange={(o) => { setShowMetrics(o); if (!o && dashTab === "metrics") setDashTab("resumen"); }}>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+            {/* ══════ METRICS — inline tab section ══════ */}
+            {dashTab === "metrics" && !isLoading && (
+              <div className="px-6 pb-6 -mt-1">
+                <div className="rounded-xl border border-border bg-card overflow-hidden">
                 <div className="p-6 pb-0">
-                  <DialogHeader>
-                    <DialogTitle className="text-xl flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-primary" />
-                      Métricas — {selectedPeriod?.label}
-                    </DialogTitle>
-                  </DialogHeader>
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    Métricas — {selectedPeriod?.label}
+                  </h2>
                 </div>
                 <div className="p-6 space-y-8">
                   <div>
@@ -1194,19 +1243,19 @@ const Dashboard2 = () => {
                     </>
                   )}
                 </div>
-              </DialogContent>
-            </Dialog>
+                </div>
+              </div>
+            )}
 
-            {/* ══════ PARETO DIALOG ══════ */}
-            <Dialog open={showPareto} onOpenChange={(o) => { setShowPareto(o); if (!o && dashTab === "pareto") setDashTab("resumen"); }}>
-              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0">
+            {/* ══════ PARETO — inline tab section ══════ */}
+            {dashTab === "pareto" && !isLoading && (
+              <div className="px-6 pb-6 -mt-1">
+                <div className="rounded-xl border border-border bg-card overflow-hidden">
                 <div className="p-6 pb-0">
-                  <DialogHeader>
-                    <DialogTitle className="text-xl flex items-center gap-2">
-                      <PieChart className="h-5 w-5 text-primary" />
-                      Análisis 80/20 — {selectedPeriod?.label}
-                    </DialogTitle>
-                  </DialogHeader>
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <PieChart className="h-5 w-5 text-primary" />
+                    Análisis 80/20 — {selectedPeriod?.label}
+                  </h2>
                 </div>
                 <div className="p-6 space-y-6">
                   <div className="flex items-center gap-4">
@@ -1326,15 +1375,16 @@ const Dashboard2 = () => {
                     </div>
                   )}
                 </div>
-              </DialogContent>
-            </Dialog>
+                </div>
+              </div>
+            )}
 
-            {/* ══════ DEEP DIVE DIALOG ══════ */}
-            <Dialog open={showDeepDive} onOpenChange={(o) => { setShowDeepDive(o); if (!o && dashTab === "deepdive") setDashTab("resumen"); }}>
-              <DialogContent className="max-w-6xl max-h-[92vh] overflow-hidden p-0 flex flex-col">
+            {/* ══════ DEEP DIVE — inline tab section ══════ */}
+            {dashTab === "deepdive" && !isLoading && (
+              <div className="px-6 pb-6 -mt-1">
+                <div className="rounded-xl border border-border bg-card overflow-hidden flex flex-col">
                 <div className="px-6 pt-5 pb-3 border-b border-border shrink-0">
-                   <DialogHeader>
-                     <DialogTitle className="text-lg flex items-center gap-2">
+                   <h2 className="text-lg font-semibold flex items-center gap-2">
                        <Telescope className="h-5 w-5 text-primary" />
                        Deep Dive
                        <span className="text-muted-foreground">—</span>
@@ -1348,8 +1398,7 @@ const Dashboard2 = () => {
                            ))}
                          </SelectContent>
                        </Select>
-                     </DialogTitle>
-                   </DialogHeader>
+                     </h2>
                   <div className="flex flex-wrap items-center gap-1 mt-3 bg-muted rounded-lg p-1">
                     {([
                       { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM", desc: "Mes vs Mes" },
@@ -1956,8 +2005,9 @@ const Dashboard2 = () => {
                     </div>
                   )}
                 </div>
-              </DialogContent>
-            </Dialog>
+                </div>
+              </div>
+            )}
           </main>
   );
 };
