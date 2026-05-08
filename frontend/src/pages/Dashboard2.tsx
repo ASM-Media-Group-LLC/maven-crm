@@ -959,7 +959,7 @@ const Dashboard2 = () => {
               {/* ══════ PROJECTION TAB ══════ */}
               <TabsContent value="projection" className="mt-4">
               {!isLoading && (
-                <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Target className="h-4 w-4 text-accent-foreground" />
@@ -1157,15 +1157,12 @@ const Dashboard2 = () => {
 
             {/* ══════ METRICS — inline tab section ══════ */}
             {dashTab === "metrics" && !isLoading && (
-              <div className="px-6 pb-6 -mt-1">
-                <div className="rounded-xl border border-border bg-card overflow-hidden">
-                <div className="p-6 pb-0">
-                  <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-primary" />
-                    Métricas — {selectedPeriod?.label}
-                  </h2>
-                </div>
-                <div className="p-6 space-y-8">
+              <div className="px-6 pb-6 -mt-1 space-y-6">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  Métricas — {selectedPeriod?.label}
+                </h2>
+                <div className="space-y-8">
                   <div>
                     <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-4">Distribución de Revenue</h3>
                     <div className="space-y-4">
@@ -1243,21 +1240,17 @@ const Dashboard2 = () => {
                     </>
                   )}
                 </div>
-                </div>
               </div>
             )}
 
             {/* ══════ PARETO — inline tab section ══════ */}
             {dashTab === "pareto" && !isLoading && (
-              <div className="px-6 pb-6 -mt-1">
-                <div className="rounded-xl border border-border bg-card overflow-hidden">
-                <div className="p-6 pb-0">
-                  <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <PieChart className="h-5 w-5 text-primary" />
-                    Análisis 80/20 — {selectedPeriod?.label}
-                  </h2>
-                </div>
-                <div className="p-6 space-y-6">
+              <div className="px-6 pb-6 -mt-1 space-y-6">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <PieChart className="h-5 w-5 text-primary" />
+                  Análisis 80/20 — {selectedPeriod?.label}
+                </h2>
+                <div className="space-y-6">
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
                       <Button variant={paretoView === "list" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setParetoView("list")}>Lista</Button>
@@ -1375,15 +1368,13 @@ const Dashboard2 = () => {
                     </div>
                   )}
                 </div>
-                </div>
               </div>
             )}
 
             {/* ══════ DEEP DIVE — inline tab section ══════ */}
             {dashTab === "deepdive" && !isLoading && (
-              <div className="px-6 pb-6 -mt-1">
-                <div className="rounded-xl border border-border bg-card overflow-hidden flex flex-col">
-                <div className="px-6 pt-5 pb-3 border-b border-border shrink-0">
+              <div className="px-6 pb-6 -mt-1 space-y-4">
+                <div className="pb-3 border-b border-border">
                    <h2 className="text-lg font-semibold flex items-center gap-2">
                        <Telescope className="h-5 w-5 text-primary" />
                        Deep Dive
@@ -2004,7 +1995,6 @@ const Dashboard2 = () => {
                       </div>
                     </div>
                   )}
-                </div>
                 </div>
               </div>
             )}
