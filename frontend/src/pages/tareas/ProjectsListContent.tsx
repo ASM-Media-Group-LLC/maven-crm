@@ -6,6 +6,7 @@ import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizonta
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import KpiCard from "@/components/dashboard/KpiCard";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -185,11 +186,11 @@ const ProjectsListContent = () => {
   }, [filteredProjects, getProjectTaskCounts]);
 
   const kpis = [
-    { label: "Total Proyectos", value: filteredProjects.length, icon: FolderOpen, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
-    { label: "Pendientes", value: totalCounts.pending, icon: Clock, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
-    { label: "En curso", value: totalCounts.in_progress, icon: Play, color: "text-blue-400", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-blue-500/15 hover:to-transparent hover:border-blue-500/40" },
-    { label: "Vencidas", value: totalCounts.overdue, icon: AlertTriangle, color: "text-destructive", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40" },
-    { label: "Completadas", value: totalCounts.completed, icon: CheckSquare, color: "text-emerald-400", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-emerald-500/15 hover:to-transparent hover:border-emerald-500/40" },
+    { label: "Total Proyectos", value: filteredProjects.length, icon: FolderOpen, color: "bg-blue-500" },
+    { label: "Pendientes", value: totalCounts.pending, icon: Clock, color: "bg-amber-500" },
+    { label: "En curso", value: totalCounts.in_progress, icon: Play, color: "bg-violet-500" },
+    { label: "Vencidas", value: totalCounts.overdue, icon: AlertTriangle, color: "bg-rose-500" },
+    { label: "Completadas", value: totalCounts.completed, icon: CheckSquare, color: "bg-emerald-500" },
   ];
 
   const renderProjectActions = (project: TaskProject, stopProp: boolean = true) => (
@@ -372,18 +373,10 @@ const ProjectsListContent = () => {
       <div className="flex-1 overflow-auto">
         {/* Sticky KPIs + Filters */}
         <div className="sticky top-0 z-10 bg-background px-6 pt-6 pb-4 space-y-4 border-b border-border">
-          {/* KPI Stats Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+          {/* KPI Stats Cards — patrón estándar (estáticas, la lista de proyectos vive abajo) */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {kpis.map((kpi) => (
-              <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
-                <CardContent className="flex items-center gap-3 p-4">
-                  <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
-                  <div>
-                    <p className="text-2xl font-bold">{kpi.value}</p>
-                    <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} icon={kpi.icon} color={kpi.color} />
             ))}
           </div>
 
