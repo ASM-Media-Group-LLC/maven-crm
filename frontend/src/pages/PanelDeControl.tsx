@@ -11,6 +11,8 @@ import {
   Building2,
   TrendingUp,
   ArrowRight,
+  Instagram,
+  ExternalLink,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -24,6 +26,7 @@ import {
 } from "recharts";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -295,6 +298,18 @@ const LeadDetailDialog = ({
 }) => {
   const { data, isLoading } = useLeadDetail(source, id);
 
+  // Resolver el handle de IG según el campo del source para armar el
+  // botón "Abrir Instagram". leadgen_entries usa `model_handle`,
+  // scouter_leads usa `instagram_handle`, creators idem.
+  const igHandle = (() => {
+    if (!data) return null;
+    const raw =
+      (data as Record<string, unknown>).instagram_handle ??
+      (data as Record<string, unknown>).model_handle;
+    if (typeof raw !== "string" || !raw.trim()) return null;
+    return raw.trim().replace(/^@/, "");
+  })();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl max-h-[80vh] overflow-hidden flex flex-col">
@@ -308,6 +323,21 @@ const LeadDetailDialog = ({
             )}
           </DialogTitle>
         </DialogHeader>
+
+        {igHandle && (
+          <div className="flex items-center gap-2 -mt-1 pb-2 border-b border-border/50">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => window.open(`https://instagram.com/${igHandle}`, "_blank", "noopener,noreferrer")}
+            >
+              <Instagram className="h-3.5 w-3.5" />
+              Abrir Instagram (@{igHandle})
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto space-y-2 pr-1">
           {isLoading ? (

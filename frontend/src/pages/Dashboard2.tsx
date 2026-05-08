@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { subMonths, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,8 +21,9 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram, PieChart,
   BarChart3, MessageSquare, Repeat, Heart, Eye, AlertTriangle, Target, Crown, X,
   Download, Zap, Activity, Lock, Brain, Layers, BarChart, Sparkles, UserCheck, ShieldAlert,
-  Telescope, ArrowRight, ChevronRight, Scale, GitCompare, CheckCircle2,
+  Telescope, ArrowRight, ChevronRight, Scale, GitCompare, CheckCircle2, Camera, Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -157,6 +158,53 @@ const Dashboard2 = () => {
   // cajones de Pareto y de Creator Reports. Muestra foto, todas las
   // métricas + botón para abrir IG.
   const [creatorDetail, setCreatorDetail] = useState<CreatorSummary | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+
+  // Upload del avatar de la creadora — bucket público `creator-files`.
+  // Path convención: avatars/{creator_id}/profile-{ts}.{ext} para que
+  // cada upload genere una URL nueva y se vea el cambio inmediato (no
+  // hay cache busting con la misma path porque el CDN cachea).
+  const handlePhotoUpload = async (file: File) => {
+    if (!creatorDetail) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("El archivo debe ser una imagen");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("La imagen no debe superar 5 MB");
+      return;
+    }
+    setPhotoUploading(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `avatars/${creatorDetail.creatorId}/profile-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("creator-files").upload(path, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("creator-files").getPublicUrl(path);
+      const newUrl = pub?.publicUrl;
+      if (!newUrl) throw new Error("No se pudo obtener la URL pública");
+      const { error: dbErr } = await supabase
+        .from("creators")
+        .update({ profile_photo_url: newUrl })
+        .eq("id", creatorDetail.creatorId);
+      if (dbErr) throw dbErr;
+      // Sync local state así el avatar del popup se actualiza al toque.
+      setCreatorDetail({ ...creatorDetail, profilePhotoUrl: newUrl });
+      // Invalidar caches para que el dashboard refresque.
+      await queryClient.invalidateQueries({ queryKey: ["creator-info-dashboard2"] });
+      toast.success("Foto actualizada");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error al subir foto";
+      toast.error(msg);
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
   const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
 
   const monthOptions = useMemo(getMonthOptions, []);
@@ -1229,10 +1277,41 @@ const Dashboard2 = () => {
                     <>
                       <DialogHeader>
                         <div className="flex items-start gap-4">
-                          <Avatar className="h-20 w-20 shrink-0">
-                            {c.profilePhotoUrl && <AvatarImage src={c.profilePhotoUrl} alt={c.name} />}
-                            <AvatarFallback className="text-lg font-semibold">{initials || "?"}</AvatarFallback>
-                          </Avatar>
+                          <button
+                            type="button"
+                            onClick={() => photoInputRef.current?.click()}
+                            disabled={photoUploading}
+                            className="relative group/avatar shrink-0 rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-default"
+                            title="Subir foto de perfil"
+                          >
+                            <Avatar className="h-20 w-20">
+                              {c.profilePhotoUrl && <AvatarImage src={c.profilePhotoUrl} alt={c.name} />}
+                              <AvatarFallback className="text-lg font-semibold">{initials || "?"}</AvatarFallback>
+                            </Avatar>
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover/avatar:opacity-100 transition-opacity rounded-full">
+                              {photoUploading ? (
+                                <Loader2 className="h-5 w-5 text-white animate-spin" />
+                              ) : (
+                                <Camera className="h-5 w-5 text-white" />
+                              )}
+                            </div>
+                            {photoUploading && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full">
+                                <Loader2 className="h-5 w-5 text-white animate-spin" />
+                              </div>
+                            )}
+                          </button>
+                          <input
+                            ref={photoInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handlePhotoUpload(file);
+                              if (photoInputRef.current) photoInputRef.current.value = "";
+                            }}
+                          />
                           <div className="flex-1 min-w-0">
                             <DialogTitle className="text-2xl mb-1 truncate">{c.name}</DialogTitle>
                             {c.instagramHandle && (
