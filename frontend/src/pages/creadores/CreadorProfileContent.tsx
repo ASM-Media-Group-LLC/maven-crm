@@ -2,16 +2,13 @@ import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { differenceInCalendarDays, setYear, format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowLeft, Phone, Cake, Download, LogOut, ChevronRight, CheckCircle2, Building2 } from "lucide-react";
+import { ArrowLeft, Phone, Cake, Download, LogOut, ChevronRight, CheckCircle2 } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
-import { useMarkCreatorEnteredCrm } from "@/hooks/useOperationsDashboard";
 import { buildSocialUrl, displayHandle } from "@/lib/utils";
 import { useCreadorById } from "./useCreadores";
 import InfoTabContent from "./InfoTabContent";
@@ -125,27 +122,6 @@ const CreadorProfileContent = () => {
   const { data: creator, isLoading } = useCreadorById(id ?? "");
   const { isAgent, isAdmin, isManager } = useUserRole();
   const [statusModalOpen, setStatusModalOpen] = useState(false);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const markEnteredCrm = useMarkCreatorEnteredCrm();
-  const [crmBusy, setCrmBusy] = useState(false);
-
-  const toggleEnteredCrm = async () => {
-    if (crmBusy || !id) return;
-    const isEntered = !!(c as any)?.entered_crm_at;
-    setCrmBusy(true);
-    try {
-      await markEnteredCrm(id, !isEntered);
-      await queryClient.invalidateQueries({ queryKey: ["creator", id] });
-      toast({
-        title: isEntered ? "Desmarcada del CRM" : "Marcada como ingresada al CRM",
-      });
-    } catch (e: any) {
-      toast({ title: "Error", description: e?.message ?? "No se pudo actualizar", variant: "destructive" });
-    } finally {
-      setCrmBusy(false);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -240,31 +216,15 @@ const CreadorProfileContent = () => {
             }}>
               <Download className="h-4 w-4" /> Exportar Ficha Técnica
             </Button>
-            {!isAgent && (
-              (c as any).entered_crm_at ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10"
-                  disabled={crmBusy}
-                  onClick={toggleEnteredCrm}
-                  title={`Ingresada el ${format(new Date((c as any).entered_crm_at), "d MMM yyyy", { locale: es })} — click para desmarcar`}
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  Ingresada al CRM
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={crmBusy}
-                  onClick={toggleEnteredCrm}
-                >
-                  <Building2 className="h-4 w-4" />
-                  Marcar ingresada al CRM
-                </Button>
-              )
+            {!isAgent && (c as any).entered_crm_at && (
+              <Badge
+                variant="success-soft"
+                className="gap-1"
+                title={`Detectada automáticamente al completar onboarding (status ≠ borrador)`}
+              >
+                <CheckCircle2 className="h-3 w-3" />
+                Ingresada al CRM · {format(new Date((c as any).entered_crm_at), "d MMM yyyy", { locale: es })}
+              </Badge>
             )}
             {c.status && (
               <Badge
