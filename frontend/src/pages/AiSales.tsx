@@ -1,16 +1,12 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import ClariAiChat from "@/components/ClariAiChat";
 import AiChatSidebar from "@/components/AiChatSidebar";
-import { Button } from "@/components/ui/button";
-import { Settings } from "lucide-react";
 import { toast } from "sonner";
 import { useAiConversations } from "@/hooks/useAiConversations";
 import { useQueryClient } from "@tanstack/react-query";
 import VentasSubtabs from "./sales-overview/VentasSubtabs";
 
 const AiSales = () => {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { conversations, createConversation, deleteConversation, renameConversation } = useAiConversations();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -51,7 +47,7 @@ const AiSales = () => {
     queryClient.invalidateQueries({ queryKey: ["ai_conversations"] });
   };
 
-  const handleTitleSet = (title: string) => {
+  const handleTitleSet = () => {
     queryClient.invalidateQueries({ queryKey: ["ai_conversations"] });
   };
 
@@ -75,7 +71,12 @@ const AiSales = () => {
 
         {/* Main Chat Area */}
         <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
-          {/* Sub-header con título de la conversación + Configuración */}
+          {/* Sub-header con título de la conversación. Antes había un
+              botón "Configuración" → /ai-sales-config (modelo + tono +
+              custom instructions). Lo removimos: ahora el modelo está
+              hardcodeado a Gemini server-side y los datos van precomputed
+              en el system prompt — ya no hay nada útil que configurar
+              desde el frontend. */}
           <div className="flex items-center justify-between border-b border-border bg-background px-6 py-3 shrink-0">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-sm font-semibold truncate">
@@ -87,15 +88,6 @@ const AiSales = () => {
                 </span>
               )}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 shrink-0"
-              onClick={() => navigate("/ai-sales-config")}
-            >
-              <Settings className="h-4 w-4" />
-              Configuración
-            </Button>
           </div>
 
           {/* Chat Component */}

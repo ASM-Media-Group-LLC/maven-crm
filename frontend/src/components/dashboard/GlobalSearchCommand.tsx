@@ -5,7 +5,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import {
   LayoutDashboard, UserPlus, CheckSquare, Users, CalendarDays,
   TrendingUp, Megaphone, Activity, Phone, Ticket, Palette, FileText,
-  Bot, Settings, Sun, Moon,
+  Bot, Sun, Moon,
 } from "lucide-react";
 import {
   CommandDialog, CommandInput, CommandList, CommandEmpty,
@@ -37,7 +37,6 @@ const GlobalSearchCommand = ({ open, onOpenChange }: { open: boolean; onOpenChan
     { label: t("nav.creatorSales") + " - Dashboard", url: "/sales-overview", icon: TrendingUp },
     { label: t("nav.salesReport"), url: "/salesdashboard", icon: TrendingUp },
     { label: t("nav.aiSales"), url: "/aisales", icon: Bot },
-    { label: t("nav.aiConfig"), url: "/ai-sales-config", icon: Settings },
     { label: t("nav.promolog"), url: "/promolog", icon: Megaphone },
     { label: t("nav.leadgen"), url: "/leadgen", icon: Activity },
     { label: t("nav.closers"), url: "/closers", icon: Phone },

@@ -63,7 +63,6 @@ import SalesDashboard from "./pages/SalesDashboard";
 import SalesAudit from "./pages/SalesAudit";
 import SalesOverview from "./pages/SalesOverview";
 import AiSales from "./pages/AiSales";
-import AiSalesConfig from "./pages/AiSalesConfig";
 
 // Creadores
 import Creadores from "./pages/Creadores";
@@ -278,7 +277,6 @@ const App = () => (
                 <Route path="/salesdashboard" element={<PermissionRoute module="Creator Sales" submodule="Reportes"><SalesDashboard /></PermissionRoute>} />
                 <Route path="/sales-audit" element={<PermissionRoute module="Creator Sales" submodule="Auditoría"><SalesAudit /></PermissionRoute>} />
                 <Route path="/aisales" element={<PermissionRoute module="Creator Sales" submodule="IA Ventas"><AiSales /></PermissionRoute>} />
-                <Route path="/ai-sales-config" element={<PermissionRoute module="Creator Sales" submodule="IA Ventas"><AiSalesConfig /></PermissionRoute>} />
                 {/* Chatter Evaluator — submodule-gated so admins can give
                     chatters Evaluator-only access without exposing the
                     admin/workspace tooling. */}

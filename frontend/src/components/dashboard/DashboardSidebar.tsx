@@ -95,7 +95,7 @@ const DashboardSidebar = () => {
   ];
   const operationsMenu = operationsMenuAll.filter((item) => canAccess(item.module, item.submodule));
 
-  const isCreatorSalesActive = creatorSalesSubItems.some((item) => pathname === item.url) || pathname === "/aisales" || pathname === "/ai-sales-config";
+  const isCreatorSalesActive = creatorSalesSubItems.some((item) => pathname === item.url) || pathname === "/aisales";
 
   type HRItem = { title: string; url: string | null; submodule?: string };
   type HRSubGroup = { label: string; key: string; items: HRItem[] };

@@ -14,7 +14,7 @@ const VentasSubtabs = () => {
   const tabs = [
     { url: "/sales-overview", label: "Dashboard", icon: LayoutDashboard, submodule: "Dashboard", prefix: "/sales-overview" },
     { url: "/salesdashboard", label: "Reportes", icon: FileBarChart, submodule: "Reportes", prefix: "/salesdashboard" },
-    { url: "/aisales", label: "IA Ventas", icon: Sparkles, submodule: "IA Ventas", prefix: "/aisales", altPrefix: "/ai-sales-config" },
+    { url: "/aisales", label: "IA Ventas", icon: Sparkles, submodule: "IA Ventas", prefix: "/aisales" },
     { url: "/sales-audit", label: "Auditoría", icon: ShieldAlert, submodule: "Auditoría", prefix: "/sales-audit" },
   ];
 

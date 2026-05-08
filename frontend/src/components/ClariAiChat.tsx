@@ -28,7 +28,6 @@ const ClariBubbleAvatar = ({ size = 32 }: { size?: number }) => {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
-import { getAiConfig } from "@/lib/ai-config";
 import { useAiMessages } from "@/hooks/useAiConversations";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -317,7 +316,11 @@ const ClariAiChat = ({
     };
 
     try {
-      const aiConfig = getAiConfig();
+      // El modelo y demás config ahora viven server-side en cada Edge
+      // Function (Gemini para ai-sales-chat y clari-help). El frontend
+      // ya no envía config — eso evita el mismatch que tuvimos cuando
+      // el front guardaba modelos Gemini y el backend solo aceptaba
+      // Groq.
       await streamChat({
         endpoint,
         userContext,
@@ -338,11 +341,6 @@ const ClariAiChat = ({
         onError: (msg) => {
           toast.error(msg);
           setIsLoading(false);
-        },
-        config: {
-          customInstructions: aiConfig.customInstructions,
-          tone: aiConfig.tone,
-          model: aiConfig.model,
         },
       });
     } catch {
