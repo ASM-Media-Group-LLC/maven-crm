@@ -19,7 +19,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
+import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import NuevaComisionModal from "./NuevaComisionModal";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 
@@ -81,6 +82,8 @@ export default function ComisionesPage() {
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>("En Tiempo Real");
   const [typeFilter, setTypeFilter] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  type KpiKey = "total" | "proyectadas" | "confirmadas" | "monto";
+  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   const [viewItem, setViewItem] = useState<any>(null);
   const [deleteItem, setDeleteItem] = useState<any>(null);
   const [showNewModal, setShowNewModal] = useState(false);
@@ -175,10 +178,10 @@ export default function ComisionesPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
-              <DashboardMetricCard label="Total Registros" value={String(commissions.length)} icon={TrendingUp} subtitle="Todas las comisiones" color="primary" />
-              <DashboardMetricCard label="Proyectadas" value={String(totalProyectadas)} icon={Clock} subtitle="Pendientes" color="warning" />
-              <DashboardMetricCard label="Confirmadas" value={String(totalConfirmadas)} icon={CheckCircle} subtitle="Listas para pago" color="accent" />
-              <DashboardMetricCard label="Monto Estimado" value={fmt(totalEstimado)} icon={DollarSign} subtitle="Suma estimada" color="destructive" />
+              <KpiCard label="Total Registros" value={String(commissions.length)} icon={TrendingUp} color="bg-blue-500" subtitle="Todas las comisiones" onClick={() => setKpiPopup("total")} />
+              <KpiCard label="Proyectadas" value={String(totalProyectadas)} icon={Clock} color="bg-amber-500" subtitle="Pendientes" onClick={() => setKpiPopup("proyectadas")} />
+              <KpiCard label="Confirmadas" value={String(totalConfirmadas)} icon={CheckCircle} color="bg-emerald-500" subtitle="Listas para pago" onClick={() => setKpiPopup("confirmadas")} />
+              <KpiCard label="Monto Estimado" value={fmt(totalEstimado)} icon={DollarSign} color="bg-rose-500" subtitle="Suma estimada" onClick={() => setKpiPopup("monto")} />
             </>
           )}
         </div>
@@ -247,6 +250,34 @@ export default function ComisionesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <KpiDetailDialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => !o && setKpiPopup(null)}
+        title={(() => {
+          switch (kpiPopup) {
+            case "total": return `Total Comisiones — ${commissions.length}`;
+            case "proyectadas": return `Proyectadas — ${totalProyectadas}`;
+            case "confirmadas": return `Confirmadas — ${totalConfirmadas}`;
+            case "monto": return `Monto Estimado — ${fmt(totalEstimado)}`;
+            default: return "";
+          }
+        })()}
+        rows={(() => {
+          if (!kpiPopup) return [];
+          let list = commissions;
+          if (kpiPopup === "proyectadas") list = commissions.filter((c: any) => c.status === "proyectado");
+          else if (kpiPopup === "confirmadas") list = commissions.filter((c: any) => c.status === "confirmado");
+          const tone = (status: string): KpiRow["rightTone"] =>
+            status === "pagado" ? "success" : status === "confirmado" ? "default" : "warning";
+          return list.slice(0, 100).map((c: any): KpiRow => ({
+            primary: c.employees ? `${c.employees.first_name ?? ""} ${c.employees.last_name ?? ""}`.trim() : "Sin nombre",
+            secondary: c.creators?.artistic_name ?? c.creators?.name ?? c.area ?? undefined,
+            right: fmt(Number(c.estimated_amount) || 0),
+            rightTone: tone(c.status ?? ""),
+          }));
+        })()}
+      />
     </div>
   );
 }

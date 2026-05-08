@@ -1,5 +1,5 @@
 import { Users, Shield, AlertTriangle, Key, UserCheck } from "lucide-react";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
 import type { AuditoriaSummary } from "./useAuditoriaData";
 
 interface Props {
@@ -8,23 +8,17 @@ interface Props {
 
 const AuditoriaSummaryCards = ({ summary }: Props) => {
   const cards = [
-    { label: "Total Usuarios", value: String(summary.total_users), icon: Users, color: "primary" as const },
-    { label: "Con Rol", value: String(summary.users_with_roles), icon: UserCheck, color: "success" as const },
-    { label: "Sin Rol", value: String(summary.users_without_roles), icon: AlertTriangle, color: summary.users_without_roles > 0 ? "destructive" as const : "muted" as const },
-    { label: "Roles Activos", value: String(summary.active_roles), icon: Shield, color: "warning" as const },
-    { label: "Permisos Config.", value: String(summary.total_permissions), icon: Key, color: "accent" as const },
+    { label: "Total Usuarios", value: String(summary.total_users), icon: Users, color: "bg-blue-500" },
+    { label: "Con Rol", value: String(summary.users_with_roles), icon: UserCheck, color: "bg-emerald-500" },
+    { label: "Sin Rol", value: String(summary.users_without_roles), icon: AlertTriangle, color: summary.users_without_roles > 0 ? "bg-rose-500" : "bg-slate-500" },
+    { label: "Roles Activos", value: String(summary.active_roles), icon: Shield, color: "bg-amber-500" },
+    { label: "Permisos Config.", value: String(summary.total_permissions), icon: Key, color: "bg-violet-500" },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
       {cards.map((c) => (
-        <DashboardMetricCard
-          key={c.label}
-          label={c.label}
-          value={c.value}
-          icon={c.icon}
-          color={c.color}
-        />
+        <KpiCard key={c.label} label={c.label} value={c.value} icon={c.icon} color={c.color} />
       ))}
     </div>
   );

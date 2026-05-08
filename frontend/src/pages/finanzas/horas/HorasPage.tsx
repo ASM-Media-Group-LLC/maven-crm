@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
 
 const TABS = ["Horas Extra", "Banco de Horas"] as const;
 type Tab = typeof TABS[number];
@@ -55,9 +55,10 @@ export default function HorasPage() {
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {isLoading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
                 <>
-                  <DashboardMetricCard label="Total Horas Extra" value={String(totalOvertimeHours)} icon={Clock} subtitle={`${uniqueEmps} empleados`} color="primary" />
-                  <DashboardMetricCard label="Costo Total" value={fmt(totalOvertimeAmount)} icon={DollarSign} subtitle="Monto acumulado" color="destructive" />
-                  <DashboardMetricCard label="Promedio por Empleado" value={uniqueEmps > 0 ? (totalOvertimeHours / uniqueEmps).toFixed(1) + "h" : "0h"} icon={Users} subtitle="Horas extra" color="accent" />
+                  {/* Cards estáticas — la tabla abajo ya muestra el detalle */}
+                  <KpiCard label="Total Horas Extra" value={String(totalOvertimeHours)} icon={Clock} color="bg-blue-500" subtitle={`${uniqueEmps} empleados`} />
+                  <KpiCard label="Costo Total" value={fmt(totalOvertimeAmount)} icon={DollarSign} color="bg-rose-500" subtitle="Monto acumulado" />
+                  <KpiCard label="Promedio por Empleado" value={uniqueEmps > 0 ? (totalOvertimeHours / uniqueEmps).toFixed(1) + "h" : "0h"} icon={Users} color="bg-violet-500" subtitle="Horas extra" />
                 </>
               )}
             </div>
@@ -93,8 +94,8 @@ export default function HorasPage() {
             <div className="grid grid-cols-2 gap-4">
               {isLoading ? Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
                 <>
-                  <DashboardMetricCard label="Horas Acumuladas" value={String(totalBankHours)} icon={Wallet} subtitle="Banco total" color="primary" />
-                  <DashboardMetricCard label="Valor Total" value={fmt(totalBankAmount)} icon={DollarSign} subtitle="Valoración" color="accent" />
+                  <KpiCard label="Horas Acumuladas" value={String(totalBankHours)} icon={Wallet} color="bg-emerald-500" subtitle="Banco total" />
+                  <KpiCard label="Valor Total" value={fmt(totalBankAmount)} icon={DollarSign} color="bg-violet-500" subtitle="Valoración" />
                 </>
               )}
             </div>

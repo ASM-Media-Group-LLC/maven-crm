@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
 import { PhoneInput } from "@/components/ui/phone-input";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
 import StartOnboardingModal from "./StartOnboardingModal";
 import {
   useProspectos, useAddProspect, useUpdateProspect, useDeleteProspect,
@@ -125,10 +125,10 @@ export default function ProspectosPage() {
               Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
             ) : (
               <>
-                <DashboardMetricCard label="Total Casting" value={String(prospects.length)} icon={Users} subtitle="Todos los registros" color="muted" />
-                <DashboardMetricCard label="Pendientes de Contacto" value={String(totalLeads)} icon={Clock} subtitle={prospects.length > 0 ? `${((totalLeads / prospects.length) * 100).toFixed(0)}% del total` : "—"} color="primary" />
-                <DashboardMetricCard label="En Negociación" value={String(totalNegociando)} icon={Target} subtitle={prospects.length > 0 ? `${((totalNegociando / prospects.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
-                <DashboardMetricCard label="Tasa de Conversión" value={`${conversionRate}%`} icon={TrendingUp} subtitle={`${totalConvertidos} convertidos`} color="success" />
+                <KpiCard label="Total Casting" value={String(prospects.length)} icon={Users} color="bg-blue-500" subtitle="Todos los registros" />
+                <KpiCard label="Pendientes de Contacto" value={String(totalLeads)} icon={Clock} color="bg-amber-500" subtitle={prospects.length > 0 ? `${((totalLeads / prospects.length) * 100).toFixed(0)}% del total` : "—"} />
+                <KpiCard label="En Negociación" value={String(totalNegociando)} icon={Target} color="bg-violet-500" subtitle={prospects.length > 0 ? `${((totalNegociando / prospects.length) * 100).toFixed(0)}% del total` : "—"} />
+                <KpiCard label="Tasa de Conversión" value={`${conversionRate}%`} icon={TrendingUp} color="bg-emerald-500" subtitle={`${totalConvertidos} convertidos`} />
               </>
             )}
           </div>

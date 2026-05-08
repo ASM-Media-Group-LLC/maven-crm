@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Eye, Trash2, FileText, Clock, Loader, CheckCircle2, AlertTriangle, MessageSquare, XCircle, ImageIcon } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useCustomRequests, type CustomContentRequest } from "./useCustomRequests";
@@ -107,11 +107,11 @@ const PersonalizadosPage = () => {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-              <DashboardMetricCard label="Total Solicitudes" value={String(total)} icon={FileText} subtitle="Todas las solicitudes" color="primary" />
-              <DashboardMetricCard label="Pendientes" value={String(pendientes)} icon={Clock} subtitle="Por gestionar" color="warning" />
-              <DashboardMetricCard label="En Progreso" value={String(enProgreso)} icon={Loader} subtitle="En proceso" color="accent" />
-              <DashboardMetricCard label="Completadas" value={String(completadas)} icon={CheckCircle2} subtitle="Finalizadas" color="success" />
-              <DashboardMetricCard label="Alertas Críticas" value={String(alertas)} icon={AlertTriangle} subtitle={alertas > 0 ? "Solicitudes vencidas" : "Sin alertas"} color="destructive" />
+              <KpiCard label="Total Solicitudes" value={String(total)} icon={FileText} color="bg-blue-500" subtitle="Todas las solicitudes" onClick={() => setStatusFilter("all")} />
+              <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-amber-500" subtitle="Por gestionar" onClick={() => setStatusFilter("pendiente")} />
+              <KpiCard label="En Progreso" value={String(enProgreso)} icon={Loader} color="bg-violet-500" subtitle="En proceso" onClick={() => setStatusFilter("en_progreso")} />
+              <KpiCard label="Completadas" value={String(completadas)} icon={CheckCircle2} color="bg-emerald-500" subtitle="Finalizadas" onClick={() => setStatusFilter("completada")} />
+              <KpiCard label="Alertas Críticas" value={String(alertas)} icon={AlertTriangle} color="bg-rose-500" subtitle={alertas > 0 ? "Solicitudes vencidas" : "Sin alertas"} />
             </div>
 
             <div className="flex flex-wrap gap-3">

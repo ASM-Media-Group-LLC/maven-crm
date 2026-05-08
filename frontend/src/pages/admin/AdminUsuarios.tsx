@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, LayoutGrid, List, Shield, UserCog, Users, User, Plus, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
 import { useAdminUsers, type AdminUser } from "./useAdminUsers";
 import UsersTable from "./UsersTable";
 import UsersGrid from "./UsersGrid";
@@ -74,10 +74,10 @@ const AdminUsuarios = () => {
   };
 
   const kpis = [
-    { label: "Total", value: String(stats.total), icon: Users, color: "primary" as const },
-    { label: "Admins", value: String(stats.admins), icon: Shield, color: "destructive" as const },
-    { label: "Managers", value: String(stats.managers), icon: UserCog, color: "warning" as const },
-    { label: "Employees", value: String(stats.employees), icon: User, color: "accent" as const },
+    { label: "Total", value: String(stats.total), icon: Users, color: "bg-blue-500" },
+    { label: "Admins", value: String(stats.admins), icon: Shield, color: "bg-rose-500" },
+    { label: "Managers", value: String(stats.managers), icon: UserCog, color: "bg-amber-500" },
+    { label: "Employees", value: String(stats.employees), icon: User, color: "bg-violet-500" },
   ];
 
   const tabs = [
@@ -118,16 +118,10 @@ const AdminUsuarios = () => {
 
             {/* Scrollable Area */}
             <div className="flex-1 overflow-auto p-6 space-y-6">
-              {/* KPIs */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* KPIs — estáticas (la tabla detallada vive abajo) */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {kpis.map((kpi) => (
-                  <DashboardMetricCard
-                    key={kpi.label}
-                    label={kpi.label}
-                    value={kpi.value}
-                    icon={kpi.icon}
-                    color={kpi.color}
-                  />
+                  <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} icon={kpi.icon} color={kpi.color} />
                 ))}
               </div>
 

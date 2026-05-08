@@ -5,7 +5,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
 import OnboardingTable from "./OnboardingTable";
 import OnboardingGrid from "./OnboardingGrid";
 import { useOnboarding, calculateCurrentStep, type OnboardingCreator } from "./useOnboarding";
@@ -60,10 +60,10 @@ const OnboardingContent = () => {
   };
 
   const kpiCards = [
-    { label: "Total", value: total, icon: Users, filter: "Todas", color: "muted" as const },
-    { label: "Pendientes", value: pending, icon: Clock, filter: "Pendientes", color: "warning" as const },
-    { label: "En Progreso", value: inProgress, icon: Loader2, filter: "En Progreso", color: "primary" as const },
-    { label: "Completados", value: completed, icon: CheckCircle2, filter: "Completados", color: "success" as const },
+    { label: "Total", value: total, icon: Users, filter: "Todas", color: "bg-blue-500" },
+    { label: "Pendientes", value: pending, icon: Clock, filter: "Pendientes", color: "bg-amber-500" },
+    { label: "En Progreso", value: inProgress, icon: Loader2, filter: "En Progreso", color: "bg-violet-500" },
+    { label: "Completados", value: completed, icon: CheckCircle2, filter: "Completados", color: "bg-emerald-500" },
   ];
 
   const handleCardClick = (creator: OnboardingCreator) => {
@@ -104,17 +104,18 @@ const OnboardingContent = () => {
       <div className="flex-1 overflow-auto px-6 pb-6 space-y-4">
         <CreadoresSubtabs />
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
+        {/* KPI Cards — click filtra la lista (no abre modal porque la lista vive abajo) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">
           {kpiCards.map((kpi) => (
-            <div key={kpi.label} onClick={() => setStatusFilter(kpi.filter)} className="cursor-pointer">
-              <DashboardMetricCard
-                label={kpi.label}
-                value={String(kpi.value)}
-                icon={kpi.icon}
-                color={kpi.color}
-              />
-            </div>
+            <KpiCard
+              key={kpi.label}
+              label={kpi.label}
+              value={String(kpi.value)}
+              icon={kpi.icon}
+              color={kpi.color}
+              onClick={() => setStatusFilter(kpi.filter)}
+              className={statusFilter === kpi.filter ? "ring-2 ring-primary" : undefined}
+            />
           ))}
         </div>
 

@@ -19,7 +19,7 @@ import {
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import KpiCard from "@/components/dashboard/KpiCard";
 import { generateReport, exportTableToExcel } from "./generateReport";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
@@ -293,9 +293,9 @@ export default function ReportesPage() {
       case "Por Método de Pago":
         return (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {methodEntries.map(([method, data]) => (
-                <DashboardMetricCard key={method} label={method} value={fmt(data.total)} icon={FileText} subtitle={`${data.count} invoices`} color="primary" />
+                <KpiCard key={method} label={method} value={fmt(data.total)} icon={FileText} color="bg-blue-500" subtitle={`${data.count} invoices`} />
               ))}
             </div>
             {viewMode === "list" ? (
