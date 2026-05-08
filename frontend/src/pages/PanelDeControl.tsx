@@ -1,17 +1,5 @@
-import { useState, useMemo } from "react";
-import {
-  startOfMonth,
-  endOfMonth,
-  startOfYear,
-  endOfYear,
-  startOfDay,
-  endOfDay,
-  startOfWeek,
-  endOfWeek,
-  subDays,
-  subMonths,
-  format,
-} from "date-fns";
+import { useState } from "react";
+import { startOfMonth, endOfMonth, startOfDay, format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   Users,
@@ -22,10 +10,8 @@ import {
   XCircle,
   Building2,
   TrendingUp,
-  CalendarIcon,
   ArrowRight,
 } from "lucide-react";
-import { DayPicker, type DateRange } from "react-day-picker";
 import { useNavigate } from "react-router-dom";
 import {
   BarChart,
@@ -38,8 +24,6 @@ import {
 } from "recharts";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import {
   useOperationsDashboard,
   useMetricDetails,
@@ -57,206 +42,6 @@ import {
   type DetailRow,
 } from "@/hooks/useOperationsDashboard";
 import { cn } from "@/lib/utils";
-
-// ─── Date range picker custom — inline en el dashboard ─────────────────
-// Réplica del estilo del screenshot: presets a la izquierda, calendario
-// a la derecha. Los meses son los ÚLTIMOS 6 calculados al render — no
-// hardcoded — para que en junio 2026 muestre Jun, May, Apr, Mar, Feb,
-// Jan en lugar de los meses fijos.
-
-interface Preset {
-  key: string;
-  label: string;
-  range: () => DashboardRange;
-}
-
-function buildPresets(): Preset[] {
-  const today = startOfDay(new Date());
-  const baseLine: Preset[] = [
-    {
-      key: "last7",
-      label: "Últimos 7 días",
-      range: () => ({ from: subDays(today, 6), to: endOfDay(today) }),
-    },
-    {
-      key: "last30",
-      label: "Últimos 30 días",
-      range: () => ({ from: subDays(today, 29), to: endOfDay(today) }),
-    },
-    {
-      key: "last90",
-      label: "Últimos 90 días",
-      range: () => ({ from: subDays(today, 89), to: endOfDay(today) }),
-    },
-    {
-      key: "last365",
-      label: "Últimos 365 días",
-      range: () => ({ from: subDays(today, 364), to: endOfDay(today) }),
-    },
-    {
-      key: "thisYear",
-      label: format(today, "yyyy"),
-      range: () => ({ from: startOfYear(today), to: endOfYear(today) }),
-    },
-  ];
-
-  // Últimos 6 meses dinámicos: el actual + 5 anteriores.
-  const months: Preset[] = Array.from({ length: 6 }, (_, i) => {
-    const d = subMonths(today, i);
-    return {
-      key: `month-${format(d, "yyyy-MM")}`,
-      label: format(d, "MMMM", { locale: es }).replace(/^\w/, (c) =>
-        c.toUpperCase(),
-      ),
-      range: () => ({ from: startOfMonth(d), to: endOfMonth(d) }),
-    };
-  });
-
-  return [...baseLine, ...months];
-}
-
-const DateRangeButton = ({
-  range,
-  onChange,
-}: {
-  range: DashboardRange;
-  onChange: (r: DashboardRange) => void;
-}) => {
-  const [open, setOpen] = useState(false);
-  const presets = useMemo(buildPresets, []);
-  const [activePreset, setActivePreset] = useState<string>("month-current");
-  const [draftRange, setDraftRange] = useState<DateRange | undefined>(
-    range.from && range.to ? { from: range.from, to: range.to } : undefined,
-  );
-
-  const label = useMemo(() => {
-    if (range.from && range.to) {
-      return `${format(range.from, "d MMM yyyy", { locale: es })} → ${format(
-        range.to,
-        "d MMM yyyy",
-        { locale: es },
-      )}`;
-    }
-    return "Seleccionar fechas";
-  }, [range]);
-
-  const apply = (r: DashboardRange, presetKey: string) => {
-    setActivePreset(presetKey);
-    setDraftRange(r.from && r.to ? { from: r.from, to: r.to } : undefined);
-    onChange(r);
-  };
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" className="gap-2 font-medium">
-          <CalendarIcon className="h-4 w-4" />
-          {label}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[680px] p-0" align="end">
-        <div className="flex">
-          {/* Presets column */}
-          <div className="w-[180px] border-r border-border p-2 space-y-1">
-            <button
-              type="button"
-              onClick={() => setActivePreset("custom")}
-              className={cn(
-                "w-full px-3 py-1.5 rounded-md text-sm text-left transition-colors",
-                activePreset === "custom"
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted",
-              )}
-            >
-              Custom
-            </button>
-            {presets.slice(0, 5).map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => apply(p.range(), p.key)}
-                className={cn(
-                  "w-full px-3 py-1.5 rounded-md text-sm text-left transition-colors",
-                  activePreset === p.key
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted",
-                )}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Months column (last 6, dynamic) */}
-          <div className="w-[140px] border-r border-border p-2 space-y-1">
-            {presets.slice(5).map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => apply(p.range(), p.key)}
-                className={cn(
-                  "w-full px-3 py-1.5 rounded-md text-sm text-left transition-colors",
-                  activePreset === p.key
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted",
-                )}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Calendar — hover ilumina números, rango se destaca con
-              fondo, día seleccionado en primary. */}
-          <div className="flex-1 p-3">
-            <DayPicker
-              mode="range"
-              numberOfMonths={2}
-              selected={draftRange}
-              locale={es}
-              onSelect={(r) => {
-                setDraftRange(r);
-                if (r?.from && r?.to) {
-                  apply({ from: startOfDay(r.from), to: endOfDay(r.to) }, "custom");
-                }
-              }}
-              className="text-sm"
-              classNames={{
-                months: "flex gap-4",
-                month: "space-y-2",
-                caption: "flex justify-center relative items-center pb-1",
-                caption_label: "text-sm font-semibold capitalize",
-                nav: "flex items-center gap-1",
-                nav_button:
-                  "h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
-                nav_button_previous: "absolute left-1",
-                nav_button_next: "absolute right-1",
-                table: "w-full border-collapse",
-                head_row: "flex",
-                head_cell:
-                  "w-9 h-9 text-muted-foreground font-normal text-[0.7rem]",
-                row: "flex w-full mt-1",
-                cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected])]:bg-primary/10 first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-                day: "h-9 w-9 inline-flex items-center justify-center rounded-md transition-all duration-150 hover:bg-primary/30 hover:text-foreground hover:scale-110 hover:font-semibold cursor-pointer",
-                day_selected:
-                  "!bg-primary !text-primary-foreground font-bold shadow-md hover:!bg-primary/90 hover:!scale-100",
-                day_today:
-                  "border border-primary/40 font-semibold",
-                day_outside: "text-muted-foreground/40",
-                day_disabled: "text-muted-foreground/30 cursor-not-allowed",
-                day_range_middle:
-                  "!bg-primary/20 !text-foreground !rounded-none hover:!bg-primary/35",
-                day_range_start: "!rounded-l-md !bg-primary !text-primary-foreground",
-                day_range_end: "!rounded-r-md !bg-primary !text-primary-foreground",
-                day_hidden: "invisible",
-              }}
-            />
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-};
 
 // ─── KPI card ──────────────────────────────────────────────────────────
 
@@ -635,7 +420,7 @@ const PanelDeControl = () => {
       value: k.numbersObtained,
       icon: <Phone className="h-5 w-5 text-white" />,
       gradient: "bg-cyan-500",
-      hint: `LLG: ${k.llgWithPhone.toLocaleString("es")} · Scouter: ${k.scouterWithPhone.toLocaleString("es")}`,
+      hint: "Capturas únicas (leadgen + closer + creator) sin duplicados",
     },
     {
       key: "closerCalls",
@@ -700,7 +485,12 @@ const PanelDeControl = () => {
             Funnel operativo en tiempo real — desde el contacto LLG hasta ingresos al CRM.
           </p>
         </div>
-        <DateRangeButton range={range} onChange={setRange} />
+        <DateRangePicker
+          from={range.from}
+          to={range.to}
+          onApply={(from, to) => setRange({ from, to })}
+          placeholder="Seleccionar fechas"
+        />
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "modelos" | "chatters")}>

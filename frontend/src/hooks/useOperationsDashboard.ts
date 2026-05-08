@@ -6,7 +6,11 @@ const sb = supabase as unknown as { from: (table: string) => any };
 export interface OperationsKpis {
   // LLG team contactó (solo `leadgen_entries`).
   contacted: number;
-  // Scouter team encontró (solo `scouter_leads`).
+  // Scouter team CONTACTÓ — un spammer completó una task 'comment' con
+  // screenshot. Filtramos por `first_scouter_contact_at` (seteado por
+  // trigger). El simple hecho de que la lead exista en `scouter_leads`
+  // NO cuenta como contactada — esos son leads descubiertos, pool de
+  // prospección.
   scouterContacts: number;
   // LLG con teléfono capturado.
   llgWithPhone: number;
@@ -60,17 +64,15 @@ export const useOperationsDashboard = (range: DashboardRange) =>
         return q;
       };
 
-      // "Números obtenidos" = primera captura de teléfono dentro del
-      // rango. Filtramos por `phone_first_set_at` (seteado por trigger
-      // sólo en la transición NULL→no-NULL, jamás sobrescrito) en lugar
-      // de `created_at` + phone IS NOT NULL — eso conflaciona la
-      // creación del lead con la captura del número y cuenta de más
-      // cuando se edita o se borra-y-reagrega el teléfono.
+      // "Números obtenidos" — leemos de la view consolidada
+      // `v_model_phone_captures` que UNIONa las 5 tablas con teléfono y
+      // dedupea por (handle, phone). Una sola modelo aparecida en
+      // varias etapas se cuenta UNA vez. captured_at es la primera
+      // captura cross-team.
       const [
         { count: contacted },
-        { count: leadgenWithPhone },
         { count: scouterTotal },
-        { count: scouterWithPhone },
+        { count: numbersObtainedCount },
         { count: closerCalls },
         { count: closes },
         { count: onHold },
@@ -78,13 +80,13 @@ export const useOperationsDashboard = (range: DashboardRange) =>
         { count: enteredCrm },
       ] = await Promise.all([
         head("leadgen_entries", "created_at"),
-        head("leadgen_entries", "phone_first_set_at", (q) =>
-          q.not("phone_first_set_at", "is", null),
+        // Scouter "contactadas" = lead con first_scouter_contact_at
+        // poblado (=spammer hizo comment con screenshot). Pool de leads
+        // descubiertos pero no contactadas no entra al funnel.
+        head("scouter_leads",   "first_scouter_contact_at", (q) =>
+          q.not("first_scouter_contact_at", "is", null),
         ),
-        head("scouter_leads",   "created_at"),
-        head("scouter_leads",   "phone_first_set_at", (q) =>
-          q.not("phone_first_set_at", "is", null),
-        ),
+        head("v_model_phone_captures", "captured_at"),
         head("qa_calls", "call_date"),
         head("qa_calls", "call_date", (q) =>
           q.eq("claude_analysis->>call_outcome", "cerro"),
@@ -103,9 +105,12 @@ export const useOperationsDashboard = (range: DashboardRange) =>
       return {
         contacted: contacted ?? 0,
         scouterContacts: scouterTotal ?? 0,
-        llgWithPhone: leadgenWithPhone ?? 0,
-        scouterWithPhone: scouterWithPhone ?? 0,
-        numbersObtained: (leadgenWithPhone ?? 0) + (scouterWithPhone ?? 0),
+        // llgWithPhone / scouterWithPhone se mantienen por compat de la
+        // interfaz pero ya no se usan en el dashboard — la view dedupea
+        // todo. Los reportamos como 0 para simplicidad.
+        llgWithPhone: 0,
+        scouterWithPhone: 0,
+        numbersObtained: numbersObtainedCount ?? 0,
         closerCalls: closerCalls ?? 0,
         closes: closes ?? 0,
         onHold: onHold ?? 0,
@@ -170,8 +175,10 @@ export const useMetricDetails = (
           }));
         }
         case "totalLeads": {
-          // Combina leadgen + scouter — todos los leads del sistema
-          // (con o sin teléfono). 50 de cada tabla, mezclados por fecha.
+          // Modelos contactadas — leadgen (cualquier fila) + scouter
+          // que tuvo al menos una task 'comment' con screenshot
+          // (filtrado por first_scouter_contact_at). El pool de leads
+          // descubiertos pero no contactadas NO aparece acá.
           const q1 = sb
             .from("leadgen_entries")
             .select("id, model_handle, phone_e164, status, created_at")
@@ -179,12 +186,13 @@ export const useMetricDetails = (
             .limit(50);
           const q2 = sb
             .from("scouter_leads")
-            .select("id, instagram_handle, phone, status, created_at")
-            .order("created_at", { ascending: false })
+            .select("id, instagram_handle, phone, status, first_scouter_contact_at")
+            .not("first_scouter_contact_at", "is", null)
+            .order("first_scouter_contact_at", { ascending: false })
             .limit(50);
           const [{ data: a }, { data: b }] = await Promise.all([
             dateLte(dateGte(q1, "created_at"), "created_at"),
-            dateLte(dateGte(q2, "created_at"), "created_at"),
+            dateLte(dateGte(q2, "first_scouter_contact_at"), "first_scouter_contact_at"),
           ]);
           const aRows = (a ?? []).map((r: any) => ({
             id: r.id,
@@ -198,7 +206,7 @@ export const useMetricDetails = (
             id: r.id,
             primary: `@${r.instagram_handle ?? "?"}`,
             secondary: r.phone ? `📞 ${r.phone}` : "Sin número",
-            date: r.created_at,
+            date: r.first_scouter_contact_at,
             badge: "scouter",
             leadSource: "scouter" as const,
           }));
@@ -208,43 +216,36 @@ export const useMetricDetails = (
         }
         case "numbersObtained": {
           // Listamos por phone_first_set_at (primera captura) — coincide
-          // con el conteo del KPI. La fecha mostrada es la captura del
-          // número, NO la creación del lead.
-          const q1 = sb
-            .from("leadgen_entries")
-            .select("id, model_handle, phone_e164, phone_first_set_at")
-            .not("phone_first_set_at", "is", null)
-            .order("phone_first_set_at", { ascending: false })
-            .limit(50);
-          const q2 = sb
-            .from("scouter_leads")
-            .select("id, instagram_handle, phone, phone_first_set_at")
-            .not("phone_first_set_at", "is", null)
-            .order("phone_first_set_at", { ascending: false })
-            .limit(50);
-          const [{ data: a }, { data: b }] = await Promise.all([
-            dateLte(dateGte(q1, "phone_first_set_at"), "phone_first_set_at"),
-            dateLte(dateGte(q2, "phone_first_set_at"), "phone_first_set_at"),
-          ]);
-          const aRows = (a ?? []).map((r: any) => ({
-            id: r.id,
-            primary: `@${r.model_handle ?? "?"}`,
-            secondary: `📞 ${r.phone_e164}`,
-            date: r.phone_first_set_at,
-            badge: "leadgen",
-            leadSource: "leadgen" as const,
-          }));
-          const bRows = (b ?? []).map((r: any) => ({
-            id: r.id,
-            primary: `@${r.instagram_handle ?? "?"}`,
-            secondary: `📞 ${r.phone}`,
-            date: r.phone_first_set_at,
-            badge: "scouter",
-            leadSource: "scouter" as const,
-          }));
-          return [...aRows, ...bRows].sort((x, y) =>
-            (y.date ?? "") < (x.date ?? "") ? -1 : 1,
+          // con el conteo del KPI. Leemos de la view consolidada — una
+          // entrada por (handle, phone), con fecha = primera captura
+          // cross-table. El badge muestra de qué tabla salió la captura
+          // ganadora del dedup.
+          const q = sb
+            .from("v_model_phone_captures")
+            .select("source_table, source_id, handle, phone, captured_at")
+            .order("captured_at", { ascending: false })
+            .limit(limit);
+          const { data, error } = await dateLte(
+            dateGte(q, "captured_at"),
+            "captured_at",
           );
+          if (error) throw error;
+          // El leadSource del dialog se infiere para los pocos casos
+          // donde el dialog puede abrir el detalle. Solo "leadgen",
+          // "scouter" y "creator" están soportados; el resto se omite.
+          const sourceMap: Record<string, "leadgen" | "scouter" | "creator" | undefined> = {
+            leadgen_entries: "leadgen",
+            scouter_leads: "scouter",
+            creators: "creator",
+          };
+          return (data ?? []).map((r: any) => ({
+            id: r.source_id,
+            primary: `@${r.handle || "?"}`,
+            secondary: `📞 ${r.phone}`,
+            date: r.captured_at,
+            badge: r.source_table,
+            leadSource: sourceMap[r.source_table],
+          }));
         }
         case "closerCalls":
         case "closes":
