@@ -726,55 +726,57 @@ const Dashboard2 = () => {
                     </div>
                   </div>
 
-                  {/* Revenue Mix — wide card (2/3 width) */}
-                  <div className="rounded-xl border border-border bg-card p-4 relative overflow-hidden lg:col-span-2">
+                  {/* Eficiencia de Monetización — wide card (2/3 width).
+                      Reemplaza al viejo Revenue Mix; barras gruesas con
+                      el % adentro y el monto al costado. */}
+                  <div className="rounded-xl border border-border bg-card p-5 relative overflow-hidden lg:col-span-2">
                     <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-25 bg-amber-500" />
-                    <div className="relative space-y-3">
+                    <div className="relative space-y-4">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500 shrink-0">
-                          <BarChart className="h-5 w-5 text-white" />
+                          <Zap className="h-5 w-5 text-white" />
                         </div>
                         <div>
-                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Revenue Mix</p>
-                          <p className="text-xs text-muted-foreground">Cómo se compone el ingreso del mes</p>
+                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Eficiencia de Monetización</p>
+                          <p className="text-xs text-muted-foreground">Revenue por canal del mes</p>
                         </div>
                       </div>
-                      <div className="flex h-3 w-full rounded-full overflow-hidden bg-muted">
-                        <div className="h-full bg-blue-500 transition-all" style={{ width: `${hlKpis.msgsPct}%` }} title={`Msgs ${hlKpis.msgsPct.toFixed(0)}%`} />
-                        <div className="h-full bg-rose-500 transition-all" style={{ width: `${hlKpis.tipsPct}%` }} title={`Tips ${hlKpis.tipsPct.toFixed(0)}%`} />
-                        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${hlKpis.subsPct}%` }} title={`Subs ${hlKpis.subsPct.toFixed(0)}%`} />
+                      <div className="space-y-2.5">
+                        {[
+                          { label: "Mensajería", value: hlKpis.totalMsgs, pct: hlKpis.msgsPct, color: "bg-blue-500" },
+                          { label: "Propinas", value: hlKpis.totalTips, pct: hlKpis.tipsPct, color: "bg-rose-500" },
+                          { label: "Suscripciones", value: hlKpis.totalSubs, pct: hlKpis.subsPct, color: "bg-emerald-500" },
+                        ].map((item) => (
+                          <div key={item.label} className="flex items-center gap-3">
+                            <span className="text-xs text-muted-foreground w-28 shrink-0 font-medium">{item.label}</span>
+                            <div className="flex-1 h-7 rounded-md bg-muted/60 overflow-hidden relative">
+                              <div
+                                className={`h-full ${item.color} transition-all flex items-center justify-end pr-2`}
+                                style={{ width: `${Math.max(item.pct, 6)}%` }}
+                              >
+                                <span className="text-[11px] font-bold text-white tabular-nums drop-shadow-sm">
+                                  {item.pct.toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-sm font-bold tabular-nums w-20 text-right">{fmtK(item.value)}</span>
+                          </div>
+                        ))}
                       </div>
-                      <div className="grid grid-cols-3 gap-3 text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-blue-500 inline-block" />
-                          <div>
-                            <span className="font-semibold tabular-nums">{hlKpis.msgsPct.toFixed(1)}%</span>
-                            <span className="text-muted-foreground ml-1">Mensajería</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-rose-500 inline-block" />
-                          <div>
-                            <span className="font-semibold tabular-nums">{hlKpis.tipsPct.toFixed(1)}%</span>
-                            <span className="text-muted-foreground ml-1">Propinas</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
-                          <div>
-                            <span className="font-semibold tabular-nums">{hlKpis.subsPct.toFixed(1)}%</span>
-                            <span className="text-muted-foreground ml-1">Suscripciones</span>
-                          </div>
-                        </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-border text-[11px] text-muted-foreground">
+                        <span>Nuevas subs: <span className="font-semibold text-foreground tabular-nums">{hlKpis.totalNewSubs.toLocaleString()}</span></span>
+                        <span>Recurrentes: <span className="font-semibold text-foreground tabular-nums">{hlKpis.totalRecurring.toLocaleString()}</span></span>
                       </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* ══════ STRATEGIC INSIGHTS ══════ */}
+              {/* ══════ STRATEGIC INSIGHTS — 2 cards (Concentración +
+                  Velocidad) ahora que Eficiencia se movió arriba al
+                  KPI strip. Cada card ocupa la mitad del row. ══════ */}
               {!isLoading && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Revenue Concentration */}
                   <div className="rounded-xl border border-border bg-card p-4 space-y-3">
                     <div className="flex items-center gap-2">
@@ -839,38 +841,6 @@ const Dashboard2 = () => {
                     </div>
                   </div>
 
-                  {/* Monetization Efficiency */}
-                  <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-7 w-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                        <Zap className="h-3.5 w-3.5 text-amber-500" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-foreground">Eficiencia de Monetización</p>
-                        <p className="text-[10px] text-muted-foreground">Revenue por canal</p>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      {[
-                        { label: "Mensajería", value: hlKpis.totalMsgs, pct: hlKpis.msgsPct, color: "bg-blue-500" },
-                        { label: "Tips", value: hlKpis.totalTips, pct: hlKpis.tipsPct, color: "bg-rose-500" },
-                        { label: "Suscripciones", value: hlKpis.totalSubs, pct: hlKpis.subsPct, color: "bg-emerald-500" },
-                      ].map((item) => (
-                        <div key={item.label} className="flex items-center gap-2">
-                          <span className="text-[10px] text-muted-foreground w-20 shrink-0">{item.label}</span>
-                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div className={`h-full rounded-full ${item.color}`} style={{ width: `${item.pct}%` }} />
-                          </div>
-                          <span className="text-[10px] font-semibold tabular-nums w-12 text-right">{fmtK(item.value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2 pt-1 border-t border-border">
-                      <span className="text-[10px] text-muted-foreground">
-                        Nuevas subs: {hlKpis.totalNewSubs.toLocaleString()} · Recurrentes: {hlKpis.totalRecurring.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -962,23 +932,23 @@ const Dashboard2 = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4 text-accent-foreground" />
-                      <h2 className="text-sm font-bold text-foreground">
+                      <Target className="h-5 w-5 text-primary" />
+                      <h2 className="text-xl font-semibold text-foreground">
                         Proyección {format(new Date(), "MMMM yyyy", { locale: es }).replace(/^\w/, (c) => c.toUpperCase())}
                       </h2>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">Proyección bruto</p>
-                      <p className="text-lg font-bold tabular-nums">{fmt(projectionTotal)}</p>
+                      <p className="text-2xl font-bold tabular-nums">{fmt(projectionTotal)}</p>
                     </div>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Basado en {new Date().getDate() - 1} días. Fórmula: (acumulado / días) × días del mes.
                   </p>
                   {projection.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Sin datos del mes actual.</p>
                   ) : (
-                    <div className="rounded-lg border border-border bg-card overflow-auto max-h-[300px]">
+                    <div className="rounded-lg border border-border bg-card overflow-x-auto">
                       <Table>
                         <TableHeader className="sticky top-0 z-10 bg-card">
                           <TableRow>
@@ -1051,7 +1021,7 @@ const Dashboard2 = () => {
                   {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
                 </div>
               ) : (
-                <div className="rounded-lg border border-border bg-card overflow-auto">
+                <div className="rounded-lg border border-border bg-card overflow-x-auto">
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-card">
                       <TableRow>
