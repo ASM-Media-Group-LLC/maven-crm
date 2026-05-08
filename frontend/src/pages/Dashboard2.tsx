@@ -749,21 +749,21 @@ const Dashboard2 = () => {
                           <span className="h-2 w-2 rounded-full bg-blue-500 inline-block" />
                           <div>
                             <span className="font-semibold tabular-nums">{hlKpis.msgsPct.toFixed(1)}%</span>
-                            <span className="text-muted-foreground ml-1">Msgs</span>
+                            <span className="text-muted-foreground ml-1">Mensajería</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="h-2 w-2 rounded-full bg-rose-500 inline-block" />
                           <div>
                             <span className="font-semibold tabular-nums">{hlKpis.tipsPct.toFixed(1)}%</span>
-                            <span className="text-muted-foreground ml-1">Tips</span>
+                            <span className="text-muted-foreground ml-1">Propinas</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
                           <div>
                             <span className="font-semibold tabular-nums">{hlKpis.subsPct.toFixed(1)}%</span>
-                            <span className="text-muted-foreground ml-1">Subs</span>
+                            <span className="text-muted-foreground ml-1">Suscripciones</span>
                           </div>
                         </div>
                       </div>
