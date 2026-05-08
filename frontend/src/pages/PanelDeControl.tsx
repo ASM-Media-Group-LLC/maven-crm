@@ -489,7 +489,10 @@ const PanelDeControl = () => {
   const [tab, setTab] = useState<"modelos" | "chatters">("modelos");
 
   return (
-    <div className="space-y-5 p-6">
+    // El layout app envuelve cada page en un wrapper con overflow-hidden.
+    // Sin overflow-y-auto acá adentro, el contenido se recorta y la
+    // página no scrollea. `flex-1` toma toda la altura disponible.
+    <main className="flex-1 overflow-y-auto p-6 space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Panel de control</h1>
@@ -700,7 +703,7 @@ const PanelDeControl = () => {
       />
         </TabsContent>
       </Tabs>
-    </div>
+    </main>
   );
 };
 
