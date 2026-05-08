@@ -101,7 +101,12 @@ const SalesDashboard = () => {
   }, [filteredRows, comparedRows, rowsToCsv]);
 
   return (
-    <>
+    <main className="flex flex-1 flex-col overflow-hidden">
+      {/* Topbar fijo con VentasSubtabs — misma posición en todas las
+          tabs de Ventas para que cambiar no genere salto visual. */}
+      <div className="border-b border-border bg-background px-6 py-3 shrink-0">
+        <VentasSubtabs />
+      </div>
       <div className="shrink-0 flex items-center justify-between border-b border-border bg-background px-6 pt-6 pb-4">
             <div>
               <h1 className="text-2xl font-bold text-foreground">Reporte de Ventas</h1>
@@ -112,8 +117,7 @@ const SalesDashboard = () => {
               Exportar CSV
             </Button>
           </div>
-          <main className="flex-1 overflow-auto p-6 space-y-8">
-            <VentasSubtabs />
+          <div className="flex-1 overflow-auto p-6 space-y-8">
             <DashboardFilters
               activeView={activeView}
               onViewChange={setActiveView}
@@ -143,8 +147,8 @@ const SalesDashboard = () => {
             ) : (
               <CreatorPerformanceView rows={filteredRows} earningsMode={earningsMode} />
             )}
-          </main>
-    </>
+          </div>
+    </main>
   );
 };
 

@@ -22,8 +22,11 @@ const SalesAudit = () => {
   }, [handleFile]);
 
   return (
-    <main className="flex-1 p-4 md:p-6 space-y-6 overflow-auto">
-            <VentasSubtabs />
+    <main className="flex flex-1 flex-col overflow-hidden">
+      <div className="border-b border-border bg-background px-6 py-3 shrink-0">
+        <VentasSubtabs />
+      </div>
+      <div className="flex-1 p-4 md:p-6 space-y-6 overflow-auto">
             <div>
               <h1 className="text-2xl font-bold">Auditoría de Ventas</h1>
               <p className="text-sm text-muted-foreground mt-1">
@@ -88,6 +91,7 @@ const SalesAudit = () => {
                 <AuditHistory />
               </TabsContent>
             </Tabs>
+      </div>
     </main>
   );
 };

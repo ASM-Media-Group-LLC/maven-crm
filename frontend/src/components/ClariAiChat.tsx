@@ -360,18 +360,54 @@ const ClariAiChat = ({
   const canChat = isPanel || !!conversationId || !!onAutoCreate;
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background min-h-0">
       {/* Chat wallpaper area */}
-      <div className="flex-1 overflow-y-auto px-3 py-5" ref={scrollRef}>
-        <div className={`space-y-3 ${isPanel ? "" : "mx-auto max-w-3xl"}`}>
+      <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0" ref={scrollRef}>
+        <div className="space-y-3">
           {localMessages.map((m, i) => {
             const isUser = m.role === "user";
+            // Estilo Chat with Mike: bubbles rounded-2xl simples sin
+            // tail-notch, label de rol en color brand para el assistant.
+            // Panel mode (FAB) mantiene el estilo viejo.
+            if (!isPanel) {
+              return (
+                <div
+                  key={i}
+                  className={`flex gap-2 ${isUser ? "flex-row-reverse items-end" : "flex-row items-end"}`}
+                >
+                  {!isUser && <ClariBubbleAvatar size={28} />}
+                  <div className={`flex max-w-[80%] flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
+                    <div
+                      className={`rounded-2xl px-3 py-2 text-sm ${
+                        isUser
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-border/60 bg-muted/30"
+                      }`}
+                    >
+                      {!isUser && (
+                        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-violet-500">
+                          Clari
+                        </div>
+                      )}
+                      {m.role === "assistant" ? (
+                        <div className="ai-chat-content">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // Panel mode (FAB) — preserva el estilo original con tail-notch.
             return (
               <div
                 key={i}
                 className={`flex items-end gap-2 ${isUser ? "flex-row-reverse" : ""}`}
               >
-                {/* Avatar */}
                 {isUser ? (
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
                     <User className="h-4 w-4" />
@@ -379,23 +415,19 @@ const ClariAiChat = ({
                 ) : (
                   <ClariBubbleAvatar size={32} />
                 )}
-
-                {/* Bubble */}
                 <div
-                  className={`relative max-w-[85%] shadow-sm ${
+                  className={`relative max-w-[85%] shadow-sm px-3 py-2.5 ${
                     isUser
                       ? "bg-primary text-primary-foreground rounded-2xl rounded-br-md"
                       : "bg-card text-card-foreground border border-border/50 rounded-2xl rounded-bl-md"
-                  } ${isPanel ? "px-3 py-2.5" : "px-4 py-3"}`}
+                  }`}
                 >
-                  {/* Tail notch */}
                   {!isUser && (
                     <div className="absolute -left-1.5 bottom-1 w-3 h-3 bg-card border-l border-b border-border/50 rotate-45" />
                   )}
                   {isUser && (
                     <div className="absolute -right-1.5 bottom-1 w-3 h-3 bg-primary rotate-45" />
                   )}
-
                   {m.role === "assistant" ? (
                     <div className="ai-chat-content relative z-10">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
@@ -410,23 +442,35 @@ const ClariAiChat = ({
 
           {/* Typing indicator */}
           {isLoading && localMessages[localMessages.length - 1]?.role === "user" && (
-            <div className="flex items-end gap-2">
-              <ClariBubbleAvatar size={32} />
-              <div className="flex items-center gap-2 bg-card border border-border/50 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
-                <div className="flex gap-1">
-                  <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]" />
-                  <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.15s]" />
-                  <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" />
+            isPanel ? (
+              <div className="flex items-end gap-2">
+                <ClariBubbleAvatar size={32} />
+                <div className="flex items-center gap-2 bg-card border border-border/50 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+                  <div className="flex gap-1">
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]" />
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.15s]" />
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" />
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-end gap-2">
+                <ClariBubbleAvatar size={28} />
+                <div className="max-w-[80%] rounded-2xl border border-dashed border-violet-500/40 bg-violet-500/10 px-3 py-2 text-sm">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-violet-500">
+                    <Bot className="h-3 w-3 animate-pulse" />
+                    Clari escribiendo…
+                  </div>
+                </div>
+              </div>
+            )
           )}
         </div>
       </div>
 
       {/* Input bar */}
       <div className="border-t border-border bg-card/80 backdrop-blur-sm p-3">
-        <div className={`flex items-end gap-2 ${isPanel ? "" : "mx-auto max-w-3xl"}`}>
+        <div className="flex items-end gap-2">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}

@@ -72,7 +72,13 @@ const SalesOverview = () => {
   };
 
   return (
-    <>
+    <main className="flex flex-1 flex-col overflow-hidden">
+      {/* Topbar fijo con VentasSubtabs — misma posición en /sales-overview,
+          /salesdashboard, /aisales y /sales-audit para que cambiar de tab
+          no genere salto visual. */}
+      <div className="border-b border-border bg-background px-6 py-3 shrink-0">
+        <VentasSubtabs />
+      </div>
       {!isLoading && (
             <div className="shrink-0 px-6 pt-6 pb-4 border-b bg-background">
               <SalesOverviewHeader
@@ -85,8 +91,7 @@ const SalesOverview = () => {
               />
             </div>
            )}
-           <main className="flex-1 overflow-auto p-6 space-y-6">
-            <VentasSubtabs />
+           <div className="flex-1 overflow-auto p-6 space-y-6">
             {isLoading ? (
               <div className="p-8 text-center text-sm text-muted-foreground">Cargando datos…</div>
             ) : (
@@ -110,8 +115,8 @@ const SalesOverview = () => {
                 />
               </>
             )}
-          </main>
-    </>
+          </div>
+    </main>
   );
 };
 

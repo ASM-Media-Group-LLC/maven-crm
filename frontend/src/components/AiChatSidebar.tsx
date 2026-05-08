@@ -87,7 +87,7 @@ export default function AiChatSidebar({
 
   return (
     <>
-      <div className="flex w-72 shrink-0 flex-col border-r border-border bg-background h-full">
+      <div className="flex w-full shrink-0 flex-col bg-background h-full min-w-0">
         {/* New Chat Button */}
         <div className="p-3 border-b border-border">
           <Button onClick={onCreate} className="w-full gap-2" size="sm">
