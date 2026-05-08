@@ -243,6 +243,27 @@ export const useMetricDetails = (
             "captured_at",
           );
           if (error) throw error;
+          // Para las filas que vinieron de closer_creators o
+          // closers_contacts, el `source_id` no apunta a creators —
+          // resolvemos el handle → creator.id buscando en `creators`
+          // case-insensitive (algunos handles están con mayúsculas, 3
+          // tienen prefix "@"). Si encontramos match, redirigimos el
+          // click al perfil del creator (ficha técnica). 273 rows no
+          // es nada para fetchear y nos evita complicar con .or().
+          const { data: creatorRows } = await sb
+            .from("creators")
+            .select("id, instagram_handle")
+            .not("instagram_handle", "is", null);
+          const creatorByHandle = new Map<string, string>();
+          for (const c of (creatorRows ?? []) as Array<{ id: string; instagram_handle: string }>) {
+            const norm = c.instagram_handle
+              .replace(/^@/, "")
+              .toLowerCase()
+              .trim();
+            if (norm && !creatorByHandle.has(norm)) {
+              creatorByHandle.set(norm, c.id);
+            }
+          }
           // El leadSource del dialog se infiere para los pocos casos
           // donde el dialog puede abrir el detalle. Solo "leadgen",
           // "scouter" y "creator" están soportados; el resto se omite.
@@ -251,14 +272,29 @@ export const useMetricDetails = (
             scouter_leads: "scouter",
             creators: "creator",
           };
-          return (data ?? []).map((r: any) => ({
-            id: r.source_id,
-            primary: `@${r.handle || "?"}`,
-            secondary: `📞 ${r.phone}`,
-            date: r.captured_at,
-            badge: r.source_table,
-            leadSource: sourceMap[r.source_table],
-          }));
+          return (data ?? []).map((r: any) => {
+            const handleNorm = (r.handle || "").toLowerCase().trim();
+            const matchedCreatorId = handleNorm
+              ? creatorByHandle.get(handleNorm)
+              : undefined;
+            // Si encontramos un creator con ese handle, redirigimos el
+            // click a su ficha técnica (creator profile). Si no, usamos
+            // el sourceMap original — leadgen/scouter/creators apuntan
+            // a sus tablas; closer_creators / closers_contacts sin
+            // matching creator quedan sin click (leadSource undefined).
+            const leadSource = matchedCreatorId
+              ? ("creator" as const)
+              : sourceMap[r.source_table];
+            const id = matchedCreatorId ?? r.source_id;
+            return {
+              id,
+              primary: `@${r.handle || "?"}`,
+              secondary: `📞 ${r.phone}`,
+              date: r.captured_at,
+              badge: r.source_table,
+              leadSource,
+            };
+          });
         }
         case "closerCalls":
         case "closes":
