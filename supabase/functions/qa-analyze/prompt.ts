@@ -14,6 +14,14 @@ CONTEXTO DEL NEGOCIO
 - El interlocutor en la llamada es la MODELO (o su representante), NO un fan. Esto NO es venta de contenido a usuarios — es venta de servicios de agencia a una creadora.
 - Producto sensible: se maneja contenido íntimo y la relación con sus fans pagos. Confianza, discreción y profesionalismo son críticos.
 
+PORTFOLIO DE PRODUCTOS / COMPAÑÍAS QUE EL CLOSER PUEDE OFRECER
+Maven opera un portfolio de productos y compañías relacionadas. La agencia de OF es la oferta central, pero hay otras compañías/servicios del grupo que pueden cubrir necesidades adyacentes de la modelo (protección de contenido, plataformas alternativas, servicios complementarios, etc.). El closer debe conocer este portfolio y, durante el discovery, escuchar señales que indiquen oportunidades de cross-fit.
+
+Compañías/productos disponibles en el portfolio:
+{{PRODUCT_PORTFOLIO}}
+
+NO se espera que el closer cierre múltiples productos en una sola llamada — la prioridad es la agencia de OF. Pero SÍ debe hacer preguntas de discovery que abran puertas a otras necesidades, y cuando detecte un fit claro debe mencionarlo o anotarlo como follow-up. Forzar venta cruzada agresiva es contraproducente y debe penalizarse.
+
 FRAMING CENTRAL — ESTO ES UNA VENTA HIGH TICKET, NO LOW TICKET
 La agencia se cierra como un producto HIGH TICKET: alto valor, personalizado, sofisticado, hecho a medida de cada modelo. No es un producto masivo, formal y automatizable (eso sería LOW TICKET — el error más común del equipo). Un cierre low-ticket tiene un discurso de venta prearmado, tono de telemarketer, misma llamada para todos; un cierre high-ticket es una conversación única donde el closer actúa como SOCIO ESTRATÉGICO de la modelo — no como proveedor, empleado, ni ejecutivo corporativo.
 Consecuencias prácticas que debes usar al puntuar toda la llamada:
@@ -38,6 +46,7 @@ RUBRIC DE EVALUACIÓN — puntúa cada dimensión 1-10
 9. Manejo de objeciones — Responde adecuadamente a: porcentaje de la agencia, miedo a perder control, desconfianza hacia el manejo de DMs, contratos, exclusividad, experiencias negativas previas.
 10. Cierre o siguiente paso claro — Pide la venta o propone un next step concreto (revisar contrato, kickoff, trial). Nada de "te llamo cuando quieras".
 11. Tono y registro — Habla con cercanía y picardía adaptada al mundo de OF: cómplice, relajado pero profesional, con malicia. Evita lenguaje corporativo, jerga B2B y formalidad excesiva. Adapta su energía a la de la modelo. Lidera sin sonar a vendedor de telemarketing.
+12. Discovery cross-portfolio — Hace preguntas que detectan si la modelo tiene necesidades cubiertas por OTROS productos del portfolio (ver lista arriba), más allá del management de OF. No hace falta que cierre cross-sell en la llamada — sí que abra el discovery a esas áreas adyacentes (protección de contenido, plataformas alternativas, etc.) y que cuando detecte fit lo mencione o lo deje como follow-up. Penaliza dos extremos: NO preguntar nada fuera de OF management (ceguera al portfolio), y forzar venta cruzada agresiva sin que haya señal de fit (over-selling). Si la modelo no muestra ninguna señal y el closer correctamente prioriza la agencia, puntúa neutro (60-70).
 
 RED FLAGS — penalizaciones fuertes, cítalos con texto literal del transcript
 
@@ -51,6 +60,8 @@ RED FLAGS — penalizaciones fuertes, cítalos con texto literal del transcript
 - muletillas_excesivas: Uso elevado y distractivo de muletillas ("eh", "este", "o sea", "como que", "tipo") que quita profesionalismo y delata inseguridad.
 - velocidad_inapropiada: Habla demasiado rápido (atropellando a la modelo, >200 wpm) o demasiado lento/dubitativo (<110 wpm).
 - monologo_excesivo: Un turno continuo del closer demasiado largo (>90s sin cederle la palabra).
+- ceguera_portfolio: Aparecen señales claras de necesidad de otro producto del portfolio (ver lista de compañías) y el closer las ignora — no pregunta, no anota como follow-up. La modelo terminó la llamada sin que se le haya abierto ninguna puerta más allá de OF management.
+- cross_sell_forzado: El closer empuja productos del portfolio sin señales de fit, distrayendo del cierre principal de OF management. Pitcheo agresivo de varios productos en la misma llamada.
 - otro: Otra conducta problemática no listada — explícala.
 
 FEEDBACK DEL SUPERVISOR (cuando aparezca)
@@ -86,7 +97,7 @@ Analiza el transcript (con el feedback humano si aparece) y devuelve EXCLUSIVAME
   },
   "dimensions": [
     {"name": "Apertura y cercanía", "score": <int 0-100>, "feedback": "<string: una línea>"},
-    ... 11 entradas en total, una por dimensión del rubric (escala 0-100)
+    ... 12 entradas en total, una por dimensión del rubric (escala 0-100)
   ],
   "red_flags": [{"type": "<uno de los enum>", "description": "<string>", "quote": "<string LITERAL del transcript>"}],
   "key_moments": [{"kind": "positivo" | "negativo", "quote": "<string LITERAL del transcript>", "why": "<string: una línea>"}],
@@ -100,7 +111,7 @@ REGLAS IMPORTANTES
 - Los \`improvements\` deben ser 3 acciones accionables para ESTE closer específico, no consejos genéricos de ventas.
 - Si el transcript parece incompleto o no es una llamada de ventas de agencia a modelo, indícalo en \`summary\` y puntúa solo lo evaluable.
 - El closer puede ser hombre o mujer; usa lenguaje neutro o adapta al género si es claro en el transcript.
-- Los \`dimensions\` deben tener exactamente 11 entradas con los nombres del rubric (Apertura y cercanía, Escucha activa, Regla 40/60, Discovery / diagnóstico objetivo, Identificación de palancas de crecimiento, Credibilidad como socio estratégico, Propuesta de valor personalizada, Confianza sobre contenido íntimo y relaciones con fans, Manejo de objeciones, Cierre o siguiente paso claro, Tono y registro).
+- Los \`dimensions\` deben tener exactamente 12 entradas con los nombres del rubric (Apertura y cercanía, Escucha activa, Regla 40/60, Discovery / diagnóstico objetivo, Identificación de palancas de crecimiento, Credibilidad como socio estratégico, Propuesta de valor personalizada, Confianza sobre contenido íntimo y relaciones con fans, Manejo de objeciones, Cierre o siguiente paso claro, Tono y registro, Discovery cross-portfolio).
 - DEVUELVE SOLO EL JSON. Nada antes, nada después. Sin \`\`\`json ni \`\`\`.
 
 CALL_OUTCOME — reglas finas

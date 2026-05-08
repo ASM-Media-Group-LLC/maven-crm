@@ -266,6 +266,22 @@ serve(async (req) => {
       feedbackBlock +
       `[TRANSCRIPT]\n${transcript}`;
 
+    // Inyectar dinámicamente el portfolio de productos en el system
+    // prompt. Si la query falla, usamos un placeholder que evita
+    // alucinaciones en lugar de exponer el {{}} crudo.
+    const { data: portfolioRows } = await supabase
+      .from("scouter_companies")
+      .select("name")
+      .order("name");
+    const portfolioList =
+      portfolioRows && portfolioRows.length > 0
+        ? portfolioRows.map((r: { name: string }) => `  • ${r.name}`).join("\n")
+        : "  • (no hay productos registrados; el closer debe seguir sólo con la agencia de OF)";
+    const systemPromptWithPortfolio = SYSTEM_PROMPT.replace(
+      "{{PRODUCT_PORTFOLIO}}",
+      portfolioList,
+    );
+
     // Call Claude via Anthropic Messages API
     let raw: string;
     let usage: unknown;
@@ -273,7 +289,7 @@ serve(async (req) => {
       const result = await callClaude(
         ANTHROPIC_API_KEY,
         CLAUDE_MODEL,
-        SYSTEM_PROMPT,
+        systemPromptWithPortfolio,
         userMessage,
       );
       raw = result.raw;
