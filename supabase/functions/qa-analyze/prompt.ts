@@ -46,7 +46,7 @@ RUBRIC DE EVALUACIÓN — puntúa cada dimensión 1-10
 9. Manejo de objeciones — Responde adecuadamente a: porcentaje de la agencia, miedo a perder control, desconfianza hacia el manejo de DMs, contratos, exclusividad, experiencias negativas previas.
 10. Cierre o siguiente paso claro — Pide la venta o propone un next step concreto (revisar contrato, kickoff, trial). Nada de "te llamo cuando quieras".
 11. Tono y registro — Habla con cercanía y picardía adaptada al mundo de OF: cómplice, relajado pero profesional, con malicia. Evita lenguaje corporativo, jerga B2B y formalidad excesiva. Adapta su energía a la de la modelo. Lidera sin sonar a vendedor de telemarketing.
-12. Discovery cross-portfolio — Hace preguntas que detectan si la modelo tiene necesidades cubiertas por OTROS productos del portfolio (ver lista arriba), más allá del management de OF. No hace falta que cierre cross-sell en la llamada — sí que abra el discovery a esas áreas adyacentes (protección de contenido, plataformas alternativas, etc.) y que cuando detecte fit lo mencione o lo deje como follow-up. Penaliza dos extremos: NO preguntar nada fuera de OF management (ceguera al portfolio), y forzar venta cruzada agresiva sin que haya señal de fit (over-selling). Si la modelo no muestra ninguna señal y el closer correctamente prioriza la agencia, puntúa neutro (60-70).
+12. Discovery cross-portfolio — Toda llamada debe tener AL MENOS UN INTENTO de cross-portfolio: o una pregunta de discovery dirigida a detectar necesidades adyacentes al management de OF (protección de contenido, plataformas alternativas, servicios complementarios), o una mención/oferta directa de otra compañía del portfolio aunque sea como argumento adicional sin pregunta previa. Si el closer NO hace nada cross-portfolio en toda la llamada (ni una pregunta, ni una mención), esta dimensión NO puede exceder 30/100 — es una falla estructural. Si pregunta pero no detecta señales y prioriza correctamente la agencia, 60-70. Si pregunta + detecta señal + abre puerta o deja follow-up, 80-100. Penaliza también el extremo opuesto: forzar venta cruzada agresiva sin señal de fit (over-selling) baja a 40-50.
 
 RED FLAGS — penalizaciones fuertes, cítalos con texto literal del transcript
 
@@ -61,6 +61,7 @@ RED FLAGS — penalizaciones fuertes, cítalos con texto literal del transcript
 - velocidad_inapropiada: Habla demasiado rápido (atropellando a la modelo, >200 wpm) o demasiado lento/dubitativo (<110 wpm).
 - monologo_excesivo: Un turno continuo del closer demasiado largo (>90s sin cederle la palabra).
 - ceguera_portfolio: Aparecen señales claras de necesidad de otro producto del portfolio (ver lista de compañías) y el closer las ignora — no pregunta, no anota como follow-up. La modelo terminó la llamada sin que se le haya abierto ninguna puerta más allá de OF management.
+- no_intento_cross_portfolio: El closer no hizo NINGÚN intento cross-portfolio en toda la llamada — ni una pregunta de discovery dirigida a otras compañías, ni una mención/oferta de otro producto del portfolio. Es una falla estructural y se dispara siempre que la llamada termina sin haber tocado el tema, INDEPENDIENTEMENTE de si la modelo dio señales o no. La regla del negocio es: cada call debería al menos sondear. Distinto de ceguera_portfolio (que requiere señales claras ignoradas).
 - cross_sell_forzado: El closer empuja productos del portfolio sin señales de fit, distrayendo del cierre principal de OF management. Pitcheo agresivo de varios productos en la misma llamada.
 - otro: Otra conducta problemática no listada — explícala.
 
@@ -123,14 +124,15 @@ CALL_OUTCOME — reglas finas
 CAP / FLOOR DE SCORE POR OUTCOME (regla dura, prevalece sobre el rubric)
 Lo único que importa al final es que la modelo CIERRE. Por bien hecho que esté el procedimiento, sin cierre el closer no entrega resultado.
 
-- Si \`call_outcome = "cerro"\` → APROBADO SEGURO. \`overall_score\` MÍNIMO 75 (floor) y sin techo. Aunque el rubric detecte fallas, si la modelo cerró el closer aprueba — el resultado manda. Puntúa según rubric pero no bajes de 75.
-- Si \`call_outcome = "en_espera"\` → \`overall_score\` NO puede exceder 55. "En espera" es prácticamente un NO con un poco de cortesía: "lo pienso", "te aviso", "consulto". Las probabilidades de cierre real desde ese estado son bajas. Aun con buen procedimiento, sin cierre vinculante el techo es 55/100.
-- Si \`call_outcome = "no_cerro"\` → \`overall_score\` NO puede exceder 50. Rechazo explícito: la propuesta o el manejo no convencieron; daño al pipeline.
+- Si \`call_outcome = "cerro"\` → APROBADO SEGURO. \`overall_score\` MÍNIMO 75 (floor) y sin techo. La nota sigue variando según rubric pero nunca baja de 75 — cerró, eso manda. Ej: rubric 50 → 75, rubric 80 → 80, rubric 95 → 95.
+- Si \`call_outcome = "en_espera"\` → \`overall_score\` NO puede exceder 45. "En espera" es prácticamente un NO con un poco de cortesía: "lo pienso", "te aviso", "consulto". Las probabilidades de cierre real desde ese estado son bajas. Aun con buen procedimiento, sin cierre vinculante el techo es 45/100. NO seas generoso con estas llamadas.
+- Si \`call_outcome = "no_cerro"\` → \`overall_score\` NO puede exceder 40. Rechazo explícito: la propuesta o el manejo no convencieron; daño al pipeline.
 
 - Aplicá el cap/floor DESPUÉS de calcular el score por rubric:
-  - Rubric da 85 + outcome "en_espera" → devolvés 55.
-  - Rubric da 60 + outcome "cerro" → devolvés 75.
-  - Rubric da 90 + outcome "cerro" → devolvés 90.
+  - Rubric da 85 + outcome "en_espera" → devolvés 45.
+  - Rubric da 70 + outcome "no_cerro"  → devolvés 40.
+  - Rubric da 60 + outcome "cerro"     → devolvés 75.
+  - Rubric da 90 + outcome "cerro"     → devolvés 90.
 
 INTEREST_LEVEL — modelo
 - alto: pide detalles concretos, comparte números, entusiasmo verbal.
