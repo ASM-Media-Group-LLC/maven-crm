@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Eye, Heart, Users, BarChart3, Wrench, Radar, Settings, ClipboardList, AlertTriangle } from "lucide-react";
+import { Eye, Heart, Users, BarChart3, Wrench, Radar, Settings, ClipboardList, AlertTriangle, Instagram } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import ScouterHome from "./ScouterHome";
 import ScouterLeads from "./ScouterLeads";
@@ -10,6 +10,7 @@ import ScouterDiscover from "./ScouterDiscover";
 import ScouterSettings from "./ScouterSettings";
 import MisTareas from "./MisTareas";
 import ScouterAlertas from "./ScouterAlertas";
+import ScouterCuentas from "./ScouterCuentas";
 
 // Scouter Assist landing — visual scaffold for the migration of the
 // `app/scouter/*` area from kash-call-qa into Maven. Each subtab is a
@@ -25,7 +26,7 @@ import ScouterAlertas from "./ScouterAlertas";
 // subtab is independently gateable as a submodule so admins can grant
 // e.g. "Funnel only" later.
 
-type SubKey = "home" | "busquedas" | "favoritas" | "leads" | "funnel" | "settings" | "mis-tareas" | "alertas";
+type SubKey = "home" | "busquedas" | "favoritas" | "leads" | "funnel" | "settings" | "mis-tareas" | "alertas" | "cuentas";
 
 interface SubDef {
   key: SubKey;
@@ -109,6 +110,15 @@ const SUBS: SubDef[] = [
       "Vista de manager con tareas pendientes acumuladas por spammer. Sirve para detectar quién deja tareas sin completar antes de que se rolleen al día siguiente.",
     source: "ScouterAlertas.tsx",
   },
+  {
+    key: "cuentas",
+    label: "Cuentas",
+    submodule: "Cuentas",
+    icon: Instagram,
+    whatsComing:
+      "Registro de cuentas de Instagram que los scouters/spammers usan personalmente para outreach. Sirve para auditar el roster y rotar las que se queman.",
+    source: "ScouterCuentas.tsx",
+  },
 ];
 
 const ScouterAssist = () => {
@@ -159,6 +169,8 @@ const ScouterAssist = () => {
                 <MisTareas />
               ) : s.key === "alertas" ? (
                 <ScouterAlertas />
+              ) : s.key === "cuentas" ? (
+                <ScouterCuentas />
               ) : (
                 <Card>
                   <CardContent className="space-y-3 p-6">
