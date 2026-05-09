@@ -662,6 +662,65 @@ export const useFetchIgAvatar = () => {
   });
 };
 
+// IG cross-module lookup — al ingresar el IG de la modelo en el form
+// de subida QA, llamamos a `qa-lookup-by-ig` para detectar si esa
+// modelo ya existe en otros módulos (scouter_leads, closer_creators,
+// creator_prospects, leadgen_entries, qa_models). Si hay matches, el
+// form muestra un Alert con la lista para que el closer sepa que
+// la modelo no es nueva en el sistema.
+
+export interface IgLookupMatch {
+  id: string;
+  label: string;
+  detail?: string | null;
+}
+
+export interface IgLookupResult {
+  normalized_handle: string | null;
+  matches: {
+    qa_models: IgLookupMatch[];
+    scouter_leads: IgLookupMatch[];
+    closer_creators: IgLookupMatch[];
+    creator_prospects: IgLookupMatch[];
+    leadgen_entries: IgLookupMatch[];
+  };
+  total: number;
+}
+
+/** Lookup cross-modular por handle de Instagram. Útil en el form de
+ *  subida QA: el closer pega el IG y el form le avisa si la modelo
+ *  ya existe en otros módulos. Debouncing lo maneja el caller — este
+ *  hook se basa en query-key para que React Query cachee resultados
+ *  por input idéntico. */
+export const useIgLookup = (instagramInput: string, opts?: { enabled?: boolean }) =>
+  useQuery({
+    queryKey: ["qa-ig-lookup", instagramInput.trim().toLowerCase()],
+    queryFn: async (): Promise<IgLookupResult> => {
+      const { data, error } = await supabase.functions.invoke("qa-lookup-by-ig", {
+        body: { instagram_input: instagramInput.trim() },
+      });
+      if (error) {
+        // Lookup es best-effort. Si falla devolvemos vacío en lugar de
+        // romper el flujo del form.
+        console.warn("qa-lookup-by-ig error:", error);
+        return {
+          normalized_handle: null,
+          matches: {
+            qa_models: [],
+            scouter_leads: [],
+            closer_creators: [],
+            creator_prospects: [],
+            leadgen_entries: [],
+          },
+          total: 0,
+        };
+      }
+      return data as IgLookupResult;
+    },
+    enabled: (opts?.enabled ?? true) && instagramInput.trim().length >= 3,
+    staleTime: 60_000,
+  });
+
 /** Resolve the current user's active tenant_id from tenant_members.
  *  We need it client-side to build Storage paths ("{tenant_id}/{call_id}.mp3")
  *  because the RLS policy on storage.objects scopes by path prefix. */

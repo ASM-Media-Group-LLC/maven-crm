@@ -43,6 +43,7 @@ import {
   useCurrentTenantId,
   useFetchIgAvatar,
   useFireQaWebhook,
+  useIgLookup,
   useQaModels,
   useTenantProfiles,
   useTranscribeAudio,
@@ -121,6 +122,20 @@ const AgencyNewQa = () => {
   const [modelCategory, setModelCategory] = useState<ModelCategory | "">("");
   const [modelCountry, setModelCountry] = useState<string>("");
   const [modelIgUrl, setModelIgUrl] = useState<string>("");
+
+  // Debounced IG lookup — al ingresar o pegar el handle/URL de la
+  // modelo, esperamos 500ms tras la última tecla y disparamos un
+  // lookup cross-modular (scouter_leads / closer_creators / etc.) para
+  // avisar al closer si la modelo ya existe en el sistema.
+  const [debouncedIg, setDebouncedIg] = useState<string>("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedIg(modelIgUrl), 500);
+    return () => clearTimeout(t);
+  }, [modelIgUrl]);
+  const igLookupQ = useIgLookup(debouncedIg, {
+    enabled: debouncedIg.trim().length >= 3,
+  });
+
   const [callDate, setCallDate] = useState<string>(today());
   // Evaluador por defecto: "Claude AI" (la IA es quien hace la evaluación).
   const [evaluatorName, setEvaluatorName] = useState<string>("Claude AI");
@@ -454,6 +469,13 @@ const AgencyNewQa = () => {
               </div>
             </div>
 
+            {/* IG cross-module lookup banner — si la modelo ya existe
+                en otros módulos del sistema, avisamos al closer para
+                que sepa que no es un nuevo descubrimiento. Estilo
+                Maven: card con accent violeta + lista agrupada. */}
+            <IgLookupBanner result={igLookupQ.data} loading={igLookupQ.isFetching} />
+
+
             {/* Row 3: fecha + evaluador */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
@@ -735,3 +757,101 @@ const CountryCombobox = ({
 };
 
 export default AgencyNewQa;
+
+// IgLookupBanner — card violeta-indigo estilo Maven que aparece bajo
+// el input de IG cuando la modelo tipeada ya existe en otros módulos
+// del sistema (scouter_leads, closer_creators, creator_prospects,
+// leadgen_entries, qa_models). Informativo, no bloquea el form —
+// solo avisa al closer. Match icons + colores se mapean por fuente
+// para que la procedencia se reconozca de un vistazo.
+import type { IgLookupResult, IgLookupMatch } from "@/hooks/useAgencyQa";
+import { Activity, MessageCircle, Search, UserCheck, UserPlus, Sparkles } from "lucide-react";
+
+interface IgLookupBannerProps {
+  result: IgLookupResult | undefined;
+  loading: boolean;
+}
+
+interface SourceConfig {
+  key: keyof IgLookupResult["matches"];
+  label: string;
+  Icon: typeof Activity;
+  color: string;
+}
+
+const LOOKUP_SOURCES: SourceConfig[] = [
+  { key: "qa_models", label: "Otra QA previa", Icon: MessageCircle, color: "text-violet-400" },
+  { key: "scouter_leads", label: "Scouter Assist", Icon: Search, color: "text-amber-400" },
+  { key: "closer_creators", label: "Closer · contratada", Icon: UserCheck, color: "text-emerald-400" },
+  { key: "creator_prospects", label: "Prospecto creator", Icon: UserPlus, color: "text-sky-400" },
+  { key: "leadgen_entries", label: "Leadgen", Icon: Activity, color: "text-rose-400" },
+];
+
+const IgLookupBanner = ({ result, loading }: IgLookupBannerProps) => {
+  if (loading) {
+    return (
+      <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Buscando esta modelo en otros módulos…
+        </span>
+      </div>
+    );
+  }
+  if (!result || result.total === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent p-4 shadow-sm">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm">
+          <Sparkles className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold leading-tight">
+            Esta modelo ya existe en el sistema
+          </p>
+          <p className="text-[11px] leading-tight text-muted-foreground">
+            Encontramos <strong>{result.total}</strong> {result.total === 1 ? "match" : "matches"} para{" "}
+            <code className="rounded bg-background/60 px-1.5 py-0.5 text-[10px]">
+              @{result.normalized_handle}
+            </code>{" "}
+            en otros módulos. Tu QA queda vinculada por nombre/IG.
+          </p>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {LOOKUP_SOURCES.map((src) => {
+          const items = result.matches[src.key];
+          if (!items || items.length === 0) return null;
+          return (
+            <div
+              key={src.key}
+              className="rounded-md border border-border/40 bg-background/40 px-3 py-2"
+            >
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <src.Icon className={cn("h-3.5 w-3.5", src.color)} />
+                <span className="text-xs font-semibold">{src.label}</span>
+                <span className="rounded-full bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  {items.length}
+                </span>
+              </div>
+              <ul className="space-y-1 pl-5">
+                {items.map((m: IgLookupMatch) => (
+                  <li
+                    key={m.id}
+                    className="text-[11px] text-muted-foreground"
+                  >
+                    <span className="text-foreground/90">{m.label}</span>
+                    {m.detail && (
+                      <span className="ml-1.5 italic opacity-70">· {m.detail}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
