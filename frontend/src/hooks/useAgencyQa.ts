@@ -168,7 +168,7 @@ export const useTranscribeAudio = () =>
     mutationFn: async (input: {
       audioPath: string;
       language?: string;
-    }): Promise<{ text: string; duration: number | null }> => {
+    }): Promise<{ text: string; duration: number | null; audio_metrics: unknown | null }> => {
       const { data, error } = await supabase.functions.invoke("qa-transcribe", {
         body: { audio_path: input.audioPath, language: input.language ?? "es" },
       });
@@ -189,11 +189,17 @@ export const useTranscribeAudio = () =>
         }
         throw new Error(detail ?? error.message ?? "Error al transcribir.");
       }
-      const payload = data as { text?: string; duration?: number | null; error?: string };
+      const payload = data as {
+        text?: string;
+        duration?: number | null;
+        audio_metrics?: unknown | null;
+        error?: string;
+      };
       if (payload?.error) throw new Error(payload.error);
       return {
         text: payload?.text ?? "",
         duration: payload?.duration ?? null,
+        audio_metrics: payload?.audio_metrics ?? null,
       };
     },
   });
@@ -458,6 +464,7 @@ export interface CreateQaCallInput {
   evaluator_name: string;
   transcript: string;
   audio_path?: string | null;
+  audio_metrics?: unknown | null;
 }
 
 export const useCreateQaCall = () => {
@@ -480,7 +487,7 @@ export const useCreateQaCall = () => {
           audio_path: input.audio_path ?? null,
           claude_analysis: {},
           claude_score: 0,
-          audio_metrics: null,
+          audio_metrics: input.audio_metrics ?? null,
           uploaded_by: uploaderId,
         })
         .select("*")

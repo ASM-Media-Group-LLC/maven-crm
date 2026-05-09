@@ -287,6 +287,8 @@ const AgencyNewQa = () => {
       }
 
       // 5. Insert qa_calls con id explícito + transcript + audio_path.
+      // audio_metrics ahora incluye words[] con timestamps por palabra
+      // que el frontend usa para captions sincronizadas en el detail.
       setSubmitStage("Guardando QA…");
       const row = await create.mutateAsync({
         closer_id: qaCloserId,
@@ -295,6 +297,7 @@ const AgencyNewQa = () => {
         evaluator_name: evaluatorName.trim() || defaultEvaluator,
         transcript: transcriptText,
         audio_path: savedAudioPath,
+        audio_metrics: transcribeResult.audio_metrics,
       });
 
       setLastSavedId(row.id);

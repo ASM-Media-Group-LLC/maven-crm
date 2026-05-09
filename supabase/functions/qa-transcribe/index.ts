@@ -70,6 +70,18 @@ interface AudioMetrics {
     talk_ratio: number;
   }>;
   filler_words: Array<{ word: string; count: number; speaker_id: string }>;
+  // Word-level timing data for live captions on playback. Solo el
+  // texto + start/end + speaker_label de cada palabra reconocida; los
+  // entries de tipo "spacing"/"audio_event" se filtran. Pesa más que
+  // los agregados pero permite sincronizar texto con el audio en el
+  // CallDetailPage. Calls viejas no tendrán este campo y el frontend
+  // lo trata como "no hay captions disponibles".
+  words?: Array<{
+    text: string;
+    start: number;
+    end: number;
+    speaker_label: string | null;
+  }>;
 }
 
 serve(async (req) => {
@@ -248,6 +260,14 @@ function buildDiarizedOutput(
   if (speakerIdMap.size === 0) {
     const lastWord = words[words.length - 1];
     const totalDuration = lastWord ? lastWord.end : 0;
+    const wordsNoSpeaker = words
+      .filter((w) => w.type === "word")
+      .map((w) => ({
+        text: w.text,
+        start: w.start,
+        end: w.end,
+        speaker_label: null as string | null,
+      }));
     return {
       diarizedText: "",
       audioMetrics: {
@@ -255,6 +275,7 @@ function buildDiarizedOutput(
         speaker_count: 0,
         speakers: [],
         filler_words: [],
+        words: wordsNoSpeaker,
       },
     };
   }
@@ -364,6 +385,18 @@ function buildDiarizedOutput(
     }
   }
 
+  // Word-level timings para captions sincronizadas en el frontend.
+  // Solo palabras reales (filtramos spacing y audio_event) con start/end
+  // del Scribe + el label de speaker mapeado.
+  const wordsForCaption = words
+    .filter((w) => w.type === "word")
+    .map((w) => ({
+      text: w.text,
+      start: w.start,
+      end: w.end,
+      speaker_label: w.speaker_id ? speakerIdMap.get(w.speaker_id) ?? null : null,
+    }));
+
   return {
     diarizedText,
     audioMetrics: {
@@ -371,6 +404,7 @@ function buildDiarizedOutput(
       speaker_count: speakerIdMap.size,
       speakers,
       filler_words,
+      words: wordsForCaption,
     },
   };
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -1498,9 +1498,27 @@ const CallDetailPage = ({
               })()}
               <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="truncate text-2xl font-black tracking-tight">
-                    {call.model?.name ?? "Sin modelo"}
-                  </h1>
+                  {(() => {
+                    const igUrl = (
+                      call.model as { ig_url?: string | null } | null
+                    )?.ig_url ?? null;
+                    const name = call.model?.name ?? "Sin modelo";
+                    return igUrl ? (
+                      <a
+                        href={igUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="truncate text-2xl font-black tracking-tight transition-colors hover:text-pink-400"
+                        title="Ver Instagram"
+                      >
+                        {name}
+                      </a>
+                    ) : (
+                      <h1 className="truncate text-2xl font-black tracking-tight">
+                        {name}
+                      </h1>
+                    );
+                  })()}
                   <OutcomePill outcome={analysis.call_outcome} size="lg" />
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -1591,14 +1609,12 @@ const CallDetailPage = ({
               Generando link…
             </div>
           ) : audioUrlQ.data ? (
-            <audio
-              controls
-              preload="metadata"
+            <AudioWithCaptions
               src={audioUrlQ.data}
-              className="w-full"
-            >
-              Tu navegador no soporta audio HTML5.
-            </audio>
+              words={
+                (call.audio_metrics as { words?: WordTiming[] } | null)?.words ?? null
+              }
+            />
           ) : (
             <p className="text-xs italic text-muted-foreground">
               No se pudo cargar el audio.
@@ -1759,3 +1775,115 @@ const CallDetailPage = ({
 };
 
 export default CallDetailPage;
+
+// AudioWithCaptions — wrapper sobre <audio> que sincroniza captions
+// en vivo a partir de los word-timings persistidos en audio_metrics.words.
+// Se actualiza con cada `timeupdate` del player (HTML5 dispara ~4 veces
+// por segundo). Para calls viejas que no tienen words[], se renderiza
+// solo el audio sin caja de captions.
+interface WordTiming {
+  text: string;
+  start: number;
+  end: number;
+  speaker_label: string | null;
+}
+
+const AudioWithCaptions = ({
+  src,
+  words,
+}: {
+  src: string;
+  words: WordTiming[] | null;
+}) => {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [activeIdx, setActiveIdx] = useState<number>(-1);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !words || words.length === 0) return;
+    const onTimeUpdate = () => {
+      const t = audio.currentTime;
+      // Búsqueda binaria por palabra activa: la primera con end > t.
+      let lo = 0;
+      let hi = words.length - 1;
+      let idx = -1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (words[mid].end <= t) {
+          lo = mid + 1;
+        } else {
+          idx = mid;
+          hi = mid - 1;
+        }
+      }
+      // Si la palabra todavía no empezó, mostramos como activa la
+      // anterior (estamos en silencio entre palabras).
+      if (idx >= 0 && words[idx].start > t) {
+        idx = idx - 1;
+      }
+      setActiveIdx(idx);
+    };
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    return () => audio.removeEventListener("timeupdate", onTimeUpdate);
+  }, [words]);
+
+  const hasCaptions = !!words && words.length > 0;
+
+  // Render: ventana de ~14 palabras alrededor de la activa para que el
+  // ojo siga el flujo sin scroll. Si no arrancó (activeIdx = -1), mostramos
+  // las primeras 14.
+  const window = useMemo(() => {
+    if (!hasCaptions || !words) return [] as Array<{ idx: number; w: WordTiming }>;
+    const pivot = activeIdx >= 0 ? activeIdx : 0;
+    const start = Math.max(0, pivot - 4);
+    const end = Math.min(words.length, start + 14);
+    const realStart = Math.max(0, end - 14);
+    return words.slice(realStart, end).map((w, i) => ({ idx: realStart + i, w }));
+  }, [words, activeIdx, hasCaptions]);
+
+  return (
+    <div className="space-y-3">
+      <audio
+        ref={audioRef}
+        controls
+        preload="metadata"
+        src={src}
+        className="w-full"
+      >
+        Tu navegador no soporta audio HTML5.
+      </audio>
+      {hasCaptions && (
+        <div className="rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-transparent p-4">
+          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-violet-400">
+            Captions en vivo
+          </p>
+          <p className="text-sm leading-relaxed text-foreground/80">
+            {window.length === 0 ? (
+              <span className="italic text-muted-foreground">
+                Apretá play para ver el texto sincronizarse con el audio.
+              </span>
+            ) : (
+              window.map(({ idx, w }) => {
+                const isActive = idx === activeIdx;
+                return (
+                  <span
+                    key={idx}
+                    className={cn(
+                      "transition-colors",
+                      isActive
+                        ? "rounded bg-violet-500/30 px-1 font-semibold text-foreground"
+                        : "",
+                    )}
+                  >
+                    {w.text}
+                    {!w.text.endsWith(" ") && " "}
+                  </span>
+                );
+              })
+            )}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
