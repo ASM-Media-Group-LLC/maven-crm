@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { encode as encodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 // scouter-spam-account-scan — al registrarse una cuenta de spam nueva
 // (o al re-escanear mensualmente), fetcheamos datos públicos del perfil
@@ -181,6 +182,20 @@ serve(async (req) => {
       console.error("ig fetch failed:", fetchErr);
     }
 
+    // La foto de IG viene como CDN URL con tokens que caducan o que IG
+    // bloquea cross-origin (no se puede renderizar desde otro dominio).
+    // Bajamos la imagen acá y la persistimos como data URL — así se
+    // sirve desde la propia row sin depender del CDN de IG. Si falla,
+    // dejamos null y el frontend usa fallback con la inicial.
+    if (snapshot?.profile_pic_url) {
+      const dataUrl = await fetchAsDataUrl(snapshot.profile_pic_url);
+      if (dataUrl) {
+        snapshot = { ...snapshot, profile_pic_url: dataUrl };
+      } else {
+        snapshot = { ...snapshot, profile_pic_url: null };
+      }
+    }
+
     if (!snapshot) {
       await sb
         .from("scouter_spammer_accounts")
@@ -330,6 +345,44 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 8000): Prom
     return await fetch(url, { ...init, signal: ctrl.signal });
   } finally {
     clearTimeout(id);
+  }
+}
+
+// Bajamos una imagen pública de IG CDN y la convertimos a data URL.
+// IG sirve sus fotos con tokens que caducan + chequea referer/origin
+// cuando se cargan cross-origin, así que el navegador del user no
+// puede renderizar el URL crudo. Descargándola server-side y guardando
+// como data URL, queda autocontenida en la row.
+async function fetchAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const isIgCdn = /cdninstagram\.com|fbcdn\.net/i.test(url);
+    const res = await fetchWithTimeout(
+      url,
+      {
+        headers: {
+          "user-agent": BROWSER_UA,
+          accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+          ...(isIgCdn
+            ? {
+                referer: "https://www.instagram.com/",
+                origin: "https://www.instagram.com",
+                "sec-fetch-site": "cross-site",
+                "sec-fetch-mode": "no-cors",
+                "sec-fetch-dest": "image",
+              }
+            : {}),
+        },
+      },
+      8000,
+    );
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("image/")) return null;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.byteLength < 500) return null; // sanity: imágenes IG nunca <500B
+    return `data:${contentType};base64,${encodeBase64(buf)}`;
+  } catch {
+    return null;
   }
 }
 

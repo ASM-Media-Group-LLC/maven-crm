@@ -76,14 +76,15 @@ const fmtCount = (n: number | null | undefined): string => {
   return n.toLocaleString("es");
 };
 
+type StatPopupKind = "all" | "pending" | "failed";
+
 const SpammerAccountsTab = () => {
   const accountsQ = useSpammerAccounts();
   const profilesQ = useTenantProfiles();
   const rescan = useRescanSpammerAccount();
   const [search, setSearch] = useState("");
   const [openHandle, setOpenHandle] = useState<string | null>(null);
-  const [filterPending, setFilterPending] = useState(false);
-  const [filterFailed, setFilterFailed] = useState(false);
+  const [statPopup, setStatPopup] = useState<StatPopupKind | null>(null);
 
   // Agrupar por handle — cuando varios spammers usan la misma cuenta,
   // se muestra UNA sola card con la lista de operators (los user_id
@@ -138,19 +139,37 @@ const SpammerAccountsTab = () => {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    if (!q) return aggregated;
     return aggregated.filter((a) => {
       const r = a.representative;
-      // Filtros por status (clickeables en los stat boxes).
-      if (filterPending && !(r.scan_status === "pending" || r.scan_status === "scanning")) return false;
-      if (filterFailed && r.scan_status !== "failed") return false;
-      if (!q) return true;
       return (
         r.instagram_handle.includes(q) ||
         (r.display_name ?? "").toLowerCase().includes(q) ||
         a.operators.some((o) => o.name.toLowerCase().includes(q))
       );
     });
-  }, [aggregated, search, filterPending, filterFailed]);
+  }, [aggregated, search]);
+
+  // Listas para los popups de stat boxes.
+  const pendingList = useMemo(
+    () =>
+      aggregated.filter(
+        (a) => a.representative.scan_status === "pending" || a.representative.scan_status === "scanning",
+      ),
+    [aggregated],
+  );
+  const failedList = useMemo(
+    () => aggregated.filter((a) => a.representative.scan_status === "failed"),
+    [aggregated],
+  );
+  const popupTitle =
+    statPopup === "all" ? "Todas las cuentas" :
+    statPopup === "pending" ? "Esperando scan" :
+    statPopup === "failed" ? "Fallidas" : "";
+  const popupList: AggregatedAccount[] =
+    statPopup === "all" ? aggregated :
+    statPopup === "pending" ? pendingList :
+    statPopup === "failed" ? failedList : [];
 
   const stats = useMemo(() => {
     const list = aggregated;
@@ -217,8 +236,7 @@ const SpammerAccountsTab = () => {
           value={stats.totalUnique}
           icon={UsersIcon}
           color="indigo"
-          active={!filterPending && !filterFailed}
-          onClick={() => { setFilterPending(false); setFilterFailed(false); }}
+          onClick={() => setStatPopup("all")}
         />
         <StatBox
           label="Score promedio"
@@ -235,8 +253,7 @@ const SpammerAccountsTab = () => {
           value={stats.pending}
           icon={Loader2}
           color="amber"
-          active={filterPending}
-          onClick={() => { setFilterPending(!filterPending); setFilterFailed(false); }}
+          onClick={() => setStatPopup("pending")}
           spinning={stats.pending > 0}
         />
         <StatBox
@@ -244,8 +261,7 @@ const SpammerAccountsTab = () => {
           value={stats.failed}
           icon={XCircle}
           color="rose"
-          active={filterFailed}
-          onClick={() => { setFilterFailed(!filterFailed); setFilterPending(false); }}
+          onClick={() => setStatPopup("failed")}
         />
       </div>
 
@@ -285,6 +301,20 @@ const SpammerAccountsTab = () => {
         onOpenChange={(o) => !o && setOpenHandle(null)}
         account={openAcc ?? null}
         onRescan={handleRescan}
+        rescanning={rescan.isPending}
+      />
+
+      <StatListDialog
+        open={!!statPopup}
+        onOpenChange={(o) => !o && setStatPopup(null)}
+        kind={statPopup}
+        title={popupTitle}
+        items={popupList}
+        onRescan={handleRescan}
+        onOpenDetail={(handle) => {
+          setStatPopup(null);
+          setOpenHandle(handle);
+        }}
         rescanning={rescan.isPending}
       />
     </div>
@@ -764,6 +794,164 @@ const SpammerDetailDialog = ({
             Re-escanear ahora
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// StatListDialog — popup que se abre desde los stat boxes. Muestra un
+// listado compacto de las cuentas correspondientes al stat clickeado.
+// Para "pending" y "failed" el popup permite re-escanear individual o
+// en lote (botón "Re-escanear todas"). Click en una row → cierra el
+// popup y abre el detail dialog.
+interface StatListDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  kind: StatPopupKind | null;
+  title: string;
+  items: AggregatedAccount[];
+  onRescan: (id: string) => void;
+  onOpenDetail: (handle: string) => void;
+  rescanning: boolean;
+}
+
+const StatListDialog = ({
+  open,
+  onOpenChange,
+  kind,
+  title,
+  items,
+  onRescan,
+  onOpenDetail,
+  rescanning,
+}: StatListDialogProps) => {
+  const showRescan = kind === "pending" || kind === "failed";
+
+  const rescanAll = () => {
+    items.forEach((a) => onRescan(a.representative.id));
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <DialogTitle>{title}</DialogTitle>
+              <DialogDescription className="text-xs">
+                {items.length} {items.length === 1 ? "cuenta" : "cuentas"}
+                {kind === "pending" && " esperando o ejecutando scan IA"}
+                {kind === "failed" && " — el scan falló (cuenta privada, baneada, o IG bloqueó la API)"}
+                {kind === "all" && " registradas en este tenant"}
+              </DialogDescription>
+            </div>
+            {showRescan && items.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 shrink-0"
+                onClick={rescanAll}
+                disabled={rescanning}
+              >
+                {rescanning ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                Re-escanear todas
+              </Button>
+            )}
+          </div>
+        </DialogHeader>
+        {items.length === 0 ? (
+          <div className="rounded-md border border-border/40 bg-muted/20 p-6 text-center text-sm italic text-muted-foreground">
+            {kind === "pending" && "No hay cuentas en cola de scan."}
+            {kind === "failed" && "No hay cuentas con scan fallido."}
+            {kind === "all" && "No hay cuentas registradas todavía."}
+          </div>
+        ) : (
+          <ul className="divide-y divide-border/40 rounded-md border border-border/40">
+            {items.map((a) => {
+              const r = a.representative;
+              const cfg = scoreCfg(r.ai_score);
+              return (
+                <li
+                  key={r.id}
+                  className="flex items-center gap-3 p-2.5 hover:bg-muted/30 transition-colors"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onOpenDetail(r.instagram_handle)}
+                    className="flex flex-1 items-center gap-2.5 min-w-0 text-left"
+                    title="Ver detalle"
+                  >
+                    <Avatar src={r.profile_pic_url} fallback={r.instagram_handle} size={36} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate font-mono text-xs font-semibold">
+                          @{r.instagram_handle}
+                        </span>
+                        {r.is_verified && (
+                          <CheckCircle2 className="h-3 w-3 shrink-0 text-sky-400" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        {r.display_name && <span className="truncate">{r.display_name}</span>}
+                        {r.display_name && a.operators.length > 0 && <span>·</span>}
+                        {a.operators.length > 0 && (
+                          <span className="inline-flex items-center gap-1 truncate">
+                            <UserCog className="h-3 w-3" />
+                            {a.operators.length === 1
+                              ? a.operators[0].name
+                              : `${a.operators.length} scouters`}
+                          </span>
+                        )}
+                      </div>
+                      {r.scan_status === "failed" && r.scan_error && (
+                        <div className="mt-0.5 flex items-start gap-1 text-[10px] text-rose-400">
+                          <AlertCircle className="h-2.5 w-2.5 mt-0.5 shrink-0" />
+                          <span className="line-clamp-1">{r.scan_error}</span>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                  {/* Score badge — solo si tiene scan completo. */}
+                  {r.ai_score != null && (
+                    <span
+                      className={cn(
+                        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-2 text-xs font-bold tabular-nums",
+                        cfg.bg,
+                        cfg.ring,
+                        cfg.text,
+                      )}
+                    >
+                      {r.ai_score}
+                    </span>
+                  )}
+                  {/* Botón rescan individual para pending/failed. */}
+                  {showRescan && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 shrink-0"
+                      disabled={rescanning || r.scan_status === "scanning"}
+                      onClick={() => onRescan(r.id)}
+                      title="Re-escanear esta cuenta"
+                    >
+                      {r.scan_status === "scanning" ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                      <span className="text-[11px]">Escanear</span>
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </DialogContent>
     </Dialog>
   );
