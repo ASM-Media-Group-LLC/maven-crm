@@ -768,7 +768,7 @@ export default AgencyNewQa;
 // solo avisa al closer. Match icons + colores se mapean por fuente
 // para que la procedencia se reconozca de un vistazo.
 import type { IgLookupResult, IgLookupMatch } from "@/hooks/useAgencyQa";
-import { Activity, MessageCircle, Search, UserCheck, UserPlus, Sparkles } from "lucide-react";
+import { Activity, MessageCircle, Search, UserCheck, UserPlus } from "lucide-react";
 
 interface IgLookupBannerProps {
   result: IgLookupResult | undefined;

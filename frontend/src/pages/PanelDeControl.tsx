@@ -542,11 +542,11 @@ const PanelDeControl = () => {
       <Tabs value={tab} onValueChange={(v) => setTab(v as "modelos" | "chatters" | "cuentas-spammer")}>
         <TabsList>
           <TabsTrigger value="modelos">Reclutamiento modelos</TabsTrigger>
-          <TabsTrigger value="chatters">Reclutamiento chatters</TabsTrigger>
           <TabsTrigger value="cuentas-spammer" className="gap-1.5">
             <Instagram className="h-3.5 w-3.5" />
             Cuentas spammer
           </TabsTrigger>
+          <TabsTrigger value="chatters">Reclutamiento chatters</TabsTrigger>
         </TabsList>
 
         <TabsContent value="cuentas-spammer" className="mt-4">

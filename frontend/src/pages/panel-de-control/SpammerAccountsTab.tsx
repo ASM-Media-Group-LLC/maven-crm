@@ -80,6 +80,8 @@ const SpammerAccountsTab = () => {
   const rescan = useRescanSpamAccount();
   const [search, setSearch] = useState("");
   const [openHandle, setOpenHandle] = useState<string | null>(null);
+  const [filterPending, setFilterPending] = useState(false);
+  const [filterFailed, setFilterFailed] = useState(false);
 
   // Agrupar por handle — cuando varios spammers usan la misma cuenta,
   // se muestra UNA sola card con la lista de operators.
@@ -129,16 +131,19 @@ const SpammerAccountsTab = () => {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return aggregated;
     return aggregated.filter((a) => {
       const r = a.representative;
+      // Filtros por status (clickeables en los stat boxes).
+      if (filterPending && !(r.scan_status === "pending" || r.scan_status === "scanning")) return false;
+      if (filterFailed && r.scan_status !== "failed") return false;
+      if (!q) return true;
       return (
         r.instagram_handle.includes(q) ||
         (r.display_name ?? "").toLowerCase().includes(q) ||
         a.operators.some((o) => o.name.toLowerCase().includes(q))
       );
     });
-  }, [aggregated, search]);
+  }, [aggregated, search, filterPending, filterFailed]);
 
   const stats = useMemo(() => {
     const list = aggregated;
@@ -175,48 +180,66 @@ const SpammerAccountsTab = () => {
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-amber-500 text-white shadow-sm">
-            <Instagram className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold">Cuentas spammer</h2>
-            <p className="text-xs text-muted-foreground max-w-2xl">
-              Cuentas de IG que los spammers/scouters usan para outreach. Cada
-              cuenta nueva se escanea con IA (Sonnet 4.6) que evalúa qué tan
-              creíble se ve para influencers grandes y devuelve un score 0-100
-              con análisis y mejoras urgentes. Click en cualquier card para ver
-              el detalle.
-            </p>
-          </div>
-        </div>
-        <div className="relative w-full sm:w-72">
+    <div className="space-y-3">
+      {/* Header compacto en una sola fila — title + hint + search.
+          Antes tenía un avatar grande + descripción de 3 líneas que
+          quitaba espacio cuando había cards. Ahora es una sola línea. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Instagram className="h-4 w-4 text-pink-400 shrink-0" />
+        <h2 className="text-sm font-semibold">Cuentas spammer</h2>
+        <span
+          className="text-[11px] text-muted-foreground"
+          title="Cuentas de IG que los spammers/scouters usan para outreach. Cada cuenta nueva se escanea con IA (Sonnet 4.6) que evalúa qué tan creíble se ve para influencers grandes."
+        >
+          · IA escanea cada cuenta nueva — click en una card para ver el detalle
+        </span>
+        <div className="relative ml-auto w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por handle, nombre, scouter…"
+            placeholder="Buscar handle, nombre, scouter…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="h-8 pl-8 text-xs"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatBox label="Cuentas únicas" value={stats.totalUnique} icon={UsersIcon} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatBox
+          label="Cuentas únicas"
+          value={stats.totalUnique}
+          icon={UsersIcon}
+          color="indigo"
+          active={!filterPending && !filterFailed}
+          onClick={() => { setFilterPending(false); setFilterFailed(false); }}
+        />
         <StatBox
           label="Score promedio"
           value={stats.avgScore || "—"}
           icon={TrendingUp}
-          accent={
-            stats.avgScore >= 65 ? "text-emerald-400" :
-            stats.avgScore >= 45 ? "text-amber-400" :
-            stats.avgScore > 0   ? "text-rose-400" : ""
+          color={
+            stats.avgScore >= 65 ? "emerald" :
+            stats.avgScore >= 45 ? "amber" :
+            stats.avgScore > 0   ? "rose" : "sky"
           }
         />
-        <StatBox label="Esperando scan" value={stats.pending} icon={Loader2} />
-        <StatBox label="Fallidas" value={stats.failed} icon={XCircle} accent={stats.failed > 0 ? "text-rose-400" : ""} />
+        <StatBox
+          label="Esperando scan"
+          value={stats.pending}
+          icon={Loader2}
+          color="amber"
+          active={filterPending}
+          onClick={() => { setFilterPending(!filterPending); setFilterFailed(false); }}
+          spinning={stats.pending > 0}
+        />
+        <StatBox
+          label="Fallidas"
+          value={stats.failed}
+          icon={XCircle}
+          color="rose"
+          active={filterFailed}
+          onClick={() => { setFilterFailed(!filterFailed); setFilterPending(false); }}
+        />
       </div>
 
       {accountsQ.isLoading ? (
@@ -393,31 +416,134 @@ const Metric = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
+// StatBox — mismo estilo que las hero cards del subtab "Reclutamiento
+// modelos" del Panel de control: borde 2px coloreado, blur orb en
+// la esquina, hover lift + glow. Si tiene onClick, además es interactivo
+// y soporta estado active (highlight más fuerte).
+//
+// Paletas predefinidas para los 4 colores que usamos.
+const COLOR_STYLES: Record<
+  "indigo" | "cyan" | "emerald" | "amber" | "rose" | "sky",
+  {
+    border: string;
+    borderActive: string;
+    borderHover: string;
+    bg: string;
+    iconBg: string;
+    glow: string;
+  }
+> = {
+  indigo: {
+    border: "border-indigo-500/30",
+    borderActive: "border-indigo-500/70",
+    borderHover: "hover:border-indigo-500/60",
+    bg: "bg-indigo-500",
+    iconBg: "bg-indigo-500",
+    glow: "hover:shadow-[0_0_24px_-4px_rgba(99,102,241,0.4)]",
+  },
+  cyan: {
+    border: "border-cyan-500/30",
+    borderActive: "border-cyan-500/70",
+    borderHover: "hover:border-cyan-500/60",
+    bg: "bg-cyan-500",
+    iconBg: "bg-cyan-500",
+    glow: "hover:shadow-[0_0_24px_-4px_rgba(34,211,238,0.4)]",
+  },
+  emerald: {
+    border: "border-emerald-500/30",
+    borderActive: "border-emerald-500/70",
+    borderHover: "hover:border-emerald-500/60",
+    bg: "bg-emerald-500",
+    iconBg: "bg-emerald-500",
+    glow: "hover:shadow-[0_0_24px_-4px_rgba(16,185,129,0.4)]",
+  },
+  amber: {
+    border: "border-amber-500/30",
+    borderActive: "border-amber-500/70",
+    borderHover: "hover:border-amber-500/60",
+    bg: "bg-amber-500",
+    iconBg: "bg-amber-500",
+    glow: "hover:shadow-[0_0_24px_-4px_rgba(245,158,11,0.4)]",
+  },
+  rose: {
+    border: "border-rose-500/30",
+    borderActive: "border-rose-500/70",
+    borderHover: "hover:border-rose-500/60",
+    bg: "bg-rose-500",
+    iconBg: "bg-rose-500",
+    glow: "hover:shadow-[0_0_24px_-4px_rgba(244,63,94,0.4)]",
+  },
+  sky: {
+    border: "border-sky-500/30",
+    borderActive: "border-sky-500/70",
+    borderHover: "hover:border-sky-500/60",
+    bg: "bg-sky-500",
+    iconBg: "bg-sky-500",
+    glow: "hover:shadow-[0_0_24px_-4px_rgba(14,165,233,0.4)]",
+  },
+};
+
 const StatBox = ({
   label,
   value,
   icon: Icon,
-  accent,
+  color,
+  onClick,
+  active,
+  spinning,
 }: {
   label: string;
   value: number | string;
   icon: typeof UsersIcon;
-  accent?: string;
-}) => (
-  <Card className="flex items-center gap-3 p-3">
-    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground/80">
-      <Icon className="h-4 w-4" />
-    </span>
-    <div className="min-w-0">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
-        {label}
+  color: keyof typeof COLOR_STYLES;
+  onClick?: () => void;
+  active?: boolean;
+  spinning?: boolean;
+}) => {
+  const cfg = COLOR_STYLES[color];
+  const Tag = onClick ? "button" : "div";
+  return (
+    <Tag
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={cn(
+        "group relative overflow-hidden rounded-lg border bg-card px-3 py-2.5 text-left transition-all duration-200",
+        active ? cfg.borderActive : cfg.border,
+        onClick && "cursor-pointer hover:scale-[1.015]",
+        onClick && cfg.borderHover,
+        onClick && cfg.glow,
+        active && "shadow-[0_0_16px_-4px_rgba(255,255,255,0.15)]",
+      )}
+    >
+      <div
+        className={cn(
+          "absolute -right-8 -top-8 h-20 w-20 rounded-full blur-2xl opacity-30 transition-opacity",
+          cfg.bg,
+          onClick && "group-hover:opacity-50",
+          active && "opacity-50",
+        )}
+      />
+      <div className="relative flex items-center gap-2.5">
+        <div
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white",
+            cfg.iconBg,
+          )}
+        >
+          <Icon className={cn("h-3.5 w-3.5", spinning && "animate-spin")} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[9px] uppercase tracking-wider text-foreground/70 font-semibold leading-tight">
+            {label}
+          </p>
+          <p className="text-base font-bold tabular-nums leading-tight">
+            {value}
+          </p>
+        </div>
       </div>
-      <div className={cn("text-lg font-semibold tabular-nums", accent ?? "")}>
-        {value}
-      </div>
-    </div>
-  </Card>
-);
+    </Tag>
+  );
+};
 
 // ─── Detail dialog ─────────────────────────────────────────────────
 
