@@ -99,24 +99,24 @@ AS $$
       (p_date_from IS NULL OR p_date_to IS NULL OR entry_date BETWEEN p_date_from AND p_date_to)
       AND lg_user_id IS NOT NULL
   ),
-  per_agent AS (
+  -- Counts por (agente, quality_lowercase) — quality desconocida → 'c'.
+  agent_quality_counts AS (
     SELECT
       lg_user_id,
-      COUNT(*) AS total,
-      MIN(created_at) AS first_lead,
-      jsonb_object_agg(
-        ql, ct
-      ) AS by_quality
-    FROM (
-      SELECT
-        lg_user_id,
-        COALESCE(LOWER(quality), 'c') AS ql,
-        COUNT(*) AS ct
-      FROM filtered
-      GROUP BY lg_user_id, COALESCE(LOWER(quality), 'c')
-    ) g
+      COALESCE(LOWER(quality), 'c') AS ql,
+      COUNT(*) AS ct
+    FROM filtered
+    GROUP BY lg_user_id, COALESCE(LOWER(quality), 'c')
+  ),
+  -- by_quality como sub-jsonb por agente.
+  per_agent_quality AS (
+    SELECT lg_user_id, jsonb_object_agg(ql, ct) AS by_quality
+    FROM agent_quality_counts
     GROUP BY lg_user_id
   ),
+  -- total + first_lead (lead más viejo) por agente. Acá sí leemos
+  -- created_at de filtered porque el GROUP BY es directo (sin
+  -- subquery agregando columnas distintas).
   totals AS (
     SELECT lg_user_id, COUNT(*) AS total, MIN(created_at) AS first_lead
     FROM filtered
@@ -127,14 +127,14 @@ AS $$
       t.lg_user_id::text,
       jsonb_build_object(
         'total', t.total,
-        'byQuality', COALESCE(pa.by_quality, '{}'::jsonb),
+        'byQuality', COALESCE(paq.by_quality, '{}'::jsonb),
         'firstLead', t.first_lead
       )
     ),
     '{}'::jsonb
   )
   FROM totals t
-  LEFT JOIN per_agent pa ON pa.lg_user_id = t.lg_user_id;
+  LEFT JOIN per_agent_quality paq ON paq.lg_user_id = t.lg_user_id;
 $$;
 
 -- ──────────────────────────────────────────────────────────────────
