@@ -45,6 +45,7 @@ import {
   type DetailRow,
 } from "@/hooks/useOperationsDashboard";
 import { cn } from "@/lib/utils";
+import SpammerAccountsTab from "./panel-de-control/SpammerAccountsTab";
 
 // ─── KPI card ──────────────────────────────────────────────────────────
 
@@ -516,7 +517,7 @@ const PanelDeControl = () => {
   const activeMetricLabel =
     cards.find((c) => c.key === openMetric)?.label ?? "";
 
-  const [tab, setTab] = useState<"modelos" | "chatters">("modelos");
+  const [tab, setTab] = useState<"modelos" | "chatters" | "cuentas-spammer">("modelos");
 
   return (
     // El layout app envuelve cada page en un wrapper con overflow-hidden.
@@ -538,11 +539,19 @@ const PanelDeControl = () => {
         />
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "modelos" | "chatters")}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "modelos" | "chatters" | "cuentas-spammer")}>
         <TabsList>
           <TabsTrigger value="modelos">Reclutamiento modelos</TabsTrigger>
           <TabsTrigger value="chatters">Reclutamiento chatters</TabsTrigger>
+          <TabsTrigger value="cuentas-spammer" className="gap-1.5">
+            <Instagram className="h-3.5 w-3.5" />
+            Cuentas spammer
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="cuentas-spammer" className="mt-4">
+          <SpammerAccountsTab />
+        </TabsContent>
 
         <TabsContent value="chatters" className="mt-4">
           <Card className="p-12 text-center space-y-3">

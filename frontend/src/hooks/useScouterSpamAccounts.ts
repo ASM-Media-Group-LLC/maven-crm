@@ -21,6 +21,25 @@ export const SPAM_ACCOUNT_STATUS_OPTIONS: Array<{
   { value: "retired", label: "Retirada" },
 ];
 
+export type ScanStatus = "pending" | "scanning" | "done" | "failed";
+
+export interface SpamAccountAiRedFlag {
+  signal: string;
+  severity: "low" | "medium" | "high";
+}
+
+export interface SpamAccountAiAnalysis {
+  score: number;
+  summary: string;
+  would_respond: "si" | "no" | "tal_vez";
+  why_not: string;
+  strengths: string[];
+  red_flags: SpamAccountAiRedFlag[];
+  urgent_improvements: string[];
+  recommendations: string[];
+  scanned_at: string;
+}
+
 export interface ScouterSpamAccount {
   id: string;
   tenant_id: string;
@@ -32,6 +51,19 @@ export interface ScouterSpamAccount {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  // Snapshot de IG capturado en el último scan.
+  profile_photo_url: string | null;
+  followers_count: number | null;
+  following_count: number | null;
+  posts_count: number | null;
+  bio: string | null;
+  is_verified: boolean | null;
+  // Resultado del scan IA.
+  ai_score: number | null;
+  ai_analysis: SpamAccountAiAnalysis | null;
+  last_scanned_at: string | null;
+  scan_status: ScanStatus;
+  scan_error: string | null;
   // Joined desde profiles para mostrar el nombre del scouter dueño.
   scouter_name?: string | null;
 }
@@ -101,6 +133,37 @@ export const useCreateSpamAccount = () => {
     mutationFn: async (input: CreateSpamAccountInput): Promise<ScouterSpamAccount> => {
       const handle = normalizeIgHandle(input.instagram_handle);
       if (!handle) throw new Error("El handle de Instagram no es válido.");
+
+      // Dedup cross-spammer: si el handle ya tiene una fila scaneada
+      // (en cualquier scouter del tenant), reusamos el snapshot + ai
+      // analysis al insertar la fila nueva. Esto evita correr Apify +
+      // Sonnet 4.6 dos veces para la misma cuenta.
+      const { data: existing } = await supabase
+        .from("scouter_spam_accounts")
+        .select(
+          "profile_photo_url, followers_count, following_count, posts_count, bio, is_verified, ai_score, ai_analysis, last_scanned_at, scan_status",
+        )
+        .eq("instagram_handle", handle)
+        .order("last_scanned_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+
+      const cloneSnapshot =
+        existing && existing.scan_status === "done"
+          ? {
+              profile_photo_url: existing.profile_photo_url,
+              followers_count: existing.followers_count,
+              following_count: existing.following_count,
+              posts_count: existing.posts_count,
+              bio: existing.bio,
+              is_verified: existing.is_verified,
+              ai_score: existing.ai_score,
+              ai_analysis: existing.ai_analysis,
+              last_scanned_at: existing.last_scanned_at,
+              scan_status: "done" as const,
+            }
+          : null;
+
       const { data, error } = await supabase
         .from("scouter_spam_accounts")
         .insert({
@@ -110,11 +173,43 @@ export const useCreateSpamAccount = () => {
           scouter_id: input.scouter_id ?? null,
           status: input.status ?? "active",
           notes: input.notes?.trim() || null,
+          ...(cloneSnapshot ?? { scan_status: "pending" }),
         })
         .select("*")
         .single();
       if (error) throw error;
+
+      // Si NO había snapshot existente, disparamos el scan en background
+      // (fire-and-forget). El frontend invalida la query cada cierto
+      // tiempo y la fila se actualiza con el resultado cuando termina.
+      if (!cloneSnapshot) {
+        supabase.functions
+          .invoke("scouter-spam-account-scan", {
+            body: { account_id: (data as { id: string }).id },
+          })
+          .catch((err) => {
+            console.warn("scouter-spam-account-scan invoke failed:", err);
+          });
+      }
+
       return data as ScouterSpamAccount;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-spam-accounts"] });
+    },
+  });
+};
+
+/** Re-escanea una cuenta existente. Útil para el botón manual del UI
+ *  o para el cron mensual. Devuelve cuando el edge termina o falla. */
+export const useRescanSpamAccount = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (accountId: string): Promise<void> => {
+      const { error } = await supabase.functions.invoke("scouter-spam-account-scan", {
+        body: { account_id: accountId },
+      });
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scouter-spam-accounts"] });
