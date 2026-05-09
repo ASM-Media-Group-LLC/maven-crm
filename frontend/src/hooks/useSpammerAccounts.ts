@@ -4,6 +4,25 @@ import { supabase } from "@/integrations/supabase/client";
 
 // Types mirror the scouter_spammer_accounts table. Kept inline here so
 // the rest of the app can import them without a regen step.
+export type ScanStatus = "pending" | "scanning" | "done" | "failed";
+
+export interface SpammerAccountAiRedFlag {
+  signal: string;
+  severity: "low" | "medium" | "high";
+}
+
+export interface SpammerAccountAiAnalysis {
+  score: number;
+  summary: string;
+  would_respond: "si" | "no" | "tal_vez";
+  why_not: string;
+  strengths: string[];
+  red_flags: SpammerAccountAiRedFlag[];
+  urgent_improvements: string[];
+  recommendations: string[];
+  scanned_at: string;
+}
+
 export interface SpammerAccount {
   id: string;
   user_id: string;
@@ -18,6 +37,16 @@ export interface SpammerAccount {
   tenant_id: string;
   created_at: string;
   updated_at: string;
+  // Snapshot extra del scan IA (migration 20260509040000).
+  following_count: number | null;
+  posts_count: number | null;
+  is_verified: boolean | null;
+  // Análisis IA — null hasta que el scan corra.
+  ai_score: number | null;
+  ai_analysis: SpammerAccountAiAnalysis | null;
+  last_scanned_at: string | null;
+  scan_status: ScanStatus | null;
+  scan_error: string | null;
 }
 
 export type AccountNiche = "lifestyle" | "fitness" | "adult" | "business" | "mixed";
@@ -56,13 +85,49 @@ export interface InsertSpammerAccountInput {
 }
 
 /** Insert a new spammer account row. tenant_id is filled by DB DEFAULT
- *  current_tenant_id(); user_id is auth.uid() via RLS policy. */
+ *  current_tenant_id(); user_id is auth.uid() via RLS policy.
+ *
+ *  Side effect: dispara un scan IA en background contra la edge function
+ *  `scouter-spam-account-scan`. Si el handle ya tiene una fila scaneada
+ *  por otro usuario del mismo tenant, importamos el snapshot + análisis
+ *  sin re-correr Apify+IA (dedup cross-spammer). */
 export const useInsertSpammerAccount = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: InsertSpammerAccountInput): Promise<SpammerAccount> => {
       const { data: userRes, error: userErr } = await supabase.auth.getUser();
       if (userErr || !userRes.user) throw userErr ?? new Error("No hay sesión activa.");
+
+      // Dedup cross-spammer: si el handle ya tiene una fila escaneada,
+      // reusamos el snapshot + análisis al insertar (no quema otra
+      // call a Apify + Sonnet).
+      const handle = input.instagram_handle.trim().toLowerCase();
+      const { data: existing } = await sb
+        .from("scouter_spammer_accounts")
+        .select(
+          "profile_pic_url, followers_count, following_count, posts_count, bio, is_verified, ai_score, ai_analysis, last_scanned_at, scan_status",
+        )
+        .ilike("instagram_handle", handle)
+        .order("last_scanned_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+
+      const cloneSnapshot =
+        existing && existing.scan_status === "done"
+          ? {
+              profile_pic_url: input.profile_pic_url ?? existing.profile_pic_url,
+              followers_count: input.followers_count ?? existing.followers_count,
+              following_count: existing.following_count,
+              posts_count: existing.posts_count,
+              bio: input.bio ?? existing.bio,
+              is_verified: existing.is_verified,
+              ai_score: existing.ai_score,
+              ai_analysis: existing.ai_analysis,
+              last_scanned_at: existing.last_scanned_at,
+              scan_status: "done" as const,
+            }
+          : null;
+
       const { data, error } = await sb
         .from("scouter_spammer_accounts")
         .insert({
@@ -74,10 +139,25 @@ export const useInsertSpammerAccount = () => {
           followers_count: input.followers_count ?? null,
           bio: input.bio ?? null,
           active: true,
+          ...(cloneSnapshot ?? { scan_status: "pending" }),
         })
         .select("*")
         .single();
       if (error) throw error;
+
+      // Si NO había snapshot existente, dispará el scan en background.
+      // Fire-and-forget — el frontend invalida la query y la fila se
+      // actualiza con el resultado cuando termina.
+      if (!cloneSnapshot) {
+        supabase.functions
+          .invoke("scouter-spam-account-scan", {
+            body: { account_id: (data as { id: string }).id },
+          })
+          .catch((err) => {
+            console.warn("scouter-spam-account-scan invoke failed:", err);
+          });
+      }
+
       return data as SpammerAccount;
     },
     onSuccess: () => {
@@ -86,6 +166,23 @@ export const useInsertSpammerAccount = () => {
     },
     onError: (e) => {
       toast.error("No se pudo registrar la cuenta", { description: (e as Error).message });
+    },
+  });
+};
+
+/** Re-escanea una cuenta existente. Útil para el botón manual del
+ *  Panel de control o para el cron mensual. */
+export const useRescanSpammerAccount = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (accountId: string): Promise<void> => {
+      const { error } = await supabase.functions.invoke("scouter-spam-account-scan", {
+        body: { account_id: accountId },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["spammer-accounts"] });
     },
   });
 };

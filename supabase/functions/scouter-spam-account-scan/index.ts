@@ -5,7 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // (o al re-escanear mensualmente), fetcheamos datos públicos del perfil
 // de IG y le pedimos a Sonnet 4.6 que evalúe qué tan creíble se ve la
 // cuenta desde la perspectiva de una creadora target. Persistimos
-// score (0-100) + análisis estructurado en scouter_spam_accounts.
+// score (0-100) + análisis estructurado en scouter_spammer_accounts.
 //
 // Endpoints:
 //   POST { account_id: uuid } → escanea esa fila específica.
@@ -144,7 +144,7 @@ serve(async (req) => {
 
     if (body.account_id) {
       const { data, error } = await sb
-        .from("scouter_spam_accounts")
+        .from("scouter_spammer_accounts")
         .select("id, tenant_id, instagram_handle")
         .eq("id", body.account_id)
         .maybeSingle();
@@ -153,7 +153,7 @@ serve(async (req) => {
     } else if (body.instagram_handle) {
       const handle = body.instagram_handle.toLowerCase().trim();
       const { data, error } = await sb
-        .from("scouter_spam_accounts")
+        .from("scouter_spammer_accounts")
         .select("id, tenant_id, instagram_handle")
         .eq("instagram_handle", handle)
         .order("created_at", { ascending: false })
@@ -169,7 +169,7 @@ serve(async (req) => {
 
     // Marcar como scanning para que el frontend muestre estado.
     await sb
-      .from("scouter_spam_accounts")
+      .from("scouter_spammer_accounts")
       .update({ scan_status: "scanning", scan_error: null })
       .eq("id", accountRow.id);
 
@@ -183,7 +183,7 @@ serve(async (req) => {
 
     if (!snapshot) {
       await sb
-        .from("scouter_spam_accounts")
+        .from("scouter_spammer_accounts")
         .update({
           scan_status: "failed",
           scan_error: "No se pudo fetchear el perfil de IG (cuenta privada, baneada, o IG bloqueó la request).",
@@ -200,7 +200,7 @@ serve(async (req) => {
     } catch (aiErr) {
       const msg = (aiErr as Error).message ?? "Error de IA.";
       await sb
-        .from("scouter_spam_accounts")
+        .from("scouter_spammer_accounts")
         .update({
           scan_status: "failed",
           scan_error: `IA: ${msg}`,
@@ -210,11 +210,15 @@ serve(async (req) => {
       return jsonError(msg, 502);
     }
 
-    // Persistir resultado completo.
+    // Persistir resultado completo. Importante:
+    // - profile_pic_url (no profile_photo_url) — la tabla existente ya
+    //   usa esa convención, así que la respetamos.
+    // - NO pisamos display_name — el spammer lo eligió a mano cuando
+    //   registró la cuenta; el full_name del IG sería ruido.
     const { error: updateErr } = await sb
-      .from("scouter_spam_accounts")
+      .from("scouter_spammer_accounts")
       .update({
-        profile_photo_url: snapshot.profile_pic_url,
+        profile_pic_url: snapshot.profile_pic_url,
         followers_count: snapshot.followers_count,
         following_count: snapshot.following_count,
         posts_count: snapshot.posts_count,
@@ -225,8 +229,6 @@ serve(async (req) => {
         last_scanned_at: new Date().toISOString(),
         scan_status: "done",
         scan_error: null,
-        // Si display_name está vacío, lo setiamos del full_name de IG.
-        display_name: snapshot.full_name,
       })
       .eq("id", accountRow.id);
 

@@ -25,12 +25,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  type ScouterSpamAccount,
-  type SpamAccountAiAnalysis,
-  type SpamAccountAiRedFlag,
-  useRescanSpamAccount,
-  useSpamAccounts,
-} from "@/hooks/useScouterSpamAccounts";
+  type SpammerAccount,
+  type SpammerAccountAiAnalysis,
+  type SpammerAccountAiRedFlag,
+  useRescanSpammerAccount,
+  useSpammerAccounts,
+} from "@/hooks/useSpammerAccounts";
+import { useTenantProfiles } from "@/hooks/useAgencyQa";
 import { toast } from "sonner";
 
 // SpammerAccountsTab — vista del manager: lista de cuentas de IG que
@@ -42,7 +43,7 @@ import { toast } from "sonner";
 interface AggregatedAccount {
   // Datos agregados por handle (la representante es la fila más
   // reciente con scan completo, o cualquier una si ninguna scaneó).
-  representative: ScouterSpamAccount;
+  representative: SpammerAccount;
   // Lista de scouters / spammers que usan esta cuenta (deduplicada
   // por nombre).
   operators: Array<{ id: string; name: string }>;
@@ -76,18 +77,24 @@ const fmtCount = (n: number | null | undefined): string => {
 };
 
 const SpammerAccountsTab = () => {
-  const accountsQ = useSpamAccounts();
-  const rescan = useRescanSpamAccount();
+  const accountsQ = useSpammerAccounts();
+  const profilesQ = useTenantProfiles();
+  const rescan = useRescanSpammerAccount();
   const [search, setSearch] = useState("");
   const [openHandle, setOpenHandle] = useState<string | null>(null);
   const [filterPending, setFilterPending] = useState(false);
   const [filterFailed, setFilterFailed] = useState(false);
 
   // Agrupar por handle — cuando varios spammers usan la misma cuenta,
-  // se muestra UNA sola card con la lista de operators.
+  // se muestra UNA sola card con la lista de operators (los user_id
+  // de la fila se resuelven contra profiles.full_name).
   const aggregated = useMemo<AggregatedAccount[]>(() => {
     const list = accountsQ.data ?? [];
-    const byHandle = new Map<string, ScouterSpamAccount[]>();
+    const profileNameById = new Map<string, string>();
+    (profilesQ.data ?? []).forEach((p) => {
+      if (p.full_name) profileNameById.set(p.id, p.full_name);
+    });
+    const byHandle = new Map<string, SpammerAccount[]>();
     list.forEach((a) => {
       const arr = byHandle.get(a.instagram_handle) ?? [];
       arr.push(a);
@@ -107,8 +114,8 @@ const SpammerAccountsTab = () => {
       const operators = Array.from(
         new Map(
           rows
-            .filter((r) => r.scouter_id)
-            .map((r) => [r.scouter_id!, { id: r.scouter_id!, name: r.scouter_name ?? "(sin nombre)" }]),
+            .filter((r) => r.user_id)
+            .map((r) => [r.user_id, { id: r.user_id, name: profileNameById.get(r.user_id) ?? "(sin nombre)" }]),
         ).values(),
       );
       aggArr.push({
@@ -127,7 +134,7 @@ const SpammerAccountsTab = () => {
       return a.representative.instagram_handle.localeCompare(b.representative.instagram_handle);
     });
     return aggArr;
-  }, [accountsQ.data]);
+  }, [accountsQ.data, profilesQ.data]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -305,7 +312,7 @@ const SpammerCard = ({
     >
       {/* Header: avatar + score circle */}
       <div className="flex items-start gap-3 p-4">
-        <Avatar src={r.profile_photo_url} fallback={r.instagram_handle} size={48} />
+        <Avatar src={r.profile_pic_url} fallback={r.instagram_handle} size={48} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="truncate font-mono text-sm font-semibold">@{r.instagram_handle}</span>
@@ -547,13 +554,13 @@ const StatBox = ({
 
 // ─── Detail dialog ─────────────────────────────────────────────────
 
-const SEVERITY_STYLE: Record<SpamAccountAiRedFlag["severity"], string> = {
+const SEVERITY_STYLE: Record<SpammerAccountAiRedFlag["severity"], string> = {
   low: "bg-amber-500/15 text-amber-400",
   medium: "bg-orange-500/15 text-orange-400",
   high: "bg-rose-500/15 text-rose-400",
 };
 
-const WOULD_RESPOND_STYLE: Record<NonNullable<SpamAccountAiAnalysis["would_respond"]>, { label: string; cls: string }> = {
+const WOULD_RESPOND_STYLE: Record<NonNullable<SpammerAccountAiAnalysis["would_respond"]>, { label: string; cls: string }> = {
   si: { label: "Sí respondería", cls: "bg-emerald-500/15 text-emerald-400" },
   tal_vez: { label: "Tal vez respondería", cls: "bg-amber-500/15 text-amber-400" },
   no: { label: "No respondería", cls: "bg-rose-500/15 text-rose-400" },
@@ -583,7 +590,7 @@ const SpammerDetailDialog = ({
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start gap-3">
-            <Avatar src={r.profile_photo_url} fallback={r.instagram_handle} size={56} />
+            <Avatar src={r.profile_pic_url} fallback={r.instagram_handle} size={56} />
             <div className="min-w-0 flex-1">
               <DialogTitle className="flex items-center gap-2">
                 <a
