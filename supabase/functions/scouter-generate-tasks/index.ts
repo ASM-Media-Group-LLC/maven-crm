@@ -27,15 +27,15 @@ const corsHeaders = {
 };
 
 // Migrado de Groq → Gemini 2.5 Flash. Free tier de Gemini = 5 RPM /
-// 250K TPM — el TPM ya no es el problema (el prompt + lead chunk pesa
-// ~3k tokens), pero el RPM sí: 5 calls/min. Por eso bajamos el chunk
-// a 5 leads (no 10) y subimos el throttle a 12s — queda bajo el RPM
-// con margen. 50 leads / 5 = 10 chunks × 12s = ~120s, todavía bajo
-// el timeout de 150s de la edge function. Si un spammer tiene >50
-// leads asignables se reduce el batch_size por body.
+// 250K TPM — el RPM (5 calls/min) es el cuello de botella, así que
+// throtteamos 12s entre calls. Para 200 tareas/día el chunk subió a
+// 20 leads (input ~12k tokens — sigue holgado en el 1M context de
+// 2.5 Flash y no satura el TPM). Math: 200 / 20 = 10 chunks × 12s =
+// 120s, bajo el timeout de 150s del edge. Si un spammer tiene > 200
+// leads asignables se reduce vía body.batch_size.
 const GEMINI_MODEL = Deno.env.get("SCOUTER_GEMINI_MODEL") || "gemini-2.5-flash";
-const BATCH_SIZE_DEFAULT = 50;
-const CHUNK_SIZE = 5;
+const BATCH_SIZE_DEFAULT = 200;
+const CHUNK_SIZE = 20;
 const THROTTLE_MS = 12_000;
 const COOLDOWN_DAYS_DEFAULT = 3;
 // Si un spammer arrastra ≥ este número de assignments pending tras el
@@ -236,10 +236,10 @@ async function processSpammer(
 
   // 2. Rollover: si ayer quedaron assignments incompletas (status !=
   // 'done'), las traemos al día de HOY. Eso le garantiza al spammer
-  // que sus 50 tareas NO se pierden cuando no las cierra todas — en
-  // vez de eso se acumulan al día siguiente y el quota nuevo del día
-  // solo cubre la diferencia. Si rollover llena los 50 slots (o más),
-  // la generación nueva se acorta o salta.
+  // que sus tareas NO se pierden cuando no las cierra todas — en vez
+  // de eso se acumulan al día siguiente y el quota nuevo del día (200
+  // por default) solo cubre la diferencia. Si rollover llena los slots
+  // (o más), la generación nueva se acorta o salta.
   const rolledCount = await rolloverPending(supabase, tenantId, spammerId);
   if (rolledCount > 0) {
     console.log(

@@ -416,7 +416,30 @@ export const useUploadScreenshot = () => {
 // gap between current pending and the target. Bypasses the backlog cap so
 // the user can re-fill at any time without waiting for the cron.
 
-export const TOP_UP_TARGET = 50;
+export const TOP_UP_TARGET = 200;
+
+// Cooldown: el botón "Generar más tareas" se inhabilita 5h después de
+// cada uso exitoso. Se persiste en localStorage por user_id para que
+// sobreviva refrescos. Si no hay user_id (ej: pre-auth), no aplica.
+export const TOP_UP_COOLDOWN_MS = 5 * 60 * 60 * 1000; // 5 horas
+const TOP_UP_COOLDOWN_KEY_PREFIX = "scouter:top-up:last-at:";
+
+const cooldownKey = (userId: string) => `${TOP_UP_COOLDOWN_KEY_PREFIX}${userId}`;
+
+export const getTopUpCooldownRemaining = (userId: string | null | undefined): number => {
+  if (!userId || typeof window === "undefined") return 0;
+  const raw = window.localStorage.getItem(cooldownKey(userId));
+  if (!raw) return 0;
+  const lastAt = Number(raw);
+  if (!Number.isFinite(lastAt)) return 0;
+  const elapsed = Date.now() - lastAt;
+  return Math.max(0, TOP_UP_COOLDOWN_MS - elapsed);
+};
+
+export const markTopUpUsed = (userId: string) => {
+  if (!userId || typeof window === "undefined") return;
+  window.localStorage.setItem(cooldownKey(userId), String(Date.now()));
+};
 
 export const useGenerateTasks = () => {
   const qc = useQueryClient();
@@ -449,6 +472,12 @@ export const useGenerateTasks = () => {
       const result = data as { assignments_created?: number; errors?: string[] };
       if (result.errors?.length) {
         throw new Error(result.errors.join("; "));
+      }
+      // Marcamos el cooldown 5h apenas se logra una generación con
+      // resultado real (>=1 tarea creada). Si no creó nada, no hay
+      // razón para bloquear el botón.
+      if ((result.assignments_created ?? 0) > 0) {
+        markTopUpUsed(userRes.user.id);
       }
       return { created: result.assignments_created ?? 0, target: TOP_UP_TARGET };
     },

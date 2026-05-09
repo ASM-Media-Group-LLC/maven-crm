@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Loader2, ClipboardList, RefreshCw } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { Loader2, ClipboardList, RefreshCw, Hourglass } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -13,8 +13,14 @@ import { TaskCard } from "@/components/scouter/TaskCard";
 import { ManagerDashboard } from "@/components/scouter/ManagerDashboard";
 import SpammerOnboarding from "@/pages/scouter/SpammerOnboarding";
 import { useSpammerAccounts } from "@/hooks/useSpammerAccounts";
-import { useDailyAssignments, useGenerateTasks, TOP_UP_TARGET } from "@/hooks/useSpammerTasks";
+import {
+  getTopUpCooldownRemaining,
+  useDailyAssignments,
+  useGenerateTasks,
+  TOP_UP_TARGET,
+} from "@/hooks/useSpammerTasks";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/hooks/useAuth";
 import type { DailyAssignment } from "@/hooks/useSpammerTasks";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -110,7 +116,35 @@ const MisTareas = () => {
   );
   const isToday = selectedDate === todayIso();
   const generateTasks = useGenerateTasks();
-  const canTopUp = isToday && pendingCount < TOP_UP_TARGET;
+  const { user } = useAuth();
+
+  // Cooldown del botón "Generar tareas" — 5h después de cada uso
+  // exitoso. Usamos un tick que se actualiza cada minuto para que el
+  // contador se refresque sin polling agresivo. La fuente de verdad
+  // está en localStorage por user_id (ver useSpammerTasks).
+  const [cooldownTick, setCooldownTick] = useState(0);
+  const cooldownRemainingMs = useMemo(
+    () => getTopUpCooldownRemaining(user?.id),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user?.id, cooldownTick, generateTasks.isSuccess],
+  );
+  useEffect(() => {
+    if (cooldownRemainingMs <= 0) return;
+    const t = setInterval(() => setCooldownTick((n) => n + 1), 60_000);
+    return () => clearInterval(t);
+  }, [cooldownRemainingMs]);
+
+  const canTopUp =
+    isToday && pendingCount < TOP_UP_TARGET && cooldownRemainingMs === 0;
+
+  // Formato compacto: "4h 23m" o "23m" si queda <1h.
+  const fmtCooldown = (ms: number): string => {
+    if (ms <= 0) return "";
+    const totalMin = Math.ceil(ms / 60_000);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
 
   // Loading state
   if (accountsQ.isLoading || roleLoading) {
@@ -193,9 +227,9 @@ const MisTareas = () => {
 
         {/* Top-up button — only visible to non-managers (a manager
             looking at this view typically isn't the assignee), only on
-            today's date, and disabled when already at target. The
-            mutation passes the current pending count and asks the edge
-            function to generate (TOP_UP_TARGET - pending) new assignments. */}
+            today's date, disabled cuando ya alcanzó el target o cuando
+            está en cooldown 5h post-uso. El cooldown se muestra como
+            "Esperá 4h 23m" en el botón. */}
         {!isManagerRole && isToday && (
           <Button
             size="sm"
@@ -204,21 +238,31 @@ const MisTareas = () => {
             onClick={() => generateTasks.mutate(pendingCount)}
             className="ml-auto gap-2"
             title={
-              !canTopUp
-                ? `Ya tenés ${pendingCount}/${TOP_UP_TARGET} tareas pendientes`
-                : `Generar ${TOP_UP_TARGET - pendingCount} tareas más`
+              cooldownRemainingMs > 0
+                ? `En cooldown — disponible en ${fmtCooldown(cooldownRemainingMs)}`
+                : !canTopUp
+                  ? `Ya tenés ${pendingCount}/${TOP_UP_TARGET} tareas pendientes`
+                  : `Generar ${TOP_UP_TARGET - pendingCount} tareas más`
             }
           >
             {generateTasks.isPending ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : cooldownRemainingMs > 0 ? (
+              <Hourglass className="h-3.5 w-3.5" />
             ) : (
               <RefreshCw className="h-3.5 w-3.5" />
             )}
             <span className="text-xs">
-              Llenar a {TOP_UP_TARGET}
-              <span className="ml-1 opacity-70">
-                ({pendingCount}/{TOP_UP_TARGET})
-              </span>
+              {cooldownRemainingMs > 0 ? (
+                <>Esperá {fmtCooldown(cooldownRemainingMs)}</>
+              ) : (
+                <>
+                  Llenar a {TOP_UP_TARGET}
+                  <span className="ml-1 opacity-70">
+                    ({pendingCount}/{TOP_UP_TARGET})
+                  </span>
+                </>
+              )}
             </span>
           </Button>
         )}
