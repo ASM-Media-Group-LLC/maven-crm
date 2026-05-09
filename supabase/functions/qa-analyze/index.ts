@@ -324,28 +324,12 @@ serve(async (req) => {
       return jsonError("El análisis no tiene la estructura esperada. Reintentá.", 502);
     }
 
-    // Hard cap/floor por outcome — Claude a veces ignora la instrucción
-    // del prompt y le pone 85 a una llamada que terminó "en_espera", o
-    // baja a 50 una que cerró. El outcome es la realidad del negocio:
-    // si no cerró, el closer no entregó resultado por buena que haya
-    // sido la conversación; si cerró, aprueba por más fallas que tenga
-    // el procedimiento.
-    const rawScore = (analysis as { overall_score: number }).overall_score;
-    const outcome = (analysis as { call_outcome?: string }).call_outcome;
-    const outcomeCap =
-      outcome === "en_espera" ? 45 :
-      outcome === "no_cerro"  ? 40 :
-      100;
-    const outcomeFloor = outcome === "cerro" ? 75 : 0;
-    const score = Math.max(outcomeFloor, Math.min(rawScore, outcomeCap));
-    if (score !== rawScore) {
-      (analysis as Record<string, unknown>).overall_score = score;
-      (analysis as Record<string, unknown>).score_capped_from = rawScore;
-      (analysis as Record<string, unknown>).score_cap_reason =
-        outcome === "cerro"
-          ? `outcome=cerro → floor=${outcomeFloor}`
-          : `outcome=${outcome} → cap=${outcomeCap}`;
-    }
+    // El score lo decide 100% Claude — el prompt ya le instruye que
+    // penalice fuerte (15-40) cuando outcome ≠ "cerro" y que sea
+    // generoso (75-100) cuando cerró. Antes había un cap/floor en
+    // código aplicado encima, pero la lógica de negocio vive mejor en
+    // el prompt y deja al modelo más espacio para matizar.
+    const score = (analysis as { overall_score: number }).overall_score;
 
     const { data: updated, error: updateErr } = await supabase
       .from("qa_calls")

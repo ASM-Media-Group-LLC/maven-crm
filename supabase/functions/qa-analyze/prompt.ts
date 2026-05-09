@@ -104,7 +104,12 @@ Analiza el transcript (con el feedback humano si aparece) y devuelve EXCLUSIVAME
   ],
   "red_flags": [{"type": "<uno de los enum>", "description": "<string>", "quote": "<string LITERAL del transcript>"}],
   "key_moments": [{"kind": "positivo" | "negativo", "quote": "<string LITERAL del transcript>", "why": "<string: una línea>"}],
-  "improvements": ["<string accionable>", "<string>", "<string>"]
+  "improvements": ["<string accionable>", "<string>", "<string>"],
+  "non_closure_analysis": {
+    "causes": ["<string específico citando transcript>", "..."],
+    "future_strategies": ["<string accionable para próximo intento>", "..."],
+    "recovery_likelihood": "alta" | "media" | "baja" | "casi_nula"
+  } | null
 }
 
 REGLAS IMPORTANTES
@@ -123,18 +128,24 @@ CALL_OUTCOME — reglas finas
 - "no_cerro": rechazo explícito.
 - "en_espera": todo lo demás (default — "se va a pensar", "consulto y te aviso", fecha aspiracional sin firma/pago).
 
-CAP / FLOOR DE SCORE POR OUTCOME (regla dura, prevalece sobre el rubric)
-Lo único que importa al final es que la modelo CIERRE. Por bien hecho que esté el procedimiento, sin cierre el closer no entrega resultado.
+SCORE POR OUTCOME — vos decidís el número, pero respetá esta lógica de negocio
+Lo único que importa al final es que la modelo CIERRE. Por bien hecho que esté el procedimiento, SIN CIERRE el closer no entregó resultado. Esto no es una métrica auxiliar — es la métrica principal y debe pesar fuerte sobre el score.
 
-- Si \`call_outcome = "cerro"\` → APROBADO SEGURO. \`overall_score\` MÍNIMO 75 (floor) y sin techo. La nota sigue variando según rubric pero nunca baja de 75 — cerró, eso manda. Ej: rubric 50 → 75, rubric 80 → 80, rubric 95 → 95.
-- Si \`call_outcome = "en_espera"\` → \`overall_score\` NO puede exceder 45. "En espera" es prácticamente un NO con un poco de cortesía: "lo pienso", "te aviso", "consulto". Las probabilidades de cierre real desde ese estado son bajas. Aun con buen procedimiento, sin cierre vinculante el techo es 45/100. NO seas generoso con estas llamadas.
-- Si \`call_outcome = "no_cerro"\` → \`overall_score\` NO puede exceder 40. Rechazo explícito: la propuesta o el manejo no convencieron; daño al pipeline.
+REGLA CRÍTICA: "en_espera" = "no_cerro" para efectos de score
+"En espera" es en la práctica un NO con cortesía ("lo pienso", "te aviso", "consulto", fecha aspiracional sin firma/pago). El cierre vinculante NO ocurrió. Trátalo igual que "no_cerro" cuando puntúes — la diferencia es solo de tono, no de resultado de negocio.
 
-- Aplicá el cap/floor DESPUÉS de calcular el score por rubric:
-  - Rubric da 85 + outcome "en_espera" → devolvés 45.
-  - Rubric da 70 + outcome "no_cerro"  → devolvés 40.
-  - Rubric da 60 + outcome "cerro"     → devolvés 75.
-  - Rubric da 90 + outcome "cerro"     → devolvés 90.
+- Si \`call_outcome = "cerro"\` → la llamada cumplió su propósito. Puntúa generoso (típicamente 75-100 según qué tan bien se hizo el procedimiento). Aún si hubo fallas en rubric, cerrar manda.
+- Si \`call_outcome = "en_espera"\` o \`"no_cerro"\` → no hubo cierre vinculante = la llamada NO entregó resultado. PENALIZA FUERTE — típicamente 15-40 sin importar qué tan bien se haya manejado la conversación. Cumplir TODOS los criterios verdes sin cierre = score bajo. La modelo no firmó, no pagó, no se comprometió. Eso es lo que importa.
+
+NO te dejes llevar por que "todos los criterios estén cumplidos". Si la modelo no cerró ni dio compromiso vinculante, el resultado de negocio es negativo y eso debe reflejarse en el score. Mejor 30 con todos los criterios verdes pero sin cierre, que 75 inflado por buena vibra. La rubric mide procedimiento; el score final mide resultado, y resultado sin cierre es resultado fallido.
+
+ANÁLISIS DE NO-CIERRE — obligatorio si outcome ≠ "cerro"
+Cuando la llamada NO cerró (en_espera o no_cerro), debes incluir en el JSON el bloque \`non_closure_analysis\` con:
+- \`causes\`: 3-5 causas concretas y específicas de POR QUÉ no cerró. Citá texto literal del transcript donde sea posible. No genéricas tipo "le faltó cierre" — específicas tipo "la modelo objetó el porcentaje del 50% y el closer no profundizó en qué incluye realmente el servicio antes de defender el número".
+- \`future_strategies\`: 3-5 estrategias accionables para un PRÓXIMO intento con esta misma modelo. Específicas a las objeciones detectadas, no genéricas. Ej: "antes de mencionar porcentaje, anclar el discovery en sus picos de ingresos máximos para que el % se compare contra ese baseline" en lugar de "trabajar manejo de objeciones".
+- \`recovery_likelihood\`: "alta" | "media" | "baja" | "casi_nula" — qué tan probable es recuperar a esta modelo en un futuro intento, basado en su nivel de interés y las causas detectadas.
+
+Si outcome = "cerro" omitir \`non_closure_analysis\` o devolver null.
 
 INTEREST_LEVEL — modelo
 - alto: pide detalles concretos, comparte números, entusiasmo verbal.
