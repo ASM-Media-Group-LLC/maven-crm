@@ -52,20 +52,11 @@ import {
   useQaSectionFeedback,
   useUpsertQaSectionFeedback,
   useDeleteQaSectionFeedback,
-  useSetQaModelIgUrl,
   type CallAnalysis,
   type CallOutcome,
   type QaSectionFeedback,
   type QaSectionType,
 } from "@/hooks/useAgencyQa";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 // CallDetailPage — port directo de Kash (kash-call-qa/app/calls/[id]/page.tsx)
 // con la paleta de colores de Maven: el dorado (--gold #c9a96e) se reemplaza
@@ -1769,13 +1760,16 @@ const CallDetailPage = ({
   );
 };
 
-// ModelNameLink — componente para el nombre de la modelo en el hero.
-// Si la modelo tiene ig_url cargado → link directo a Instagram.
-// Si NO tiene → botón con dialog inline para cargar el IG, persistir
-// en qa_models, y entonces abrir el link. UX: el manager nunca queda
-// sin forma de ir al IG aunque el closer haya olvidado cargarlo.
+// ModelNameLink — el nombre del modelo siempre es link. Si la modelo
+// tiene ig_url cargado, abre directo. Si no (caso de QAs viejas
+// subidas antes de hacer required el campo IG), abre una búsqueda de
+// Google "<nombre> instagram" — funciona como fallback útil para que
+// el manager encuentre la cuenta en una pestaña sin pasar por dialogs.
+//
+// El form de subida QA ahora tiene IG required (validación en
+// AgencyNewQa.tsx), así que las QAs nuevas siempre van a entrar al
+// path con ig_url directo. El fallback de Google es para data legacy.
 const ModelNameLink = ({
-  modelId,
   name,
   igUrl,
 }: {
@@ -1783,121 +1777,20 @@ const ModelNameLink = ({
   name: string;
   igUrl: string | null;
 }) => {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const setIg = useSetQaModelIgUrl();
-
-  // Normaliza el input — acepta @user, instagram.com/user, https://...,
-  // y devuelve la URL completa para guardar.
-  const normalize = (raw: string): string | null => {
-    let s = raw.trim();
-    if (!s) return null;
-    // Si parece URL completa, dejala como está.
-    if (/^https?:\/\//i.test(s)) return s;
-    // Quitamos @ si arranca con eso.
-    s = s.replace(/^@+/, "");
-    // Quitamos prefijo instagram.com/ si lo tipearon sin protocolo.
-    s = s.replace(/^(www\.)?instagram\.com\//i, "");
-    s = s.split("?")[0].split("/")[0].toLowerCase();
-    if (!/^[a-z0-9._]+$/.test(s)) return null;
-    return `https://instagram.com/${s}`;
-  };
-
-  if (igUrl) {
-    return (
-      <a
-        href={igUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="truncate text-2xl font-black tracking-tight transition-colors hover:text-pink-400"
-        title="Ver Instagram"
-      >
-        {name}
-      </a>
-    );
-  }
-
-  const handleSave = async () => {
-    if (!modelId) {
-      toast.error("No se encontró el ID de la modelo.");
-      return;
-    }
-    const normalized = normalize(draft);
-    if (!normalized) {
-      toast.error("Handle de Instagram inválido.");
-      return;
-    }
-    try {
-      await setIg.mutateAsync({ model_id: modelId, ig_url: normalized });
-      toast.success("Instagram guardado");
-      setEditing(false);
-      // Abrimos en una pestaña nueva para que el manager confirme que
-      // está bien. Si fue mal, puede volver y editarlo.
-      window.open(normalized, "_blank", "noopener,noreferrer");
-    } catch (err) {
-      toast.error("No se pudo guardar", { description: (err as Error).message });
-    }
-  };
-
+  const targetUrl =
+    igUrl ??
+    `https://www.google.com/search?q=${encodeURIComponent(`${name} instagram`)}`;
+  const isFallback = !igUrl;
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          setDraft("");
-          setEditing(true);
-        }}
-        className="truncate text-2xl font-black tracking-tight transition-colors hover:text-pink-400 text-left"
-        title="Cargar Instagram para esta modelo"
-      >
-        {name}
-      </button>
-      <Dialog open={editing} onOpenChange={setEditing}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cargar Instagram de {name}</DialogTitle>
-            <DialogDescription className="text-xs">
-              Esta modelo todavía no tiene IG cargado. Pegá el handle o la URL
-              y se guarda en el roster — la próxima vez el nombre va a ser
-              link directo.
-            </DialogDescription>
-          </DialogHeader>
-          <Input
-            placeholder="@user, instagram.com/user, o URL completa"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void handleSave();
-              }
-            }}
-          />
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditing(false)}
-              disabled={setIg.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={setIg.isPending || !draft.trim()}
-              className="gap-1.5"
-            >
-              {setIg.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <InstagramIcon className="h-3.5 w-3.5" />
-              )}
-              Guardar y abrir
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+    <a
+      href={targetUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="truncate text-2xl font-black tracking-tight transition-colors hover:text-pink-400"
+      title={isFallback ? `Buscar a ${name} en Instagram` : "Ver Instagram"}
+    >
+      {name}
+    </a>
   );
 };
 

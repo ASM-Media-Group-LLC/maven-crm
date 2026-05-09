@@ -193,7 +193,10 @@ const AgencyNewQa = () => {
   if (!closerId) errors.closer = "Elegí un closer";
   if (!modelName.trim()) errors.model = "Nombre de la modelo requerido";
   if (!modelCategory) errors.category = "Categoría requerida";
+  if (!modelCountry.trim()) errors.country = "País de la modelo requerido";
+  if (!modelIgUrl.trim()) errors.ig = "Instagram de la modelo requerido";
   if (!callDate) errors.callDate = "Fecha requerida";
+  if (!evaluatorName.trim()) errors.evaluator = "Evaluador requerido";
   if (!audioFile) errors.audio = "Subí el audio de la llamada";
 
   const isValid = Object.keys(errors).length === 0;
@@ -458,17 +461,24 @@ const AgencyNewQa = () => {
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="country">País modelo</Label>
+                <Label htmlFor="country">País modelo *</Label>
                 <CountryCombobox value={modelCountry} onChange={setModelCountry} />
+                {errors.country && (
+                  <p className="text-xs text-rose-400">{errors.country}</p>
+                )}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ig">Instagram</Label>
+                <Label htmlFor="ig">Instagram *</Label>
                 <Input
                   id="ig"
                   placeholder="@user o instagram.com/user"
                   value={modelIgUrl}
                   onChange={(e) => setModelIgUrl(e.target.value)}
+                  required
                 />
+                {errors.ig && (
+                  <p className="text-xs text-rose-400">{errors.ig}</p>
+                )}
               </div>
             </div>
 
@@ -495,13 +505,17 @@ const AgencyNewQa = () => {
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="evaluator">Evaluador</Label>
+                <Label htmlFor="evaluator">Evaluador *</Label>
                 <Input
                   id="evaluator"
-                  placeholder="Tu nombre (opcional, default: tu perfil)"
+                  placeholder="Tu nombre (default: tu perfil)"
                   value={evaluatorName}
                   onChange={(e) => setEvaluatorName(e.target.value)}
+                  required
                 />
+                {errors.evaluator && (
+                  <p className="text-xs text-rose-400">{errors.evaluator}</p>
+                )}
               </div>
             </div>
 
