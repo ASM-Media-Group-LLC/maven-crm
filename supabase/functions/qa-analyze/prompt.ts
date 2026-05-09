@@ -47,6 +47,7 @@ RUBRIC DE EVALUACIÓN — puntúa cada dimensión 1-10
 10. Cierre o siguiente paso claro — Pide la venta o propone un next step concreto (revisar contrato, kickoff, trial). Nada de "te llamo cuando quieras".
 11. Tono y registro — Habla con cercanía y picardía adaptada al mundo de OF: cómplice, relajado pero profesional, con malicia. Evita lenguaje corporativo, jerga B2B y formalidad excesiva. Adapta su energía a la de la modelo. Lidera sin sonar a vendedor de telemarketing.
 12. Discovery cross-portfolio — Toda llamada debe tener AL MENOS UN INTENTO de cross-portfolio: o una pregunta de discovery dirigida a detectar necesidades adyacentes al management de OF (protección de contenido, plataformas alternativas, servicios complementarios), o una mención/oferta directa de otra compañía del portfolio aunque sea como argumento adicional sin pregunta previa. Si el closer NO hace nada cross-portfolio en toda la llamada (ni una pregunta, ni una mención), esta dimensión NO puede exceder 30/100 — es una falla estructural. Si pregunta pero no detecta señales y prioriza correctamente la agencia, 60-70. Si pregunta + detecta señal + abre puerta o deja follow-up, 80-100. Penaliza también el extremo opuesto: forzar venta cruzada agresiva sin señal de fit (over-selling) baja a 40-50.
+13. Manejo de cámara — Protocolo obligatorio del equipo: si la modelo ENTRA con cámara encendida, el closer debe agradecerlo explícitamente al inicio (frase tipo "gracias por entrar con cam", "te agradezco la cam", o equivalente). Si la modelo entra SIN cámara, el closer debe PEDIRLE que la prenda (frase tipo "¿podés prender la cam?", "te pido si podés encender la cámara", o equivalente). Conexión visual real es crítica para una venta high-ticket. Cómo puntuar: cumplimiento del protocolo (gracias o pedido según corresponda) → 80-100. Si la modelo entró sin cam y el closer NO la pidió en TODA la llamada → MÁXIMO 30/100. Si la modelo entró con cam y el closer NO agradeció → 40-60. Si del transcript no podés determinar si había cam (no hay señales claras), puntúa 70 neutro y mencionalo en feedback. Importante: este criterio es INDEPENDIENTE del cierre — incluso si la llamada cerró, si no se cumplió el protocolo de cam la dim baja igual.
 
 RED FLAGS — penalizaciones fuertes, cítalos con texto literal del transcript
 
@@ -63,6 +64,7 @@ RED FLAGS — penalizaciones fuertes, cítalos con texto literal del transcript
 - ceguera_portfolio: Aparecen señales claras de necesidad de otro producto del portfolio (ver lista de compañías) y el closer las ignora — no pregunta, no anota como follow-up. La modelo terminó la llamada sin que se le haya abierto ninguna puerta más allá de OF management.
 - no_intento_cross_portfolio: El closer no hizo NINGÚN intento cross-portfolio en toda la llamada — ni una pregunta de discovery dirigida a otras compañías, ni una mención/oferta de otro producto del portfolio. Es una falla estructural y se dispara siempre que la llamada termina sin haber tocado el tema, INDEPENDIENTEMENTE de si la modelo dio señales o no. La regla del negocio es: cada call debería al menos sondear. Distinto de ceguera_portfolio (que requiere señales claras ignoradas).
 - cross_sell_forzado: El closer empuja productos del portfolio sin señales de fit, distrayendo del cierre principal de OF management. Pitcheo agresivo de varios productos en la misma llamada.
+- protocolo_cam_no_cumplido: Falla del protocolo de cámara — la modelo entró sin cam y el closer no se la pidió en toda la llamada, O la modelo entró con cam y el closer nunca lo agradeció. Independiente del outcome del cierre.
 - otro: Otra conducta problemática no listada — explícala.
 
 FEEDBACK DEL SUPERVISOR (cuando aparezca)
@@ -98,7 +100,7 @@ Analiza el transcript (con el feedback humano si aparece) y devuelve EXCLUSIVAME
   },
   "dimensions": [
     {"name": "Apertura y cercanía", "score": <int 0-100>, "feedback": "<string: una línea>"},
-    ... 12 entradas en total, una por dimensión del rubric (escala 0-100)
+    ... 13 entradas en total, una por dimensión del rubric (escala 0-100)
   ],
   "red_flags": [{"type": "<uno de los enum>", "description": "<string>", "quote": "<string LITERAL del transcript>"}],
   "key_moments": [{"kind": "positivo" | "negativo", "quote": "<string LITERAL del transcript>", "why": "<string: una línea>"}],
@@ -112,7 +114,7 @@ REGLAS IMPORTANTES
 - Los \`improvements\` deben ser 3 acciones accionables para ESTE closer específico, no consejos genéricos de ventas.
 - Si el transcript parece incompleto o no es una llamada de ventas de agencia a modelo, indícalo en \`summary\` y puntúa solo lo evaluable.
 - El closer puede ser hombre o mujer; usa lenguaje neutro o adapta al género si es claro en el transcript.
-- Los \`dimensions\` deben tener exactamente 12 entradas con los nombres del rubric (Apertura y cercanía, Escucha activa, Regla 40/60, Discovery / diagnóstico objetivo, Identificación de palancas de crecimiento, Credibilidad como socio estratégico, Propuesta de valor personalizada, Confianza sobre contenido íntimo y relaciones con fans, Manejo de objeciones, Cierre o siguiente paso claro, Tono y registro, Discovery cross-portfolio).
+- Los \`dimensions\` deben tener exactamente 13 entradas con los nombres del rubric (Apertura y cercanía, Escucha activa, Regla 40/60, Discovery / diagnóstico objetivo, Identificación de palancas de crecimiento, Credibilidad como socio estratégico, Propuesta de valor personalizada, Confianza sobre contenido íntimo y relaciones con fans, Manejo de objeciones, Cierre o siguiente paso claro, Tono y registro, Discovery cross-portfolio, Manejo de cámara).
 - DEVUELVE SOLO EL JSON. Nada antes, nada después. Sin \`\`\`json ni \`\`\`.
 
 CALL_OUTCOME — reglas finas
