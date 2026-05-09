@@ -604,6 +604,30 @@ export const useUpsertQaModel = () =>
     },
   });
 
+/** Setea (o limpia) el ig_url de una modelo existente. Usado en el
+ *  CallDetailPage cuando el manager edita el IG desde el nombre. */
+export const useSetQaModelIgUrl = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { model_id: string; ig_url: string | null }): Promise<void> => {
+      const { error } = await sb
+        .from("qa_models")
+        .update({ ig_url: input.ig_url?.trim() || null })
+        .eq("id", input.model_id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      // Las queries del detail page leen call.model.ig_url joineado, así
+      // que invalidamos rosters y queries de calls para que el dato
+      // nuevo entre en la próxima render.
+      qc.invalidateQueries({ queryKey: ["qa-calls"] });
+      qc.invalidateQueries({ queryKey: ["qa-call"] });
+      qc.invalidateQueries({ queryKey: ["qa-models"] });
+      qc.invalidateQueries({ queryKey: ["qa-models-with-stats"] });
+    },
+  });
+};
+
 /** Lookup all CRM profiles. Used by Nueva QA para popular el closer
  *  dropdown — cualquier empleado de la empresa puede ser closer de
  *  una llamada (managers / supervisores también cubren a veces).
