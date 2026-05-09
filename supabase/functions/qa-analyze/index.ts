@@ -96,10 +96,23 @@ serve(async (req) => {
         500,
       );
     }
-    // Modelo configurable. Default: claude-sonnet-4-20250514 (buen balance
-    // calidad/costo). Para máxima calidad: claude-opus-4-20250514.
-    const CLAUDE_MODEL =
-      Deno.env.get("CLAUDE_MODEL") || "claude-sonnet-4-20250514";
+    // Modelo configurable por TIER de la modelo:
+    //   A++ y A+ → premium (Opus 4.7) — modelos top que justifican el
+    //   costo extra del análisis más fino.
+    //   A / B+ / B / C+ / C / null → standard (Sonnet 4.6) — buen
+    //   balance calidad/costo, suficiente para el grueso del catálogo.
+    //
+    // Override por env si querés ajustar:
+    //   CLAUDE_MODEL_PREMIUM   — modelo para A++/A+ (default: claude-opus-4-7)
+    //   CLAUDE_MODEL_STANDARD  — modelo para el resto (default: claude-sonnet-4-6)
+    //   CLAUDE_MODEL           — legacy/fuerza para TODAS las calls (override total)
+    //
+    // El pick efectivo se hace abajo cuando ya tenemos category de la modelo.
+    const CLAUDE_MODEL_PREMIUM =
+      Deno.env.get("CLAUDE_MODEL_PREMIUM") || "claude-opus-4-7";
+    const CLAUDE_MODEL_STANDARD =
+      Deno.env.get("CLAUDE_MODEL_STANDARD") || "claude-sonnet-4-6";
+    const CLAUDE_MODEL_FORCE = Deno.env.get("CLAUDE_MODEL");
 
     let body: AnalyzeRequest;
     try {
@@ -281,6 +294,18 @@ serve(async (req) => {
       "{{PRODUCT_PORTFOLIO}}",
       portfolioList,
     );
+
+    // Pick del modelo según category. Premium tier = A++ / A+ (modelos
+    // top que justifican el costo extra). Resto va a standard. Si está
+    // seteado el override CLAUDE_MODEL, ese gana sobre todo (escape
+    // hatch para casos como debug o forzar todas a Opus en una corrida).
+    const cat = (c.model?.category ?? "").trim();
+    const isPremiumTier = cat === "A++" || cat === "A+";
+    const CLAUDE_MODEL = CLAUDE_MODEL_FORCE
+      ? CLAUDE_MODEL_FORCE
+      : isPremiumTier
+        ? CLAUDE_MODEL_PREMIUM
+        : CLAUDE_MODEL_STANDARD;
 
     // Call Claude via Anthropic Messages API
     let raw: string;
