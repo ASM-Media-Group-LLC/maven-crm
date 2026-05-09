@@ -247,88 +247,46 @@ export const useUpdateLeadField = () => {
   });
 };
 
-/** Fetch lightweight agent stats across ALL leads in a date range (no pagination limit) */
+/** Fetch lightweight agent stats across ALL leads in a date range.
+ *  Antes traíamos toda la tabla y agregábamos en JS — ahora Postgres
+ *  hace el GROUP BY via RPC `leadgen_agent_stats`. ~10-100x más rápido. */
 export const useLeadGenAgentStats = (dateFrom?: string, dateTo?: string) =>
   useQuery({
     queryKey: ["leadgen-agent-stats", dateFrom, dateTo],
     queryFn: async () => {
-      const baseQuery = () => {
-        let q = supabase
-          .from("leadgen_entries")
-          .select("lg_user_id, quality, created_at");
-        if (dateFrom && dateTo) {
-          q = q.gte("entry_date", dateFrom).lte("entry_date", dateTo);
-        }
-        return q;
-      };
-
-      let all: Array<{ lg_user_id: string; quality: string; created_at: string }> = [];
-      let page = 0;
-      while (true) {
-        const { data, error } = await baseQuery()
-          .order("created_at", { ascending: false })
-          .range(page * 1000, (page + 1) * 1000 - 1);
-        if (error) throw error;
-        all = all.concat((data || []) as any);
-        if (!data || data.length < 1000) break;
-        page++;
-      }
-
-      const byAgent: Record<string, { total: number; byQuality: Record<string, number>; firstLead: string }> = {};
-      all.forEach((r) => {
-        if (!byAgent[r.lg_user_id]) {
-          byAgent[r.lg_user_id] = { total: 0, byQuality: {}, firstLead: r.created_at };
-        }
-        byAgent[r.lg_user_id].total++;
-        const q = r.quality?.toLowerCase() || "c";
-        byAgent[r.lg_user_id].byQuality[q] = (byAgent[r.lg_user_id].byQuality[q] || 0) + 1;
-        if (r.created_at < byAgent[r.lg_user_id].firstLead) {
-          byAgent[r.lg_user_id].firstLead = r.created_at;
-        }
+      const { data, error } = await supabase.rpc("leadgen_agent_stats", {
+        p_date_from: dateFrom ?? null,
+        p_date_to: dateTo ?? null,
       });
-      return byAgent;
+      if (error) throw error;
+      // Shape preservada del JS antiguo:
+      //   { [user_id]: { total, byQuality, firstLead } }
+      return (data ?? {}) as Record<
+        string,
+        { total: number; byQuality: Record<string, number>; firstLead: string }
+      >;
     },
     staleTime: 2 * 60 * 1000,
   });
 
-/** Fetch summary stats across ALL leads in a date range (no pagination limit) */
+/** Fetch summary stats across ALL leads in a date range. RPC-based
+ *  (mismo motivo que useLeadGenAgentStats). */
 export const useLeadGenSummaryStats = (dateFrom?: string, dateTo?: string, userId?: string) =>
   useQuery({
     queryKey: ["leadgen-summary-stats", dateFrom, dateTo, userId],
     queryFn: async () => {
-      const baseQuery = () => {
-        let q = supabase
-          .from("leadgen_entries")
-          .select("quality, phone_raw, phone_e164");
-        if (dateFrom && dateTo) {
-          q = q.gte("entry_date", dateFrom).lte("entry_date", dateTo);
-        }
-        if (userId) {
-          q = q.eq("lg_user_id", userId);
-        }
-        return q;
-      };
-
-      let all: Array<{ quality: string; phone_raw: string | null; phone_e164: string | null }> = [];
-      let page = 0;
-      while (true) {
-        const { data, error } = await baseQuery()
-          .range(page * 1000, (page + 1) * 1000 - 1);
-        if (error) throw error;
-        all = all.concat((data || []) as any);
-        if (!data || data.length < 1000) break;
-        page++;
-      }
-
-      const byQuality: Record<string, number> = { "a+": 0, a: 0, "b+": 0, b: 0, c: 0 };
-      let qa = 0;
-      all.forEach(r => {
-        const q = r.quality?.toLowerCase() || "c";
-        if (q in byQuality) byQuality[q]++;
-        if (r.phone_raw || r.phone_e164) qa++;
+      const { data, error } = await supabase.rpc("leadgen_summary_stats", {
+        p_date_from: dateFrom ?? null,
+        p_date_to: dateTo ?? null,
+        p_user_id: userId ?? null,
       });
-
-      return { total: all.length, qa, byQuality };
+      if (error) throw error;
+      // Shape preservada: { total, qa, byQuality: { "a+", "a", "b+", "b", "c" } }
+      return (data ?? { total: 0, qa: 0, byQuality: { "a+": 0, a: 0, "b+": 0, b: 0, c: 0 } }) as {
+        total: number;
+        qa: number;
+        byQuality: Record<string, number>;
+      };
     },
     staleTime: 2 * 60 * 1000,
   });
