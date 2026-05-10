@@ -786,14 +786,15 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
         >
           <Settings className="h-4 w-4" />
         </Button>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
           onClick={handleLogout}
           title="Salir"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-md shadow-accent/25 ring-1 ring-accent/30 transition-all hover:shadow-lg hover:shadow-accent/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         >
           <LogOut className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
     );
   }
@@ -844,16 +845,18 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
         <span>Settings</span>
       </button>
 
-      {/* Salir — Maven-styled pill: rose gradient, soft glow ring, slight
-          lift on hover. Keeps the destructive intent (red) but feels
-          like the rest of the app instead of a flat danger button. */}
+      {/* Salir — ghost button, mismo lenguaje que Settings.
+          La intención destructiva se comunica solo en hover (icono +
+          texto pasan a text-destructive). Sin gradient ni shadow:
+          deja de competir con el active state bar y con el resto de
+          la navegación. */}
       <button
         type="button"
         onClick={handleLogout}
-        className="group flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-br from-accent to-primary px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-accent/25 ring-1 ring-accent/30 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-accent/40 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        className="group flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover hover:!text-destructive"
       >
-        <LogOut className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-        Salir
+        <LogOut className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-destructive" />
+        <span>Salir</span>
       </button>
     </div>
   );
