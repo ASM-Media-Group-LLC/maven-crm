@@ -112,6 +112,12 @@ export interface ChatterMessage {
   // notifique cambios sin tabla extra. Si la columna todavía no existe
   // en el DB (pre-migración), las queries devuelven `[]` por default.
   reactions: MessageReaction[];
+  // Edit tracking. `edited_at` es null si nunca se editó; cualquier
+  // edición lo bumpea y empuja el contenido viejo a content_history
+  // (newest-first). El chatter sólo ve la "(editado)" tag; el examiner
+  // puede abrir el historial.
+  edited_at: string | null;
+  content_history: Array<{ content: string | null; edited_at: string | null }>;
   created_at: string;
 }
 

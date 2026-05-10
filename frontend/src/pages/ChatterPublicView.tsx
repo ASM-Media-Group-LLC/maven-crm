@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Clock, Check, CheckCheck } from "lucide-react";
+import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Clock, Check, CheckCheck, SmilePlus as Smile } from "lucide-react";
 import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { VolumeControl, playSoundFile } from "@/pages/chatter-evaluator/workspace/VolumeControl";
 import { MediaViewer } from "@/pages/chatter-evaluator/workspace/MediaViewer";
@@ -184,9 +184,11 @@ const ReactionsRowChatter = ({
   );
 };
 
-// Botón de reacción rápida sobre cada bubble. Se muestra siempre (no
-// hover-only) porque en mobile el hover no dispara y el chatter
-// principalmente usa el celular.
+// Reaction picker — mirrors the examiner-side ReactionPickerButton in
+// look + behavior so the two sides feel consistent. Hover-only on
+// desktop (group-hover/bubble:opacity-100) so the icon doesn't clutter
+// every message; on touch devices it stays at half opacity (the
+// `opacity-50` baseline) so the chatter can still tap it.
 const ReactionPickerChatter = ({
   align,
   onPick,
@@ -204,11 +206,12 @@ const ReactionPickerChatter = ({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-6 w-6 items-center justify-center rounded-full bg-background text-muted-foreground opacity-50 shadow-sm ring-1 ring-border hover:bg-muted hover:text-foreground hover:opacity-100"
+        className="flex h-6 w-6 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground hover:opacity-100 group-hover/bubble:opacity-100 data-[state=open]:opacity-100"
         title="Reaccionar"
         aria-label="Reaccionar"
+        data-state={open ? "open" : "closed"}
       >
-        😊
+        <Smile className="h-3.5 w-3.5" />
       </button>
       {open && (
         <div className="absolute top-full mt-1 flex gap-0.5 rounded-md border bg-popover p-1 shadow-md z-10">
@@ -333,13 +336,22 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
             }`}
           >
             {msg.content}
-            {/* Chatter-only delete — siempre visible (matches the always-on
-                X used on the examiner's own bubbles). */}
+            {msg.edited_at && (
+              <span
+                className="ml-1 text-[10px] italic opacity-60"
+                title={`Editado ${new Date(msg.edited_at).toLocaleString()}`}
+              >
+                (editado)
+              </span>
+            )}
+            {/* Chatter-only delete. Botón discreto: aparece al hover en
+                desktop, semi-visible (opacity-50) en touch para que el
+                chatter pueda tapearlo sin necesidad de hover. */}
             {isMine && (
               <button
                 type="button"
                 onClick={() => onDelete(msg)}
-                className="absolute -left-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white opacity-70 shadow-sm hover:opacity-100 hover:bg-rose-600"
+                className="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-rose-500 hover:text-white hover:opacity-100 group-hover/bubble:opacity-100"
                 title="Eliminar mensaje"
                 aria-label="Eliminar mensaje"
               >

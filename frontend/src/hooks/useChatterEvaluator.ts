@@ -892,6 +892,58 @@ export const useDeleteExaminerMessage = () => {
   });
 };
 
+/** Examiner-side message edit. Pushes the OLD content + edited_at into
+ *  content_history (newest-first), then writes the new content and
+ *  bumps edited_at. The chatter sees a small "(editado)" tag below
+ *  the bubble; the examiner can additionally open a history dialog. */
+export const useEditExaminerMessage = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      messageId,
+      newContent,
+    }: {
+      sessionId: string;
+      messageId: string;
+      newContent: string;
+    }): Promise<void> => {
+      const { data: row, error: readErr } = await sb
+        .from("chatter_messages")
+        .select("content, edited_at, content_history")
+        .eq("id", messageId)
+        .maybeSingle();
+      if (readErr) throw readErr;
+      const current = row as
+        | {
+            content: string | null;
+            edited_at: string | null;
+            content_history: Array<{ content: string | null; edited_at: string | null }> | null;
+          }
+        | null;
+      if (!current) throw new Error("mensaje no encontrado");
+      const history = Array.isArray(current.content_history)
+        ? current.content_history
+        : [];
+      const nextHistory = [
+        { content: current.content, edited_at: current.edited_at },
+        ...history,
+      ];
+      const { error: updErr } = await sb
+        .from("chatter_messages")
+        .update({
+          content: newContent,
+          edited_at: new Date().toISOString(),
+          content_history: nextHistory,
+        })
+        .eq("id", messageId);
+      if (updErr) throw updErr;
+    },
+    onSuccess: (_, vars) =>
+      qc.invalidateQueries({ queryKey: ["chatter-messages", vars.sessionId] }),
+  });
+};
+
 export const useDeleteChatterSession = () => {
   const qc = useQueryClient();
   return useMutation({

@@ -1,7 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square, X as XIcon, Mic, MicOff, SmilePlus } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square, X as XIcon, Mic, MicOff, SmilePlus, MoreVertical, History, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Popover,
   PopoverContent,
@@ -25,6 +40,7 @@ import {
   usePurchaseChatterMessage,
   useEndChatterSession,
   useDeleteExaminerMessage,
+  useEditExaminerMessage,
   useToggleMessageReaction,
 } from "@/hooks/useChatterEvaluator";
 import { useAuth } from "@/hooks/useAuth";
@@ -210,6 +226,8 @@ const MessageBubble = ({
   onPurchase,
   purchasing,
   onDelete,
+  onEdit,
+  onShowHistory,
   currentUserId,
   onToggleReaction,
 }: {
@@ -224,8 +242,13 @@ const MessageBubble = ({
   onPurchase: (msg: ChatterMessage) => void;
   purchasing: boolean;
   /** Examiner-side delete (sets deleted='full'). Only invoked from the
-   *  ✕ button on the examiner's own (fan-role) bubbles. */
+   *  3-dot menu on the examiner's own (fan-role) bubbles. */
   onDelete: (msg: ChatterMessage) => void;
+  /** Examiner-side edit. Opens an edit dialog whose Save action calls
+   *  the useEditExaminerMessage mutation. */
+  onEdit: (msg: ChatterMessage) => void;
+  /** Examiner-only history viewer for edited messages. */
+  onShowHistory: (msg: ChatterMessage) => void;
   /** Auth user id del que está mirando el chat — para saber si SU
    *  reacción está activa en cada emoji. */
   currentUserId: string | null;
@@ -281,7 +304,11 @@ const MessageBubble = ({
   const isPriced = !isFan && (msg.price ?? 0) > 0 && msg.images && msg.images.length > 0;
 
   return (
-    <div className={`flex gap-2 ${isFan ? "" : "flex-row-reverse"}`}>
+    // Alignment estilo WhatsApp / iMessage desde el punto de vista del
+    // examiner: SUS mensajes (role='fan') van a la DERECHA con color
+    // primario; los del chatter (role='chatter') van a la IZQUIERDA en
+    // tono neutral. Antes estaba al revés y resultaba confuso.
+    <div className={`flex gap-2 ${isFan ? "flex-row-reverse" : ""}`}>
       <div className="aspect-square h-8 w-8 shrink-0 overflow-hidden rounded-full bg-muted">
         {avatar ? (
           <img
@@ -303,7 +330,7 @@ const MessageBubble = ({
           </div>
         )}
       </div>
-      <div className={`flex max-w-[70%] flex-col ${isFan ? "items-start" : "items-end"}`}>
+      <div className={`flex max-w-[70%] flex-col ${isFan ? "items-end" : "items-start"}`}>
         <span className="text-[10px] text-muted-foreground">{name}</span>
         {(msg.content || msg.deleted === "chatter") && (
           <div
@@ -311,35 +338,65 @@ const MessageBubble = ({
               msg.deleted === "chatter"
                 ? "rounded-bl-sm bg-rose-500 text-white"
                 : isFan
-                ? "rounded-bl-sm bg-muted text-foreground"
-                : "rounded-br-sm bg-primary text-primary-foreground"
+                ? "rounded-br-sm bg-primary text-primary-foreground"
+                : "rounded-bl-sm bg-muted text-foreground"
             }`}
           >
             {/* Examiner keeps seeing the chatter's original message even
                 after the chatter soft-deletes it — the bubble just turns
                 rose and gets a small "eliminado" tag below the body. */}
             {msg.content}
+            {msg.edited_at && (
+              <button
+                type="button"
+                onClick={() => onShowHistory(msg)}
+                className="ml-1 text-[10px] italic opacity-60 hover:opacity-100 hover:underline"
+                title="Ver historial de cambios"
+              >
+                (editado)
+              </button>
+            )}
             {msg.deleted === "chatter" && (
               <div className="mt-0.5 text-[10px] italic opacity-90">eliminado</div>
             )}
-            {/* Examiner-only delete. Mirrors the original Roleplaychatters
-                position (CSS line 625): top:-8px on the side opposite the
-                bubble tail (which is bottom-RIGHT for fan messages here,
-                so the X goes top-LEFT to stay clear of the speech tail
-                and to avoid getting clipped on the right edge of the
-                container). Always visible — the previous hover-only
-                version wasn't reliably triggering, especially on touch
-                devices, so the user couldn't find the button at all. */}
+            {/* Examiner-side 3-dot menu. Replaces the previous always-visible
+                X (which the user found visually noisy). Sits on the side
+                OPPOSITE the bubble's speech tail (fan messages are right-
+                aligned with bottom-right tail, so the menu goes top-left).
+                Editar / Eliminar / Historial — Historial only when the
+                message has been edited. */}
             {isFan && (
-              <button
-                type="button"
-                onClick={() => onDelete(msg)}
-                className="absolute -left-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white opacity-70 shadow-sm hover:opacity-100 hover:bg-rose-600"
-                title="Eliminar mensaje"
-                aria-label="Eliminar mensaje"
-              >
-                <XIcon className="h-3 w-3" />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="absolute -left-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground group-hover/bubble:opacity-100 data-[state=open]:opacity-100"
+                    title="Opciones del mensaje"
+                    aria-label="Opciones del mensaje"
+                  >
+                    <MoreVertical className="h-3 w-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-44">
+                  <DropdownMenuItem onClick={() => onEdit(msg)}>
+                    <Pencil className="mr-2 h-3.5 w-3.5" />
+                    Editar mensaje
+                  </DropdownMenuItem>
+                  {msg.edited_at && (msg.content_history?.length ?? 0) > 0 && (
+                    <DropdownMenuItem onClick={() => onShowHistory(msg)}>
+                      <History className="mr-2 h-3.5 w-3.5" />
+                      Historial de cambios
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={() => onDelete(msg)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                    Eliminar mensaje
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             {/* Reacción rápida — flota al lado opuesto a la cola del
                 bubble. Para mensajes del fan (left-aligned) → derecha;
@@ -567,6 +624,7 @@ export const ChatPanel = ({ session }: Props) => {
   const extendMut = useExtendChatterSession();
   const purchaseMut = usePurchaseChatterMessage();
   const deleteMsgMut = useDeleteExaminerMessage();
+  const editMsgMut = useEditExaminerMessage();
   const reactionMut = useToggleMessageReaction();
   const { user: authUser } = useAuth();
   const profileQ = useMyProfile();
@@ -601,6 +659,9 @@ export const ChatPanel = ({ session }: Props) => {
   const [linkCopied, setLinkCopied] = useState(false);
   const chatFontSize = useChatFontSize();
   const [confirmDelMsg, setConfirmDelMsg] = useState<ChatterMessage | null>(null);
+  const [editMsg, setEditMsg] = useState<ChatterMessage | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [historyMsg, setHistoryMsg] = useState<ChatterMessage | null>(null);
   const updateConfigMut = useUpdateChatterConfig();
   const examinerEmojis =
     configQ.data?.examiner_emojis && configQ.data.examiner_emojis.length > 0
@@ -1140,6 +1201,11 @@ export const ChatPanel = ({ session }: Props) => {
             readByOther={session?.read_by_chatter_at ?? null}
             onOpenMedia={(url) => setMediaUrl(url)}
             onDelete={(target) => setConfirmDelMsg(target)}
+            onEdit={(target) => {
+              setEditMsg(target);
+              setEditDraft(target.content ?? "");
+            }}
+            onShowHistory={(target) => setHistoryMsg(target)}
             onPurchase={(target) => {
               if (!session || !target.price) return;
               purchaseMut.mutate(
@@ -1276,6 +1342,121 @@ export const ChatPanel = ({ session }: Props) => {
 
       <MediaViewer url={mediaUrl} onClose={() => setMediaUrl(null)} />
       <TipPopup amount={tipAmount} onDone={() => setTipAmount(null)} />
+
+      {/* Edit-message dialog. Pre-fills the textarea with the current
+          content; Save calls useEditExaminerMessage which appends the
+          old version to content_history before writing the new one. */}
+      <Dialog
+        open={!!editMsg}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEditMsg(null);
+            setEditDraft("");
+          } else if (editMsg) {
+            setEditDraft(editMsg.content ?? "");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar mensaje</DialogTitle>
+            <DialogDescription>
+              El chatter va a ver el texto nuevo + una pequeña tag
+              "(editado)" debajo de la burbuja.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={editDraft}
+            onChange={(e) => setEditDraft(e.target.value)}
+            rows={4}
+            placeholder="Texto del mensaje…"
+            className="resize-none"
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditMsg(null);
+                setEditDraft("");
+              }}
+              disabled={editMsgMut.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (!editMsg || !session) return;
+                const next = editDraft.trim();
+                if (!next || next === (editMsg.content ?? "").trim()) {
+                  setEditMsg(null);
+                  setEditDraft("");
+                  return;
+                }
+                editMsgMut.mutate(
+                  { sessionId: session.id, messageId: editMsg.id, newContent: next },
+                  {
+                    onSuccess: () => {
+                      setEditMsg(null);
+                      setEditDraft("");
+                    },
+                    onError: (err) =>
+                      toast.error("No se pudo editar", {
+                        description: (err as Error).message,
+                      }),
+                  },
+                );
+              }}
+              disabled={editMsgMut.isPending || !editDraft.trim()}
+            >
+              {editMsgMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* History dialog — examiner-only. Newest version at the top, with
+          the current (post-edit) content shown as the first card so the
+          user always sees the full timeline at a glance. */}
+      <Dialog open={!!historyMsg} onOpenChange={(o) => !o && setHistoryMsg(null)}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Historial del mensaje</DialogTitle>
+            <DialogDescription>
+              {historyMsg?.content_history?.length ?? 0} versión(es) anterior(es).
+              La actual es la que ve el chatter ahora.
+            </DialogDescription>
+          </DialogHeader>
+          {historyMsg && (
+            <div className="space-y-2">
+              <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
+                <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  <span>Actual</span>
+                  {historyMsg.edited_at && (
+                    <span className="font-normal normal-case text-muted-foreground">
+                      editada {new Date(historyMsg.edited_at).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                <div className="whitespace-pre-wrap text-sm">{historyMsg.content}</div>
+              </div>
+              {(historyMsg.content_history ?? []).map((h, i) => (
+                <div key={i} className="rounded-lg border bg-muted/30 p-3">
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {i === 0 ? "Versión previa" : `Versión hace ${i + 1}`}
+                    {h.edited_at && (
+                      <span className="ml-2 font-normal normal-case">
+                        ({new Date(h.edited_at).toLocaleString()})
+                      </span>
+                    )}
+                  </div>
+                  <div className="whitespace-pre-wrap text-sm">{h.content || <em className="opacity-60">(vacío)</em>}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete-message confirm — same Maven-styled AlertDialog as the
           other destructive flows, no native browser prompt. */}
