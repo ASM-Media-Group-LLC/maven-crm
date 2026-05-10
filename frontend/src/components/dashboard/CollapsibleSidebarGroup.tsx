@@ -44,7 +44,7 @@ interface Props {
 export const CollapsibleSidebarGroup = ({
   label,
   storageKey,
-  defaultOpen = true,
+  defaultOpen = false,
   icon: Icon,
   active = false,
   collapsedItems,
