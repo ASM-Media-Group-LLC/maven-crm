@@ -322,29 +322,24 @@ const MessageBubble = ({
             {msg.deleted === "chatter" && (
               <div className="mt-0.5 text-[10px] italic opacity-90">eliminado</div>
             )}
-            {/* Examiner-only delete — floats OUTSIDE the bubble on the
-                side opposite the avatar (right side) so it doesn't crash
-                into the avatar slot. Hidden by default; appears only
-                while hovering the bubble. The transparent <span> is a
-                "bridge": it sits in the gap between the bubble and the
-                button, keeping the group hover active while the cursor
-                crosses over so the button doesn't blink off mid-move. */}
+            {/* Examiner-only delete. Mirrors the original Roleplaychatters
+                position (CSS line 625): top:-8px on the side opposite the
+                bubble tail (which is bottom-RIGHT for fan messages here,
+                so the X goes top-LEFT to stay clear of the speech tail
+                and to avoid getting clipped on the right edge of the
+                container). Always visible — the previous hover-only
+                version wasn't reliably triggering, especially on touch
+                devices, so the user couldn't find the button at all. */}
             {isFan && (
-              <>
-                <span
-                  aria-hidden
-                  className="absolute right-[-28px] top-0 bottom-0 w-7 pointer-events-auto"
-                />
-                <button
-                  type="button"
-                  onClick={() => onDelete(msg)}
-                  className="absolute right-[-28px] top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm ring-1 ring-border hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
-                  title="Eliminar mensaje"
-                  aria-label="Eliminar mensaje"
-                >
-                  <XIcon className="h-3 w-3" />
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => onDelete(msg)}
+                className="absolute -left-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white opacity-70 shadow-sm hover:opacity-100 hover:bg-rose-600"
+                title="Eliminar mensaje"
+                aria-label="Eliminar mensaje"
+              >
+                <XIcon className="h-3 w-3" />
+              </button>
             )}
             {/* Reacción rápida — flota al lado opuesto a la cola del
                 bubble. Para mensajes del fan (left-aligned) → derecha;
