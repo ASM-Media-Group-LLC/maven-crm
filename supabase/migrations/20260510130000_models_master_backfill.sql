@@ -14,8 +14,21 @@
 --
 -- IMPORTANTE: rows con handle NULL o vacío NO migran (decisión: "lead
 -- sin handle = basura"). Quedan en sus tablas viejas con model_id NULL.
+-- EXCEPCIÓN: creators con phone pero sin handle SÍ migran (~25 rows) —
+-- son clientes firmados, no basura.
+--
+-- NOTA SOBRE TENANT_ID: closers_contacts / closer_creators / creators
+-- son pre-multi-tenant y no tienen columna tenant_id. Usamos el único
+-- tenant existente en el sistema (ASM Tech). Cuando se haga el refactor
+-- multi-tenant de esas tablas, este script ya no aplica — pero para la
+-- migración actual asumimos single-tenant.
 
 BEGIN;
+
+-- Default tenant: el único que existe en el sistema hoy (ASM Tech).
+-- Usado para las tablas pre-multi-tenant que no tienen columna tenant_id.
+CREATE TEMP TABLE IF NOT EXISTS _default_tenant AS
+  SELECT id FROM public.tenants ORDER BY created_at LIMIT 1;
 
 -- ─── 1. Backfill de `models` ───────────────────────────────────────────
 --
@@ -36,7 +49,9 @@ WITH all_handles AS (
   -- Aggregate functions con FILTER recorren todos los rows y eligen
   -- el primer non-null según el orden de prioridad (creators primero).
   SELECT
-    coalesce(c.tenant_id, ccr.tenant_id, cc.tenant_id, sl.tenant_id, le.tenant_id) AS tenant_id,
+    -- Solo leadgen_entries y scouter_leads tienen tenant_id columna.
+    -- Las otras 3 tablas son single-tenant; usamos el default.
+    coalesce(sl.tenant_id, le.tenant_id, (SELECT id FROM _default_tenant)) AS tenant_id,
     h.handle AS instagram_handle,
     -- display_name: creators > closer_creators > closers_contacts > scouter_leads
     coalesce(c.name, ccr.name, cc.name, sl.name) AS display_name,
@@ -98,7 +113,47 @@ SELECT
   followers_count, posts_count, last_scraped_at, created_at
 FROM all_handles
 WHERE tenant_id IS NOT NULL  -- defensa: handles huérfanos sin tenant
-ON CONFLICT (tenant_id, instagram_handle) DO NOTHING;
+ON CONFLICT DO NOTHING;  -- partial unique index sobre (tenant, lower(handle)) WHERE NOT NULL
+
+-- ─── 1b. Backfill de creators SIN handle pero CON phone ────────────────
+--
+-- Edge case real: ~25 creators firmados nunca capturaron IG, pero tienen
+-- contrato + phone. Política "sin handle = basura" no aplica porque son
+-- clientes activos. Dedup por (tenant, phone_e164) — si dos creators
+-- tienen el mismo phone, asumimos que son la misma persona física.
+
+INSERT INTO public.models (
+  tenant_id, instagram_handle, display_name, country, city, state,
+  onlyfans_url, created_at
+)
+WITH phone_only_creators AS (
+  -- DISTINCT ON (tenant, phone) elige el más viejo por phone para
+  -- preservar el created_at original (si dos creators con mismo phone
+  -- existen, agarra el primero registrado).
+  -- creators no tiene tenant_id propio → usamos el default tenant.
+  SELECT DISTINCT ON (phone_normalized)
+    (SELECT id FROM _default_tenant) AS tenant_id,
+    name, country, city, state, onlyfans_url, created_at,
+    phone_normalized
+  FROM (
+    SELECT name, country, city, state, onlyfans_url, created_at, phone_e164, phone,
+           coalesce(regexp_replace(phone_e164, '[^0-9+]', '', 'g'),
+                    regexp_replace(phone, '[^0-9+]', '', 'g')) AS phone_normalized
+    FROM public.creators
+    WHERE (instagram_handle IS NULL OR trim(instagram_handle) = '')
+      AND (phone_e164 IS NOT NULL OR phone IS NOT NULL)
+  ) c
+  WHERE phone_normalized ~ '^\+?[0-9]{6,15}$'
+  ORDER BY phone_normalized, created_at ASC
+)
+SELECT
+  tenant_id, NULL, name, country, city, state, onlyfans_url, created_at
+FROM phone_only_creators;
+
+-- Estos no tienen handle, así que no van a chocar con el partial unique
+-- index. Pero podríamos correr este script 2 veces y duplicar — la
+-- protección está en el ON CONFLICT del backfill de model_phones más
+-- abajo, que dedupea por (tenant, model_id, phone_e164).
 
 -- ─── 2. Backfill de `model_phones` ─────────────────────────────────────
 --
@@ -140,7 +195,7 @@ WITH all_phones AS (
     m.tenant_id, m.id, regexp_replace(cc.phone, '[^0-9+]', '', 'g'),
     cc.phone, 'closers_contacts', NULL, cc.phone_first_set_at
   FROM public.closers_contacts cc
-  JOIN public.models m ON m.tenant_id = cc.tenant_id
+  JOIN public.models m ON m.tenant_id = (SELECT id FROM _default_tenant)
                        AND m.instagram_handle = lower(trim(cc.handle))
   WHERE cc.phone_first_set_at IS NOT NULL
     AND cc.phone IS NOT NULL
@@ -152,7 +207,7 @@ WITH all_phones AS (
     m.tenant_id, m.id, regexp_replace(ccr.phone, '[^0-9+]', '', 'g'),
     ccr.phone, 'closer_creators', NULL, ccr.phone_first_set_at
   FROM public.closer_creators ccr
-  JOIN public.models m ON m.tenant_id = ccr.tenant_id
+  JOIN public.models m ON m.tenant_id = (SELECT id FROM _default_tenant)
                        AND m.instagram_handle = lower(trim(ccr.instagram_handle))
   WHERE ccr.phone_first_set_at IS NOT NULL
     AND ccr.phone IS NOT NULL
@@ -166,7 +221,7 @@ WITH all_phones AS (
              regexp_replace(c.phone, '[^0-9+]', '', 'g')),
     coalesce(c.phone, c.phone_e164), 'creators', NULL, c.phone_first_set_at
   FROM public.creators c
-  JOIN public.models m ON m.tenant_id = c.tenant_id
+  JOIN public.models m ON m.tenant_id = (SELECT id FROM _default_tenant)
                        AND m.instagram_handle = lower(trim(c.instagram_handle))
   WHERE c.phone_first_set_at IS NOT NULL
     AND (c.phone_e164 IS NOT NULL OR c.phone IS NOT NULL)
@@ -192,6 +247,32 @@ SELECT
   tenant_id, model_id, phone_e164, phone_raw,
   source_module, captured_by, captured_at, 'active'
 FROM deduped
+ON CONFLICT (tenant_id, model_id, phone_e164) DO NOTHING;
+
+-- ─── 2b. Backfill de model_phones para los no-handle creators ─────────
+-- Estos models recién creados (paso 1b) tienen handle=NULL. Los linkeamos
+-- al phone original del creator vía phone normalizado.
+
+INSERT INTO public.model_phones (
+  tenant_id, model_id, phone_e164, phone_raw,
+  source_module, captured_at, status
+)
+SELECT DISTINCT ON (m.id, p.phone_normalized)
+  m.tenant_id, m.id, p.phone_normalized, c.phone,
+  'creators', c.phone_first_set_at, 'active'
+FROM public.creators c
+CROSS JOIN LATERAL (
+  SELECT coalesce(regexp_replace(c.phone_e164, '[^0-9+]', '', 'g'),
+                  regexp_replace(c.phone, '[^0-9+]', '', 'g')) AS phone_normalized
+) p
+JOIN public.models m
+  ON m.tenant_id = (SELECT id FROM _default_tenant)
+ AND m.instagram_handle IS NULL
+ AND m.created_at = c.created_at  -- match por timestamp + sin handle (proxy de identidad)
+ AND m.display_name IS NOT DISTINCT FROM c.name
+WHERE (c.instagram_handle IS NULL OR trim(c.instagram_handle) = '')
+  AND (c.phone_e164 IS NOT NULL OR c.phone IS NOT NULL)
+  AND p.phone_normalized ~ '^\+?[0-9]{6,15}$'
 ON CONFLICT (tenant_id, model_id, phone_e164) DO NOTHING;
 
 -- Marcar como is_primary el phone más reciente por modelo. Si tiene
@@ -230,10 +311,12 @@ WHERE sl.tenant_id = m.tenant_id
   AND trim(sl.instagram_handle) <> ''
   AND sl.model_id IS NULL;
 
+-- closers_contacts / closer_creators / creators NO tienen tenant_id
+-- (pre-multi-tenant). El JOIN se hace contra el tenant default.
 UPDATE public.closers_contacts cc
 SET model_id = m.id
 FROM public.models m
-WHERE cc.tenant_id = m.tenant_id
+WHERE m.tenant_id = (SELECT id FROM _default_tenant)
   AND m.instagram_handle = lower(trim(cc.handle))
   AND cc.handle IS NOT NULL
   AND trim(cc.handle) <> ''
@@ -242,7 +325,7 @@ WHERE cc.tenant_id = m.tenant_id
 UPDATE public.closer_creators ccr
 SET model_id = m.id
 FROM public.models m
-WHERE ccr.tenant_id = m.tenant_id
+WHERE m.tenant_id = (SELECT id FROM _default_tenant)
   AND m.instagram_handle = lower(trim(ccr.instagram_handle))
   AND ccr.instagram_handle IS NOT NULL
   AND trim(ccr.instagram_handle) <> ''
@@ -251,11 +334,27 @@ WHERE ccr.tenant_id = m.tenant_id
 UPDATE public.creators c
 SET model_id = m.id
 FROM public.models m
-WHERE c.tenant_id = m.tenant_id
+WHERE m.tenant_id = (SELECT id FROM _default_tenant)
   AND m.instagram_handle = lower(trim(c.instagram_handle))
   AND c.instagram_handle IS NOT NULL
   AND trim(c.instagram_handle) <> ''
   AND c.model_id IS NULL;
+
+-- ─── 3b. Linking de creators-sin-handle vía phone ──────────────────────
+-- Para los 25 creators con phone pero sin handle (ver paso 1b), linkeamos
+-- el creator a su model recién creado matcheando por phone normalizado.
+
+UPDATE public.creators c
+SET model_id = mp.model_id
+FROM public.model_phones mp
+JOIN public.models m ON m.id = mp.model_id AND m.instagram_handle IS NULL
+WHERE mp.tenant_id = (SELECT id FROM _default_tenant)
+  AND c.model_id IS NULL
+  AND (c.instagram_handle IS NULL OR trim(c.instagram_handle) = '')
+  AND mp.phone_e164 = coalesce(
+    regexp_replace(c.phone_e164, '[^0-9+]', '', 'g'),
+    regexp_replace(c.phone, '[^0-9+]', '', 'g')
+  );
 
 -- ─── 4. Validation queries (no hacen cambios, solo reportan) ───────────
 -- Estos resultados se loggean al aplicar la migration para verificar

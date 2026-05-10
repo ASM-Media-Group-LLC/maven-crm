@@ -19,9 +19,13 @@ CREATE TABLE IF NOT EXISTS public.models (
                   DEFAULT public.current_tenant_id(),
 
   -- Clave natural normalizada a lowercase + sin espacios.
-  -- UNIQUE per tenant — futuro white-label permite la misma modelo en
-  -- otra agencia sin colisión.
-  instagram_handle text NOT NULL,
+  -- NULLABLE para soportar el edge case "creator firmado sin handle de IG"
+  -- (25 rows en producción al día del refactor) — esos creators tienen
+  -- phone + contrato pero nunca capturamos su IG. Quedan en `models` con
+  -- handle NULL y el dedup en backfill se hace via phone.
+  -- UNIQUE per tenant cuando hay handle — definido como partial unique
+  -- index abajo, no como CONSTRAINT, para que el NULL no rompa la regla.
+  instagram_handle text,
 
   -- Identidad display
   display_name    text,
@@ -49,15 +53,22 @@ CREATE TABLE IF NOT EXISTS public.models (
   updated_at      timestamptz NOT NULL DEFAULT now(),
   created_by      uuid REFERENCES auth.users(id) ON DELETE SET NULL,
 
-  CONSTRAINT models_handle_per_tenant UNIQUE (tenant_id, instagram_handle),
-  CONSTRAINT models_handle_not_empty CHECK (length(trim(instagram_handle)) > 0)
+  CONSTRAINT models_handle_not_empty CHECK (instagram_handle IS NULL OR length(trim(instagram_handle)) > 0)
 );
 
 CREATE INDEX IF NOT EXISTS models_tenant_idx
   ON public.models (tenant_id);
 
+-- Partial UNIQUE: el handle es único por tenant CUANDO existe. Para los
+-- modelos sin handle (creators con contrato pero sin IG capturado), no
+-- aplica esta regla — el dedup de esos casos se hace en model_phones.
+CREATE UNIQUE INDEX IF NOT EXISTS models_handle_per_tenant
+  ON public.models (tenant_id, lower(instagram_handle))
+  WHERE instagram_handle IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS models_handle_lower_idx
-  ON public.models (lower(instagram_handle));
+  ON public.models (lower(instagram_handle))
+  WHERE instagram_handle IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS models_country_idx
   ON public.models (country)
