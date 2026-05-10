@@ -205,22 +205,29 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   color: hsl(var(--foreground));
 }
 
-.sidebar-glass-active {
+/* Active state — aplica a:
+     1. Top-level items con .sidebar-glass-active (lo añade NavLink via
+        activeClassName cuando matchea la ruta).
+     2. Sub-items (Finanzas/RRHH anidados) con [data-active="true"] que
+        setea SidebarMenuSubButton via su prop isActive. La variant
+        de Tailwind `data-[active=true]:sidebar-glass-active` que se
+        usa en esos componentes NO funciona para clases custom (solo
+        para utilities), así que matcheamos data-active directamente. */
+.sidebar-glass-active,
+[data-sidebar="menu-sub-button"][data-active="true"] {
   background: linear-gradient(135deg, hsl(var(--primary) / 0.16), hsl(var(--accent) / 0.16)) !important;
-  /* Active item label stays white — the previous accent color washed
-     into the tinted background and was hard to read. */
   color: hsl(var(--foreground)) !important;
   /* Left accent bar pintado con inset box-shadow:
        · 3px sólido en el borde izquierdo (la barra)
        · Glow tenue que decae hacia adentro ~16px (la firma visual)
      Inset shadows se renderizan SOBRE el elemento, así que sobreviven
-     a overflow:hidden y border-radius en cualquier nivel de anidación
-     (sub / sub-sub / sub-sub-sub), a diferencia de un ::before. */
+     a overflow:hidden y border-radius en cualquier nivel de anidación. */
   box-shadow:
     inset 3px 0 0 hsl(var(--accent)),
     inset 16px 0 16px -10px hsl(var(--accent) / 0.35) !important;
 }
-.sidebar-glass-active:hover {
+.sidebar-glass-active:hover,
+[data-sidebar="menu-sub-button"][data-active="true"]:hover {
   color: hsl(var(--foreground)) !important;
 }
 
