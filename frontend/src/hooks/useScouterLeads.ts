@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { checkPreviousLead, checkScouterLead } from "@/lib/lead-validation";
+import { checkPreviousLead } from "@/lib/lead-validation";
 
 // Types mirror the scouter_leads / scouter_companies tables. Kept inline
 // here (not in the generated Supabase types yet) so the rest of the app
@@ -910,19 +910,11 @@ export const useCreateLeadManual = () => {
       if (!handle) throw new Error("Pasá un @handle.");
       if (!input.company_id) throw new Error("Seleccioná una compañía.");
 
-      // Cross-system dedup. La UNIQUE constraint en DB es per-company,
-      // así que un mismo handle podía meterse para 2 compañías distintas
-      // y además podía duplicar uno ya cargado en Lead Gen. Bloqueamos
-      // ambos casos acá antes del insert.
-      const scouterCheck = await checkScouterLead(handle);
-      if (scouterCheck.exists) {
-        const dateInfo = scouterCheck.createdAt
-          ? ` desde ${scouterCheck.createdAt.slice(0, 10)}`
-          : "";
-        throw new Error(
-          `Ya existe @${handle} en Scouter (status "${scouterCheck.status}"${dateInfo}). No se puede duplicar.`,
-        );
-      }
+      // Cross-system dedup contra Lead Gen. (No bloqueamos cross-company
+      // dentro de Scouter — un mismo modelo puede calificar legítimamente
+      // para varias compañías porque son productos distintos. La UNIQUE
+      // per-company en DB ya cubre el caso mismo-handle + misma-compañía
+      // con un mensaje friendly más abajo.)
       const leadgenCheck = await checkPreviousLead(handle);
       if (leadgenCheck.existed) {
         const date = leadgenCheck.lastEntryDate?.slice(0, 10) ?? "?";
