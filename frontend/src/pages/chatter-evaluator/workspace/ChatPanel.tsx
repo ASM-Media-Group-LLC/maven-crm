@@ -243,16 +243,23 @@ const MessageBubble = ({
       const cls = isPurchase
         ? "border-emerald-500 bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 text-emerald-400"
         : "border-amber-500 bg-gradient-to-br from-amber-500/20 to-amber-500/5 text-amber-400";
+      // Wording solicitado por el equipo: el system pill cuenta la historia
+      // desde el punto de vista del chatter ("X sent you a tip / purchased
+      // your content"), no como un evento abstracto. El amount del purchase
+      // queda en el badge derecho — no se repite en el texto.
+      const label = isPurchase
+        ? `${fanName} purchased your content`
+        : `${fanName} sent you a $${msg.price} usd tip`;
       return (
         <div className="my-2 flex justify-center">
           <div className={`flex w-full max-w-[420px] items-center gap-2.5 rounded-xl border px-5 py-2 ${cls}`}>
             <span className="text-lg">{isPurchase ? "🎉" : "💸"}</span>
-            <span className="text-xs font-bold uppercase tracking-wide">
-              {isPurchase ? "Contenido comprado" : "Tip enviada"}
-            </span>
-            <span className="ml-auto text-sm font-extrabold text-foreground">
-              ${msg.price} USD
-            </span>
+            <span className="flex-1 text-xs font-semibold">{label}</span>
+            {isPurchase && (
+              <span className="ml-auto text-sm font-extrabold text-foreground">
+                ${msg.price} USD
+              </span>
+            )}
           </div>
         </div>
       );
@@ -633,6 +640,10 @@ export const ChatPanel = ({ session }: Props) => {
     }
 
     if (msgs.length === 0) {
+      // Empty session — keep refs null so the FIRST incoming message
+      // counts as new (the previous `prevLastId &&` truthy check
+      // suppressed it, which is why the very first chatter message
+      // / tip after opening a fresh session never played its sound).
       lastMessageIdRef.current = null;
       lastTipIdRef.current = null;
       return;
@@ -640,7 +651,11 @@ export const ChatPanel = ({ session }: Props) => {
     const last = msgs[msgs.length - 1];
     const prevLastId = lastMessageIdRef.current;
     lastMessageIdRef.current = last.id;
-    if (prevLastId && prevLastId !== last.id && last.role === "chatter") {
+    // Fire on any *change* of last-message id (including null → id), as
+    // long as it's a chatter message. The session-switch branch above
+    // already baselines lastMessageIdRef for sessions that load with
+    // pre-existing messages, so this won't fire on initial mount.
+    if (prevLastId !== last.id && last.role === "chatter") {
       playPing();
     }
 
@@ -655,9 +670,13 @@ export const ChatPanel = ({ session }: Props) => {
           m.price,
       );
     if (newestEvent && newestEvent.id !== lastTipIdRef.current) {
-      const isInitial = lastTipIdRef.current === null;
+      const prevTipId = lastTipIdRef.current;
       lastTipIdRef.current = newestEvent.id;
-      if (!isInitial && newestEvent.price) {
+      // Fire popup whenever the newest tip/purchase id changes, including
+      // from null. The session-switch branch baselines this ref for
+      // sessions that load with pre-existing tips, so we won't replay
+      // on initial mount.
+      if (prevTipId !== newestEvent.id && newestEvent.price) {
         setTipAmount(newestEvent.price);
         playTipSound(newestEvent.price);
       }
