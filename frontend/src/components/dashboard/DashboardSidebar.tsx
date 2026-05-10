@@ -755,10 +755,17 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
   if (collapsed) {
     return (
       <div className="flex flex-col items-center gap-2">
-        <Avatar className="h-8 w-8">
-          {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName} />}
-          <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar className="h-8 w-8">
+            {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName} />}
+            <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+          </Avatar>
+          <span
+            aria-label="Sesión activa"
+            title="Sesión activa"
+            className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-background"
+          />
+        </div>
         {mounted && (
           <Button
             variant="ghost"
@@ -793,15 +800,25 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
 
   return (
     <div className="space-y-2">
-      {/* Identity row — avatar, name, "Sesión activa", theme toggle. */}
+      {/* Identity row — avatar (con dot de presencia), name, theme toggle.
+          Antes mostraba "Sesión activa" como texto verde a tamaño completo;
+          ahora el estado de presencia vive como un dot 2.5px verde sobre el
+          borde inferior-derecho del avatar (patrón estándar Slack/Discord/
+          Linear) y el nombre tiene su línea completa, más limpio. */}
       <div className="flex items-center gap-2">
-        <Avatar className="h-9 w-9 shrink-0">
-          {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName} />}
-          <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
-        </Avatar>
+        <div className="relative shrink-0">
+          <Avatar className="h-9 w-9">
+            {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName} />}
+            <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+          </Avatar>
+          <span
+            aria-label="Sesión activa"
+            title="Sesión activa"
+            className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-background"
+          />
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">{fullName}</div>
-          <div className="truncate text-[11px] text-emerald-500">Sesión activa</div>
+          <div className="truncate text-sm font-semibold leading-tight">{fullName}</div>
         </div>
         {mounted && (
           <Button
