@@ -10,8 +10,11 @@ import type { Database } from './types';
 
 const PROD_URL =
   "https://lsagslbkliprespbyhts.supabase.co";
+// Modern publishable key (sb_publishable_*). Replaced the legacy anon JWT
+// after the v2→v3 cutover so the legacy JWT can be disabled without
+// breaking the production build's fallback path.
 const PROD_PUBLISHABLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzYWdzbGJrbGlwcmVzcGJ5aHRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyODYzMjYsImV4cCI6MjA4MDg2MjMyNn0.4xDi5w0nKAE54OzVzR56XHMzXswQ8leXqzV-H21XrGw";
+  "sb_publishable_hEuAcbx-kSMDF9lAG3aPTQ_YXoNdL5Q";
 
 const isPlaceholder = (v: string | undefined): boolean =>
   !v || v.startsWith("__RUNTIME_");
