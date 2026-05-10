@@ -297,11 +297,14 @@ const Settings = () => {
       {/* Left rail — sits flush against the app sidebar (no outer max-w
           centring) so it reads as a proper desktop two-pane layout
           rather than a centred mobile card. */}
-      <aside className="w-64 shrink-0 border-r bg-card/40 p-4">
+      <aside className="sub-rail w-64 shrink-0 border-r bg-card/40 p-4">
         <div className="sticky top-4">
           <div className="px-2 pb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             Conectado como {prettyRole}
           </div>
+          {/* Tabs — mismo lenguaje que la sidebar principal:
+              sidebar-glass-hover en reposo + sidebar-glass-active cuando
+              el tab está seleccionado (accent bar + bg gradient + glow). */}
           <nav className="space-y-0.5">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -311,10 +314,8 @@ const Settings = () => {
                   key={tab.key}
                   type="button"
                   onClick={() => setActive(tab.key)}
-                  className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-sm transition-colors ${
-                    isActive
-                      ? "bg-primary/15 text-primary font-medium"
-                      : "text-foreground hover:bg-muted/60"
+                  className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-sm sidebar-glass-hover ${
+                    isActive ? "sidebar-glass-active font-medium" : ""
                   }`}
                 >
                   <Icon className="h-4 w-4 shrink-0" />

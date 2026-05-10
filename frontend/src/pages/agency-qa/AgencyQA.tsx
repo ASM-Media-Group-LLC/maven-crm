@@ -311,8 +311,11 @@ const AgencyQA = () => {
 
   return (
     <main className="flex flex-1 overflow-y-auto">
-      {/* Left rail vertical estilo Settings — 4 categorías de QA por rol. */}
-      <aside className="w-60 shrink-0 border-r bg-card/40 p-4">
+      {/* Left rail vertical estilo Settings — 4 categorías de QA por rol.
+          Mismo lenguaje visual que la sidebar principal: sidebar-glass-hover
+          en reposo, sidebar-glass-active cuando el rol está seleccionado
+          (accent bar + bg gradient + glow). */}
+      <aside className="sub-rail w-60 shrink-0 border-r bg-card/40 p-4">
         <div className="sticky top-4 space-y-1">
           <div className="px-2 pb-2">
             <h1 className="text-base font-bold tracking-tight">Company QA</h1>
@@ -335,10 +338,8 @@ const AgencyQA = () => {
                 type="button"
                 onClick={() => setActiveRole(sec.key)}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
-                  isActive
-                    ? "bg-primary/15 text-primary font-medium"
-                    : "text-foreground hover:bg-muted/60",
+                  "flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-sm sidebar-glass-hover",
+                  isActive && "sidebar-glass-active font-medium",
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
