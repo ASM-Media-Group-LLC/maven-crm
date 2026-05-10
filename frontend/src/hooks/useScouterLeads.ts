@@ -63,7 +63,7 @@ export interface ScouterLead {
   created_at: string;
   updated_at: string;
   converted_at: string | null;
-  converted_to_contact_id: string | null;
+  converted_to_lead_id: string | null;
 }
 
 export interface CompanySearchConfig {

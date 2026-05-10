@@ -578,14 +578,13 @@ export const LeadDrawer = ({
               </button>
             ))}
           </div>
-          {/* Convertir a Pipeline Closers — handoff formal del scouter al
-              equipo de cerradores. Sólo si todavía no fue convertido. Si
-              ya pasó al pipeline, mostramos badge informativo en lugar
-              del botón para evitar duplicados. */}
+          {/* Pasar a Lead Gen — el scouter descubre, LG contacta. El handoff
+              va al funnel de leadgen (no directo a Closers) para que el LG
+              team curate antes. Si ya fue pasado, badge en lugar del botón. */}
           {lead.converted_at ? (
             <div className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
               <CheckCircle2 className="h-3.5 w-3.5" />
-              Convertido a Pipeline Closers
+              Pasado a Lead Gen
             </div>
           ) : (
             <Button
@@ -595,7 +594,7 @@ export const LeadDrawer = ({
               onClick={() => setConvertOpen(true)}
             >
               <ArrowRight className="h-3.5 w-3.5" />
-              Convertir a Pipeline Closers
+              Pasar a Lead Gen
             </Button>
           )}
 
