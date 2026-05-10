@@ -63,10 +63,22 @@ const SessionRow = ({
   <button
     type="button"
     onClick={onSelect}
-    className={`group flex w-full items-center gap-2 rounded-md p-2 text-left transition-colors ${
+    className={`group relative flex w-full items-center gap-2 rounded-md p-2 text-left transition-colors ${
       active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted"
     }`}
   >
+    {/* Unread badge — anclada a la esquina superior derecha del card,
+        OUTSIDE del flujo inline para no robarle ancho al nombre.
+        Mismo lugar que típicamente usan iOS / Discord para
+        notificaciones de chat. */}
+    {unread > 0 && (
+      <span
+        className="pointer-events-none absolute -right-1 -top-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white shadow ring-2 ring-background"
+        aria-label={`${unread} mensajes sin leer`}
+      >
+        {unread > 99 ? "99+" : unread}
+      </span>
+    )}
     <div className="aspect-square h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
       {profile?.avatar_url ? (
         <img
@@ -107,17 +119,6 @@ const SessionRow = ({
         </div>
       )}
     </div>
-    {/* Unread badge — vive en la columna derecha del card, al lado del
-        botón "cerrar sesión" (que aparece al hover). Cuando no hay
-        unread, el espacio queda invisible para no descuadrar el layout. */}
-    {unread > 0 && (
-      <span
-        className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white shadow"
-        aria-label={`${unread} mensajes sin leer`}
-      >
-        {unread > 99 ? "99+" : unread}
-      </span>
-    )}
     <span
       role="button"
       tabIndex={0}

@@ -359,25 +359,25 @@ const MessageBubble = ({
             {msg.deleted === "chatter" && (
               <div className="mt-0.5 text-[10px] italic opacity-90">eliminado</div>
             )}
-            {/* Examiner-side 3-dot menu. Replaces the previous always-visible
-                X (which the user found visually noisy). Sits on the side
-                OPPOSITE the bubble's speech tail (fan messages are right-
-                aligned with bottom-right tail, so the menu goes top-left).
-                Editar / Eliminar / Historial — Historial only when the
-                message has been edited. */}
+            {/* Examiner-side 3-dot menu. Posicionado del lado del avatar
+                (top-right para mensajes del fan/examiner, que están right-
+                aligned con avatar a la derecha) — matching el chatter side
+                para que ambos lados se sientan consistentes. El emoji
+                picker vive del lado opuesto. Editar / Eliminar / Historial
+                — Historial solo cuando el mensaje fue editado. */}
             {isFan && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="absolute -left-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground group-hover/bubble:opacity-100 data-[state=open]:opacity-100"
+                    className="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground group-hover/bubble:opacity-100 data-[state=open]:opacity-100"
                     title="Opciones del mensaje"
                     aria-label="Opciones del mensaje"
                   >
                     <MoreVertical className="h-3 w-3" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-44">
+                <DropdownMenuContent align="end" className="w-44">
                   <DropdownMenuItem onClick={() => onEdit(msg)}>
                     <Pencil className="mr-2 h-3.5 w-3.5" />
                     Editar mensaje
@@ -398,11 +398,14 @@ const MessageBubble = ({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            {/* Reacción rápida — flota al lado opuesto a la cola del
-                bubble. Para mensajes del fan (left-aligned) → derecha;
-                para mensajes del chatter (right-aligned) → izquierda. */}
+            {/* Reacción rápida — del lado OPUESTO al avatar (y al 3-dot
+                menu), así el bubble queda con menú+avatar de un lado y
+                el picker del otro. Para mensajes del fan (right-aligned,
+                avatar a la derecha) el picker va a la izquierda; para
+                mensajes del chatter (left-aligned, avatar a la izquierda)
+                va a la derecha. */}
             <ReactionPickerButton
-              align={isFan ? "left" : "right"}
+              align={isFan ? "right" : "left"}
               onToggle={(emoji) => onToggleReaction(msg, emoji)}
             />
           </div>
@@ -494,7 +497,7 @@ const MessageBubble = ({
         <ReactionsRow
           reactions={msg.reactions ?? []}
           currentUserId={currentUserId}
-          align={isFan ? "left" : "right"}
+          align={isFan ? "right" : "left"}
           onToggle={(emoji) => onToggleReaction(msg, emoji)}
         />
       </div>

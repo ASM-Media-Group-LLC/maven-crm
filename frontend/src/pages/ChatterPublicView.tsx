@@ -1,13 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Clock, Check, CheckCheck, SmilePlus as Smile, MoreVertical, Trash2 } from "lucide-react";
+import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Clock, Check, CheckCheck, SmilePlus as Smile, MoreVertical, Trash2, Pencil } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { VolumeControl, playSoundFile } from "@/pages/chatter-evaluator/workspace/VolumeControl";
 import { MediaViewer } from "@/pages/chatter-evaluator/workspace/MediaViewer";
@@ -257,13 +266,16 @@ interface BubbleProps {
   /** Toggle a reaction on a message. Calls the chatter-public edge
    *  function; the function applies the server-side toggle. */
   onReact: (msg: ChatterMessage, emoji: string) => void;
+  /** Chatter-side edit. Opens the edit dialog whose Save action calls
+   *  the chatter-public edge function's "edit-message" action. */
+  onEdit: (msg: ChatterMessage) => void;
   /** Chatter-side soft delete (deleted='chatter'). The bubble disappears
    *  here but the examiner still sees the "(mensaje eliminado por el
    *  chatter)" placeholder. Only invoked from the chatter's own bubbles. */
   onDelete: (msg: ChatterMessage) => void;
 }
 
-const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMedia, onDelete, myReactionId, onReact }: BubbleProps) => {
+const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMedia, onDelete, onEdit, myReactionId, onReact }: BubbleProps) => {
   if (msg.deleted === "full") return null;
 
   if (msg.role === "system") {
@@ -360,6 +372,10 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => onEdit(msg)}>
+                    <Pencil className="mr-2 h-3.5 w-3.5" />
+                    Editar mensaje
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => onDelete(msg)}
                     className="text-destructive focus:text-destructive"
@@ -550,6 +566,9 @@ const ChatterPublicView = () => {
   const [tipAmount, setTipAmount] = useState<number | null>(null);
   const lastTipIdRef = useRef<string | null>(null);
   const [confirmDelMsg, setConfirmDelMsg] = useState<ChatterMessage | null>(null);
+  const [editMsg, setEditMsg] = useState<ChatterMessage | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
   const [deletingMsg, setDeletingMsg] = useState(false);
   const lastMessageIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1171,6 +1190,10 @@ const ChatterPublicView = () => {
                 readByOther={session.read_by_examiner_at ?? null}
                 onOpenMedia={(url) => setMediaUrl(url)}
                 onDelete={(target) => setConfirmDelMsg(target)}
+                onEdit={(target) => {
+                  setEditMsg(target);
+                  setEditDraft(target.content ?? "");
+                }}
                 myReactionId={`chatter:${sessionId}`}
                 onReact={(target, emoji) => {
                   callChatterApi("react", {
@@ -1278,6 +1301,79 @@ const ChatterPublicView = () => {
         sending={sendVaultItemMut.isPending}
       />
 
+      {/* Edit dialog. El chatter ve un textarea pre-llena con su
+          mensaje actual. Save llama al edge function "edit-message"
+          que empuja la versión vieja a content_history. */}
+      <Dialog
+        open={!!editMsg}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEditMsg(null);
+            setEditDraft("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar mensaje</DialogTitle>
+            <DialogDescription>
+              El examiner va a poder ver el historial de cambios.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={editDraft}
+            onChange={(e) => setEditDraft(e.target.value)}
+            rows={4}
+            placeholder="Texto del mensaje…"
+            className="resize-none"
+          />
+          <DialogFooter>
+            <button
+              type="button"
+              className="rounded-md border px-3 py-1.5 text-sm"
+              onClick={() => {
+                setEditMsg(null);
+                setEditDraft("");
+              }}
+              disabled={editSaving}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              onClick={async () => {
+                if (!editMsg || !sessionId) return;
+                const next = editDraft.trim();
+                if (!next || next === (editMsg.content ?? "").trim()) {
+                  setEditMsg(null);
+                  setEditDraft("");
+                  return;
+                }
+                setEditSaving(true);
+                try {
+                  await callChatterApi("edit-message", {
+                    sessionId,
+                    messageId: editMsg.id,
+                    newContent: next,
+                  });
+                  setEditMsg(null);
+                  setEditDraft("");
+                } catch (e) {
+                  toast.error("No se pudo editar", {
+                    description: (e as Error).message,
+                  });
+                } finally {
+                  setEditSaving(false);
+                }
+              }}
+              disabled={editSaving || !editDraft.trim()}
+            >
+              {editSaving ? "Guardando…" : "Guardar"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <MediaViewer url={mediaUrl} onClose={() => setMediaUrl(null)} />
       <TipPopup amount={tipAmount} onDone={() => setTipAmount(null)} />
 
