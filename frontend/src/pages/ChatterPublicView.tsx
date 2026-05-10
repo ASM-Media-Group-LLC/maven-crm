@@ -116,6 +116,121 @@ const callChatterApi = async (action: string, payload: Record<string, unknown>) 
   return data;
 };
 
+// Quick reactions strip — same set as the examiner side. Tapping one
+// toggles the reaction via the chatter-public edge function (which
+// runs the toggle logic with service_role to bypass RLS).
+const QUICK_REACTIONS = ["❤️", "😂", "🔥", "😮", "😢", "👍"] as const;
+
+// Renderea los chips de reacciones bajo una burbuja. Mismo formato que
+// la versión del examiner (ReactionsRow en ChatPanel) — agrupa por emoji
+// y muestra el conteo si hay más de uno. Sólo lectura desde aquí; el
+// toggle se hace desde el picker.
+const ReactionsRowChatter = ({
+  reactions,
+  myUserId,
+  align,
+  onToggle,
+}: {
+  reactions: ChatterMessage["reactions"];
+  myUserId: string;
+  align: "left" | "right";
+  onToggle: (emoji: string) => void;
+}) => {
+  if (!reactions || reactions.length === 0) return null;
+  const groups = new Map<
+    string,
+    { emoji: string; count: number; userIds: Set<string>; names: string[] }
+  >();
+  for (const r of reactions) {
+    const slot = groups.get(r.emoji) ?? {
+      emoji: r.emoji,
+      count: 0,
+      userIds: new Set<string>(),
+      names: [],
+    };
+    slot.count += 1;
+    slot.userIds.add(r.user_id);
+    slot.names.push(r.user_name);
+    groups.set(r.emoji, slot);
+  }
+  return (
+    <div
+      className={`mt-0.5 flex flex-wrap gap-1 ${
+        align === "right" ? "justify-end" : "justify-start"
+      }`}
+    >
+      {Array.from(groups.values()).map((g) => {
+        const mine = g.userIds.has(myUserId);
+        return (
+          <button
+            key={g.emoji}
+            type="button"
+            onClick={() => onToggle(g.emoji)}
+            title={g.names.join(", ")}
+            className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs transition-colors ${
+              mine
+                ? "border-primary/40 bg-primary/15 text-primary"
+                : "border-border bg-muted/50 text-foreground hover:bg-muted"
+            }`}
+          >
+            <span>{g.emoji}</span>
+            {g.count > 1 && (
+              <span className="text-[10px] tabular-nums">{g.count}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// Botón de reacción rápida sobre cada bubble. Se muestra siempre (no
+// hover-only) porque en mobile el hover no dispara y el chatter
+// principalmente usa el celular.
+const ReactionPickerChatter = ({
+  align,
+  onPick,
+}: {
+  align: "left" | "right";
+  onPick: (emoji: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      className={`absolute top-1/2 -translate-y-1/2 ${
+        align === "right" ? "left-[-30px]" : "right-[-30px]"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-6 w-6 items-center justify-center rounded-full bg-background text-muted-foreground opacity-50 shadow-sm ring-1 ring-border hover:bg-muted hover:text-foreground hover:opacity-100"
+        title="Reaccionar"
+        aria-label="Reaccionar"
+      >
+        😊
+      </button>
+      {open && (
+        <div className="absolute top-full mt-1 flex gap-0.5 rounded-md border bg-popover p-1 shadow-md z-10">
+          {QUICK_REACTIONS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => {
+                onPick(e);
+                setOpen(false);
+              }}
+              className="rounded p-1 text-base transition-colors hover:bg-muted"
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface BubbleProps {
   msg: ChatterMessage;
   fanName: string;
@@ -126,13 +241,20 @@ interface BubbleProps {
    *  to render single vs. double check on the chatter's own messages. */
   readByOther: string | null;
   onOpenMedia: (url: string) => void;
+  /** Synthetic user_id for the chatter — `chatter:${sessionId}`. Used to
+   *  highlight which reactions are theirs, mirrors the userId the
+   *  edge-function `react` action stamps on inserts. */
+  myReactionId: string;
+  /** Toggle a reaction on a message. Calls the chatter-public edge
+   *  function; the function applies the server-side toggle. */
+  onReact: (msg: ChatterMessage, emoji: string) => void;
   /** Chatter-side soft delete (deleted='chatter'). The bubble disappears
    *  here but the examiner still sees the "(mensaje eliminado por el
    *  chatter)" placeholder. Only invoked from the chatter's own bubbles. */
   onDelete: (msg: ChatterMessage) => void;
 }
 
-const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMedia, onDelete }: BubbleProps) => {
+const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMedia, onDelete, myReactionId, onReact }: BubbleProps) => {
   if (msg.deleted === "full") return null;
 
   if (msg.role === "system") {
@@ -142,16 +264,19 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
       const cls = isPurchase
         ? "border-emerald-500 bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 text-emerald-400"
         : "border-amber-500 bg-gradient-to-br from-amber-500/20 to-amber-500/5 text-amber-400";
+      const label = isPurchase
+        ? `${fanName} purchased your content`
+        : `${fanName} sent you a $${msg.price} usd tip`;
       return (
         <div className="my-2 flex justify-center">
           <div className={`flex w-full max-w-[420px] items-center gap-2.5 rounded-xl border px-5 py-2 ${cls}`}>
             <span className="text-lg">{isPurchase ? "🎉" : "💸"}</span>
-            <span className="text-xs font-bold uppercase tracking-wide">
-              {isPurchase ? "Contenido comprado" : "Tip recibida"}
-            </span>
-            <span className="ml-auto text-sm font-extrabold text-foreground">
-              ${msg.price} USD
-            </span>
+            <span className="flex-1 text-xs font-semibold">{label}</span>
+            {isPurchase && (
+              <span className="ml-auto text-sm font-extrabold text-foreground">
+                ${msg.price} USD
+              </span>
+            )}
           </div>
         </div>
       );
@@ -208,28 +333,34 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
             }`}
           >
             {msg.content}
-            {/* Chatter-only delete — floats OUTSIDE the bubble on the
-                left. Hidden by default; the transparent <span> bridges
-                the gap so the cursor doesn't lose group-hover mid-move. */}
+            {/* Chatter-only delete — siempre visible (matches the always-on
+                X used on the examiner's own bubbles). */}
             {isMine && (
-              <>
-                <span
-                  aria-hidden
-                  className="absolute left-[-28px] top-0 bottom-0 w-7 pointer-events-auto"
-                />
-                <button
-                  type="button"
-                  onClick={() => onDelete(msg)}
-                  className="absolute left-[-28px] top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground shadow-sm ring-1 ring-border hover:bg-rose-500 hover:text-white group-hover/bubble:flex"
-                  title="Eliminar mensaje"
-                  aria-label="Eliminar mensaje"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => onDelete(msg)}
+                className="absolute -left-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white opacity-70 shadow-sm hover:opacity-100 hover:bg-rose-600"
+                title="Eliminar mensaje"
+                aria-label="Eliminar mensaje"
+              >
+                <X className="h-3 w-3" />
+              </button>
             )}
+            {/* Reaction picker — flota al lado opuesto a la cola del
+                bubble (left para mensajes del fan, right para los del
+                chatter). */}
+            <ReactionPickerChatter
+              align={isMine ? "right" : "left"}
+              onPick={(emoji) => onReact(msg, emoji)}
+            />
           </div>
         )}
+        <ReactionsRowChatter
+          reactions={msg.reactions ?? []}
+          myUserId={myReactionId}
+          align={isMine ? "right" : "left"}
+          onToggle={(emoji) => onReact(msg, emoji)}
+        />
         {msg.images && msg.images.length > 0 && (
           isPriced ? (
             <div
@@ -1016,6 +1147,18 @@ const ChatterPublicView = () => {
                 readByOther={session.read_by_examiner_at ?? null}
                 onOpenMedia={(url) => setMediaUrl(url)}
                 onDelete={(target) => setConfirmDelMsg(target)}
+                myReactionId={`chatter:${sessionId}`}
+                onReact={(target, emoji) => {
+                  callChatterApi("react", {
+                    sessionId,
+                    messageId: target.id,
+                    emoji,
+                  }).catch((e) =>
+                    toast.error("No se pudo reaccionar", {
+                      description: (e as Error).message,
+                    }),
+                  );
+                }}
               />
             ))}
           </div>
