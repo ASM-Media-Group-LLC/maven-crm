@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,9 +14,11 @@ import {
   Camera,
   Loader2,
   KeyRound,
+  LogOut,
   User as UserIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -253,6 +255,15 @@ const Settings = () => {
   const { t } = useLanguage();
   const { canAccess } = usePermissions();
   const { isAdmin, role } = useUserRole();
+  const { signOut } = useAuth();
+  const { toast: notifyToast } = useToast();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await signOut();
+    notifyToast({ title: t("topbar.logoutSuccess"), description: t("topbar.logoutDesc") });
+    navigate("/login");
+  };
 
   const showProyectoMP = canAccess("ProyectoMP") || isAdmin;
   const showAdmin = canAccess("Administración") || isAdmin;
@@ -312,6 +323,20 @@ const Settings = () => {
               );
             })}
           </nav>
+
+          {/* Cerrar sesión — última opción del rail, separada con border-t
+              para señalar que es una acción (no un tab). Hover destructivo
+              porque la sesión ya no vive como botón en la sidebar global. */}
+          <div className="mt-4 border-t border-border/60 pt-4">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="group flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4 shrink-0 transition-colors group-hover:text-destructive" />
+              <span className="truncate">Cerrar sesión</span>
+            </button>
+          </div>
         </div>
       </aside>
 

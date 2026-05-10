@@ -2,12 +2,11 @@ import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign,
-  MessageCircle, MessageSquare, Contact, Rocket, Sun, Moon, LogOut, Home, Briefcase, Users2, Search, Headphones,
+  MessageCircle, MessageSquare, Contact, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useMyProfile } from "@/hooks/useUserProfile";
@@ -722,14 +721,13 @@ const DashboardSidebar = () => {
   );
 };
 
-// ----- Sidebar footer: avatar + Sesión activa + theme + Settings + Salir
-// Mirrors the screenshot the user sketched. Collapsed state shows just
-// the icons stacked vertically so the rail is still usable when the
-// user toggles to icon-only mode.
+// ----- Sidebar footer: avatar (con presence dot) + name + theme + Settings.
+// Logout vive en /settings (rail izquierdo, última opción). Collapsed state
+// muestra los iconos apilados para que el rail siga siendo usable cuando
+// el usuario lo pone en modo icon-only.
 const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { t } = useLanguage();
   const { theme, setTheme } = useTheme();
   const profileQ = useMyProfile();
@@ -745,12 +743,6 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
     .toUpperCase()
     .slice(0, 2);
   const avatarUrl = profileQ.data?.avatar_url ?? null;
-
-  const handleLogout = async () => {
-    await signOut();
-    toast({ title: t("topbar.logoutSuccess"), description: t("topbar.logoutDesc") });
-    navigate("/login");
-  };
 
   if (collapsed) {
     return (
@@ -785,15 +777,6 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
           title="Settings"
         >
           <Settings className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-          onClick={handleLogout}
-          title="Salir"
-        >
-          <LogOut className="h-4 w-4" />
         </Button>
       </div>
     );
@@ -846,20 +829,6 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
           <Settings className="h-4 w-4" />
         </Button>
       </div>
-
-      {/* Salir — ghost button, mismo lenguaje que Settings.
-          La intención destructiva se comunica solo en hover (icono +
-          texto pasan a text-destructive). Sin gradient ni shadow:
-          deja de competir con el active state bar y con el resto de
-          la navegación. */}
-      <button
-        type="button"
-        onClick={handleLogout}
-        className="group flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover hover:!text-destructive"
-      >
-        <LogOut className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-destructive" />
-        <span>Salir</span>
-      </button>
     </div>
   );
 };
