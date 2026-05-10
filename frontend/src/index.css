@@ -232,6 +232,14 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   color: hsl(var(--foreground)) !important;
 }
 
+/* Lucide icons dentro de la sidebar — stroke 1.5 en vez del default 2.
+   Cambio chico que hace los iconos más finos/refinados sin tocar nada
+   más. Scope: solo el aside de la sidebar (no afecta dropdowns en
+   portal ni el resto de la app). */
+[data-sidebar="sidebar"] svg {
+  stroke-width: 1.5;
+}
+
 /* Auth animated gradient blobs */
 @keyframes blob-move-1 {
   0% { transform: translate(0, 0) scale(1); }
