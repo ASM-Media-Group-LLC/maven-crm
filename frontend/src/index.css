@@ -240,6 +240,14 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   stroke-width: 1.5;
 }
 
+/* Los SidebarMenuSubButton vienen con overflow-hidden inline, lo que
+   recorta el pseudo ::before del accent bar en items anidados (sub /
+   sub-sub / sub-sub-sub). El truncado del label sigue funcionando
+   porque `truncate` se aplica al <span> hijo, no a este contenedor. */
+[data-sidebar="menu-sub-button"] {
+  overflow: visible;
+}
+
 /* Auth animated gradient blobs */
 @keyframes blob-move-1 {
   0% { transform: translate(0, 0) scale(1); }
