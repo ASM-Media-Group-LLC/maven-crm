@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, X, Clock, CircleDot, CircleDashed, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -47,12 +47,16 @@ const SessionRow = ({
   session,
   profile,
   active,
+  unread,
+  isTyping,
   onSelect,
   onEnd,
 }: {
   session: ChatterSession;
   profile: ChatterProfile | null;
   active: boolean;
+  unread: number;
+  isTyping: boolean;
   onSelect: () => void;
   onEnd: () => void;
 }) => (
@@ -63,7 +67,7 @@ const SessionRow = ({
       active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted"
     }`}
   >
-    <div className="aspect-square h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
+    <div className="relative aspect-square h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
       {profile?.avatar_url ? (
         <img
           src={profile.avatar_url}
@@ -79,18 +83,37 @@ const SessionRow = ({
           {(profile?.name ?? session.chatter_name)[0]}
         </div>
       )}
+      {unread > 0 && (
+        <span
+          className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow ring-2 ring-background"
+          aria-label={`${unread} mensajes sin leer`}
+        >
+          {unread > 99 ? "99+" : unread}
+        </span>
+      )}
     </div>
     <div className="min-w-0 flex-1">
       <div className="flex items-center gap-1.5">
         <StatusDot status={session.status} />
         <span className="truncate text-sm font-medium">{session.chatter_name}</span>
       </div>
-      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-        <span className="truncate">{profile?.name ?? "?"}</span>
-        <span>·</span>
-        <Clock className="h-2.5 w-2.5" />
-        <span>{formatRelative(session.created_at)}</span>
-      </div>
+      {isTyping ? (
+        <div className="flex items-center gap-1 text-[11px] font-medium text-emerald-500">
+          <span className="inline-flex gap-0.5">
+            <span className="h-1 w-1 animate-pulse rounded-full bg-current" style={{ animationDelay: "0ms" }} />
+            <span className="h-1 w-1 animate-pulse rounded-full bg-current" style={{ animationDelay: "150ms" }} />
+            <span className="h-1 w-1 animate-pulse rounded-full bg-current" style={{ animationDelay: "300ms" }} />
+          </span>
+          <span>escribiendo…</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <span className="truncate">{profile?.name ?? "?"}</span>
+          <span>·</span>
+          <Clock className="h-2.5 w-2.5" />
+          <span>{formatRelative(session.created_at)}</span>
+        </div>
+      )}
     </div>
     <span
       role="button"
@@ -115,6 +138,11 @@ const SessionRow = ({
   </button>
 );
 
+// Constante compartida con la vista del chat: cuántos ms después del
+// último timestamp de typing_chatter_at consideramos que el chatter
+// dejó de escribir. Misma lógica que el original Roleplaychatters.
+const TYPING_TIMEOUT_MS = 3500;
+
 // SessionsPanel — listado de sesiones ABIERTAS (status !== 'ended').
 // Antes tenía tabs Abiertas/Cerradas; el listado de cerradas se movió
 // al tab History del rail derecho. El header ahora solo tiene "+ Nueva".
@@ -126,15 +154,51 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   const [newOpen, setNewOpen] = useState(false);
   const [endTarget, setEndTarget] = useState<string | null>(null);
 
+  // Tick cada segundo para que el "escribiendo" auto-expire al envejecer
+  // typing_chatter_at más allá de TYPING_TIMEOUT_MS sin necesidad de
+  // recibir un nuevo evento realtime.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  // Unread counts por sesión — el RPC filtra por examiner_user_id =
+  // auth.uid() así sólo trae las del user logueado.
+  const unreadQ = useQuery({
+    queryKey: ["chatter-sessions-unread"],
+    queryFn: async (): Promise<Record<string, number>> => {
+      const { data, error } = await supabase.rpc("chatter_sessions_unread_counts" as never);
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      for (const row of (data ?? []) as Array<{ session_id: string; unread_count: number }>) {
+        map[row.session_id] = Number(row.unread_count) || 0;
+      }
+      return map;
+    },
+    refetchOnWindowFocus: true,
+    staleTime: 5_000,
+  });
+  const unreadById = unreadQ.data ?? {};
+
   // Realtime — refresca la lista cuando otra persona crea, cierra o
-  // edita una sesión.
+  // edita una sesión, y refresca los unread counts cuando entra un
+  // mensaje nuevo de cualquier sesión.
   useEffect(() => {
     const channel = supabase
       .channel("chatter-sessions-list")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "chatter_sessions" },
-        () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
+        () => {
+          qc.invalidateQueries({ queryKey: ["chatter-sessions"] });
+          qc.invalidateQueries({ queryKey: ["chatter-sessions-unread"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "chatter_messages" },
+        () => qc.invalidateQueries({ queryKey: ["chatter-sessions-unread"] }),
       )
       .subscribe();
     return () => {
@@ -187,16 +251,22 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
             Sin sesiones abiertas.
           </p>
         )}
-        {open.map((s) => (
-          <SessionRow
-            key={s.id}
-            session={s}
-            profile={profilesById.get(s.profile_id) ?? null}
-            active={s.id === selectedId}
-            onSelect={() => onSelect(s.id)}
-            onEnd={() => setEndTarget(s.id)}
-          />
-        ))}
+        {open.map((s) => {
+          const ts = s.typing_chatter_at ? new Date(s.typing_chatter_at).getTime() : 0;
+          const isTyping = !!ts && now - ts < TYPING_TIMEOUT_MS;
+          return (
+            <SessionRow
+              key={s.id}
+              session={s}
+              profile={profilesById.get(s.profile_id) ?? null}
+              active={s.id === selectedId}
+              unread={unreadById[s.id] ?? 0}
+              isTyping={isTyping}
+              onSelect={() => onSelect(s.id)}
+              onEnd={() => setEndTarget(s.id)}
+            />
+          );
+        })}
       </div>
 
       <NewSessionDialog open={newOpen} onOpenChange={setNewOpen} />
