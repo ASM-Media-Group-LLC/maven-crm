@@ -206,11 +206,27 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 }
 
 .sidebar-glass-active {
-  background: linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--accent) / 0.18)) !important;
-  border-left: 2px solid hsl(var(--accent));
+  position: relative;
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.16), hsl(var(--accent) / 0.16)) !important;
   /* Active item label stays white — the previous accent color washed
      into the tinted background and was hard to read. */
   color: hsl(var(--foreground)) !important;
+}
+/* Left accent bar — sustituye al border-left de 2px (que se diluía con
+   el gradient de fondo). Pseudo-elemento con margen vertical, ancho
+   3px, gradient violeta→azul + glow sutil. Lectura inmediata de
+   "estás acá" sin cargar visualmente la columna. */
+.sidebar-glass-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(180deg, hsl(var(--primary)), hsl(var(--accent)));
+  box-shadow: 0 0 10px hsl(var(--accent) / 0.45);
+  pointer-events: none;
 }
 .sidebar-glass-active:hover {
   color: hsl(var(--foreground)) !important;
