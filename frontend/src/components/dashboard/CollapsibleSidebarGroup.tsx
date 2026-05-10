@@ -134,7 +134,7 @@ export const CollapsibleSidebarGroup = ({
     <SidebarGroup>
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <SidebarGroupLabel className="group/label flex w-full cursor-pointer items-center gap-2 rounded-md text-[11px] font-semibold uppercase tracking-wider !text-foreground/80 transition-colors hover:!text-foreground hover:bg-foreground/5">
+          <SidebarGroupLabel className="group/label flex w-full cursor-pointer items-center gap-2 rounded-md text-[11px] font-semibold uppercase tracking-widest !text-foreground/70 transition-colors hover:!text-foreground hover:bg-foreground/5">
             <Icon className="h-3.5 w-3.5 shrink-0 opacity-70 transition-opacity group-hover/label:opacity-100" />
             <span className="flex-1 text-left">{label}</span>
             <ChevronRight

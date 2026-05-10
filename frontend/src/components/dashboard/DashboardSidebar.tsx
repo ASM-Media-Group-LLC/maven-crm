@@ -331,7 +331,7 @@ const DashboardSidebar = () => {
         <Logo size="sm" collapsed={collapsed} />
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="gap-3 py-1">
         <CollapsibleSidebarGroup
           label={t("sidebar.menu")}
           storageKey="menu"
@@ -699,10 +699,10 @@ const DashboardSidebar = () => {
                 to="/panel-de-control"
                 title="Panel de control"
                 className={({ isActive }) =>
-                  `group/label flex w-full cursor-pointer items-center gap-2 rounded-md text-[11px] font-semibold uppercase tracking-wider transition-colors hover:!text-foreground hover:bg-foreground/5 ${
+                  `group/label flex w-full cursor-pointer items-center gap-2 rounded-md text-[11px] font-semibold uppercase tracking-widest transition-colors hover:!text-foreground hover:bg-foreground/5 ${
                     isActive
                       ? "!text-foreground bg-foreground/5"
-                      : "!text-foreground/80"
+                      : "!text-foreground/70"
                   }`
                 }
               >
