@@ -62,6 +62,8 @@ export interface ScouterLead {
   contact_touches: ContactTouch[];
   created_at: string;
   updated_at: string;
+  converted_at: string | null;
+  converted_to_contact_id: string | null;
 }
 
 export interface CompanySearchConfig {

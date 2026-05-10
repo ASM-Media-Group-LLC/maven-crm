@@ -4,8 +4,8 @@
 -- Depende de 20260510120000_models_master_schema.sql (las tablas ya
 -- existen, las columnas model_id ya están en las 5 tablas viejas).
 --
--- Esta migration mueve data: extrae los 15,325 handles únicos de las 5
--- fuentes, los consolida en `models` aplicando política de merge (ver
+-- Esta migration mueve data: extrae los handles únicos de las 5 fuentes,
+-- los consolida en `models` aplicando política de merge (ver
 -- docs/refactor-models-master.md), backfillea `model_phones`, y
 -- finalmente updatea `model_id` en cada tabla vieja.
 --
@@ -22,6 +22,23 @@
 -- tenant existente en el sistema (ASM Tech). Cuando se haga el refactor
 -- multi-tenant de esas tablas, este script ya no aplica — pero para la
 -- migración actual asumimos single-tenant.
+--
+-- COLUMNAS REALES (verificadas contra information_schema 2026-05-10):
+--   leadgen_entries:    model_handle, phone_e164, phone_raw, phone_first_set_at,
+--                       lg_user_id, tenant_id, city, state, onlyfans_url, created_at
+--   scouter_leads:      instagram_handle, name, phone, country, city, photo_data_url,
+--                       bio, verified, followers, onlyfans_url, phone_first_set_at,
+--                       tenant_id, created_at
+--   closers_contacts:   handle, name, phone, city, onlyfans_url, profile_picture_url,
+--                       phone_first_set_at, created_at
+--   closer_creators:    instagram_handle, phone, city, onlyfans_url, phone_first_set_at,
+--                       created_at  (NO tiene name, country, state, ni avatar)
+--   creators:           instagram_handle, name, phone, phone_e164, country, city, bio,
+--                       onlyfans_url, profile_photo_url, piclink_url, tiktok_handle,
+--                       twitter_handle, phone_first_set_at, created_at
+--
+-- Campos en `models` que quedan NULL post-backfill por falta de source:
+--   posts_count, last_scraped_at  (los rellena el scraper en Sprint 4)
 
 BEGIN;
 
@@ -32,7 +49,7 @@ CREATE TEMP TABLE IF NOT EXISTS _default_tenant AS
 
 -- ─── 1. Backfill de `models` ───────────────────────────────────────────
 --
--- Política de merge para handles que aparecen en N tablas (1,657 casos):
+-- Política de merge para handles que aparecen en N tablas:
 -- recorremos las 5 fuentes en orden de "más confiable → menos confiable"
 -- (creators > closer_creators > closers_contacts > scouter_leads > leadgen_entries)
 -- y la primera fuente que encontremos con datos para cada campo, gana.
@@ -42,30 +59,35 @@ CREATE TEMP TABLE IF NOT EXISTS _default_tenant AS
 INSERT INTO public.models (
   tenant_id, instagram_handle, display_name, avatar_url, bio,
   is_verified, country, city, state, onlyfans_url,
-  followers_count, posts_count, last_scraped_at, created_at
+  tiktok_handle, twitter_handle,
+  followers_count, created_at
 )
 WITH all_handles AS (
-  -- Una fila por (tenant, handle_lower) con los datos consolidados.
-  -- Aggregate functions con FILTER recorren todos los rows y eligen
-  -- el primer non-null según el orden de prioridad (creators primero).
   SELECT
     -- Solo leadgen_entries y scouter_leads tienen tenant_id columna.
     -- Las otras 3 tablas son single-tenant; usamos el default.
     coalesce(sl.tenant_id, le.tenant_id, (SELECT id FROM _default_tenant)) AS tenant_id,
     h.handle AS instagram_handle,
-    -- display_name: creators > closer_creators > closers_contacts > scouter_leads
-    coalesce(c.name, ccr.name, cc.name, sl.name) AS display_name,
-    -- avatar: scouter_leads (es el único con foto fresca del scraper)
-    sl.profile_pic_url AS avatar_url,
-    sl.bio,
-    sl.is_verified,
-    coalesce(c.country, ccr.country, cc.country, sl.country) AS country,
-    coalesce(c.city, ccr.city, cc.city, sl.city) AS city,
-    coalesce(c.state, sl.state) AS state,
-    coalesce(c.onlyfans_url, cc.onlyfans_url, le.onlyfans_url) AS onlyfans_url,
-    sl.followers_count,
-    sl.posts_count,
-    sl.recent_posts_last_fetched_at AS last_scraped_at,
+    -- display_name: creators > closers_contacts > scouter_leads
+    -- (closer_creators NO tiene columna name)
+    coalesce(c.name, cc.name, sl.name) AS display_name,
+    -- avatar: creators (profile_photo_url o piclink_url) > scouter (photo_data_url) > closers_contacts (profile_picture_url)
+    coalesce(c.profile_photo_url, c.piclink_url, sl.photo_data_url, cc.profile_picture_url) AS avatar_url,
+    -- bio: creators > scouter
+    coalesce(c.bio, sl.bio) AS bio,
+    -- verified: solo scouter_leads.verified existe
+    sl.verified AS is_verified,
+    -- country: solo creators y scouter_leads tienen columna country
+    -- (closers_contacts/closer_creators/leadgen_entries no tienen)
+    coalesce(c.country, sl.country) AS country,
+    -- city: la mayoría tiene city
+    coalesce(c.city, ccr.city, cc.city, sl.city, le.city) AS city,
+    -- state: solo leadgen_entries
+    le.state AS state,
+    coalesce(c.onlyfans_url, ccr.onlyfans_url, cc.onlyfans_url, sl.onlyfans_url, le.onlyfans_url) AS onlyfans_url,
+    c.tiktok_handle,
+    c.twitter_handle,
+    sl.followers AS followers_count,
     -- created_at = el más viejo entre las 5 fuentes
     least(c.created_at, ccr.created_at, cc.created_at, sl.created_at, le.created_at) AS created_at
   FROM (
@@ -79,8 +101,6 @@ WITH all_handles AS (
       UNION SELECT instagram_handle FROM public.creators WHERE instagram_handle IS NOT NULL AND trim(instagram_handle) <> ''
     ) u
   ) h
-  -- LEFT JOINs con DISTINCT ON para asegurar 1 row por handle por fuente
-  -- (algunas tablas tienen múltiples rows con el mismo handle).
   LEFT JOIN LATERAL (
     SELECT * FROM public.creators
     WHERE lower(trim(instagram_handle)) = h.handle
@@ -110,33 +130,31 @@ WITH all_handles AS (
 SELECT
   tenant_id, instagram_handle, display_name, avatar_url, bio,
   is_verified, country, city, state, onlyfans_url,
-  followers_count, posts_count, last_scraped_at, created_at
+  tiktok_handle, twitter_handle,
+  followers_count, created_at
 FROM all_handles
-WHERE tenant_id IS NOT NULL  -- defensa: handles huérfanos sin tenant
-ON CONFLICT DO NOTHING;  -- partial unique index sobre (tenant, lower(handle)) WHERE NOT NULL
+WHERE tenant_id IS NOT NULL
+ON CONFLICT DO NOTHING;
 
 -- ─── 1b. Backfill de creators SIN handle pero CON phone ────────────────
 --
--- Edge case real: ~25 creators firmados nunca capturaron IG, pero tienen
+-- Edge case real: creators firmados que nunca capturaron IG, pero tienen
 -- contrato + phone. Política "sin handle = basura" no aplica porque son
--- clientes activos. Dedup por (tenant, phone_e164) — si dos creators
--- tienen el mismo phone, asumimos que son la misma persona física.
+-- clientes activos. Dedup por phone normalizado.
 
 INSERT INTO public.models (
-  tenant_id, instagram_handle, display_name, country, city, state,
-  onlyfans_url, created_at
+  tenant_id, instagram_handle, display_name, avatar_url, bio,
+  country, city, onlyfans_url, created_at
 )
 WITH phone_only_creators AS (
-  -- DISTINCT ON (tenant, phone) elige el más viejo por phone para
-  -- preservar el created_at original (si dos creators con mismo phone
-  -- existen, agarra el primero registrado).
-  -- creators no tiene tenant_id propio → usamos el default tenant.
   SELECT DISTINCT ON (phone_normalized)
     (SELECT id FROM _default_tenant) AS tenant_id,
-    name, country, city, state, onlyfans_url, created_at,
+    name,
+    coalesce(profile_photo_url, piclink_url) AS avatar_url,
+    bio, country, city, onlyfans_url, created_at,
     phone_normalized
   FROM (
-    SELECT name, country, city, state, onlyfans_url, created_at, phone_e164, phone,
+    SELECT name, profile_photo_url, piclink_url, bio, country, city, onlyfans_url, created_at,
            coalesce(regexp_replace(phone_e164, '[^0-9+]', '', 'g'),
                     regexp_replace(phone, '[^0-9+]', '', 'g')) AS phone_normalized
     FROM public.creators
@@ -147,19 +165,10 @@ WITH phone_only_creators AS (
   ORDER BY phone_normalized, created_at ASC
 )
 SELECT
-  tenant_id, NULL, name, country, city, state, onlyfans_url, created_at
+  tenant_id, NULL, name, avatar_url, bio, country, city, onlyfans_url, created_at
 FROM phone_only_creators;
 
--- Estos no tienen handle, así que no van a chocar con el partial unique
--- index. Pero podríamos correr este script 2 veces y duplicar — la
--- protección está en el ON CONFLICT del backfill de model_phones más
--- abajo, que dedupea por (tenant, model_id, phone_e164).
-
 -- ─── 2. Backfill de `model_phones` ─────────────────────────────────────
---
--- Cada (handle, phone) único de las 5 fuentes con phone_first_set_at no
--- null se inserta como un row en model_phones con el source_module
--- correspondiente. El más reciente por modelo se marca is_primary.
 
 WITH all_phones AS (
   SELECT
@@ -229,9 +238,6 @@ WITH all_phones AS (
                  regexp_replace(c.phone, '[^0-9+]', '', 'g')) ~ '^\+?[0-9]{6,15}$'
 ),
 deduped AS (
-  -- Si el mismo (model_id, phone) aparece en varias fuentes, nos
-  -- quedamos con el más viejo captured_at (la primera vez que se
-  -- capturó es lo que mejor refleja cuándo entró al sistema).
   SELECT DISTINCT ON (model_id, phone_e164)
     tenant_id, model_id, phone_e164, phone_raw, source_module,
     captured_by, captured_at
@@ -250,8 +256,6 @@ FROM deduped
 ON CONFLICT (tenant_id, model_id, phone_e164) DO NOTHING;
 
 -- ─── 2b. Backfill de model_phones para los no-handle creators ─────────
--- Estos models recién creados (paso 1b) tienen handle=NULL. Los linkeamos
--- al phone original del creator vía phone normalizado.
 
 INSERT INTO public.model_phones (
   tenant_id, model_id, phone_e164, phone_raw,
@@ -268,7 +272,7 @@ CROSS JOIN LATERAL (
 JOIN public.models m
   ON m.tenant_id = (SELECT id FROM _default_tenant)
  AND m.instagram_handle IS NULL
- AND m.created_at = c.created_at  -- match por timestamp + sin handle (proxy de identidad)
+ AND m.created_at = c.created_at
  AND m.display_name IS NOT DISTINCT FROM c.name
 WHERE (c.instagram_handle IS NULL OR trim(c.instagram_handle) = '')
   AND (c.phone_e164 IS NOT NULL OR c.phone IS NOT NULL)
@@ -276,7 +280,7 @@ WHERE (c.instagram_handle IS NULL OR trim(c.instagram_handle) = '')
 ON CONFLICT (tenant_id, model_id, phone_e164) DO NOTHING;
 
 -- Marcar como is_primary el phone más reciente por modelo. Si tiene
--- múltiples (los 372 casos), los anteriores quedan con status='replaced'.
+-- múltiples, los anteriores quedan con status='replaced'.
 
 WITH ranked AS (
   SELECT id, model_id,
@@ -311,8 +315,6 @@ WHERE sl.tenant_id = m.tenant_id
   AND trim(sl.instagram_handle) <> ''
   AND sl.model_id IS NULL;
 
--- closers_contacts / closer_creators / creators NO tienen tenant_id
--- (pre-multi-tenant). El JOIN se hace contra el tenant default.
 UPDATE public.closers_contacts cc
 SET model_id = m.id
 FROM public.models m
@@ -341,8 +343,6 @@ WHERE m.tenant_id = (SELECT id FROM _default_tenant)
   AND c.model_id IS NULL;
 
 -- ─── 3b. Linking de creators-sin-handle vía phone ──────────────────────
--- Para los 25 creators con phone pero sin handle (ver paso 1b), linkeamos
--- el creator a su model recién creado matcheando por phone normalizado.
 
 UPDATE public.creators c
 SET model_id = mp.model_id
@@ -356,9 +356,7 @@ WHERE mp.tenant_id = (SELECT id FROM _default_tenant)
     regexp_replace(c.phone, '[^0-9+]', '', 'g')
   );
 
--- ─── 4. Validation queries (no hacen cambios, solo reportan) ───────────
--- Estos resultados se loggean al aplicar la migration para verificar
--- que la migración cuadra.
+-- ─── 4. Validation queries ─────────────────────────────────────────────
 
 DO $$
 DECLARE
@@ -371,6 +369,8 @@ DECLARE
   v_scouter_total int;
   v_creators_with_model int;
   v_creators_total int;
+  v_closers_contacts_with int;
+  v_closer_creators_with int;
 BEGIN
   SELECT count(*) INTO v_models_count FROM public.models;
   SELECT count(*) INTO v_phones_count FROM public.model_phones;
@@ -385,6 +385,9 @@ BEGIN
   SELECT count(*) INTO v_creators_total FROM public.creators;
   SELECT count(*) INTO v_creators_with_model FROM public.creators WHERE model_id IS NOT NULL;
 
+  SELECT count(*) INTO v_closers_contacts_with FROM public.closers_contacts WHERE model_id IS NOT NULL;
+  SELECT count(*) INTO v_closer_creators_with FROM public.closer_creators WHERE model_id IS NOT NULL;
+
   RAISE NOTICE '──────── BACKFILL VALIDATION ────────';
   RAISE NOTICE 'models inserted:                    %', v_models_count;
   RAISE NOTICE 'model_phones inserted:              %', v_phones_count;
@@ -392,6 +395,8 @@ BEGIN
                v_leadgen_with_model, v_leadgen_total, v_leadgen_no_handle;
   RAISE NOTICE 'scouter_leads:   % / % linked', v_scouter_with_model, v_scouter_total;
   RAISE NOTICE 'creators:        % / % linked', v_creators_with_model, v_creators_total;
+  RAISE NOTICE 'closers_contacts:% linked',     v_closers_contacts_with;
+  RAISE NOTICE 'closer_creators: % linked',     v_closer_creators_with;
   RAISE NOTICE '─────────────────────────────────────';
 END $$;
 

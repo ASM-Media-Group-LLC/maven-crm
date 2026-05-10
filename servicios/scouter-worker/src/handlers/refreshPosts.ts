@@ -5,7 +5,7 @@
 // semanal lo encola para refrescar los high_fit del pool).
 
 import { sb } from "../db.ts";
-import { runPostScrape } from "../apify.ts";
+import { runPostScrape } from "../scrapecreators.ts";
 import type { JobResult, RefreshPostsPayload, ScouterJob } from "../types.ts";
 
 interface LeadRow {
@@ -52,7 +52,7 @@ export async function handleRefreshPosts(
     const msg = (e as Error).message ?? "Error desconocido";
     // Errores de quota/rate-limit los dejamos burbujear para que el
     // dispatcher haga retry/quota-handling como en otros jobs Apify.
-    throw new Error(`Apify post scrape falló: ${msg}`);
+    throw new Error(`ScrapeCreators post scrape falló: ${msg}`);
   }
 
   // Aunque vengan 0 posts (cuenta privada / borró todo), guardamos []

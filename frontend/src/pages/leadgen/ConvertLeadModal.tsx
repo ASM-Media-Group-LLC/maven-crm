@@ -1,4 +1,4 @@
-import { ArrowRight, Lightbulb } from "lucide-react";
+import { ArrowRight, Lightbulb, AlertTriangle } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -65,8 +65,12 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
     },
   });
 
+  // Regla nueva: ningún contacto entra al sistema sin handle de IG.
+  // Si el lead está sin handle, bloqueamos la conversión.
+  const missingHandle = !lead.model_handle || !lead.model_handle.trim();
+
   const items = [
-    { label: "Handle", value: `@${lead.model_handle}` },
+    { label: "Handle", value: lead.model_handle ? `@${lead.model_handle}` : "—" },
     { label: "Plataforma", value: lead.platform },
     { label: "Categoría", value: lead.quality || "—" },
     { label: "Cuenta origen", value: lead.company || "—" },
@@ -102,18 +106,31 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
           </ul>
         </div>
 
-        <div className="flex items-start gap-2.5 rounded-lg bg-primary/10 p-3">
-          <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            El lead quedará marcado como "contactado" y la creator aparecerá en el módulo de Closers con referencia al lead original.
-          </p>
-        </div>
+        {missingHandle ? (
+          <div className="flex items-start gap-2.5 rounded-lg bg-amber-500/10 p-3">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-900 dark:text-amber-200">
+              <span className="font-semibold">Falta el handle de Instagram.</span> Ningún
+              contacto puede entrar al pipeline sin handle. Editá el lead para agregarlo y volvé a intentar.
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2.5 rounded-lg bg-primary/10 p-3">
+            <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground">
+              El lead quedará marcado como "contactado" y la creator aparecerá en el módulo de Closers con referencia al lead original.
+            </p>
+          </div>
+        )}
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={handleCancel} disabled={convert.isPending}>
             Cancelar
           </Button>
-          <Button onClick={() => convert.mutate()} disabled={convert.isPending}>
+          <Button
+            onClick={() => convert.mutate()}
+            disabled={convert.isPending || missingHandle}
+          >
             {convert.isPending ? "Convirtiendo..." : "Confirmar Conversión"}
           </Button>
         </DialogFooter>

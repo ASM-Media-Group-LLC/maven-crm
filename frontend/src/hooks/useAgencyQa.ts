@@ -558,6 +558,10 @@ export interface UpsertQaModelInput {
   category?: ModelCategory | null;
   country?: string | null;
   ig_url?: string | null;
+  /** FK al catálogo canónico models. Si viene seteado, primero buscamos
+   *  un qa_model linkeado a ese model_id (path preferido). El fallback
+   *  por nombre queda como red de seguridad para rows legacy. */
+  model_id?: string | null;
 }
 
 export const useUpsertQaModel = () =>
@@ -565,19 +569,45 @@ export const useUpsertQaModel = () =>
     mutationFn: async (input: UpsertQaModelInput): Promise<string> => {
       const trimmed = input.name.trim();
       if (!trimmed) throw new Error("Nombre de la modelo vacío.");
+
+      // Si tenemos model_id (vino del combobox de models canónicos),
+      // priorizamos ese match — un qa_model linkeado a ese model.
+      if (input.model_id) {
+        const { data: byLink, error: linkErr } = await sb
+          .from("qa_models")
+          .select("id, category, country, ig_url")
+          .eq("model_id", input.model_id)
+          .maybeSingle();
+        if (linkErr) throw linkErr;
+        if (byLink?.id) {
+          const patch: Record<string, string> = {};
+          if (!byLink.category && input.category) patch.category = input.category;
+          if (!byLink.country && input.country) patch.country = input.country;
+          if (!byLink.ig_url && input.ig_url) patch.ig_url = input.ig_url;
+          if (Object.keys(patch).length > 0) {
+            const { error: updateErr } = await sb
+              .from("qa_models")
+              .update(patch)
+              .eq("id", byLink.id);
+            if (updateErr) throw updateErr;
+          }
+          return byLink.id as string;
+        }
+      }
+
       const { data: existing, error: lookupErr } = await sb
         .from("qa_models")
-        .select("id, category, country, ig_url")
+        .select("id, category, country, ig_url, model_id")
         .ilike("name", trimmed)
         .maybeSingle();
       if (lookupErr) throw lookupErr;
 
       if (existing?.id) {
-        // Patch metadata gaps without overwriting existing values.
         const patch: Record<string, string> = {};
         if (!existing.category && input.category) patch.category = input.category;
         if (!existing.country && input.country) patch.country = input.country;
         if (!existing.ig_url && input.ig_url) patch.ig_url = input.ig_url;
+        if (!existing.model_id && input.model_id) patch.model_id = input.model_id;
         if (Object.keys(patch).length > 0) {
           const { error: updateErr } = await sb
             .from("qa_models")
@@ -595,12 +625,59 @@ export const useUpsertQaModel = () =>
           category: input.category ?? null,
           country: input.country ?? null,
           ig_url: input.ig_url ?? null,
+          model_id: input.model_id ?? null,
           active: true,
         })
         .select("id")
         .single();
       if (insertErr) throw insertErr;
       return created.id as string;
+    },
+  });
+
+/** Búsqueda en el catálogo canónico de models — usado por el New QA
+ *  combobox para obligar al closer a elegir una modelo que YA exista
+ *  en el sistema (regla nueva: si no está, crear lead primero). */
+export interface ModelSearchResult {
+  id: string;
+  instagram_handle: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  country: string | null;
+  city: string | null;
+  followers_count: number | null;
+}
+
+export const useSearchModelsForQa = (query: string, opts?: { enabled?: boolean }) =>
+  useQuery({
+    queryKey: ["search-models-qa", query.trim().toLowerCase()],
+    enabled: (opts?.enabled ?? true) && query.trim().length >= 2,
+    staleTime: 60_000,
+    queryFn: async (): Promise<ModelSearchResult[]> => {
+      const { data, error } = await sb.rpc("search_models", {
+        p_query: query.trim(),
+        p_limit: 20,
+        p_order_by: "name",
+      });
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{
+        id: string;
+        instagram_handle: string | null;
+        display_name: string | null;
+        avatar_url: string | null;
+        country: string | null;
+        city: string | null;
+        followers_count: number | null;
+      }>;
+      return rows.map((r) => ({
+        id: r.id,
+        instagram_handle: r.instagram_handle,
+        display_name: r.display_name,
+        avatar_url: r.avatar_url,
+        country: r.country,
+        city: r.city,
+        followers_count: r.followers_count,
+      }));
     },
   });
 

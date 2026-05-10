@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Pencil, Save, X, Star, ExternalLink } from "lucide-react";
+import { Loader2, Pencil, Save, X, Star, ExternalLink, ArrowRight, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useUpdateLead,
@@ -27,6 +27,7 @@ import {
   type LeadPatch,
   type ScouterLead,
 } from "@/hooks/useScouterLeads";
+import ConvertScouterLeadModal from "./ConvertScouterLeadModal";
 
 // ─── Status palette (shared by Home grid + Leads table) ────────────────
 // Nota: a partir de la simplificación del popup (2026-05), los closer
@@ -145,6 +146,7 @@ export const LeadDrawer = ({
   // más permanente y borra el lead del flujo activo, así que pide
   // que el usuario lo piense un segundo.
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -576,6 +578,27 @@ export const LeadDrawer = ({
               </button>
             ))}
           </div>
+          {/* Convertir a Pipeline Closers — handoff formal del scouter al
+              equipo de cerradores. Sólo si todavía no fue convertido. Si
+              ya pasó al pipeline, mostramos badge informativo en lugar
+              del botón para evitar duplicados. */}
+          {lead.converted_at ? (
+            <div className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Convertido a Pipeline Closers
+            </div>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-9 w-full gap-1.5 text-sm font-semibold"
+              onClick={() => setConvertOpen(true)}
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+              Convertir a Pipeline Closers
+            </Button>
+          )}
+
           {/* Contactar — full-width, lleva al perfil de Instagram en
               una pestaña nueva. Es la acción primaria que un closer
               hace después de revisar el lead. Sale arriba de Guardar
@@ -652,6 +675,15 @@ export const LeadDrawer = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal de conversión a Pipeline Closers — el handoff scouter→cerradores.
+          Se cierra solo en onSuccess y refresca queries afectadas. */}
+      <ConvertScouterLeadModal
+        open={convertOpen}
+        onOpenChange={setConvertOpen}
+        lead={lead}
+        onConverted={() => onOpenChange(false)}
+      />
     </Dialog>
   );
 };

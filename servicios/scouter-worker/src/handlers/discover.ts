@@ -6,7 +6,7 @@
 
 import { sb } from "../db.ts";
 import { checkBudget } from "../budget.ts";
-import { runHashtagDiscovery, runProfileScrape } from "../apify.ts";
+import { runHashtagDiscovery, runProfileScrape } from "../scrapecreators.ts";
 import type {
   DiscoverHashtagPayload,
   DiscoverSeedPayload,

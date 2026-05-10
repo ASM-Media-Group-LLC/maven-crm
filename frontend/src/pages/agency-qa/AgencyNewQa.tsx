@@ -45,12 +45,14 @@ import {
   useFireQaWebhook,
   useIgLookup,
   useQaModels,
+  useSearchModelsForQa,
   useTenantProfiles,
   useTranscribeAudio,
   useUploadQaAudio,
   useUpsertQaCloser,
   useUpsertQaModel,
   type ModelCategory,
+  type ModelSearchResult,
 } from "@/hooks/useAgencyQa";
 
 // AgencyNewQa — audio-only intake con free-text para closer y modelo.
@@ -118,10 +120,32 @@ const AgencyNewQa = () => {
   // — así el roster de qa_closers queda sincronizado con los closers
   // reales del CRM sin tener que mantener dos listas a mano.
   const [closerId, setCloserId] = useState<string>("");
+  // Regla nueva (2026-05): el form ya no acepta nombres libres. El closer
+  // tiene que seleccionar una modelo que ya exista en `models` (catálogo
+  // canónico). Si no existe, primero hay que crear el lead en /scouter o
+  // /lead-gen. Esto cierra el agujero de qa_models huérfanos.
+  const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [modelName, setModelName] = useState<string>("");
+  const [modelSearch, setModelSearch] = useState<string>("");
+  const [modelComboOpen, setModelComboOpen] = useState(false);
   const [modelCategory, setModelCategory] = useState<ModelCategory | "">("");
   const [modelCountry, setModelCountry] = useState<string>("");
   const [modelIgUrl, setModelIgUrl] = useState<string>("");
+
+  const modelSearchQ = useSearchModelsForQa(modelSearch, {
+    enabled: modelComboOpen && modelSearch.trim().length >= 2,
+  });
+
+  const handlePickModel = (m: ModelSearchResult) => {
+    setSelectedModelId(m.id);
+    setModelName(m.display_name || m.instagram_handle || "");
+    if (m.instagram_handle && !modelIgUrl) {
+      setModelIgUrl(`https://instagram.com/${m.instagram_handle}`);
+    }
+    if (m.country && !modelCountry) setModelCountry(m.country);
+    setModelComboOpen(false);
+    setModelSearch("");
+  };
 
   // Debounced IG lookup — al ingresar o pegar el handle/URL de la
   // modelo, esperamos 500ms tras la última tecla y disparamos un
@@ -191,7 +215,7 @@ const AgencyNewQa = () => {
 
   const errors: Record<string, string> = {};
   if (!closerId) errors.closer = "Elegí un closer";
-  if (!modelName.trim()) errors.model = "Nombre de la modelo requerido";
+  if (!selectedModelId) errors.model = "Seleccioná una modelo del catálogo (creá el lead primero si no existe)";
   if (!modelCategory) errors.category = "Categoría requerida";
   if (!modelCountry.trim()) errors.country = "País de la modelo requerido";
   if (!modelIgUrl.trim()) errors.ig = "Instagram de la modelo requerido";
@@ -245,6 +269,7 @@ const AgencyNewQa = () => {
           category: modelCategory || null,
           country: modelCountry.trim() || null,
           ig_url: modelIgUrl.trim() || null,
+          model_id: selectedModelId || null,
         }),
       ]);
 
@@ -309,6 +334,7 @@ const AgencyNewQa = () => {
       // 7. Reset form (mantiene closer + evaluator + categoría — son
       // los que más se repiten cuando un closer sube varias QAs seguidas).
       setModelName("");
+      setSelectedModelId("");
       setModelCountry("");
       setModelIgUrl("");
       setCallDate(today());
@@ -423,14 +449,79 @@ const AgencyNewQa = () => {
 
               <div className="space-y-1.5">
                 <Label htmlFor="model">Modelo *</Label>
-                <Input
-                  id="model"
-                  list="qa-models-list"
-                  placeholder="Tipeá el nombre de la modelo"
-                  value={modelName}
-                  onChange={(e) => setModelName(e.target.value)}
-                  autoComplete="off"
-                />
+                <Popover open={modelComboOpen} onOpenChange={setModelComboOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={modelComboOpen}
+                      className={cn(
+                        "w-full justify-between font-normal",
+                        !modelName && "text-muted-foreground",
+                      )}
+                    >
+                      {modelName || "Buscar modelo en el catálogo…"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder="Buscar por handle o nombre…"
+                        value={modelSearch}
+                        onValueChange={setModelSearch}
+                      />
+                      <CommandList>
+                        {modelSearch.trim().length < 2 ? (
+                          <CommandEmpty>Tipeá al menos 2 caracteres…</CommandEmpty>
+                        ) : modelSearchQ.isFetching ? (
+                          <CommandEmpty>Buscando…</CommandEmpty>
+                        ) : (modelSearchQ.data ?? []).length === 0 ? (
+                          <CommandEmpty>
+                            <div className="py-2 text-center">
+                              <p className="text-sm">Sin resultados.</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Si la modelo no existe, creala en{" "}
+                                <a href="/scouter/leads" className="text-primary underline">Scouter</a>{" "}
+                                o{" "}
+                                <a href="/lead-gen" className="text-primary underline">Lead Gen</a>{" "}
+                                primero, después subí la QA.
+                              </p>
+                            </div>
+                          </CommandEmpty>
+                        ) : (
+                          <CommandGroup>
+                            {(modelSearchQ.data ?? []).map((m) => (
+                              <CommandItem
+                                key={m.id}
+                                value={m.id}
+                                onSelect={() => handlePickModel(m)}
+                                className="flex items-center gap-2"
+                              >
+                                <Check
+                                  className={cn(
+                                    "h-3.5 w-3.5",
+                                    selectedModelId === m.id ? "opacity-100" : "opacity-0",
+                                  )}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate font-medium">
+                                    {m.display_name || m.instagram_handle || "Sin nombre"}
+                                  </div>
+                                  <div className="truncate text-xs text-muted-foreground">
+                                    {m.instagram_handle ? `@${m.instagram_handle}` : "—"}
+                                    {m.country ? ` · ${m.country}` : ""}
+                                  </div>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 {errors.model && (
                   <p className="text-xs text-rose-400">{errors.model}</p>
                 )}

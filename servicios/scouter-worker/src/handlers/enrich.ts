@@ -5,7 +5,7 @@
 
 import { sb } from "../db.ts";
 import { checkBudget } from "../budget.ts";
-import { runProfileScrape } from "../apify.ts";
+import { runProfileScrape } from "../scrapecreators.ts";
 import type { EnrichProfilePayload, JobResult, ScouterJob } from "../types.ts";
 
 interface LeadRow {

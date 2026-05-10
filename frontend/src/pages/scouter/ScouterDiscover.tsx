@@ -38,6 +38,7 @@ import {
   type ScouterLead,
   type ScouterJob,
 } from "@/hooks/useScouterLeads";
+import { supabase as sb } from "@/integrations/supabase/client";
 import {
   LeadDrawer,
   STATUS_META,
@@ -770,19 +771,32 @@ const ScouterDiscover = () => {
       }
     }
 
-    // Bonus: si hay leads existentes, usar como seeds adicionales
-    const existingHandles = (leads.data?.leads ?? [])
-      .slice(0, 10)
-      .map((l) => l.instagram_handle)
-      .filter(Boolean);
-    if (existingHandles.length > 0) {
+    // Weighted seed pool — RPC pick_discovery_seeds devuelve ~30 handles
+  // distribuidos: 50% creators firmadas (señal máxima), 30% leadgen
+  // quality A/A+, 20% scouter_leads validadas (high_fit + ai_score≥7).
+  // Reemplaza el bonus naive de "los 10 últimos leads" — ahora el pool
+  // que el scraper usa para sugerir similares está alineado con la
+  // calidad real del CRM.
+    void (async () => {
+      const { data: seedRows, error: seedErr } = await sb.rpc(
+        "pick_discovery_seeds",
+        { p_total: 30 },
+      );
+      if (seedErr) {
+        console.warn("pick_discovery_seeds error", seedErr.message);
+        return;
+      }
+      const handles = ((seedRows ?? []) as Array<{ out_handle: string }>)
+        .map((r) => r.out_handle)
+        .filter(Boolean);
+      if (handles.length === 0) return;
       enqueueSeed.mutate({
-        seeds: existingHandles,
+        seeds: handles,
         company_id: companyList[0]?.id ?? null,
-        maxLeads: existingHandles.length,
+        maxLeads: handles.length,
       });
-    }
-  }, [companies.data, leads.data, enqueueHashtag, enqueueSeed]);
+    })();
+  }, [companies.data, enqueueHashtag, enqueueSeed]);
 
   const handleStop = useCallback(() => {
     setShowStopConfirm(true);

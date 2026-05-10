@@ -253,19 +253,33 @@ no hay data divergente).
 **Acceptance**: el worker scouter actualiza `models.last_scraped_at` y los
 campos del scraper directamente, sin pasar por `scouter_leads.instagram_handle`.
 
-### Sprint 5 — Cleanup + drop columnas
+### Sprint 5 — Cleanup (sin destruir data)
+
+**Principio guía (lockeado)**: cualquier columna que un user llenó en
+el pasado se PRESERVA. La migración solo AGREGA `models` como fuente
+canónica; las columnas duplicadas siguen existiendo en sus tablas
+originales como histórico de input.
 
 Una vez TODAS las pantallas leen de `models`:
 
-1. Drop triggers de sincronía de Sprint 2.
-2. Drop columnas duplicadas en las 5 tablas viejas: `model_handle`,
-   `instagram_handle`, `handle`, `name`, `phone`, `country`, etc.
-3. Drop `v_model_phone_captures` (la materialized view ya no es
-   necesaria — `count(*) FROM model_phones WHERE status='active'` la
-   reemplaza directamente).
-4. Update memoria + este doc → status: `applied`.
+1. Drop triggers de sincronía de Sprint 2 (ya no hace falta mantener
+   las viejas en sync porque el frontend escribe directo a `models`).
+2. ❌ **NO** se dropea ninguna columna de las 5 tablas viejas:
+   `model_handle`, `instagram_handle`, `handle`, `name`, `phone`,
+   `country`, `city`, etc. siguen ahí como audit trail. Para los 129
+   conflictos de nombre, 33 de country, etc., los valores no
+   prioritarios siguen accesibles en su tabla original.
+3. Frontend deja de escribir a esas columnas viejas (los forms nuevos
+   apuntan a `models`). Reads viejos siguen funcionando si alguna
+   pantalla legacy todavía no migró.
+4. Marcar columnas como deprecated en docs internos.
+5. `v_model_phone_captures` se conserva (es read-only y alguien podría
+   tener queries apuntando ahí); puede coexistir con `model_phones`.
+6. Update memoria + este doc → status: `applied`.
 
-**Acceptance**: schema limpio, sin redundancia, todos los KPIs cuadran.
+**Acceptance**: ningún user pierde un input que metió. `models` es la
+fuente canónica para reads nuevos. Las 5 tablas viejas son audit log
+histórico.
 
 ## Validación / criterios de aceptación globales
 

@@ -1,4 +1,4 @@
-import { Sparkles, Lightbulb } from "lucide-react";
+import { Sparkles, Lightbulb, AlertTriangle } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -63,9 +63,15 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
 
   if (!contacto) return null;
 
+  // Regla nueva: ningún creator entra al sistema sin handle de IG.
+  // Si el contacto está sin handle (legacy/import incompleto), bloqueamos
+  // la conversión y pedimos completarlo primero. Mantiene la integridad
+  // de models como fuente canónica de identidad.
+  const missingHandle = !contacto.handle || !contacto.handle.trim();
+
   const items = [
     { label: "Nombre", value: contacto.name },
-    { label: "Handle", value: contacto.handle },
+    { label: "Handle", value: contacto.handle || "—" },
     { label: "País", value: contacto.country_code || "—" },
     { label: "Categoría", value: contacto.physical_appearance || "—" },
     { label: "Teléfono", value: contacto.phone ? `${contacto.country_code || ""}${contacto.phone}` : "—" },
@@ -100,18 +106,32 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
           </ul>
         </div>
 
-        <div className="flex items-start gap-2.5 rounded-lg bg-primary/10 p-3">
-          <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            El contacto quedará marcado como "Convertido" y se creará un nuevo perfil en el módulo de Creadoras.
-          </p>
-        </div>
+        {missingHandle ? (
+          <div className="flex items-start gap-2.5 rounded-lg bg-amber-500/10 p-3">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-900 dark:text-amber-200">
+              <span className="font-semibold">Falta el handle de Instagram.</span> Ningún
+              creador puede entrar al sistema sin handle. Cerrá este modal, editá el contacto
+              para agregarlo y volvé a intentar.
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2.5 rounded-lg bg-primary/10 p-3">
+            <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground">
+              El contacto quedará marcado como "Convertido" y se creará un nuevo perfil en el módulo de Creadoras.
+            </p>
+          </div>
+        )}
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={convert.isPending}>
             Cancelar
           </Button>
-          <Button onClick={() => convert.mutate()} disabled={convert.isPending}>
+          <Button
+            onClick={() => convert.mutate()}
+            disabled={convert.isPending || missingHandle}
+          >
             {convert.isPending ? "Convirtiendo..." : "Confirmar Conversión"}
           </Button>
         </DialogFooter>
