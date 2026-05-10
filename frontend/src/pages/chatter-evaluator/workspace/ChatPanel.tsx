@@ -743,28 +743,71 @@ export const ChatPanel = ({ session }: Props) => {
     }
   };
 
-  // Typing indicator (debounced on the fan/examiner side)
+  // Typing indicator (debounced on the fan/examiner side). Mirror of the
+  // chatter-side logic in ChatterPublicView: empty input has to immediately
+  // clear typing, otherwise the chatter sees "está escribiendo…" stuck for
+  // 3 s after the examiner deletes everything (or forever if the tab
+  // closes mid-typing).
   const typingTimer = useRef<number | null>(null);
+  const lastTypingState = useRef<boolean>(false);
+  const sendTypingFan = (typing: boolean) => {
+    if (!session) return;
+    lastTypingState.current = typing;
+    void supabase
+      .from("chatter_sessions" as never)
+      .update({
+        typing_fan: typing,
+        typing_fan_at: typing ? new Date().toISOString() : null,
+      } as never)
+      .eq("id", session.id as never);
+  };
   const handleInputChange = (val: string) => {
     setInput(val);
     // Si el usuario edita a mano mientras dicta, sincronizamos el anchor
     // para que la voz se anexe al final del texto nuevo.
     if (listening) speechAnchorRef.current = val;
     if (!session) return;
+    if (typingTimer.current) {
+      window.clearTimeout(typingTimer.current);
+      typingTimer.current = null;
+    }
     if (val.length > 0) {
-      void supabase
-        .from("chatter_sessions" as never)
-        .update({ typing_fan: true, typing_fan_at: new Date().toISOString() } as never)
-        .eq("id", session.id as never);
-      if (typingTimer.current) window.clearTimeout(typingTimer.current);
+      // Re-send on every keystroke so a single dropped realtime event
+      // doesn't leave the chatter blind to "examiner is typing".
+      sendTypingFan(true);
       typingTimer.current = window.setTimeout(() => {
-        void supabase
-          .from("chatter_sessions" as never)
-          .update({ typing_fan: false, typing_fan_at: null } as never)
-          .eq("id", session.id as never);
-      }, 3000);
+        sendTypingFan(false);
+      }, 2500);
+    } else if (lastTypingState.current) {
+      sendTypingFan(false);
     }
   };
+
+  // Clear typing on unmount + tab hide so a closed tab doesn't leave
+  // typing_fan=true stuck in the DB forever.
+  useEffect(() => {
+    if (!session?.id) return;
+    const clear = () => {
+      if (lastTypingState.current) {
+        if (typingTimer.current) {
+          window.clearTimeout(typingTimer.current);
+          typingTimer.current = null;
+        }
+        sendTypingFan(false);
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") clear();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", clear);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", clear);
+      clear();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id]);
 
   // Mark messages as read by examiner — but only when the tab is actually
   // visible AND the window has focus. Otherwise the chatter would see a

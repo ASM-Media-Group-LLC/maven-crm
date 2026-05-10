@@ -757,19 +757,63 @@ const ChatterPublicView = () => {
     }
   };
 
-  // Typing indicator (debounced)
+  // Typing indicator (debounced). Two paths:
+  //   - Non-empty input → mark typing=true on every keystroke (cheap re-send
+  //     so a single dropped realtime event doesn't leave the examiner blind),
+  //     reschedule auto-clear in 2.5 s
+  //   - Empty input (user deleted everything) → cancel timer + immediately
+  //     mark typing=false, so the examiner doesn't see a phantom indicator
+  // Plus cleanup on unmount / tab close so typing=true doesn't get stuck
+  // in the DB if the chatter walks away mid-message.
   const typingTimer = useRef<number | null>(null);
+  const lastTypingState = useRef<boolean>(false);
+  const sendTyping = (typing: boolean) => {
+    if (!sessionId) return;
+    lastTypingState.current = typing;
+    callChatterApi("set-typing", { sessionId, typing }).catch(() => {});
+  };
   const handleInputChange = (val: string) => {
     setInput(val);
     if (!sessionId) return;
+    if (typingTimer.current) {
+      window.clearTimeout(typingTimer.current);
+      typingTimer.current = null;
+    }
     if (val.length > 0) {
-      callChatterApi("set-typing", { sessionId, typing: true }).catch(() => {});
-      if (typingTimer.current) window.clearTimeout(typingTimer.current);
+      sendTyping(true);
       typingTimer.current = window.setTimeout(() => {
-        callChatterApi("set-typing", { sessionId, typing: false }).catch(() => {});
-      }, 3000);
+        sendTyping(false);
+      }, 2500);
+    } else if (lastTypingState.current) {
+      sendTyping(false);
     }
   };
+
+  // Clear typing on unmount + tab hide. Without this, closing the tab
+  // mid-message leaves typing_chatter=true in the DB indefinitely.
+  useEffect(() => {
+    if (!sessionId) return;
+    const clear = () => {
+      if (lastTypingState.current) {
+        if (typingTimer.current) {
+          window.clearTimeout(typingTimer.current);
+          typingTimer.current = null;
+        }
+        sendTyping(false);
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") clear();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", clear);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", clear);
+      clear();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   const session = sessionQ.data;
   const profile = profileQ.data ?? null;
