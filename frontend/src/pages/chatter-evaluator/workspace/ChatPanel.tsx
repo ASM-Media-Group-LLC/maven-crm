@@ -266,13 +266,13 @@ const MessageBubble = ({
       const cls = isPurchase
         ? "border-emerald-500 bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 text-emerald-400"
         : "border-amber-500 bg-gradient-to-br from-amber-500/20 to-amber-500/5 text-amber-400";
-      // Wording solicitado por el equipo: el system pill cuenta la historia
-      // desde el punto de vista del chatter ("X sent you a tip / purchased
-      // your content"), no como un evento abstracto. El amount del purchase
-      // queda en el badge derecho — no se repite en el texto.
+      // Wording desde la perspectiva del EXAMINER (que ES JavixBuster):
+      // "You purchased X content" / "You sent X a $Y tip" — la versión
+      // chatter-perspective vive en ChatterPublicView.
+      const modelName = profile?.name ?? "the model";
       const label = isPurchase
-        ? `${fanName} purchased your content`
-        : `${fanName} sent you a $${msg.price} usd tip`;
+        ? `You purchased ${modelName} content`
+        : `You sent ${modelName} a $${msg.price} usd tip`;
       return (
         <div className="my-2 flex justify-center">
           <div className={`flex w-full max-w-[420px] items-center gap-2.5 rounded-xl border px-5 py-2 ${cls}`}>
@@ -414,11 +414,11 @@ const MessageBubble = ({
           <>
             {isPriced ? (
               // PPV bubble — orange when unbought, green once purchased.
-              // Matches the original .msg-priced + .msg-purchase-btn:
-              // container is `position:relative`, button is absolutely
-              // positioned at top:50% right:-44px so it floats outside
-              // the bubble at vertical center.
-              <div className="mt-1 ml-12">
+              // Buy button vive a la DERECHA del bubble (junto al
+              // avatar/menu del examiner) en lugar de a la izquierda
+              // — más natural: "el examiner hace click cerca de su
+              // propio side del chat".
+              <div className="mt-1 mr-12">
                 <div
                   className={`relative inline-block rounded-[14px] border-2 p-1 ${
                     msg.purchased
@@ -453,7 +453,7 @@ const MessageBubble = ({
                     onClick={() => onPurchase(msg)}
                     disabled={msg.purchased || purchasing}
                     title={msg.purchased ? "Comprado" : `Comprar — $${msg.price}`}
-                    className={`absolute left-[-44px] top-1/2 z-[5] flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 text-base font-bold shadow-md transition-all ${
+                    className={`absolute right-[-44px] top-1/2 z-[5] flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 text-base font-bold shadow-md transition-all ${
                       msg.purchased
                         ? "cursor-default border-emerald-500 bg-emerald-500/15 text-emerald-400"
                         : "cursor-pointer border-orange-500 bg-card text-orange-500 hover:scale-110 hover:bg-orange-500 hover:text-white"
@@ -527,6 +527,7 @@ export const ChatPanel = ({ session }: Props) => {
   const qc = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
 
@@ -679,6 +680,29 @@ export const ChatPanel = ({ session }: Props) => {
     return () => clearInterval(t);
   }, []);
 
+  // Auto-cierra la sesión cuando expires_at se cumple. El examiner ya
+  // tiene un botón "+ tiempo" para extender — el cierre automático
+  // sólo aplica cuando NO se extendió. Una sola llamada con un ref de
+  // guard para que el setInterval no dispare endSession dos veces si
+  // el realtime tarda en propagar el status='ended'.
+  const autoEndedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!session?.id) return;
+    if (session.status === "ended") return;
+    if (!session.expires_at) return;
+    const expires = new Date(session.expires_at).getTime();
+    if (Number.isNaN(expires)) return;
+    if (Date.now() < expires) return;
+    if (autoEndedRef.current === session.id) return;
+    autoEndedRef.current = session.id;
+    endMut.mutate(session.id, {
+      onError: () => {
+        // Si falla la primera vez, dejar que el siguiente tick reintente.
+        autoEndedRef.current = null;
+      },
+    });
+  }, [now, session?.id, session?.status, session?.expires_at, endMut]);
+
   // Play ping when a NEW message arrives from the chatter (not on initial load)
   // and fire the tip popup whenever a brand-new tip system message lands.
   useEffect(() => {
@@ -818,6 +842,13 @@ export const ChatPanel = ({ session }: Props) => {
     } catch (e) {
       toast.error("No se pudo enviar", { description: (e as Error).message });
       setInput(content); // restore
+    } finally {
+      // Devuelve el foco al textarea después del send. Sin esto, el
+      // `disabled={sendMut.isPending}` lo suelta cuando arranca el
+      // mutate y nunca vuelve, así que el siguiente keypress no
+      // entra al textarea (lo que el examiner sentía como "me saca
+      // del cajón de chat").
+      textareaRef.current?.focus();
     }
   };
 
@@ -1279,6 +1310,7 @@ export const ChatPanel = ({ session }: Props) => {
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
           </Button>
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={(e) => {
@@ -1288,7 +1320,7 @@ export const ChatPanel = ({ session }: Props) => {
               }
             }}
             placeholder={`Mensaje como ${fanName}…`}
-            disabled={session.status === "ended" || sendMut.isPending}
+            disabled={session.status === "ended"}
             rows={2}
             className="min-h-[2.25rem] flex-1 resize-none rounded-md border bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
           />

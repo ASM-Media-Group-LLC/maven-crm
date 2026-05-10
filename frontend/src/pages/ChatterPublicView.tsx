@@ -118,6 +118,18 @@ const formatTime = (iso: string): string => {
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 };
 
+// Tag used by callers to silently swallow expected post-session-end
+// errors (set-typing, mark-read, etc.) without showing a toast — once
+// the examiner ends the session the chatter UI is about to switch to
+// the "session ended" screen anyway, so a 403 from the edge function
+// during that window is noise, not a real failure.
+class SessionEndedError extends Error {
+  readonly sessionEnded = true;
+  constructor() {
+    super("session ended");
+  }
+}
+
 const callChatterApi = async (action: string, payload: Record<string, unknown>) => {
   // supabaseAnon en vez del global por la misma razón que las queries:
   // si un Maven user abre el link logueado, su JWT NO debe viajar a una
@@ -126,9 +138,30 @@ const callChatterApi = async (action: string, payload: Record<string, unknown>) 
   const { data, error } = await supabaseAnon.functions.invoke("chatter-public", {
     body: { action, ...payload },
   });
-  if (error) throw error;
-  if (!data?.ok) throw new Error(data?.error || "chatter-public returned !ok");
+  if (error) {
+    // The edge function returns 403 with body { error: "session ended" }
+    // when status='ended'. supabase-js wraps the non-2xx into FunctionsHttpError
+    // which doesn't expose the body cleanly, so we tag any error after the
+    // local cache says ended. We re-throw the wrapped sentinel so callers
+    // can decide whether to show a toast or stay quiet.
+    throw error;
+  }
+  if (!data?.ok) {
+    if (data?.error === "session ended" || data?.error === "session not found") {
+      throw new SessionEndedError();
+    }
+    throw new Error(data?.error || "chatter-public returned !ok");
+  }
   return data;
+};
+
+const isSessionEndedError = (e: unknown): boolean => {
+  if (e instanceof SessionEndedError) return true;
+  const msg = e instanceof Error ? e.message : "";
+  // FunctionsHttpError wraps the response — Supabase doesn't expose the
+  // status cleanly across versions, so match by message. Also catches the
+  // generic "Edge Function returned a non-2xx status code" the user saw.
+  return /session ended|session not found|non-2xx status/i.test(msg);
 };
 
 // Quick reactions strip — same set as the examiner side. Tapping one
@@ -453,15 +486,9 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
         )}
         <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
           {formatTime(msg.created_at)}
-          {/* Double-check on the chatter's own messages. Single = enviado.
-              Double sky-blue = leído por el examinador. */}
-          {isMine && msg.msg_type === "message" && (
-            readByOther && new Date(readByOther) >= new Date(msg.created_at) ? (
-              <CheckCheck className="h-3 w-3 text-sky-400" />
-            ) : (
-              <Check className="h-3 w-3" />
-            )
-          )}
+          {/* Read indicator (single/double check) is examiner-only feature.
+              The chatter never sees whether the examiner has read their
+              messages — they just see the timestamp. */}
         </span>
       </div>
     </div>
@@ -891,8 +918,10 @@ const ChatterPublicView = () => {
       await sendMut.mutateAsync(text);
       callChatterApi("set-typing", { sessionId, typing: false }).catch(() => {});
     } catch (e) {
-      toast.error("No se pudo enviar", { description: (e as Error).message });
-      setInput(text);
+      if (!isSessionEndedError(e)) {
+        toast.error("No se pudo enviar", { description: (e as Error).message });
+        setInput(text);
+      }
     }
   };
 
@@ -924,7 +953,9 @@ const ChatterPublicView = () => {
       qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] });
       toast.success("Imagen enviada");
     } catch (e) {
-      toast.error("No se pudo subir", { description: (e as Error).message });
+      if (!isSessionEndedError(e)) {
+        toast.error("No se pudo subir", { description: (e as Error).message });
+      }
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1200,11 +1231,13 @@ const ChatterPublicView = () => {
                     sessionId,
                     messageId: target.id,
                     emoji,
-                  }).catch((e) =>
-                    toast.error("No se pudo reaccionar", {
-                      description: (e as Error).message,
-                    }),
-                  );
+                  }).catch((e) => {
+                    if (!isSessionEndedError(e)) {
+                      toast.error("No se pudo reaccionar", {
+                        description: (e as Error).message,
+                      });
+                    }
+                  });
                 }}
               />
             ))}
@@ -1360,9 +1393,11 @@ const ChatterPublicView = () => {
                   setEditMsg(null);
                   setEditDraft("");
                 } catch (e) {
-                  toast.error("No se pudo editar", {
-                    description: (e as Error).message,
-                  });
+                  if (!isSessionEndedError(e)) {
+                    toast.error("No se pudo editar", {
+                      description: (e as Error).message,
+                    });
+                  }
                 } finally {
                   setEditSaving(false);
                 }
