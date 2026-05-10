@@ -31,7 +31,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
 
-const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-2.5 text-sm sidebar-glass-hover";
+const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-3 text-sm sidebar-glass-hover";
 const ACTIVE_CLASS = "sidebar-glass-active font-medium";
 
 // Picks the URL with the LONGEST prefix match against `pathname`. Sin
@@ -832,18 +832,20 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
         )}
+        {/* Settings — icon button al lado del theme toggle.
+            Antes ocupaba su propia fila full-width pero la jerarquía
+            era demasiado equivalente a Salir; como icono entra en la
+            fila de identidad y libera vertical. */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 rounded-full text-muted-foreground"
+          onClick={() => navigate("/settings")}
+          title="Settings"
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
       </div>
-
-      {/* Settings row — same hover style as the rest of the sidebar
-          so it doesn't look out of place. */}
-      <button
-        type="button"
-        onClick={() => navigate("/settings")}
-        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover"
-      >
-        <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span>Settings</span>
-      </button>
 
       {/* Salir — ghost button, mismo lenguaje que Settings.
           La intención destructiva se comunica solo en hover (icono +
