@@ -110,7 +110,7 @@ export interface QaCall {
 /** Row shape returned by the joined list query — calls + flattened
  *  model + closer fields for table rendering. */
 export interface QaCallRow extends QaCall {
-  model: { name: string; avatar_data_url: string | null } | null;
+  model: { name: string; avatar_data_url: string | null; ig_url: string | null } | null;
   closer: { name: string } | null;
 }
 
@@ -135,7 +135,7 @@ export const useQaCalls = (params: ListParams = {}) => {
       let q = sb
         .from("qa_calls")
         .select(
-          "*, model:qa_models(name, avatar_data_url), closer:qa_closers(name)",
+          "*, model:qa_models(name, avatar_data_url, ig_url), closer:qa_closers(name)",
         )
         .order("created_at", { ascending: false })
         .limit(limit);
@@ -825,7 +825,7 @@ export const useQaCall = (id: string | null) =>
       const { data, error } = await sb
         .from("qa_calls")
         .select(
-          "*, model:qa_models(name, avatar_data_url), closer:qa_closers(name)",
+          "*, model:qa_models(name, avatar_data_url, ig_url), closer:qa_closers(name)",
         )
         .eq("id", id)
         .maybeSingle();
