@@ -1,4 +1,5 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { endOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 
 const sb = supabase as unknown as { from: (table: string) => any };
@@ -52,6 +53,15 @@ export interface DashboardRange {
 const toIso = (d: Date | undefined): string | null =>
   d ? d.toISOString() : null;
 
+// El user pickea fechas como "1/may → 10/may" pero las columnas son
+// timestamptz. Si pasamos `to = 2026-05-10T00:00:00Z` con `<=`, sólo
+// matchean filas creadas exactamente a la medianoche → resultado vacío.
+// Inflamos el `to` a fin-de-día para que la cota superior sea inclusiva
+// del día completo (rango cerrado por la izquierda, inclusivo por la
+// derecha al nivel de día).
+const toIsoEndOfDay = (d: Date | undefined): string | null =>
+  d ? endOfDay(d).toISOString() : null;
+
 /** KPIs del dashboard. Si from/to son undefined, sin filtro de fecha. */
 export const useOperationsDashboard = (range: DashboardRange) =>
   useQuery({
@@ -66,7 +76,7 @@ export const useOperationsDashboard = (range: DashboardRange) =>
     placeholderData: keepPreviousData,
     queryFn: async (): Promise<OperationsKpis> => {
       const fromIso = toIso(range.from);
-      const toIsoVal = toIso(range.to);
+      const toIsoVal = toIsoEndOfDay(range.to);
 
       const head = (table: string, dateCol: string, filter?: (q: any) => any) => {
         let q = sb.from(table).select("*", { count: "exact", head: true });
@@ -168,7 +178,7 @@ export const useMetricDetails = (
     staleTime: 30_000,
     queryFn: async (): Promise<DetailRow[]> => {
       const fromIso = toIso(range.from);
-      const toIsoVal = toIso(range.to);
+      const toIsoVal = toIsoEndOfDay(range.to);
 
       const dateGte = (q: any, col: string) => (fromIso ? q.gte(col, fromIso) : q);
       const dateLte = (q: any, col: string) => (toIsoVal ? q.lte(col, toIsoVal) : q);
