@@ -743,68 +743,56 @@ export const ChatPanel = ({ session }: Props) => {
     }
   };
 
-  // Typing indicator (debounced on the fan/examiner side). Mirror of the
-  // chatter-side logic in ChatterPublicView: empty input has to immediately
-  // clear typing, otherwise the chatter sees "está escribiendo…" stuck for
-  // 3 s after the examiner deletes everything (or forever if the tab
-  // closes mid-typing).
-  const typingTimer = useRef<number | null>(null);
-  const lastTypingState = useRef<boolean>(false);
-  const sendTypingFan = (typing: boolean) => {
+  // Typing indicator — port of the original Roleplaychatters pattern
+  // (index.html line 2017). Throttled timestamp write; the chatter side
+  // auto-expires the bubble client-side when typing_fan_at ages beyond
+  // TYPING_TIMEOUT_MS, so we don't need an explicit "stop typing" call
+  // and can't leave the bubble stuck on a closed tab.
+  const TYPING_THROTTLE_MS = 1500;
+  const lastTypingWriteRef = useRef<number>(0);
+  const writeTypingFan = () => {
     if (!session) return;
-    lastTypingState.current = typing;
+    const now = Date.now();
+    if (now - lastTypingWriteRef.current < TYPING_THROTTLE_MS) return;
+    lastTypingWriteRef.current = now;
     void supabase
       .from("chatter_sessions" as never)
       .update({
-        typing_fan: typing,
-        typing_fan_at: typing ? new Date().toISOString() : null,
+        typing_fan: true,
+        typing_fan_at: new Date().toISOString(),
       } as never)
+      .eq("id", session.id as never);
+  };
+  const cancelTypingFan = () => {
+    lastTypingWriteRef.current = 0;
+    if (!session) return;
+    void supabase
+      .from("chatter_sessions" as never)
+      .update({ typing_fan: false, typing_fan_at: null } as never)
       .eq("id", session.id as never);
   };
   const handleInputChange = (val: string) => {
     setInput(val);
-    // Si el usuario edita a mano mientras dicta, sincronizamos el anchor
-    // para que la voz se anexe al final del texto nuevo.
     if (listening) speechAnchorRef.current = val;
     if (!session) return;
-    if (typingTimer.current) {
-      window.clearTimeout(typingTimer.current);
-      typingTimer.current = null;
-    }
-    if (val.length > 0) {
-      // Re-send on every keystroke so a single dropped realtime event
-      // doesn't leave the chatter blind to "examiner is typing".
-      sendTypingFan(true);
-      typingTimer.current = window.setTimeout(() => {
-        sendTypingFan(false);
-      }, 2500);
-    } else if (lastTypingState.current) {
-      sendTypingFan(false);
-    }
+    if (val.length > 0) writeTypingFan();
+    else cancelTypingFan();
   };
 
-  // Clear typing on unmount + tab hide so a closed tab doesn't leave
-  // typing_fan=true stuck in the DB forever.
+  // Best-effort cancelTypingFan on tab hide / unmount so the chatter sees
+  // the bubble disappear instantly. Without this they'd wait the
+  // TYPING_TIMEOUT_MS auto-expire (~3.5 s) — fine, but feels snappier.
   useEffect(() => {
     if (!session?.id) return;
-    const clear = () => {
-      if (lastTypingState.current) {
-        if (typingTimer.current) {
-          window.clearTimeout(typingTimer.current);
-          typingTimer.current = null;
-        }
-        sendTypingFan(false);
-      }
-    };
     const onVisibilityChange = () => {
-      if (document.visibilityState === "hidden") clear();
+      if (document.visibilityState === "hidden") cancelTypingFan();
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("pagehide", clear);
+    window.addEventListener("pagehide", cancelTypingFan);
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("pagehide", clear);
-      clear();
+      window.removeEventListener("pagehide", cancelTypingFan);
+      cancelTypingFan();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id]);

@@ -757,60 +757,49 @@ const ChatterPublicView = () => {
     }
   };
 
-  // Typing indicator (debounced). Two paths:
-  //   - Non-empty input → mark typing=true on every keystroke (cheap re-send
-  //     so a single dropped realtime event doesn't leave the examiner blind),
-  //     reschedule auto-clear in 2.5 s
-  //   - Empty input (user deleted everything) → cancel timer + immediately
-  //     mark typing=false, so the examiner doesn't see a phantom indicator
-  // Plus cleanup on unmount / tab close so typing=true doesn't get stuck
-  // in the DB if the chatter walks away mid-message.
-  const typingTimer = useRef<number | null>(null);
-  const lastTypingState = useRef<boolean>(false);
-  const sendTyping = (typing: boolean) => {
+  // Typing indicator — port of the original Roleplaychatters pattern
+  // (index.html line 2017). Sender stamps `typing_chatter_at = now()`
+  // throttled to 1 write per 1.5 s on input change. Receiver subscribes
+  // via realtime and auto-hides the bubble when the timestamp ages
+  // beyond TYPING_TIMEOUT_MS (3.5 s). No explicit "stop typing" message
+  // is needed — the indicator self-clears, which means a closed tab or
+  // a dropped realtime event can't leave the bubble stuck.
+  const TYPING_THROTTLE_MS = 1500;
+  const lastTypingWriteRef = useRef<number>(0);
+  const writeTyping = () => {
     if (!sessionId) return;
-    lastTypingState.current = typing;
-    callChatterApi("set-typing", { sessionId, typing }).catch(() => {});
+    const now = Date.now();
+    if (now - lastTypingWriteRef.current < TYPING_THROTTLE_MS) return;
+    lastTypingWriteRef.current = now;
+    callChatterApi("set-typing", { sessionId, typing: true }).catch(() => {});
+  };
+  const cancelTyping = () => {
+    lastTypingWriteRef.current = 0;
+    if (!sessionId) return;
+    callChatterApi("set-typing", { sessionId, typing: false }).catch(() => {});
   };
   const handleInputChange = (val: string) => {
     setInput(val);
     if (!sessionId) return;
-    if (typingTimer.current) {
-      window.clearTimeout(typingTimer.current);
-      typingTimer.current = null;
-    }
-    if (val.length > 0) {
-      sendTyping(true);
-      typingTimer.current = window.setTimeout(() => {
-        sendTyping(false);
-      }, 2500);
-    } else if (lastTypingState.current) {
-      sendTyping(false);
-    }
+    if (val.length > 0) writeTyping();
+    else cancelTyping();
   };
 
-  // Clear typing on unmount + tab hide. Without this, closing the tab
-  // mid-message leaves typing_chatter=true in the DB indefinitely.
+  // Best-effort cancelTyping on page hide / unmount so the receiver's
+  // indicator clears immediately instead of waiting for the 3.5 s
+  // client-side auto-expire. Not strictly needed (the timeout would
+  // catch it), but feels snappier.
   useEffect(() => {
     if (!sessionId) return;
-    const clear = () => {
-      if (lastTypingState.current) {
-        if (typingTimer.current) {
-          window.clearTimeout(typingTimer.current);
-          typingTimer.current = null;
-        }
-        sendTyping(false);
-      }
-    };
     const onVisibilityChange = () => {
-      if (document.visibilityState === "hidden") clear();
+      if (document.visibilityState === "hidden") cancelTyping();
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("pagehide", clear);
+    window.addEventListener("pagehide", cancelTyping);
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("pagehide", clear);
-      clear();
+      window.removeEventListener("pagehide", cancelTyping);
+      cancelTyping();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
