@@ -779,6 +779,9 @@ const ChatterPublicView = () => {
   // race against the strict device lock).
   useEffect(() => {
     if (!sessionId || tabState !== "active") return;
+    // Don't even try to claim if we already know the session is over —
+    // saves a guaranteed 403 round-trip and the user-facing toast.
+    if (sessionQ.data?.status === "ended") return;
     let cancelled = false;
     const claim = async () => {
       try {
@@ -791,6 +794,11 @@ const ChatterPublicView = () => {
         const msg = (e as Error).message;
         if (msg.includes("session_locked") || msg.includes("Otro dispositivo")) {
           if (!cancelled) setLocked(true);
+        } else if (isSessionEndedError(e)) {
+          // The examiner closed the session mid-claim. The session-ended
+          // screen takes over from sessionQ; no need to toast a "couldn't
+          // join" error on top of it.
+          return;
         } else {
           if (!cancelled) toast.error("No se pudo entrar a la sesión", { description: msg });
         }
@@ -802,7 +810,7 @@ const ChatterPublicView = () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [sessionId, tabState]);
+  }, [sessionId, tabState, sessionQ.data?.status]);
 
   // Realtime subscription on messages
   useEffect(() => {
