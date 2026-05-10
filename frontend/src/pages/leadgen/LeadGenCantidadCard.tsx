@@ -1,5 +1,6 @@
 import { Star, TrendingUp, ArrowUpRight, ArrowRight, ArrowDownRight, Users, PhoneCall } from "lucide-react";
 import KpiCard from "@/components/dashboard/KpiCard";
+import { formatCompact } from "@/lib/format";
 
 interface ActiveFilter {
   type: "categoria" | "status" | null;
@@ -49,7 +50,7 @@ const LeadGenCantidadCard = ({ stats, activeFilter, onFilterChange }: Props) => 
           <KpiCard
             key={cat.key}
             label={`Cat. ${cat.label}`}
-            value={count}
+            value={formatCompact(count)}
             icon={cat.icon}
             color={cat.color}
             onClick={() => handleClick(cat.key)}
@@ -58,8 +59,8 @@ const LeadGenCantidadCard = ({ stats, activeFilter, onFilterChange }: Props) => 
         );
       })}
 
-      <KpiCard label="Total" value={total} icon={Users} color="bg-violet-500" />
-      <KpiCard label="QA" value={qa} icon={PhoneCall} color="bg-blue-500" />
+      <KpiCard label="Total" value={formatCompact(total)} icon={Users} color="bg-violet-500" />
+      <KpiCard label="QA" value={formatCompact(qa)} icon={PhoneCall} color="bg-blue-500" />
     </div>
   );
 };

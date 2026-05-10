@@ -288,7 +288,13 @@ export const useLeadGenSummaryStats = (dateFrom?: string, dateTo?: string, userI
         byQuality: Record<string, number>;
       };
     },
-    staleTime: 2 * 60 * 1000,
+    // Bumped 2min → 10min. El RPC scanea 102k filas (~800ms) y los
+    // conteos no cambian de un segundo a otro — staleTime más largo
+    // reduce el round-trip al cambiar de filtros.
+    staleTime: 10 * 60 * 1000,
+    // keepPreviousData: mientras refetcha (cambio de fecha/agente), los
+    // números viejos se quedan en los cards en vez de irse a 0.
+    placeholderData: keepPreviousData,
   });
 
 /** Fetch ALL leads for a specific agent in a date range (for performance charts) */

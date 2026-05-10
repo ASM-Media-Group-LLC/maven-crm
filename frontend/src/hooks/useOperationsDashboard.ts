@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 const sb = supabase as unknown as { from: (table: string) => any };
@@ -56,8 +56,14 @@ const toIso = (d: Date | undefined): string | null =>
 export const useOperationsDashboard = (range: DashboardRange) =>
   useQuery({
     queryKey: ["ops-dashboard", toIso(range.from), toIso(range.to)],
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    // Bumped 60s → 5min. Las 9 queries de count en paralelo (la más
+    // lenta marca el ritmo) no necesitan refrescarse cada minuto en un
+    // dashboard de overview. refetchInterval también sube.
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+    // keepPreviousData: al cambiar de rango de fechas, los números
+    // viejos se quedan visibles mientras llega el nuevo resultado.
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<OperationsKpis> => {
       const fromIso = toIso(range.from);
       const toIsoVal = toIso(range.to);
