@@ -17,12 +17,18 @@ export async function initPWA() {
 
   if (!isProductionHost) return;
 
+  // Skip in dev — vite-plugin-pwa only loads in production (see vite.config.ts),
+  // so virtual:pwa-register doesn't exist during `npm run dev`.
+  if (import.meta.env.DEV) return;
+
   try {
-    // Build the module specifier dynamically to avoid Vite dev-server resolution
-    const parts = ["virtual", ":", "pwa-register"];
-    const mod = parts.join("");
-    const imported = await (new Function('s', 'return import(s)'))(mod);
-    const { registerSW } = imported;
+    // Static-string dynamic import: Vite resolves this at build time and
+    // emits a real chunk for the SW registration. Using a literal string
+    // is required — computed/obfuscated specifiers leave the literal
+    // "virtual:pwa-register" in the bundle, which the browser then tries
+    // to fetch as a URL and rejects with a CORS/scheme error.
+    // @ts-expect-error - virtual module resolved by vite-plugin-pwa
+    const { registerSW } = await import("virtual:pwa-register");
     registerSW({
       onNeedRefresh() {
         const banner = document.createElement("div");
