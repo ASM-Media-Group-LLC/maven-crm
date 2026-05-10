@@ -137,8 +137,17 @@ export const CollapsibleSidebarGroup = ({
           <SidebarGroupLabel className="group/label flex w-full cursor-pointer items-center gap-2 rounded-md text-[11px] font-semibold uppercase tracking-widest !text-foreground/70 transition-colors hover:!text-foreground hover:bg-foreground/5">
             <Icon className="h-3.5 w-3.5 shrink-0 opacity-70 transition-opacity group-hover/label:opacity-100" />
             <span className="flex-1 text-left">{label}</span>
+            {/* Dot accent — solo si la ruta activa cae dentro de esta
+                sección. Sirve como "estás acá" cuando los grupos están
+                plegados, sin competir con el active bar del item. */}
+            {active && (
+              <span
+                aria-hidden
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent shadow-[0_0_6px_hsl(var(--accent)/0.55)]"
+              />
+            )}
             <ChevronRight
-              className={`h-4 w-4 shrink-0 opacity-60 transition-transform group-hover/label:opacity-100 ${open ? "rotate-90" : ""}`}
+              className={`h-3 w-3 shrink-0 opacity-40 transition-[transform,opacity] group-hover/label:opacity-80 ${open ? "rotate-90" : ""}`}
             />
           </SidebarGroupLabel>
         </CollapsibleTrigger>
