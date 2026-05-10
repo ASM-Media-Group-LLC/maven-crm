@@ -299,7 +299,10 @@ const Settings = () => {
           rather than a centred mobile card. */}
       <aside className="sub-rail w-64 shrink-0 border-r bg-card/40 p-4">
         <div className="sticky top-4">
-          <div className="px-2 pb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+          {/* Header del rail — mismo tratamiento tipográfico que los
+              headers de sección del sidebar principal (text-[11px],
+              tracking-widest, foreground/70). */}
+          <div className="px-2 pb-3 text-[11px] font-semibold uppercase tracking-widest text-foreground/70">
             Conectado como {prettyRole}
           </div>
           {/* Tabs — mismo lenguaje que la sidebar principal:

@@ -317,10 +317,14 @@ const AgencyQA = () => {
           (accent bar + bg gradient + glow). */}
       <aside className="sub-rail w-60 shrink-0 border-r bg-card/40 p-4">
         <div className="sticky top-4 space-y-1">
-          <div className="px-2 pb-2">
-            <h1 className="text-base font-bold tracking-tight">Company QA</h1>
-            <p className="text-[11px] text-muted-foreground">
-              Auditorías por rol.
+          {/* Header del rail — mismo tratamiento que el resto de los
+              sub-rails (text-[11px], tracking-widest, foreground/70). */}
+          <div className="px-2 pb-3">
+            <h1 className="text-[11px] font-semibold uppercase tracking-widest text-foreground/70">
+              Company QA
+            </h1>
+            <p className="mt-1 text-[11px] text-muted-foreground/80">
+              Auditorías por rol
             </p>
           </div>
           {visibleRoleSections.length === 0 && (
