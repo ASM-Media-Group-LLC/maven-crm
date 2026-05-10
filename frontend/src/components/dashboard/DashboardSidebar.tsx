@@ -34,6 +34,20 @@ import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSideb
 const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-2.5 text-sm sidebar-glass-hover";
 const ACTIVE_CLASS = "sidebar-glass-active font-medium";
 
+// Picks the URL with the LONGEST prefix match against `pathname`. Sin
+// esto, dos items hermanos cuyas URLs se solapan (ej: /hr/horarios y
+// /hr/horarios/horas-extras) se marcan activos a la vez. Aplica a los
+// sub-items de Finanzas/RRHH renderizados con SidebarMenuSubButton.
+const pickActiveUrl = (urls: string[], pathname: string): string | null => {
+  let best: string | null = null;
+  for (const u of urls) {
+    if (pathname === u || pathname.startsWith(u + "/")) {
+      if (!best || u.length > best.length) best = u;
+    }
+  }
+  return best;
+};
+
 const DashboardSidebar = () => {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -217,6 +231,11 @@ const DashboardSidebar = () => {
     if (group.subGroups) group.subGroups.forEach(sg => urls.push(...sg.items.filter(i => i.url).map(i => i.url!)));
     return urls;
   };
+
+  // Longest-prefix-wins entre TODOS los sub-items de RRHH (cruzando
+  // groups y subGroups), para que solo uno quede activo aunque sus
+  // URLs se solapen (ej: /hr/horarios vs /hr/horarios/horas-extras).
+  const hrActiveUrl = pickActiveUrl(hrGroups.flatMap(getGroupUrls), pathname);
 
   // Flat list for collapsed dropdown
   const hrFlatItems = hrGroups.flatMap((g) => {
@@ -453,6 +472,14 @@ const DashboardSidebar = () => {
 
           const isFinanzasActive = pathname === "/finanzas" || pathname.startsWith("/finanzas/");
 
+          // Longest-prefix-wins entre todos los sub-items de Finanzas,
+          // para que solo uno quede marcado activo aunque sus URLs se
+          // solapen (ver pickActiveUrl).
+          const finActiveUrl = pickActiveUrl(
+            finanzasGroups.flatMap((g) => g.items.map((i) => i.url)),
+            pathname,
+          );
+
           const finCollapsedItems: CI[] = [
             { title: "Dashboard Financiero", url: "/finanzas" },
             { title: "Collections", url: "/finanzas/collections" },
@@ -530,7 +557,7 @@ const DashboardSidebar = () => {
                                 <SidebarMenuSub>
                                   {group.items.map((item) => (
                                     <SidebarMenuSubItem key={item.url}>
-                                      <SidebarMenuSubButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
+                                      <SidebarMenuSubButton asChild isActive={item.url === finActiveUrl} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
                                         <NavLink to={item.url}>{item.title}</NavLink>
                                       </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
@@ -599,7 +626,7 @@ const DashboardSidebar = () => {
                     const renderHRItem = (item: HRItem) =>
                       item.url ? (
                         <SidebarMenuSubItem key={item.title}>
-                          <SidebarMenuSubButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
+                          <SidebarMenuSubButton asChild isActive={item.url === hrActiveUrl} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
                             <NavLink to={item.url}>{item.title}</NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
