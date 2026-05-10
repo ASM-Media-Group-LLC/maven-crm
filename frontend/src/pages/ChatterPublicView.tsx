@@ -164,6 +164,58 @@ const isSessionEndedError = (e: unknown): boolean => {
   return /session ended|session not found|non-2xx status/i.test(msg);
 };
 
+// MediaThumb — preview clickeable. Si la URL apunta a un video,
+// usa <video preload="metadata"> + fragment `#t=0.1` para forzar el
+// primer frame como póster + ícono Play encima. Para imágenes, <img>
+// normal. El MediaViewer auto-detecta video por extensión también.
+const VIDEO_EXT_RE = /\.(mp4|mov|webm|m4v|avi|mkv|hevc)(\?|#|$)/i;
+const isVideoUrl = (u: string) => VIDEO_EXT_RE.test(u);
+
+const MediaThumb = ({
+  url,
+  onClick,
+  className,
+}: {
+  url: string;
+  onClick: () => void;
+  className?: string;
+}) => {
+  if (isVideoUrl(url)) {
+    return (
+      <div className="relative inline-block">
+        <video
+          src={`${url}#t=0.1`}
+          preload="metadata"
+          muted
+          playsInline
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          className={className}
+        />
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
+            <Play className="h-5 w-5 fill-current" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={url}
+      alt=""
+      loading="lazy"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={className}
+    />
+  );
+};
+
 // Quick reactions strip — same set as the examiner side. Tapping one
 // toggles the reaction via the chatter-public edge function (which
 // runs the toggle logic with service_role to bypass RLS).
@@ -445,15 +497,10 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
             >
               <div className="flex flex-wrap gap-1">
                 {msg.images.map((url, i) => (
-                  <img
+                  <MediaThumb
                     key={i}
-                    src={url}
-                    alt=""
-                    loading="lazy"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenMedia(url);
-                    }}
+                    url={url}
+                    onClick={() => onOpenMedia(url)}
                     className="max-h-[200px] max-w-[200px] cursor-zoom-in rounded-[12px] object-cover"
                   />
                 ))}
@@ -469,15 +516,10 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
           ) : (
             <div className="mt-1 flex flex-wrap gap-1">
               {msg.images.map((url, i) => (
-                <img
+                <MediaThumb
                   key={i}
-                  src={url}
-                  alt=""
-                  loading="lazy"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenMedia(url);
-                  }}
+                  url={url}
+                  onClick={() => onOpenMedia(url)}
                   className="max-h-[200px] max-w-[200px] cursor-zoom-in rounded-[12px] border border-border object-cover"
                 />
               ))}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square, X as XIcon, Mic, MicOff, SmilePlus, MoreVertical, History, Trash2 } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square, X as XIcon, Mic, MicOff, SmilePlus, MoreVertical, History, Trash2, Play } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -108,6 +108,62 @@ const QUICK_REACTIONS = ["👍", "❤️", "🔥", "😂", "😮", "👀", "🙏
 // Cada chip muestra el emoji + el conteo (si > 1). Click sobre un chip
 // togglea la reacción del user actual con ese emoji. Si el user actual
 // es uno de los que reaccionaron con ese emoji, el chip se ve activado.
+// MediaThumb — renderea una preview clickeable. Si la URL apunta a un
+// video (extensión común), usa <video preload="metadata"> + el fragment
+// `#t=0.1` para forzar a que el browser cargue el primer frame como
+// thumbnail; superpone un ícono de Play para que el usuario sepa que
+// es video. Para imágenes, <img loading="lazy"> normal. Click llama
+// onClick — el caller abre el MediaViewer (que también auto-detecta
+// kind por extensión).
+const VIDEO_EXT_RE = /\.(mp4|mov|webm|m4v|avi|mkv|hevc)(\?|#|$)/i;
+const isVideoUrl = (u: string) => VIDEO_EXT_RE.test(u);
+
+const MediaThumb = ({
+  url,
+  onClick,
+  className,
+}: {
+  url: string;
+  onClick: () => void;
+  className?: string;
+}) => {
+  const isVideo = isVideoUrl(url);
+  if (isVideo) {
+    return (
+      <div className="relative inline-block">
+        <video
+          src={`${url}#t=0.1`}
+          preload="metadata"
+          muted
+          playsInline
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          className={className}
+        />
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
+            <Play className="h-5 w-5 fill-current" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={url}
+      alt=""
+      loading="lazy"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={className}
+    />
+  );
+};
+
 const ReactionsRow = ({
   reactions,
   currentUserId,
@@ -428,15 +484,10 @@ const MessageBubble = ({
                 >
                   <div className="flex flex-wrap gap-1">
                     {msg.images.map((url, i) => (
-                      <img
+                      <MediaThumb
                         key={i}
-                        src={url}
-                        alt=""
-                        loading="lazy"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenMedia(url);
-                        }}
+                        url={url}
+                        onClick={() => onOpenMedia(url)}
                         className="max-h-[200px] max-w-[200px] cursor-zoom-in rounded-[12px] object-cover"
                       />
                     ))}
@@ -466,15 +517,10 @@ const MessageBubble = ({
             ) : (
               <div className="mt-1 flex flex-wrap gap-1">
                 {msg.images.map((url, i) => (
-                  <img
+                  <MediaThumb
                     key={i}
-                    src={url}
-                    alt=""
-                    loading="lazy"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenMedia(url);
-                    }}
+                    url={url}
+                    onClick={() => onOpenMedia(url)}
                     className="max-h-[200px] max-w-[200px] cursor-zoom-in rounded-[12px] border border-border object-cover"
                   />
                 ))}

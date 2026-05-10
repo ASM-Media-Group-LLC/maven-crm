@@ -10,7 +10,13 @@ interface MediaViewerProps {
   onClose: () => void;
 }
 
-export const MediaViewer = ({ url, kind = "image", onClose }: MediaViewerProps) => {
+// Auto-detect video vs image from the URL when the caller doesn't
+// specify `kind`. Matches the chat-files / chatter-vault upload extensions.
+const VIDEO_EXT_RE = /\.(mp4|mov|webm|m4v|avi|mkv|hevc)(\?|#|$)/i;
+
+export const MediaViewer = ({ url, kind, onClose }: MediaViewerProps) => {
+  const resolvedKind: "image" | "video" =
+    kind ?? (url && VIDEO_EXT_RE.test(url) ? "video" : "image");
   // Close on Escape, like a sane lightbox would.
   useEffect(() => {
     if (!url) return;
@@ -38,7 +44,7 @@ export const MediaViewer = ({ url, kind = "image", onClose }: MediaViewerProps) 
       >
         <X className="h-5 w-5" />
       </button>
-      {kind === "video" ? (
+      {resolvedKind === "video" ? (
         <video
           src={url}
           controls
