@@ -7,6 +7,7 @@ export type JobKind =
   | "discover_hashtag"
   | "score_lead"
   | "enrich_profile"
+  | "enrich_handle"
   | "refresh_posts";
 
 export type JobStatus = "queued" | "running" | "done" | "failed";
@@ -54,6 +55,17 @@ export interface EnrichProfilePayload {
   leadId: string;
 }
 
+export interface EnrichHandlePayload {
+  /** IG handle (sin @, sin URL) o URL completa de IG — el handler normaliza.
+   *  Encolado por el frontend cada vez que se ingresa un handle nuevo
+   *  (LeadGen, Scouter manual, NuevoContacto). Escribe directo a
+   *  `models.avatar_url` — idempotente: skip si el model ya tiene avatar. */
+  handle: string;
+  /** Tenant explícito (opcional, default = job.tenant_id) — usado cuando
+   *  encolamos desde código que no tiene contexto del tenant. */
+  tenantId?: string;
+}
+
 export interface RefreshPostsPayload {
   /** scouter_leads.id (debe ser high_fit) a enriquecer con recent_posts. */
   leadId: string;
@@ -64,6 +76,7 @@ export type JobPayloadByKind = {
   discover_hashtag: DiscoverHashtagPayload;
   score_lead: ScoreLeadPayload;
   enrich_profile: EnrichProfilePayload;
+  enrich_handle: EnrichHandlePayload;
   refresh_posts: RefreshPostsPayload;
 };
 

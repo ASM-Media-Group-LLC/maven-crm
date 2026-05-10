@@ -18,6 +18,7 @@ import { Upload, X, ChevronsUpDown, Check, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
+import { enqueueAvatarFetch } from "@/lib/avatarFetch";
 import { checkCreatorExists, checkPreviousLead, checkDuplicateOnlyFans } from "@/lib/lead-validation";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -173,6 +174,11 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       } as any).select("id").single();
 
       if (error) throw error;
+
+      // Fire-and-forget: dispara avatar fetch al worker para que el
+      // model canónico tenga foto/followers/bio/name del IG. No
+      // bloqueamos el submit — el avatar aparece en `models` en 30-60s.
+      void enqueueAvatarFetch(normalizedHandle);
 
       // Upload evidence files
       if (files.length > 0 && inserted) {

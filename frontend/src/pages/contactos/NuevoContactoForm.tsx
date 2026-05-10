@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, UserPlus, Upload, Save, X, ImageIcon, Film, FileText, Check, ChevronsUpDown, Plus, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
+import { enqueueAvatarFetch } from "@/lib/avatarFetch";
 import { checkCreatorExists, checkExistingContact, checkDuplicateOnlyFans } from "@/lib/lead-validation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -239,6 +240,10 @@ const NuevoContactoForm = () => {
 
       if (error) throw error;
 
+      // Avatar fetch async — el worker baja foto IG y la pone en
+      // models.avatar_url (idempotente). No bloqueamos el submit.
+      if (handle) void enqueueAvatarFetch(handle);
+
       toast({ title: "Contacto guardado exitosamente" });
       navigate("/contactos");
     } catch (err: any) {
@@ -308,6 +313,7 @@ const NuevoContactoForm = () => {
         record_type: "reactivado",
       } as any);
       if (error) throw error;
+      if (handle) void enqueueAvatarFetch(handle);
       toast({ title: "Contacto guardado exitosamente" });
       navigate("/contactos");
     } catch (err: any) {

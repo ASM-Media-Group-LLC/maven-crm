@@ -15,6 +15,7 @@ import {
   handleDiscoverSeed,
 } from "./handlers/discover.ts";
 import { handleEnrichProfile } from "./handlers/enrich.ts";
+import { handleEnrichHandle } from "./handlers/enrichHandle.ts";
 import { handleScoreLead } from "./handlers/score.ts";
 import { handleRefreshPosts } from "./handlers/refreshPosts.ts";
 import type { JobResult, ScouterJob } from "./types.ts";
@@ -127,6 +128,8 @@ async function dispatchJob(job: ScouterJob): Promise<JobResult> {
       return handleScoreLead(job, payload as never);
     case "enrich_profile":
       return handleEnrichProfile(job, payload as never);
+    case "enrich_handle":
+      return handleEnrichHandle(job, payload as never);
     case "refresh_posts":
       return handleRefreshPosts(job, payload as never);
     default:

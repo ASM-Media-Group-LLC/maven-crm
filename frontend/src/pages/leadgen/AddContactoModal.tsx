@@ -13,6 +13,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle } from "@/lib/handle-utils";
+import { enqueueAvatarFetch } from "@/lib/avatarFetch";
 import { checkCreatorExists, checkExistingContact } from "@/lib/lead-validation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -149,6 +150,10 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
 
       if (error) throw error;
 
+      // Avatar fetch async — el worker descarga foto IG y la pone en
+      // models.avatar_url (idempotente). No bloqueamos el submit.
+      void enqueueAvatarFetch(normalizedIg || data.instagram);
+
       toast({ title: "Contacto guardado exitosamente" });
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
@@ -216,6 +221,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         record_type: "reactivado",
       });
       if (error) throw error;
+      void enqueueAvatarFetch(normalizedIg || pendingFormData.instagram);
       toast({ title: "Contacto guardado exitosamente" });
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
