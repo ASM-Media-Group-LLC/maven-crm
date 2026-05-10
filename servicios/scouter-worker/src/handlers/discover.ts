@@ -47,14 +47,63 @@ async function persistProfilesAsLeads(
   tenantId: string,
   companyId: string | null,
   discoverySource: string,
-): Promise<{ inserted: number; updated: number; leadIds: string[] }> {
+): Promise<{ inserted: number; updated: number; skippedInLeadgen: number; leadIds: string[] }> {
   const leadIds: string[] = [];
   let inserted = 0;
   let updated = 0;
+  let skippedInLeadgen = 0;
+
+  // Pre-fetch batch: cross-system dedup contra Lead Gen.
+  //   · existingInLeadgen: handles que ya viven en leadgen_entries
+  //   · existingInScouter: handles que ya existen en scouter_leads para
+  //     ESTA compañía (la condición para el upsert refresh path).
+  // Regla: skipeamos un handle si está en leadgen Y todavía no existe en
+  // scouter para esta compañía (sería un insert nuevo, que es lo que el
+  // usuario quiere evitar). Si ya existe en scouter, dejamos correr el
+  // upsert para que refresque followers/bio (no empeoramos el duplicado
+  // pre-existente).
+  const allHandles = items
+    .map((i) => i.username?.trim().toLowerCase())
+    .filter((h): h is string => !!h);
+
+  const existingInLeadgen = new Set<string>();
+  const existingInScouter = new Set<string>();
+  if (allHandles.length > 0) {
+    const [lgRes, scRes] = await Promise.all([
+      sb.from("leadgen_entries").select("model_handle").in("model_handle", allHandles),
+      companyId
+        ? sb
+            .from("scouter_leads")
+            .select("instagram_handle")
+            .eq("company_id", companyId)
+            .in("instagram_handle", allHandles)
+        : Promise.resolve({ data: [] as Array<{ instagram_handle: string }>, error: null }),
+    ]);
+    if (lgRes.error) console.error("leadgen dedup query failed", lgRes.error);
+    else {
+      for (const row of (lgRes.data ?? []) as { model_handle: string | null }[]) {
+        if (row.model_handle) existingInLeadgen.add(row.model_handle.toLowerCase());
+      }
+    }
+    if (scRes.error) console.error("scouter dedup query failed", scRes.error);
+    else {
+      for (const row of (scRes.data ?? []) as { instagram_handle: string }[]) {
+        existingInScouter.add(row.instagram_handle.toLowerCase());
+      }
+    }
+  }
 
   for (const item of items) {
     const handle = item.username?.trim().toLowerCase();
     if (!handle) continue;
+
+    // Cross-system dedup: si vive en Lead Gen y NO está ya en Scouter
+    // para esta compañía, lo skipeamos para no crear un duplicado nuevo.
+    if (existingInLeadgen.has(handle) && !existingInScouter.has(handle)) {
+      skippedInLeadgen += 1;
+      console.log(`[discover] skip @${handle} — ya existe en Lead Gen`);
+      continue;
+    }
 
     const linkPlatform = detectLinkInBio(item.externalUrl);
     const photo = item.profilePicUrlHD ?? item.profilePicUrl ?? null;
@@ -92,7 +141,7 @@ async function persistProfilesAsLeads(
     else updated += 1;
   }
 
-  return { inserted, updated, leadIds };
+  return { inserted, updated, skippedInLeadgen, leadIds };
 }
 
 async function enqueueScoreJobs(leadIds: string[], tenantId: string): Promise<void> {
@@ -122,7 +171,7 @@ export async function handleDiscoverSeed(
   if (!budget.ok) return { ok: false, message: budget.reason ?? "budget agotado" };
 
   const items = (await runProfileScrape(seeds.slice(0, max), job.tenant_id)) as ProfileItem[];
-  const { inserted, updated, leadIds } = await persistProfilesAsLeads(
+  const { inserted, updated, skippedInLeadgen, leadIds } = await persistProfilesAsLeads(
     items,
     job.tenant_id,
     job.company_id,
@@ -130,10 +179,11 @@ export async function handleDiscoverSeed(
   );
   await enqueueScoreJobs(leadIds, job.tenant_id);
 
+  const skipSuffix = skippedInLeadgen > 0 ? `, ${skippedInLeadgen} skip (ya en Lead Gen)` : "";
   return {
     ok: true,
-    message: `discover_seed: ${inserted} nuevos, ${updated} actualizados.`,
-    data: { inserted, updated, leadIds },
+    message: `discover_seed: ${inserted} nuevos, ${updated} actualizados${skipSuffix}.`,
+    data: { inserted, updated, skippedInLeadgen, leadIds },
     apifyItemsProcessed: items.length,
   };
 }
@@ -168,7 +218,7 @@ export async function handleDiscoverHashtag(
   // 3) Enriquecer perfiles + persistir.
   const usernames = authors.map((a) => a.username);
   const items = (await runProfileScrape(usernames, job.tenant_id)) as ProfileItem[];
-  const { inserted, updated, leadIds } = await persistProfilesAsLeads(
+  const { inserted, updated, skippedInLeadgen, leadIds } = await persistProfilesAsLeads(
     items,
     job.tenant_id,
     job.company_id,
@@ -176,10 +226,11 @@ export async function handleDiscoverHashtag(
   );
   await enqueueScoreJobs(leadIds, job.tenant_id);
 
+  const skipSuffix = skippedInLeadgen > 0 ? `, ${skippedInLeadgen} skip (ya en Lead Gen)` : "";
   return {
     ok: true,
-    message: `discover_hashtag #${hashtag}: ${inserted} nuevos, ${updated} actualizados.`,
-    data: { authorsFound: authors.length, inserted, updated },
+    message: `discover_hashtag #${hashtag}: ${inserted} nuevos, ${updated} actualizados${skipSuffix}.`,
+    data: { authorsFound: authors.length, inserted, updated, skippedInLeadgen },
     apifyItemsProcessed: authors.length + items.length,
   };
 }
