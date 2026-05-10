@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Clock, Check, CheckCheck, SmilePlus as Smile } from "lucide-react";
+import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Clock, Check, CheckCheck, SmilePlus as Smile, MoreVertical, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { VolumeControl, playSoundFile } from "@/pages/chatter-evaluator/workspace/VolumeControl";
 import { MediaViewer } from "@/pages/chatter-evaluator/workspace/MediaViewer";
@@ -326,7 +332,7 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
         )}
       </div>
       <div className={`flex max-w-[75%] flex-col ${isMine ? "items-end" : "items-start"}`}>
-        <span className="text-[10px] text-muted-foreground">{name}</span>
+        <span className="text-xs font-semibold text-foreground/80">{name}</span>
         {(msg.content || msg.deleted === "chatter") && (
           <div
             className={`group/bubble relative rounded-2xl px-3.5 py-2 ${
@@ -336,27 +342,33 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
             }`}
           >
             {msg.content}
-            {msg.edited_at && (
-              <span
-                className="ml-1 text-[10px] italic opacity-60"
-                title={`Editado ${new Date(msg.edited_at).toLocaleString()}`}
-              >
-                (editado)
-              </span>
-            )}
-            {/* Chatter-only delete. Botón discreto: aparece al hover en
-                desktop, semi-visible (opacity-50) en touch para que el
-                chatter pueda tapearlo sin necesidad de hover. */}
+            {/* Chatter-side message menu — 3-dot dropdown matching the
+                examiner's pattern. Only one action ("Eliminar") because
+                edit + history are examiner-only. The chatter never sees
+                the "(editado)" tag either: that's intentional, the
+                examiner's edits should look seamless to the chatter. */}
             {isMine && (
-              <button
-                type="button"
-                onClick={() => onDelete(msg)}
-                className="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-rose-500 hover:text-white hover:opacity-100 group-hover/bubble:opacity-100"
-                title="Eliminar mensaje"
-                aria-label="Eliminar mensaje"
-              >
-                <X className="h-3 w-3" />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground group-hover/bubble:opacity-100 data-[state=open]:opacity-100"
+                    title="Opciones del mensaje"
+                    aria-label="Opciones del mensaje"
+                  >
+                    <MoreVertical className="h-3 w-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem
+                    onClick={() => onDelete(msg)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                    Eliminar mensaje
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             {/* Reaction picker — flota al lado opuesto a la cola del
                 bubble (left para mensajes del fan, right para los del

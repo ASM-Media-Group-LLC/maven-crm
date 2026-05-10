@@ -331,7 +331,7 @@ const MessageBubble = ({
         )}
       </div>
       <div className={`flex max-w-[70%] flex-col ${isFan ? "items-end" : "items-start"}`}>
-        <span className="text-[10px] text-muted-foreground">{name}</span>
+        <span className="text-xs font-semibold text-foreground/80">{name}</span>
         {(msg.content || msg.deleted === "chatter") && (
           <div
             className={`group/bubble relative rounded-2xl px-3 py-1.5 ${
@@ -879,9 +879,8 @@ export const ChatPanel = ({ session }: Props) => {
   useEffect(() => {
     if (!session) return;
     const sid = session.id;
-    const markIfLooking = () => {
+    const markIfLooking = async () => {
       if (document.hidden || !document.hasFocus()) return;
-      // Re-check unread inside the listener so focus-gained also flushes.
       const msgs = messagesQ.data ?? [];
       const hasUnread = msgs.some(
         (m) =>
@@ -890,14 +889,27 @@ export const ChatPanel = ({ session }: Props) => {
             new Date(m.created_at) > new Date(session.read_by_examiner_at)),
       );
       if (!hasUnread) return;
-      void supabase
+      // Optimistic local update first — the sidebar badge clears
+      // instantly. If the server UPDATE later fails, the realtime
+      // round-trip (or the next refetch) will restore the real count.
+      qc.setQueryData<Record<string, number>>(
+        ["chatter-sessions-unread"],
+        (prev) => ({ ...(prev ?? {}), [sid]: 0 }),
+      );
+      // Await the actual UPDATE so we know it landed before we ask
+      // the server to recompute counts. Previously this was fire-and-
+      // forget which raced with the invalidate, occasionally leaving
+      // the badge stuck.
+      const { error } = await supabase
         .from("chatter_sessions" as never)
         .update({ read_by_examiner_at: new Date().toISOString() } as never)
         .eq("id", sid as never);
-      // Don't wait for the realtime round-trip to refresh the unread
-      // badge in the sidebar — invalidate locally so it disappears
-      // immediately when the user opens the session. The server
-      // round-trip (and realtime) act as a safety net if this misses.
+      if (error) {
+        // Roll back the optimistic 0 so the user doesn't lose the badge
+        // for a session that genuinely still has unread messages.
+        qc.invalidateQueries({ queryKey: ["chatter-sessions-unread"] });
+        return;
+      }
       qc.invalidateQueries({ queryKey: ["chatter-sessions-unread"] });
     };
     markIfLooking();
