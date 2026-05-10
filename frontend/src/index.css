@@ -206,27 +206,19 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 }
 
 .sidebar-glass-active {
-  position: relative;
   background: linear-gradient(135deg, hsl(var(--primary) / 0.16), hsl(var(--accent) / 0.16)) !important;
   /* Active item label stays white — the previous accent color washed
      into the tinted background and was hard to read. */
   color: hsl(var(--foreground)) !important;
-}
-/* Left accent bar — sustituye al border-left de 2px (que se diluía con
-   el gradient de fondo). Pseudo-elemento con margen vertical, ancho
-   3px, gradient violeta→azul + glow sutil. Lectura inmediata de
-   "estás acá" sin cargar visualmente la columna. */
-.sidebar-glass-active::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
-  border-radius: 0 2px 2px 0;
-  background: linear-gradient(180deg, hsl(var(--primary)), hsl(var(--accent)));
-  box-shadow: 0 0 10px hsl(var(--accent) / 0.45);
-  pointer-events: none;
+  /* Left accent bar pintado con inset box-shadow:
+       · 3px sólido en el borde izquierdo (la barra)
+       · Glow tenue que decae hacia adentro ~16px (la firma visual)
+     Inset shadows se renderizan SOBRE el elemento, así que sobreviven
+     a overflow:hidden y border-radius en cualquier nivel de anidación
+     (sub / sub-sub / sub-sub-sub), a diferencia de un ::before. */
+  box-shadow:
+    inset 3px 0 0 hsl(var(--accent)),
+    inset 16px 0 16px -10px hsl(var(--accent) / 0.35) !important;
 }
 .sidebar-glass-active:hover {
   color: hsl(var(--foreground)) !important;
@@ -238,14 +230,6 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
    portal ni el resto de la app). */
 [data-sidebar="sidebar"] svg {
   stroke-width: 1.5;
-}
-
-/* Los SidebarMenuSubButton vienen con overflow-hidden inline, lo que
-   recorta el pseudo ::before del accent bar en items anidados (sub /
-   sub-sub / sub-sub-sub). El truncado del label sigue funcionando
-   porque `truncate` se aplica al <span> hijo, no a este contenedor. */
-[data-sidebar="menu-sub-button"] {
-  overflow: visible;
 }
 
 /* Auth animated gradient blobs */
