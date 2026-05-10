@@ -1451,11 +1451,11 @@ const CallDetailPage = ({
         />
         <div className="relative p-6 md:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            {/* Left: avatar + nombre + outcome + meta */}
+            {/* Left: avatar + nombre + meta. El IG icon va al lado del título
+                (no debajo de la foto) para evitar redundar con el wrap-link
+                que ya envuelve la propia foto. El outcome pill se renderiza
+                debajo del Score IA en la columna derecha. */}
             <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-start">
-              {/* Avatar + IG icon (ambos linkean al mismo perfil de IG si
-                  existe). Click en la foto = abrir IG. Click en el ícono
-                  abajo de la foto también. */}
               {(() => {
                 const igUrl = (
                   call.model as { ig_url?: string | null } | null
@@ -1467,33 +1467,18 @@ const CallDetailPage = ({
                     size={72}
                   />
                 );
-                return (
-                  <div className="flex shrink-0 flex-col items-center gap-1.5">
-                    {igUrl ? (
-                      <a
-                        href={igUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block transition-transform hover:scale-105"
-                        title="Ver Instagram"
-                      >
-                        {inner}
-                      </a>
-                    ) : (
-                      inner
-                    )}
-                    {igUrl && (
-                      <a
-                        href={igUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Ver Instagram"
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-amber-500 text-white shadow-md transition-transform hover:scale-110"
-                      >
-                        <InstagramIcon className="h-3.5 w-3.5" />
-                      </a>
-                    )}
-                  </div>
+                return igUrl ? (
+                  <a
+                    href={igUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block shrink-0 transition-transform hover:scale-105"
+                    title="Ver Instagram"
+                  >
+                    {inner}
+                  </a>
+                ) : (
+                  <div className="shrink-0">{inner}</div>
                 );
               })()}
               <div className="min-w-0 flex-1 space-y-1.5">
@@ -1505,7 +1490,22 @@ const CallDetailPage = ({
                       (call.model as { ig_url?: string | null } | null)?.ig_url ?? null
                     }
                   />
-                  <OutcomePill outcome={analysis.call_outcome} size="lg" />
+                  {(() => {
+                    const igUrl = (
+                      call.model as { ig_url?: string | null } | null
+                    )?.ig_url ?? null;
+                    return igUrl ? (
+                      <a
+                        href={igUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Ver Instagram"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-amber-500 text-white shadow-md transition-transform hover:scale-110"
+                      >
+                        <InstagramIcon className="h-3.5 w-3.5" />
+                      </a>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
@@ -1535,36 +1535,24 @@ const CallDetailPage = ({
               </div>
             </div>
 
-            {/* Right: score circle + label */}
+            {/* Right: score circle + label + outcome pill (movida acá desde
+                al lado del título, así Score IA y "estado del cierre" viven
+                en la misma columna). */}
             <div className="flex shrink-0 flex-col items-center gap-2">
               <ScoreGauge score={call.claude_score} size={150} />
               <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                 Score IA
               </span>
+              <OutcomePill outcome={analysis.call_outcome} size="lg" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Sub-row: Instagram link + Re-analyze + análisis generado */}
+      {/* Sub-row: Re-analyze + análisis generado. El "Ver Instagram" se
+          quitó — ya hay link al IG via la foto y el ícono junto al título. */}
       <section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3">
         <div className="flex flex-wrap items-center gap-3">
-          {(() => {
-            const igUrl = (
-              call.model as { ig_url?: string | null } | null
-            )?.ig_url;
-            return igUrl ? (
-              <a
-                href={igUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full border border-pink-500/40 bg-pink-500/10 px-3 py-1 text-xs font-semibold text-pink-400 transition-colors hover:bg-pink-500/20"
-              >
-                <InstagramIcon className="h-3.5 w-3.5" />
-                Ver Instagram
-              </a>
-            ) : null;
-          })()}
           {call.model?.category && (
             <span
               className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
