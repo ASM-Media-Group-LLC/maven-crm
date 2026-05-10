@@ -124,6 +124,45 @@ export async function checkPreviousLead(
 }
 
 /**
+ * Check if a handle already exists in scouter_leads (Scouter Assist).
+ * Match es por instagram_handle case-insensitive — un mismo modelo se
+ * considera "el mismo lead" independientemente de la compañía a la que
+ * esté asignada en Scouter. Devuelve status y fecha para que el caller
+ * pueda explicar el bloqueo al usuario.
+ */
+export async function checkScouterLead(
+  handle: string,
+): Promise<{
+  exists: boolean;
+  scouterId?: string;
+  status?: string;
+  companyId?: string;
+  createdAt?: string;
+}> {
+  const normalizedHandle = normalizeHandle(handle);
+  if (!normalizedHandle) return { exists: false };
+
+  // scouter_* tables no están en los tipos generados aún — cast a any
+  // para evitar el type plumbing extra (mismo patrón que useScouterLeads).
+  const sb = supabase as unknown as { from: (t: string) => any };
+  const { data } = await sb
+    .from("scouter_leads")
+    .select("id, status, company_id, created_at")
+    .ilike("instagram_handle", normalizedHandle)
+    .limit(1)
+    .maybeSingle();
+
+  if (!data) return { exists: false };
+  return {
+    exists: true,
+    scouterId: data.id,
+    status: data.status,
+    companyId: data.company_id,
+    createdAt: data.created_at,
+  };
+}
+
+/**
  * Check if a handle already exists in closers_contacts.
  * Returns enriched info: name, created_at, agent name.
  */

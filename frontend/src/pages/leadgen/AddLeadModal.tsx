@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
 import { enqueueAvatarFetch } from "@/lib/avatarFetch";
-import { checkCreatorExists, checkPreviousLead, checkDuplicateOnlyFans } from "@/lib/lead-validation";
+import { checkCreatorExists, checkPreviousLead, checkDuplicateOnlyFans, checkScouterLead } from "@/lib/lead-validation";
 import { useQueryClient } from "@tanstack/react-query";
 
 
@@ -158,6 +158,24 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
           setIsSubmitting(false);
           return;
         }
+      }
+
+      // VALIDATION 4: Check handle in Scouter Assist (cross-system dedup).
+      // Si el handle ya vive en scouter_leads, bloqueamos — independiente
+      // del status (incluso rejected) porque significa que el equipo ya
+      // tomó una decisión sobre ese perfil y no queremos duplicarlo.
+      const scouterCheck = await checkScouterLead(data.source_link);
+      if (scouterCheck.exists) {
+        const dateInfo = scouterCheck.createdAt
+          ? ` (desde ${new Date(scouterCheck.createdAt).toLocaleDateString("es-CO")})`
+          : "";
+        toast({
+          title: "❌ Lead ya existe en Scouter Assist",
+          description: `Este @ ya está en Scouter Assist con status "${scouterCheck.status}"${dateInfo}. No se puede duplicar.`,
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
       }
 
       const { data: inserted, error } = await supabase.from("leadgen_entries").insert({
