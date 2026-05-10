@@ -833,6 +833,11 @@ export const ChatPanel = ({ session }: Props) => {
         .from("chatter_sessions" as never)
         .update({ read_by_examiner_at: new Date().toISOString() } as never)
         .eq("id", sid as never);
+      // Don't wait for the realtime round-trip to refresh the unread
+      // badge in the sidebar — invalidate locally so it disappears
+      // immediately when the user opens the session. The server
+      // round-trip (and realtime) act as a safety net if this misses.
+      qc.invalidateQueries({ queryKey: ["chatter-sessions-unread"] });
     };
     markIfLooking();
     document.addEventListener("visibilitychange", markIfLooking);

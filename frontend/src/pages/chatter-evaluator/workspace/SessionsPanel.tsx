@@ -67,7 +67,7 @@ const SessionRow = ({
       active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted"
     }`}
   >
-    <div className="relative aspect-square h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
+    <div className="aspect-square h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
       {profile?.avatar_url ? (
         <img
           src={profile.avatar_url}
@@ -82,14 +82,6 @@ const SessionRow = ({
         <div className="flex h-full w-full items-center justify-center text-xs">
           {(profile?.name ?? session.chatter_name)[0]}
         </div>
-      )}
-      {unread > 0 && (
-        <span
-          className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow ring-2 ring-background"
-          aria-label={`${unread} mensajes sin leer`}
-        >
-          {unread > 99 ? "99+" : unread}
-        </span>
       )}
     </div>
     <div className="min-w-0 flex-1">
@@ -115,6 +107,17 @@ const SessionRow = ({
         </div>
       )}
     </div>
+    {/* Unread badge — vive en la columna derecha del card, al lado del
+        botón "cerrar sesión" (que aparece al hover). Cuando no hay
+        unread, el espacio queda invisible para no descuadrar el layout. */}
+    {unread > 0 && (
+      <span
+        className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white shadow"
+        aria-label={`${unread} mensajes sin leer`}
+      >
+        {unread > 99 ? "99+" : unread}
+      </span>
+    )}
     <span
       role="button"
       tabIndex={0}
