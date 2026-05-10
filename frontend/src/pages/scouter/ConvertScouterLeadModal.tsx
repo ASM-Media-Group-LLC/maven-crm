@@ -16,22 +16,16 @@ interface Props {
   onConverted?: () => void;
 }
 
-// El equipo de scouter NO contacta — su trabajo es descubrir. Por eso
-// la conversión va al funnel de Lead Gen (no directo a Closers): el
-// LG team es quien curate, agrega data faltante y decide cuándo pasa
-// a closers. Mantiene un solo funnel de calidad para todo el sistema.
-
-// Mapeo del ai_score (0-10 del scouter) al quality enum de leadgen.
-// Conservador: necesita 9+ para A+, 7+ para A — refleja que un score
-// alto del scouter ≠ creator firmable, solo significa "vale la pena
-// que LG la mire de cerca".
-function mapAiScoreToQuality(score: number | null): string {
-  if (score == null) return "B";
-  if (score >= 9) return "A+";
-  if (score >= 7) return "A";
-  if (score >= 5) return "B+";
-  return "B";
-}
+// El equipo de scouter NO contacta — su trabajo es descubrir. Cuando
+// pasa un lead al pipeline de closers, el flow es idéntico al de LG:
+// INSERT en closers_contacts (sin closer asignado) → trigger sync
+// propaga a closer_creators → el supervisor del equipo Closers lo
+// asigna después en /closers.
+//
+// Diferencia: source='scouter' (vs 'leadgen') para mantener trackeable
+// de dónde vino el contacto. Los leads originales siguen viviendo en
+// scouter_leads (no se "pasan", se hace el handoff y queda marcado
+// con converted_at + converted_to_contact_id).
 
 const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
   const { toast } = useToast();
@@ -47,78 +41,55 @@ const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Prop
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autenticado");
 
-      // Trae la company del scouter para usarla como company del
-      // leadgen_entries. Si no hay match (scouter_companies vs
-      // LEADGEN_COMPANIES son catálogos distintos), guardamos el name
-      // como text libre — la columna lo acepta.
-      let companyName: string | null = null;
-      if (lead.company_id) {
-        const { data: scCompany } = await supabase
-          .from("scouter_companies")
-          .select("name")
-          .eq("id", lead.company_id)
-          .maybeSingle();
-        companyName = (scCompany as { name?: string } | null)?.name ?? null;
-      }
-
-      const sourceLink =
-        lead.instagram_url ||
-        `https://www.instagram.com/${lead.instagram_handle.replace(/^@/, "")}`;
-
-      // INSERT en leadgen_entries — el LG team lo verá en su tabla
-      // y podrá completar/curate antes de convertirlo a closers_contacts
-      // como cualquier otro lead.
-      const { data: lg, error: insertError } = await supabase
-        .from("leadgen_entries")
+      const ticketId = `#SC${lead.id.slice(-7).toUpperCase()}`;
+      const { data: contact, error: insertError } = await supabase
+        .from("closers_contacts")
         .insert({
-          model_handle: lead.instagram_handle,
+          name: lead.name || lead.instagram_handle,
+          handle: lead.instagram_handle,
           platform: lead.platform || "instagram",
-          quality: mapAiScoreToQuality(lead.ai_score),
-          company: companyName || "Scouter",
-          source_link: sourceLink,
-          onlyfans_url: lead.onlyfans_url,
-          phone_e164: lead.phone,
-          phone_raw: lead.phone,
           city: lead.city,
-          notes: lead.notes,
-          lg_user_id: user.id,
-          entry_date: new Date().toISOString().slice(0, 10),
-          record_type: "nuevo",
+          phone: lead.phone,
+          onlyfans_url: lead.onlyfans_url,
+          profile_picture_url: lead.photo_data_url,
+          source: "scouter",
+          ticket_number: ticketId,
+          created_by: user.id,
         } as never)
         .select("id")
         .single();
       if (insertError) throw insertError;
 
-      // Marcar el scouter_lead como convertido (pero NO en pipeline
-      // closers todavía — pasa a manos del LG team).
       const { error: updateError } = await supabase
         .from("scouter_leads")
         .update({
           converted_at: new Date().toISOString(),
-          converted_to_lead_id: (lg as { id: string }).id,
+          converted_to_contact_id: (contact as { id: string }).id,
+          status: "contacting",
         } as never)
         .eq("id", lead.id);
       if (updateError) throw updateError;
 
-      // Avatar fetch async — el lead nuevo en leadgen también dispara
-      // el job para que models.avatar_url se popule si todavía no estaba.
+      // Avatar fetch async — populamos models.avatar_url si todavía no estaba.
       void enqueueAvatarFetch(lead.instagram_handle);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["scouter-leads"] });
       queryClient.invalidateQueries({ queryKey: ["scouter-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["leadgen-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
       toast({
-        title: "Lead pasado a Lead Gen",
-        description: "El equipo de Lead Gen lo va a curate y contactar.",
+        title: "Pasado al pipeline de Closers",
+        description: "El supervisor del equipo lo va a asignar a un closer.",
       });
       onConverted?.();
       onOpenChange(false);
     },
     onError: (e) => {
       toast({
-        title: "Error al pasar a Lead Gen",
+        title: "Error al pasar a Closers",
         description: (e as Error).message,
         variant: "destructive",
       });
@@ -131,7 +102,6 @@ const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Prop
     { label: "Plataforma", value: lead.platform || "instagram" },
     { label: "País / Ciudad", value: [lead.country, lead.city].filter(Boolean).join(" · ") || "—" },
     { label: "Teléfono", value: lead.phone || "—" },
-    { label: "AI Score → Quality", value: `${lead.ai_score?.toFixed(1) ?? "—"} → ${mapAiScoreToQuality(lead.ai_score)}` },
     { label: "OnlyFans", value: lead.onlyfans_url ? "✓ Incluido" : "—" },
   ];
 
@@ -141,10 +111,10 @@ const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Prop
         <DialogHeader>
           <div className="flex items-center gap-2">
             <ArrowRight className="h-5 w-5 text-primary" />
-            <DialogTitle>Pasar Lead a Lead Gen</DialogTitle>
+            <DialogTitle>Pasar a Pipeline Closers</DialogTitle>
           </div>
           <DialogDescription>
-            El scouter descubre — Lead Gen contacta. Este lead se pasa al funnel del equipo LG con su quality estimada por IA. Ellos lo curate y, cuando esté listo, lo convierten a Pipeline Closers como cualquier otro lead.
+            El scouter descubre — los closers contactan. Este lead se pasa al pool del equipo Closers (separado de los leads del equipo LG por la columna <code>source='scouter'</code>). El supervisor lo asigna a un closer específico desde /closers.
           </DialogDescription>
         </DialogHeader>
 
@@ -166,7 +136,7 @@ const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Prop
         <div className="flex items-start gap-2.5 rounded-lg bg-primary/10 p-3">
           <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            Aparece en /lead-gen como entrada nueva. El LG team puede agregar phone, OF URL, notas, y mover a "contactado". Cuando lo conviertan, va al pipeline de Closers normal.
+            El lead queda marcado como "convertido" en Scouter. Aparece en /closers como contacto sin asignar — el supervisor lo asignará a un closer concreto desde ahí.
           </p>
         </div>
 
@@ -175,7 +145,7 @@ const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Prop
             Cancelar
           </Button>
           <Button onClick={() => convert.mutate()} disabled={convert.isPending}>
-            {convert.isPending ? "Pasando…" : "Pasar a Lead Gen"}
+            {convert.isPending ? "Pasando…" : "Confirmar"}
           </Button>
         </DialogFooter>
       </DialogContent>
