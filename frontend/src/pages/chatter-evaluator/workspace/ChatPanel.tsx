@@ -751,13 +751,17 @@ export const ChatPanel = ({ session }: Props) => {
 
   // Play ping when a NEW message arrives from the chatter (not on initial load)
   // and fire the tip popup whenever a brand-new tip system message lands.
+  // The baseline lives PER SESSION and waits until messagesQ.data is
+  // actually defined — otherwise a hard refresh would treat the just-
+  // fetched messages as "new" and replay the last tip's animation.
   useEffect(() => {
-    const msgs = messagesQ.data ?? [];
+    const msgs = messagesQ.data;
     const sid = session?.id ?? null;
+    if (!sid || msgs === undefined) return;
 
-    // Session switched: re-baseline the refs to the new session's tail
-    // without firing any sounds/popups. Anything that lands AFTER this
-    // baseline (via realtime) will trigger normally.
+    // First time we have data for this session → baseline silently.
+    // Covers both the initial mount case AND the page-refresh case
+    // where existing tips were getting replayed.
     if (lastSessionIdRef.current !== sid) {
       lastSessionIdRef.current = sid;
       lastMessageIdRef.current = msgs[msgs.length - 1]?.id ?? null;
