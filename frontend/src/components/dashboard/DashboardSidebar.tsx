@@ -29,6 +29,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
+import { cn } from "@/lib/utils";
 
 const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-3 text-sm sidebar-glass-hover";
 const ACTIVE_CLASS = "sidebar-glass-active font-medium";
@@ -728,11 +729,34 @@ const DashboardSidebar = () => {
 const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { t } = useLanguage();
   const { theme, setTheme } = useTheme();
   const profileQ = useMyProfile();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // Toggle behavior del gear: si estás EN settings, el botón vuelve al
+  // tab anterior (guardado en sessionStorage al primer click). Si NO
+  // estás en settings, guarda la ruta actual y navega a /settings.
+  // Si el usuario navega al sidebar a otro tab, el active se apaga solo
+  // (deriva de pathname). Esto reemplaza el behavior anterior que solo
+  // hacía navigate("/settings") sin "ida y vuelta".
+  const isOnSettings = pathname.startsWith("/settings");
+  const SETTINGS_RETURN_KEY = "maven.sidebar.preSettingsRoute";
+  const handleSettingsToggle = () => {
+    if (isOnSettings) {
+      const prev = (typeof window !== "undefined"
+        ? window.sessionStorage.getItem(SETTINGS_RETURN_KEY)
+        : null) || "/dashboard";
+      navigate(prev);
+    } else {
+      try {
+        window.sessionStorage.setItem(SETTINGS_RETURN_KEY, pathname);
+      } catch { /* no-op: storage bloqueado / SSR */ }
+      navigate("/settings");
+    }
+  };
 
   const fullName =
     user?.user_metadata?.full_name || profileQ.data?.full_name || "Usuario";
@@ -772,9 +796,12 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
-          onClick={() => navigate("/settings")}
-          title="Settings"
+          className={cn(
+            "h-8 w-8",
+            isOnSettings && "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary",
+          )}
+          onClick={handleSettingsToggle}
+          title={isOnSettings ? "Volver" : "Settings"}
         >
           <Settings className="h-4 w-4" />
         </Button>
@@ -818,13 +845,21 @@ const UserFooterBlock = ({ collapsed }: { collapsed: boolean }) => {
         {/* Settings — icon button al lado del theme toggle.
             Antes ocupaba su propia fila full-width pero la jerarquía
             era demasiado equivalente a Salir; como icono entra en la
-            fila de identidad y libera vertical. */}
+            fila de identidad y libera vertical.
+            Comporta como toggle: si ya estás en /settings se muestra
+            activo (color primary) y el click te lleva al tab anterior
+            guardado. */}
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 shrink-0 rounded-full text-muted-foreground"
-          onClick={() => navigate("/settings")}
-          title="Settings"
+          className={cn(
+            "h-8 w-8 shrink-0 rounded-full",
+            isOnSettings
+              ? "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary"
+              : "text-muted-foreground",
+          )}
+          onClick={handleSettingsToggle}
+          title={isOnSettings ? "Volver" : "Settings"}
         >
           <Settings className="h-4 w-4" />
         </Button>
