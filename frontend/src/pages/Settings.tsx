@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,12 +11,21 @@ import {
   FileText,
   Map,
   ChevronRight,
+  ArrowLeft,
   Camera,
   Loader2,
   KeyRound,
   LogOut,
   User as UserIcon,
 } from "lucide-react";
+// Sub-páginas que antes se navegaban como rutas separadas (perdiendo el
+// rail de Settings). Ahora se renderizan embebidas en el panel derecho
+// vía ?sub=<key>.
+import AdminUsuarios from "@/pages/admin/AdminUsuarios";
+import AuditoriaRoles from "@/pages/admin/AuditoriaRoles";
+import DesignSystem from "@/pages/DesignSystem";
+import Docs from "@/pages/Docs";
+import Roadmap from "@/pages/Roadmap";
 import { toast } from "sonner";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -199,7 +208,7 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
       <CardContent className="space-y-2 p-4">
         {(canAccess("Administración", "Usuarios") || isAdmin) && (
           <Row
-            to="/admin/usuarios"
+            to="/settings?sub=usuarios"
             icon={Shield}
             title="Usuarios"
             description="Gestión de usuarios, roles y permisos."
@@ -207,7 +216,7 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
         )}
         {(canAccess("Administración", "Roles") || isAdmin) && (
           <Row
-            to="/admin/auditoria"
+            to="/settings?sub=auditoria"
             icon={ClipboardCheck}
             title="Auditoría"
             description="Historial de cambios de roles y permisos."
@@ -229,19 +238,19 @@ const ResourcesTab = ({ t }: { t: ReturnType<typeof useLanguage>["t"] }) => (
     <Card>
       <CardContent className="space-y-2 p-4">
         <Row
-          to="/design-system"
+          to="/settings?sub=design-system"
           icon={Palette}
           title={t("nav.designSystem") || "Design System"}
           description="Componentes, paleta y guía de estilo."
         />
         <Row
-          to="/docs"
+          to="/settings?sub=docs"
           icon={FileText}
           title={t("nav.docs") || "Docs"}
           description="Documentación interna del proyecto."
         />
         <Row
-          to="/roadmap"
+          to="/settings?sub=roadmap"
           icon={Map}
           title="Roadmap"
           description="Seguimiento de funciones planificadas."
@@ -346,14 +355,84 @@ const Settings = () => {
 
       {/* Right side — active tab content, flush-left so it fills the
           available width on desktop instead of floating in the middle
-          like a mobile screen. */}
-      <section className="min-w-0 flex-1 overflow-y-auto p-6 lg:p-8">
-        {active === "account" && <MyAccountTab />}
-        {active === "mp" && showProyectoMP && <ProyectoMPTab />}
-        {active === "admin" && showAdmin && <AdminTab canAccess={canAccess} isAdmin={isAdmin} />}
-        {active === "resources" && showResources && <ResourcesTab t={t} />}
-      </section>
+          like a mobile screen. Si hay ?sub=<key>, embedimos la
+          sub-página acá adentro (con header de "Volver al menú" arriba)
+          en vez de mandar al usuario a otra ruta. */}
+      <SettingsRightPane
+        active={active}
+        showProyectoMP={showProyectoMP}
+        showAdmin={showAdmin}
+        showResources={showResources}
+        canAccess={canAccess}
+        isAdmin={isAdmin}
+        t={t}
+      />
     </main>
+  );
+};
+
+// Right pane que decide entre el tab content normal o una sub-página
+// embebida según ?sub=. Vive como componente aparte para poder usar
+// hooks (useSearchParams) sin contaminar el render principal.
+const SettingsRightPane = ({
+  active,
+  showProyectoMP,
+  showAdmin,
+  showResources,
+  canAccess,
+  isAdmin,
+  t,
+}: {
+  active: TabKey;
+  showProyectoMP: boolean;
+  showAdmin: boolean;
+  showResources: boolean;
+  canAccess: ReturnType<typeof usePermissions>["canAccess"];
+  isAdmin: boolean;
+  t: ReturnType<typeof useLanguage>["t"];
+}) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sub = searchParams.get("sub");
+
+  // Cuáles sub-keys son embeddable. Cualquier otra cosa se ignora.
+  const SUB_PAGES: Record<string, { title: string; render: () => JSX.Element }> = {
+    usuarios:        { title: "Usuarios",       render: () => <AdminUsuarios /> },
+    auditoria:       { title: "Auditoría",      render: () => <AuditoriaRoles /> },
+    "design-system": { title: "Design System",  render: () => <DesignSystem /> },
+    docs:            { title: "Docs",           render: () => <Docs /> },
+    roadmap:         { title: "Roadmap",        render: () => <Roadmap /> },
+  };
+  const activeSub = sub && SUB_PAGES[sub] ? SUB_PAGES[sub] : null;
+
+  if (activeSub) {
+    const goBack = () => {
+      // Quita el query param sin perder otros (si los hubiera).
+      const next = new URLSearchParams(searchParams);
+      next.delete("sub");
+      setSearchParams(next, { replace: true });
+    };
+    return (
+      <section className="min-w-0 flex-1 overflow-y-auto">
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-6 py-3 backdrop-blur">
+          <Button variant="ghost" size="sm" onClick={goBack} className="gap-1.5">
+            <ArrowLeft className="h-4 w-4" />
+            Volver al menú
+          </Button>
+          <span className="text-sm font-medium text-muted-foreground">·</span>
+          <span className="text-sm font-medium">{activeSub.title}</span>
+        </div>
+        {activeSub.render()}
+      </section>
+    );
+  }
+
+  return (
+    <section className="min-w-0 flex-1 overflow-y-auto p-6 lg:p-8">
+      {active === "account" && <MyAccountTab />}
+      {active === "mp" && showProyectoMP && <ProyectoMPTab />}
+      {active === "admin" && showAdmin && <AdminTab canAccess={canAccess} isAdmin={isAdmin} />}
+      {active === "resources" && showResources && <ResourcesTab t={t} />}
+    </section>
   );
 };
 
