@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { usePermissions } from "@/hooks/usePermissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import KpiCard from "@/components/dashboard/KpiCard";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -18,26 +16,20 @@ import {
   YAxis,
 } from "recharts";
 import {
-  Plus,
   Image as ImageIcon,
   Users,
   CheckCircle2,
   XCircle,
   Percent,
-  ListChecks,
-  LayoutDashboard,
-  Settings,
-  History as HistoryIcon,
 } from "lucide-react";
 import {
   useChatterProfiles,
   useChatterVaultCounts,
-  useChatterSessions,
   useChatterEvaluationStats,
   type StatsRange,
 } from "@/hooks/useChatterEvaluator";
 import type { ChatterProfile } from "./types";
-import { NewSessionDialog } from "./NewSessionDialog";
+import ChatterEvaluatorHeader from "./ChatterEvaluatorHeader";
 
 const ProfileCard = ({
   profile,
@@ -122,14 +114,7 @@ const StatCard = ({
 const ChatterEvaluatorContent = () => {
   const profilesQ = useChatterProfiles();
   const vaultCountsQ = useChatterVaultCounts();
-  const sessionsQ = useChatterSessions("active-only");
   const statsQ = useChatterEvaluationStats();
-  const { canAccess } = usePermissions();
-  // Si el rol no tiene acceso al submódulo "Admin" del módulo Chatters,
-  // ocultamos el botón en vez de dejar que el click los rebote a otra
-  // ruta (la guard del routing los redirigía silenciosamente).
-  const canSeeAdmin = canAccess("Chatters", "Admin");
-  const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   type KpiKey = "total" | "approved" | "rejected" | "rate";
   const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
@@ -145,64 +130,14 @@ const ChatterEvaluatorContent = () => {
   const counters = stats?.byRange[statsRange];
 
   return (
-    <main className="flex-1 overflow-y-auto p-6">
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Chatter Evaluator
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Evalúa chatters con perfiles, vault y criterios compartidos.
-            </p>
-          </div>
-          <Button onClick={() => setNewSessionOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nueva sesión
-          </Button>
-        </div>
-
-        <NewSessionDialog open={newSessionOpen} onOpenChange={setNewSessionOpen} />
-
-        {/* Subtabs Dashboard / Workspace / History / Admin +
-            DateRangePicker — calendario alineado a la derecha (mismo
-            layout que Panel de Control). Range filtra los stats vía
-            statsRange (cuando hay rango custom usamos byRange.all). */}
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      <ChatterEvaluatorHeader />
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* DateRangePicker arriba de los KPIs — alineado a la derecha.
+            Range filtra los stats vía statsRange (cuando hay rango
+            custom usamos byRange.all). */}
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-              <Button asChild variant="secondary" size="sm" className="gap-1.5">
-                <Link to="/chatter-evaluator">
-                  <LayoutDashboard className="h-4 w-4" />
-                  Dashboard
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="sm" className="gap-1.5">
-                <Link to="/chatter-evaluator/workspace">
-                  <ListChecks className="h-4 w-4" />
-                  Workspace
-                  {sessionsQ.data && sessionsQ.data.length > 0 && (
-                    <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                      {sessionsQ.data.length}
-                    </span>
-                  )}
-                </Link>
-              </Button>
-              <Button asChild variant="ghost" size="sm" className="gap-1.5">
-                <Link to="/chatter-evaluator/history">
-                  <HistoryIcon className="h-4 w-4" />
-                  History
-                </Link>
-              </Button>
-              {canSeeAdmin && (
-                <Button asChild variant="ghost" size="sm" className="gap-1.5">
-                  <Link to="/chatter-evaluator/admin">
-                    <Settings className="h-4 w-4" />
-                    Admin
-                  </Link>
-                </Button>
-              )}
-            </div>
+          <div className="flex justify-end">
             <DateRangePicker
               from={dateRange.from}
               to={dateRange.to}

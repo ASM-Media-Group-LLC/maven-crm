@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Trash2, Loader2, Search, Mail, History as HistoryIcon } from "lucide-react";
+import { Trash2, Loader2, Search, Mail } from "lucide-react";
+import ChatterEvaluatorHeader from "./ChatterEvaluatorHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -130,29 +131,9 @@ const HistoryContent = () => {
   };
 
   return (
-    <main className="flex-1 overflow-y-auto p-6">
-      <div className="space-y-5">
-        <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/chatter-evaluator">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Volver
-            </Link>
-          </Button>
-        </div>
-
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-              <HistoryIcon className="h-6 w-6 text-primary" />
-              Historial de sesiones
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Sesiones cerradas con su mensajería y evaluación. Click en una
-              fila para reabrir el chat en modo lectura.
-            </p>
-          </div>
-        </div>
-
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      <ChatterEvaluatorHeader />
+      <div className="flex-1 overflow-y-auto p-6 space-y-5">
         <div className="relative max-w-sm">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input

@@ -19,7 +19,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  ArrowLeft,
   GripVertical,
   Plus,
   Trash2,
@@ -27,6 +26,7 @@ import {
   Save,
   Loader2,
 } from "lucide-react";
+import ChatterEvaluatorHeader from "./ChatterEvaluatorHeader";
 import { toast } from "sonner";
 import {
   useChatterCriteria,
@@ -707,21 +707,9 @@ const ConfigSection = () => {
 };
 
 const ChatterAdminContent = () => (
-  <main className="flex-1 overflow-y-auto p-6">
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/chatter-evaluator">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Volver
-          </Link>
-        </Button>
-      </div>
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Administración</h1>
-        <p className="text-sm text-muted-foreground">
-          Criterios de evaluación y configuración global. Estos cambios afectan a todos los examiners.
-        </p>
-      </div>
+  <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+    <ChatterEvaluatorHeader />
+    <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <ProfilesSection />
       <CriteriaSection />
       <ConfigSection />
