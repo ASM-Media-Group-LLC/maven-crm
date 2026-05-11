@@ -859,7 +859,7 @@ const PanelDeControl = () => {
             </div>
             <div>
               <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
-                Mejor cerrador <span className="text-muted-foreground font-normal normal-case">· mes actual</span>
+                Mejor cerrador <span className="text-muted-foreground font-normal normal-case">· {format(new Date(), "MMMM yyyy", { locale: es })}</span>
               </p>
               {bestCloserLoading ? (
                 <Skeleton className="mt-1 h-7 w-32" />

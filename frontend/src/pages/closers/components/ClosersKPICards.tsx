@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Users, CheckCircle, Trophy, XCircle, TrendingUp, Layers, Crown } from "lucide-react";
-import { startOfMonth, endOfMonth } from "date-fns";
+import { startOfMonth, endOfMonth, format } from "date-fns";
+import { es } from "date-fns/locale";
 import KpiCard from "@/components/dashboard/KpiCard";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -110,7 +111,7 @@ const ClosersKPICards = ({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[11px] uppercase tracking-widest text-amber-500/90 font-bold">
-                Mejor cerrador <span className="text-muted-foreground/80 font-semibold">· mes actual</span>
+                Mejor cerrador <span className="text-muted-foreground/80 font-semibold">· {format(today, "MMMM yyyy", { locale: es })}</span>
               </p>
               {bestCloserLoading ? (
                 <Skeleton className="mt-1 h-7 w-48" />
