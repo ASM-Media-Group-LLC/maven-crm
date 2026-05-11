@@ -1,4 +1,5 @@
 import { Users, CheckCircle, Trophy, XCircle, TrendingUp, Layers, Crown } from "lucide-react";
+import { startOfMonth, endOfMonth } from "date-fns";
 import KpiCard from "@/components/dashboard/KpiCard";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,12 +50,17 @@ const ClosersKPICards = ({
   const cerradas = confirmadas + completadas;
   const total = asignadas + confirmadas + completadas + noInteresadas;
 
-  // Mismo hook que usa Panel de Control para que sean coherentes — 70%
-  // cierres normalizados + 30% calif QA promedio del rango.
-  const { data: bestCloser, isLoading: bestCloserLoading } = useBestCloser({
-    from: dateFrom,
-    to: dateTo,
-  });
+  // Mismo hook que usa Panel de Control — 70% cierres normalizados +
+  // 30% calif QA promedio del rango. Si el filter de la página NO tiene
+  // rango activo, defaulteamos a mes en curso (igual que Panel de
+  // Control). Sin este default, el hero contaría TODO el histórico y se
+  // mostraría desincronizado con el card de Panel de Control.
+  const today = new Date();
+  const bestCloserRange =
+    dateFrom || dateTo
+      ? { from: dateFrom, to: dateTo }
+      : { from: startOfMonth(today), to: endOfMonth(today) };
+  const { data: bestCloser, isLoading: bestCloserLoading } = useBestCloser(bestCloserRange);
 
   const salePlatforms = ["Trafix", "Blu", "Piclink", "LeakHunter", "ORA"];
   const revPlataformas = salePlatforms.reduce((s, p) => s + (platformRevenue[p] || 0), 0);
