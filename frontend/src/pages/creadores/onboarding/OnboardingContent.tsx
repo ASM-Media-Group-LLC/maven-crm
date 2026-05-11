@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Users, Clock, Loader2, CheckCircle2, Search, List, LayoutGrid, Plus, X } from "lucide-react";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,7 +9,7 @@ import OnboardingTable from "./OnboardingTable";
 import OnboardingGrid from "./OnboardingGrid";
 import { useOnboarding, calculateCurrentStep, type OnboardingCreator } from "./useOnboarding";
 import { useUserRole } from "@/hooks/useUserRole";
-import CreadoresSubtabs from "../CreadoresSubtabs";
+import CreadoresHeader from "../CreadoresHeader";
 
 const agencyOptions = ["Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "Otra"];
 
@@ -72,40 +71,20 @@ const OnboardingContent = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-      <div className="shrink-0 bg-background px-6 pt-4 pb-2">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/creadores">Creadores</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Onboarding</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
-        <div className="flex items-center justify-between mt-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Onboarding</h1>
-            <p className="text-sm text-muted-foreground">Gestiona el onboarding de nuevos creadores</p>
-          </div>
-          {!isAgent && (
+      <CreadoresHeader
+        action={
+          !isAgent ? (
             <Button onClick={() => navigate("/creadores/onboarding/nuevo")}>
               <Plus className="h-4 w-4 mr-2" />
               Iniciar Onboarding
             </Button>
-          )}
-        </div>
-      </div>
+          ) : undefined
+        }
+      />
 
-      <div className="flex-1 overflow-auto px-6 pb-6 space-y-4">
-        <CreadoresSubtabs />
-
+      <div className="flex-1 overflow-auto px-6 pt-6 pb-6 space-y-4">
         {/* KPI Cards — click filtra la lista (no abre modal porque la lista vive abajo) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {kpiCards.map((kpi) => (
             <KpiCard
               key={kpi.label}

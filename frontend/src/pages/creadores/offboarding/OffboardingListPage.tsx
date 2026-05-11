@@ -37,7 +37,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import InitiateOffboardingDialog from "./InitiateOffboardingDialog";
-import CreadoresSubtabs from "../CreadoresSubtabs";
+import CreadoresHeader from "../CreadoresHeader";
 
 const STATUS_LABELS: Record<string, { label: string; variant: string }> = {
   en_proceso: { label: "En Proceso", variant: "bg-primary/15 text-primary border-primary/30" },
@@ -116,26 +116,17 @@ const OffboardingListPage = () => {
 
   return (
     <>
-      <main className="flex-1 overflow-y-auto p-6 space-y-6">
-            <CreadoresSubtabs />
+      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+        <CreadoresHeader
+          action={
+            <Button onClick={() => setInitiateOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Iniciar Offboarding
+            </Button>
+          }
+        />
 
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-destructive/10 flex items-center justify-center">
-                  <LogOut className="h-5 w-5 text-destructive" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight">Offboarding</h1>
-                  <p className="text-sm text-muted-foreground">Gestión centralizada de procesos de salida</p>
-                </div>
-              </div>
-              <Button onClick={() => setInitiateOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Iniciar Offboarding
-              </Button>
-            </div>
-
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
             <InitiateOffboardingDialog
               open={initiateOpen}
               onOpenChange={setInitiateOpen}
@@ -351,6 +342,7 @@ const OffboardingListPage = () => {
                 })}
               </div>
             )}
+        </div>
       </main>
 
     <AlertDialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>

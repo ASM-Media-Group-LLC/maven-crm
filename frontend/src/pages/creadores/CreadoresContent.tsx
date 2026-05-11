@@ -7,7 +7,7 @@ import DataTableShell from "@/components/ui/data-table-shell";
 import CreadoresFilters from "./CreadoresFilters";
 import CreadoresTable from "./CreadoresTable";
 import CreadoresGrid from "./CreadoresGrid";
-import CreadoresSubtabs from "./CreadoresSubtabs";
+import CreadoresHeader from "./CreadoresHeader";
 import { useCreadores, type CreadorFilters } from "./useCreadores";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -48,20 +48,14 @@ const CreadoresContent = () => {
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Listado de Creadores</h1>
-            <p className="text-sm text-muted-foreground">
-              Total: {isLoading ? "…" : allCreators.length} creadores
-            </p>
-          </div>
+      <CreadoresHeader
+        action={
           <Button onClick={() => navigate("/creadores/nuevo")}>
             <Plus className="mr-2 h-4 w-4" />
             Agregar Creador
           </Button>
-        </div>
-      </header>
+        }
+      />
 
       {isLoading ? (
         <div className="flex-1 overflow-auto p-6">
@@ -73,8 +67,6 @@ const CreadoresContent = () => {
         </div>
       ) : (
         <div className="flex-1 flex flex-col min-h-0 p-6 gap-4">
-          <CreadoresSubtabs />
-
           {/* KPI cards removidos — la info ya vive en el dashboard. El
               listado queda enfocado solo en la tabla/grid. La fila de
               botones de agency también — ahora vive como filtro

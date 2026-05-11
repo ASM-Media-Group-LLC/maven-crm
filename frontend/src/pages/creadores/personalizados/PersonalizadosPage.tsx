@@ -13,7 +13,7 @@ import { es } from "date-fns/locale";
 import { useCustomRequests, type CustomContentRequest } from "./useCustomRequests";
 import NewRequestModal from "./NewRequestModal";
 import ViewRequestModal from "./ViewRequestModal";
-import CreadoresSubtabs from "../CreadoresSubtabs";
+import CreadoresHeader from "../CreadoresHeader";
 import TrackingDrawer from "./TrackingDrawer";
 
 const TYPE_COLORS: Record<string, string> = {
@@ -92,20 +92,17 @@ const PersonalizadosPage = () => {
 
   return (
     <>
-      <main className="flex-1 overflow-auto px-6 py-6 space-y-6">
-            <CreadoresSubtabs />
+      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+        <CreadoresHeader
+          action={
+            <Button onClick={() => setNewOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Solicitud
+            </Button>
+          }
+        />
 
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-xl font-semibold">Contenido Personalizado</h1>
-                <p className="text-sm text-muted-foreground">Solicitudes de contenido personalizado para creadoras</p>
-              </div>
-              <Button onClick={() => setNewOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Nueva Solicitud
-              </Button>
-            </div>
-
+        <div className="flex-1 overflow-auto px-6 py-6 space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
               <KpiCard label="Total Solicitudes" value={String(total)} icon={FileText} color="bg-blue-500" subtitle="Todas las solicitudes" onClick={() => setStatusFilter("all")} />
               <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-amber-500" subtitle="Por gestionar" onClick={() => setStatusFilter("pendiente")} />
@@ -224,7 +221,8 @@ const PersonalizadosPage = () => {
                 </TableBody>
               </Table>
             </div>
-          </main>
+        </div>
+      </main>
 
       <NewRequestModal open={newOpen} onOpenChange={setNewOpen} />
       <ViewRequestModal request={viewRequest} open={!!viewRequest} onOpenChange={(open) => !open && setViewRequest(null)} />

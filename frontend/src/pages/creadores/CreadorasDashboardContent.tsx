@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import CreadoresSubtabs from "./CreadoresSubtabs";
+import CreadoresHeader from "./CreadoresHeader";
 
 const emptyFilters = { search: "", agency: "", status: "", category: "", country: "", city: "", manager: "" };
 
@@ -160,16 +160,9 @@ const CreadorasDashboardContent = () => {
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard de Creadores</h1>
-          <p className="text-sm text-muted-foreground">Visión ejecutiva · {total} creadores en total</p>
-        </div>
-      </header>
+      <CreadoresHeader />
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        <CreadoresSubtabs />
-
         {/* Section 1 — Status KPIs estilo Panel de Control / Dashboard v2 */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {statusConfig.map(({ key, label, icon: Icon, bg }) => {
