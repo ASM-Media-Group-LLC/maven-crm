@@ -207,14 +207,42 @@ const LeadCard = ({
             {countryToFlag(lead.country)} {formatFollowers(lead.followers)}
           </span>
         </div>
-        {/* Company tag badges */}
-        {companySlug && (
-          <div className="flex flex-wrap gap-1 mt-0.5">
-            <span className="rounded-full border border-amber-400/60 px-1.5 py-0 text-[8px] font-bold uppercase text-amber-400">
-              {companySlug}
-            </span>
-          </div>
-        )}
+        {/* Company tag badges. Prioridad: target_companies (asignación
+            manual + IA, multi-compañía) → company_id (discovery owner,
+            fallback). Antes solo se mostraba company_id, así que los
+            cambios manuales en el popup no se reflejaban en la card. */}
+        {(() => {
+          const targets = lead.target_companies ?? [];
+          if (targets.length > 0) {
+            return (
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {targets.slice(0, 3).map((slug) => (
+                  <span
+                    key={slug}
+                    className="rounded-full border border-amber-400/60 px-1.5 py-0 text-[8px] font-bold uppercase text-amber-400"
+                  >
+                    {slug}
+                  </span>
+                ))}
+                {targets.length > 3 && (
+                  <span className="text-[8px] text-muted-foreground self-center">
+                    +{targets.length - 3}
+                  </span>
+                )}
+              </div>
+            );
+          }
+          if (companySlug) {
+            return (
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                <span className="rounded-full border border-amber-400/60 px-1.5 py-0 text-[8px] font-bold uppercase text-amber-400">
+                  {companySlug}
+                </span>
+              </div>
+            );
+          }
+          return null;
+        })()}
       </div>
 
       {/* Score progress bar at bottom */}
