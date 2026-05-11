@@ -30,6 +30,7 @@ import {
 import {
   useLeadFavoriteIds,
   useScouterLeads,
+  useScouterCountries,
   useScouterCompanies,
   useToggleLeadFavorite,
   useScouterJobs,
@@ -41,6 +42,7 @@ import {
   useToggleScouterAutopilot,
   useSetAutopilotCompaniesFilter,
   useRecentDiscoveredLeads,
+  type AiQualityFilter,
   type ScouterLead,
   type ScouterJob,
   type ConsoleLeadEvent,
@@ -51,12 +53,22 @@ import { useNavigate } from "react-router-dom";
 import {
   LeadDrawer,
   STATUS_META,
+  STATUS_OPTIONS,
   VerifiedBadge,
   formatFollowers,
   initialsBg,
   scoreColor,
   countryToFlag,
 } from "./leadShared";
+
+// Mismas opciones de AI quality que Home — duplicadas acá para evitar
+// import cruzado pesado entre rutas. Si suman opciones, tocar ambos.
+const AI_QUALITY_OPTIONS: Array<{ value: AiQualityFilter; label: string }> = [
+  { value: "approved", label: "✅ Aprobadas IA" },
+  { value: "high_fit", label: "Solo high_fit" },
+  { value: "scored", label: "Evaluadas (incluye low_fit)" },
+  { value: "all", label: "Todas (sin filtro IA)" },
+];
 
 // ─── CSS Animations (injected once) ───────────────────────────────────
 const DISCOVER_STYLES = `
@@ -811,6 +823,23 @@ const ScouterDiscover = () => {
   const [page, setPage] = useState(1);
   const pageSize = 48;
 
+  // ── Filtros de la grid (mismos que Home pero el sort siempre es
+  //    created_at DESC — orden de descubrimiento, lo que el user vio
+  //    primero arriba). Status default "discovery" (lo que el bot acaba
+  //    de traer y aún no fue tocado por nadie); AI quality "approved"
+  //    para mostrar leads buenos. El user puede aflojar a "all" para
+  //    ver TODO incluyendo low_fit y unscored.
+  const [statusFilter, setStatusFilter] = useState<string>("discovery");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
+  const [aiQuality, setAiQuality] = useState<AiQualityFilter>("approved");
+  const [search, setSearch] = useState("");
+
+  // Reset page cuando cambian filtros
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, companyFilter, countryFilter, aiQuality, search]);
+
   // ── Data hooks
   const companies = useScouterCompanies();
   const enqueueSeed = useEnqueueDiscoverySeed();
@@ -826,10 +855,28 @@ const ScouterDiscover = () => {
   const activeJobs = useScouterJobs({ status: ["queued", "running"], limit: 20, refetchInterval: 3_000 });
   const recentJobs = useScouterJobs({ limit: 50, refetchInterval: 5_000 });
 
-  // Leads — only discovery status, approved AI, newest first
+  // Companies + slug del seleccionado (para que el filtro matchee
+  // también target_companies, no solo company_id de discovery).
+  const activeCompanySlug =
+    companyFilter !== "all"
+      ? companies.data?.find((c) => c.id === companyFilter)?.slug
+      : undefined;
+
+  // Países dinámicos respetando los otros filtros (igual que Home).
+  const countriesQ = useScouterCountries({
+    status: statusFilter,
+    aiQuality,
+  });
+
+  // Leads — sort por created_at DESC (orden de descubrimiento) siempre.
+  // Filtros: si están en "all" no se aplican.
   const leads = useScouterLeads({
-    status: "discovery",
-    aiQuality: "approved",
+    status: statusFilter,
+    search,
+    company: companyFilter !== "all" ? companyFilter : undefined,
+    companySlug: activeCompanySlug,
+    country: countryFilter !== "all" ? countryFilter : undefined,
+    aiQuality,
     page,
     pageSize,
   });
@@ -1113,9 +1160,86 @@ const ScouterDiscover = () => {
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-border" />
         <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Recién descubiertas · Aprobadas IA
+          Recién descubiertas
         </span>
         <div className="h-px flex-1 bg-border" />
+      </div>
+
+      {/* ── Filtros (mismos que Home) — el sort sigue siendo por
+          orden de descubrimiento (created_at DESC). Los filtros solo
+          acotan qué se ve. ── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={companyFilter} onValueChange={setCompanyFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Compañía" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">
+              Todas ({companies.data?.length ?? 0})
+            </SelectItem>
+            {(companies.data ?? []).map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={countryFilter} onValueChange={setCountryFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="País" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los países</SelectItem>
+            {(countriesQ.data ?? []).map((c) => (
+              <SelectItem key={c.country} value={c.country}>
+                {countryToFlag(c.country)} {c.country} ({c.count})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={aiQuality} onValueChange={(v) => setAiQuality(v as AiQualityFilter)}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Calidad IA" />
+          </SelectTrigger>
+          <SelectContent>
+            {AI_QUALITY_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por handle, nombre, país…"
+            className="pl-8"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {leads.isLoading
+            ? "Cargando…"
+            : `${totalLeads} lead${totalLeads === 1 ? "" : "s"}`}
+        </span>
       </div>
 
       {/* ── Recently discovered leads grid ── */}
