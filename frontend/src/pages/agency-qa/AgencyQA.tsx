@@ -172,7 +172,10 @@ const ClosersQaSection = () => {
   const [active, setActive] = useState<ClosersQaKey>(
     (visibleSubs[0]?.key as ClosersQaKey) ?? "calls",
   );
-  // Full-page call detail: when set, replaces the tabs with CallDetailPage.
+  // Detail embebido: cuando hay callId, se muestra CallDetailPage
+  // ADENTRO del tab qa-history en vez de reemplazar todo Closers QA.
+  // Así las tabs y el header siguen visibles y la sensación es de
+  // "abrir el detalle en el mismo espacio" (con back button).
   // El deeplink desde el email (`?callId=<uuid>`) lo abre automáticamente.
   const [searchParams, setSearchParams] = useSearchParams();
   const urlCallId = searchParams.get("callId");
@@ -188,6 +191,8 @@ const ClosersQaSection = () => {
   const openCallDetail = (callId: string) => {
     setDetailCallId(callId);
     setSearchParams({ callId }, { replace: false });
+    // Forzamos el tab qa-history porque ahí vive el detail embebido.
+    setActive("qa-history");
   };
   const closeCallDetail = () => {
     setDetailCallId(null);
@@ -197,15 +202,13 @@ const ClosersQaSection = () => {
     setSearchParams(next, { replace: true });
   };
 
-  // If a call is selected, show the full-page detail view
-  if (detailCallId) {
-    return (
-      <CallDetailPage
-        callId={detailCallId}
-        onBack={closeCallDetail}
-      />
-    );
-  }
+  // Si entran con un deeplink ?callId=, asegurar que el tab activo sea
+  // qa-history para que el detail embebido se vea.
+  useEffect(() => {
+    if (detailCallId && active !== "qa-history") {
+      setActive("qa-history");
+    }
+  }, [detailCallId, active]);
 
   return (
     <div className="space-y-4">
@@ -238,7 +241,11 @@ const ClosersQaSection = () => {
             ) : s.key === "new-qa" ? (
               <AgencyNewQa />
             ) : s.key === "qa-history" ? (
-              <AgencyQaHistory onOpenDetail={openCallDetail} />
+              detailCallId ? (
+                <CallDetailPage callId={detailCallId} onBack={closeCallDetail} />
+              ) : (
+                <AgencyQaHistory onOpenDetail={openCallDetail} />
+              )
             ) : s.key === "qa-chat" ? (
               <AgencyQaChat />
             ) : s.key === "notifications" ? (
