@@ -1297,6 +1297,11 @@ export interface ScouterAutopilotState {
   paused_reason: string | null;
   paused_at: string | null;
   last_tick_at: string | null;
+  // NULL = todas las compañías activas. Array = solo esas IDs. El RPC
+  // del autopilot respeta este filter cuando encola la siguiente ronda.
+  // Antes el picker vivía solo en localStorage y el trigger ignoraba
+  // el scope del user.
+  companies_filter: string[] | null;
 }
 
 /** Estado actual del autopilot. Crea la row con active=true si no existe
@@ -1320,6 +1325,7 @@ export const useScouterAutopilot = () =>
             paused_reason: row.paused_reason ?? null,
             paused_at: row.paused_at ?? null,
             last_tick_at: row.last_tick_at ?? null,
+            companies_filter: row.companies_filter ?? null,
           }
         : null;
     },
@@ -1371,6 +1377,39 @@ export const useToggleScouterAutopilot = () => {
     },
     onError: (e) => {
       toast.error("No se pudo cambiar el autopilot", { description: (e as Error).message });
+    },
+  });
+};
+
+/** Persiste el scope de compañías que el user eligió en el picker.
+ *  null = todas las compañías activas. Array = solo esas IDs.
+ *  El RPC del autopilot lee este valor y filtra cuándo encola la
+ *  siguiente ronda — antes vivía solo en localStorage y el trigger
+ *  del autopilot encolaba para todas las compañías, ignorándolo. */
+export const useSetAutopilotCompaniesFilter = () => {
+  const qc = useQueryClient();
+  const tenantQ = useCurrentTenantId();
+  return useMutation({
+    mutationFn: async (companyIds: string[] | null): Promise<void> => {
+      const tenantId = tenantQ.data;
+      if (!tenantId) throw new Error("Tenant no resuelto todavía.");
+      const { error } = await sb
+        .from("scouter_autopilot")
+        .upsert(
+          {
+            tenant_id: tenantId,
+            companies_filter: companyIds,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "tenant_id" },
+        );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-autopilot"] });
+    },
+    onError: (e) => {
+      toast.error("No se pudo guardar el scope", { description: (e as Error).message });
     },
   });
 };

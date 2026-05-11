@@ -39,6 +39,7 @@ import {
   useScouterApifyBudget,
   useScouterAutopilot,
   useToggleScouterAutopilot,
+  useSetAutopilotCompaniesFilter,
   useRecentDiscoveredLeads,
   type ScouterLead,
   type ScouterJob,
@@ -796,6 +797,14 @@ const ScouterDiscover = () => {
     } catch {
       /* no-op */
     }
+    // Persisto también el scope en scouter_autopilot — el RPC del
+    // autopilot lo lee y filtra las compañías a encolar. Antes vivía
+    // solo en localStorage y el trigger encolaba para TODAS las
+    // compañías activas del tenant, ignorando el picker.
+    setAutopilotFilter.mutate(
+      selectedCompanyIds === "all" ? null : (selectedCompanyIds as string[]),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCompanyIds]);
   const [selected, setSelected] = useState<ScouterLead | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -810,6 +819,7 @@ const ScouterDiscover = () => {
   const budget = useScouterApifyBudget();
   const autopilot = useScouterAutopilot();
   const toggleAutopilot = useToggleScouterAutopilot();
+  const setAutopilotFilter = useSetAutopilotCompaniesFilter();
   const recentLeads = useRecentDiscoveredLeads(40);
 
   // Jobs — poll active jobs faster (3s) and all recent jobs for console
