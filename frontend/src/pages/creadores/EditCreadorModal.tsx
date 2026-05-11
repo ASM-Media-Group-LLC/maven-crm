@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ExternalLink } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -17,9 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUpdateCreador } from "./useCreadores";
 import { toast } from "@/hooks/use-toast";
+import { buildSocialUrl } from "@/lib/utils";
 import type { CreatorWithBusiness } from "./useCreadores";
 
 interface Props {
@@ -114,15 +116,79 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
     );
   };
 
+  // Identity bits para el header del modal.
+  const displayName = creator.artistic_name || creator.name || "Creadora";
+  const initials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  const igUrl = buildSocialUrl("instagram", creator.instagram_handle);
+
+  // Sub-componente: nombre como link a IG si existe; sino texto plano.
+  // External icon solo cuando el link existe.
+  const NameLink = () =>
+    igUrl ? (
+      <a
+        href={igUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-primary"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="truncate">{displayName}</span>
+        <ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
+      </a>
+    ) : (
+      <span className="text-sm text-muted-foreground truncate">{displayName}</span>
+    );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Editar Creador</DialogTitle>
+      {/* DialogContent en flex column con max-h, scroll en el área central
+          y footer pegado abajo — el cambio clave que arregla el textarea
+          de Bio que antes se comía con el footer. */}
+      <DialogContent className="sm:max-w-[620px] max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border/60 space-y-3">
+          <div className="flex items-center gap-3">
+            {/* Avatar — clickeable al perfil de IG (si tiene handle). */}
+            {igUrl ? (
+              <a
+                href={igUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 group"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Avatar className="h-14 w-14 ring-2 ring-border transition-all group-hover:ring-primary/50">
+                  {creator.profile_photo_url && (
+                    <AvatarImage src={creator.profile_photo_url} alt={displayName} />
+                  )}
+                  <AvatarFallback className="text-sm font-semibold">{initials}</AvatarFallback>
+                </Avatar>
+              </a>
+            ) : (
+              <Avatar className="h-14 w-14 shrink-0 ring-2 ring-border">
+                {creator.profile_photo_url && (
+                  <AvatarImage src={creator.profile_photo_url} alt={displayName} />
+                )}
+                <AvatarFallback className="text-sm font-semibold">{initials}</AvatarFallback>
+              </Avatar>
+            )}
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-lg">Editar Creador</DialogTitle>
+              <div className="mt-0.5">
+                <NameLink />
+              </div>
+            </div>
+          </div>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[60vh] pr-4">
-          <div className="grid grid-cols-2 gap-4 py-4">
+        {/* Área scrollable. flex-1 lo deja consumir el espacio sobrante
+            entre header y footer; overflow-y-auto activa el scroll real. */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Nombre *</Label>
               <Input
@@ -151,7 +217,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               <Label>Ciudad</Label>
               <Input value={form.city} onChange={(e) => handleChange("city", e.target.value)} />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 sm:col-span-2">
               <Label>Categoría</Label>
               <Select value={form.category} onValueChange={(v) => handleChange("category", v)}>
                 <SelectTrigger>
@@ -164,11 +230,11 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 </SelectContent>
               </Select>
             </div>
-          </div>
+          </section>
 
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium">Redes Sociales</h4>
-            <div className="grid grid-cols-2 gap-4">
+          <section className="space-y-3 pt-2 border-t border-border/60">
+            <h4 className="text-[11px] font-semibold uppercase tracking-widest text-foreground/70 pt-3">Redes Sociales</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Instagram</Label>
                 <Input value={form.instagram_handle} onChange={(e) => handleChange("instagram_handle", e.target.value)} placeholder="@usuario" />
@@ -194,15 +260,20 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 <Input value={form.whatsapp_number} onChange={(e) => handleChange("whatsapp_number", e.target.value)} placeholder="+1 234 567 8900" />
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="space-y-1.5 mt-4">
-            <Label>Biografía</Label>
-            <Textarea value={form.bio} onChange={(e) => handleChange("bio", e.target.value)} placeholder="Breve descripción del creador..." rows={3} />
-          </div>
-        </ScrollArea>
+          <section className="space-y-1.5 pt-2 border-t border-border/60">
+            <h4 className="text-[11px] font-semibold uppercase tracking-widest text-foreground/70 pt-3">Biografía</h4>
+            <Textarea
+              value={form.bio}
+              onChange={(e) => handleChange("bio", e.target.value)}
+              placeholder="Breve descripción del creador..."
+              rows={3}
+            />
+          </section>
+        </div>
 
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4 border-t border-border/60 bg-card">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={handleSave} disabled={updateMutation.isPending}>
             {updateMutation.isPending ? "Guardando..." : "Guardar Cambios"}
