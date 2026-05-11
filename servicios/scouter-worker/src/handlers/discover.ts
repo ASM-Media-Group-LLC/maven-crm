@@ -43,6 +43,100 @@ function detectLinkInBio(externalUrl?: string | null): string | null {
   return "Other";
 }
 
+// Heurística de país basada en señales visibles en el perfil de IG. Es
+// pre-scoring: solo descartamos si el user puso target_countries en la
+// compañía y la cuenta NO matchea. Si no hay señal clara, devolvemos
+// null y el caller decide qué hacer (skipear o no).
+//
+// Detectamos:
+//   · banderas emoji en bio/fullName
+//   · keywords explícitas: "México", "MX", "CDMX", "Argentina", etc.
+//   · sufijo del handle: "_mx", "_arg" (señal débil pero suma)
+//
+// Para perfiles que mezclan bandera con keyword + handle suffix, los
+// señalamos con confianza alta. Para los que solo tienen 1 señal débil,
+// confianza media. Los que no tienen nada → null.
+const FLAG_TO_COUNTRY: Record<string, string> = {
+  "🇲🇽": "México", "🇦🇷": "Argentina", "🇧🇷": "Brasil", "🇨🇱": "Chile",
+  "🇨🇴": "Colombia", "🇵🇪": "Perú", "🇺🇾": "Uruguay", "🇵🇾": "Paraguay",
+  "🇧🇴": "Bolivia", "🇪🇨": "Ecuador", "🇻🇪": "Venezuela", "🇨🇺": "Cuba",
+  "🇨🇷": "Costa Rica", "🇵🇦": "Panamá", "🇬🇹": "Guatemala", "🇸🇻": "El Salvador",
+  "🇭🇳": "Honduras", "🇳🇮": "Nicaragua", "🇩🇴": "República Dominicana",
+  "🇵🇷": "Puerto Rico", "🇯🇲": "Jamaica",
+  "🇪🇸": "España", "🇵🇹": "Portugal", "🇮🇹": "Italia", "🇫🇷": "Francia",
+  "🇩🇪": "Alemania", "🇬🇧": "UK", "🇮🇪": "Irlanda", "🇳🇴": "Noruega",
+  "🇸🇪": "Suecia", "🇨🇭": "Suiza", "🇳🇱": "Países Bajos", "🇵🇱": "Polonia",
+  "🇷🇺": "Rusia", "🇺🇦": "Ucrania", "🇷🇴": "Rumania", "🇨🇿": "República Checa",
+  "🇭🇺": "Hungría", "🇷🇸": "Serbia", "🇦🇲": "Armenia",
+  "🇺🇸": "US/CA", "🇨🇦": "Canadá",
+  "🇦🇺": "Australia", "🇳🇿": "Nueva Zelanda", "🇯🇵": "Japón",
+  "🇨🇳": "China", "🇰🇷": "Corea del Sur", "🇹🇭": "Tailandia",
+  "🇵🇭": "Filipinas", "🇮🇩": "Indonesia", "🇻🇳": "Vietnam",
+  "🇸🇬": "Singapur", "🇮🇳": "India", "🇵🇰": "Pakistán",
+  "🇮🇱": "Israel", "🇹🇷": "Turquía", "🇦🇪": "Emiratos Árabes Unidos",
+  "🇲🇦": "Marruecos", "🇪🇬": "Egipto", "🇿🇦": "Sudáfrica", "🇳🇬": "Nigeria",
+};
+
+// Keywords de ciudades/palabras-clave → país canónico. Lista corta —
+// solo los matches más confiables. Lowercase, sin acentos.
+const KEYWORD_TO_COUNTRY: Record<string, string> = {
+  // México
+  "mexico": "México", "mexicana": "México", "mexicano": "México",
+  "mexico city": "México", "cdmx": "México", "ciudad de mexico": "México",
+  "guadalajara": "México", "monterrey": "México", "puebla": "México",
+  "cancun": "México", "queretaro": "México", "tijuana": "México",
+  // Argentina
+  "argentina": "Argentina", "argentino": "Argentina", "argentina🇦🇷": "Argentina",
+  "buenos aires": "Argentina", "bsas": "Argentina",
+  "cordoba": "Argentina", "rosario": "Argentina", "mendoza": "Argentina",
+  // Brasil
+  "brasil": "Brasil", "brazil": "Brasil", "brasilera": "Brasil",
+  "brasileira": "Brasil", "brasileiro": "Brasil", "sao paulo": "Brasil",
+  "rio de janeiro": "Brasil", "salvador bahia": "Brasil",
+  // Colombia
+  "colombia": "Colombia", "colombiana": "Colombia", "bogota": "Colombia",
+  "medellin": "Colombia", "cali colombia": "Colombia",
+  // Chile
+  "chile": "Chile", "chilena": "Chile", "santiago de chile": "Chile",
+  // Venezuela
+  "venezuela": "Venezuela", "venezolana": "Venezuela", "caracas": "Venezuela",
+  // España
+  "españa": "España", "espana": "España", "spain": "España",
+  "madrid": "España", "barcelona": "España", "valencia es": "España",
+  // Otros confiables
+  "peru": "Perú", "peruana": "Perú", "lima peru": "Perú",
+  "uruguay": "Uruguay", "uruguaya": "Uruguay", "montevideo": "Uruguay",
+  "ecuador": "Ecuador", "ecuatoriana": "Ecuador", "quito": "Ecuador",
+};
+
+function inferCountry(item: ProfileItem): string | null {
+  const haystack = [
+    item.fullName ?? "",
+    item.biography ?? "",
+    item.externalUrl ?? "",
+  ].join(" ");
+  // 1) Banderas emoji — señal más fuerte. Si hay más de una, devolvemos
+  //    la primera (caller decide si matchea con target_countries).
+  for (const [flag, country] of Object.entries(FLAG_TO_COUNTRY)) {
+    if (haystack.includes(flag)) return country;
+  }
+  // 2) Keywords. Lowercase sin acentos para evitar miss por capitalización.
+  const norm = haystack
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+  for (const [kw, country] of Object.entries(KEYWORD_TO_COUNTRY)) {
+    if (norm.includes(kw)) return country;
+  }
+  // 3) Sufijo del handle (señal débil — solo para countries muy comunes)
+  const handle = (item.username ?? "").toLowerCase();
+  if (/_(mx|mex|mexico)\b/.test(handle)) return "México";
+  if (/_(arg|argentina)\b/.test(handle)) return "Argentina";
+  if (/_(br|brasil|brazil)\b/.test(handle)) return "Brasil";
+  if (/_(col|colombia)\b/.test(handle)) return "Colombia";
+  return null;
+}
+
 async function persistProfilesAsLeads(
   items: ProfileItem[],
   tenantId: string,
@@ -52,11 +146,24 @@ async function persistProfilesAsLeads(
   // (per-lead, derivado del item — típico de seed discovery donde cada
   // lead viene de una cuenta semilla distinta y queremos guardarla).
   discoverySource: string | ((item: ProfileItem) => string),
-): Promise<{ inserted: number; updated: number; skippedInLeadgen: number; leadIds: string[] }> {
+  // Si la compañía tiene target_countries seteado, descartamos cualquier
+  // lead que no podamos confirmar como de uno de esos países. La intención
+  // del user: "solo paises que podamos confirmar" — si no detectamos
+  // señal clara, skipea (conservador). Vacío/null = sin restricción.
+  targetCountries: string[] | null,
+): Promise<{
+  inserted: number;
+  updated: number;
+  skippedInLeadgen: number;
+  skippedByCountry: number;
+  leadIds: string[];
+}> {
   const leadIds: string[] = [];
   let inserted = 0;
   let updated = 0;
   let skippedInLeadgen = 0;
+  let skippedByCountry = 0;
+  const hasCountryFilter = !!(targetCountries && targetCountries.length > 0);
 
   // Pre-fetch batch: cross-system dedup contra Lead Gen.
   //   · existingInLeadgen: handles que ya viven en leadgen_entries
@@ -131,6 +238,26 @@ async function persistProfilesAsLeads(
       continue;
     }
 
+    // Filtro por país: si la compañía tiene target_countries, descartamos
+    // leads que NO podamos confirmar como de uno de esos países.
+    const inferredCountry = inferCountry(item);
+    if (hasCountryFilter) {
+      if (!inferredCountry) {
+        skippedByCountry += 1;
+        console.log(
+          `[discover] skip @${handle} — sin señal de país confirmable (target=${targetCountries!.join(",")})`,
+        );
+        continue;
+      }
+      if (!targetCountries!.includes(inferredCountry)) {
+        skippedByCountry += 1;
+        console.log(
+          `[discover] skip @${handle} — país inferido ${inferredCountry} fuera de target (${targetCountries!.join(",")})`,
+        );
+        continue;
+      }
+    }
+
     const linkPlatform = detectLinkInBio(item.externalUrl);
     // URL cruda de IG CDN — firmada, expira en ~24-48h. La persistimos
     // ya en nuestro storage para que photo_data_url no caduque.
@@ -140,7 +267,7 @@ async function persistProfilesAsLeads(
     // Upsert por (company_id, instagram_handle) — UNIQUE constraint.
     // Si ya existía, refrescamos followers/bio/etc. pero NO pisamos
     // ai_score / status — esos los maneja score_lead.
-    const upsertPayload = {
+    const upsertPayload: Record<string, unknown> = {
       company_id: companyId,
       instagram_handle: handle,
       instagram_url: item.url ?? `https://www.instagram.com/${handle}/`,
@@ -154,6 +281,12 @@ async function persistProfilesAsLeads(
         typeof discoverySource === "function" ? discoverySource(item) : discoverySource,
       tenant_id: tenantId,
     };
+    // Si detectamos país por heurística, lo persistimos para que el
+    // scorer no tenga que re-inferirlo y para que aparezca en la card
+    // antes del scoring.
+    if (inferredCountry) {
+      upsertPayload.country = inferredCountry;
+    }
 
     const { data, error } = await sb
       .from("scouter_leads")
@@ -171,7 +304,22 @@ async function persistProfilesAsLeads(
     else updated += 1;
   }
 
-  return { inserted, updated, skippedInLeadgen, leadIds };
+  return { inserted, updated, skippedInLeadgen, skippedByCountry, leadIds };
+}
+
+// Lee target_countries de la compañía. Devuelve null si no hay
+// restricción (vacío o columna ausente).
+async function fetchTargetCountries(companyId: string | null): Promise<string[] | null> {
+  if (!companyId) return null;
+  const { data, error } = await sb
+    .from("scouter_companies")
+    .select("search_config")
+    .eq("id", companyId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const cfg = (data as { search_config?: { target_countries?: string[] } }).search_config ?? {};
+  const arr = cfg.target_countries ?? [];
+  return arr.length > 0 ? arr : null;
 }
 
 async function enqueueScoreJobs(leadIds: string[], tenantId: string): Promise<void> {
@@ -201,22 +349,29 @@ export async function handleDiscoverSeed(
   if (!budget.ok) return { ok: false, message: budget.reason ?? "budget agotado" };
 
   const items = (await runProfileScrape(seeds.slice(0, max), job.tenant_id)) as ProfileItem[];
-  const { inserted, updated, skippedInLeadgen, leadIds } = await persistProfilesAsLeads(
-    items,
-    job.tenant_id,
-    job.company_id,
-    // Por-lead: usamos el handle de la cuenta semilla como fuente. Antes
-    // era hardcoded "seed" para todos y se perdía la trazabilidad de
-    // desde qué cuenta vino cada lead.
-    (item) => `seed:@${item.username ?? "?"}`,
-  );
+  const targetCountries = await fetchTargetCountries(job.company_id);
+  const { inserted, updated, skippedInLeadgen, skippedByCountry, leadIds } =
+    await persistProfilesAsLeads(
+      items,
+      job.tenant_id,
+      job.company_id,
+      // Por-lead: usamos el handle de la cuenta semilla como fuente. Antes
+      // era hardcoded "seed" para todos y se perdía la trazabilidad de
+      // desde qué cuenta vino cada lead.
+      (item) => `seed:@${item.username ?? "?"}`,
+      targetCountries,
+    );
   await enqueueScoreJobs(leadIds, job.tenant_id);
 
-  const skipSuffix = skippedInLeadgen > 0 ? `, ${skippedInLeadgen} skip (ya en Lead Gen)` : "";
+  const skipLeadgen = skippedInLeadgen > 0 ? `, ${skippedInLeadgen} skip (ya en Lead Gen)` : "";
+  const skipCountry =
+    skippedByCountry > 0
+      ? `, ${skippedByCountry} skip (país fuera de ${targetCountries?.join("/") ?? "target"})`
+      : "";
   return {
     ok: true,
-    message: `discover_seed: ${inserted} nuevos, ${updated} actualizados${skipSuffix}.`,
-    data: { inserted, updated, skippedInLeadgen, leadIds },
+    message: `discover_seed: ${inserted} nuevos, ${updated} actualizados${skipLeadgen}${skipCountry}.`,
+    data: { inserted, updated, skippedInLeadgen, skippedByCountry, leadIds },
     apifyItemsProcessed: items.length,
   };
 }
@@ -251,19 +406,26 @@ export async function handleDiscoverHashtag(
   // 3) Enriquecer perfiles + persistir.
   const usernames = authors.map((a) => a.username);
   const items = (await runProfileScrape(usernames, job.tenant_id)) as ProfileItem[];
-  const { inserted, updated, skippedInLeadgen, leadIds } = await persistProfilesAsLeads(
-    items,
-    job.tenant_id,
-    job.company_id,
-    `hashtag:${hashtag}`,
-  );
+  const targetCountries = await fetchTargetCountries(job.company_id);
+  const { inserted, updated, skippedInLeadgen, skippedByCountry, leadIds } =
+    await persistProfilesAsLeads(
+      items,
+      job.tenant_id,
+      job.company_id,
+      `hashtag:${hashtag}`,
+      targetCountries,
+    );
   await enqueueScoreJobs(leadIds, job.tenant_id);
 
-  const skipSuffix = skippedInLeadgen > 0 ? `, ${skippedInLeadgen} skip (ya en Lead Gen)` : "";
+  const skipLeadgen = skippedInLeadgen > 0 ? `, ${skippedInLeadgen} skip (ya en Lead Gen)` : "";
+  const skipCountry =
+    skippedByCountry > 0
+      ? `, ${skippedByCountry} skip (país fuera de ${targetCountries?.join("/") ?? "target"})`
+      : "";
   return {
     ok: true,
-    message: `discover_hashtag #${hashtag}: ${inserted} nuevos, ${updated} actualizados${skipSuffix}.`,
-    data: { authorsFound: authors.length, inserted, updated, skippedInLeadgen },
+    message: `discover_hashtag #${hashtag}: ${inserted} nuevos, ${updated} actualizados${skipLeadgen}${skipCountry}.`,
+    data: { authorsFound: authors.length, inserted, updated, skippedInLeadgen, skippedByCountry },
     apifyItemsProcessed: authors.length + items.length,
   };
 }

@@ -41,6 +41,8 @@ import {
   type ScouterJob,
 } from "@/hooks/useScouterLeads";
 import { supabase as sb } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import {
   LeadDrawer,
   STATUS_META,
@@ -665,6 +667,7 @@ function jobToConsoleLines(job: ScouterJob): ConsoleLine[] {
 // ─── Main component ──────────────────────────────────────────────────
 const ScouterDiscover = () => {
   useEffect(() => injectStyles(), []);
+  const navigate = useNavigate();
 
   // ── State
   const [showNewSeed, setShowNewSeed] = useState(false);
@@ -755,21 +758,34 @@ const ScouterDiscover = () => {
 
   // ── Handlers
   const handleStart = useCallback(() => {
-    // Encolar búsquedas para las compañías seleccionadas (default: todas
-    // las activas). Si la lista persisted en localStorage tiene ids
-    // específicos, filtramos por ahí. El user puede cambiar el scope
-    // desde el botón ⚙️ "Compañías".
+    // Encolar búsquedas para las compañías seleccionadas. El scope:
+    //   · selectedCompanyIds === "all" → todas las compañías activas;
+    //     además corremos el pool global pick_discovery_seeds porque la
+    //     intención es "buscar lo más amplio posible".
+    //   · lista específica → SOLO las elegidas. NO mezclamos con el pool
+    //     global (el user quiere búsqueda dirigida por seeds de esa
+    //     compañía). Si ninguna de las elegidas tiene seeds ni hashtags,
+    //     mostramos alerta clara con CTA hacia Settings.
     const allCompanies = companies.data ?? [];
-    const companyList =
-      selectedCompanyIds === "all"
-        ? allCompanies
-        : allCompanies.filter((c) => selectedCompanyIds.includes(c.id));
+    const isAllScope = selectedCompanyIds === "all";
+    const companyList = isAllScope
+      ? allCompanies
+      : allCompanies.filter((c) => selectedCompanyIds.includes(c.id));
+
+    // Detectamos compañías sin config — para la alerta cuando el user
+    // elige específicas. Almacenamos los nombres para mostrarlos.
+    const companiesWithoutConfig: string[] = [];
     let enqueued = false;
 
     for (const company of companyList) {
       const cfg = (company as any).search_config ?? {};
       const hashtags: string[] = cfg.hashtags ?? [];
       const seeds: string[] = cfg.seed_accounts ?? [];
+
+      if (hashtags.length === 0 && seeds.length === 0) {
+        companiesWithoutConfig.push(company.name ?? "(sin nombre)");
+        continue;
+      }
 
       // Hashtag jobs por compañía
       for (const tag of hashtags) {
@@ -792,8 +808,34 @@ const ScouterDiscover = () => {
       }
     }
 
-    // Fallback: si ninguna compañía tenía config, usar hashtags genéricos
-    if (!enqueued) {
+    // Caso búsqueda dirigida (scope específico) y NINGUNA tenía config:
+    // alerta clara con CTA hacia Settings — no corremos fallback genérico
+    // porque eso traería leads random no alineados con la(s) compañía(s).
+    if (!isAllScope && !enqueued && companyList.length > 0) {
+      const names = companiesWithoutConfig.join(", ");
+      toast.error("Las compañías elegidas no tienen seeds ni hashtags configurados", {
+        description: `${names} — agregá al menos un @handle o #hashtag en Settings → Compañías → Editar.`,
+        action: {
+          label: "Abrir Settings",
+          onClick: () => navigate("/scouter/settings?sub=companies"),
+        },
+        duration: 10_000,
+      });
+      return;
+    }
+
+    // Si una compañía específica corrió pero otras no tenían config,
+    // damos un warning informativo (no bloqueante).
+    if (!isAllScope && enqueued && companiesWithoutConfig.length > 0) {
+      toast.warning(
+        `Algunas compañías no se buscaron por falta de config: ${companiesWithoutConfig.join(", ")}`,
+        { duration: 7_000 },
+      );
+    }
+
+    // Fallback scope="all" sin ninguna config en ninguna compañía:
+    // hashtags genéricos para arrancar.
+    if (isAllScope && !enqueued) {
       const fallbackCompanyId = companyList[0]?.id ?? null;
       for (const tag of FALLBACK_HASHTAGS) {
         enqueueHashtag.mutate({
@@ -804,32 +846,34 @@ const ScouterDiscover = () => {
       }
     }
 
-    // Weighted seed pool — RPC pick_discovery_seeds devuelve ~30 handles
-  // distribuidos: 50% creators firmadas (señal máxima), 30% leadgen
-  // quality A/A+, 20% scouter_leads validadas (high_fit + ai_score≥7).
-  // Reemplaza el bonus naive de "los 10 últimos leads" — ahora el pool
-  // que el scraper usa para sugerir similares está alineado con la
-  // calidad real del CRM.
-    void (async () => {
-      const { data: seedRows, error: seedErr } = await sb.rpc(
-        "pick_discovery_seeds",
-        { p_total: 30 },
-      );
-      if (seedErr) {
-        console.warn("pick_discovery_seeds error", seedErr.message);
-        return;
-      }
-      const handles = ((seedRows ?? []) as Array<{ out_handle: string }>)
-        .map((r) => r.out_handle)
-        .filter(Boolean);
-      if (handles.length === 0) return;
-      enqueueSeed.mutate({
-        seeds: handles,
-        company_id: companyList[0]?.id ?? null,
-        maxLeads: handles.length,
-      });
-    })();
-  }, [companies.data, enqueueHashtag, enqueueSeed, selectedCompanyIds]);
+    // Weighted seed pool global — SOLO en scope "all". RPC
+    // pick_discovery_seeds devuelve ~30 handles distribuidos: 50%
+    // creators firmadas, 30% leadgen quality A/A+, 20% scouter_leads
+    // validadas. Cuando el user elige compañías específicas, NO usamos
+    // este pool porque traería seeds de otras compañías y rompe la
+    // búsqueda dirigida que pidió.
+    if (isAllScope) {
+      void (async () => {
+        const { data: seedRows, error: seedErr } = await sb.rpc(
+          "pick_discovery_seeds",
+          { p_total: 30 },
+        );
+        if (seedErr) {
+          console.warn("pick_discovery_seeds error", seedErr.message);
+          return;
+        }
+        const handles = ((seedRows ?? []) as Array<{ out_handle: string }>)
+          .map((r) => r.out_handle)
+          .filter(Boolean);
+        if (handles.length === 0) return;
+        enqueueSeed.mutate({
+          seeds: handles,
+          company_id: companyList[0]?.id ?? null,
+          maxLeads: handles.length,
+        });
+      })();
+    }
+  }, [companies.data, enqueueHashtag, enqueueSeed, selectedCompanyIds, navigate]);
 
   const handleStop = useCallback(() => {
     setShowStopConfirm(true);

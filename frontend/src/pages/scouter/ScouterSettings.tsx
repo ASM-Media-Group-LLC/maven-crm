@@ -20,6 +20,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Check, ChevronsUpDown } from "lucide-react";
+import {
   Plus,
   Sparkles,
   Loader2,
@@ -390,6 +400,111 @@ const CompanyLogoUploader = ({
           <div className={`rounded-md px-4 py-3 ${previewBg}`}>
             <img src={value} alt="Preview" className="h-12 w-auto object-contain" />
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Combobox de países objetivo — búsqueda + multi-select. Vacío = sin
+// restricción. Reemplaza la grilla anterior de 30+ botones que ocupaba
+// media pantalla.
+const CountriesPicker = ({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const toggle = (country: string) => {
+    onChange(
+      value.includes(country)
+        ? value.filter((c) => c !== country)
+        : [...value, country],
+    );
+  };
+  return (
+    <div>
+      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+        <MapPin className="inline h-3 w-3 mr-1" />
+        Países objetivo (opcional)
+      </label>
+      <p className="text-[10px] text-muted-foreground mb-2">
+        Dejar vacío = sin restricción. Elegí uno o varios países si la
+        compañía solo busca creadores de un país específico.
+      </p>
+
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between text-xs h-9"
+          >
+            <span className="text-muted-foreground">
+              {value.length === 0
+                ? "Buscar y agregar país…"
+                : `${value.length} país${value.length === 1 ? "" : "es"} seleccionado${value.length === 1 ? "" : "s"}`}
+            </span>
+            <ChevronsUpDown className="h-3.5 w-3.5 opacity-60" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Filtrá país…" className="h-9 text-xs" />
+            <CommandList>
+              <CommandEmpty className="text-xs py-3 text-center text-muted-foreground">
+                No se encontró ningún país.
+              </CommandEmpty>
+              <CommandGroup>
+                {COUNTRIES_ALPHA.map((country) => {
+                  const isOn = value.includes(country);
+                  return (
+                    <CommandItem
+                      key={country}
+                      value={country}
+                      onSelect={() => toggle(country)}
+                      className="text-xs cursor-pointer"
+                    >
+                      <Check
+                        className={`mr-2 h-3.5 w-3.5 ${
+                          isOn ? "opacity-100" : "opacity-0"
+                        }`}
+                      />
+                      <span className="mr-1.5">{COUNTRY_FLAGS[country] ?? "🌍"}</span>
+                      {country}
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      {/* Chips de seleccionados con X */}
+      {value.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {value.map((country) => (
+            <span
+              key={country}
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300"
+            >
+              <span>{COUNTRY_FLAGS[country] ?? "🌍"}</span>
+              {country}
+              <button
+                type="button"
+                onClick={() => toggle(country)}
+                className="ml-0.5 text-emerald-300/70 hover:text-emerald-200"
+                aria-label={`Quitar ${country}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
         </div>
       )}
     </div>
@@ -943,44 +1058,11 @@ const CompanyFormModal = ({
             </div>
           </div>
 
-          {/* Países objetivo — más granular que geo_targets. Click toggea
-              cada país on/off. Vacío = no hay restricción de país. */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              <MapPin className="inline h-3 w-3 mr-1" />
-              Países objetivo (opcional)
-            </label>
-            <p className="text-[10px] text-muted-foreground mb-2">
-              Dejar vacío = sin restricción. Tickeá uno o varios países si
-              la compañía solo busca creadores de un país específico.
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {COUNTRIES_ALPHA.map((country) => {
-                const isOn = (cfg.target_countries ?? []).includes(country);
-                return (
-                  <button
-                    key={country}
-                    type="button"
-                    onClick={() => {
-                      const current = cfg.target_countries ?? [];
-                      updateConfig({
-                        target_countries: isOn
-                          ? current.filter((c) => c !== country)
-                          : [...current, country],
-                      });
-                    }}
-                    className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                      isOn
-                        ? "border-emerald-400 bg-emerald-400/15 text-emerald-400"
-                        : "border-border text-muted-foreground hover:border-primary/40"
-                    }`}
-                  >
-                    {COUNTRY_FLAGS[country] ?? "🌍"} {country}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* Países objetivo — combobox con búsqueda + multi-select. */}
+          <CountriesPicker
+            value={cfg.target_countries ?? []}
+            onChange={(next) => updateConfig({ target_countries: next })}
+          />
 
           {/* Scoring notes */}
           <div>
