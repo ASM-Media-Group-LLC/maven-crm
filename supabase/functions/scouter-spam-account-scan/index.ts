@@ -36,6 +36,11 @@ interface IgProfileSnapshot {
   external_url: string | null;
   profile_pic_url: string | null;
   account_created_year: number | null;
+  // IG aplica este flag automáticamente a cuentas que detecta como
+  // adult/spam/reportadas. Cuando es true, los endpoints públicos
+  // devuelven 404 "Profile is restricted" o `isRestricted:true` y
+  // no podemos leer bio/followers/posts sin cookies de sesión.
+  is_restricted: boolean;
 }
 
 interface ScanRequest {
@@ -62,6 +67,9 @@ Tu tarea: ponerte en el lugar de una INFLUENCER GRANDE que recibe un DM o follow
    ¿Esta influencer respondería a esta cuenta? ¿Por qué sí o por qué no?
 
 Las creadoras grandes son selectivas, ya las contactan muchas agencias. Para responder, necesitan ver que la cuenta es de una agencia REAL, profesional, con track record visible — no un fake recién armado.
+
+DEAL-BREAKERS automáticos (score ≤ 30, would_respond = "no", el primer red_flag debe explicarlo en texto plano):
+- is_restricted = true: IG marcó la cuenta como restringida — está oculta a no-loggeados. Cuando el agente comercial le mande DM a una creadora, lo más probable es que el perfil le aparezca con muro de login, "Esta cuenta es restringida" o sin info pública. Las creators target no van a poder validar quién manda el DM → no responden. Eso pasa por contenido NSFW visible, patrones de spam previos, reportes de usuarios, o cuenta sin verificación. Para que la cuenta sirva para scouting hay que resolverlo primero (verificar mail+teléfono, eliminar posts problemáticos, esperar weeks hasta que IG levante el flag). El red_flag debe decir literal: "IG marcó la cuenta como restringida — las creators target podrían no verla al recibir el DM".
 
 Señales QUE PENALIZAN (la creadora skipea):
 - Cuenta muy nueva (< 6 meses) sin track record.
@@ -239,6 +247,7 @@ serve(async (req) => {
         posts_count: snapshot.posts_count,
         bio: snapshot.biography,
         is_verified: snapshot.is_verified,
+        is_restricted: snapshot.is_restricted,
         ai_score: analysis.score,
         ai_analysis: analysis,
         last_scanned_at: new Date().toISOString(),
@@ -289,25 +298,41 @@ async function fetchIgProfile(username: string): Promise<IgProfileSnapshot | nul
         { headers: { "x-api-key": scKey } },
         10000,
       );
-      if (scRes.ok) {
-        const scData = (await scRes.json().catch(() => null)) as {
-          data?: {
-            user?: {
-              username?: string;
-              full_name?: string;
-              biography?: string;
-              edge_followed_by?: { count?: number };
-              edge_follow?: { count?: number };
-              edge_owner_to_timeline_media?: { count?: number };
-              is_verified?: boolean;
-              is_private?: boolean;
-              is_business_account?: boolean;
-              external_url?: string;
-              profile_pic_url_hd?: string;
-              profile_pic_url?: string;
-            };
+      // El endpoint devuelve 200 incluso cuando IG bloquea — el body
+      // tiene un campo `error` o `message: "Profile is restricted"`.
+      // Para 404/200-con-restricted, todavía consideramos que la cuenta
+      // existe y se la pasamos al AI con is_restricted:true en vez de
+      // fallar el scan entero.
+      const scData = (await scRes.json().catch(() => null)) as {
+        success?: boolean;
+        message?: string;
+        error?: string;
+        errorStatus?: number;
+        isRestricted?: boolean;
+        handle?: string;
+        userId?: string | null;
+        data?: {
+          user?: {
+            username?: string;
+            full_name?: string;
+            biography?: string;
+            edge_followed_by?: { count?: number };
+            edge_follow?: { count?: number };
+            edge_owner_to_timeline_media?: { count?: number };
+            is_verified?: boolean;
+            is_private?: boolean;
+            is_business_account?: boolean;
+            external_url?: string;
+            profile_pic_url_hd?: string;
+            profile_pic_url?: string;
           };
-        } | null;
+        };
+      } | null;
+      const restrictedHint =
+        scData?.isRestricted === true ||
+        (typeof scData?.message === "string" && /restricted/i.test(scData.message)) ||
+        scData?.error === "not_found" && scData.errorStatus === 404;
+      if (scRes.ok || scData) {
         const su = scData?.data?.user;
         if (su) {
           return {
@@ -323,11 +348,25 @@ async function fetchIgProfile(username: string): Promise<IgProfileSnapshot | nul
             external_url: su.external_url ?? null,
             profile_pic_url: su.profile_pic_url_hd ?? su.profile_pic_url ?? null,
             account_created_year: null,
+            is_restricted: false,
           };
         }
-      } else {
-        const errTxt = await scRes.text().catch(() => "");
-        console.warn("[spam-scan] ScrapeCreators failed, falling back to IG direct:", scRes.status, errTxt.slice(0, 150));
+        if (restrictedHint) {
+          // Cuenta existe pero IG la oculta sin login. Confirmamos con
+          // /v2/instagram/user/posts (devuelve isRestricted:true sin 404)
+          // para descartar typo / cuenta inexistente.
+          const confirmed = await confirmRestrictedViaPosts(u, scKey);
+          if (confirmed) {
+            return makeRestrictedSnapshot(u);
+          }
+        }
+      }
+      if (!scRes.ok) {
+        console.warn(
+          "[spam-scan] ScrapeCreators failed, falling back to IG direct:",
+          scRes.status,
+          (scData?.message ?? "").slice(0, 150),
+        );
       }
     } catch (e) {
       console.warn("[spam-scan] ScrapeCreators exception, falling back:", (e as Error).message);
@@ -358,6 +397,7 @@ async function fetchIgProfile(username: string): Promise<IgProfileSnapshot | nul
     );
     if (!res.ok) return null;
     const data = (await res.json().catch(() => null)) as {
+      status?: string;
       data?: {
         user?: {
           username?: string;
@@ -376,7 +416,16 @@ async function fetchIgProfile(username: string): Promise<IgProfileSnapshot | nul
       };
     } | null;
     const u_ = data?.data?.user;
-    if (!u_) return null;
+    if (!u_) {
+      // IG devuelve `{"status":"ok"}` sin data.user cuando la cuenta
+      // está restricted y no hay cookies de sesión. Lo tratamos como
+      // restricted confirmado (mejor falso positivo de restricted que
+      // perder el scan entero).
+      if (data?.status === "ok") {
+        return makeRestrictedSnapshot(u);
+      }
+      return null;
+    }
     return {
       username: u_.username ?? u,
       full_name: u_.full_name ?? null,
@@ -390,10 +439,55 @@ async function fetchIgProfile(username: string): Promise<IgProfileSnapshot | nul
       external_url: u_.external_url ?? null,
       profile_pic_url: u_.profile_pic_url_hd ?? u_.profile_pic_url ?? null,
       account_created_year: null,
+      is_restricted: false,
     };
   } catch {
     return null;
   }
+}
+
+// Confirma que el handle existe en IG pero está restricted. El endpoint
+// /v2/instagram/user/posts devuelve `isRestricted:true` con status 200
+// cuando es realmente restricted (vs 404 si no existe). Diferenciar
+// importa porque si el user puso un handle inexistente queremos fallar
+// el scan en vez de armar un análisis fantasma.
+async function confirmRestrictedViaPosts(handle: string, scKey: string): Promise<boolean> {
+  try {
+    const res = await fetchWithTimeout(
+      `https://api.scrapecreators.com/v2/instagram/user/posts?handle=${encodeURIComponent(handle)}`,
+      { headers: { "x-api-key": scKey } },
+      10000,
+    );
+    if (!res.ok) return false;
+    const j = (await res.json().catch(() => null)) as {
+      isRestricted?: boolean;
+      message?: string;
+    } | null;
+    return j?.isRestricted === true || (!!j?.message && /restricted/i.test(j.message));
+  } catch {
+    return false;
+  }
+}
+
+// Snapshot mínimo para cuenta confirmada como restricted. El AI lo va
+// a evaluar tomando is_restricted=true como deal-breaker (regla en el
+// system prompt). No tenemos bio/followers/pic porque IG los oculta.
+function makeRestrictedSnapshot(username: string): IgProfileSnapshot {
+  return {
+    username,
+    full_name: null,
+    biography: null,
+    followers_count: null,
+    following_count: null,
+    posts_count: null,
+    is_verified: null,
+    is_private: null,
+    is_business_account: null,
+    external_url: null,
+    profile_pic_url: null,
+    account_created_year: null,
+    is_restricted: true,
+  };
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit, ms = 8000): Promise<Response> {
@@ -462,6 +556,13 @@ Privada: ${snapshot.is_private ? "sí" : "no"}
 Cuenta business: ${snapshot.is_business_account ? "sí" : "no"}
 Link externo: ${snapshot.external_url ?? "(ninguno)"}
 Foto de perfil: ${snapshot.profile_pic_url ? "sí, la veo" : "no tiene"}
+Restringida por IG: ${snapshot.is_restricted ? "SÍ — IG ocultó la cuenta a viewers no-loggeados (deal-breaker)" : "no"}${
+    snapshot.is_restricted
+      ? `
+
+NOTA: la cuenta está marcada como restringida por IG, así que no tenemos visibilidad sobre bio, followers, ni foto desde un viewer no-loggeado. Evaluá pensando que las creators target reciben el DM y al chequear el perfil van a topar con un muro / aviso de cuenta restringida — eso baja la confianza al piso. Aplicá la regla del deal-breaker.`
+      : ""
+  }
 
 Devolvé el JSON de evaluación.`;
 

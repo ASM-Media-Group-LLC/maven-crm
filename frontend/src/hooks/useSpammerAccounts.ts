@@ -41,6 +41,10 @@ export interface SpammerAccount {
   following_count: number | null;
   posts_count: number | null;
   is_verified: boolean | null;
+  // IG marca la cuenta como restringida → oculta a viewers no-loggeados.
+  // Deal-breaker para outreach: las creators target no pueden ver la
+  // cuenta sin estar logueadas. (migration 20260511090000).
+  is_restricted: boolean | null;
   // Análisis IA — null hasta que el scan corra.
   ai_score: number | null;
   ai_analysis: SpammerAccountAiAnalysis | null;

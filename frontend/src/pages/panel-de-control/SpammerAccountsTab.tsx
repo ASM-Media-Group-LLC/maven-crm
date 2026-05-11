@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Instagram,
   Loader2,
+  Lock,
   RefreshCw,
   Search,
   Sparkles,
@@ -344,10 +345,19 @@ const SpammerCard = ({
       <div className="flex items-start gap-3 p-4">
         <Avatar src={r.profile_pic_url} fallback={r.instagram_handle} size={48} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="truncate font-mono text-sm font-semibold">@{r.instagram_handle}</span>
             {r.is_verified && (
               <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-sky-400" />
+            )}
+            {r.is_restricted && (
+              <span
+                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300"
+                title="IG marcó la cuenta como restringida — oculta a viewers no-loggeados."
+              >
+                <Lock className="h-2.5 w-2.5" />
+                Restringida
+              </span>
             )}
           </div>
           <p className="truncate text-xs text-muted-foreground">
@@ -645,6 +655,26 @@ const SpammerDetailDialog = ({
           </div>
         </DialogHeader>
 
+        {/* Restricted banner — deal-breaker para outreach */}
+        {r.is_restricted && (
+          <div className="rounded-lg border border-rose-500/50 bg-rose-500/10 p-3">
+            <div className="flex items-start gap-2">
+              <Lock className="h-4 w-4 mt-0.5 shrink-0 text-rose-400" />
+              <div className="text-xs leading-relaxed">
+                <span className="font-semibold text-rose-400 uppercase tracking-wider text-[10px] block mb-1">
+                  IG marcó la cuenta como restringida
+                </span>
+                <span className="text-foreground/80">
+                  IG la oculta a viewers no-loggeados. Cuando esta cuenta le mande DM a una creadora, lo más
+                  probable es que el perfil le aparezca con muro de login o aviso de cuenta restringida —
+                  no van a poder validar quién manda el mensaje. Típicamente pasa por contenido NSFW, patrones
+                  de spam previos, reportes de usuarios, o cuenta sin verificar mail/teléfono.
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Bio */}
         {r.bio && (
           <div className="rounded-md border border-border/40 bg-muted/20 p-3 text-xs italic text-foreground/80">
@@ -893,6 +923,15 @@ const StatListDialog = ({
                         </span>
                         {r.is_verified && (
                           <CheckCircle2 className="h-3 w-3 shrink-0 text-sky-400" />
+                        )}
+                        {r.is_restricted && (
+                          <span
+                            className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300"
+                            title="IG marcó la cuenta como restringida — las creators target no pueden verla sin login."
+                          >
+                            <Lock className="h-2.5 w-2.5" />
+                            Restringida
+                          </span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">

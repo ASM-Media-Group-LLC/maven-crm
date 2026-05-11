@@ -1280,7 +1280,21 @@ const SpammerAccountsSection = () => {
   const [newDisplayName, setNewDisplayName] = useState("");
   const [newNiche, setNewNiche] = useState<AccountNiche | "">("");
 
-  const cleanedHandle = newHandle.trim().replace(/^@+/, "");
+  // Parser flexible: acepta handle pelado ("kash_creators"), con @
+  // ("@kash_creators") O URL completa de IG
+  // ("https://instagram.com/kash_creators/" o "instagram.com/kash_creators?hl=es").
+  // Extrae el handle limpio.
+  const cleanedHandle = (() => {
+    const raw = newHandle.trim();
+    if (!raw) return "";
+    // URL match
+    const m = raw.match(
+      /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([A-Za-z0-9._]+)/i,
+    );
+    if (m && m[1]) return m[1].replace(/\/+$/, "");
+    // Handle con o sin @
+    return raw.replace(/^@+/, "").replace(/\/+$/, "");
+  })();
   const handleError =
     cleanedHandle.length > 0 && !IG_HANDLE_REGEX.test(cleanedHandle)
       ? "Solo letras, números, puntos y guiones bajos (máx 30)."
@@ -1374,7 +1388,7 @@ const SpammerAccountsSection = () => {
                     <Input
                       value={newHandle}
                       onChange={(e) => setNewHandle(e.target.value)}
-                      placeholder="handle_de_instagram"
+                      placeholder="handle o link de IG"
                       className={`h-8 text-xs rounded-l-none ${handleError ? "border-destructive" : ""}`}
                       autoCapitalize="none"
                       autoCorrect="off"
@@ -1383,6 +1397,11 @@ const SpammerAccountsSection = () => {
                   </div>
                   {handleError && (
                     <p className="mt-0.5 text-[10px] text-destructive">{handleError}</p>
+                  )}
+                  {!handleError && cleanedHandle && cleanedHandle !== newHandle.trim().replace(/^@+/, "") && (
+                    <p className="mt-0.5 text-[10px] text-emerald-500">
+                      Detectado: @{cleanedHandle}
+                    </p>
                   )}
                 </div>
 
