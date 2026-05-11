@@ -30,7 +30,8 @@ interface Props {
   creator: CreatorWithBusiness;
 }
 
-const CATEGORIES = ["A+", "A", "B+", "B", "C"] as const;
+// A++ incluida — match con Closers QA y otros lugares de la app.
+const CATEGORIES = ["A++", "A+", "A", "B+", "B", "C"] as const;
 
 const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   const [form, setForm] = useState({

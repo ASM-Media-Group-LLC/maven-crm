@@ -43,7 +43,7 @@ const countryOptions = [
 ];
 
 const agencyOptions = ["Atomic Agency", "Elite Models", "Kash Agency", "Trafix", "Unlok Platform", "Otra"];
-const categoryOptions = ["A+", "A", "B+", "B", "C"];
+const categoryOptions = ["A++", "A+", "A", "B+", "B", "C"];
 const managerOptions = ["Full Management", "Hybrid", "Basic"];
 
 const countryToCode: Record<string, string> = {

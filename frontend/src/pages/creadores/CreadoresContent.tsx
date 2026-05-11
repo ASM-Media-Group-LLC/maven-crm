@@ -9,6 +9,7 @@ import CreadoresTable from "./CreadoresTable";
 import CreadoresGrid from "./CreadoresGrid";
 import CreadoresSubtabs from "./CreadoresSubtabs";
 import { useCreadores, type CreadorFilters } from "./useCreadores";
+import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -34,6 +35,11 @@ const CreadoresContent = () => {
 
   const { creators, allCreators, isLoading, statusCounts, agencies, categories, countries, cities, managers, totalCount, totalPages } =
     useCreadores(filters, page, pageSize);
+
+  // Compañías = scouter_companies.name. Fuente única para el filtro de
+  // listado y para cualquier input de compañía que enchufemos a futuro.
+  const { data: scouterCompanies = [] } = useScouterCompanies();
+  const companyOptions = scouterCompanies.map((c) => c.name);
 
   const updateFilters = (patch: Partial<CreadorFilters>) => {
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -70,27 +76,10 @@ const CreadoresContent = () => {
           <CreadoresSubtabs />
 
           {/* KPI cards removidos — la info ya vive en el dashboard. El
-              listado queda enfocado solo en la tabla/grid. */}
-
-          <div className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-            <Button
-              variant={filters.agency === "" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => updateFilters({ agency: "" })}
-            >
-              Todas
-            </Button>
-            {agencies.map((agency) => (
-              <Button
-                key={agency}
-                variant={filters.agency === agency ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => updateFilters({ agency })}
-              >
-                {agency}
-              </Button>
-            ))}
-          </div>
+              listado queda enfocado solo en la tabla/grid. La fila de
+              botones de agency también — ahora vive como filtro
+              "Compañías" en CreadoresFilters, alimentado desde la
+              tabla scouter_companies (única fuente de verdad). */}
 
           <div className="shrink-0">
             <CreadoresFilters
@@ -100,9 +89,10 @@ const CreadoresContent = () => {
               countries={countries}
               cities={cities}
               managers={managers}
+              companies={companyOptions}
               view={view}
               onViewChange={setView}
-              hasActiveFilters={!!(filters.search || filters.status || filters.category || filters.country || filters.city || filters.manager)}
+              hasActiveFilters={!!(filters.search || filters.status || filters.category || filters.country || filters.city || filters.manager || filters.agency)}
               onClear={() => setFilters(emptyFilters)}
             />
           </div>

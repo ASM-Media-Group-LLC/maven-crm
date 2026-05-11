@@ -33,6 +33,7 @@ const STATUSES = [
   { value: "terminated", label: "Terminada" },
 ];
 const CATEGORIES = [
+  { value: "A++", label: "A++ (Top Tier)" },
   { value: "A+", label: "A+ (Premium)" },
   { value: "A", label: "A (Alta)" },
   { value: "B+", label: "B+ (Media Alta)" },

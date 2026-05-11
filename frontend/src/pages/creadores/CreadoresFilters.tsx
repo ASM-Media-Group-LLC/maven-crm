@@ -17,6 +17,9 @@ interface Props {
   countries: string[];
   cities: string[];
   managers: string[];
+  // Compañías centralizadas en scouter_companies — fuente única para el
+  // filtro y para cualquier input de compañía en el resto de la app.
+  companies: string[];
   view: "table" | "grid";
   onViewChange: (v: "table" | "grid") => void;
   hasActiveFilters?: boolean;
@@ -30,6 +33,7 @@ const CreadoresFilters = ({
   countries,
   cities,
   managers,
+  companies,
   view,
   onViewChange,
   hasActiveFilters,
@@ -75,6 +79,14 @@ const CreadoresFilters = ({
       value={filters.manager}
       options={managers}
       onChange={(v) => onChange({ manager: v })}
+    />
+    {/* Compañías — fuente única scouter_companies, reemplaza la fila de
+        botones de agency que estaba arriba del listado. */}
+    <FilterSelect
+      placeholder="Compañías"
+      value={filters.agency}
+      options={companies}
+      onChange={(v) => onChange({ agency: v })}
     />
 
     {hasActiveFilters && onClear && (
