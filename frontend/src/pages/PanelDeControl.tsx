@@ -410,6 +410,8 @@ const PanelDeControl = () => {
     onHold: 0,
     rejections: 0,
     enteredCrm: 0,
+    crmAltas: 0,
+    crmBajas: 0,
     totalLeads: 0,
   };
 
@@ -429,7 +431,7 @@ const PanelDeControl = () => {
     { stage: "Núm. obtenidos",  value: k.numbersObtained,  fill: "#06b6d4" },
     { stage: "Llamadas",        value: k.closerCalls,      fill: "#8b5cf6" },
     { stage: "Cierres",         value: k.closes,           fill: "#10b981" },
-    { stage: "Ingresos CRM",    value: k.enteredCrm,       fill: "#6366f1" },
+    { stage: "Mov. CRM (neto)", value: k.crmAltas - k.crmBajas, fill: "#6366f1" },
   ];
 
   const cards: Array<{
@@ -490,11 +492,15 @@ const PanelDeControl = () => {
     },
     {
       key: "enteredCrm",
-      label: "Ingresos al CRM",
-      value: k.enteredCrm,
+      // "Movimientos del CRM" = altas - bajas netas del estado
+      // blu_infloww_active. value se usa para el orden ascendente/
+      // descendente del card; mostramos el neto. La descomposición
+      // ↑X / ↓Y vive en el render abajo via hint.
+      label: "Movimientos del CRM",
+      value: k.crmAltas - k.crmBajas,
       icon: <Building2 className="h-5 w-5 text-white" />,
       gradient: "bg-indigo-500",
-      hint: "Closer marcó como ingresada al CRM",
+      hint: `↑ ${k.crmAltas.toLocaleString("es")} altas  ·  ↓ ${k.crmBajas.toLocaleString("es")} bajas`,
     },
   ];
 
@@ -688,7 +694,7 @@ const PanelDeControl = () => {
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
           <FunnelStep label="Cierres" value={k.closes} color="text-emerald-400" />
           <ArrowRight className="h-3 w-3 text-muted-foreground" />
-          <FunnelStep label="Ingresos CRM" value={k.enteredCrm} color="text-indigo-400" />
+          <FunnelStep label="Mov. CRM" value={k.crmAltas - k.crmBajas} color="text-indigo-400" />
         </div>
       </Card>
 

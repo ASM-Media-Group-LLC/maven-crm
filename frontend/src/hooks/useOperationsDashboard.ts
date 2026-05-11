@@ -31,7 +31,9 @@ export interface OperationsKpis {
   closes: number;          // Cerró (call_outcome=cerro)
   onHold: number;          // En espera (call_outcome=en_espera)
   rejections: number;      // Rechazos (call_outcome=no_cerro)
-  enteredCrm: number;      // Ingresada al CRM (creators.entered_crm_at)
+  enteredCrm: number;      // [DEPRECATED] Ingresada al CRM por entered_crm_at (legacy)
+  crmAltas: number;        // ↑ Movimientos del CRM: creators que pasaron a blu_infloww_active=true netos en el período
+  crmBajas: number;        // ↓ Movimientos del CRM: creators que pasaron a false netos en el período
   totalLeads: number;      // LLG + Scouter — el verdadero "total contactadas"
 }
 
@@ -101,6 +103,7 @@ export const useOperationsDashboard = (range: DashboardRange) =>
         { count: onHold },
         { count: rejections },
         { count: enteredCrm },
+        crmMovementsRes,
       ] = await Promise.all([
         head("leadgen_entries", "created_at"),
         // Scouter "contactadas" = lead con first_scouter_contact_at
@@ -127,7 +130,16 @@ export const useOperationsDashboard = (range: DashboardRange) =>
         head("creators", "entered_crm_at", (q) =>
           q.not("entered_crm_at", "is", null),
         ),
+        // Movimientos del CRM — RPC que computa altas/bajas NETAS de
+        // creator.blu_infloww_active en el rango. NULLs OK: el RPC
+        // los trata como "desde el principio" / "hasta ahora".
+        (supabase as any).rpc("crm_movements_in_range", {
+          p_from: fromIso ?? null,
+          p_to: toIsoVal ?? null,
+        }),
       ]);
+
+      const crmMov = (crmMovementsRes as any)?.data ?? { altas: 0, bajas: 0 };
 
       return {
         contacted: contacted ?? 0,
@@ -145,6 +157,8 @@ export const useOperationsDashboard = (range: DashboardRange) =>
         onHold: onHold ?? 0,
         rejections: rejections ?? 0,
         enteredCrm: enteredCrm ?? 0,
+        crmAltas: crmMov.altas ?? 0,
+        crmBajas: crmMov.bajas ?? 0,
         totalLeads: (contacted ?? 0) + (scouterTotal ?? 0),
       };
     },
