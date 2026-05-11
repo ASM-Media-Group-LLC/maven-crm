@@ -18,7 +18,7 @@
 // y queda inhabilitado hasta que migremos a `/v2/instagram/reels/search`
 // o usemos otra estrategia.
 
-import { recordSpend } from "./budget.ts";
+import { markCreditsDepleted, recordSpend } from "./budget.ts";
 
 const API_KEY = process.env.SCRAPECREATORS_API_KEY;
 const BASE_URL = process.env.SCRAPECREATORS_BASE_URL ?? "https://api.scrapecreators.com";
@@ -32,7 +32,22 @@ if (!API_KEY) {
 // telemetría de budget siga comparable durante el cutover.
 const COST_PER_REQUEST_USD = 0.0023;
 
-// Helper genérico — agrega auth header + chequeos comunes.
+// Detector de respuestas "sin créditos en la cuenta" de ScrapeCreators.
+// Cubre:
+//   · HTTP 402 Payment Required (estándar para "pagá").
+//   · HTTP 403/429 cuyo body menciona credit/insufficient/depleted/balance.
+const CREDIT_DEPLETED_RE =
+  /credit|insufficient|depleted|exhausted|balance|out of (credits|funds)/i;
+
+function looksLikeCreditDepleted(status: number, body: string): boolean {
+  if (status === 402) return true;
+  if ((status === 403 || status === 429) && CREDIT_DEPLETED_RE.test(body)) return true;
+  return false;
+}
+
+// Helper genérico — agrega auth header + chequeos comunes. Si la API
+// responde "credit depleted", seteamos cooldown global ANTES de tirar
+// el error, así el queue (queue.ts) puede detectarlo y rescheduleNoAttempt.
 async function scFetch<T>(path: string, params: Record<string, string>): Promise<T> {
   if (!API_KEY) throw new Error("SCRAPECREATORS_API_KEY no configurada.");
   const url = new URL(BASE_URL + path);
@@ -43,6 +58,13 @@ async function scFetch<T>(path: string, params: Record<string, string>): Promise
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
+    if (looksLikeCreditDepleted(res.status, text)) {
+      const errMsg = `ScrapeCreators credits depleted (${res.status}): ${text.slice(0, 200) || res.statusText}`;
+      await markCreditsDepleted(errMsg);
+      // Mensaje con prefijo reconocible para que queue.ts lo trate como
+      // rescheduleNoAttempt en vez de consumir un attempt del job.
+      throw new Error(`scrapecreators-credits-depleted: ${errMsg}`);
+    }
     throw new Error(`ScrapeCreators ${path} ${res.status}: ${text || res.statusText}`);
   }
   return (await res.json()) as T;

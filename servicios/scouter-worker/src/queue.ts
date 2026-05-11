@@ -91,15 +91,22 @@ async function markFailed(
   if (error) console.error("markFailed error", error);
 }
 
-// Detecta el error de Apify "Monthly usage hard limit exceeded" (429
-// con ese cuerpo). En esos casos el job NO está realmente fallando — el
-// proveedor está pausado, hay que esperar al reset (1° del mes o
-// recarga manual del usuario). Si dejamos que se cuente como attempt
-// normal, los 3 reintentos del cooldown se gastan en un par de minutos
-// y el job queda failed permanente, perdiendo trabajo legítimo.
-function isApifyQuotaError(msg: string): boolean {
-  return /Monthly usage hard limit|usage limit (has been )?reached|quota.*exceeded|usage.*restricted/i
-    .test(msg);
+// Detecta errores de "el proveedor está pausado" — el job no está
+// realmente fallando, hay que esperar al reset (cuota mensual de Apify,
+// recarga de créditos de ScrapeCreators, o reset diario del cap local).
+// Si dejamos que cuenten como attempt normal, los 3 reintentos se
+// gastan en un par de minutos y el job queda failed permanente,
+// perdiendo trabajo legítimo. Mejor: dejarlo en queued para que el
+// próximo tick lo retome cuando el cooldown se levante.
+function isProviderPausedError(msg: string): boolean {
+  return (
+    // Apify (legacy)
+    /Monthly usage hard limit|usage limit (has been )?reached|quota.*exceeded|usage.*restricted/i.test(msg) ||
+    // ScrapeCreators credits depleted (prefijo seteado por scrapecreators.ts)
+    /scrapecreators-credits-depleted/i.test(msg) ||
+    // checkBudget refusing — daily cap o cooldown global
+    /Daily ScrapeCreators budget agotado|ScrapeCreators sin cr[eé]ditos/i.test(msg)
+  );
 }
 
 // Rollback del attempt incrementado en markRunning + devuelve el job a
@@ -111,7 +118,7 @@ async function rescheduleNoAttempt(job: ScouterJob, errMsg: string): Promise<voi
       status: "queued",
       attempts: job.attempts, // restaura — markRunning había puesto attempts+1
       started_at: null,
-      last_error: `apify-quota: ${errMsg.slice(0, 800)}`,
+      last_error: `provider-paused: ${errMsg.slice(0, 800)}`,
     })
     .eq("id", job.id);
   if (error) console.error("rescheduleNoAttempt error", error);
@@ -171,9 +178,9 @@ export async function processOne(job: ScouterJob): Promise<void> {
       // tick lo reintenta cuando vuelva el budget — por reset mensual o
       // recarga del usuario. Sin esto, 3 reintentos rápidos consumen
       // los attempts y el job queda failed permanente.
-      if (isApifyQuotaError(failMsg)) {
+      if (isProviderPausedError(failMsg)) {
         await rescheduleNoAttempt(job, failMsg);
-        console.warn(`[${job.id}] apify-quota — keeping queued (no attempt consumed)`);
+        console.warn(`[${job.id}] provider-paused — keeping queued (no attempt consumed)`);
         return;
       }
       const exhausted = job.attempts + 1 >= job.max_attempts;
@@ -184,9 +191,9 @@ export async function processOne(job: ScouterJob): Promise<void> {
     }
   } catch (e) {
     const msg = (e as Error).message ?? String(e);
-    if (isApifyQuotaError(msg)) {
+    if (isProviderPausedError(msg)) {
       await rescheduleNoAttempt(job, msg);
-      console.warn(`[${job.id}] apify-quota — keeping queued (no attempt consumed)`);
+      console.warn(`[${job.id}] provider-paused — keeping queued (no attempt consumed)`);
       return;
     }
     const exhausted = job.attempts + 1 >= job.max_attempts;
