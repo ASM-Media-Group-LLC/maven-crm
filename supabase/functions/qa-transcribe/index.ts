@@ -211,6 +211,24 @@ serve(async (req) => {
     // Build diarized transcript from word-level data
     const { diarizedText, audioMetrics } = buildDiarizedOutput(scribeData);
 
+    // Loggea uso para "Control de Gasto". Scribe se cobra por hora de
+    // audio — total_duration_s ya está calculado y es la fuente correcta.
+    if (audioMetrics.total_duration_s > 0) {
+      void (async () => {
+        try {
+          const { logElevenLabsUsage } = await import("../_shared/usage.ts");
+          await logElevenLabsUsage({
+            operation: "qa-transcribe",
+            model: "scribe_v1",
+            audioSeconds: audioMetrics.total_duration_s,
+            characters: rawText.length,
+          });
+        } catch (e) {
+          console.warn("logElevenLabsUsage failed:", (e as Error).message);
+        }
+      })();
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,

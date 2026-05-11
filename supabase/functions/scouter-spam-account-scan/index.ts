@@ -439,7 +439,29 @@ Devolvé el JSON de evaluación.`;
 
   const data = (await res.json()) as {
     content?: Array<{ type: string; text?: string }>;
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    };
   };
+  // Loggea para Control de Gasto (fire-and-forget, no awaitea).
+  if (data.usage) {
+    void (async () => {
+      try {
+        const { logAnthropicUsage } = await import("../_shared/usage.ts");
+        await logAnthropicUsage({
+          operation: "scouter-spam-account-scan",
+          model,
+          usage: data.usage as any,
+          context: { username: snapshot.username },
+        });
+      } catch (e) {
+        console.warn("logAnthropicUsage failed:", (e as Error).message);
+      }
+    })();
+  }
   const raw = (data.content ?? [])
     .filter((c) => c.type === "text" && c.text)
     .map((c) => c.text!)

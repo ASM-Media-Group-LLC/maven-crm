@@ -91,13 +91,14 @@ export async function checkBudget(tenantId: string): Promise<{
 }
 
 /** Suma spend + items al row del día. Crea la row si no existe (PK = day,tenant_id).
- *  itemsProcessed = cantidad de requests reales hechos. spendUsd se mantiene en
- *  est_spend_usd pero ya no se usa para gating (rounding bug hacía que 0.0023 se
- *  redondeara a 0 y nunca acumulara). */
+ *  itemsProcessed = cantidad de requests reales hechos. También loggea en
+ *  api_usage_log para que el dashboard "Control de Gasto" lo vea junto
+ *  con Anthropic y ElevenLabs. */
 export async function recordSpend(
   tenantId: string,
   spendUsd: number,
   itemsProcessed: number,
+  operation = "scouter-worker",
 ): Promise<void> {
   const day = today();
   const { data: existing } = await sb
@@ -123,6 +124,22 @@ export async function recordSpend(
     .upsert(next, { onConflict: "day,tenant_id" });
   if (error) {
     console.error("recordSpend upsert error", error);
+  }
+
+  // Loggea también en api_usage_log para dashboard unificado.
+  // Falla silenciosa (no rompe el job worker si esto falla).
+  try {
+    await sb.from("api_usage_log").insert({
+      provider: "scrapecreators",
+      operation,
+      model: null,
+      units: { requests: itemsProcessed },
+      cost_usd: spendUsd,
+      context: {},
+      tenant_id: tenantId,
+    });
+  } catch (e) {
+    console.warn("api_usage_log insert failed:", (e as Error).message);
   }
 }
 

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SYSTEM_PROMPT } from "./prompt.ts";
+import { logAnthropicUsage } from "../_shared/usage.ts";
 
 // qa-analyze — corre el análisis con Claude (Anthropic API) de un
 // qa_calls.id existente. Migrado de Gemini/Groq → Anthropic para igualar
@@ -367,6 +368,17 @@ serve(async (req) => {
       .single();
 
     if (updateErr) throw updateErr;
+
+    // Loggea uso para el dashboard "Control de Gasto". No await crítico
+    // — si falla el insert, no rompe la response al cliente.
+    if (usage) {
+      void logAnthropicUsage({
+        operation: "qa-analyze",
+        model: CLAUDE_MODEL,
+        usage: usage as any,
+        context: { qa_call_id: callId, score },
+      });
+    }
 
     return new Response(
       JSON.stringify({

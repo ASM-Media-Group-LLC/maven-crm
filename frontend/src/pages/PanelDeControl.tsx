@@ -46,6 +46,7 @@ import {
 } from "@/hooks/useOperationsDashboard";
 import { cn } from "@/lib/utils";
 import SpammerAccountsTab from "./panel-de-control/SpammerAccountsTab";
+import ControlGastoTab from "./panel-de-control/ControlGastoTab";
 
 // ─── KPI card ──────────────────────────────────────────────────────────
 
@@ -523,7 +524,7 @@ const PanelDeControl = () => {
   const activeMetricLabel =
     cards.find((c) => c.key === openMetric)?.label ?? "";
 
-  const [tab, setTab] = useState<"modelos" | "chatters" | "cuentas-spammer">("modelos");
+  const [tab, setTab] = useState<"modelos" | "chatters" | "cuentas-spammer" | "control-gasto">("modelos");
 
   return (
     // El layout app envuelve cada page en un wrapper con overflow-hidden.
@@ -545,7 +546,7 @@ const PanelDeControl = () => {
         />
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "modelos" | "chatters" | "cuentas-spammer")}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "modelos" | "chatters" | "cuentas-spammer" | "control-gasto")}>
         <TabsList>
           <TabsTrigger value="modelos">Reclutamiento modelos</TabsTrigger>
           <TabsTrigger value="cuentas-spammer" className="gap-1.5">
@@ -553,10 +554,15 @@ const PanelDeControl = () => {
             Cuentas spammer
           </TabsTrigger>
           <TabsTrigger value="chatters">Reclutamiento chatters</TabsTrigger>
+          <TabsTrigger value="control-gasto">Control de Gasto</TabsTrigger>
         </TabsList>
 
         <TabsContent value="cuentas-spammer" className="mt-4">
           <SpammerAccountsTab />
+        </TabsContent>
+
+        <TabsContent value="control-gasto" className="mt-4">
+          <ControlGastoTab />
         </TabsContent>
 
         <TabsContent value="chatters" className="mt-4">
