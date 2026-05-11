@@ -129,7 +129,13 @@ const CreadoresGrid = ({ creators }: Props) => {
                           {statusLabel[c.status] ?? c.status}
                         </Badge>
                       )}
-                      
+                      {/* Indicador Blu/Infloww — read-only en grid view.
+                          Toggle real con confirmación vive en la tabla. */}
+                      {((c as any).blu_infloww_active ?? false) && (
+                        <Badge variant="success-soft" className="text-[10px] px-1.5 py-0">
+                          Blu
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
