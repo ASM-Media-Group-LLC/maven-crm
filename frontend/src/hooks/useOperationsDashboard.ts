@@ -45,7 +45,11 @@ export type MetricKey =
   | "onHold"
   | "rejections"
   | "enteredCrm"
-  | "totalLeads";
+  | "totalLeads"
+  // Pool entero de descubrimiento (leadgen + scouter sin filtrar por
+  // first_scouter_contact_at). Para el card "Total leads generados".
+  // Distinto de totalLeads que solo cuenta los contactados.
+  | "totalGenerated";
 
 export interface DashboardRange {
   from: Date | undefined;
@@ -398,6 +402,54 @@ export const useMetricDetails = (
               category: r.creator?.category ?? undefined,
               leadSource: "creator" as const,
             })),
+          };
+        }
+        case "totalGenerated": {
+          // Pool ENTERO de descubrimiento: leadgen (todas las rows) +
+          // scouter_leads (TODAS, no solo las contactadas). Distinto
+          // de totalLeads que filtra scouter por first_scouter_contact_at.
+          // Para el card "Total leads generados".
+          const countQ1 = sb.from("leadgen_entries").select("*", { count: "exact", head: true });
+          const countQ2 = sb.from("scouter_leads").select("*", { count: "exact", head: true });
+          const q1 = sb
+            .from("leadgen_entries")
+            .select("id, model_handle, phone_e164, status, category_code, created_at")
+            .order("created_at", { ascending: false })
+            .limit(50);
+          const q2 = sb
+            .from("scouter_leads")
+            .select("id, instagram_handle, phone, status, category, created_at")
+            .order("created_at", { ascending: false })
+            .limit(50);
+          const [c1, c2, a, b] = await Promise.all([
+            dateLte(dateGte(countQ1, "created_at"), "created_at"),
+            dateLte(dateGte(countQ2, "created_at"), "created_at"),
+            dateLte(dateGte(q1, "created_at"), "created_at"),
+            dateLte(dateGte(q2, "created_at"), "created_at"),
+          ]);
+          const aRows = (a.data ?? []).map((r: any) => ({
+            id: r.id,
+            primary: `@${r.model_handle ?? "?"}`,
+            secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
+            date: r.created_at,
+            badge: "leadgen",
+            category: r.category_code ?? undefined,
+            leadSource: "leadgen" as const,
+          }));
+          const bRows = (b.data ?? []).map((r: any) => ({
+            id: r.id,
+            primary: `@${r.instagram_handle ?? "?"}`,
+            secondary: r.phone ? `📞 ${r.phone}` : "Sin número",
+            date: r.created_at,
+            badge: "scouter",
+            category: r.category ?? undefined,
+            leadSource: "scouter" as const,
+          }));
+          return {
+            totalCount: (c1.count ?? 0) + (c2.count ?? 0),
+            rows: [...aRows, ...bRows].sort((x, y) =>
+              (y.date ?? "") < (x.date ?? "") ? -1 : 1,
+            ),
           };
         }
       }

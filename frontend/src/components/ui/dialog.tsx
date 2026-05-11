@@ -27,13 +27,18 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
-// Estética por default para TODOS los Dialog del proyecto:
-//   · rounded-2xl (más esquinas redondeadas, antes era sm:rounded-lg)
-//   · gradient sutil del card al card/95 — da profundidad sin saturar
-//   · border más suave (border-border/40)
-//   · shadow-2xl + ring sutil — efecto de "elevación" más marcado
-// Las páginas que necesiten otro estilo pasan className específico
-// que sobrescribe vía cn() (ej. p-0 para popups con header propio).
+// Estética por default para TODOS los Dialog del proyecto. Tomamos
+// el mismo degradado que usa el header de Agency QA (que el user
+// validó visualmente): from-primary/15 via-card to-card — tinte de
+// color principal en la esquina superior-izquierda que se difumina
+// hacia el resto del card.
+//
+// La X de cerrar:
+//   · top-3 right-3 (antes top-4 — sale del header bonito)
+//   · z-10 + bg-background/80 backdrop-blur — para que sea legible
+//     sobre cualquier contenido y NO se confunda con botones cercanos
+//   · padding wrapper más generoso → click area más grande pero sin
+//     pisar contenido
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
@@ -43,15 +48,15 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-border/40 bg-gradient-to-br from-card via-card to-card/95 p-6 shadow-2xl ring-1 ring-white/5 duration-200",
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-border/60 bg-gradient-to-br from-primary/15 via-card to-card p-6 shadow-2xl ring-1 ring-white/5 duration-200",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-        "rounded-2xl",
+        "rounded-3xl",
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-1 opacity-70 ring-offset-background transition-all hover:bg-muted hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+      <DialogPrimitive.Close className="absolute right-3 top-3 z-10 rounded-full bg-background/60 p-1.5 opacity-70 backdrop-blur-sm ring-offset-background transition-all hover:bg-muted hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>

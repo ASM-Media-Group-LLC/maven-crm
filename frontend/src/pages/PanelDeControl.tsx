@@ -338,51 +338,32 @@ const DetailDialog = ({
     title: string;
   } | null>(null);
 
-  // Agrupado pre-computado. Si NO hay categorías reales, agrupamos
-  // por badge (status / source / outcome) para que el popup siempre
-  // tenga estructura visual con headers — no quede plano y sin
-  // diseño como el user reportó.
-  //
-  // El user dijo: "se aplicó pero el cuadro de total leads generados
-  // y modelos contactadas se sigue mostrando con el diseño feo".
-  // Eso pasa porque la mayoría de leadgen_entries tienen category_code
-  // = null, entonces hasCategory era false y caía al render plano sin
-  // grupos. Ahora siempre tiene grupos.
+  // SIEMPRE agrupamos por category. Si la row no tiene category,
+  // cae al bucket "Sin categoría" al final del orden canónico
+  // (Elite → A+ → A → B+ → B → C+ → C → Sin categoría). El user
+  // pidió: "filtra por categorías Elite, A+, no por leadgen". Antes
+  // la heurística cambiaba a agrupar por badge (leadgen/scouter)
+  // cuando ningún row tenía category — confuso. Ahora siempre por
+  // category, los sin clasificar quedan al final visibles.
   const groups = useMemo(() => {
     if (!data || data.length === 0) {
-      return { hasCategory: false, groupedBy: "none" as const, list: [] as Array<{ cat: string; rows: DetailRow[] }> };
+      return { hasCategory: false, list: [] as Array<{ cat: string; rows: DetailRow[] }> };
     }
-    const hasCategory = data.some((r) => r.category);
-    // Decide qué campo usar para agrupar:
-    // 1. category (si al menos uno la tiene → Elite/A+/etc).
-    // 2. badge (status/source/outcome — siempre tiene).
-    const groupBy: "category" | "badge" = hasCategory ? "category" : "badge";
-    const fallbackLabel = hasCategory ? "Sin categoría" : "Sin clasificar";
     const map = new Map<string, DetailRow[]>();
     for (const r of data) {
-      const raw = groupBy === "category" ? r.category : r.badge;
-      const key = raw ?? fallbackLabel;
+      const key = r.category ?? "Sin categoría";
       const arr = map.get(key) ?? [];
       arr.push(r);
       map.set(key, arr);
     }
     const sortedKeys = Array.from(map.keys()).sort((a, b) => {
-      // Si agrupamos por category, usamos CATEGORY_ORDER.
-      if (groupBy === "category") {
-        const sa = CATEGORY_ORDER[a] ?? 999;
-        const sb = CATEGORY_ORDER[b] ?? 999;
-        if (sa !== sb) return sa - sb;
-      } else {
-        // Por badge: ordenamos por mayor cantidad primero (más relevante).
-        const ca = map.get(a)!.length;
-        const cb = map.get(b)!.length;
-        if (ca !== cb) return cb - ca;
-      }
+      const sa = CATEGORY_ORDER[a] ?? 999;
+      const sb = CATEGORY_ORDER[b] ?? 999;
+      if (sa !== sb) return sa - sb;
       return a.localeCompare(b);
     });
     return {
-      hasCategory: true, // ahora siempre tenemos grupos visualmente
-      groupedBy: groupBy,
+      hasCategory: true,
       list: sortedKeys.map((cat) => ({ cat, rows: map.get(cat)! })),
     };
   }, [data]);
@@ -1055,7 +1036,7 @@ const PanelDeControl = () => {
       <div className="grid gap-3 sm:grid-cols-2">
         <button
           type="button"
-          onClick={() => setOpenMetric("totalLeads")}
+          onClick={() => setOpenMetric("totalGenerated")}
           className="group relative overflow-hidden rounded-xl border-2 border-indigo-500/30 bg-card p-5 text-left transition-all duration-200 hover:scale-[1.015] hover:border-indigo-500/60 hover:shadow-[0_0_24px_-4px_rgba(99,102,241,0.4)]"
         >
           <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-30 bg-indigo-500 transition-opacity group-hover:opacity-50" />
