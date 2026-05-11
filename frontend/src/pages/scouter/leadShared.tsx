@@ -300,18 +300,37 @@ export const LeadDrawer = ({
                 </>
               )}
             </div>
-            {/* Score */}
-            {aiScore != null && (
-              <div className="text-right shrink-0">
-                <div
-                  className="text-2xl font-extrabold tabular-nums leading-none"
-                  style={{ color: sc }}
-                >
-                  {aiScore.toFixed(1)}
+            {/* Score + Favorite — el botón de favorito vive acá al lado del
+                score (no en el footer) para liberar el "Guardar" a ancho
+                completo. */}
+            <div className="flex items-center gap-2 shrink-0">
+              {aiScore != null && (
+                <div className="text-right">
+                  <div
+                    className="text-2xl font-extrabold tabular-nums leading-none"
+                    style={{ color: sc }}
+                  >
+                    {aiScore.toFixed(1)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">score</div>
                 </div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">score</div>
-              </div>
-            )}
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  toggleFavoriteMut.mutate({ leadId: lead.id, isFavorite })
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-md border transition-colors hover:bg-muted"
+                aria-label={isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
+              >
+                <Star
+                  className="h-4 w-4"
+                  fill={isFavorite ? "rgb(251 191 36)" : "transparent"}
+                  stroke={isFavorite ? "rgb(251 191 36)" : "currentColor"}
+                  strokeWidth={2}
+                />
+              </button>
+            </div>
           </div>
 
           {/* Score bar */}
@@ -613,37 +632,22 @@ export const LeadDrawer = ({
               Contactar
             </a>
           )}
-          {/* Favorite + Guardar */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() =>
-                toggleFavoriteMut.mutate({ leadId: lead.id, isFavorite })
-              }
-              className="flex h-8 w-8 items-center justify-center rounded-md border transition-colors hover:bg-muted"
-              aria-label={isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
-            >
-              <Star
-                className="h-4 w-4"
-                fill={isFavorite ? "rgb(251 191 36)" : "transparent"}
-                stroke={isFavorite ? "rgb(251 191 36)" : "currentColor"}
-                strokeWidth={2}
-              />
-            </button>
-            <Button
-              size="sm"
-              className="flex-1 gap-1"
-              onClick={handleSave}
-              disabled={update.isPending || Object.keys(draft).length === 0}
-            >
-              {update.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Save className="h-3.5 w-3.5" />
-              )}
-              Guardar
-            </Button>
-          </div>
+          {/* Guardar — el favorito se movió arriba al lado del score,
+              así Guardar toma todo el ancho disponible y no queda
+              recortado. */}
+          <Button
+            size="sm"
+            className="w-full gap-1"
+            onClick={handleSave}
+            disabled={update.isPending || Object.keys(draft).length === 0}
+          >
+            {update.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            Guardar
+          </Button>
         </div>
       </DialogContent>
 
