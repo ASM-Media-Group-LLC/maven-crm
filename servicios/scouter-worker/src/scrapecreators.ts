@@ -234,9 +234,11 @@ export async function runHashtagDiscovery(
   if (!clean) return [];
 
   // /v2/instagram/reels/search devuelve reels populares con ese tag.
+  // El query param se llama `query` (no `keyword` — ese era el bug:
+  // la API devolvía 400 "You must provide a query").
   const json = await scFetch<ReelsSearchResponse>(
     "/v2/instagram/reels/search",
-    { keyword: clean, trim: "true" },
+    { query: clean, trim: "true" },
   );
   await recordSpend(tenantId, COST_PER_REQUEST_USD, 1);
 
