@@ -142,19 +142,26 @@ const ScouterAssist = () => {
   return (
     <main className="flex-1 overflow-y-auto p-6">
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
+        {/* Wrapper del logo: items-start + min-h para acomodar la escala
+            del img sin que se superponga con las Tabs de abajo. */}
+        <div className={showLogo ? "flex items-start gap-3 min-h-44" : "flex items-center gap-3"}>
           {showLogo ? (
             // Logo de la compañía filtrada (reemplaza el título).
-            // h-24 = 96px de display real. Antes era h-16 (64px) y se
-            // veía chiquito al lado del whitespace del header — si el
-            // PNG uploaded tiene padding interno transparente, la mitad
-            // se "comía". Con h-24 el logo queda dominante en el header
-            // aún con algo de padding interno. Cap a h-32 (128px) por
-            // si subiste un logo cuadrado grande.
+            // El problema con los PNG subidos: muchos tienen padding
+            // transparente INTERNO (el logo dibujado ocupa, p. ej., 40%
+            // del bitmap y el resto es alpha=0). object-contain respeta
+            // ese padding, así que crecer el container solo agranda el
+            // vacío, no el logo.
+            // Workaround: scale CSS transform sobre el <img> para
+            // agrandar visualmente todo (logo + padding). El logo se
+            // vuelve mucho más prominente; el padding "vacío" se mantiene
+            // alrededor pero la mancha visible de marca crece. La
+            // alternativa real es subir un PNG mejor recortado (lo cual
+            // está fuera de scope acá).
             <img
               src={logoForTheme!}
               alt={activeCompany!.name}
-              className="h-24 max-h-32 w-auto object-contain"
+              className="h-24 w-auto object-contain origin-top-left scale-[1.8]"
             />
           ) : (
             <h1 className="text-2xl font-bold tracking-tight">Maven Scouter Assist</h1>
