@@ -83,22 +83,48 @@ export interface GeminiResult {
 // suelen alcanzar para que la siguiente toque un instante de capacidad
 // libre. Si al 4to intento sigue 503, tiramos el error real.
 export async function callGeminiOnce(opts: GeminiCallOptions): Promise<GeminiResult> {
+  // Retry budget separado para 503 (model overload, transitorio rápido)
+  // y 429 (rate limit / RESOURCE_EXHAUSTED — gemini-2.5-flash es 5 RPM,
+  // o sea 1 request cada ~12s en free tier). El edge function tiene
+  // 60s de timeout total, así que limitamos los waits para no excederlo.
   const MAX_503_RETRIES = 3;
+  const MAX_429_RETRIES = 2;
+  let attempts503 = 0;
+  let attempts429 = 0;
   let lastError: Error | null = null;
-  for (let attempt = 0; attempt <= MAX_503_RETRIES; attempt++) {
+  while (true) {
     try {
       return await callGeminiOnceInner(opts);
     } catch (e) {
       const msg = (e as Error).message ?? "";
       const is503 = /\b503\b|overload|high demand|UNAVAILABLE/i.test(msg);
+      const is429 = /\b429\b|rate limit|quota|RESOURCE_EXHAUSTED/i.test(msg);
       lastError = e as Error;
-      if (!is503 || attempt === MAX_503_RETRIES) throw e;
-      const delayMs = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
-      console.warn(`Gemini 503 attempt ${attempt + 1}, retrying in ${delayMs}ms`);
-      await new Promise((r) => setTimeout(r, delayMs));
+      if (is503 && attempts503 < MAX_503_RETRIES) {
+        const delayMs = 1000 * Math.pow(2, attempts503); // 1s, 2s, 4s
+        attempts503 += 1;
+        console.warn(`Gemini 503 retry ${attempts503}, sleeping ${delayMs}ms`);
+        await new Promise((r) => setTimeout(r, delayMs));
+        continue;
+      }
+      if (is429 && attempts429 < MAX_429_RETRIES) {
+        // 13s cubre la ventana de 5 RPM (1 req cada 12s) con margen.
+        // 26s en el 2º intento por si el cliente disparó varias seguidas.
+        const delayMs = 13_000 + attempts429 * 13_000;
+        attempts429 += 1;
+        console.warn(`Gemini 429 retry ${attempts429}, sleeping ${delayMs}ms`);
+        await new Promise((r) => setTimeout(r, delayMs));
+        continue;
+      }
+      // No es retriable o ya agoté el budget → re-throw con mensaje claro.
+      if (is429) {
+        throw new Error("Gemini está saturado por rate limit. Esperá ~15 segundos y volvé a intentar.");
+      }
+      throw e;
     }
   }
-  throw lastError ?? new Error("Gemini retry loop exhausted");
+  // Inalcanzable — el loop solo sale por return o throw arriba.
+  throw lastError ?? new Error("Gemini retry loop terminated unexpectedly");
 }
 
 async function callGeminiOnceInner(opts: GeminiCallOptions): Promise<GeminiResult> {
