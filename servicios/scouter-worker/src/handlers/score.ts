@@ -179,16 +179,19 @@ export async function handleScoreLead(
     .eq("id", lead.id);
   if (updateErr) throw updateErr;
 
-  // Embedding + lookalike (fire-and-forget). El edge function pega a
-  // Gemini text-embedding-004, guarda el vector en scouter_leads.embedding
-  // y computa lookalike_score / lookalike_seed_handle contra los seeds
-  // de la compañía. Si falla, NO bloqueamos el job — el scoring ya quedó.
+  // Embedding + lookalike (fire-and-forget). Después del embed, corremos
+  // el router cross-compañía: el RPC scouter_route_lead rankea TODAS las
+  // compañías activas del tenant por fit (embedding cosine + heurística
+  // bio_keywords/exclude/followers_max/target_countries) y reasignamos
+  // company_id + target_companies según el resultado.
   void (async () => {
     try {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL");
-      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
       if (!supabaseUrl || !serviceKey) return;
-      const res = await fetch(`${supabaseUrl}/functions/v1/scouter-embed-leads`, {
+
+      // 1) Embed
+      const embedRes = await fetch(`${supabaseUrl}/functions/v1/scouter-embed-leads`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${serviceKey}`,
@@ -196,12 +199,66 @@ export async function handleScoreLead(
         },
         body: JSON.stringify({ lead_ids: [lead.id] }),
       });
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        console.warn("[score-lead] embed-leads failed", res.status, txt.slice(0, 200));
+      if (!embedRes.ok) {
+        const txt = await embedRes.text().catch(() => "");
+        console.warn("[score-lead] embed-leads failed", embedRes.status, txt.slice(0, 200));
+        // No bloqueamos el router — el RPC tiene fallback heurístico si
+        // el lead no tiene embedding.
+      }
+
+      // 2) Router cross-compañía
+      const { data: routes, error: routeErr } = await sb.rpc("scouter_route_lead", {
+        p_lead_id: lead.id,
+      });
+      if (routeErr) {
+        console.warn("[score-lead] route_lead RPC failed:", routeErr.message);
+        return;
+      }
+      const ranking = (routes ?? []) as Array<{
+        company_id: string;
+        company_slug: string;
+        score: number;
+        method: string;
+      }>;
+      if (ranking.length === 0) return;
+
+      // Threshold para entrar a target_companies. 0.55 funciona bien para
+      // similarity de embeddings (rangos típicos 0.5-0.9) y para keywords
+      // normalizado (0-1). Por encima → la compañía es candidata real.
+      const SECONDARY_THRESHOLD = 0.55;
+      const best = ranking[0];
+      if (!best) return;
+      // Si TODAS las compañías candidatas tienen score 0 (caso típico
+      // cuando las otras compañías no tienen search_config), mantenemos
+      // el company_id actual del discovery — no movemos al lead.
+      if (best.score <= 0) {
+        console.log(`[score-lead] router: ${lead.instagram_handle} sin matches >0, mantengo company actual`);
+        return;
+      }
+
+      const targetSlugs = ranking
+        .filter((r) => r.score >= SECONDARY_THRESHOLD)
+        .map((r) => r.company_slug);
+
+      // Update solo si la mejor compañía cambia respecto a la actual.
+      // Eso evita escrituras innecesarias cuando el discovery ya
+      // asignó la correcta.
+      const { error: upErr } = await sb
+        .from("scouter_leads")
+        .update({
+          company_id: best.company_id,
+          target_companies: targetSlugs,
+        })
+        .eq("id", lead.id);
+      if (upErr) {
+        console.warn("[score-lead] router update failed:", upErr.message);
+      } else {
+        console.log(
+          `[score-lead] router: ${lead.instagram_handle} → ${best.company_slug} (${best.score.toFixed(2)}, ${best.method}), targets=${targetSlugs.join(",") || "—"}`,
+        );
       }
     } catch (e) {
-      console.warn("[score-lead] embed-leads exception", (e as Error).message);
+      console.warn("[score-lead] router exception:", (e as Error).message);
     }
   })();
 
