@@ -634,6 +634,11 @@ const ChatterPublicView = () => {
   // when a brand-new "tip" system message lands in the realtime feed.
   const [tipAmount, setTipAmount] = useState<number | null>(null);
   const lastTipIdRef = useRef<string | null>(null);
+  // Bandera explícita de "ya snapshoteé el primer load". No alcanza con
+  // mirar `lastTipIdRef === null` porque ese ref también queda null cuando
+  // el chatter abre el link SIN tips históricos — y entonces el primer tip
+  // en vivo se trataría como histórico y no animaría.
+  const tipInitializedRef = useRef<boolean>(false);
   const [confirmDelMsg, setConfirmDelMsg] = useState<ChatterMessage | null>(null);
   const [editMsg, setEditMsg] = useState<ChatterMessage | null>(null);
   const [editDraft, setEditDraft] = useState("");
@@ -852,6 +857,7 @@ const ChatterPublicView = () => {
     if (msgs.length === 0) {
       lastMessageIdRef.current = null;
       lastTipIdRef.current = null;
+      tipInitializedRef.current = false;
       return;
     }
     const last = msgs[msgs.length - 1];
@@ -874,7 +880,7 @@ const ChatterPublicView = () => {
           m.price,
       );
     if (newestEvent && newestEvent.id !== lastTipIdRef.current) {
-      const isInitial = lastTipIdRef.current === null;
+      const isInitial = !tipInitializedRef.current;
       lastTipIdRef.current = newestEvent.id;
       if (!isInitial && newestEvent.price) {
         setTipAmount(newestEvent.price);
@@ -900,16 +906,21 @@ const ChatterPublicView = () => {
     }
   }, [messagesQ.data, configQ.data]);
 
-  // Initialize lastTipIdRef on first load so historical events don't fire.
+  // Initialize lastTipIdRef + tipInitializedRef en el primer load para que
+  // (a) tips históricos no disparen animación al reabrir el chat, y
+  // (b) el ref de inicialización quede marcado incluso cuando NO hay tips
+  // históricos — así el primer tip en vivo sí dispara la animación.
   useEffect(() => {
-    if (lastTipIdRef.current !== null) return;
-    const msgs = messagesQ.data ?? [];
+    if (tipInitializedRef.current) return;
+    const msgs = messagesQ.data;
+    if (!msgs) return; // todavía cargando
     const newestEvent = [...msgs]
       .reverse()
       .find(
         (m) => m.role === "system" && (m.msg_type === "tip" || m.msg_type === "purchase"),
       );
-    if (newestEvent) lastTipIdRef.current = newestEvent.id;
+    lastTipIdRef.current = newestEvent?.id ?? null;
+    tipInitializedRef.current = true;
   }, [messagesQ.data]);
 
   // Mark messages as read — but ONLY when the chatter is actually looking
