@@ -4,7 +4,7 @@
 // en scouter_notifications para que la UI alerte al equipo.
 
 import { sb } from "../db.ts";
-import { scoreLead, type ScoreLeadInput } from "../llm.ts";
+import { scoreLead, type ScoreLeadInput, type ScoreLeadCompanyConfig } from "../llm.ts";
 import { analyzeLook } from "../vision.ts";
 import type { JobResult, ScoreLeadPayload, ScouterJob } from "../types.ts";
 
@@ -45,7 +45,41 @@ interface LeadRow {
   link_in_bio_platform: string | null;
   country: string | null;
   tenant_id: string;
+  company_id: string | null;
   photo_data_url: string | null;
+}
+
+interface CompanyRow {
+  id: string;
+  search_config: {
+    target_countries?: string[];
+    target_gender?: "male" | "female" | "any";
+    profile_tier?: string | null;
+    scoring_notes?: string | null;
+  } | null;
+}
+
+// Lee la config de scoring de la compañía a la que pertenece el lead.
+// Pasamos solo los campos que el LLM scorer usa para aplicar
+// deal-breakers (sin país, género opuesto, tier wrong, brand-not-human).
+async function fetchScoringConfig(
+  companyId: string | null,
+): Promise<ScoreLeadCompanyConfig | null> {
+  if (!companyId) return null;
+  const { data, error } = await sb
+    .from("scouter_companies")
+    .select("id, search_config")
+    .eq("id", companyId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const row = data as CompanyRow;
+  const cfg = row.search_config ?? {};
+  return {
+    target_countries: cfg.target_countries ?? null,
+    target_gender: cfg.target_gender ?? null,
+    profile_tier: cfg.profile_tier ?? null,
+    scoring_notes: cfg.scoring_notes ?? null,
+  };
 }
 
 export async function handleScoreLead(
@@ -60,7 +94,7 @@ export async function handleScoreLead(
   const { data: leadRaw, error: leadErr } = await sb
     .from("scouter_leads")
     .select(
-      "id, instagram_handle, name, bio, followers, verified, category, link_in_bio_platform, country, tenant_id, photo_data_url",
+      "id, instagram_handle, name, bio, followers, verified, category, link_in_bio_platform, country, tenant_id, company_id, photo_data_url",
     )
     .eq("id", leadId)
     .eq("tenant_id", job.tenant_id)
@@ -70,6 +104,10 @@ export async function handleScoreLead(
   if (!leadRaw) return { ok: false, message: `Lead ${leadId} no encontrado en tenant.` };
 
   const lead = leadRaw as LeadRow;
+  // Fetcheamos los filtros de la compañía para que el scorer pueda
+  // aplicar deal-breakers (sin país, género opuesto, brand-no-humano).
+  const companyConfig = await fetchScoringConfig(lead.company_id);
+
   const input: ScoreLeadInput = {
     username: lead.instagram_handle,
     fullName: lead.name,
@@ -79,6 +117,7 @@ export async function handleScoreLead(
     category: lead.category,
     linkInBioPlatform: lead.link_in_bio_platform,
     country: lead.country,
+    companyConfig,
   };
 
   const result = await scoreLead(input);

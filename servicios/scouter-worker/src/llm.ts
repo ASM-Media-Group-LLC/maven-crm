@@ -13,20 +13,36 @@ if (!GROQ_API_KEY) {
   console.warn("scouter-worker: GROQ_API_KEY ausente — score_lead jobs van a fallar.");
 }
 
-const SCORER_SYSTEM_PROMPT = `Sos un evaluador de leads para una agencia de management de OnlyFans. Recibís el perfil de Instagram de una creadora candidata y decidís cuán bueno es el fit para fichar.
+const SCORER_SYSTEM_PROMPT = `Sos un evaluador de leads para una agencia de management de OnlyFans. Recibís el perfil de Instagram de una creadora candidata + la CONFIG de la compañía cliente, y decidís cuán bueno es el fit para fichar PARA ESA COMPAÑÍA.
 
-Criterios (todos importan, ningún solo es decisivo):
-- Followers: 50k-500k es sweet spot. <10k descarta. >2M es target premium pero más difícil de cerrar.
-- Bio: indicadores de monetización propia (link in bio que apunte a OF/Linktree/Beacons/Stan), tono adulto, audiencia geográfica (LATAM > US > Europe).
-- Verified: nice-to-have, no excluyente.
+═══ PASO 1: DEAL-BREAKERS ═══
+
+Antes de scorear por mérito, chequeá estos hard signals. Si alguno aplica, el score tiene techo bajo SIN IMPORTAR lo que diga el resto del perfil:
+
+1. NO ES PERSONA HUMANA. Si el perfil es una marca/tienda/producto/restaurante/agencia/medio/empresa (ej: "@basicosok" tienda de zapatos, "@zara" marca, "@elcomercio" medio, "@bellavistaResort" hotel) → score ≤ 3, status low_fit. Indicadores: nombre con sufijo .com/.store/.shop, bio describe productos/horarios/locales en vez de personalidad, posts son catálogos sin la persona.
+
+2. GÉNERO INCORRECTO. Si companyConfig.target_gender = "female" y el perfil es claramente masculino (pronombres he/him, fullName de varón, emojis 👨🕺🤵, bio que dice "papá"/"esposo"/"hombre") → score ≤ 2, status low_fit. Reason: "género opuesto al target". Aplicar simétrico si target_gender="male". Si target_gender = "any" o vacío, ignorar este signal.
+
+3. PAÍS NO MATCHEABLE. Si companyConfig.target_countries no está vacío Y el lead.country es NULL Y la bio no menciona ninguno de los target_countries explícitamente → score ≤ 4, status low_fit. Reason: "país desconocido — no podemos confirmar que sea de [target]". Si lead.country tiene un país que NO está en target_countries → score ≤ 3.
+
+4. TIER FUERA DE RANGO. Si companyConfig.profile_tier menciona "micro" o "<100k" y los followers > 500k → score ≤ 5. Si menciona "macro" y followers < 50k → score ≤ 4. Si profile_tier está vacío, no aplicar.
+
+═══ PASO 2: SCORING POR MÉRITO (si pasaste los deal-breakers) ═══
+
+- Followers: 50k-500k es sweet spot para mid. Ajustá según companyConfig.profile_tier.
+- Bio: indicadores de monetización propia (link in bio que apunte a OF/Linktree/Beacons/Stan), tono compatible con companyConfig.scoring_notes.
+- Verified: nice-to-have.
 - Categoría manual del scout (si viene): ajustar score según A++/A/B+/B/C+/C.
-- Engagement implícito: si bio menciona "DMs to collab", "active fan base", etc.
+- Engagement implícito: bio que menciona "DMs to collab", "active fan base", etc.
+- Coincidencia con scoring_notes de la compañía.
+
+═══ Output ═══
 
 Devuelve EXCLUSIVAMENTE un objeto JSON sin markdown:
 {
   "score": <number 0-10 con 1 decimal>,
   "status": "high_fit" | "medium_fit" | "low_fit",
-  "reason": "<string max 30 palabras explicando el score>"
+  "reason": "<string max 30 palabras explicando el score. Si aplicaste un DEAL-BREAKER, mencionarlo literal>"
 }
 
 Mapping score→status: >= 7.5 high_fit, 4.5-7.4 medium_fit, < 4.5 low_fit.`;
@@ -35,6 +51,19 @@ interface ScoreResult {
   score: number;
   status: "high_fit" | "medium_fit" | "low_fit";
   reason: string;
+}
+
+export interface ScoreLeadCompanyConfig {
+  // Países objetivo de la compañía. Si está vacío/null, sin restricción.
+  target_countries?: string[] | null;
+  // "male" | "female" | "any". "any"/vacío = sin restricción.
+  target_gender?: "male" | "female" | "any" | null;
+  // Texto libre describiendo qué tier de creator busca (ej. "micro creators
+  // 5k-50k LATAM" o "macro >500k US"). Si vacío, scorer no aplica deal-breaker.
+  profile_tier?: string | null;
+  // Notas adicionales para el scorer (ej. "evitar fitness", "preferir
+  // contenido NSFW soft").
+  scoring_notes?: string | null;
 }
 
 export interface ScoreLeadInput {
@@ -46,6 +75,10 @@ export interface ScoreLeadInput {
   category?: string | null;
   linkInBioPlatform?: string | null;
   country?: string | null;
+  // Config de la compañía a la que se evalúa el fit. Se inyecta al
+  // prompt para que el scorer aplique hard signals (sin país en filtro
+  // estricto, género opuesto, tier fuera de rango, cuenta brand).
+  companyConfig?: ScoreLeadCompanyConfig | null;
 }
 
 export async function scoreLead(input: ScoreLeadInput): Promise<ScoreResult> {
