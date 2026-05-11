@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, List, Search, Play, Pause, Crown, Pencil, Columns, BarChart3, Users, Check, Settings, Archive, Trash2, Share2, FileText } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
@@ -37,6 +38,13 @@ interface TareasContentProps {
 
 const TareasContent = ({ projectId }: TareasContentProps) => {
   const navigate = useNavigate();
+  // Permisos por acción dentro de Tareas. Default heredados del padre
+  // → roles que tenían acceso al tab Tareas siguen pudiendo
+  // crear/eliminar a menos que admin revoque granularmente.
+  const { canAccess } = usePermissions();
+  const canCreateTask = canAccess("Tareas", "Crear Tarea");
+  const canDeleteTask = canAccess("Tareas", "Eliminar Tarea");
+  const canDeleteProject = canAccess("Tareas", "Eliminar Proyecto");
   const { tasks, isLoading, companyProfiles, projectName, projectDescription, projectLeaderId, createTask, completeTask, updateTaskStatus, submitOverdueReason, updateTask, deleteTask, reorderTasks, patchTask, updateTaskAssignees, updateProjectInline } = useTareas(projectId);
   const { members, setProjectMembers } = useProjectMembers(projectId);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -215,9 +223,11 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
-            </Button>
+            {canCreateTask && (
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">
@@ -241,9 +251,11 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
                 }}>
                   <Archive className="h-4 w-4 mr-2" /> Archivar
                 </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive" onClick={() => setDeleteProjectOpen(true)}>
-                  <Trash2 className="h-4 w-4 mr-2" /> Eliminar
-                </DropdownMenuItem>
+                {canDeleteProject && (
+                  <DropdownMenuItem className="text-destructive" onClick={() => setDeleteProjectOpen(true)}>
+                    <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -605,10 +617,11 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
       />
 
       <DeleteTaskDialog
-        open={!!deleteTarget}
+        open={!!deleteTarget && canDeleteTask}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         taskTitle={deleteTarget?.title || ""}
         onConfirm={() => {
+          if (!canDeleteTask) return;
           if (deleteTarget) deleteTask.mutate(deleteTarget.id);
           setDeleteTarget(null);
         }}

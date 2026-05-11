@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePermissions } from "@/hooks/usePermissions";
 import { ArrowUpDown, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Phone, Trash2 } from "lucide-react";
 import { getCountryFlag, getCountryShortDisplay, maskPhone } from "@/lib/country-utils";
 import InstagramIcon from "@/components/icons/InstagramIcon";
@@ -48,6 +49,12 @@ const getAgentInitials = (name: string) => {
 };
 
 const ContactosTable = ({ contactos, onView, onEdit, onConvert, onDelete }: Props) => {
+  // Permisos: editar y eliminar contactos. Default heredado del padre
+  // "Contactos" (sembrado en DB) → roles que tenían acceso al tab
+  // siguen pudiendo editar/eliminar a menos que admin revoque.
+  const { canAccess } = usePermissions();
+  const canEditContacto = canAccess("Contactos", "Editar Contacto");
+  const canDeleteContacto = canAccess("Contactos", "Eliminar Contacto");
   const [sortKey, setSortKey] = useState<SortKey>("creacion");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -194,13 +201,15 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onDelete }: Prop
                       <DropdownMenuItem onClick={() => onView?.(c)}>
                         <Eye className="mr-2 h-4 w-4" /> Ver detalle
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onEdit?.(c)}>
-                        <Pencil className="mr-2 h-4 w-4" /> Editar
-                      </DropdownMenuItem>
+                      {canEditContacto && (
+                        <DropdownMenuItem onClick={() => onEdit?.(c)}>
+                          <Pencil className="mr-2 h-4 w-4" /> Editar
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => onConvert?.(c)}>
                         <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
                       </DropdownMenuItem>
-                      {onDelete && (
+                      {onDelete && canDeleteContacto && (
                         <DropdownMenuItem onClick={() => onDelete(c)} className="text-destructive focus:text-destructive">
                           <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                         </DropdownMenuItem>

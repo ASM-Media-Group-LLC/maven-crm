@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePermissions } from "@/hooks/usePermissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
@@ -72,6 +73,9 @@ const getSortValue = (ticket: TicketWithCreator, key: SortKey): string => {
 };
 
 const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
+  const { canAccess } = usePermissions();
+  const canEditTicket = canAccess("Tickets", "Editar Ticket");
+  const canDeleteTicket = canAccess("Tickets", "Eliminar Ticket");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -190,15 +194,21 @@ const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
                           <Eye className="mr-2 h-4 w-4" />
                           Ver detalle
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onEdit(ticket)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive" onClick={() => onDelete(ticket)}>
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Eliminar
-                        </DropdownMenuItem>
+                        {canEditTicket && (
+                          <DropdownMenuItem onClick={() => onEdit(ticket)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                        )}
+                        {canDeleteTicket && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive" onClick={() => onDelete(ticket)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

@@ -112,6 +112,10 @@ const CreadoresTable = ({ creators }: Props) => {
   // "Editar Blu CRM"); canAccess devuelve true para admin sin requerir
   // la fila.
   const canEditBlu = canAccess("Creadores", "Editar Blu CRM");
+  // "Eliminar Creator" — acción destructiva propia. Default heredado
+  // del padre Creadores (sembrado en DB) → preservamos accesos
+  // existentes; admin la puede revocar a roles específicos.
+  const canDeleteCreator = canAccess("Creadores", "Eliminar Creator");
 
   const toggleBluMutation = useMutation({
     mutationFn: async ({ id, nextState }: { id: string; nextState: boolean }) => {
@@ -549,8 +553,18 @@ const CreadoresTable = ({ creators }: Props) => {
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            onClick={() => deletingCreator && deleteCreator.mutate(deletingCreator.id)}
-            disabled={deleteCreator.isPending}
+            onClick={() => {
+              // Guard de permiso. El AlertDialog puede abrirse desde
+              // otros componentes (ViewCreadorModal); gatear acá evita
+              // que se ejecute la mutation si el rol perdió permiso.
+              if (!canDeleteCreator) {
+                toast.error("No tenés permiso para eliminar creators.");
+                setDeletingCreator(null);
+                return;
+              }
+              if (deletingCreator) deleteCreator.mutate(deletingCreator.id);
+            }}
+            disabled={deleteCreator.isPending || !canDeleteCreator}
           >
             {deleteCreator.isPending ? "Eliminando..." : "Eliminar"}
           </AlertDialogAction>

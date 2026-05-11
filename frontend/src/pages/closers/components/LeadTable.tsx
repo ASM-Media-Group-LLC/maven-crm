@@ -1,4 +1,5 @@
 import { useState, memo, useMemo, useCallback } from "react";
+import { usePermissions } from "@/hooks/usePermissions";
 import PlatformSalesModal from "./PlatformSalesModal";
 import { LEADGEN_COMPANIES } from "@/pages/leadgen/leadgenConstants";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
@@ -57,7 +58,7 @@ const stageVariant = (s: string): "primary-soft" | "secondary-soft" | "success-s
 const cleanPhoneForWhatsApp = (phone: string) => phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
 
 // ─── Inline editable number cell ───
-const InlineNumber = memo(({ value, onSave, prefix = "", suffix = "" }: { value: number | null; onSave: (v: number) => void; prefix?: string; suffix?: string }) => {
+const InlineNumber = memo(({ value, onSave, prefix = "", suffix = "", disabled }: { value: number | null; onSave: (v: number) => void; prefix?: string; suffix?: string; disabled?: boolean }) => {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(String(value || 0));
 
@@ -70,8 +71,12 @@ const InlineNumber = memo(({ value, onSave, prefix = "", suffix = "" }: { value:
   if (!editing) {
     return (
       <span
-        className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm font-medium"
-        onClick={() => { setText(String(value || 0)); setEditing(true); }}
+        className={`rounded px-1 py-0.5 text-sm font-medium ${disabled ? "cursor-default" : "cursor-pointer hover:bg-muted/50"}`}
+        onClick={() => {
+          if (disabled) return;
+          setText(String(value || 0));
+          setEditing(true);
+        }}
       >
         {prefix}{Number(value || 0).toLocaleString()}{suffix}
       </span>
@@ -387,6 +392,15 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
   const [platformModalId, setPlatformModalId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
+
+  // Permisos por acción. Default true para roles con acceso al módulo
+  // padre (default DB sembrado heredando del parent). Si admin quita
+  // específicamente uno, esos controles se ven disabled o desaparecen.
+  const { canAccess } = usePermissions();
+  const canEditStatus = canAccess("Closers", "Editar Status");
+  const canAssign = canAccess("Closers", "Asignar Closer");
+  const canEditComisiones = canAccess("Closers", "Editar Comisiones");
+  const canConvert = canAccess("Closers", "Convertir a Creadora");
 
   const handleSort = useCallback((key: string) => {
     if (sortKey === key) {
@@ -717,7 +731,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                         </DropdownMenuItem>
                       </>
                     )}
-                    {isAdmin && (
+                    {isAdmin && canAssign && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
@@ -742,13 +756,13 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
               <TableCell><PhoneWhatsApp phone={c.phone} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
               <TableCell>
-                <InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} />
+                <InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} />
               </TableCell>
               <TableCell>
-                <InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} />
+                <InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} disabled={!canEditComisiones} />
               </TableCell>
               <TableCell>
-                <InlineNumber value={c.extras} prefix="$" onSave={(v) => onFieldChange(c.id, "extras", v)} />
+                <InlineNumber value={c.extras} prefix="$" onSave={(v) => onFieldChange(c.id, "extras", v)} disabled={!canEditComisiones} />
               </TableCell>
               <TableCell>
                 <Select value={c.main_platform || ""} onValueChange={(v) => onFieldChange(c.id, "main_platform", v)}>
@@ -813,8 +827,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
             </TableCell>
             <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
-            <TableCell><InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} /></TableCell>
-            <TableCell><InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} /></TableCell>
+            <TableCell><InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} /></TableCell>
+            <TableCell><InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} disabled={!canEditComisiones} /></TableCell>
             <TableCell
               className="cursor-pointer hover:bg-muted/50 rounded"
               onClick={() => setPlatformModalId(c.id)}
@@ -858,7 +872,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     <ShoppingCart className="mr-2 h-4 w-4" />
                     Ventas por Plataforma
                   </DropdownMenuItem>
-                  {onConvertToCreator && (
+                  {onConvertToCreator && canConvert && (
                     <DropdownMenuItem onClick={() => onConvertToCreator(c)}>
                       <UserPlus className="h-4 w-4 mr-2" /> Convertir a Creadora
                     </DropdownMenuItem>
@@ -915,7 +929,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
             </TableCell>
             <TableCell>
-              <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v)} />
+              <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v)} disabled={!canEditStatus} />
             </TableCell>
             <TableCell><PhoneWhatsApp phone={c.phone} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
             <TableCell className="text-sm">
@@ -935,7 +949,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                   <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {isAdmin && (
+                  {isAdmin && canAssign && (
                     <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
                       <UserPlus className="h-4 w-4 mr-2" /> Asignar a Closer
                     </DropdownMenuItem>
@@ -957,7 +971,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell>
-              <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v, c._source)} disabled={false} />
+              <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v, c._source)} disabled={!canEditStatus} />
             </TableCell>
             <TableCell>
               <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
@@ -993,7 +1007,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                         Mover a {s}
                       </DropdownMenuItem>
                     ))}
-                    {isAdmin && (
+                    {isAdmin && canAssign && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to, c._source)}>

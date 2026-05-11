@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePermissions } from "@/hooks/usePermissions";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -54,6 +55,9 @@ function copyResumen(e: EventRow, toast: ReturnType<typeof useToast>["toast"]) {
 }
 
 const EventosTable = ({ events }: Props) => {
+  const { canAccess } = usePermissions();
+  const canDeleteEvento = canAccess("Eventos", "Eliminar Evento");
+  const canEditEvento = canAccess("Eventos", "Editar Evento");
   const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(true);
@@ -168,9 +172,11 @@ const EventosTable = ({ events }: Props) => {
                       <DropdownMenuItem onClick={() => openModal(e, setViewOpen)}>
                         <Eye className="mr-2 h-4 w-4" />Ver detalles
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate(`/eventos/${e.id}/editar`)}>
-                        <Pencil className="mr-2 h-4 w-4" />Editar
-                      </DropdownMenuItem>
+                      {canEditEvento && (
+                        <DropdownMenuItem onClick={() => navigate(`/eventos/${e.id}/editar`)}>
+                          <Pencil className="mr-2 h-4 w-4" />Editar
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => copySharelink(e, toast)}>
                         <ExternalLink className="mr-2 h-4 w-4" />Copiar sharelink
                       </DropdownMenuItem>
@@ -180,10 +186,14 @@ const EventosTable = ({ events }: Props) => {
                       <DropdownMenuItem onClick={() => openModal(e, setCloseOpen)}>
                         <Lock className="mr-2 h-4 w-4" />Cerrar evento
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive" onClick={() => openModal(e, setDeleteOpen)}>
-                        <Trash2 className="mr-2 h-4 w-4" />Eliminar
-                      </DropdownMenuItem>
+                      {canDeleteEvento && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-destructive" onClick={() => openModal(e, setDeleteOpen)}>
+                            <Trash2 className="mr-2 h-4 w-4" />Eliminar
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
