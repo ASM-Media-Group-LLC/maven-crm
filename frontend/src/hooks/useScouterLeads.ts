@@ -861,7 +861,10 @@ export const useEnqueueDiscoverySeed = () => {
           tenant_id: tenantId,
           company_id: input.company_id ?? null,
           payload: { seeds: cleaned, maxLeads: input.maxLeads ?? cleaned.length },
-          priority: input.priority ?? 5,
+          // Priority 7: discovery va por encima de enrich_handle (3),
+          // score_lead (6) y refresh_posts (3). Queremos leads frescos
+          // primero — los enriquecimientos pueden esperar.
+          priority: input.priority ?? 7,
         })
         .select("*")
         .single();
@@ -902,7 +905,7 @@ export const useEnqueueDiscoveryHashtag = () => {
           tenant_id: tenantId,
           company_id: input.company_id ?? null,
           payload: { hashtag: tag, maxLeads: input.maxLeads ?? 30 },
-          priority: input.priority ?? 5,
+          priority: input.priority ?? 7,
         })
         .select("*")
         .single();

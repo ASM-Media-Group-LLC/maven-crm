@@ -503,27 +503,131 @@ function inferCountry(item: ProfileItem): string | null {
   return null;
 }
 
+// Cache de profile fresh: si ya scrapeamos este handle hace <24h, no
+// gastamos crédito de nuevo. El refresh natural cada 24h mantiene los
+// followers/bio actualizados pero no sangra créditos en autopilot.
+const SCRAPE_CACHE_HOURS = 24;
+
+interface DedupResult {
+  toScrape: string[];
+  skippedInLeadgen: number;
+  skippedScouterFresh: number;
+  skippedBlocked: number;
+}
+
+// Filtra una lista de handles ANTES de pegarle a ScrapeCreators. Cada
+// handle filtrado = 1 crédito ahorrado. Devuelve los handles que SÍ
+// deben scrapearse + counts de los descartados.
+//
+//   · en leadgen Y NO en scouter para esta company → skip (no creamos
+//     duplicado de Lead Gen → Scouter)
+//   · en scouter para esta company con updated_at < 24h → skip (cache
+//     fresh, ya tenemos datos recientes)
+//   · en blocklist del tenant → skip permanente
+//   · resto → scrape (incluye refresh de scouter > 24h)
+async function filterFreshHandles(
+  handles: string[],
+  tenantId: string,
+  companyId: string | null,
+): Promise<DedupResult> {
+  const norm = handles
+    .map((h) => h.replace(/^@/, "").trim().toLowerCase())
+    .filter(Boolean);
+  if (norm.length === 0) {
+    return { toScrape: [], skippedInLeadgen: 0, skippedScouterFresh: 0, skippedBlocked: 0 };
+  }
+
+  const cacheBefore = new Date(Date.now() - SCRAPE_CACHE_HOURS * 3600 * 1000).toISOString();
+
+  const [lgRes, scFreshRes, scAnyRes, dhRes] = await Promise.all([
+    sb.from("leadgen_entries").select("model_handle").in("model_handle", norm),
+    // "fresh" en scouter para esta company: scrapped reciente, NO gastar
+    // crédito de nuevo.
+    companyId
+      ? sb
+          .from("scouter_leads")
+          .select("instagram_handle")
+          .eq("company_id", companyId)
+          .gte("updated_at", cacheBefore)
+          .in("instagram_handle", norm)
+      : Promise.resolve({ data: [] as Array<{ instagram_handle: string }>, error: null }),
+    // existing-en-scouter-para-esta-company (sin restricción de fecha):
+    // si ya existe, no es "duplicado nuevo" desde Lead Gen — refresh ok.
+    companyId
+      ? sb
+          .from("scouter_leads")
+          .select("instagram_handle")
+          .eq("company_id", companyId)
+          .in("instagram_handle", norm)
+      : Promise.resolve({ data: [] as Array<{ instagram_handle: string }>, error: null }),
+    sb
+      .from("scouter_discarded_handles")
+      .select("handle")
+      .eq("tenant_id", tenantId)
+      .in("handle", norm),
+  ]);
+
+  const existingInLeadgen = new Set<string>();
+  const scouterFresh = new Set<string>();
+  const scouterAny = new Set<string>();
+  const blocked = new Set<string>();
+  if (lgRes.error) console.error("leadgen dedup query failed", lgRes.error);
+  else for (const r of (lgRes.data ?? []) as { model_handle: string | null }[]) {
+    if (r.model_handle) existingInLeadgen.add(r.model_handle.toLowerCase());
+  }
+  if (scFreshRes.error) console.error("scouter-fresh query failed", scFreshRes.error);
+  else for (const r of (scFreshRes.data ?? []) as { instagram_handle: string }[]) {
+    scouterFresh.add(r.instagram_handle.toLowerCase());
+  }
+  if (scAnyRes.error) console.error("scouter-any query failed", scAnyRes.error);
+  else for (const r of (scAnyRes.data ?? []) as { instagram_handle: string }[]) {
+    scouterAny.add(r.instagram_handle.toLowerCase());
+  }
+  if (dhRes.error) console.error("discarded-handles query failed", dhRes.error);
+  else for (const r of (dhRes.data ?? []) as { handle: string }[]) {
+    blocked.add(r.handle.toLowerCase());
+  }
+
+  const toScrape: string[] = [];
+  let skippedInLeadgen = 0;
+  let skippedScouterFresh = 0;
+  let skippedBlocked = 0;
+  const seen = new Set<string>();
+
+  for (const h of norm) {
+    if (seen.has(h)) continue;
+    seen.add(h);
+    if (blocked.has(h)) {
+      skippedBlocked += 1;
+      continue;
+    }
+    if (scouterFresh.has(h)) {
+      skippedScouterFresh += 1;
+      continue;
+    }
+    if (existingInLeadgen.has(h) && !scouterAny.has(h)) {
+      skippedInLeadgen += 1;
+      continue;
+    }
+    toScrape.push(h);
+  }
+  return { toScrape, skippedInLeadgen, skippedScouterFresh, skippedBlocked };
+}
+
+// Persiste los items ya scrapeados como leads, aplicando solo filtros
+// post-scrape (país, género). El dedup contra Lead Gen / blocklist /
+// cache fresh ya se hizo upstream en filterFreshHandles para no
+// desperdiciar créditos de ScrapeCreators.
 async function persistProfilesAsLeads(
   items: ProfileItem[],
   tenantId: string,
   companyId: string | null,
-  // discoverySource ahora acepta string (mismo valor para todos los
-  // leads — típico de hashtag discovery: "hashtag:fitness") o función
-  // (per-lead, derivado del item — típico de seed discovery donde cada
-  // lead viene de una cuenta semilla distinta y queremos guardarla).
   discoverySource: string | ((item: ProfileItem) => string),
-  // Si la compañía tiene target_countries seteado, descartamos cualquier
-  // lead cuyo país DETECTADO no esté en target. Si no detectamos país,
-  // dejamos pasar (permisivo — el scorer LLM va a refinar después).
   targetCountries: string[] | null,
-  // Sexo objetivo: "male" / "female" → descartamos si detectamos el
-  // sexo opuesto. "any" / null = sin restricción. Mismo approach
-  // permisivo que país: si no se detecta, pasa.
   targetGender: "male" | "female" | "any" | null,
 ): Promise<{
   inserted: number;
   updated: number;
-  skippedInLeadgen: number;
   skippedByCountry: number;
   skippedByGender: number;
   leadIds: string[];
@@ -531,92 +635,15 @@ async function persistProfilesAsLeads(
   const leadIds: string[] = [];
   let inserted = 0;
   let updated = 0;
-  let skippedInLeadgen = 0;
   let skippedByCountry = 0;
   let skippedByGender = 0;
   const hasCountryFilter = !!(targetCountries && targetCountries.length > 0);
   const hasGenderFilter = targetGender === "male" || targetGender === "female";
 
-  // Pre-fetch batch: cross-system dedup contra Lead Gen.
-  //   · existingInLeadgen: handles que ya viven en leadgen_entries
-  //   · existingInScouter: handles que ya existen en scouter_leads para
-  //     ESTA compañía (la condición para el upsert refresh path).
-  // Regla: skipeamos un handle si está en leadgen Y todavía no existe en
-  // scouter para esta compañía (sería un insert nuevo, que es lo que el
-  // usuario quiere evitar). Si ya existe en scouter, dejamos correr el
-  // upsert para que refresque followers/bio (no empeoramos el duplicado
-  // pre-existente).
-  const allHandles = items
-    .map((i) => i.username?.trim().toLowerCase())
-    .filter((h): h is string => !!h);
-
-  const existingInLeadgen = new Set<string>();
-  const existingInScouter = new Set<string>();
-  const discardedHandles = new Set<string>();
-  if (allHandles.length > 0) {
-    const [lgRes, scRes, dhRes] = await Promise.all([
-      sb.from("leadgen_entries").select("model_handle").in("model_handle", allHandles),
-      companyId
-        ? sb
-            .from("scouter_leads")
-            .select("instagram_handle")
-            .eq("company_id", companyId)
-            .in("instagram_handle", allHandles)
-        : Promise.resolve({ data: [] as Array<{ instagram_handle: string }>, error: null }),
-      // Blocklist global por tenant — handles que el user descartó
-      // desde el popup. No queremos reagregarlos NUNCA.
-      sb
-        .from("scouter_discarded_handles")
-        .select("handle")
-        .eq("tenant_id", tenantId)
-        .in("handle", allHandles),
-    ]);
-    if (lgRes.error) console.error("leadgen dedup query failed", lgRes.error);
-    else {
-      for (const row of (lgRes.data ?? []) as { model_handle: string | null }[]) {
-        if (row.model_handle) existingInLeadgen.add(row.model_handle.toLowerCase());
-      }
-    }
-    if (scRes.error) console.error("scouter dedup query failed", scRes.error);
-    else {
-      for (const row of (scRes.data ?? []) as { instagram_handle: string }[]) {
-        existingInScouter.add(row.instagram_handle.toLowerCase());
-      }
-    }
-    if (dhRes.error) console.error("discarded-handles dedup query failed", dhRes.error);
-    else {
-      for (const row of (dhRes.data ?? []) as { handle: string }[]) {
-        discardedHandles.add(row.handle.toLowerCase());
-      }
-    }
-  }
-
   for (const item of items) {
     const handle = item.username?.trim().toLowerCase();
     if (!handle) continue;
 
-    // Cross-system dedup: si vive en Lead Gen y NO está ya en Scouter
-    // para esta compañía, lo skipeamos para no crear un duplicado nuevo.
-    if (existingInLeadgen.has(handle) && !existingInScouter.has(handle)) {
-      skippedInLeadgen += 1;
-      console.log(`[discover] skip @${handle} — ya existe en Lead Gen`);
-      continue;
-    }
-
-    // Blocklist: el user lo descartó manualmente desde el popup. No
-    // se vuelve a agregar a ninguna compañía dentro del mismo tenant.
-    if (discardedHandles.has(handle)) {
-      console.log(`[discover] skip @${handle} — está en blocklist de descartados`);
-      continue;
-    }
-
-    // Filtro por país: si la compañía tiene target_countries y SÍ
-    // detectamos un país que NO matchea → descartamos. Si NO podemos
-    // detectar país (bio sin señal), dejamos pasar — la mayoría de
-    // creadoras no escriben país en bio, y skipearlas a todas era
-    // demasiado conservador. El scorer LLM va a refinar el país en
-    // su paso, y la UI ya filtra visualmente por país. Solo cuando hay
-    // evidencia clara de país equivocado descartamos en discovery.
     const inferredCountry = inferCountry(item);
     if (hasCountryFilter && inferredCountry && !targetCountries!.includes(inferredCountry)) {
       skippedByCountry += 1;
@@ -626,8 +653,6 @@ async function persistProfilesAsLeads(
       continue;
     }
 
-    // Filtro por sexo: si detectamos el sexo opuesto al target,
-    // descartamos. Si no podemos detectar → pasa.
     if (hasGenderFilter) {
       const inferredGender = inferGender(item);
       if (inferredGender && inferredGender !== targetGender) {
@@ -640,14 +665,9 @@ async function persistProfilesAsLeads(
     }
 
     const linkPlatform = detectLinkInBio(item.externalUrl);
-    // URL cruda de IG CDN — firmada, expira en ~24-48h. La persistimos
-    // ya en nuestro storage para que photo_data_url no caduque.
     const rawPhoto = item.profilePicUrlHD ?? item.profilePicUrl ?? null;
     const photo = await persistIgPhoto(rawPhoto, handle);
 
-    // Upsert por (company_id, instagram_handle) — UNIQUE constraint.
-    // Si ya existía, refrescamos followers/bio/etc. pero NO pisamos
-    // ai_score / status — esos los maneja score_lead.
     const upsertPayload: Record<string, unknown> = {
       company_id: companyId,
       instagram_handle: handle,
@@ -662,12 +682,7 @@ async function persistProfilesAsLeads(
         typeof discoverySource === "function" ? discoverySource(item) : discoverySource,
       tenant_id: tenantId,
     };
-    // Si detectamos país por heurística, lo persistimos para que el
-    // scorer no tenga que re-inferirlo y para que aparezca en la card
-    // antes del scoring.
-    if (inferredCountry) {
-      upsertPayload.country = inferredCountry;
-    }
+    if (inferredCountry) upsertPayload.country = inferredCountry;
 
     const { data, error } = await sb
       .from("scouter_leads")
@@ -685,7 +700,7 @@ async function persistProfilesAsLeads(
     else updated += 1;
   }
 
-  return { inserted, updated, skippedInLeadgen, skippedByCountry, skippedByGender, leadIds };
+  return { inserted, updated, skippedByCountry, skippedByGender, leadIds };
 }
 
 // Lee target_countries + target_gender de la compañía. Si no hay
@@ -721,7 +736,10 @@ async function enqueueScoreJobs(leadIds: string[], tenantId: string): Promise<vo
     status: "queued",
     tenant_id: tenantId,
     payload: { leadId },
-    priority: 5, // por encima del default — queremos scorear leads frescos
+    // Priority 6: score_lead va por debajo de discovery (7) pero por
+    // encima de enrich_handle (3). Queremos scorear leads frescos antes
+    // que esperar avatares.
+    priority: 6,
   }));
   const { error } = await sb.from("scouter_jobs").insert(rows);
   if (error) console.error("enqueueScoreJobs error", error);
@@ -740,31 +758,49 @@ export async function handleDiscoverSeed(
   const budget = await checkBudget(job.tenant_id);
   if (!budget.ok) return { ok: false, message: budget.reason ?? "budget agotado" };
 
-  const items = (await runProfileScrape(seeds.slice(0, max), job.tenant_id)) as ProfileItem[];
+  // Dedup ANTES del scrape — ahorra 1 crédito por handle ya conocido.
+  const { toScrape, skippedInLeadgen, skippedScouterFresh, skippedBlocked } =
+    await filterFreshHandles(seeds.slice(0, max), job.tenant_id, job.company_id);
+
+  if (toScrape.length === 0) {
+    const skips: string[] = [];
+    if (skippedInLeadgen) skips.push(`${skippedInLeadgen} en Lead Gen`);
+    if (skippedScouterFresh) skips.push(`${skippedScouterFresh} cache <24h`);
+    if (skippedBlocked) skips.push(`${skippedBlocked} blocklist`);
+    return {
+      ok: true,
+      message: `discover_seed: 0 nuevos (todos skipped: ${skips.join(", ") || "—"}).`,
+      data: { skippedInLeadgen, skippedScouterFresh, skippedBlocked },
+    };
+  }
+
+  const items = (await runProfileScrape(toScrape, job.tenant_id)) as ProfileItem[];
   const { targetCountries, targetGender } = await fetchCompanyFilters(job.company_id);
-  const {
-    inserted, updated, skippedInLeadgen, skippedByCountry, skippedByGender, leadIds,
-  } = await persistProfilesAsLeads(
-    items,
-    job.tenant_id,
-    job.company_id,
-    (item) => `seed:@${item.username ?? "?"}`,
-    targetCountries,
-    targetGender,
-  );
+  const { inserted, updated, skippedByCountry, skippedByGender, leadIds } =
+    await persistProfilesAsLeads(
+      items,
+      job.tenant_id,
+      job.company_id,
+      (item) => `seed:@${item.username ?? "?"}`,
+      targetCountries,
+      targetGender,
+    );
   await enqueueScoreJobs(leadIds, job.tenant_id);
 
-  const skipLeadgen = skippedInLeadgen > 0 ? `, ${skippedInLeadgen} skip (ya en Lead Gen)` : "";
-  const skipCountry =
-    skippedByCountry > 0
-      ? `, ${skippedByCountry} skip (país ≠ ${targetCountries?.join("/") ?? "target"})`
-      : "";
-  const skipGender =
-    skippedByGender > 0 ? `, ${skippedByGender} skip (sexo ≠ ${targetGender})` : "";
+  const parts: string[] = [];
+  if (skippedInLeadgen) parts.push(`${skippedInLeadgen} skip Lead Gen`);
+  if (skippedScouterFresh) parts.push(`${skippedScouterFresh} skip cache<24h`);
+  if (skippedBlocked) parts.push(`${skippedBlocked} skip blocklist`);
+  if (skippedByCountry) parts.push(`${skippedByCountry} skip país`);
+  if (skippedByGender) parts.push(`${skippedByGender} skip sexo`);
+  const skipSummary = parts.length > 0 ? `, ${parts.join(", ")}` : "";
   return {
     ok: true,
-    message: `discover_seed: ${inserted} nuevos, ${updated} actualizados${skipLeadgen}${skipCountry}${skipGender}.`,
-    data: { inserted, updated, skippedInLeadgen, skippedByCountry, skippedByGender, leadIds },
+    message: `discover_seed: ${inserted} nuevos, ${updated} actualizados${skipSummary}.`,
+    data: {
+      inserted, updated, skippedInLeadgen, skippedScouterFresh, skippedBlocked,
+      skippedByCountry, skippedByGender, leadIds,
+    },
     apifyItemsProcessed: items.length,
   };
 }
@@ -796,33 +832,53 @@ export async function handleDiscoverHashtag(
     };
   }
 
-  // 3) Enriquecer perfiles + persistir.
+  // 3) Dedup ANTES del scrape — ahorra crédito por cada autor ya conocido.
   const usernames = authors.map((a) => a.username);
-  const items = (await runProfileScrape(usernames, job.tenant_id)) as ProfileItem[];
+  const { toScrape, skippedInLeadgen, skippedScouterFresh, skippedBlocked } =
+    await filterFreshHandles(usernames, job.tenant_id, job.company_id);
+
+  if (toScrape.length === 0) {
+    const skips: string[] = [];
+    if (skippedInLeadgen) skips.push(`${skippedInLeadgen} Lead Gen`);
+    if (skippedScouterFresh) skips.push(`${skippedScouterFresh} cache<24h`);
+    if (skippedBlocked) skips.push(`${skippedBlocked} blocklist`);
+    return {
+      ok: true,
+      message: `discover_hashtag #${hashtag}: ${authors.length} autores, 0 nuevos (skipped: ${skips.join(", ") || "—"}).`,
+      data: { authorsFound: authors.length, skippedInLeadgen, skippedScouterFresh, skippedBlocked },
+      apifyItemsProcessed: authors.length,
+    };
+  }
+
+  // 4) Enriquecer solo los handles que no están en cache.
+  const items = (await runProfileScrape(toScrape, job.tenant_id)) as ProfileItem[];
   const { targetCountries, targetGender } = await fetchCompanyFilters(job.company_id);
-  const {
-    inserted, updated, skippedInLeadgen, skippedByCountry, skippedByGender, leadIds,
-  } = await persistProfilesAsLeads(
-    items,
-    job.tenant_id,
-    job.company_id,
-    `hashtag:${hashtag}`,
-    targetCountries,
-    targetGender,
-  );
+  const { inserted, updated, skippedByCountry, skippedByGender, leadIds } =
+    await persistProfilesAsLeads(
+      items,
+      job.tenant_id,
+      job.company_id,
+      `hashtag:${hashtag}`,
+      targetCountries,
+      targetGender,
+    );
   await enqueueScoreJobs(leadIds, job.tenant_id);
 
-  const skipLeadgen = skippedInLeadgen > 0 ? `, ${skippedInLeadgen} skip (ya en Lead Gen)` : "";
-  const skipCountry =
-    skippedByCountry > 0
-      ? `, ${skippedByCountry} skip (país ≠ ${targetCountries?.join("/") ?? "target"})`
-      : "";
-  const skipGender =
-    skippedByGender > 0 ? `, ${skippedByGender} skip (sexo ≠ ${targetGender})` : "";
+  const parts: string[] = [];
+  if (skippedInLeadgen) parts.push(`${skippedInLeadgen} skip Lead Gen`);
+  if (skippedScouterFresh) parts.push(`${skippedScouterFresh} skip cache<24h`);
+  if (skippedBlocked) parts.push(`${skippedBlocked} skip blocklist`);
+  if (skippedByCountry) parts.push(`${skippedByCountry} skip país`);
+  if (skippedByGender) parts.push(`${skippedByGender} skip sexo`);
+  const skipSummary = parts.length > 0 ? `, ${parts.join(", ")}` : "";
   return {
     ok: true,
-    message: `discover_hashtag #${hashtag}: ${inserted} nuevos, ${updated} actualizados${skipLeadgen}${skipCountry}${skipGender}.`,
-    data: { authorsFound: authors.length, inserted, updated, skippedInLeadgen, skippedByCountry, skippedByGender },
+    message: `discover_hashtag #${hashtag}: ${inserted} nuevos, ${updated} actualizados${skipSummary}.`,
+    data: {
+      authorsFound: authors.length, inserted, updated,
+      skippedInLeadgen, skippedScouterFresh, skippedBlocked,
+      skippedByCountry, skippedByGender,
+    },
     apifyItemsProcessed: authors.length + items.length,
   };
 }

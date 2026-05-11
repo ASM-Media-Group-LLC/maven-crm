@@ -47,7 +47,10 @@ export async function enqueueAvatarFetch(handle: string): Promise<void> {
     status: "queued",
     tenant_id: tenantId,
     payload: { handle: normalized, tenantId },
-    priority: 7, // entre score_lead (5) y discover_seed (default).
+    // Priority 3: avatar fetch es nice-to-have, NO debe bloquear
+    // discovery (que va a priority 7) ni scoring (6). Si entra una ola
+    // de 30 avatares vía LeadGen, ya no atraganta el autopilot.
+    priority: 3,
   });
   if (error) {
     // Silent: avatar fetch es nice-to-have. Si falla el insert (RLS,
