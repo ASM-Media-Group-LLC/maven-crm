@@ -11,6 +11,9 @@ import {
   Building2,
   TrendingUp,
   ArrowRight,
+  ArrowUp,
+  ArrowDown,
+  Crown,
   Instagram,
   ExternalLink,
 } from "lucide-react";
@@ -40,6 +43,7 @@ import {
   useOperationsDashboard,
   useMetricDetails,
   useLeadDetail,
+  useBestCloser,
   type MetricKey,
   type DashboardRange,
   type DetailRow,
@@ -397,6 +401,7 @@ const PanelDeControl = () => {
   });
   const [openMetric, setOpenMetric] = useState<MetricKey | null>(null);
   const { data, isLoading } = useOperationsDashboard(range);
+  const { data: bestCloser, isLoading: bestCloserLoading } = useBestCloser(range);
 
   const k = data ?? {
     contacted: 0,
@@ -490,18 +495,6 @@ const PanelDeControl = () => {
       icon: <XCircle className="h-5 w-5 text-white" />,
       gradient: "bg-rose-500",
       hint: "IA marcó la llamada como no_cerro",
-    },
-    {
-      key: "enteredCrm",
-      // "Movimientos del CRM" = altas - bajas netas del estado
-      // blu_infloww_active. value se usa para el orden ascendente/
-      // descendente del card; mostramos el neto. La descomposición
-      // ↑X / ↓Y vive en el render abajo via hint.
-      label: "Movimientos del CRM",
-      value: k.crmAltas - k.crmBajas,
-      icon: <Building2 className="h-5 w-5 text-white" />,
-      gradient: "bg-indigo-500",
-      hint: `↑ ${k.crmAltas.toLocaleString("es")} altas  ·  ↓ ${k.crmBajas.toLocaleString("es")} bajas`,
     },
   ];
 
@@ -683,6 +676,77 @@ const PanelDeControl = () => {
               <p className="text-[10px] text-muted-foreground mt-1">
                 Cierres / Llamadas ({k.closes}/{k.closerCalls})
               </p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Movimientos del CRM — display custom: altas (↑ verde) + bajas
+            (↓ rojo) grandes, neto chico abajo. Click abre el popup con
+            los eventos individuales (mismo source que el card via
+            creator_blu_history). */}
+        <button
+          type="button"
+          onClick={() => setOpenMetric("enteredCrm")}
+          className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
+        >
+          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-indigo-500 transition-opacity group-hover:opacity-50" />
+          <div className="relative space-y-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500">
+              <Building2 className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+                Movimientos del CRM
+              </p>
+              {isLoading ? (
+                <Skeleton className="mt-1 h-9 w-32" />
+              ) : (
+                <div className="flex items-baseline gap-4 mt-1 tabular-nums">
+                  <span className="flex items-center text-emerald-500 text-2xl font-bold">
+                    <ArrowUp className="h-5 w-5 mr-0.5" />
+                    {k.crmAltas.toLocaleString("es")}
+                  </span>
+                  <span className="flex items-center text-rose-500 text-2xl font-bold">
+                    <ArrowDown className="h-5 w-5 mr-0.5" />
+                    {k.crmBajas.toLocaleString("es")}
+                  </span>
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Neto: {(k.crmAltas - k.crmBajas).toLocaleString("es")} · altas / bajas en Blu/Infloww
+              </p>
+            </div>
+          </div>
+        </button>
+
+        {/* Mejor cerrador — score compuesto 70% cierres + 30% avg QA.
+            Click no abre popup todavía (no hay metric key) — solo display. */}
+        <Card className="p-4 border-2 border-amber-500/30 relative overflow-hidden">
+          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-amber-500" />
+          <div className="relative space-y-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500">
+              <Crown className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+                Mejor cerrador
+              </p>
+              {bestCloserLoading ? (
+                <Skeleton className="mt-1 h-7 w-32" />
+              ) : bestCloser ? (
+                <>
+                  <p className="text-xl font-bold leading-tight mt-1 truncate">
+                    {bestCloser.name}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
+                    {bestCloser.closes.toLocaleString("es")} cierres · calif promedio {Math.round(bestCloser.avgScore)}/100
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Sin calls en el rango
+                </p>
+              )}
             </div>
           </div>
         </Card>

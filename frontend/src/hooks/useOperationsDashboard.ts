@@ -359,23 +359,26 @@ export const useMetricDetails = (
           }));
         }
         case "enteredCrm": {
+          // Mismo source que el card: creator_blu_history JOIN creators.
+          // El card muestra el NETO (altas - bajas) y el popup lista los
+          // eventos individuales. Antes el popup queryeaba la columna
+          // legacy entered_crm_at, por eso no matcheaba.
           const q = sb
-            .from("creators")
-            .select("id, name, entered_crm_at, entered_crm_by, entered_crm_notes")
-            .not("entered_crm_at", "is", null)
-            .order("entered_crm_at", { ascending: false })
+            .from("creator_blu_history")
+            .select("id, creator_id, new_state, changed_at, creator:creators(name)")
+            .order("changed_at", { ascending: false })
             .limit(limit);
           const { data, error } = await dateLte(
-            dateGte(q, "entered_crm_at"),
-            "entered_crm_at",
+            dateGte(q, "changed_at"),
+            "changed_at",
           );
           if (error) throw error;
           return (data ?? []).map((r: any) => ({
-            id: r.id,
-            primary: r.name ?? "(sin nombre)",
-            secondary: r.entered_crm_notes ?? "",
-            date: r.entered_crm_at,
-            badge: "ingresada",
+            id: r.creator_id,
+            primary: r.creator?.name ?? "(sin nombre)",
+            secondary: r.new_state ? "Activada en Blu/Infloww" : "Desactivada de Blu/Infloww",
+            date: r.changed_at,
+            badge: r.new_state ? "alta" : "baja",
             leadSource: "creator" as const,
           }));
         }
@@ -410,6 +413,79 @@ export const useLeadDetail = (
         .maybeSingle();
       if (error) throw error;
       return data ?? null;
+    },
+  });
+
+/** Mejor cerrador del rango: score compuesto 70% cierres + 30% avg QA.
+ *  Devuelve null si no hay calls en el rango. */
+export interface BestCloser {
+  closerId: string;
+  name: string;
+  closes: number;
+  avgScore: number; // 0-100
+  composite: number; // 0-1, sólo para ranking interno
+}
+
+export const useBestCloser = (range: DashboardRange) =>
+  useQuery({
+    queryKey: ["best-closer", toIso(range.from), toIso(range.to)],
+    staleTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
+    queryFn: async (): Promise<BestCloser | null> => {
+      const fromIso = toIso(range.from);
+      const toIsoVal = toIsoEndOfDay(range.to);
+      let q = sb
+        .from("qa_calls")
+        .select("closer_id, claude_score, claude_analysis, closer:qa_closers(name)")
+        .not("closer_id", "is", null);
+      if (fromIso) q = q.gte("call_date", fromIso.slice(0, 10));
+      if (toIsoVal) q = q.lte("call_date", toIsoVal.slice(0, 10));
+      const { data, error } = await q;
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{
+        closer_id: string;
+        claude_score: number | null;
+        claude_analysis: { call_outcome?: string } | null;
+        closer: { name?: string } | null;
+      }>;
+      if (rows.length === 0) return null;
+
+      const byCloser = new Map<
+        string,
+        { name: string; closes: number; scoreSum: number; scoreCount: number }
+      >();
+      for (const r of rows) {
+        const entry = byCloser.get(r.closer_id) ?? {
+          name: r.closer?.name ?? "(sin nombre)",
+          closes: 0,
+          scoreSum: 0,
+          scoreCount: 0,
+        };
+        if (r.claude_analysis?.call_outcome === "cerro") entry.closes += 1;
+        if (typeof r.claude_score === "number") {
+          entry.scoreSum += r.claude_score;
+          entry.scoreCount += 1;
+        }
+        byCloser.set(r.closer_id, entry);
+      }
+
+      // Normalizar cierres contra el max del período para que ambas
+      // dimensiones queden en [0,1]. Si nadie cerró, el ranking se
+      // decide sólo por avg QA.
+      const aggregated = Array.from(byCloser.entries()).map(([id, v]) => ({
+        closerId: id,
+        name: v.name,
+        closes: v.closes,
+        avgScore: v.scoreCount > 0 ? v.scoreSum / v.scoreCount : 0,
+      }));
+      const maxCloses = Math.max(1, ...aggregated.map((x) => x.closes));
+      const ranked = aggregated
+        .map((x) => ({
+          ...x,
+          composite: 0.7 * (x.closes / maxCloses) + 0.3 * (x.avgScore / 100),
+        }))
+        .sort((a, b) => b.composite - a.composite);
+      return ranked[0] ?? null;
     },
   });
 
