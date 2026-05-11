@@ -74,12 +74,14 @@ const SUBS: SubDef[] = [
     source: "app/scouter/leads/page.tsx → LeadsCrm.tsx + LeadDrawer.tsx",
   },
   {
+    // key + submodule se mantienen para no romper permisos guardados
+    // en role_permissions; solo el label visible cambió a "Analytics".
     key: "funnel",
-    label: "Funnel",
+    label: "Analytics",
     submodule: "Funnel",
     icon: BarChart3,
     whatsComing:
-      "Embudo del pipeline: nuevos → contactados → respondieron → convertidos. Gráficas de conversión por canal y por scouter.",
+      "Embudo del pipeline + progreso diario del equipo de spammers.",
     source: "app/scouter/funnel/page.tsx → ScouterFunnelPanel.tsx",
   },
   {

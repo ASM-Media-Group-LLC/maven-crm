@@ -12,6 +12,7 @@ import {
   useScouterCompanies,
   type FunnelWindow,
 } from "@/hooks/useScouterLeads";
+import { ManagerDashboard } from "@/components/scouter/ManagerDashboard";
 
 // Funnel subtab — pipeline metrics for Scouter Assist. Reuses the
 // counts in scouter_leads (no new tables needed) and renders:
@@ -44,6 +45,11 @@ const ScouterFunnel = () => {
   const funnelQ = useScouterFunnel(window);
   const companiesQ = useScouterCompanies();
   const data = funnelQ.data;
+  // ManagerDashboard date — controlled state, antes vivía en Home y se
+  // movió acá para liberar el Home.
+  const [managerDate, setManagerDate] = useState<string>(
+    new Date().toISOString().slice(0, 10),
+  );
 
   const companyById = new Map(companiesQ.data?.map((c) => [c.id, c]) ?? []);
 
@@ -62,11 +68,12 @@ const ScouterFunnel = () => {
     : [null, null, null, null];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
+      {/* ─── Sección: Funnel ────────────────────────────────────────── */}
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Pipeline de Scouter</h2>
+          <h2 className="text-base font-semibold">Funnel</h2>
           <p className="text-xs text-muted-foreground">
             De descubierto a activo — counts y conversiones por etapa.
           </p>
@@ -224,6 +231,17 @@ const ScouterFunnel = () => {
           </div>
         </>
       )}
+
+      {/* ─── Sección: Progreso del equipo ─────────────────────────────
+          Vivía en ScouterHome arriba de los filtros, pero ocupaba mucho
+          espacio vertical en una vista enfocada a Listado. Acá tiene su
+          lugar natural junto al Funnel. */}
+      <div className="pt-2 border-t border-border/60">
+        <div className="pt-4">
+          <h2 className="text-base font-semibold mb-3">Progreso del equipo</h2>
+          <ManagerDashboard date={managerDate} onDateChange={setManagerDate} />
+        </div>
+      </div>
     </div>
   );
 };

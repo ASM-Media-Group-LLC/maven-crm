@@ -4,7 +4,6 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Star, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Activity } from "lucide-react";
-import KpiCard from "@/components/dashboard/KpiCard";
 import {
   useLeadFavoriteIds,
   useScouterLeads,
@@ -26,15 +25,19 @@ import {
   countryToFlag,
 } from "./leadShared";
 
-// ─── Stat card — wrapper sobre KpiCard estándar para mantener
-// consistencia con dashboards globales. Click toggles el filtro de
-// status (sigue sin navegar a otra ventana).
+// ─── Stat card compacto — versión chica de KpiCard, optimizada para
+// ahorrar vertical space en Home (las 4 cards de la parte superior
+// ocupaban demasiada altura comparadas con la cantidad de info que
+// muestran). Mantenemos el ícono cuadrado coloreado para que la
+// jerarquía visual siga coherente con dashboards globales, pero todo
+// más chico: padding p-3 vs p-4, icon 8x8 vs 10x10, value text-xl vs
+// text-3xl. La gradient corner blur se va — saturaba en chico.
 const StatCard = ({
   label,
   big,
   color,
   active,
-  icon,
+  icon: Icon,
   onClick,
 }: {
   label: string;
@@ -43,16 +46,37 @@ const StatCard = ({
   active?: boolean;
   icon?: typeof Activity;
   onClick?: () => void;
-}) => (
-  <KpiCard
-    label={label}
-    value={big}
-    icon={icon ?? Activity}
-    color={color}
-    onClick={onClick}
-    className={active ? "ring-2 ring-primary" : undefined}
-  />
-);
+}) => {
+  const IconEl = Icon ?? Activity;
+  const baseCls = `relative overflow-hidden rounded-lg border bg-card p-3 transition-colors ${
+    active ? "border-primary ring-1 ring-primary/40" : "border-border"
+  }`;
+  const inner = (
+    <div className="flex items-center gap-3">
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${color}`}>
+        <IconEl className="h-4 w-4 text-white" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] uppercase tracking-wider text-foreground/70 font-semibold leading-none">
+          {label}
+        </p>
+        <p className="mt-1 text-xl font-bold tabular-nums leading-none">{big}</p>
+      </div>
+    </div>
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${baseCls} text-left hover:border-primary/40`}
+      >
+        {inner}
+      </button>
+    );
+  }
+  return <div className={baseCls}>{inner}</div>;
+};
 
 // ─── Lead card ──────────────────────────────────────────────────────────
 const LeadCard = ({
@@ -400,10 +424,8 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
         </div>
       )}
 
-      {/* Manager dashboard — admin/manager/supervisor only */}
-      {(isAdmin || isManager || isSupervisor) && (
-        <ManagerDashboard date={managerDate} onDateChange={setManagerDate} />
-      )}
+      {/* "Progreso del equipo" (ManagerDashboard) movido al tab Analytics
+          para liberar Home. */}
 
       {/* Filters row */}
       <div className="flex flex-wrap items-center gap-2">
