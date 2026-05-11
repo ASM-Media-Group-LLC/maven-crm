@@ -179,8 +179,8 @@ const CreadoresTable = ({ creators }: Props) => {
         vb = `${b.country ?? ""} ${b.city ?? ""}`;
         break;
       case "agency":
-        va = a.creator_business?.assigned_agency ?? "";
-        vb = b.creator_business?.assigned_agency ?? "";
+        va = a.creator_business?.company?.name ?? a.creator_business?.assigned_agency ?? "";
+        vb = b.creator_business?.company?.name ?? b.creator_business?.assigned_agency ?? "";
         break;
     }
     return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
@@ -221,7 +221,7 @@ const CreadoresTable = ({ creators }: Props) => {
             .toUpperCase();
 
           const flag = showRealLocation ? getFlagEmoji(c.country_code) : "";
-          const agency = c.creator_business?.assigned_agency;
+          const agency = c.creator_business?.company?.name ?? c.creator_business?.assigned_agency;
           const kashType = c.creator_business?.kash_type;
           const agencyLabel = [agency, kashType].filter(Boolean).join(" · ");
 

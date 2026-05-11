@@ -23,6 +23,9 @@ import { useUpdateLeadQuality, useUpdateLeadField, useLeadGenQA, useCreateQARevi
 import type { LeadGenEntry } from "./useLeadGen";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
+import { useScouterCompanies } from "@/hooks/useScouterLeads";
+import { supabase } from "@/integrations/supabase/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const QUALITY_OPTIONS = ["a+", "a", "b+", "b", "c"] as const;
 
@@ -114,13 +117,33 @@ QualityCell.displayName = "QualityCell";
 const InlineSourceCell = React.memo(({ lead }: { lead: LeadGenEntry }) => {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(lead.company || "");
-  const updateField = useUpdateLeadField();
+  const { data: scouterCompanies = [] } = useScouterCompanies();
+  const qc = useQueryClient();
+
+  // Dual-write mutation: actualiza company (texto) + company_id (FK) en
+  // un solo UPDATE. company_id se deriva del name match. Si el texto
+  // no matchea ninguna compañía canónica, company_id queda NULL.
+  const updateCompany = useMutation({
+    mutationFn: async (newName: string | null) => {
+      const matchId = newName
+        ? scouterCompanies.find((sc) => sc.name === newName)?.id ?? null
+        : null;
+      const { error } = await supabase
+        .from("leadgen_entries")
+        .update({ company: newName, company_id: matchId } as any)
+        .eq("id", lead.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leadgen"] });
+    },
+  });
 
   const save = () => {
     setEditing(false);
     const newVal = text.trim();
     if (newVal !== (lead.company || "")) {
-      updateField.mutate({ id: lead.id, field: "company", value: newVal || null });
+      updateCompany.mutate(newVal || null);
     }
   };
 

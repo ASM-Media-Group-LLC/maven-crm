@@ -91,7 +91,7 @@ const CreadoresGrid = ({ creators }: Props) => {
           const location = showRealLocation
             ? [c.country, c.city].filter(Boolean).join(", ")
             : ((c as any).ubicacion_artistica || "");
-          const agency = c.creator_business?.assigned_agency;
+          const agency = c.creator_business?.company?.name ?? c.creator_business?.assigned_agency;
           const kashType = c.creator_business?.kash_type;
           const agencyLabel = [agency, kashType].filter(Boolean).join(" - ");
 

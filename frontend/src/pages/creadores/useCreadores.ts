@@ -3,7 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
 
 export type CreatorWithBusiness = Tables<"creators"> & {
-  creator_business: { assigned_agency: string | null; manager_type: string | null; kash_type: string | null; start_date: string | null } | null;
+  creator_business: {
+    assigned_agency: string | null;
+    manager_type: string | null;
+    kash_type: string | null;
+    start_date: string | null;
+    company_id: string | null;
+    company: { id: string; name: string } | null;
+  } | null;
 };
 
 const STATUS_LIST = ["active", "onboarding", "paused", "leaving", "terminated", "pendiente", "pendiente_verificacion"] as const;
@@ -21,9 +28,14 @@ export interface StatusCounts {
 }
 
 async function fetchCreators(): Promise<CreatorWithBusiness[]> {
+  // JOIN explícito con scouter_companies vía company_id FK. assigned_agency
+  // (texto) se mantiene en el select por compat — los reads que aún no
+  // migraron lo siguen leyendo. Una vez todos en company.name, droppeamos.
   const { data, error } = await supabase
     .from("creators")
-    .select("*, creator_business(assigned_agency, manager_type, kash_type, start_date)");
+    .select(
+      "*, creator_business(assigned_agency, manager_type, kash_type, start_date, company_id, company:scouter_companies(id, name))",
+    );
   if (error) throw error;
   return (data ?? []) as CreatorWithBusiness[];
 }
@@ -52,9 +64,10 @@ const AGENCY_ORDER = [
 ];
 
 function uniqueAgencies(creators: CreatorWithBusiness[]): string[] {
+  // Lee del FK joined; fallback al texto sólo si la FK no está poblada.
   const set = new Set<string>();
   for (const c of creators) {
-    const agency = c.creator_business?.assigned_agency;
+    const agency = c.creator_business?.company?.name ?? c.creator_business?.assigned_agency;
     if (agency) set.add(agency);
   }
   const known = AGENCY_ORDER.filter((a) => set.has(a));
@@ -85,7 +98,11 @@ function applyFilters(creators: CreatorWithBusiness[], filters: CreadorFilters):
   let result = creators;
 
   if (filters.agency) {
-    result = result.filter((c) => c.creator_business?.assigned_agency === filters.agency);
+    // Match contra el name del FK joined, con fallback al texto.
+    result = result.filter((c) => {
+      const name = c.creator_business?.company?.name ?? c.creator_business?.assigned_agency;
+      return name === filters.agency;
+    });
   }
   if (filters.status) {
     result = result.filter((c) => c.status === filters.status);

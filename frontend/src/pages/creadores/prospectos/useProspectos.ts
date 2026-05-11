@@ -159,13 +159,21 @@ export function useStartOnboarding() {
         .single();
       if (creatorError) throw creatorError;
 
-      // 2. Create creator_business with agency
+      // 2. Create creator_business with agency.
+      // Dual-write: lookup company_id en scouter_companies por name match
+      // case-insensitive. Si no matchea, queda NULL.
+      const { data: companyRow } = await supabase
+        .from("scouter_companies")
+        .select("id")
+        .ilike("name", agency)
+        .maybeSingle();
       const { error: bizError } = await supabase
         .from("creator_business")
         .insert({
           creator_id: creator.id,
           assigned_agency: agency,
-        });
+          company_id: (companyRow as any)?.id ?? null,
+        } as any);
       if (bizError) throw bizError;
 
       // 3. Update prospect status to convertido

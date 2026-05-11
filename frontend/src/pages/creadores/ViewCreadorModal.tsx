@@ -185,7 +185,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 <InfoField icon={MapPin} label="Ubicación" value={
                   <span>{flag && <span className="mr-1">{flag}</span>}{c.city || c.country || "—"}</span>
                 } />
-                <InfoField icon={Building2} label="Agencia" value={c.creator_business?.assigned_agency} />
+                <InfoField icon={Building2} label="Agencia" value={c.creator_business?.company?.name ?? c.creator_business?.assigned_agency} />
                 <InfoField icon={Mail} label="Email" value={c.email} />
                 <InfoField icon={Phone} label="Teléfono" value={c.phone} />
                 <InfoField icon={UserCog} label="Tipo de Manager" value={c.creator_business?.manager_type} />

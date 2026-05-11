@@ -188,11 +188,17 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         return;
       }
 
+      // Dual-write: derivamos company_id desde el name elegido (puede
+      // ser una compañía recién creada via useCreateCompany — la lista
+      // ya está fresca en scouterCompanies por la invalidation que ese
+      // hook dispara).
+      const matchedCompany = scouterCompanies.find((sc) => sc.name === data.company);
       const { data: inserted, error } = await supabase.from("leadgen_entries").insert({
         model_handle: normalizedHandle,
         platform: data.platform,
         quality: data.quality,
         company: data.company,
+        company_id: matchedCompany?.id ?? null,
         notes: data.notes || null,
         source_link: data.source_link,
         onlyfans_url: data.onlyfans_url?.trim() || null,

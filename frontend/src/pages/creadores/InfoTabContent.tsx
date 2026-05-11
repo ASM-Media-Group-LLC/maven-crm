@@ -117,7 +117,8 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
 
   const startEditing = () => {
     setEditData({
-      assigned_agency: biz?.assigned_agency ?? "",
+      // Lee del FK joined; fallback al texto si la FK no está poblada.
+      assigned_agency: (biz as any)?.company?.name ?? biz?.assigned_agency ?? "",
       category: c.category ?? "",
       manager_type: biz?.manager_type ?? "",
       country: c.country ?? "",
@@ -150,12 +151,19 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
         .eq("id", creatorId);
 
       if (biz?.id) {
+        // Dual-write: resolvemos company_id desde el name elegido (la
+        // lista viene de scouter_companies) y guardamos AMBOS — la FK
+        // canónica y el texto por backwards-compat.
+        const matchedCompany = scouterCompanies.find(
+          (sc) => sc.name === editData.assigned_agency,
+        );
         await supabase
           .from("creator_business")
           .update({
             assigned_agency: editData.assigned_agency || null,
+            company_id: matchedCompany?.id ?? null,
             manager_type: editData.manager_type || null,
-          })
+          } as any)
           .eq("id", biz.id);
       }
 
@@ -204,8 +212,8 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           </EditField>
         ) : (
           <InfoField label="Agencia Asignada" value={
-            biz?.assigned_agency ? (
-              <span className="text-primary cursor-pointer hover:underline">{biz.assigned_agency}</span>
+            ((biz as any)?.company?.name || biz?.assigned_agency) ? (
+              <span className="text-primary cursor-pointer hover:underline">{(biz as any)?.company?.name ?? biz?.assigned_agency}</span>
             ) : null
           } />
         )}

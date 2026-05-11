@@ -97,7 +97,7 @@ const CreadorasDashboardContent = () => {
   const byAgency = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of allCreators) {
-      const a = c.creator_business?.assigned_agency ?? "Sin agencia";
+      const a = c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? "Sin agencia";
       map[a] = (map[a] ?? 0) + 1;
     }
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
@@ -353,7 +353,7 @@ const CreadorasDashboardContent = () => {
                       <div className="hidden sm:flex items-center gap-4 text-right shrink-0">
                         <div>
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Agencia</p>
-                          <p className="text-xs font-medium truncate max-w-[120px]">{c.creator_business?.assigned_agency ?? "—"}</p>
+                          <p className="text-xs font-medium truncate max-w-[120px]">{c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? "—"}</p>
                         </div>
                         <Badge variant="outline" className={`text-[10px] ${statusBadgeClass[c.status ?? ""] ?? ""}`}>
                           {c.status}
@@ -446,7 +446,7 @@ const CreadorasDashboardContent = () => {
               .toUpperCase() || "?";
             const stats: { label: string; value: string }[] = [
               { label: "Estado", value: c.status ?? "—" },
-              { label: "Agencia", value: c.creator_business?.assigned_agency ?? "—" },
+              { label: "Agencia", value: c.creator_business?.company?.name ?? c.creator_business?.assigned_agency ?? "—" },
               { label: "País", value: c.country ?? "—" },
               { label: "Categoría", value: c.category ?? "—" },
               { label: "Registro", value: c.created_at ? format(new Date(c.created_at), "dd MMM yyyy", { locale: es }) : "—" },
@@ -568,10 +568,10 @@ const CreadorasDashboardContent = () => {
                         )}
                       </div>
                       <div className="hidden sm:flex items-center gap-4 text-right shrink-0">
-                        {c.creator_business?.assigned_agency && (
+                        {(c.creator_business?.company?.name || c.creator_business?.assigned_agency) && (
                           <div>
                             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Agencia</p>
-                            <p className="text-xs font-medium truncate max-w-[110px]">{c.creator_business.assigned_agency}</p>
+                            <p className="text-xs font-medium truncate max-w-[110px]">{c.creator_business?.company?.name ?? c.creator_business?.assigned_agency}</p>
                           </div>
                         )}
                         {c.country && (

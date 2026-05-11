@@ -283,6 +283,10 @@ const NuevoCreadorForm = () => {
         },
         business: {
           assigned_agency: form.assigned_agency || null,
+          // Dual-write: derivamos company_id desde el name elegido.
+          // Si no matchea (caso raro), queda NULL — el trigger podría
+          // recuperarlo después por name match.
+          company_id: scouterCompanies.find((sc) => sc.name === form.assigned_agency)?.id ?? null,
           agency_percentage: form.commission_type === "fixed" ? (form.agency_percentage || null) : null,
           commission_type: form.commission_type,
           commission_tiers: form.commission_type === "tiered" ? (form.commission_tiers as any) : [],
