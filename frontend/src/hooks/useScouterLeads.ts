@@ -238,14 +238,21 @@ export const useScouterLeads = (params: ListParams = {}) => {
 };
 
 /** Returns unique countries with counts for the country filter dropdown.
- *  Pagina en chunks de 1000 para abarcar todos los leads (con .limit(5000)
- *  perdíamos rows cuando el pool superaba ese tamaño y la suma de países
- *  no daba el total). Incluye una fila "Sin país" para los NULL, que
- *  antes se ocultaban con .not("country", "is", null) y hacían que el
- *  conteo total no cuadrara con la card de Total scouteadas. */
-export const useScouterCountries = () =>
-  useQuery({
-    queryKey: ["scouter-countries"],
+ *  Pagina en chunks de 1000 para abarcar todos los leads. Incluye una
+ *  fila "Sin país" para los NULL.
+ *
+ *  IMPORTANTE: aplica los mismos filtros que useScouterLeads (status,
+ *  aiQuality) — de otro modo el dropdown decía "853 México" pero la
+ *  lista solo mostraba 321 porque la lista filtra status=discovery +
+ *  AI aprobado por default y el contador no lo hacía.
+ */
+export const useScouterCountries = (filters: {
+  status?: string | "all";
+  aiQuality?: AiQualityFilter;
+} = {}) => {
+  const { status = "discovery", aiQuality = "approved" } = filters;
+  return useQuery({
+    queryKey: ["scouter-countries", { status, aiQuality }],
     queryFn: async (): Promise<Array<{ country: string; count: number }>> => {
       const CHUNK = 1000;
       const map = new Map<string, number>();
@@ -255,10 +262,16 @@ export const useScouterCountries = () =>
       // Hard cap a 100 chunks (100k rows) por seguridad.
       for (let i = 0; i < 100; i++) {
         const to = from + CHUNK - 1;
-        const { data, error } = await sb
-          .from("scouter_leads")
-          .select("country")
-          .range(from, to);
+        let q = sb.from("scouter_leads").select("country").range(from, to);
+        if (status !== "all") q = q.eq("status", status);
+        if (aiQuality === "approved") {
+          q = q.in("ai_status", ["high_fit", "medium_fit", "maybe", "approved"]);
+        } else if (aiQuality === "high_fit") {
+          q = q.eq("ai_status", "high_fit");
+        } else if (aiQuality === "scored") {
+          q = q.not("ai_status", "is", null);
+        }
+        const { data, error } = await q;
         if (error) throw error;
         const rows = (data ?? []) as { country: string | null }[];
         for (const row of rows) {
@@ -281,6 +294,7 @@ export const useScouterCountries = () =>
     },
     staleTime: 60_000,
   });
+};
 
 /** Set of lead ids the current user has marked as favorite. Used to
  * render the star overlay on cards and to drive favoritesOnly filters. */

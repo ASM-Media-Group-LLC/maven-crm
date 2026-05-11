@@ -404,7 +404,14 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
 
   const stats = useScouterStats();
   const companies = useScouterCompanies();
-  const countries = useScouterCountries();
+  // El dropdown de país ahora respeta status + aiQuality del filtro
+  // activo, para que el conteo coincida con lo que ves en la grilla.
+  // Antes mostraba "México 853" pero la grilla con filtros default
+  // solo cargaba ~321 → confusión total.
+  const countries = useScouterCountries({
+    status: statusFilter,
+    aiQuality,
+  });
   const leads = useScouterLeads({
     status: statusFilter,
     search,
