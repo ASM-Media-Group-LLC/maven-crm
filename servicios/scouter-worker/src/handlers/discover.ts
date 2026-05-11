@@ -77,36 +77,326 @@ const FLAG_TO_COUNTRY: Record<string, string> = {
   "🇲🇦": "Marruecos", "🇪🇬": "Egipto", "🇿🇦": "Sudáfrica", "🇳🇬": "Nigeria",
 };
 
-// Keywords de ciudades/palabras-clave → país canónico. Lista corta —
-// solo los matches más confiables. Lowercase, sin acentos.
+// Keywords de ciudades/palabras-clave → país canónico. Lowercase, sin
+// acentos. Ordenadas por especificidad: las claves más largas/más raras
+// se chequean primero (un loop normal va match-by-match, pero hay un
+// orden manual que pone "santiago de chile" antes que "santiago" para
+// que no se pierda el match más específico).
+//
+// Ambigüedades comunes resueltas:
+//   · Córdoba → "cordoba arg/ar/argentina" vs "cordoba esp/es/spain"
+//   · Valencia → "valencia es/españa/spain" vs "valencia ve/venezuela"
+//   · Santiago → "santiago de chile/chile" vs "santiago de cuba"
+//   · Mérida → "merida mx/mexico/yucatan" vs "merida ve/venezuela"
+//   · San José → "san jose costa rica/cr"
 const KEYWORD_TO_COUNTRY: Record<string, string> = {
-  // México
-  "mexico": "México", "mexicana": "México", "mexicano": "México",
-  "mexico city": "México", "cdmx": "México", "ciudad de mexico": "México",
-  "guadalajara": "México", "monterrey": "México", "puebla": "México",
-  "cancun": "México", "queretaro": "México", "tijuana": "México",
-  // Argentina
+  // ─── MÉXICO ──────────────────────────────────────────────────────
+  "mexico": "México", "méxico": "México", "mexicana": "México",
+  "mexicano": "México", "mexicanx": "México", "mex 🇲🇽": "México",
+  "mexico city": "México", "ciudad de mexico": "México", "cdmx": "México",
+  "df mexico": "México",
+  "guadalajara": "México", "gdl": "México", "tapatia": "México",
+  "tapatio": "México", "jalisco": "México",
+  "monterrey": "México", "mty": "México", "regio mx": "México",
+  "regiomontana": "México", "regiomontano": "México",
+  "tijuana": "México", "tj mexico": "México", "tj baja": "México",
+  "baja california": "México", "mexicali": "México", "ensenada": "México",
+  "cancun": "México", "cdmx 🇲🇽": "México", "playa del carmen": "México",
+  "tulum": "México", "cozumel": "México", "riviera maya": "México",
+  "queretaro": "México", "qro": "México",
+  "puebla": "México", "pue mexico": "México", "puebla mx": "México",
+  "merida mx": "México", "merida mexico": "México", "merida yucatan": "México",
+  "yucatan": "México", "campeche": "México", "quintana roo": "México",
+  "leon mexico": "México", "leon mx": "México", "leon guanajuato": "México",
+  "guanajuato": "México", "san miguel de allende": "México",
+  "toluca": "México", "estado de mexico": "México", "edomex": "México",
+  "acapulco": "México", "veracruz": "México", "mazatlan": "México",
+  "hermosillo": "México", "saltillo": "México", "aguascalientes": "México",
+  "tampico": "México", "chihuahua": "México", "ciudad juarez": "México",
+  "oaxaca": "México", "morelia": "México", "michoacan": "México",
+  "culiacan": "México", "sinaloa": "México", "san luis potosi": "México",
+  "slp mexico": "México", "pachuca": "México", "hidalgo mexico": "México",
+  "tepic": "México", "nayarit": "México", "villahermosa": "México",
+  "tabasco": "México", "durango": "México", "los cabos": "México",
+  "san cabos": "México", "huatulco": "México", "puerto vallarta": "México",
+  "vallarta mexico": "México", "ixtapa": "México", "zihuatanejo": "México",
+
+  // ─── ARGENTINA ───────────────────────────────────────────────────
   "argentina": "Argentina", "argentino": "Argentina", "argentina🇦🇷": "Argentina",
-  "buenos aires": "Argentina", "bsas": "Argentina",
-  "cordoba": "Argentina", "rosario": "Argentina", "mendoza": "Argentina",
-  // Brasil
-  "brasil": "Brasil", "brazil": "Brasil", "brasilera": "Brasil",
-  "brasileira": "Brasil", "brasileiro": "Brasil", "sao paulo": "Brasil",
-  "rio de janeiro": "Brasil", "salvador bahia": "Brasil",
-  // Colombia
-  "colombia": "Colombia", "colombiana": "Colombia", "bogota": "Colombia",
-  "medellin": "Colombia", "cali colombia": "Colombia",
-  // Chile
-  "chile": "Chile", "chilena": "Chile", "santiago de chile": "Chile",
-  // Venezuela
-  "venezuela": "Venezuela", "venezolana": "Venezuela", "caracas": "Venezuela",
-  // España
+  "argenta": "Argentina", "argento": "Argentina",
+  "buenos aires": "Argentina", "bsas": "Argentina", "bs as": "Argentina",
+  "bs.as": "Argentina", "capital federal": "Argentina", "caba": "Argentina",
+  "porteño": "Argentina", "porteña": "Argentina", "porteno": "Argentina",
+  "portena": "Argentina", "palermo arg": "Argentina", "palermo bsas": "Argentina",
+  "recoleta": "Argentina", "belgrano arg": "Argentina", "caballito": "Argentina",
+  "almagro arg": "Argentina", "villa crespo": "Argentina",
+  "cordoba arg": "Argentina", "cordoba ar": "Argentina",
+  "cordoba argentina": "Argentina", "cordobesa": "Argentina",
+  "cordobes": "Argentina", "cba arg": "Argentina",
+  "rosario arg": "Argentina", "rosario ar": "Argentina",
+  "rosario santa fe": "Argentina", "rosarino": "Argentina", "rosarina": "Argentina",
+  "santa fe arg": "Argentina", "santa fe ar": "Argentina",
+  "mendoza arg": "Argentina", "mendoza ar": "Argentina", "mdz": "Argentina",
+  "mendocina": "Argentina", "mendocino": "Argentina",
+  "la plata arg": "Argentina", "la plata bsas": "Argentina",
+  "mar del plata": "Argentina", "mdp arg": "Argentina", "marplatense": "Argentina",
+  "tucuman arg": "Argentina", "tucuman ar": "Argentina", "tucumana": "Argentina",
+  "salta arg": "Argentina", "salta ar": "Argentina", "salteña": "Argentina",
+  "bariloche": "Argentina", "brc": "Argentina", "patagonia arg": "Argentina",
+  "neuquen": "Argentina", "neuquina": "Argentina", "san juan arg": "Argentina",
+  "san juan argentina": "Argentina", "jujuy": "Argentina", "jujeña": "Argentina",
+  "entre rios": "Argentina", "tigre arg": "Argentina", "san isidro arg": "Argentina",
+  "zona norte arg": "Argentina", "zona sur arg": "Argentina", "gba arg": "Argentina",
+  "ushuaia": "Argentina", "tierra del fuego": "Argentina",
+
+  // ─── BRASIL ──────────────────────────────────────────────────────
+  "brasil": "Brasil", "brazil": "Brasil", "brasileira": "Brasil",
+  "brasileiro": "Brasil", "brasilera": "Brasil", "brasilero": "Brasil",
+  "sao paulo": "Brasil", "são paulo": "Brasil", "sp brasil": "Brasil",
+  "sampa": "Brasil", "paulista": "Brasil", "paulistano": "Brasil",
+  "paulistana": "Brasil",
+  "rio de janeiro": "Brasil", "rj brasil": "Brasil", "rj brazil": "Brasil",
+  "carioca": "Brasil", "ipanema": "Brasil", "copacabana": "Brasil",
+  "leblon": "Brasil", "barra da tijuca": "Brasil",
+  "salvador bahia": "Brasil", "ssa brasil": "Brasil", "bahiana": "Brasil",
+  "bahiano": "Brasil", "soteropolitano": "Brasil",
+  "brasilia": "Brasil", "brasília": "Brasil", "bsb brasil": "Brasil",
+  "belo horizonte": "Brasil", "bh brasil": "Brasil", "bhz brasil": "Brasil",
+  "mineiro": "Brasil", "mineira": "Brasil", "minas gerais": "Brasil",
+  "fortaleza": "Brasil", "fortaleza ce": "Brasil", "cearense": "Brasil",
+  "ceará": "Brasil",
+  "manaus": "Brasil", "amazonas brasil": "Brasil", "amazonense": "Brasil",
+  "curitiba": "Brasil", "cwb brasil": "Brasil", "curitibano": "Brasil",
+  "curitibana": "Brasil", "parana brasil": "Brasil", "paranaense": "Brasil",
+  "recife": "Brasil", "pernambuco": "Brasil", "pernambucana": "Brasil",
+  "pernambucano": "Brasil",
+  "porto alegre": "Brasil", "poa brasil": "Brasil", "gaucho": "Brasil",
+  "gaucha": "Brasil", "rio grande do sul": "Brasil",
+  "florianopolis": "Brasil", "floripa": "Brasil", "fln brasil": "Brasil",
+  "santa catarina": "Brasil", "catarinense": "Brasil",
+  "goiania": "Brasil", "goiás brasil": "Brasil", "belem para": "Brasil",
+  "natal rn": "Brasil", "natal brasil": "Brasil", "joao pessoa": "Brasil",
+  "maceio": "Brasil", "aracaju": "Brasil", "vitoria es brasil": "Brasil",
+  "campinas": "Brasil", "santos brasil": "Brasil", "guaruja": "Brasil",
+  "buzios": "Brasil", "paraty": "Brasil",
+
+  // ─── COLOMBIA ────────────────────────────────────────────────────
+  "colombia": "Colombia", "colombiana": "Colombia", "colombiano": "Colombia",
+  "colombianita": "Colombia",
+  "bogota": "Colombia", "bog colombia": "Colombia", "rolo bogotano": "Colombia",
+  "rola bogotana": "Colombia", "cundinamarca": "Colombia",
+  "medellin": "Colombia", "medellín": "Colombia", "mde colombia": "Colombia",
+  "med colombia": "Colombia", "paisa": "Colombia", "antioquia": "Colombia",
+  "antioqueña": "Colombia", "antioqueno": "Colombia",
+  "cali colombia": "Colombia", "cali col": "Colombia", "caleña": "Colombia",
+  "caleño": "Colombia", "valle del cauca": "Colombia",
+  "cartagena col": "Colombia", "cartagena colombia": "Colombia",
+  "ctg colombia": "Colombia", "cartagenera": "Colombia",
+  "barranquilla": "Colombia", "baq colombia": "Colombia", "barranquillera": "Colombia",
+  "barranquillero": "Colombia", "costeña col": "Colombia",
+  "bucaramanga": "Colombia", "bga colombia": "Colombia", "bumangues": "Colombia",
+  "santander col": "Colombia", "pereira col": "Colombia", "pereirana": "Colombia",
+  "manizales": "Colombia", "manizalita": "Colombia", "caldas col": "Colombia",
+  "santa marta col": "Colombia", "santa marta colombia": "Colombia",
+  "samaria col": "Colombia", "magdalena col": "Colombia",
+  "cucuta": "Colombia", "norte de santander": "Colombia",
+  "ibague": "Colombia", "tolima col": "Colombia",
+  "armenia col": "Colombia", "quindio": "Colombia",
+  "monteria": "Colombia", "neiva col": "Colombia", "huila col": "Colombia",
+  "villavicencio": "Colombia",
+  "san andres col": "Colombia", "providencia col": "Colombia",
+
+  // ─── CHILE ───────────────────────────────────────────────────────
+  "chile": "Chile", "chilena": "Chile", "chileno": "Chile",
+  "santiago de chile": "Chile", "santiago chile": "Chile", "scl chile": "Chile",
+  "santiaguino": "Chile", "santiaguina": "Chile",
+  "providencia chile": "Chile", "las condes": "Chile", "vitacura": "Chile",
+  "ñuñoa": "Chile", "lo barnechea": "Chile",
+  "valparaiso": "Chile", "valpo": "Chile", "porteña chile": "Chile",
+  "viña del mar": "Chile", "viña chile": "Chile", "vina del mar": "Chile",
+  "viñamarina": "Chile",
+  "concepcion chile": "Chile", "ccp chile": "Chile", "penquista": "Chile",
+  "antofagasta": "Chile", "la serena chile": "Chile",
+  "temuco": "Chile", "araucania": "Chile", "iquique": "Chile",
+  "puerto montt": "Chile", "puerto varas": "Chile", "chiloe": "Chile",
+  "patagonia chilena": "Chile", "punta arenas": "Chile",
+  "rancagua": "Chile", "talca chile": "Chile", "chillan": "Chile",
+  "arica chile": "Chile",
+
+  // ─── VENEZUELA ───────────────────────────────────────────────────
+  "venezuela": "Venezuela", "venezolana": "Venezuela", "venezolano": "Venezuela",
+  "venezolana🇻🇪": "Venezuela",
+  "caracas": "Venezuela", "ccs venezuela": "Venezuela", "caraqueña": "Venezuela",
+  "caraqueño": "Venezuela",
+  "maracaibo": "Venezuela", "mcbo": "Venezuela", "zuliana": "Venezuela",
+  "zuliano": "Venezuela", "zulia ve": "Venezuela",
+  "valencia ve": "Venezuela", "valencia venezuela": "Venezuela",
+  "valencia carabobo": "Venezuela", "carabobeña": "Venezuela",
+  "barquisimeto": "Venezuela", "lara venezuela": "Venezuela",
+  "maracay": "Venezuela", "aragua venezuela": "Venezuela",
+  "merida ve": "Venezuela", "merida venezuela": "Venezuela",
+  "puerto la cruz ve": "Venezuela", "puerto ordaz ve": "Venezuela",
+  "ciudad bolivar ve": "Venezuela", "isla margarita": "Venezuela",
+  "san cristobal ve": "Venezuela", "tachira ve": "Venezuela",
+
+  // ─── PERÚ ────────────────────────────────────────────────────────
+  "peru": "Perú", "perú": "Perú", "peruana": "Perú", "peruano": "Perú",
+  "lima peru": "Perú", "lima perú": "Perú", "lim peru": "Perú",
+  "limeña": "Perú", "limeño": "Perú", "miraflores peru": "Perú",
+  "barranco peru": "Perú", "san isidro peru": "Perú",
+  "arequipa": "Perú", "aqp peru": "Perú", "arequipeña": "Perú",
+  "arequipeño": "Perú",
+  "cusco": "Perú", "cuzco": "Perú", "machu picchu": "Perú", "cusqueña": "Perú",
+  "trujillo peru": "Perú", "trujillana": "Perú", "trujillano": "Perú",
+  "piura": "Perú", "piurana": "Perú", "iquitos": "Perú",
+  "chiclayo": "Perú", "chiclayana": "Perú", "huancayo": "Perú",
+  "tacna": "Perú", "puno peru": "Perú", "ica peru": "Perú",
+  "callao peru": "Perú", "chalaca": "Perú",
+
+  // ─── URUGUAY ─────────────────────────────────────────────────────
+  "uruguay": "Uruguay", "uruguaya": "Uruguay", "uruguayo": "Uruguay",
+  "montevideo": "Uruguay", "mvd uy": "Uruguay", "montevideana": "Uruguay",
+  "montevideano": "Uruguay",
+  "punta del este": "Uruguay", "punta uy": "Uruguay", "maldonado uy": "Uruguay",
+  "salto uy": "Uruguay", "paysandu": "Uruguay", "colonia uy": "Uruguay",
+
+  // ─── PARAGUAY ────────────────────────────────────────────────────
+  "paraguay": "Paraguay", "paraguaya": "Paraguay", "paraguayo": "Paraguay",
+  "asuncion py": "Paraguay", "asunción py": "Paraguay", "asu paraguay": "Paraguay",
+  "ciudad del este": "Paraguay", "cde paraguay": "Paraguay",
+  "encarnacion py": "Paraguay", "pedro juan caballero": "Paraguay",
+
+  // ─── BOLIVIA ─────────────────────────────────────────────────────
+  "bolivia": "Bolivia", "boliviana": "Bolivia", "boliviano": "Bolivia",
+  "la paz bo": "Bolivia", "la paz bolivia": "Bolivia", "lpz bolivia": "Bolivia",
+  "paceña": "Bolivia",
+  "santa cruz bo": "Bolivia", "santa cruz bolivia": "Bolivia",
+  "cruceña": "Bolivia", "cruceño": "Bolivia",
+  "cochabamba": "Bolivia", "cochabambina": "Bolivia",
+  "sucre bo": "Bolivia", "sucre bolivia": "Bolivia",
+  "potosi bo": "Bolivia", "oruro bo": "Bolivia", "tarija bo": "Bolivia",
+
+  // ─── ECUADOR ─────────────────────────────────────────────────────
+  "ecuador": "Ecuador", "ecuatoriana": "Ecuador", "ecuatoriano": "Ecuador",
+  "quito": "Ecuador", "uio ecuador": "Ecuador", "quiteña": "Ecuador",
+  "quiteño": "Ecuador",
+  "guayaquil": "Ecuador", "gye ecuador": "Ecuador", "guayaca": "Ecuador",
+  "guayaco": "Ecuador",
+  "cuenca ec": "Ecuador", "cuenca ecuador": "Ecuador", "cuencana": "Ecuador",
+  "manta ecuador": "Ecuador", "salinas ecuador": "Ecuador",
+  "galapagos": "Ecuador",
+
+  // ─── CUBA ────────────────────────────────────────────────────────
+  "cuba": "Cuba", "cubana": "Cuba", "cubano": "Cuba",
+  "la habana": "Cuba", "havana": "Cuba", "habana cuba": "Cuba",
+  "habanera": "Cuba", "habanero": "Cuba",
+  "santiago de cuba": "Cuba", "varadero": "Cuba", "matanzas cuba": "Cuba",
+  "holguin cuba": "Cuba", "camaguey": "Cuba", "santa clara cuba": "Cuba",
+
+  // ─── REPÚBLICA DOMINICANA ───────────────────────────────────────
+  "republica dominicana": "República Dominicana",
+  "república dominicana": "República Dominicana",
+  "dominican republic": "República Dominicana", "dominicana": "República Dominicana",
+  "dominicano": "República Dominicana",
+  "santo domingo": "República Dominicana", "sdq": "República Dominicana",
+  "punta cana": "República Dominicana", "puj dominicana": "República Dominicana",
+  "santiago do": "República Dominicana", "santiago rd": "República Dominicana",
+  "puerto plata": "República Dominicana", "la romana rd": "República Dominicana",
+
+  // ─── PUERTO RICO ────────────────────────────────────────────────
+  "puerto rico": "Puerto Rico", "puertorriqueña": "Puerto Rico",
+  "puertorriqueño": "Puerto Rico", "boricua": "Puerto Rico",
+  "san juan pr": "Puerto Rico", "san juan puerto rico": "Puerto Rico",
+  "bayamon pr": "Puerto Rico", "ponce pr": "Puerto Rico",
+  "mayaguez pr": "Puerto Rico", "caguas pr": "Puerto Rico",
+
+  // ─── PANAMÁ ─────────────────────────────────────────────────────
+  "panama": "Panamá", "panamá": "Panamá", "panameña": "Panamá",
+  "panameño": "Panamá",
+  "panama city": "Panamá", "pty panama": "Panamá", "ciudad de panama": "Panamá",
+  "colon panama": "Panamá", "david panama": "Panamá", "chitre": "Panamá",
+  "bocas del toro": "Panamá", "san blas panama": "Panamá",
+
+  // ─── COSTA RICA ─────────────────────────────────────────────────
+  "costa rica": "Costa Rica", "costarricense": "Costa Rica", "tica": "Costa Rica",
+  "tico": "Costa Rica", "ticx": "Costa Rica",
+  "san jose costa rica": "Costa Rica", "san jose cr": "Costa Rica",
+  "sjo costa rica": "Costa Rica", "heredia cr": "Costa Rica",
+  "alajuela": "Costa Rica", "guanacaste cr": "Costa Rica", "tamarindo cr": "Costa Rica",
+  "puntarenas cr": "Costa Rica", "cartago cr": "Costa Rica",
+
+  // ─── GUATEMALA ──────────────────────────────────────────────────
+  "guatemala": "Guatemala", "guatemalteca": "Guatemala", "guatemalteco": "Guatemala",
+  "chapina": "Guatemala", "chapin": "Guatemala",
+  "guatemala city": "Guatemala", "gua guatemala": "Guatemala",
+  "antigua guatemala": "Guatemala", "quetzaltenango": "Guatemala", "xela": "Guatemala",
+
+  // ─── EL SALVADOR ────────────────────────────────────────────────
+  "el salvador": "El Salvador", "salvadoreña": "El Salvador",
+  "salvadoreño": "El Salvador", "guanaca": "El Salvador", "guanaco": "El Salvador",
+  "san salvador": "El Salvador", "santa ana es": "El Salvador",
+  "san miguel es": "El Salvador",
+
+  // ─── HONDURAS ───────────────────────────────────────────────────
+  "honduras": "Honduras", "hondureña": "Honduras", "hondureño": "Honduras",
+  "catracha": "Honduras", "catracho": "Honduras",
+  "tegucigalpa": "Honduras", "tegus": "Honduras", "san pedro sula": "Honduras",
+  "sps honduras": "Honduras", "roatan": "Honduras", "la ceiba honduras": "Honduras",
+
+  // ─── NICARAGUA ──────────────────────────────────────────────────
+  "nicaragua": "Nicaragua", "nicaraguense": "Nicaragua", "nicaragüense": "Nicaragua",
+  "nica": "Nicaragua",
+  "managua": "Nicaragua", "mga nicaragua": "Nicaragua",
+  "granada nicaragua": "Nicaragua", "leon nicaragua": "Nicaragua",
+  "san juan del sur": "Nicaragua",
+
+  // ─── JAMAICA ────────────────────────────────────────────────────
+  "jamaica": "Jamaica", "jamaicana": "Jamaica", "jamaicano": "Jamaica",
+  "kingston jamaica": "Jamaica", "montego bay": "Jamaica", "ocho rios": "Jamaica",
+
+  // ─── ESPAÑA ─────────────────────────────────────────────────────
   "españa": "España", "espana": "España", "spain": "España",
-  "madrid": "España", "barcelona": "España", "valencia es": "España",
-  // Otros confiables
-  "peru": "Perú", "peruana": "Perú", "lima peru": "Perú",
-  "uruguay": "Uruguay", "uruguaya": "Uruguay", "montevideo": "Uruguay",
-  "ecuador": "Ecuador", "ecuatoriana": "Ecuador", "quito": "Ecuador",
+  "española": "España", "espanola": "España", "español": "España",
+  "espanol": "España",
+  "madrid": "España", "mad spain": "España", "madrileña": "España",
+  "madrileño": "España", "chamartin": "España", "malasaña": "España",
+  "barcelona": "España", "bcn spain": "España", "bcn españa": "España",
+  "barcelonesa": "España", "barcelones": "España", "catalana": "España",
+  "catalan": "España", "cataluña": "España", "catalunya": "España",
+  "valencia es": "España", "valencia spain": "España",
+  "valencia españa": "España", "valenciana": "España", "valenciano": "España",
+  "sevilla": "España", "svq spain": "España", "sevillana": "España",
+  "sevillano": "España", "andalucia": "España", "andaluz": "España",
+  "andaluza": "España",
+  "bilbao": "España", "bio spain": "España", "vasca": "España", "vasco": "España",
+  "euskadi": "España", "pais vasco": "España",
+  "malaga": "España", "agp spain": "España", "marbella": "España",
+  "costa del sol": "España", "torremolinos": "España", "fuengirola": "España",
+  "zaragoza": "España", "maña spain": "España", "aragon spain": "España",
+  "murcia es": "España", "murciana": "España",
+  "palma de mallorca": "España", "pmi spain": "España", "ibiza": "España",
+  "menorca": "España", "mallorca": "España",
+  "las palmas": "España", "gran canaria": "España", "tenerife": "España",
+  "canarias": "España", "canaria": "España", "canarian": "España",
+  "granada es": "España", "granada españa": "España", "granadina": "España",
+  "alicante es": "España", "alicantina": "España", "benidorm": "España",
+  "cordoba es": "España", "cordoba esp": "España", "cordoba spain": "España",
+  "cordoba españa": "España", "cordoba andalucia": "España",
+  "a coruña": "España", "coruña spain": "España", "galicia": "España",
+  "gallega": "España", "gallego": "España",
+  "vigo es": "España", "vigo spain": "España", "gijon": "España",
+  "asturias": "España", "asturiana": "España", "oviedo es": "España",
+  "santander es": "España", "cantabria": "España",
+  "pamplona": "España", "navarra": "España", "logroño": "España",
+  "la rioja es": "España", "san sebastian": "España", "donosti": "España",
+  "donostia": "España", "salamanca es": "España", "salmantina": "España",
+  "valladolid": "España", "burgos es": "España", "leon es": "España",
+  "leon españa": "España", "leon spain": "España", "castilla y leon": "España",
+  "toledo es": "España", "toledana": "España", "albacete": "España",
+  "ciudad real": "España", "castilla la mancha": "España",
+  "cadiz": "España", "gaditana": "España", "jerez": "España",
+  "almeria": "España", "huelva": "España", "jaen es": "España",
+  "extremadura": "España", "badajoz": "España", "caceres es": "España",
 };
 
 function inferCountry(item: ProfileItem): string | null {
@@ -128,12 +418,60 @@ function inferCountry(item: ProfileItem): string | null {
   for (const [kw, country] of Object.entries(KEYWORD_TO_COUNTRY)) {
     if (norm.includes(kw)) return country;
   }
-  // 3) Sufijo del handle (señal débil — solo para countries muy comunes)
+  // 3) Sufijo del handle (señal débil pero suma cuando va sola). Match
+  //    busca el patrón _xx o xx_ al final del handle. Solo abreviaturas
+  //    inequívocas — evitamos colisiones tipo "_es" que también es plural
+  //    en español, o "_co" que podría ser ".com".
   const handle = (item.username ?? "").toLowerCase();
-  if (/_(mx|mex|mexico)\b/.test(handle)) return "México";
-  if (/_(arg|argentina)\b/.test(handle)) return "Argentina";
-  if (/_(br|brasil|brazil)\b/.test(handle)) return "Brasil";
-  if (/_(col|colombia)\b/.test(handle)) return "Colombia";
+  const suffixMatch: Array<[RegExp, string]> = [
+    // México
+    [/(?:_|^)(mx|mex|mexico|mxn|mexicana|mexicano|cdmx|gdl|mty)(?:_|\d*$)/, "México"],
+    // Argentina
+    [/(?:_|^)(arg|argentina|argenta|bsas|caba|mdz)(?:_|\d*$)/, "Argentina"],
+    // Brasil
+    [/(?:_|^)(br|bra|brasil|brazil|carioca|paulista|sampa)(?:_|\d*$)/, "Brasil"],
+    // Colombia
+    [/(?:_|^)(col|colombia|paisa|bogota|medellin)(?:_|\d*$)/, "Colombia"],
+    // Chile
+    [/(?:_|^)(chl|chile|chilena|santiagochile|scl)(?:_|\d*$)/, "Chile"],
+    // Perú
+    [/(?:_|^)(pe|peru|peruana|limena|limeño)(?:_|\d*$)/, "Perú"],
+    // Venezuela
+    [/(?:_|^)(ve|ven|venezuela|venezolana|caracas|ccs)(?:_|\d*$)/, "Venezuela"],
+    // Uruguay
+    [/(?:_|^)(uy|uru|uruguay|uruguaya|mvd)(?:_|\d*$)/, "Uruguay"],
+    // Paraguay
+    [/(?:_|^)(py|par|paraguay|paraguaya|asu)(?:_|\d*$)/, "Paraguay"],
+    // Bolivia
+    [/(?:_|^)(bo|bol|bolivia|boliviana|lpb)(?:_|\d*$)/, "Bolivia"],
+    // Ecuador
+    [/(?:_|^)(ec|ecu|ecuador|ecuatoriana|uio|gye)(?:_|\d*$)/, "Ecuador"],
+    // Costa Rica
+    [/(?:_|^)(cr|crc|costarica|costarrica|tica)(?:_|\d*$)/, "Costa Rica"],
+    // Panamá
+    [/(?:_|^)(pa|pty|panama|panameña|panamenia)(?:_|\d*$)/, "Panamá"],
+    // República Dominicana
+    [/(?:_|^)(rd|do|dom|dominicana|sdq)(?:_|\d*$)/, "República Dominicana"],
+    // Puerto Rico
+    [/(?:_|^)(pr|boricua|puertorico|sanjuanpr)(?:_|\d*$)/, "Puerto Rico"],
+    // Cuba
+    [/(?:_|^)(cu|cuba|cubana|habana)(?:_|\d*$)/, "Cuba"],
+    // Guatemala
+    [/(?:_|^)(gt|gua|guate|guatemala|chapina)(?:_|\d*$)/, "Guatemala"],
+    // Honduras
+    [/(?:_|^)(hn|hnd|honduras|catracha)(?:_|\d*$)/, "Honduras"],
+    // El Salvador
+    [/(?:_|^)(sv|elsalvador|salvadoreña|guanaca)(?:_|\d*$)/, "El Salvador"],
+    // Nicaragua
+    [/(?:_|^)(ni|nic|nicaragua|nica)(?:_|\d*$)/, "Nicaragua"],
+    // Jamaica
+    [/(?:_|^)(jm|jamaica|jamaicana)(?:_|\d*$)/, "Jamaica"],
+    // España
+    [/(?:_|^)(esp|españa|espana|spain|madrid|bcn|catalana|catalan)(?:_|\d*$)/, "España"],
+  ];
+  for (const [re, country] of suffixMatch) {
+    if (re.test(handle)) return country;
+  }
   return null;
 }
 
