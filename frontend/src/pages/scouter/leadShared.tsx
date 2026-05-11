@@ -29,6 +29,7 @@ import {
   type ScouterLead,
 } from "@/hooks/useScouterLeads";
 import ConvertScouterLeadModal from "./ConvertScouterLeadModal";
+import { COUNTRIES_ALPHA, COUNTRY_FLAGS } from "@/lib/countries";
 
 // ─── Status palette (shared by Home grid + Leads table) ────────────────
 // Nota: a partir de la simplificación del popup (2026-05), los closer
@@ -79,26 +80,12 @@ export const initialsBg = (seed: string): string => {
   return `linear-gradient(135deg, hsl(${h}, 40%, 30%) 0%, hsl(${(h + 60) % 360}, 50%, 20%) 100%)`;
 };
 
-// ─── Country flag mapper ────────────────────────────────────────────────
-const COUNTRY_FLAGS: Record<string, string> = {
-  colombia: "🇨🇴", mexico: "🇲🇽", méxico: "🇲🇽", argentina: "🇦🇷",
-  chile: "🇨🇱", peru: "🇵🇪", perú: "🇵🇪", ecuador: "🇪🇨",
-  venezuela: "🇻🇪", "united states": "🇺🇸", usa: "🇺🇸", "estados unidos": "🇺🇸",
-  spain: "🇪🇸", españa: "🇪🇸", brazil: "🇧🇷", brasil: "🇧🇷",
-  "dominican republic": "🇩🇴", "república dominicana": "🇩🇴", "costa rica": "🇨🇷",
-  panama: "🇵🇦", panamá: "🇵🇦", guatemala: "🇬🇹", honduras: "🇭🇳",
-  "el salvador": "🇸🇻", nicaragua: "🇳🇮", uruguay: "🇺🇾", paraguay: "🇵🇾",
-  bolivia: "🇧🇴", "puerto rico": "🇵🇷", cuba: "🇨🇺",
-  canada: "🇨🇦", canadá: "🇨🇦", uk: "🇬🇧", "united kingdom": "🇬🇧",
-  france: "🇫🇷", francia: "🇫🇷", germany: "🇩🇪", alemania: "🇩🇪",
-  italy: "🇮🇹", italia: "🇮🇹", portugal: "🇵🇹", romania: "🇷🇴", rumania: "🇷🇴",
-  philippines: "🇵🇭", filipinas: "🇵🇭", japan: "🇯🇵", japón: "🇯🇵",
-  australia: "🇦🇺", india: "🇮🇳",
-};
-
+// Flag helper — usa el mapa canónico centralizado en @/lib/countries.
+// Antes había un Record local con keys en lowercase, pero ahora que
+// hay backfill + Select cerrado, las keys vienen ya canónicas.
 export const countryToFlag = (country: string | null | undefined): string => {
   if (!country) return "";
-  return COUNTRY_FLAGS[country.toLowerCase().trim()] ?? "🌍";
+  return COUNTRY_FLAGS[country] ?? COUNTRY_FLAGS[country.trim()] ?? "🌍";
 };
 
 // ─── Verified badge (IG-style) ──────────────────────────────────────────
@@ -564,13 +551,30 @@ export const LeadDrawer = ({
 
                 <Field label="País">
                   {editing ? (
-                    <Input
-                      value={(get("country") as string) ?? ""}
-                      onChange={(e) => setField("country", e.target.value || null)}
-                      className="h-8"
-                    />
+                    <Select
+                      value={(get("country") as string) ?? "__none__"}
+                      onValueChange={(v) =>
+                        setField("country", v === "__none__" ? null : v)
+                      }
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Seleccionar país" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Sin país —</SelectItem>
+                        {COUNTRIES_ALPHA.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {COUNTRY_FLAGS[c] ?? "🌍"} {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   ) : (
-                    <span>{lead.country ?? "—"}</span>
+                    <span>
+                      {lead.country
+                        ? `${COUNTRY_FLAGS[lead.country] ?? "🌍"} ${lead.country}`
+                        : "—"}
+                    </span>
                   )}
                 </Field>
 
