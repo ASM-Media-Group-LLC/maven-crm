@@ -15,7 +15,6 @@ import {
   ArrowDown,
   Crown,
   Instagram,
-  ExternalLink,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -29,7 +28,6 @@ import {
 } from "recharts";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +42,7 @@ import {
   useMetricDetails,
   useLeadDetail,
   useBestCloser,
+  CATEGORY_ORDER,
   type MetricKey,
   type DashboardRange,
   type DetailRow,
@@ -169,60 +168,46 @@ const DetailDialog = ({
             <p className="text-sm text-muted-foreground text-center py-12">
               Sin registros en el rango seleccionado.
             </p>
-          ) : (
-            data.map((row) => {
-              const handleRowClick = () => {
-                if (row.linkUrl) {
-                  navigate(row.linkUrl);
-                  onOpenChange(false);
-                  return;
-                }
-                if (row.leadSource) {
-                  setDetailLead({
-                    source: row.leadSource,
-                    id: row.id,
-                    title: row.primary,
-                  });
-                }
-              };
-              const isClickable = !!row.linkUrl || !!row.leadSource;
+          ) : (() => {
+            // Si NINGUNA fila trae category, mantenemos la lista plana
+            // (mismo display de siempre). Si al menos una la trae, agrupamos
+            // por categoría con header. Las que vengan sin category caen a
+            // "Sin categoría" al final.
+            const hasCategory = data.some((r) => r.category);
+            if (!hasCategory) {
+              return data.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead));
+            }
+            const groups = new Map<string, DetailRow[]>();
+            for (const r of data) {
+              const key = r.category ?? "Sin categoría";
+              const arr = groups.get(key) ?? [];
+              arr.push(r);
+              groups.set(key, arr);
+            }
+            const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+              const sa = CATEGORY_ORDER[a] ?? 999;
+              const sb = CATEGORY_ORDER[b] ?? 999;
+              if (sa !== sb) return sa - sb;
+              return a.localeCompare(b);
+            });
+            return sortedKeys.map((cat) => {
+              const rows = groups.get(cat)!;
               return (
-                <div
-                  key={row.id}
-                  onClick={handleRowClick}
-                  className={cn(
-                    "flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors",
-                    isClickable &&
-                      "cursor-pointer hover:bg-accent hover:border-primary/40",
-                  )}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{row.primary}</p>
-                    {row.secondary && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {row.secondary}
-                      </p>
-                    )}
+                <div key={cat} className="space-y-1.5">
+                  <div className="flex items-center gap-2 pt-2 pb-1">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {cat}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground tabular-nums">
+                      · {rows.length}
+                    </span>
+                    <div className="h-px flex-1 bg-border/40" />
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {row.badge && (
-                      <Badge variant="outline" className="text-[10px]">
-                        {row.badge}
-                      </Badge>
-                    )}
-                    {row.date && (
-                      <span className="text-[10px] text-muted-foreground tabular-nums">
-                        {format(new Date(row.date), "d MMM", { locale: es })}
-                      </span>
-                    )}
-                    {isClickable && (
-                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
-                  </div>
+                  {rows.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead))}
                 </div>
               );
-            })
-          )}
+            });
+          })()}
         </div>
 
         {data && data.length === 100 && (
@@ -242,6 +227,66 @@ const DetailDialog = ({
       title={detailLead?.title ?? ""}
     />
     </>
+  );
+};
+
+// Renderer de una fila individual del DetailDialog. Se extrae a una
+// función para poder reutilizarla en los dos branches (flat y agrupado
+// por categoría) sin duplicar el JSX.
+const renderRow = (
+  row: DetailRow,
+  navigate: (path: string) => void,
+  onOpenChange: (o: boolean) => void,
+  setDetailLead: (v: { source: "leadgen" | "scouter" | "creator"; id: string; title: string } | null) => void,
+) => {
+  const handleRowClick = () => {
+    if (row.linkUrl) {
+      navigate(row.linkUrl);
+      onOpenChange(false);
+      return;
+    }
+    if (row.leadSource) {
+      setDetailLead({
+        source: row.leadSource,
+        id: row.id,
+        title: row.primary,
+      });
+    }
+  };
+  const isClickable = !!row.linkUrl || !!row.leadSource;
+  return (
+    <div
+      key={row.id}
+      onClick={handleRowClick}
+      className={cn(
+        "flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors",
+        isClickable && "cursor-pointer hover:bg-accent hover:border-primary/40",
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="font-medium truncate">{row.primary}</p>
+        {row.secondary && (
+          <p className="text-xs text-muted-foreground truncate">
+            {row.secondary}
+          </p>
+        )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {row.badge && (
+          <Badge variant="outline" className="text-[10px]">
+            {row.badge}
+          </Badge>
+        )}
+        {row.date && (
+          <span className="text-[10px] text-muted-foreground tabular-nums">
+            {format(new Date(row.date), "d MMM", { locale: es })}
+          </span>
+        )}
+        {isClickable && (
+          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -287,6 +332,15 @@ const HIDDEN_FIELDS = new Set([
   "entered_crm_by",
   "company_id",
   "created_creator_id",
+  // Foto + nombre + handle ya viven en el header del dialog, no
+  // hace falta repetirlos en la lista de campos abajo.
+  "profile_photo_url",
+  "photo_data_url",
+  "piclink_url",
+  "name",
+  "model_handle",
+  "instagram_handle",
+  "category",
 ]);
 
 const LeadDetailDialog = ({
@@ -304,9 +358,11 @@ const LeadDetailDialog = ({
 }) => {
   const { data, isLoading } = useLeadDetail(source, id);
 
-  // Resolver el handle de IG según el campo del source para armar el
-  // botón "Abrir Instagram". leadgen_entries usa `model_handle`,
-  // scouter_leads usa `instagram_handle`, creators idem.
+  // Datos derivados del header — handle de IG, foto, nombre, categoría.
+  // leadgen_entries usa `model_handle`; scouter_leads y creators usan
+  // `instagram_handle`. Foto: `profile_photo_url` (creators) o
+  // `photo_data_url` (scouter); leadgen no tiene foto → caemos al
+  // placeholder con iniciales.
   const igHandle = (() => {
     if (!data) return null;
     const raw =
@@ -315,41 +371,109 @@ const LeadDetailDialog = ({
     if (typeof raw !== "string" || !raw.trim()) return null;
     return raw.trim().replace(/^@/, "");
   })();
+  const photoUrl = (() => {
+    if (!data) return null;
+    const raw =
+      (data as Record<string, unknown>).profile_photo_url ??
+      (data as Record<string, unknown>).photo_data_url;
+    return typeof raw === "string" && raw.trim() ? raw : null;
+  })();
+  const displayName =
+    (data && typeof (data as any).name === "string" && (data as any).name.trim())
+      ? (data as any).name as string
+      : title;
+  const category =
+    data && typeof (data as any).category === "string"
+      ? ((data as any).category as string)
+      : null;
+  const initials = displayName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+
+  const openIg = () => {
+    if (!igHandle) return;
+    window.open(`https://instagram.com/${igHandle}`, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {title}
-            {source && (
-              <Badge variant="outline" className="text-[10px]">
-                {source}
-              </Badge>
-            )}
-          </DialogTitle>
+      <DialogContent className="max-w-xl max-h-[85vh] overflow-hidden flex flex-col p-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{displayName}</DialogTitle>
         </DialogHeader>
 
-        {igHandle && (
-          <div className="flex items-center gap-2 -mt-1 pb-2 border-b border-border/50">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => window.open(`https://instagram.com/${igHandle}`, "_blank", "noopener,noreferrer")}
+        {/* Header con foto + nombre. Click en cualquiera abre IG en una
+            tab nueva si tenemos handle. Sin handle, no es clickeable. */}
+        <div className="flex items-center gap-4 p-5 bg-gradient-to-br from-muted/40 to-transparent border-b border-border">
+          <button
+            type="button"
+            onClick={openIg}
+            disabled={!igHandle}
+            className={cn(
+              "relative h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-border bg-muted",
+              igHandle && "cursor-pointer transition-all hover:border-primary hover:scale-105",
+            )}
+            aria-label={igHandle ? `Abrir Instagram de @${igHandle}` : "Sin Instagram"}
+          >
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt={displayName}
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-lg font-bold text-muted-foreground">
+                {initials || "?"}
+              </div>
+            )}
+          </button>
+          <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={openIg}
+              disabled={!igHandle}
+              className={cn(
+                "block text-left text-xl font-bold truncate w-full",
+                igHandle && "hover:text-primary transition-colors cursor-pointer",
+              )}
             >
-              <Instagram className="h-3.5 w-3.5" />
-              Abrir Instagram (@{igHandle})
-              <ExternalLink className="h-3 w-3" />
-            </Button>
+              {displayName}
+            </button>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {igHandle && (
+                <button
+                  type="button"
+                  onClick={openIg}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <Instagram className="h-3 w-3" />
+                  @{igHandle}
+                </button>
+              )}
+              {category && (
+                <Badge variant="outline" className="text-[10px]">
+                  {category}
+                </Badge>
+              )}
+              {source && (
+                <Badge variant="secondary" className="text-[10px] capitalize">
+                  {source}
+                </Badge>
+              )}
+            </div>
           </div>
-        )}
+        </div>
 
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
           {isLoading ? (
             <>
               {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
+                <Skeleton key={i} className="h-9 w-full" />
               ))}
             </>
           ) : !data ? (
@@ -368,7 +492,7 @@ const LeadDetailDialog = ({
               .map(([k, v]) => (
                 <div
                   key={k}
-                  className="grid grid-cols-[140px_1fr] gap-3 py-1.5 border-b border-border/40 last:border-0"
+                  className="grid grid-cols-[140px_1fr] gap-3 py-2 border-b border-border/40 last:border-0"
                 >
                   <span className="text-xs text-muted-foreground font-medium">
                     {FIELD_LABELS[k] ?? k}

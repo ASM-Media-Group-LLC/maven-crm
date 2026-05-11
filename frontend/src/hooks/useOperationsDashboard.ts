@@ -172,12 +172,27 @@ export interface DetailRow {
   secondary?: string; // texto secundario (closer, fecha, etc)
   date?: string;
   badge?: string;
+  /** Categoría de la modelo (Elite, A+, A, B+, B, C+, C). Si no se
+   *  pudo determinar, queda undefined → grupo "Sin categoría". */
+  category?: string;
   /** Si está, la fila se vuelve clickable y navega a esa ruta. */
   linkUrl?: string;
   /** Si está, la fila abre LeadDetailDialog con la info completa
    *  de la fila desde la tabla source. */
   leadSource?: "leadgen" | "scouter" | "creator";
 }
+
+// Orden canónico de categorías para los grupos del popup. Las que no
+// estén en este map quedan al final, ordenadas alfabéticamente.
+export const CATEGORY_ORDER: Record<string, number> = {
+  Elite: 1,
+  "A+": 2,
+  A: 3,
+  "B+": 4,
+  B: 5,
+  "C+": 6,
+  C: 7,
+};
 
 /** Fetch de los items detrás de una métrica. Hasta 100 rows.
  *  Misma lógica de fechas que useOperationsDashboard. */
@@ -203,7 +218,7 @@ export const useMetricDetails = (
         case "contacted": {
           const q = sb
             .from("leadgen_entries")
-            .select("id, model_handle, lg_user_id, phone_e164, status, created_at")
+            .select("id, model_handle, lg_user_id, phone_e164, status, category_code, created_at")
             .order("created_at", { ascending: false })
             .limit(limit);
           const { data, error } = await dateLte(dateGte(q, "created_at"), "created_at");
@@ -214,6 +229,7 @@ export const useMetricDetails = (
             secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
             date: r.created_at,
             badge: r.status,
+            category: r.category_code ?? undefined,
             leadSource: "leadgen" as const,
           }));
         }
@@ -224,12 +240,12 @@ export const useMetricDetails = (
           // descubiertos pero no contactadas NO aparece acá.
           const q1 = sb
             .from("leadgen_entries")
-            .select("id, model_handle, phone_e164, status, created_at")
+            .select("id, model_handle, phone_e164, status, category_code, created_at")
             .order("created_at", { ascending: false })
             .limit(50);
           const q2 = sb
             .from("scouter_leads")
-            .select("id, instagram_handle, phone, status, first_scouter_contact_at")
+            .select("id, instagram_handle, phone, status, category, first_scouter_contact_at")
             .not("first_scouter_contact_at", "is", null)
             .order("first_scouter_contact_at", { ascending: false })
             .limit(50);
@@ -243,6 +259,7 @@ export const useMetricDetails = (
             secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
             date: r.created_at,
             badge: "leadgen",
+            category: r.category_code ?? undefined,
             leadSource: "leadgen" as const,
           }));
           const bRows = (b ?? []).map((r: any) => ({
@@ -251,6 +268,7 @@ export const useMetricDetails = (
             secondary: r.phone ? `📞 ${r.phone}` : "Sin número",
             date: r.first_scouter_contact_at,
             badge: "scouter",
+            category: r.category ?? undefined,
             leadSource: "scouter" as const,
           }));
           return [...aRows, ...bRows].sort((x, y) =>
@@ -282,16 +300,16 @@ export const useMetricDetails = (
           // es nada para fetchear y nos evita complicar con .or().
           const { data: creatorRows } = await sb
             .from("creators")
-            .select("id, instagram_handle")
+            .select("id, instagram_handle, category")
             .not("instagram_handle", "is", null);
-          const creatorByHandle = new Map<string, string>();
-          for (const c of (creatorRows ?? []) as Array<{ id: string; instagram_handle: string }>) {
+          const creatorByHandle = new Map<string, { id: string; category: string | null }>();
+          for (const c of (creatorRows ?? []) as Array<{ id: string; instagram_handle: string; category: string | null }>) {
             const norm = c.instagram_handle
               .replace(/^@/, "")
               .toLowerCase()
               .trim();
             if (norm && !creatorByHandle.has(norm)) {
-              creatorByHandle.set(norm, c.id);
+              creatorByHandle.set(norm, { id: c.id, category: c.category });
             }
           }
           // El leadSource del dialog se infiere para los pocos casos
@@ -304,7 +322,7 @@ export const useMetricDetails = (
           };
           return (data ?? []).map((r: any) => {
             const handleNorm = (r.handle || "").toLowerCase().trim();
-            const matchedCreatorId = handleNorm
+            const match = handleNorm
               ? creatorByHandle.get(handleNorm)
               : undefined;
             // Si encontramos un creator con ese handle, redirigimos el
@@ -312,16 +330,17 @@ export const useMetricDetails = (
             // el sourceMap original — leadgen/scouter/creators apuntan
             // a sus tablas; closer_creators / closers_contacts sin
             // matching creator quedan sin click (leadSource undefined).
-            const leadSource = matchedCreatorId
+            const leadSource = match
               ? ("creator" as const)
               : sourceMap[r.source_table];
-            const id = matchedCreatorId ?? r.source_id;
+            const id = match?.id ?? r.source_id;
             return {
               id,
               primary: `@${r.handle || "?"}`,
               secondary: `📞 ${r.phone}`,
               date: r.captured_at,
               badge: r.source_table,
+              category: match?.category ?? undefined,
               leadSource,
             };
           });
@@ -333,7 +352,7 @@ export const useMetricDetails = (
           let q = sb
             .from("qa_calls")
             .select(
-              "id, call_date, closer:qa_closers(name), model:qa_models(name), claude_analysis",
+              "id, call_date, closer:qa_closers(name), model:qa_models(name, category), claude_analysis",
             )
             .order("call_date", { ascending: false })
             .limit(limit);
@@ -353,6 +372,7 @@ export const useMetricDetails = (
               : "Closer: ?",
             date: r.call_date,
             badge: r.claude_analysis?.call_outcome ?? "—",
+            category: r.model?.category ?? undefined,
             // Click → abre la página del detalle de la QA call
             // (AgencyQA usa ?callId=<id> para deeplinkear).
             linkUrl: `/agency-qa?callId=${r.id}`,
