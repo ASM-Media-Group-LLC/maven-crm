@@ -7,7 +7,6 @@ import DataTableShell from "@/components/ui/data-table-shell";
 import CreadoresFilters from "./CreadoresFilters";
 import CreadoresTable from "./CreadoresTable";
 import CreadoresGrid from "./CreadoresGrid";
-import CreadoresKPICards from "./CreadoresKPICards";
 import CreadoresSubtabs from "./CreadoresSubtabs";
 import { useCreadores, type CreadorFilters } from "./useCreadores";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -70,9 +69,8 @@ const CreadoresContent = () => {
         <div className="flex-1 flex flex-col min-h-0 p-6 gap-4">
           <CreadoresSubtabs />
 
-          <div className="shrink-0">
-            <CreadoresKPICards counts={statusCounts} isCloser={isCloser} />
-          </div>
+          {/* KPI cards removidos — la info ya vive en el dashboard. El
+              listado queda enfocado solo en la tabla/grid. */}
 
           <div className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
             <Button

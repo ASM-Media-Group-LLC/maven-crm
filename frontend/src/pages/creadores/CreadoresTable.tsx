@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe, LogOut, Trash2 } from "lucide-react";
+import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe, LogOut, Trash2, Check, X as XLucide } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePermissions } from "@/hooks/usePermissions";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -93,12 +94,44 @@ const CreadoresTable = ({ creators }: Props) => {
   const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
   const [statusChangeCreator, setStatusChangeCreator] = useState<CreatorWithBusiness | null>(null);
   const [deletingCreator, setDeletingCreator] = useState<CreatorWithBusiness | null>(null);
+  // Toggle de Blu/Infloww: { creator, nextState } — modal confirma en
+  // ambas direcciones (marcar y desmarcar).
+  const [bluToggleTarget, setBluToggleTarget] = useState<{ creator: CreatorWithBusiness; nextState: boolean } | null>(null);
   const updateCreador = useUpdateCreador();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAgent, isAdmin, isManager, role } = useUserRole();
+  const { canAccess } = usePermissions();
   const isCloser = role === "closer";
   const canSeeAllData = isAdmin || isManager || !isAgent;
+  // Por default solo admin puede tocar el toggle de Blu/Infloww. Admin
+  // habilita el permiso por rol desde Settings → Roles ("Creadores" /
+  // "Editar Blu CRM"); canAccess devuelve true para admin sin requerir
+  // la fila.
+  const canEditBlu = canAccess("Creadores", "Editar Blu CRM");
+
+  const toggleBluMutation = useMutation({
+    mutationFn: async ({ id, nextState }: { id: string; nextState: boolean }) => {
+      const { error } = await supabase
+        .from("creators")
+        .update({ blu_infloww_active: nextState } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["creadores"] });
+      queryClient.invalidateQueries({ queryKey: ["ops-dashboard"] });
+      toast.success(
+        bluToggleTarget?.nextState
+          ? "Marcada como activa en Blu/Infloww"
+          : "Desmarcada de Blu/Infloww",
+      );
+      setBluToggleTarget(null);
+    },
+    onError: (err: any) => {
+      toast.error("No se pudo actualizar Blu/Infloww", { description: err.message });
+    },
+  });
 
   const deleteCreator = useMutation({
     mutationFn: async (id: string) => {
@@ -166,6 +199,7 @@ const CreadoresTable = ({ creators }: Props) => {
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creador" col="name" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="category" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Estado" col="status" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">Blu/Infloww</TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ubicación" col="country" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agencia" col="agency" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Redes</TableHead>
@@ -225,6 +259,31 @@ const CreadoresTable = ({ creators }: Props) => {
                   </Badge>
                   <ChevronDown className="h-3 w-3 text-muted-foreground" />
                 </button>
+              </TableCell>
+              <TableCell className="text-center">
+                {(() => {
+                  const isActive = ((c as any).blu_infloww_active ?? false) as boolean;
+                  const interactive = canEditBlu;
+                  return (
+                    <button
+                      type="button"
+                      disabled={!interactive}
+                      onClick={() => interactive && setBluToggleTarget({ creator: c, nextState: !isActive })}
+                      title={
+                        interactive
+                          ? isActive ? "Activa en Blu/Infloww — clic para desmarcar" : "Inactiva — clic para marcar"
+                          : isActive ? "Activa en Blu/Infloww" : "Inactiva"
+                      }
+                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full border transition-colors ${
+                        isActive
+                          ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                          : "border-border bg-muted/40 text-muted-foreground"
+                      } ${interactive ? "hover:scale-105 cursor-pointer" : "cursor-default opacity-80"}`}
+                    >
+                      {isActive ? <Check className="h-3.5 w-3.5" /> : <XLucide className="h-3.5 w-3.5" />}
+                    </button>
+                  );
+                })()}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {showRealLocation ? (
@@ -427,6 +486,54 @@ const CreadoresTable = ({ creators }: Props) => {
         }}
       />
     )}
+
+    {/* Confirmación de toggle Blu/Infloww (marcar o desmarcar).
+        El estado cambia automáticamente en creators, el trigger logea
+        la transición en creator_blu_history, y eso es lo que alimenta
+        Movimientos del CRM en Panel de Control. */}
+    <AlertDialog open={!!bluToggleTarget} onOpenChange={(open) => { if (!open) setBluToggleTarget(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {bluToggleTarget?.nextState
+              ? "¿Marcar como activa en Blu/Infloww?"
+              : "¿Desmarcar de Blu/Infloww?"}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {bluToggleTarget?.nextState ? (
+              <>
+                <strong>{bluToggleTarget.creator.name}</strong> va a contar como
+                ingreso al CRM (↑ alta) en el Panel de Control.
+              </>
+            ) : (
+              <>
+                <strong>{bluToggleTarget?.creator.name}</strong> va a contar como
+                baja (↓) en el Panel de Control. Podés volver a marcarla cuando quieras.
+              </>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() =>
+              bluToggleTarget &&
+              toggleBluMutation.mutate({
+                id: bluToggleTarget.creator.id,
+                nextState: bluToggleTarget.nextState,
+              })
+            }
+            disabled={toggleBluMutation.isPending}
+          >
+            {toggleBluMutation.isPending
+              ? "Guardando..."
+              : bluToggleTarget?.nextState
+                ? "Sí, marcar"
+                : "Sí, desmarcar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
     <AlertDialog open={!!deletingCreator} onOpenChange={(open) => { if (!open) setDeletingCreator(null); }}>
       <AlertDialogContent>
