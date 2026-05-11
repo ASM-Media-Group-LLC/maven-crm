@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -153,6 +153,8 @@ interface CompanyFormState {
   description: string;
   active: boolean;
   search_config: CompanySearchConfig;
+  logo_dark_url: string | null;
+  logo_light_url: string | null;
 }
 
 const emptyForm: CompanyFormState = {
@@ -161,6 +163,136 @@ const emptyForm: CompanyFormState = {
   description: "",
   active: true,
   search_config: {},
+  logo_dark_url: null,
+  logo_light_url: null,
+};
+
+// ─── Logo uploader ──────────────────────────────────────────────────
+// Sube PNG (transparente) o WebP a storage.objects bucket "company-logos".
+// Recomendación al user: 200×200 mínimo (display real ~32-40px, da
+// margen para retina). Cap server-side: 500KB.
+const CompanyLogoUploader = ({
+  value,
+  onChange,
+  companyName,
+  label,
+  variant = "dark",
+}: {
+  value: string | null;
+  onChange: (url: string | null) => void;
+  companyName: string;
+  label: string;
+  variant?: "dark" | "light";
+}) => {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const MAX_BYTES = 500_000;
+  const MIN_DIM = 200;
+
+  const handleFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Solo se permiten imágenes PNG, SVG o WebP.");
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      toast.error("Archivo demasiado pesado", {
+        description: `Máximo 500KB — el tuyo pesa ${Math.round(file.size / 1024)}KB.`,
+      });
+      return;
+    }
+    // Validar dimensiones para imágenes raster (no aplica a SVG).
+    if (file.type !== "image/svg+xml") {
+      const img = new Image();
+      const ok = await new Promise<boolean>((resolve) => {
+        img.onload = () => resolve(img.width >= MIN_DIM && img.height >= MIN_DIM);
+        img.onerror = () => resolve(false);
+        img.src = URL.createObjectURL(file);
+      });
+      if (!ok) {
+        toast.error("Imagen muy chica", {
+          description: `Mínimo ${MIN_DIM}×${MIN_DIM} px (PNG transparente recomendado).`,
+        });
+        return;
+      }
+    }
+
+    setUploading(true);
+    try {
+      const ext = (file.name.split(".").pop() || "png").toLowerCase();
+      const slugBase = (companyName || "company")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_|_$/g, "")
+        || "company";
+      const path = `${slugBase}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("company-logos")
+        .upload(path, file, { upsert: false, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("company-logos").getPublicUrl(path);
+      onChange(pub.publicUrl);
+      toast.success("Logo subido");
+    } catch (e) {
+      toast.error("No se pudo subir el logo", { description: (e as Error).message });
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  // El preview usa un fondo distinto según el variant para que se vea
+  // realista: dark mode → fondo oscuro (logos claros lucen ahí),
+  // light mode → fondo blanco (logos oscuros lucen ahí).
+  const previewBg = variant === "dark" ? "bg-zinc-900" : "bg-white";
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3">
+      <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-border overflow-hidden ${previewBg}`}>
+        {value ? (
+          <img src={value} alt="Logo" className="h-full w-full object-contain" />
+        ) : (
+          <Building2 className={`h-6 w-6 ${variant === "dark" ? "text-zinc-600" : "text-zinc-400"}`} />
+        )}
+      </div>
+      <div className="min-w-0 flex-1 space-y-1">
+        <p className="text-xs font-medium">{label}</p>
+        <p className="text-[11px] text-muted-foreground">
+          PNG transparente recomendado · mínimo {MIN_DIM}×{MIN_DIM}px · máx 500KB
+        </p>
+        <div className="flex gap-2 pt-1">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+          >
+            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : value ? "Cambiar" : "Subir logo"}
+          </Button>
+          {value && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => onChange(null)}
+              className="text-destructive"
+            >
+              Quitar
+            </Button>
+          )}
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png,image/svg+xml,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleFile(f);
+          }}
+        />
+      </div>
+    </div>
+  );
 };
 
 const CompanyFormModal = ({
@@ -326,6 +458,8 @@ const CompanyFormModal = ({
         description: form.description.trim() || null,
         active: form.active,
         search_config: form.search_config,
+        logo_dark_url: form.logo_dark_url,
+        logo_light_url: form.logo_light_url,
       });
     } else {
       await createCompany.mutateAsync({
@@ -334,6 +468,8 @@ const CompanyFormModal = ({
         description: form.description.trim() || null,
         active: form.active,
         search_config: form.search_config,
+        logo_dark_url: form.logo_dark_url,
+        logo_light_url: form.logo_light_url,
       });
     }
     onClose();
@@ -368,6 +504,25 @@ const CompanyFormModal = ({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Logo upload — dual: una version para dark, otra para light.
+              Si solo se sube una, el header la usa para ambos themes. */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CompanyLogoUploader
+              variant="dark"
+              label="Logo para Dark Mode"
+              value={form.logo_dark_url}
+              onChange={(url) => setForm((f) => ({ ...f, logo_dark_url: url }))}
+              companyName={form.name}
+            />
+            <CompanyLogoUploader
+              variant="light"
+              label="Logo para Light Mode"
+              value={form.logo_light_url}
+              onChange={(url) => setForm((f) => ({ ...f, logo_light_url: url }))}
+              companyName={form.name}
+            />
+          </div>
+
           {/* Basic info */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -1355,6 +1510,8 @@ const ScouterSettings = () => {
                   description: editingCompany.description ?? "",
                   active: editingCompany.active,
                   search_config: editingCompany.search_config ?? {},
+                  logo_dark_url: editingCompany.logo_dark_url ?? null,
+                  logo_light_url: editingCompany.logo_light_url ?? null,
                 }
               : undefined
           }

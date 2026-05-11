@@ -317,9 +317,14 @@ const AI_QUALITY_OPTIONS: Array<{ value: AiQualityFilter; label: string }> = [
 // ─── Main ────────────────────────────────────────────────────────────────
 interface ScouterHomeProps {
   favoritesOnly?: boolean;
+  // El header dinámico de /scouter-assist necesita saber qué compañía
+  // está filtrada (para mostrar el logo). Por eso el state vive arriba
+  // ahora — opcional para mantener compat con la card Favoritas.
+  companyFilter?: string;
+  setCompanyFilter?: (v: string) => void;
 }
 
-const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
+const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, setCompanyFilter: setCompanyFilterProp }: ScouterHomeProps) => {
   // Spammers ven SOLO sus leads asignadas en Home — no el pool
   // completo del tenant. Admins/managers/supervisors siguen viendo
   // todo. Computamos el rol arriba porque el defaultStatus depende
@@ -341,7 +346,11 @@ const ScouterHome = ({ favoritesOnly = false }: ScouterHomeProps) => {
   // prendían las 3 al mismo tiempo. Default = "total".
   const [selectedCardKey, setSelectedCardKey] = useState<string>("total");
   const [search, setSearch] = useState("");
-  const [companyFilter, setCompanyFilter] = useState<string>("all");
+  // Si el padre pasó companyFilter via prop, usamos eso (state lifted).
+  // Sino state local — pre-existente cuando Home era standalone.
+  const [companyFilterLocal, setCompanyFilterLocal] = useState<string>("all");
+  const companyFilter = companyFilterProp ?? companyFilterLocal;
+  const setCompanyFilter = setCompanyFilterProp ?? setCompanyFilterLocal;
   const [countryFilter, setCountryFilter] = useState<string>("all");
   const [aiQuality, setAiQuality] = useState<AiQualityFilter>("all");
   const [page, setPage] = useState(1);

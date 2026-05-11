@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useTheme } from "next-themes";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Eye, Heart, Users, BarChart3, Wrench, Radar, Settings, ClipboardList, AlertTriangle } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import ScouterHome from "./ScouterHome";
 import ScouterLeads from "./ScouterLeads";
 import ScouterFunnel from "./ScouterFunnel";
@@ -119,16 +121,41 @@ const ScouterAssist = () => {
   const [active, setActive] = useState<SubKey>(
     (visibleSubs[0]?.key as SubKey) ?? "home",
   );
+  // companyFilter lifted desde ScouterHome — el header necesita saber
+  // qué compañía está filtrada para decidir si mostrar su logo.
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
+  const companiesQ = useScouterCompanies();
+  const { resolvedTheme } = useTheme();
+  const activeCompany = companyFilter !== "all"
+    ? companiesQ.data?.find((c) => c.id === companyFilter) ?? null
+    : null;
+  // Pick correcto según theme con fallback al otro. Si solo hay uno
+  // cargado, se usa para ambos modes. Si no hay ninguno, showLogo=false.
+  const isDark = resolvedTheme === "dark";
+  const logoForTheme = activeCompany
+    ? (isDark
+        ? activeCompany.logo_dark_url ?? activeCompany.logo_light_url
+        : activeCompany.logo_light_url ?? activeCompany.logo_dark_url)
+    : null;
+  const showLogo = !!logoForTheme;
 
   return (
     <main className="flex-1 overflow-y-auto p-6">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Scouter Assist</h1>
-          <p className="text-sm text-muted-foreground">
-            Migrando desde Kash-call-qa. Las pestañas y permisos ya están
-            cableados; el contenido se llenará en las próximas iteraciones.
-          </p>
+        <div className="flex items-center gap-3">
+          {showLogo ? (
+            // Logo de la compañía filtrada (reemplaza el título).
+            // h-10 = 40px de display real; el upload pidió mín 200x200
+            // así que retina queda cubierto. object-contain para que
+            // PNG transparentes no se distorsionen.
+            <img
+              src={logoForTheme!}
+              alt={activeCompany!.name}
+              className="h-10 object-contain"
+            />
+          ) : (
+            <h1 className="text-2xl font-bold tracking-tight">Maven Scouter Assist</h1>
+          )}
         </div>
 
         <Tabs value={active} onValueChange={(v) => setActive(v as SubKey)}>
@@ -146,7 +173,10 @@ const ScouterAssist = () => {
           {visibleSubs.map((s) => (
             <TabsContent key={s.key} value={s.key} className="mt-4">
               {s.key === "home" ? (
-                <ScouterHome />
+                <ScouterHome
+                  companyFilter={companyFilter}
+                  setCompanyFilter={setCompanyFilter}
+                />
               ) : s.key === "busquedas" ? (
                 <ScouterDiscover />
               ) : s.key === "favoritas" ? (

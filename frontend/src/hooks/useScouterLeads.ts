@@ -93,6 +93,8 @@ export interface ScouterCompany {
   description: string | null;
   active: boolean;
   search_config: CompanySearchConfig;
+  logo_dark_url: string | null;
+  logo_light_url: string | null;
   created_at: string;
 }
 
@@ -613,6 +615,8 @@ export type CompanyInput = {
   description?: string | null;
   active?: boolean;
   search_config?: CompanySearchConfig;
+  logo_dark_url?: string | null;
+  logo_light_url?: string | null;
 };
 
 export const useCreateCompany = () => {
@@ -630,6 +634,8 @@ export const useCreateCompany = () => {
           description: input.description ?? null,
           active: input.active ?? true,
           search_config: input.search_config ?? {},
+          logo_dark_url: input.logo_dark_url ?? null,
+          logo_light_url: input.logo_light_url ?? null,
           tenant_id: tenantId,
         })
         .select("*")
