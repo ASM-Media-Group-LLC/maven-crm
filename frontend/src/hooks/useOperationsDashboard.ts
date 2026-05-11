@@ -442,9 +442,11 @@ export const useLeadDetail = (
 export interface BestCloser {
   closerId: string;
   name: string;
-  closes: number;
-  avgScore: number; // 0-100
-  composite: number; // 0-1, sólo para ranking interno
+  totalCalls: number;       // total de qa_calls hechas por el closer
+  closes: number;           // calls con outcome=cerro
+  successRate: number;      // closes / totalCalls (0-1)
+  avgScore: number;         // 0-100 (avg de claude_score)
+  composite: number;        // 0-1, sólo para ranking interno
 }
 
 export const useBestCloser = (range: DashboardRange) =>
@@ -473,15 +475,17 @@ export const useBestCloser = (range: DashboardRange) =>
 
       const byCloser = new Map<
         string,
-        { name: string; closes: number; scoreSum: number; scoreCount: number }
+        { name: string; totalCalls: number; closes: number; scoreSum: number; scoreCount: number }
       >();
       for (const r of rows) {
         const entry = byCloser.get(r.closer_id) ?? {
           name: r.closer?.name ?? "(sin nombre)",
+          totalCalls: 0,
           closes: 0,
           scoreSum: 0,
           scoreCount: 0,
         };
+        entry.totalCalls += 1;
         if (r.claude_analysis?.call_outcome === "cerro") entry.closes += 1;
         if (typeof r.claude_score === "number") {
           entry.scoreSum += r.claude_score;
@@ -496,7 +500,9 @@ export const useBestCloser = (range: DashboardRange) =>
       const aggregated = Array.from(byCloser.entries()).map(([id, v]) => ({
         closerId: id,
         name: v.name,
+        totalCalls: v.totalCalls,
         closes: v.closes,
+        successRate: v.totalCalls > 0 ? v.closes / v.totalCalls : 0,
         avgScore: v.scoreCount > 0 ? v.scoreSum / v.scoreCount : 0,
       }));
       const maxCloses = Math.max(1, ...aggregated.map((x) => x.closes));
@@ -507,6 +513,102 @@ export const useBestCloser = (range: DashboardRange) =>
         }))
         .sort((a, b) => b.composite - a.composite);
       return ranked[0] ?? null;
+    },
+  });
+
+/** Hall of fame mensual — mejor cerrador de cada mes desde MIN_MONTH.
+ *  Misma fórmula que useBestCloser (70% cierres + 30% calif QA) pero
+ *  un row por mes. Solo cuenta desde 2026-05 (el ranking se lanzó ahí —
+ *  no traemos meses anteriores aunque haya data). */
+export interface BestCloserByMonth {
+  month: string; // YYYY-MM
+  monthLabel: string; // "Mayo 2026"
+  winner: BestCloser | null;
+}
+
+const MIN_MONTH = "2026-05"; // ranking arranca acá. NO traer meses previos.
+
+const MONTH_LABELS_ES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+export const useBestCloserByMonth = () =>
+  useQuery({
+    queryKey: ["best-closer-by-month"],
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<BestCloserByMonth[]> => {
+      // Trae todas las calls con closer asignado desde MIN_MONTH-01.
+      const since = `${MIN_MONTH}-01`;
+      const { data, error } = await sb
+        .from("qa_calls")
+        .select("closer_id, call_date, claude_score, claude_analysis, closer:qa_closers(name)")
+        .not("closer_id", "is", null)
+        .gte("call_date", since);
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{
+        closer_id: string;
+        call_date: string;
+        claude_score: number | null;
+        claude_analysis: { call_outcome?: string } | null;
+        closer: { name?: string } | null;
+      }>;
+
+      // Agrupa por (month, closer) y dentro de cada mes calcula el
+      // composite igual que useBestCloser.
+      const byMonth = new Map<
+        string,
+        Map<string, { name: string; totalCalls: number; closes: number; scoreSum: number; scoreCount: number }>
+      >();
+      for (const r of rows) {
+        const month = (r.call_date || "").slice(0, 7); // YYYY-MM
+        if (!month || month < MIN_MONTH) continue;
+        const closers = byMonth.get(month) ?? new Map();
+        const entry = closers.get(r.closer_id) ?? {
+          name: r.closer?.name ?? "(sin nombre)",
+          totalCalls: 0,
+          closes: 0,
+          scoreSum: 0,
+          scoreCount: 0,
+        };
+        entry.totalCalls += 1;
+        if (r.claude_analysis?.call_outcome === "cerro") entry.closes += 1;
+        if (typeof r.claude_score === "number") {
+          entry.scoreSum += r.claude_score;
+          entry.scoreCount += 1;
+        }
+        closers.set(r.closer_id, entry);
+        byMonth.set(month, closers);
+      }
+
+      const result: BestCloserByMonth[] = [];
+      for (const [month, closers] of byMonth.entries()) {
+        const aggregated = Array.from(closers.entries()).map(([id, v]) => ({
+          closerId: id,
+          name: v.name,
+          totalCalls: v.totalCalls,
+          closes: v.closes,
+          successRate: v.totalCalls > 0 ? v.closes / v.totalCalls : 0,
+          avgScore: v.scoreCount > 0 ? v.scoreSum / v.scoreCount : 0,
+        }));
+        const maxCloses = Math.max(1, ...aggregated.map((x) => x.closes));
+        const ranked = aggregated
+          .map((x) => ({
+            ...x,
+            composite: 0.7 * (x.closes / maxCloses) + 0.3 * (x.avgScore / 100),
+          }))
+          .sort((a, b) => b.composite - a.composite);
+        const [year, m] = month.split("-");
+        const monthLabel = `${MONTH_LABELS_ES[parseInt(m, 10) - 1]} ${year}`;
+        result.push({
+          month,
+          monthLabel,
+          winner: ranked[0] ?? null,
+        });
+      }
+      // Ordena del mes más reciente al más viejo.
+      result.sort((a, b) => (a.month < b.month ? 1 : -1));
+      return result;
     },
   });
 

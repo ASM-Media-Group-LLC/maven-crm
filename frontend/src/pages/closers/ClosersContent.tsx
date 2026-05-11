@@ -328,25 +328,30 @@ const ClosersContent = () => {
         rows={(() => {
           if (!kpiPopup) return [];
           if (kpiPopup.kind === "pipeline") {
-            const filterByStatus = (statuses: string[]): CloserCreatorRow[] => creators.filter((c: CloserCreatorRow) => statuses.includes(c.status ?? ""));
+            // CloserCreatorRow usa `stage` (no `status`) y `instagram_handle`
+            // (no `name`/`artistic_name`). Antes el popup salía vacío
+            // porque filtraba por un campo que no existe → siempre 0
+            // matches.
+            const filterByStage = (stages: string[]): CloserCreatorRow[] =>
+              creators.filter((c: CloserCreatorRow) => stages.includes(c.stage ?? ""));
             let list: CloserCreatorRow[] = [];
             switch (kpiPopup.key) {
               case "total": list = creators; break;
-              case "asignadas": list = filterByStatus(["Asignada"]); break;
-              case "confirmadas": list = filterByStatus(["Confirmada"]); break;
-              case "completadas": list = filterByStatus(["Completada"]); break;
-              case "cerradas": list = filterByStatus(["Confirmada", "Completada"]); break;
-              case "no_interesadas": list = filterByStatus(["No interesada"]); break;
+              case "asignadas": list = filterByStage(["Asignada"]); break;
+              case "confirmadas": list = filterByStage(["Confirmada"]); break;
+              case "completadas": list = filterByStage(["Completada"]); break;
+              case "cerradas": list = filterByStage(["Confirmada", "Completada"]); break;
+              case "no_interesadas": list = filterByStage(["No interesada"]); break;
             }
-            const tone = (status: string): KpiRow["rightTone"] =>
-              status === "Completada" || status === "Confirmada" ? "success" :
-              status === "No interesada" ? "destructive" :
-              status === "Asignada" ? "warning" : "default";
+            const tone = (stage: string): KpiRow["rightTone"] =>
+              stage === "Completada" || stage === "Confirmada" ? "success" :
+              stage === "No interesada" ? "destructive" :
+              stage === "Asignada" ? "warning" : "default";
             return list.map((c): KpiRow => ({
-              primary: c.artistic_name ?? c.name ?? "Sin nombre",
-              secondary: c.assigned_to ?? "Sin asignar",
-              right: c.status ?? "—",
-              rightTone: tone(c.status ?? ""),
+              primary: c.instagram_handle ? `@${c.instagram_handle}` : "Sin handle",
+              secondary: c.agent_name ?? "Sin asignar",
+              right: c.stage ?? "—",
+              rightTone: tone(c.stage ?? ""),
             }));
           }
           if (kpiPopup.kind === "revenue") {

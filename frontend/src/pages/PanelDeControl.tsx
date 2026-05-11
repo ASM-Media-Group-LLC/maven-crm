@@ -50,6 +50,7 @@ import {
 import { cn } from "@/lib/utils";
 import SpammerAccountsTab from "./panel-de-control/SpammerAccountsTab";
 import ControlGastoTab from "./panel-de-control/ControlGastoTab";
+import BestCloserMonthlyDialog from "@/components/dashboard/BestCloserMonthlyDialog";
 
 // ─── KPI card ──────────────────────────────────────────────────────────
 
@@ -524,6 +525,7 @@ const PanelDeControl = () => {
     to: endOfMonth(today),
   });
   const [openMetric, setOpenMetric] = useState<MetricKey | null>(null);
+  const [bestCloserMonthlyOpen, setBestCloserMonthlyOpen] = useState(false);
   const { data, isLoading } = useOperationsDashboard(range);
   const { data: bestCloser, isLoading: bestCloserLoading } = useBestCloser(range);
 
@@ -844,8 +846,12 @@ const PanelDeControl = () => {
         </button>
 
         {/* Mejor cerrador — score compuesto 70% cierres + 30% avg QA.
-            Click no abre popup todavía (no hay metric key) — solo display. */}
-        <Card className="p-4 border-2 border-amber-500/30 relative overflow-hidden">
+            Click abre el popup con el ranking por mes. */}
+        <button
+          type="button"
+          onClick={() => setBestCloserMonthlyOpen(true)}
+          className="text-left rounded-xl border-2 border-amber-500/30 relative overflow-hidden bg-card p-4 transition-all duration-200 hover:scale-[1.025] hover:border-amber-500/60 hover:shadow-[0_0_24px_-4px_rgba(245,158,11,0.4)]"
+        >
           <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-amber-500" />
           <div className="relative space-y-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500">
@@ -873,8 +879,10 @@ const PanelDeControl = () => {
               )}
             </div>
           </div>
-        </Card>
+        </button>
       </div>
+
+      <BestCloserMonthlyDialog open={bestCloserMonthlyOpen} onOpenChange={setBestCloserMonthlyOpen} />
 
       {/* Funnel visual flow — cross-team. "Contactadas" = LLG+Scouter. */}
       <Card className="p-4">

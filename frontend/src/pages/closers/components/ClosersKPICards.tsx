@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Users, CheckCircle, Trophy, XCircle, TrendingUp, Layers, Crown } from "lucide-react";
 import { startOfMonth, endOfMonth } from "date-fns";
 import KpiCard from "@/components/dashboard/KpiCard";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import BestCloserMonthlyDialog from "@/components/dashboard/BestCloserMonthlyDialog";
 import { useBestCloser } from "@/hooks/useOperationsDashboard";
 
 interface Props {
@@ -61,6 +63,7 @@ const ClosersKPICards = ({
       ? { from: dateFrom, to: dateTo }
       : { from: startOfMonth(today), to: endOfMonth(today) };
   const { data: bestCloser, isLoading: bestCloserLoading } = useBestCloser(bestCloserRange);
+  const [monthlyOpen, setMonthlyOpen] = useState(false);
 
   const salePlatforms = ["Trafix", "Blu", "Piclink", "LeakHunter", "ORA"];
   const revPlataformas = salePlatforms.reduce((s, p) => s + (platformRevenue[p] || 0), 0);
@@ -92,44 +95,51 @@ const ClosersKPICards = ({
 
   return (
     <div className="space-y-6">
-      {/* Mejor cerrador — hero card de ancho completo. 👑 ámbar a la
-          izquierda, nombre grande + breakdown a la derecha. Si no hay
-          calls en el rango, se muestra un placeholder. */}
-      <Card className="p-5 border-2 border-amber-500/30 relative overflow-hidden">
-        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl opacity-30 bg-amber-500" />
-        <div className="relative flex items-center gap-5">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg">
-            <Crown className="h-8 w-8 text-white" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] uppercase tracking-widest text-amber-500/90 font-bold">
-              Mejor cerrador <span className="text-muted-foreground/80 font-semibold">· mes actual</span>
-            </p>
-            {bestCloserLoading ? (
-              <Skeleton className="mt-1 h-7 w-48" />
-            ) : bestCloser ? (
-              <>
-                <p className="text-2xl font-bold leading-tight mt-1 truncate">
-                  {bestCloser.name}
-                </p>
-                <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                  <span className="tabular-nums">
-                    <strong className="text-foreground">{bestCloser.closes.toLocaleString("es")}</strong> cierres
-                  </span>
-                  <span className="text-border">·</span>
-                  <span className="tabular-nums">
-                    Calif. QA promedio <strong className="text-foreground">{Math.round(bestCloser.avgScore)}/100</strong>
-                  </span>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground mt-1">
-                Sin calls en el rango seleccionado.
+      {/* Mejor cerrador — hero card clickeable. Click abre el dialog
+          con el ranking por mes. */}
+      <button
+        type="button"
+        onClick={() => setMonthlyOpen(true)}
+        className="w-full text-left"
+      >
+        <Card className="p-5 border-2 border-amber-500/30 relative overflow-hidden transition-all duration-200 hover:scale-[1.01] hover:border-amber-500/60 hover:shadow-[0_0_24px_-4px_rgba(245,158,11,0.4)] cursor-pointer">
+          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl opacity-30 bg-amber-500" />
+          <div className="relative flex items-center gap-5">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg">
+              <Crown className="h-8 w-8 text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] uppercase tracking-widest text-amber-500/90 font-bold">
+                Mejor cerrador <span className="text-muted-foreground/80 font-semibold">· mes actual</span>
               </p>
-            )}
+              {bestCloserLoading ? (
+                <Skeleton className="mt-1 h-7 w-48" />
+              ) : bestCloser ? (
+                <>
+                  <p className="text-2xl font-bold leading-tight mt-1 truncate">
+                    {bestCloser.name}
+                  </p>
+                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                    <span className="tabular-nums">
+                      <strong className="text-foreground">{bestCloser.closes.toLocaleString("es")}</strong> cierres
+                    </span>
+                    <span className="text-border">·</span>
+                    <span className="tabular-nums">
+                      Calif. QA promedio <strong className="text-foreground">{Math.round(bestCloser.avgScore)}/100</strong>
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Sin calls en el rango seleccionado.
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      </button>
+
+      <BestCloserMonthlyDialog open={monthlyOpen} onOpenChange={setMonthlyOpen} />
 
       {/* Pipeline — primera sección */}
       <div className="space-y-3">
