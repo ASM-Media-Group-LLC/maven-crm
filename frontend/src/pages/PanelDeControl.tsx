@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { startOfMonth, endOfMonth, startOfDay, format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -15,6 +15,8 @@ import {
   ArrowDown,
   Crown,
   Instagram,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -151,15 +153,91 @@ const DetailDialog = ({
     title: string;
   } | null>(null);
 
+  // Estado de categorías colapsadas — Set de keys. Click en header
+  // toggea. Inicia con todo expandido al abrir el dialog.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (open) setCollapsed(new Set());
+  }, [open, metric]);
+  const toggleCat = (cat: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+
+  // Agrupado pre-computado. Si NO hay categorías en la data, queda
+  // como un solo "grupo" implícito (sin headers).
+  const groups = useMemo(() => {
+    if (!data) return { hasCategory: false, list: [] as Array<{ cat: string; rows: DetailRow[] }> };
+    const hasCategory = data.some((r) => r.category);
+    if (!hasCategory) return { hasCategory: false, list: [{ cat: "", rows: data }] };
+    const map = new Map<string, DetailRow[]>();
+    for (const r of data) {
+      const key = r.category ?? "Sin categoría";
+      const arr = map.get(key) ?? [];
+      arr.push(r);
+      map.set(key, arr);
+    }
+    const sortedKeys = Array.from(map.keys()).sort((a, b) => {
+      const sa = CATEGORY_ORDER[a] ?? 999;
+      const sb = CATEGORY_ORDER[b] ?? 999;
+      if (sa !== sb) return sa - sb;
+      return a.localeCompare(b);
+    });
+    return {
+      hasCategory: true,
+      list: sortedKeys.map((cat) => ({ cat, rows: map.get(cat)! })),
+    };
+  }, [data]);
+
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>{metricLabel}</DialogTitle>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
+        {/* Header con título grande, conteo total y, si hay categorías,
+            controles para expandir/colapsar todo. */}
+        <DialogHeader className="px-5 pt-5 pb-3 border-b border-border">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-lg font-bold tracking-tight">
+                {metricLabel || "Detalle"}
+              </DialogTitle>
+              {!isLoading && data && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {data.length.toLocaleString("es")} {data.length === 1 ? "registro" : "registros"}
+                  {groups.hasCategory && ` · ${groups.list.length} ${groups.list.length === 1 ? "categoría" : "categorías"}`}
+                </p>
+              )}
+            </div>
+            {groups.hasCategory && groups.list.length > 1 && (
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setCollapsed(new Set())}
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  title="Expandir todas"
+                >
+                  Expandir todo
+                </button>
+                <span className="text-[11px] text-muted-foreground">·</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCollapsed(new Set(groups.list.map((g) => g.cat)))
+                  }
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  title="Colapsar todas"
+                >
+                  Colapsar todo
+                </button>
+              </div>
+            )}
+          </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
           {isLoading ? (
             <>
               {Array.from({ length: 6 }).map((_, i) => (
@@ -170,36 +248,23 @@ const DetailDialog = ({
             <p className="text-sm text-muted-foreground text-center py-12">
               Sin registros en el rango seleccionado.
             </p>
-          ) : (() => {
-            // Si NINGUNA fila trae category, mantenemos la lista plana
-            // (mismo display de siempre). Si al menos una la trae, agrupamos
-            // por categoría con header. Las que vengan sin category caen a
-            // "Sin categoría" al final.
-            const hasCategory = data.some((r) => r.category);
-            if (!hasCategory) {
-              return data.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead));
-            }
-            const groups = new Map<string, DetailRow[]>();
-            for (const r of data) {
-              const key = r.category ?? "Sin categoría";
-              const arr = groups.get(key) ?? [];
-              arr.push(r);
-              groups.set(key, arr);
-            }
-            const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
-              const sa = CATEGORY_ORDER[a] ?? 999;
-              const sb = CATEGORY_ORDER[b] ?? 999;
-              if (sa !== sb) return sa - sb;
-              return a.localeCompare(b);
-            });
-            return sortedKeys.map((cat) => {
-              const rows = groups.get(cat)!;
+          ) : !groups.hasCategory ? (
+            <div className="space-y-1.5">
+              {data.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead))}
+            </div>
+          ) : (
+            groups.list.map(({ cat, rows }) => {
+              const isCollapsed = collapsed.has(cat);
               return (
                 <div key={cat} className="space-y-1.5">
-                  {/* Header de categoría — antes era muy chiquito y pálido,
-                      el user se perdía entre filas. Ahora: chip con
-                      categoría grande + pill con contador. */}
-                  <div className="flex items-center gap-3 pt-3 pb-2 sticky top-0 bg-background z-[1]">
+                  {/* Header de categoría — clickeable para colapsar/expandir.
+                      Sticky top sobre el bg del dialog para que el contexto
+                      no se pierda al scrollear listas largas. */}
+                  <button
+                    type="button"
+                    onClick={() => toggleCat(cat)}
+                    className="group flex w-full items-center gap-3 pb-2 sticky top-0 bg-background z-[1] hover:opacity-80 transition-opacity"
+                  >
                     <div className="flex items-center gap-2 rounded-md bg-primary/10 px-2.5 py-1">
                       <span className="text-sm font-bold tracking-wide text-primary">
                         {cat}
@@ -209,16 +274,25 @@ const DetailDialog = ({
                       </span>
                     </div>
                     <div className="h-px flex-1 bg-border" />
-                  </div>
-                  {rows.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead))}
+                    {isCollapsed ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    ) : (
+                      <ChevronUp className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    )}
+                  </button>
+                  {!isCollapsed && (
+                    <div className="space-y-1.5">
+                      {rows.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead))}
+                    </div>
+                  )}
                 </div>
               );
-            });
-          })()}
+            })
+          )}
         </div>
 
         {data && data.length === 100 && (
-          <p className="text-[10px] text-muted-foreground text-center pt-2 border-t border-border/40">
+          <p className="text-[10px] text-muted-foreground text-center py-2 border-t border-border/40">
             Mostrando los primeros 100 — si querés todos, exportar desde Reports.
           </p>
         )}
@@ -476,7 +550,7 @@ const LeadDetailDialog = ({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {isLoading ? (
             <>
               {Array.from({ length: 8 }).map((_, i) => (
@@ -487,35 +561,75 @@ const LeadDetailDialog = ({
             <p className="text-sm text-muted-foreground text-center py-12">
               No se encontró el registro.
             </p>
-          ) : (
-            Object.entries(data)
-              .filter(
-                ([k, v]) =>
-                  !HIDDEN_FIELDS.has(k) &&
-                  v !== null &&
-                  v !== "" &&
-                  !(typeof v === "object" && Object.keys(v ?? {}).length === 0),
-              )
-              .map(([k, v]) => (
-                <div
-                  key={k}
-                  className="grid grid-cols-[140px_1fr] gap-3 py-2 border-b border-border/40 last:border-0"
-                >
-                  <span className="text-xs text-muted-foreground font-medium">
-                    {FIELD_LABELS[k] ?? k}
-                  </span>
-                  <span className="text-sm break-words">
-                    {typeof v === "boolean"
-                      ? v
-                        ? "Sí"
-                        : "No"
-                      : typeof v === "object"
-                        ? JSON.stringify(v).slice(0, 200)
-                        : String(v)}
-                  </span>
+          ) : (() => {
+            // Agrupamos los campos en secciones lógicas para que el
+            // dialog no sea una lista monótona de key-value. El group
+            // function clasifica cada campo según su key.
+            const entries = Object.entries(data).filter(
+              ([k, v]) =>
+                !HIDDEN_FIELDS.has(k) &&
+                v !== null &&
+                v !== "" &&
+                !(typeof v === "object" && Object.keys(v ?? {}).length === 0),
+            );
+            type Section = { title: string; keys: string[] };
+            const SECTIONS: Section[] = [
+              { title: "Contacto",   keys: ["phone_e164", "phone", "phone_raw", "source_link", "ig_url"] },
+              { title: "Ubicación",  keys: ["country", "country_code", "state", "city"] },
+              { title: "OnlyFans / Plataforma", keys: ["platform", "onlyfans_url", "ai_score", "ai_status", "ai_reason"] },
+              { title: "Estado",     keys: ["status", "record_type", "quality", "category", "verified"] },
+              { title: "Métricas",   keys: ["followers", "bio"] },
+              { title: "Notas",      keys: ["notes", "entered_crm_notes", "entered_crm_at"] },
+              { title: "Timestamps", keys: ["created_at", "updated_at"] },
+            ];
+            const used = new Set<string>();
+            const sectioned: Array<{ title: string; entries: Array<[string, unknown]> }> = [];
+            for (const sec of SECTIONS) {
+              const matches = entries.filter(([k]) => sec.keys.includes(k));
+              if (matches.length > 0) {
+                sectioned.push({ title: sec.title, entries: matches });
+                matches.forEach(([k]) => used.add(k));
+              }
+            }
+            // Cualquier campo que no calza en una sección conocida va
+            // a "Otros" para no perderse.
+            const others = entries.filter(([k]) => !used.has(k));
+            if (others.length > 0) sectioned.push({ title: "Otros", entries: others });
+
+            return sectioned.map((sec) => (
+              <div
+                key={sec.title}
+                className="rounded-lg border border-border/60 bg-muted/20 overflow-hidden"
+              >
+                <div className="px-3 py-2 border-b border-border/40 bg-muted/30">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    {sec.title}
+                  </p>
                 </div>
-              ))
-          )}
+                <div className="divide-y divide-border/40">
+                  {sec.entries.map(([k, v]) => (
+                    <div
+                      key={k}
+                      className="grid grid-cols-[120px_1fr] gap-3 px-3 py-2 text-sm hover:bg-muted/20 transition-colors"
+                    >
+                      <span className="text-xs text-muted-foreground font-medium self-center">
+                        {FIELD_LABELS[k] ?? k}
+                      </span>
+                      <span className="break-words self-center">
+                        {typeof v === "boolean"
+                          ? v
+                            ? "Sí"
+                            : "No"
+                          : typeof v === "object"
+                            ? JSON.stringify(v).slice(0, 200)
+                            : String(v)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ));
+          })()}
         </div>
       </DialogContent>
     </Dialog>
