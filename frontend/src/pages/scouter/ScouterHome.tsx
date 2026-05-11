@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ManagerDashboard } from "@/components/scouter/ManagerDashboard";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Search, Star, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Activity } from "lucide-react";
 import {
   useLeadFavoriteIds,
@@ -521,65 +521,51 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
 
       {/* Filters row */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Company filter */}
-        <Select value={companyFilter} onValueChange={setCompanyFilter}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Compañía" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">
-              Todas ({companies.data?.length ?? 0})
-            </SelectItem>
-            {(companies.data ?? []).map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={companyFilter}
+          onValueChange={setCompanyFilter}
+          placeholder="Compañía"
+          searchPlaceholder="Buscar compañía…"
+          triggerClassName="w-[180px] h-9 text-xs"
+          options={[
+            { value: "all", label: `Todas (${companies.data?.length ?? 0})` },
+            ...(companies.data ?? []).map((c) => ({ value: c.id, label: c.name })),
+          ]}
+        />
 
-        {/* Status filter */}
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+          placeholder="Status"
+          searchPlaceholder="Buscar status…"
+          triggerClassName="w-[160px] h-9 text-xs"
+          options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        />
 
-        {/* Country filter */}
-        <Select value={countryFilter} onValueChange={setCountryFilter}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="País" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los países</SelectItem>
-            {(countries.data ?? []).map((c) => (
-              <SelectItem key={c.country} value={c.country}>
-                {countryToFlag(c.country)} {c.country} ({c.count})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={countryFilter}
+          onValueChange={setCountryFilter}
+          placeholder="País"
+          searchPlaceholder="Buscar país…"
+          triggerClassName="w-[180px] h-9 text-xs"
+          options={[
+            { value: "all", label: "Todos los países" },
+            ...(countries.data ?? []).map((c) => ({
+              value: c.country,
+              label: `${countryToFlag(c.country)} ${c.country} (${c.count})`,
+              searchAdditional: c.country,
+            })),
+          ]}
+        />
 
-        {/* AI Quality filter */}
-        <Select value={aiQuality} onValueChange={(v) => setAiQuality(v as AiQualityFilter)}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Calidad IA" />
-          </SelectTrigger>
-          <SelectContent>
-            {AI_QUALITY_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={aiQuality}
+          onValueChange={(v) => setAiQuality(v as AiQualityFilter)}
+          placeholder="Calidad IA"
+          searchPlaceholder="Buscar calidad…"
+          triggerClassName="w-[220px] h-9 text-xs"
+          options={AI_QUALITY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        />
 
         {/* Search — full width remaining */}
         <div className="relative flex-1 min-w-[200px]">

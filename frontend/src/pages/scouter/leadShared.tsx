@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Loader2, Pencil, Save, X, Star, ExternalLink, ArrowRight, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -514,15 +515,18 @@ export const LeadDrawer = ({
                     const discoverySlug = lead.company_id
                       ? companies.find((c) => c.id === lead.company_id)?.slug
                       : null;
-                    // El "current set" mostrado son: las target_companies
-                    // explícitas + la del discovery (si todavía está OK).
+                    // Si el user ya tocó el campo (draft.target_companies
+                    // definido), respetamos EXACTAMENTE lo que eligió —
+                    // sino el toggle del chip scouter se deshace en el
+                    // próximo render (bug previo). Solo mergeamos el slug
+                    // del scouter cuando el popup recién abre.
                     const draftedTargets = get("target_companies") as string[] | undefined;
-                    const baseTargets =
-                      draftedTargets !== undefined ? draftedTargets : (lead.target_companies ?? []);
                     const current =
-                      discoverySlug && !baseTargets.includes(discoverySlug)
-                        ? [discoverySlug, ...baseTargets]
-                        : baseTargets;
+                      draftedTargets !== undefined
+                        ? draftedTargets
+                        : discoverySlug && !(lead.target_companies ?? []).includes(discoverySlug)
+                          ? [discoverySlug, ...(lead.target_companies ?? [])]
+                          : (lead.target_companies ?? []);
                     if (editing) {
                       return (
                         <div className="flex flex-wrap gap-1.5">
@@ -598,24 +602,23 @@ export const LeadDrawer = ({
 
                 <Field label="País">
                   {editing ? (
-                    <Select
+                    <SearchableSelect
                       value={(get("country") as string) ?? "__none__"}
                       onValueChange={(v) =>
                         setField("country", v === "__none__" ? null : v)
                       }
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Seleccionar país" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">— Sin país —</SelectItem>
-                        {COUNTRIES_ALPHA.map((c) => (
-                          <SelectItem key={c} value={c}>
-                            {COUNTRY_FLAGS[c] ?? "🌍"} {c}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Seleccionar país"
+                      searchPlaceholder="Buscar país…"
+                      triggerClassName="w-full h-8 text-xs"
+                      options={[
+                        { value: "__none__", label: "— Sin país —" },
+                        ...COUNTRIES_ALPHA.map((c) => ({
+                          value: c,
+                          label: `${COUNTRY_FLAGS[c] ?? "🌍"} ${c}`,
+                          searchAdditional: c,
+                        })),
+                      ]}
+                    />
                   ) : (
                     <span>
                       {lead.country
