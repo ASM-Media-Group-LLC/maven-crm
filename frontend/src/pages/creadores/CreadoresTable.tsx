@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe, LogOut, Trash2, Check, X as XLucide } from "lucide-react";
+import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe, LogOut, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePermissions } from "@/hooks/usePermissions";
+import { Switch } from "@/components/ui/switch";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -265,23 +266,22 @@ const CreadoresTable = ({ creators }: Props) => {
                   const isActive = ((c as any).blu_infloww_active ?? false) as boolean;
                   const interactive = canEditBlu;
                   return (
-                    <button
-                      type="button"
-                      disabled={!interactive}
-                      onClick={() => interactive && setBluToggleTarget({ creator: c, nextState: !isActive })}
-                      title={
-                        interactive
-                          ? isActive ? "Activa en Blu/Infloww — clic para desmarcar" : "Inactiva — clic para marcar"
-                          : isActive ? "Activa en Blu/Infloww" : "Inactiva"
-                      }
-                      className={`inline-flex h-6 w-6 items-center justify-center rounded-full border transition-colors ${
-                        isActive
-                          ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                          : "border-border bg-muted/40 text-muted-foreground"
-                      } ${interactive ? "hover:scale-105 cursor-pointer" : "cursor-default opacity-80"}`}
-                    >
-                      {isActive ? <Check className="h-3.5 w-3.5" /> : <XLucide className="h-3.5 w-3.5" />}
-                    </button>
+                    <div className="flex justify-center">
+                      <Switch
+                        checked={isActive}
+                        disabled={!interactive}
+                        onCheckedChange={(checked) => {
+                          if (!interactive) return;
+                          setBluToggleTarget({ creator: c, nextState: checked });
+                        }}
+                        title={
+                          interactive
+                            ? isActive ? "Activa — clic para desmarcar" : "Inactiva — clic para marcar"
+                            : isActive ? "Activa en Blu/Infloww" : "Inactiva en Blu/Infloww"
+                        }
+                        className="data-[state=checked]:bg-emerald-500"
+                      />
+                    </div>
                   );
                 })()}
               </TableCell>
