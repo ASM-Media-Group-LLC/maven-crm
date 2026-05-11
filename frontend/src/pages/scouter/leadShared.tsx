@@ -586,6 +586,28 @@ export const LeadDrawer = ({
                   )}
                 </Field>
 
+                <Field label="Teléfono">
+                  {editing ? (
+                    <Input
+                      value={(get("phone") as string) ?? ""}
+                      placeholder="+57 300 1234567"
+                      onChange={(e) => setField("phone", e.target.value || null)}
+                      className="h-8"
+                    />
+                  ) : lead.phone ? (
+                    <a
+                      href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline tabular-nums"
+                    >
+                      {lead.phone}
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </Field>
+
                 <Field label="Seguidores">
                   <span>{formatFollowers(lead.followers)}</span>
                 </Field>
