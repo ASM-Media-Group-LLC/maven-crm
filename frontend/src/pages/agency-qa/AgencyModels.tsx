@@ -8,15 +8,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Search, Loader2, ExternalLink } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import {
+  Search,
+  Loader2,
+  ExternalLink,
+  Users,
+  UserCheck,
+  ClipboardCheck,
+  Award,
+} from "lucide-react";
 import {
   useQaModelsWithStats,
   scoreColor,
-  OUTCOME_META,
   type CallOutcome,
   type QaModelWithStats,
 } from "@/hooks/useAgencyQa";
-import CallDetailDrawer from "./CallDetailDrawer";
+import { cn } from "@/lib/utils";
+import CallDetailPage from "./CallDetailPage";
 
 // Modelos subtab — catálogo de modelos con stats agregados (count de
 // llamadas, avg score, fecha de la última, outcome del último cierre).
@@ -60,8 +69,10 @@ const OutcomeMini = ({ outcome }: { outcome: CallOutcome }) => {
 
 const AgencyModels = () => {
   const [search, setSearch] = useState("");
-  const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Detail embebido: cuando hay callId, ocultamos la tabla + stats y
+  // mostramos CallDetailPage en su lugar con el botón "← Historial"
+  // que limpia el state. Antes esto era un side drawer feo.
+  const [detailCallId, setDetailCallId] = useState<string | null>(null);
   const modelsQ = useQaModelsWithStats();
 
   const filtered = useMemo(() => {
@@ -88,23 +99,51 @@ const AgencyModels = () => {
     return { totalModels, totalCalls, overallAvg, activeModels: withCalls.length };
   }, [modelsQ.data]);
 
+  // Si está abierto el detail embebido, ocultamos la tabla y stats.
+  if (detailCallId) {
+    return (
+      <CallDetailPage callId={detailCallId} onBack={() => setDetailCallId(null)} />
+    );
+  }
+
+  const activePct =
+    summary.totalModels > 0
+      ? Math.round((summary.activeModels / summary.totalModels) * 100)
+      : 0;
+
   return (
     <div className="space-y-5">
-      {/* Stats row */}
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <Stat label="Modelos" value={summary.totalModels} hint="en el catálogo" color="rgb(148 163 184)" />
-        <Stat
+      {/* Stats — mismo lenguaje visual que Reclutamiento modelos:
+          gradient corner blur, icono en cuadrado de color, label
+          uppercase, valor 3xl tabular-nums, hint debajo. */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Modelos"
+          value={summary.totalModels}
+          hint="en el catálogo"
+          icon={<Users className="h-5 w-5 text-white" />}
+          gradient="bg-slate-500"
+        />
+        <StatCard
           label="Activas"
           value={summary.activeModels}
-          hint={summary.totalModels > 0 ? `${Math.round((summary.activeModels / summary.totalModels) * 100)}% del catálogo` : ""}
-          color="rgb(34 197 94)"
+          hint={summary.totalModels > 0 ? `${activePct}% del catálogo` : ""}
+          icon={<UserCheck className="h-5 w-5 text-white" />}
+          gradient="bg-emerald-500"
         />
-        <Stat label="Análisis totales" value={summary.totalCalls} hint="todas las QAs" color="rgb(99 102 241)" />
-        <Stat
+        <StatCard
+          label="Análisis totales"
+          value={summary.totalCalls}
+          hint="todas las QAs"
+          icon={<ClipboardCheck className="h-5 w-5 text-white" />}
+          gradient="bg-violet-500"
+        />
+        <StatCard
           label="Score promedio"
           value={summary.overallAvg || "—"}
           hint={summary.activeModels > 0 ? "/ 100 (modelos con llamadas)" : ""}
-          color={scoreColor(summary.overallAvg)}
+          icon={<Award className="h-5 w-5 text-white" />}
+          gradient="bg-amber-500"
         />
       </div>
 
@@ -161,8 +200,7 @@ const AgencyModels = () => {
                     className={`hover:bg-muted/40 ${last ? "cursor-pointer" : ""}`}
                     onClick={() => {
                       if (!last) return;
-                      setSelectedCallId(last.id);
-                      setDrawerOpen(true);
+                      setDetailCallId(last.id);
                     }}
                   >
                     <TableCell>
@@ -231,38 +269,46 @@ const AgencyModels = () => {
         )}
       </div>
 
-      <CallDetailDrawer
-        callId={selectedCallId}
-        open={drawerOpen}
-        onOpenChange={(v) => {
-          setDrawerOpen(v);
-          if (!v) setSelectedCallId(null);
-        }}
-      />
     </div>
   );
 };
 
-const Stat = ({
+// StatCard — wrapper con el lenguaje visual del Panel de Control
+// (gradient corner blur + icon en colored square + valor 3xl). Reemplaza
+// el componente Stat plain que tenía antes border simple sin glow.
+const StatCard = ({
   label,
   value,
   hint,
-  color,
+  icon,
+  gradient,
 }: {
   label: string;
   value: string | number;
   hint?: string;
-  color: string;
+  icon: React.ReactNode;
+  gradient: string;
 }) => (
-  <div className="rounded-xl border border-border bg-muted/20 p-3">
-    <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-      {label}
+  <Card className="p-4 relative overflow-hidden">
+    <div
+      className={cn(
+        "absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25",
+        gradient,
+      )}
+    />
+    <div className="relative space-y-3">
+      <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", gradient)}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{label}</p>
+        <p className="text-3xl font-bold tabular-nums leading-tight">{value}</p>
+        {hint && (
+          <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{hint}</p>
+        )}
+      </div>
     </div>
-    <div className="mt-1 text-2xl font-bold tabular-nums" style={{ color }}>
-      {value}
-    </div>
-    {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
-  </div>
+  </Card>
 );
 
 export default AgencyModels;
