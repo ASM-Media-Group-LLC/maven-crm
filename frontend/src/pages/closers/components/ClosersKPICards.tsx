@@ -103,7 +103,7 @@ const ClosersKPICards = ({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] uppercase tracking-widest text-amber-500/90 font-bold">
-              Mejor cerrador
+              Mejor cerrador <span className="text-muted-foreground/80 font-semibold">· mes actual</span>
             </p>
             {bestCloserLoading ? (
               <Skeleton className="mt-1 h-7 w-48" />
