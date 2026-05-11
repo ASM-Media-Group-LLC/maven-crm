@@ -11,6 +11,7 @@
 import { sb } from "../db.ts";
 import { checkBudget } from "../budget.ts";
 import { runProfileScrape } from "../scrapecreators.ts";
+import { persistIgPhoto } from "../storage.ts";
 import type { EnrichHandlePayload, JobResult, ScouterJob } from "../types.ts";
 
 // Limpia un input que puede venir como URL completa o con @ — devuelve
@@ -75,7 +76,10 @@ export async function handleEnrichHandle(
     };
   }
 
-  const photo = item.profilePicUrlHD ?? item.profilePicUrl ?? null;
+  // URL cruda de IG CDN expira en ~24-48h. Persistimos en nuestro
+  // bucket scouter-avatars así models.avatar_url no caduca.
+  const rawPhoto = item.profilePicUrlHD ?? item.profilePicUrl ?? null;
+  const photo = await persistIgPhoto(rawPhoto, handle);
   const name = item.fullName ?? null;
   const bio = item.biography ?? null;
   const followers = item.followersCount ?? null;

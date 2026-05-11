@@ -184,18 +184,53 @@ export async function runPostScrape(
 
 // ─── Hashtag ──────────────────────────────────────────────────────────
 //
-// ScrapeCreators no expone un IG hashtag scraper directo (sólo
-// `/v2/instagram/reels/search` que devuelve reels, no autores únicos).
-// Hasta que migremos esa estrategia, este endpoint tira un error
-// claro — `handleDiscoverHashtag` ya maneja el error y reporta al user.
+// Implementado vía /v2/instagram/reels/search (ScrapeCreators no expone
+// un endpoint dedicado de IG hashtag scrape). Estrategia:
+//   1. Pedimos reels que contengan el hashtag en su caption.
+//   2. Extraemos los usernames únicos de los autores.
+//   3. El caller (handleDiscoverHashtag) los pasa a runProfileScrape.
+//
+// Costo: 1 crédito por search request. Devuelve hasta ~25 reels por
+// página; con esos sacamos ~15-25 autores únicos típicamente.
+
+interface ReelsSearchResponse {
+  reels?: Array<{
+    media?: {
+      code?: string;
+      user?: { username?: string };
+      caption?: { text?: string } | null;
+    };
+  }>;
+}
 
 export async function runHashtagDiscovery(
-  _hashtag: string,
-  _tenantId: string,
-  _maxItems?: number,
+  hashtag: string,
+  tenantId: string,
+  maxItems?: number,
 ): Promise<Array<{ username: string; postUrl: string }>> {
-  throw new Error(
-    "Hashtag discovery no implementado en ScrapeCreators (MVP). " +
-    "Use seed_accounts en lugar de hashtags por ahora.",
+  const clean = hashtag.replace(/^#/, "").trim();
+  if (!clean) return [];
+
+  // /v2/instagram/reels/search devuelve reels populares con ese tag.
+  const json = await scFetch<ReelsSearchResponse>(
+    "/v2/instagram/reels/search",
+    { keyword: clean, trim: "true" },
   );
+  await recordSpend(tenantId, COST_PER_REQUEST_USD, 1);
+
+  const seenUsers = new Set<string>();
+  const out: Array<{ username: string; postUrl: string }> = [];
+  for (const reel of json.reels ?? []) {
+    const username = reel.media?.user?.username?.trim();
+    const code = reel.media?.code;
+    if (!username || !code) continue;
+    if (seenUsers.has(username)) continue;
+    seenUsers.add(username);
+    out.push({
+      username,
+      postUrl: `https://www.instagram.com/reel/${code}/`,
+    });
+    if (maxItems && out.length >= maxItems) break;
+  }
+  return out;
 }

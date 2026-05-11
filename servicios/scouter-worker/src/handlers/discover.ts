@@ -7,6 +7,7 @@
 import { sb } from "../db.ts";
 import { checkBudget } from "../budget.ts";
 import { runHashtagDiscovery, runProfileScrape } from "../scrapecreators.ts";
+import { persistIgPhoto } from "../storage.ts";
 import type {
   DiscoverHashtagPayload,
   DiscoverSeedPayload,
@@ -106,7 +107,10 @@ async function persistProfilesAsLeads(
     }
 
     const linkPlatform = detectLinkInBio(item.externalUrl);
-    const photo = item.profilePicUrlHD ?? item.profilePicUrl ?? null;
+    // URL cruda de IG CDN — firmada, expira en ~24-48h. La persistimos
+    // ya en nuestro storage para que photo_data_url no caduque.
+    const rawPhoto = item.profilePicUrlHD ?? item.profilePicUrl ?? null;
+    const photo = await persistIgPhoto(rawPhoto, handle);
 
     // Upsert por (company_id, instagram_handle) — UNIQUE constraint.
     // Si ya existía, refrescamos followers/bio/etc. pero NO pisamos
