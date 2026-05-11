@@ -80,6 +80,10 @@ export interface CompanySearchConfig {
   // la compañía no segmentaba por tamaño.
   profile_tier?: string | null;
   geo_targets?: string[];
+  // Países específicos que la compañía busca. Más granular que
+  // geo_targets (que es region como "LATAM" / "US"). Usar los nombres
+  // canónicos de @/lib/countries (CANONICAL_COUNTRIES).
+  target_countries?: string[];
   bio_keywords?: string[];
   exclude_keywords?: string[];
   scoring_notes?: string;

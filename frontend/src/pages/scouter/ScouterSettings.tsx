@@ -40,6 +40,7 @@ import {
   UserCircle2,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { COUNTRIES_ALPHA, COUNTRY_FLAGS } from "@/lib/countries";
 import {
   useScouterCompaniesAll,
   useCreateCompany,
@@ -942,6 +943,45 @@ const CompanyFormModal = ({
             </div>
           </div>
 
+          {/* Países objetivo — más granular que geo_targets. Click toggea
+              cada país on/off. Vacío = no hay restricción de país. */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+              <MapPin className="inline h-3 w-3 mr-1" />
+              Países objetivo (opcional)
+            </label>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              Dejar vacío = sin restricción. Tickeá uno o varios países si
+              la compañía solo busca creadores de un país específico.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {COUNTRIES_ALPHA.map((country) => {
+                const isOn = (cfg.target_countries ?? []).includes(country);
+                return (
+                  <button
+                    key={country}
+                    type="button"
+                    onClick={() => {
+                      const current = cfg.target_countries ?? [];
+                      updateConfig({
+                        target_countries: isOn
+                          ? current.filter((c) => c !== country)
+                          : [...current, country],
+                      });
+                    }}
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                      isOn
+                        ? "border-emerald-400 bg-emerald-400/15 text-emerald-400"
+                        : "border-border text-muted-foreground hover:border-primary/40"
+                    }`}
+                  >
+                    {COUNTRY_FLAGS[country] ?? "🌍"} {country}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Scoring notes */}
           <div>
             <label className="text-xs font-medium text-muted-foreground">
@@ -999,6 +1039,7 @@ const CompanyCard = ({
   const hashtags = cfg.hashtags ?? [];
   const seeds = cfg.seed_accounts ?? [];
   const geos = cfg.geo_targets ?? [];
+  const countries = cfg.target_countries ?? [];
 
   return (
     <Card className="relative group">
@@ -1054,6 +1095,11 @@ const CompanyCard = ({
               {geos.map((g) => (
                 <Badge key={g} variant="outline" className="text-[10px] border-blue-400/40 text-blue-400">
                   {g}
+                </Badge>
+              ))}
+              {countries.map((c) => (
+                <Badge key={c} variant="outline" className="text-[10px] border-emerald-400/40 text-emerald-400">
+                  {COUNTRY_FLAGS[c] ?? "🌍"} {c}
                 </Badge>
               ))}
             </div>
