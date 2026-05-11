@@ -183,7 +183,14 @@ export const LeadDrawer = ({
       return;
     }
     try {
-      await update.mutateAsync({ id: lead.id, patch: draft });
+      // Si el draft tocó target_companies, marcamos manual_company_assignment.
+      // Eso convierte el lead en un "seed" válido para el lookalike de
+      // futuras búsquedas en esa compañía — señal humana de fit.
+      const patch: LeadPatch = { ...draft };
+      if ("target_companies" in draft) {
+        patch.manual_company_assignment = true;
+      }
+      await update.mutateAsync({ id: lead.id, patch });
       toast.success("Lead actualizado");
       setEditing(false);
       setDraft({});

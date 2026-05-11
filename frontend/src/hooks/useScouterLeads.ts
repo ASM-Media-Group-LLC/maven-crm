@@ -70,6 +70,10 @@ export interface ScouterLead {
   // Se computa post-scoring vía edge function scouter-embed-leads.
   lookalike_score: number | null;
   lookalike_seed_handle: string | null;
+  // True cuando un user asignó manualmente la compañía desde el popup —
+  // la marca como seed válido para el lookalike de futuras búsquedas
+  // (señal humana de fit, mismo peso que un seed_account de Settings).
+  manual_company_assignment: boolean;
 }
 
 export interface CompanySearchConfig {
@@ -351,6 +355,7 @@ export type LeadPatch = Partial<
     | "onlyfans_url"
     | "name"
     | "target_companies"
+    | "manual_company_assignment"
   >
 >;
 
