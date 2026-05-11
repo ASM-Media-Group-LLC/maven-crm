@@ -190,37 +190,52 @@ export const useMetricDetails = (
 
       switch (metric) {
         case "contacted": {
-          const baseQ = () => {
-            const q = sb.from("leadgen_entries");
-            return q;
-          };
-          // Count exacto separado del fetch para no traer 10k rows.
-          const countQ = baseQ().select("*", { count: "exact", head: true });
-          const dataQ = baseQ()
+          // Solo leadgen entries. category_code suele estar null →
+          // enriquecemos con creators.category por handle matching.
+          const countQ = sb.from("leadgen_entries").select("*", { count: "exact", head: true });
+          const dataQ = sb
+            .from("leadgen_entries")
             .select("id, model_handle, lg_user_id, phone_e164, status, category_code, created_at")
             .order("created_at", { ascending: false })
             .limit(limit);
-          const [countRes, dataRes] = await Promise.all([
+          const creatorsQ = sb
+            .from("creators")
+            .select("instagram_handle, category")
+            .not("instagram_handle", "is", null);
+          const [countRes, dataRes, creatorsRes] = await Promise.all([
             dateLte(dateGte(countQ, "created_at"), "created_at"),
             dateLte(dateGte(dataQ, "created_at"), "created_at"),
+            creatorsQ,
           ]);
           if (dataRes.error) throw dataRes.error;
+          const creatorCat = new Map<string, string>();
+          for (const c of (creatorsRes.data ?? []) as Array<{ instagram_handle: string; category: string | null }>) {
+            if (!c.category) continue;
+            const norm = c.instagram_handle.replace(/^@/, "").toLowerCase().trim();
+            if (norm && !creatorCat.has(norm)) creatorCat.set(norm, c.category);
+          }
           return {
             totalCount: countRes.count ?? 0,
-            rows: (dataRes.data ?? []).map((r: any) => ({
-              id: r.id,
-              primary: `@${r.model_handle ?? "?"}`,
-              secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
-              date: r.created_at,
-              badge: r.status,
-              category: r.category_code ?? undefined,
-              leadSource: "leadgen" as const,
-            })),
+            rows: (dataRes.data ?? []).map((r: any) => {
+              const handleNorm = (r.model_handle ?? "").toLowerCase().trim();
+              const enriched = r.category_code ?? creatorCat.get(handleNorm);
+              return {
+                id: r.id,
+                primary: `@${r.model_handle ?? "?"}`,
+                secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
+                date: r.created_at,
+                badge: r.status,
+                category: enriched ?? undefined,
+                leadSource: "leadgen" as const,
+              };
+            }),
           };
         }
         case "totalLeads": {
           // Modelos contactadas = leadgen (todas) + scouter con
-          // first_scouter_contact_at. Count exacto cross-table.
+          // first_scouter_contact_at. leadgen.category_code suele
+          // estar null, entonces ENRIQUECEMOS con creators.category
+          // por handle matching (mismo approach que numbersObtained).
           const countQ1 = sb.from("leadgen_entries").select("*", { count: "exact", head: true });
           const countQ2 = sb
             .from("scouter_leads")
@@ -237,30 +252,51 @@ export const useMetricDetails = (
             .not("first_scouter_contact_at", "is", null)
             .order("first_scouter_contact_at", { ascending: false })
             .limit(50);
-          const [c1, c2, a, b] = await Promise.all([
+          const creatorsQ = sb
+            .from("creators")
+            .select("instagram_handle, category")
+            .not("instagram_handle", "is", null);
+          const [c1, c2, a, b, creatorsRes] = await Promise.all([
             dateLte(dateGte(countQ1, "created_at"), "created_at"),
             dateLte(dateGte(countQ2, "first_scouter_contact_at"), "first_scouter_contact_at"),
             dateLte(dateGte(q1, "created_at"), "created_at"),
             dateLte(dateGte(q2, "first_scouter_contact_at"), "first_scouter_contact_at"),
+            creatorsQ,
           ]);
-          const aRows = (a.data ?? []).map((r: any) => ({
-            id: r.id,
-            primary: `@${r.model_handle ?? "?"}`,
-            secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
-            date: r.created_at,
-            badge: "leadgen",
-            category: r.category_code ?? undefined,
-            leadSource: "leadgen" as const,
-          }));
-          const bRows = (b.data ?? []).map((r: any) => ({
-            id: r.id,
-            primary: `@${r.instagram_handle ?? "?"}`,
-            secondary: r.phone ? `📞 ${r.phone}` : "Sin número",
-            date: r.first_scouter_contact_at,
-            badge: "scouter",
-            category: r.category ?? undefined,
-            leadSource: "scouter" as const,
-          }));
+          // Map handle (normalizado) → category. Para enriquecer rows
+          // sin category propia.
+          const creatorCat = new Map<string, string>();
+          for (const c of (creatorsRes.data ?? []) as Array<{ instagram_handle: string; category: string | null }>) {
+            if (!c.category) continue;
+            const norm = c.instagram_handle.replace(/^@/, "").toLowerCase().trim();
+            if (norm && !creatorCat.has(norm)) creatorCat.set(norm, c.category);
+          }
+          const aRows = (a.data ?? []).map((r: any) => {
+            const handleNorm = (r.model_handle ?? "").toLowerCase().trim();
+            const enriched = r.category_code ?? creatorCat.get(handleNorm);
+            return {
+              id: r.id,
+              primary: `@${r.model_handle ?? "?"}`,
+              secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
+              date: r.created_at,
+              badge: "leadgen",
+              category: enriched ?? undefined,
+              leadSource: "leadgen" as const,
+            };
+          });
+          const bRows = (b.data ?? []).map((r: any) => {
+            const handleNorm = (r.instagram_handle ?? "").toLowerCase().trim();
+            const enriched = r.category ?? creatorCat.get(handleNorm);
+            return {
+              id: r.id,
+              primary: `@${r.instagram_handle ?? "?"}`,
+              secondary: r.phone ? `📞 ${r.phone}` : "Sin número",
+              date: r.first_scouter_contact_at,
+              badge: "scouter",
+              category: enriched ?? undefined,
+              leadSource: "scouter" as const,
+            };
+          });
           return {
             totalCount: (c1.count ?? 0) + (c2.count ?? 0),
             rows: [...aRows, ...bRows].sort((x, y) =>
@@ -406,9 +442,9 @@ export const useMetricDetails = (
         }
         case "totalGenerated": {
           // Pool ENTERO de descubrimiento: leadgen (todas las rows) +
-          // scouter_leads (TODAS, no solo las contactadas). Distinto
-          // de totalLeads que filtra scouter por first_scouter_contact_at.
-          // Para el card "Total leads generados".
+          // scouter_leads (TODAS, no solo las contactadas). Enriquece
+          // con creators.category por handle matching (igual que
+          // numbersObtained y totalLeads).
           const countQ1 = sb.from("leadgen_entries").select("*", { count: "exact", head: true });
           const countQ2 = sb.from("scouter_leads").select("*", { count: "exact", head: true });
           const q1 = sb
@@ -421,30 +457,49 @@ export const useMetricDetails = (
             .select("id, instagram_handle, phone, status, category, created_at")
             .order("created_at", { ascending: false })
             .limit(50);
-          const [c1, c2, a, b] = await Promise.all([
+          const creatorsQ = sb
+            .from("creators")
+            .select("instagram_handle, category")
+            .not("instagram_handle", "is", null);
+          const [c1, c2, a, b, creatorsRes] = await Promise.all([
             dateLte(dateGte(countQ1, "created_at"), "created_at"),
             dateLte(dateGte(countQ2, "created_at"), "created_at"),
             dateLte(dateGte(q1, "created_at"), "created_at"),
             dateLte(dateGte(q2, "created_at"), "created_at"),
+            creatorsQ,
           ]);
-          const aRows = (a.data ?? []).map((r: any) => ({
-            id: r.id,
-            primary: `@${r.model_handle ?? "?"}`,
-            secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
-            date: r.created_at,
-            badge: "leadgen",
-            category: r.category_code ?? undefined,
-            leadSource: "leadgen" as const,
-          }));
-          const bRows = (b.data ?? []).map((r: any) => ({
-            id: r.id,
-            primary: `@${r.instagram_handle ?? "?"}`,
-            secondary: r.phone ? `📞 ${r.phone}` : "Sin número",
-            date: r.created_at,
-            badge: "scouter",
-            category: r.category ?? undefined,
-            leadSource: "scouter" as const,
-          }));
+          const creatorCat = new Map<string, string>();
+          for (const c of (creatorsRes.data ?? []) as Array<{ instagram_handle: string; category: string | null }>) {
+            if (!c.category) continue;
+            const norm = c.instagram_handle.replace(/^@/, "").toLowerCase().trim();
+            if (norm && !creatorCat.has(norm)) creatorCat.set(norm, c.category);
+          }
+          const aRows = (a.data ?? []).map((r: any) => {
+            const handleNorm = (r.model_handle ?? "").toLowerCase().trim();
+            const enriched = r.category_code ?? creatorCat.get(handleNorm);
+            return {
+              id: r.id,
+              primary: `@${r.model_handle ?? "?"}`,
+              secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
+              date: r.created_at,
+              badge: "leadgen",
+              category: enriched ?? undefined,
+              leadSource: "leadgen" as const,
+            };
+          });
+          const bRows = (b.data ?? []).map((r: any) => {
+            const handleNorm = (r.instagram_handle ?? "").toLowerCase().trim();
+            const enriched = r.category ?? creatorCat.get(handleNorm);
+            return {
+              id: r.id,
+              primary: `@${r.instagram_handle ?? "?"}`,
+              secondary: r.phone ? `📞 ${r.phone}` : "Sin número",
+              date: r.created_at,
+              badge: "scouter",
+              category: enriched ?? undefined,
+              leadSource: "scouter" as const,
+            };
+          });
           return {
             totalCount: (c1.count ?? 0) + (c2.count ?? 0),
             rows: [...aRows, ...bRows].sort((x, y) =>
