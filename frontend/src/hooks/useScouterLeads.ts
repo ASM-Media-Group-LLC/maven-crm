@@ -1278,3 +1278,130 @@ export const useMarkNotificationRead = () => {
     },
   });
 };
+
+// ─── Autopilot · scouter_autopilot ────────────────────────────────────
+// Estado del bot persistente: cuando autopilot.active=true, un trigger
+// en la DB encola la siguiente ronda de discovery automáticamente
+// cuando termina la anterior, hasta que el budget se agote.
+
+export interface ScouterAutopilotState {
+  active: boolean;
+  paused_reason: string | null;
+  paused_at: string | null;
+  last_tick_at: string | null;
+}
+
+/** Estado actual del autopilot. Crea la row con active=true si no existe
+ *  (default ON, como pidió el user). Refetch cada 5s para reflejar
+ *  cambios del trigger sin pollear DB pesado. */
+export const useScouterAutopilot = () =>
+  useQuery({
+    queryKey: ["scouter-autopilot"],
+    queryFn: async (): Promise<ScouterAutopilotState | null> => {
+      const { data, error } = await (
+        supabase.rpc as unknown as (fn: string) => Promise<{
+          data: ScouterAutopilotState[] | null;
+          error: unknown;
+        }>
+      )("scouter_autopilot_state");
+      if (error) throw error;
+      const row = data?.[0];
+      return row
+        ? {
+            active: !!row.active,
+            paused_reason: row.paused_reason ?? null,
+            paused_at: row.paused_at ?? null,
+            last_tick_at: row.last_tick_at ?? null,
+          }
+        : null;
+    },
+    refetchInterval: 5_000,
+    staleTime: 1_000,
+  });
+
+/** Toggle del autopilot. Cuando se prende, limpia paused_reason y dispara
+ *  un primer batch via RPC. Cuando se apaga, solo updatea el flag — los
+ *  jobs ya encolados siguen procesándose y el trigger no encola más. */
+export const useToggleScouterAutopilot = () => {
+  const qc = useQueryClient();
+  const tenantQ = useCurrentTenantId();
+  return useMutation({
+    mutationFn: async (active: boolean): Promise<void> => {
+      const tenantId = tenantQ.data;
+      if (!tenantId) throw new Error("Tenant no resuelto todavía.");
+      const { error: upErr } = await sb
+        .from("scouter_autopilot")
+        .upsert(
+          {
+            tenant_id: tenantId,
+            active,
+            // Si lo prendo, limpio el paused_reason — el user dio
+            // intent explícito de querer correr de nuevo.
+            paused_reason: active ? null : undefined,
+            paused_at: active ? null : undefined,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "tenant_id" },
+        );
+      if (upErr) throw upErr;
+      // Si se prende, disparamos un primer batch ahora (el trigger
+      // solo dispara al terminar un job — al activar manualmente
+      // queremos arranque inmediato).
+      if (active) {
+        const { error: rpcErr } = await (
+          supabase.rpc as unknown as (
+            fn: string,
+            args: Record<string, unknown>,
+          ) => Promise<{ data: number | null; error: unknown }>
+        )("scouter_enqueue_autopilot_batch", { p_tenant_id: tenantId });
+        if (rpcErr) throw rpcErr;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-autopilot"] });
+      qc.invalidateQueries({ queryKey: ["scouter-jobs"] });
+    },
+    onError: (e) => {
+      toast.error("No se pudo cambiar el autopilot", { description: (e as Error).message });
+    },
+  });
+};
+
+// ─── Recent discovered leads · feed para la consola ──────────────────
+// Pollea los leads más recientes del tenant para mostrarlos en la
+// consola del Scouter Assist con flag/handle/followers a medida que
+// aparecen. Separado de useScouterLeads (que filtra por status para
+// la grid principal) — la consola quiere TODOS los nuevos.
+
+export interface ConsoleLeadEvent {
+  id: string;
+  instagram_handle: string;
+  name: string | null;
+  followers: number | null;
+  country: string | null;
+  ai_score: number | null;
+  ai_status: string | null;
+  company_id: string | null;
+  discovery_source: string | null;
+  created_at: string;
+}
+
+/** Últimos N leads creados, ordenados por más nuevo primero. Refetch
+ *  cada 3s para que la consola sienta "vivo" mientras el worker procesa. */
+export const useRecentDiscoveredLeads = (limit = 40) =>
+  useQuery({
+    queryKey: ["scouter-recent-discovered-leads", limit],
+    queryFn: async (): Promise<ConsoleLeadEvent[]> => {
+      const { data, error } = await sb
+        .from("scouter_leads")
+        .select(
+          "id, instagram_handle, name, followers, country, ai_score, ai_status, company_id, discovery_source, created_at",
+        )
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return (data ?? []) as ConsoleLeadEvent[];
+    },
+    refetchInterval: 3_000,
+    staleTime: 1_000,
+  });

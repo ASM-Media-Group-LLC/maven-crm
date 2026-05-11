@@ -37,8 +37,12 @@ import {
   useEnqueueDiscoveryHashtag,
   useCancelScouterJob,
   useScouterApifyBudget,
+  useScouterAutopilot,
+  useToggleScouterAutopilot,
+  useRecentDiscoveredLeads,
   type ScouterLead,
   type ScouterJob,
+  type ConsoleLeadEvent,
 } from "@/hooks/useScouterLeads";
 import { supabase as sb } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -91,20 +95,47 @@ function injectStyles() {
 // ─── Types ────────────────────────────────────────────────────────────
 type ScanState = "idle" | "scanning" | "paused";
 
-interface ConsoleLine {
-  id: number;
-  ts: string;
+// Lines have two shapes: plain (worker job events) y "lead_found" que
+// pintamos rico con flag + handle + followers + score.
+interface PlainLine {
+  id: string;
+  kind: "plain";
+  tsKey: number; // epoch ms para ordenar
+  ts: string;    // visible
   level: "ok" | "warn" | "error" | "info";
   text: string;
 }
+interface LeadFoundLine {
+  id: string;
+  kind: "lead_found";
+  tsKey: number;
+  ts: string;
+  handle: string;
+  name: string | null;
+  country: string | null;
+  flag: string;
+  followers: number | null;
+  aiScore: number | null;
+  aiStatus: string | null;
+  companySlug: string | null;
+}
+type ConsoleLine = PlainLine | LeadFoundLine;
 
 const MAX_CONSOLE_LINES = 300;
 
-const LEVEL_COLORS: Record<ConsoleLine["level"], string> = {
+const LEVEL_COLORS: Record<PlainLine["level"], string> = {
   ok: "#22c55e",
   warn: "#fbbf24",
   error: "#ef4444",
   info: "#71717a",
+};
+
+// Colores por ai_status para el chip de score en las líneas de lead.
+const AI_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  high_fit: { bg: "rgba(16, 185, 129, 0.18)", text: "#34d399" },
+  medium_fit: { bg: "rgba(245, 158, 11, 0.18)", text: "#fbbf24" },
+  low_fit: { bg: "rgba(239, 68, 68, 0.18)", text: "#f87171" },
+  approved: { bg: "rgba(16, 185, 129, 0.18)", text: "#34d399" },
 };
 
 // ─── Fallback hashtags (si ninguna compañía tiene search_config) ──────
@@ -127,26 +158,28 @@ const DiscoverButton = ({
   onStop: () => void;
 }) => {
   const isScanning = state === "scanning";
+  const isPaused = state === "paused";
+
+  // Colores y label varían: scanning = verde activo, paused = amber
+  // (budget out), idle = gris.
+  const tone = isScanning
+    ? { border: "#22c55e", bg: "rgba(34, 197, 94, 0.08)", glow: "0 0 30px rgba(34, 197, 94, 0.2)", text: "#22c55e", icon: "#22c55e" }
+    : isPaused
+      ? { border: "#fbbf24", bg: "rgba(251, 191, 36, 0.08)", glow: "0 0 24px rgba(251, 191, 36, 0.15)", text: "#fbbf24", icon: "#fbbf24" }
+      : { border: "#52525b", bg: "rgba(82, 82, 91, 0.08)", glow: "none", text: "#a1a1aa", icon: "#71717a" };
 
   return (
     <div className="relative flex flex-col items-center gap-3">
       {/* Button + pulse container */}
       <div className="relative flex items-center justify-center">
-        {/* Pulse rings — only when scanning */}
-        {/* Subtle glow ring — no expanding pulse to avoid overlap */}
-
         <button
           type="button"
           onClick={isScanning ? undefined : onStart}
           className="relative z-10 flex h-[120px] w-[120px] flex-col items-center justify-center rounded-full border-2 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2"
           style={{
-            borderColor: isScanning ? "#22c55e" : "#52525b",
-            backgroundColor: isScanning
-              ? "rgba(34, 197, 94, 0.08)"
-              : "rgba(82, 82, 91, 0.08)",
-            boxShadow: isScanning
-              ? "0 0 30px rgba(34, 197, 94, 0.2)"
-              : "none",
+            borderColor: tone.border,
+            backgroundColor: tone.bg,
+            boxShadow: tone.glow,
             animation: isScanning ? "discover-breathe 2s ease-in-out infinite" : "none",
             cursor: isScanning ? "default" : "pointer",
           }}
@@ -165,11 +198,11 @@ const DiscoverButton = ({
 
           <Radar
             className="h-6 w-6"
-            style={{ color: isScanning ? "#22c55e" : "#71717a" }}
+            style={{ color: tone.icon }}
           />
           <span
             className="mt-1 text-xs font-bold"
-            style={{ color: isScanning ? "#22c55e" : "#a1a1aa" }}
+            style={{ color: tone.text }}
           >
             {isScanning ? (
               <span className="flex items-center gap-0.5">
@@ -178,6 +211,8 @@ const DiscoverButton = ({
                 <span style={{ animation: "discover-dot 1.4s infinite 0.2s" }}>.</span>
                 <span style={{ animation: "discover-dot 1.4s infinite 0.4s" }}>.</span>
               </span>
+            ) : isPaused ? (
+              "Reanudar"
             ) : (
               "Descubrir"
             )}
@@ -195,6 +230,49 @@ const DiscoverButton = ({
           <StopCircle className="h-3.5 w-3.5" />
           Detener
         </button>
+      )}
+    </div>
+  );
+};
+
+// Renderer rico para el evento "lead encontrado" — flag + handle bold
+// + followers + chip de ai_status. Click al handle abre IG en otra
+// pestaña. Compacto pero más vivo que una línea plain con texto.
+const LeadFoundRow = ({ line }: { line: LeadFoundLine }) => {
+  const aiCfg = line.aiStatus ? AI_STATUS_COLORS[line.aiStatus] : null;
+  return (
+    <div className="flex items-center gap-2 group">
+      <span className="shrink-0 text-zinc-600 select-none tabular-nums">{line.ts}</span>
+      <span className="text-emerald-400 select-none">✓</span>
+      <span className="shrink-0">{line.flag}</span>
+      <a
+        href={`https://www.instagram.com/${line.handle}/`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-white font-semibold hover:text-emerald-300 truncate"
+      >
+        @{line.handle}
+      </a>
+      {line.followers != null && (
+        <span className="text-zinc-500 tabular-nums shrink-0">
+          {formatFollowers(line.followers)}
+        </span>
+      )}
+      {line.country && (
+        <span className="text-zinc-500 truncate hidden md:inline">· {line.country}</span>
+      )}
+      {line.companySlug && (
+        <span className="text-violet-400/80 truncate hidden md:inline">
+          · {line.companySlug}
+        </span>
+      )}
+      {line.aiScore != null && aiCfg && (
+        <span
+          className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums shrink-0"
+          style={{ background: aiCfg.bg, color: aiCfg.text }}
+        >
+          {line.aiScore.toFixed(1)}
+        </span>
       )}
     </div>
   );
@@ -243,12 +321,16 @@ const ScoutConsole = ({ lines }: { lines: ConsoleLine[] }) => {
             Esperando actividad del worker…
           </div>
         ) : (
-          lines.map((line) => (
-            <div key={line.id} className="flex gap-2">
-              <span className="shrink-0 text-zinc-600 select-none">{line.ts}</span>
-              <span style={{ color: LEVEL_COLORS[line.level] }}>{line.text}</span>
-            </div>
-          ))
+          lines.map((line) =>
+            line.kind === "plain" ? (
+              <div key={line.id} className="flex gap-2">
+                <span className="shrink-0 text-zinc-600 select-none">{line.ts}</span>
+                <span style={{ color: LEVEL_COLORS[line.level] }}>{line.text}</span>
+              </div>
+            ) : (
+              <LeadFoundRow key={line.id} line={line} />
+            ),
+          )
         )}
       </div>
     </div>
@@ -585,15 +667,17 @@ const Pagination = ({
 };
 
 // ─── Helper: jobs → console lines ────────────────────────────────────
-let lineCounter = 0;
-
-function jobToConsoleLines(job: ScouterJob): ConsoleLine[] {
-  const ts = new Date(job.created_at).toLocaleTimeString("es-CO", {
+const fmtTs = (iso: string): string =>
+  new Date(iso).toLocaleTimeString("es-CO", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
   });
-  const lines: ConsoleLine[] = [];
+
+function jobToConsoleLines(job: ScouterJob): PlainLine[] {
+  const ts = fmtTs(job.created_at);
+  const tsKey = new Date(job.created_at).getTime();
+  const lines: PlainLine[] = [];
 
   const kind =
     job.kind === "discover_seed"
@@ -616,52 +700,67 @@ function jobToConsoleLines(job: ScouterJob): ConsoleLine[] {
 
   if (job.status === "queued") {
     lines.push({
-      id: ++lineCounter,
+      id: `job-${job.id}-queued`,
+      kind: "plain",
+      tsKey,
       ts,
       level: "info",
       text: `[${kind}] encolado — ${detail}`,
     });
   } else if (job.status === "running") {
+    const startTs = job.started_at ?? job.created_at;
     lines.push({
-      id: ++lineCounter,
-      ts: job.started_at
-        ? new Date(job.started_at).toLocaleTimeString("es-CO", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })
-        : ts,
+      id: `job-${job.id}-running`,
+      kind: "plain",
+      tsKey: new Date(startTs).getTime(),
+      ts: fmtTs(startTs),
       level: "ok",
       text: `[${kind}] ejecutando… — ${detail}`,
     });
   } else if (job.status === "done") {
+    const endTs = job.completed_at ?? job.created_at;
     lines.push({
-      id: ++lineCounter,
-      ts: job.completed_at
-        ? new Date(job.completed_at).toLocaleTimeString("es-CO", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })
-        : ts,
+      id: `job-${job.id}-done`,
+      kind: "plain",
+      tsKey: new Date(endTs).getTime(),
+      ts: fmtTs(endTs),
       level: "ok",
       text: `[${kind}] ✔ completado — ${detail}`,
     });
   } else if (job.status === "failed") {
+    const endTs = job.completed_at ?? job.created_at;
     lines.push({
-      id: ++lineCounter,
-      ts: job.completed_at
-        ? new Date(job.completed_at).toLocaleTimeString("es-CO", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })
-        : ts,
+      id: `job-${job.id}-failed`,
+      kind: "plain",
+      tsKey: new Date(endTs).getTime(),
+      ts: fmtTs(endTs),
       level: job.last_error?.includes("Cancelado") ? "warn" : "error",
       text: `[${kind}] ✗ ${job.last_error ?? "error desconocido"}`,
     });
   }
   return lines;
+}
+
+// Convierte un lead recientemente descubierto en una línea LeadFoundLine
+// para la consola. Usa la heurística de bandera del país canónico.
+function leadToConsoleLine(
+  lead: ConsoleLeadEvent,
+  companySlug: string | null,
+): LeadFoundLine {
+  return {
+    id: `lead-${lead.id}`,
+    kind: "lead_found",
+    tsKey: new Date(lead.created_at).getTime(),
+    ts: fmtTs(lead.created_at),
+    handle: lead.instagram_handle,
+    name: lead.name,
+    country: lead.country,
+    flag: countryToFlag(lead.country),
+    followers: lead.followers,
+    aiScore: lead.ai_score,
+    aiStatus: lead.ai_status,
+    companySlug,
+  };
 }
 
 // ─── Main component ──────────────────────────────────────────────────
@@ -709,6 +808,9 @@ const ScouterDiscover = () => {
   const enqueueHashtag = useEnqueueDiscoveryHashtag();
   const cancelJob = useCancelScouterJob();
   const budget = useScouterApifyBudget();
+  const autopilot = useScouterAutopilot();
+  const toggleAutopilot = useToggleScouterAutopilot();
+  const recentLeads = useRecentDiscoveredLeads(40);
 
   // Jobs — poll active jobs faster (3s) and all recent jobs for console
   const activeJobs = useScouterJobs({ status: ["queued", "running"], limit: 20, refetchInterval: 3_000 });
@@ -738,26 +840,48 @@ const ScouterDiscover = () => {
     return map;
   }, [companies.data]);
 
-  // ── Scan state derived from jobs
+  // ── Scan state derived from jobs + autopilot status. Si autopilot
+  //    está activo, el botón debe mostrar "scanning" aunque no haya
+  //    jobs ahora — porque sabemos que se van a encolar cuando termine
+  //    el gap. Si está pausado por budget, también queda en "scanning"
+  //    visualmente pero pintamos un indicator extra abajo.
   const activeJobList = activeJobs.data ?? [];
   const runningCount = activeJobList.filter((j) => j.status === "running").length;
   const queuedCount = activeJobList.filter((j) => j.status === "queued").length;
+  const autopilotActive = autopilot.data?.active ?? true;
+  const autopilotPaused = autopilot.data?.paused_reason === "budget";
   const scanState: ScanState =
-    runningCount > 0 ? "scanning" : queuedCount > 0 ? "scanning" : "idle";
+    runningCount > 0 || queuedCount > 0
+      ? "scanning"
+      : autopilotActive && !autopilotPaused
+        ? "scanning"
+        : autopilotPaused
+          ? "paused"
+          : "idle";
 
-  // ── Console lines from recent jobs
+  // ── Console lines — mergeo jobs + leads encontrados, ordenados por
+  // timestamp ascendente (oldest at top, newest at bottom — natural
+  // log feel).
   const consoleLines = useMemo(() => {
+    const lines: ConsoleLine[] = [];
     const jobs = recentJobs.data ?? [];
-    // Generate lines from jobs, most recent first (but we want oldest at top)
-    const allLines: ConsoleLine[] = [];
-    for (const job of [...jobs].reverse()) {
-      allLines.push(...jobToConsoleLines(job));
+    for (const job of jobs) lines.push(...jobToConsoleLines(job));
+    const leads = recentLeads.data ?? [];
+    for (const lead of leads) {
+      const slug = lead.company_id ? companyMap.get(lead.company_id) ?? null : null;
+      lines.push(leadToConsoleLine(lead, slug));
     }
-    return allLines.slice(-MAX_CONSOLE_LINES);
-  }, [recentJobs.data]);
+    lines.sort((a, b) => a.tsKey - b.tsKey);
+    return lines.slice(-MAX_CONSOLE_LINES);
+  }, [recentJobs.data, recentLeads.data, companyMap]);
 
   // ── Handlers
   const handleStart = useCallback(() => {
+    // Click manual al botón → siempre activamos autopilot. La intención
+    // del user es "arrancar el bot". Si ya estaba activo, lo refrescamos
+    // (limpia paused_reason si lo había) y disparamos un batch. Si ya
+    // hay jobs activos, sigue corriendo y el trigger encadena el resto.
+    toggleAutopilot.mutate(true);
     // Encolar búsquedas para las compañías seleccionadas. El scope:
     //   · selectedCompanyIds === "all" → todas las compañías activas;
     //     además corremos el pool global pick_discovery_seeds porque la
@@ -881,6 +1005,9 @@ const ScouterDiscover = () => {
 
   const handleStopConfirm = useCallback(async () => {
     setShowStopConfirm(false);
+    // Apaga el autopilot ANTES de cancelar — sino cuando el último job
+    // se cancela, el trigger podría re-encolar.
+    toggleAutopilot.mutate(false);
     // Cancel all queued + running jobs
     for (const job of activeJobList) {
       try {
@@ -889,7 +1016,7 @@ const ScouterDiscover = () => {
         // ignore individual failures
       }
     }
-  }, [activeJobList, cancelJob]);
+  }, [activeJobList, cancelJob, toggleAutopilot]);
 
   const handleSubmitSeed = useCallback(
     (seeds: string[], companyId: string | null) => {
@@ -930,11 +1057,21 @@ const ScouterDiscover = () => {
             onStart={handleStart}
             onStop={handleStop}
           />
-          {/* Queue stats */}
+          {/* Queue stats + autopilot status */}
           <div className="text-center text-[11px] text-muted-foreground space-y-0.5">
-            {scanState === "scanning" && (
+            {(runningCount > 0 || queuedCount > 0) && (
               <div className="font-medium text-emerald-400">
                 {runningCount} ejecutando · {queuedCount} en cola
+              </div>
+            )}
+            {autopilotActive && !autopilotPaused && runningCount === 0 && queuedCount === 0 && (
+              <div className="text-emerald-400/80">
+                Autopilot activo · esperando próxima ronda
+              </div>
+            )}
+            {autopilotPaused && (
+              <div className="text-amber-400">
+                Autopilot pausado: budget agotado, vuelve mañana
               </div>
             )}
             {budgetText && (
