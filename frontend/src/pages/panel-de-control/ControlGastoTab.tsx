@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Brain, Mic, Search, AlertTriangle } from "lucide-react";
+import { Brain, Mic, Search, AlertTriangle, DollarSign } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   ResponsiveContainer,
   LineChart,
@@ -58,6 +59,15 @@ const PROVIDER_COLOR: Record<string, string> = {
   anthropic: "rgb(168 85 247)",     // violet
   elevenlabs: "rgb(244 114 182)",   // pink
   scrapecreators: "rgb(34 197 94)", // green
+};
+
+// Tailwind classes que matchean con PROVIDER_COLOR. Las usamos para
+// los gradient corner blurs y los icon containers — igual lenguaje
+// visual que los otros subtabs de Panel de Control (modelos / chatters).
+const PROVIDER_GRADIENT: Record<string, string> = {
+  anthropic: "bg-violet-500",
+  elevenlabs: "bg-pink-500",
+  scrapecreators: "bg-emerald-500",
 };
 
 // ─── Data hooks ──────────────────────────────────────────────────────
@@ -154,73 +164,119 @@ const ControlGastoTab = () => {
   const totalCap = summaries.reduce((s, p) => s + p.cap, 0);
   const recent = usage.slice(0, 50);
 
+  const totalPct = totalCap > 0 ? totalMonth / totalCap : 0;
+
   return (
     <div className="space-y-5">
-      {/* Total combinado */}
-      <Card className="p-4">
-        <div className="flex items-baseline justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Total mes en curso</p>
-            <p className="text-3xl font-bold tabular-nums">${totalMonth.toFixed(2)}</p>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            de ${totalCap.toFixed(2)} caps combinados
+      {/* Hero — Total mes en curso. Mismo lenguaje visual que las hero
+          cards de Reclutamiento modelos: border-2 con color, gradient
+          corner blur que se intensifica en hover. */}
+      <Card className="p-5 border-2 border-indigo-500/30 relative overflow-hidden">
+        <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-30 bg-indigo-500" />
+        <div className="relative">
+          <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+            Total mes en curso
           </p>
+          <div className="flex items-end gap-3 mt-2">
+            <p className="text-4xl font-bold tabular-nums leading-none">
+              ${totalMonth.toFixed(2)}
+            </p>
+            <p className="text-xs text-muted-foreground pb-1">
+              de ${totalCap.toFixed(2)} caps combinados · {(totalPct * 100).toFixed(1)}%
+            </p>
+          </div>
         </div>
       </Card>
 
-      {/* 3 cards por provider */}
+      {/* 3 cards por provider — estilo KpiCard del tab modelos: gradient
+          corner blur con el color del provider, icono en cuadrado de
+          color, label uppercase, valor grande, hint debajo. */}
       <div className="grid gap-3 sm:grid-cols-3">
         {summaries.map((s) => {
           const Icon = s.icon;
-          const bgByStatus =
+          const gradient = PROVIDER_GRADIENT[s.provider] ?? "bg-slate-500";
+          const borderByStatus =
             s.status === "red"
-              ? "border-rose-500/40 bg-rose-500/5"
+              ? "border-rose-500/40"
               : s.status === "amber"
-                ? "border-amber-500/40 bg-amber-500/5"
-                : "border-border bg-card";
+                ? "border-amber-500/40"
+                : "border-border";
           const barByStatus =
             s.status === "red" ? "bg-rose-500" : s.status === "amber" ? "bg-amber-500" : "bg-emerald-500";
           return (
-            <Card key={s.provider} className={`p-4 ${bgByStatus}`}>
-              <div className="flex items-start gap-3">
-                <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-                  style={{ background: s.color }}
-                >
+            <Card
+              key={s.provider}
+              className={cn(
+                "p-4 relative overflow-hidden border",
+                borderByStatus,
+              )}
+            >
+              <div
+                className={cn(
+                  "absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25",
+                  gradient,
+                )}
+              />
+              <div className="relative space-y-3">
+                <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", gradient)}>
                   <Icon className="h-5 w-5 text-white" />
                 </div>
-                <div className="min-w-0 flex-1">
+                <div>
                   <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold truncate">
                     {s.label}
                   </p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums leading-none">
+                  <p className="text-3xl font-bold tabular-nums leading-tight">
                     ${s.monthSpend.toFixed(2)}
                   </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
+                  <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">
                     de ${s.cap.toFixed(2)} · {s.callsThisMonth.toLocaleString("es")} calls
                   </p>
                 </div>
-              </div>
-              {/* Barra de progreso */}
-              <div className="mt-3 h-1.5 w-full rounded-full bg-muted/50 overflow-hidden">
-                <div
-                  className={`h-full transition-all ${barByStatus}`}
-                  style={{ width: `${Math.min(100, s.pctOfCap * 100).toFixed(1)}%` }}
-                />
-              </div>
-              <p className="mt-1 text-[11px] text-muted-foreground tabular-nums">
-                {(s.pctOfCap * 100).toFixed(1)}% del cap
-              </p>
-              {s.status === "red" && (
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-rose-500">
-                  <AlertTriangle className="h-3 w-3" />
-                  Cerca del cap mensual
+                {/* Progress bar — fina, status-coloreada. */}
+                <div>
+                  <div className="h-1.5 w-full rounded-full bg-muted/50 overflow-hidden">
+                    <div
+                      className={cn("h-full transition-all", barByStatus)}
+                      style={{ width: `${Math.min(100, s.pctOfCap * 100).toFixed(1)}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground tabular-nums mt-1">
+                    {(s.pctOfCap * 100).toFixed(1)}% del cap
+                  </p>
                 </div>
-              )}
+                {s.status === "red" && (
+                  <div className="flex items-center gap-1.5 text-[11px] text-rose-500 font-medium">
+                    <AlertTriangle className="h-3 w-3" />
+                    Cerca del cap mensual
+                  </div>
+                )}
+              </div>
             </Card>
           );
         })}
+
+        {/* Card derived — % del cap combinado. Misma estética que el
+            "Tasa de cierre" del tab modelos. */}
+        <Card className="p-4 border-2 border-fuchsia-500/30 relative overflow-hidden">
+          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-fuchsia-500" />
+          <div className="relative space-y-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-fuchsia-500">
+              <DollarSign className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
+                % del cap combinado
+              </p>
+              <p className="text-3xl font-bold tabular-nums leading-tight">
+                {(totalPct * 100).toFixed(1)}
+                <span className="text-lg text-muted-foreground">%</span>
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                ${totalMonth.toFixed(2)} / ${totalCap.toFixed(2)}
+              </p>
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* Gráfico diario */}
