@@ -399,6 +399,34 @@ const KEYWORD_TO_COUNTRY: Record<string, string> = {
   "extremadura": "España", "badajoz": "España", "caceres es": "España",
 };
 
+// Heurística de género — pronombres explícitos primero (señal más
+// fuerte), después emojis típicos, después términos del bio. Si nada
+// matchea → null. Comportamiento de "no detectable" lo decide el caller
+// (mismo approach que país: permisivo si no podemos confirmar).
+function inferGender(item: ProfileItem): "male" | "female" | null {
+  const text = [item.fullName ?? "", item.biography ?? ""].join(" ");
+  // 1) Pronombres explícitos
+  if (/\b(she\s*\/\s*her|she\s*\/\s*they|ella\s*\/\s*ella|hers)\b/i.test(text))
+    return "female";
+  if (/\b(he\s*\/\s*him|he\s*\/\s*they|él\s*\/\s*él|el\s*\/\s*el|his)\b/i.test(text))
+    return "male";
+  // 2) Emojis femeninos / masculinos típicos
+  if (/[👩💃👗💄💋👠👚👒👰🙋‍♀️🤷‍♀️🤰🌸💗💕]/u.test(text)) return "female";
+  if (/[👨🕺🥷🤵🙋‍♂️🤷‍♂️💪]/u.test(text)) return "male";
+  // 3) Keywords en español + inglés
+  const norm = text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+  const femaleHints =
+    /\b(mom|mama|mami|wife|esposa|girlfriend|novia|sister|hermana|chica|girl|gal|mujer|woman|female|mamacita|mrs|miss|madre|señorita|senorita|princesa|reina|baddie|girlie|girlies)\b/i;
+  const maleHints =
+    /\b(papa|padre|husband|esposo|boyfriend|novio|brother|hermano|chico|guy|hombre|man|male|sir|mr|señor|senor|caballero|king|rey)\b/i;
+  if (femaleHints.test(norm)) return "female";
+  if (maleHints.test(norm)) return "male";
+  return null;
+}
+
 function inferCountry(item: ProfileItem): string | null {
   const haystack = [
     item.fullName ?? "",
@@ -485,15 +513,19 @@ async function persistProfilesAsLeads(
   // lead viene de una cuenta semilla distinta y queremos guardarla).
   discoverySource: string | ((item: ProfileItem) => string),
   // Si la compañía tiene target_countries seteado, descartamos cualquier
-  // lead que no podamos confirmar como de uno de esos países. La intención
-  // del user: "solo paises que podamos confirmar" — si no detectamos
-  // señal clara, skipea (conservador). Vacío/null = sin restricción.
+  // lead cuyo país DETECTADO no esté en target. Si no detectamos país,
+  // dejamos pasar (permisivo — el scorer LLM va a refinar después).
   targetCountries: string[] | null,
+  // Sexo objetivo: "male" / "female" → descartamos si detectamos el
+  // sexo opuesto. "any" / null = sin restricción. Mismo approach
+  // permisivo que país: si no se detecta, pasa.
+  targetGender: "male" | "female" | "any" | null,
 ): Promise<{
   inserted: number;
   updated: number;
   skippedInLeadgen: number;
   skippedByCountry: number;
+  skippedByGender: number;
   leadIds: string[];
 }> {
   const leadIds: string[] = [];
@@ -501,7 +533,9 @@ async function persistProfilesAsLeads(
   let updated = 0;
   let skippedInLeadgen = 0;
   let skippedByCountry = 0;
+  let skippedByGender = 0;
   const hasCountryFilter = !!(targetCountries && targetCountries.length > 0);
+  const hasGenderFilter = targetGender === "male" || targetGender === "female";
 
   // Pre-fetch batch: cross-system dedup contra Lead Gen.
   //   · existingInLeadgen: handles que ya viven en leadgen_entries
@@ -576,21 +610,30 @@ async function persistProfilesAsLeads(
       continue;
     }
 
-    // Filtro por país: si la compañía tiene target_countries, descartamos
-    // leads que NO podamos confirmar como de uno de esos países.
+    // Filtro por país: si la compañía tiene target_countries y SÍ
+    // detectamos un país que NO matchea → descartamos. Si NO podemos
+    // detectar país (bio sin señal), dejamos pasar — la mayoría de
+    // creadoras no escriben país en bio, y skipearlas a todas era
+    // demasiado conservador. El scorer LLM va a refinar el país en
+    // su paso, y la UI ya filtra visualmente por país. Solo cuando hay
+    // evidencia clara de país equivocado descartamos en discovery.
     const inferredCountry = inferCountry(item);
-    if (hasCountryFilter) {
-      if (!inferredCountry) {
-        skippedByCountry += 1;
+    if (hasCountryFilter && inferredCountry && !targetCountries!.includes(inferredCountry)) {
+      skippedByCountry += 1;
+      console.log(
+        `[discover] skip @${handle} — país inferido ${inferredCountry} fuera de target (${targetCountries!.join(",")})`,
+      );
+      continue;
+    }
+
+    // Filtro por sexo: si detectamos el sexo opuesto al target,
+    // descartamos. Si no podemos detectar → pasa.
+    if (hasGenderFilter) {
+      const inferredGender = inferGender(item);
+      if (inferredGender && inferredGender !== targetGender) {
+        skippedByGender += 1;
         console.log(
-          `[discover] skip @${handle} — sin señal de país confirmable (target=${targetCountries!.join(",")})`,
-        );
-        continue;
-      }
-      if (!targetCountries!.includes(inferredCountry)) {
-        skippedByCountry += 1;
-        console.log(
-          `[discover] skip @${handle} — país inferido ${inferredCountry} fuera de target (${targetCountries!.join(",")})`,
+          `[discover] skip @${handle} — sexo inferido ${inferredGender} ≠ target ${targetGender}`,
         );
         continue;
       }
@@ -642,22 +685,33 @@ async function persistProfilesAsLeads(
     else updated += 1;
   }
 
-  return { inserted, updated, skippedInLeadgen, skippedByCountry, leadIds };
+  return { inserted, updated, skippedInLeadgen, skippedByCountry, skippedByGender, leadIds };
 }
 
-// Lee target_countries de la compañía. Devuelve null si no hay
-// restricción (vacío o columna ausente).
-async function fetchTargetCountries(companyId: string | null): Promise<string[] | null> {
-  if (!companyId) return null;
+// Lee target_countries + target_gender de la compañía. Si no hay
+// restricción, devuelve los nulls correspondientes.
+async function fetchCompanyFilters(
+  companyId: string | null,
+): Promise<{ targetCountries: string[] | null; targetGender: "male" | "female" | "any" | null }> {
+  if (!companyId) return { targetCountries: null, targetGender: null };
   const { data, error } = await sb
     .from("scouter_companies")
     .select("search_config")
     .eq("id", companyId)
     .maybeSingle();
-  if (error || !data) return null;
-  const cfg = (data as { search_config?: { target_countries?: string[] } }).search_config ?? {};
-  const arr = cfg.target_countries ?? [];
-  return arr.length > 0 ? arr : null;
+  if (error || !data) return { targetCountries: null, targetGender: null };
+  const cfg =
+    (data as {
+      search_config?: {
+        target_countries?: string[];
+        target_gender?: "male" | "female" | "any";
+      };
+    }).search_config ?? {};
+  const countries = cfg.target_countries ?? [];
+  return {
+    targetCountries: countries.length > 0 ? countries : null,
+    targetGender: cfg.target_gender ?? null,
+  };
 }
 
 async function enqueueScoreJobs(leadIds: string[], tenantId: string): Promise<void> {
@@ -687,29 +741,30 @@ export async function handleDiscoverSeed(
   if (!budget.ok) return { ok: false, message: budget.reason ?? "budget agotado" };
 
   const items = (await runProfileScrape(seeds.slice(0, max), job.tenant_id)) as ProfileItem[];
-  const targetCountries = await fetchTargetCountries(job.company_id);
-  const { inserted, updated, skippedInLeadgen, skippedByCountry, leadIds } =
-    await persistProfilesAsLeads(
-      items,
-      job.tenant_id,
-      job.company_id,
-      // Por-lead: usamos el handle de la cuenta semilla como fuente. Antes
-      // era hardcoded "seed" para todos y se perdía la trazabilidad de
-      // desde qué cuenta vino cada lead.
-      (item) => `seed:@${item.username ?? "?"}`,
-      targetCountries,
-    );
+  const { targetCountries, targetGender } = await fetchCompanyFilters(job.company_id);
+  const {
+    inserted, updated, skippedInLeadgen, skippedByCountry, skippedByGender, leadIds,
+  } = await persistProfilesAsLeads(
+    items,
+    job.tenant_id,
+    job.company_id,
+    (item) => `seed:@${item.username ?? "?"}`,
+    targetCountries,
+    targetGender,
+  );
   await enqueueScoreJobs(leadIds, job.tenant_id);
 
   const skipLeadgen = skippedInLeadgen > 0 ? `, ${skippedInLeadgen} skip (ya en Lead Gen)` : "";
   const skipCountry =
     skippedByCountry > 0
-      ? `, ${skippedByCountry} skip (país fuera de ${targetCountries?.join("/") ?? "target"})`
+      ? `, ${skippedByCountry} skip (país ≠ ${targetCountries?.join("/") ?? "target"})`
       : "";
+  const skipGender =
+    skippedByGender > 0 ? `, ${skippedByGender} skip (sexo ≠ ${targetGender})` : "";
   return {
     ok: true,
-    message: `discover_seed: ${inserted} nuevos, ${updated} actualizados${skipLeadgen}${skipCountry}.`,
-    data: { inserted, updated, skippedInLeadgen, skippedByCountry, leadIds },
+    message: `discover_seed: ${inserted} nuevos, ${updated} actualizados${skipLeadgen}${skipCountry}${skipGender}.`,
+    data: { inserted, updated, skippedInLeadgen, skippedByCountry, skippedByGender, leadIds },
     apifyItemsProcessed: items.length,
   };
 }
@@ -744,26 +799,30 @@ export async function handleDiscoverHashtag(
   // 3) Enriquecer perfiles + persistir.
   const usernames = authors.map((a) => a.username);
   const items = (await runProfileScrape(usernames, job.tenant_id)) as ProfileItem[];
-  const targetCountries = await fetchTargetCountries(job.company_id);
-  const { inserted, updated, skippedInLeadgen, skippedByCountry, leadIds } =
-    await persistProfilesAsLeads(
-      items,
-      job.tenant_id,
-      job.company_id,
-      `hashtag:${hashtag}`,
-      targetCountries,
-    );
+  const { targetCountries, targetGender } = await fetchCompanyFilters(job.company_id);
+  const {
+    inserted, updated, skippedInLeadgen, skippedByCountry, skippedByGender, leadIds,
+  } = await persistProfilesAsLeads(
+    items,
+    job.tenant_id,
+    job.company_id,
+    `hashtag:${hashtag}`,
+    targetCountries,
+    targetGender,
+  );
   await enqueueScoreJobs(leadIds, job.tenant_id);
 
   const skipLeadgen = skippedInLeadgen > 0 ? `, ${skippedInLeadgen} skip (ya en Lead Gen)` : "";
   const skipCountry =
     skippedByCountry > 0
-      ? `, ${skippedByCountry} skip (país fuera de ${targetCountries?.join("/") ?? "target"})`
+      ? `, ${skippedByCountry} skip (país ≠ ${targetCountries?.join("/") ?? "target"})`
       : "";
+  const skipGender =
+    skippedByGender > 0 ? `, ${skippedByGender} skip (sexo ≠ ${targetGender})` : "";
   return {
     ok: true,
-    message: `discover_hashtag #${hashtag}: ${inserted} nuevos, ${updated} actualizados${skipLeadgen}${skipCountry}.`,
-    data: { authorsFound: authors.length, inserted, updated, skippedInLeadgen, skippedByCountry },
+    message: `discover_hashtag #${hashtag}: ${inserted} nuevos, ${updated} actualizados${skipLeadgen}${skipCountry}${skipGender}.`,
+    data: { authorsFound: authors.length, inserted, updated, skippedInLeadgen, skippedByCountry, skippedByGender },
     apifyItemsProcessed: authors.length + items.length,
   };
 }

@@ -215,8 +215,18 @@ export async function runPostScrape(
 // Costo: 1 crédito por search request. Devuelve hasta ~25 reels por
 // página; con esos sacamos ~15-25 autores únicos típicamente.
 
+// Shape de la respuesta de ScrapeCreators /v2/instagram/reels/search.
+// Cambió ~2026-05: antes los reels venían anidados bajo `media`
+// (`reel.media.user.username` + `reel.media.code`), ahora vienen flat
+// con `reel.owner.username` + `reel.shortcode`. Soportamos ambos por
+// si revierten o si versiones del API conviven.
 interface ReelsSearchResponse {
   reels?: Array<{
+    // shape nuevo (2026-05+)
+    shortcode?: string;
+    url?: string;
+    owner?: { username?: string; id?: string; is_verified?: boolean };
+    // shape viejo (legacy)
     media?: {
       code?: string;
       user?: { username?: string };
@@ -234,8 +244,7 @@ export async function runHashtagDiscovery(
   if (!clean) return [];
 
   // /v2/instagram/reels/search devuelve reels populares con ese tag.
-  // El query param se llama `query` (no `keyword` — ese era el bug:
-  // la API devolvía 400 "You must provide a query").
+  // El query param se llama `query` (no `keyword`).
   const json = await scFetch<ReelsSearchResponse>(
     "/v2/instagram/reels/search",
     { query: clean, trim: "true" },
@@ -245,14 +254,16 @@ export async function runHashtagDiscovery(
   const seenUsers = new Set<string>();
   const out: Array<{ username: string; postUrl: string }> = [];
   for (const reel of json.reels ?? []) {
-    const username = reel.media?.user?.username?.trim();
-    const code = reel.media?.code;
+    // Preferimos shape nuevo; caemos al viejo si owner/shortcode no
+    // están seteados.
+    const username = (reel.owner?.username ?? reel.media?.user?.username)?.trim();
+    const code = reel.shortcode ?? reel.media?.code;
     if (!username || !code) continue;
     if (seenUsers.has(username)) continue;
     seenUsers.add(username);
     out.push({
       username,
-      postUrl: `https://www.instagram.com/reel/${code}/`,
+      postUrl: reel.url ?? `https://www.instagram.com/reel/${code}/`,
     });
     if (maxItems && out.length >= maxItems) break;
   }

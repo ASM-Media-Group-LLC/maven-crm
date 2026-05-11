@@ -511,6 +511,56 @@ const CountriesPicker = ({
   );
 };
 
+// Picker de sexo del creator objetivo. 3 opciones: ambos (default) /
+// mujer / hombre. Cuando el user elige uno específico, el worker
+// descarta en discovery los leads que detectemos como del sexo opuesto.
+// "any" o vacío = sin restricción (default).
+const GenderPicker = ({
+  value,
+  onChange,
+}: {
+  value: "male" | "female" | "any";
+  onChange: (next: "male" | "female" | "any") => void;
+}) => {
+  const options: Array<{ key: "any" | "female" | "male"; label: string; emoji: string }> = [
+    { key: "any", label: "Ambos", emoji: "👥" },
+    { key: "female", label: "Mujeres", emoji: "👩" },
+    { key: "male", label: "Hombres", emoji: "👨" },
+  ];
+  return (
+    <div>
+      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+        <Users className="inline h-3 w-3 mr-1" />
+        Sexo del creador (opcional)
+      </label>
+      <p className="text-[10px] text-muted-foreground mb-2">
+        Filtra en discovery por sexo detectado en bio/nombre/emojis. Si no
+        se puede detectar, el lead pasa igual — el scorer IA refina después.
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((opt) => {
+          const isOn = (value ?? "any") === opt.key;
+          return (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => onChange(opt.key)}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                isOn
+                  ? "border-emerald-400 bg-emerald-400/15 text-emerald-400"
+                  : "border-border text-muted-foreground hover:border-primary/40"
+              }`}
+            >
+              <span>{opt.emoji}</span>
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const CompanyFormModal = ({
   open,
   onClose,
@@ -1062,6 +1112,12 @@ const CompanyFormModal = ({
           <CountriesPicker
             value={cfg.target_countries ?? []}
             onChange={(next) => updateConfig({ target_countries: next })}
+          />
+
+          {/* Sexo del creador objetivo */}
+          <GenderPicker
+            value={cfg.target_gender ?? "any"}
+            onChange={(next) => updateConfig({ target_gender: next })}
           />
 
           {/* Scoring notes */}

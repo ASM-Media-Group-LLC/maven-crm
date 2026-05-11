@@ -93,6 +93,11 @@ export interface CompanySearchConfig {
   // geo_targets (que es region como "LATAM" / "US"). Usar los nombres
   // canónicos de @/lib/countries (CANONICAL_COUNTRIES).
   target_countries?: string[];
+  // Sexo del creator que busca la compañía. "any" o vacío = sin
+  // restricción (default). Cuando es "male"/"female", el worker
+  // descarta en discovery los leads que no podamos confirmar como
+  // ese sexo via heurística (bio + nombre + emojis).
+  target_gender?: "male" | "female" | "any";
   bio_keywords?: string[];
   exclude_keywords?: string[];
   scoring_notes?: string;
