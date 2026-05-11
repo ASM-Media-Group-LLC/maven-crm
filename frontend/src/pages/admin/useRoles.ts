@@ -51,11 +51,21 @@ export const MODULES_CONFIG: ModuleConfig[] = [
 
   // === Operaciones ===
   { group: "Operaciones",   module: "Promolog",      submodules: [] },
-  { group: "Operaciones",   module: "LeadGen",       submodules: [] },
-  { group: "Operaciones",   module: "Closers",       submodules: [] },
+  // LeadGen subtabs: el rail interno tiene Dashboard + Lista + Crear.
+  // El permiso "Eliminar Entradas" hard-gatea el delete button.
+  { group: "Operaciones",   module: "LeadGen",       submodules: ["Dashboard", "Lista", "Crear Entrada", "Eliminar Entradas", "Exportar"] },
+  // Closers subtabs internos: Dashboard (KPIs) y Operaciones (tabla).
+  // Acciones dentro: editar status, asignar closer, comisiones, export.
+  { group: "Operaciones",   module: "Closers",       submodules: ["Dashboard", "Operaciones", "Editar Status", "Asignar Closer", "Editar Comisiones", "Exportar"] },
   { group: "Operaciones",   module: "Tickets",       submodules: [] },
   { group: "Operaciones",   module: "Chatters",      submodules: ["Evaluator", "Workspace", "Admin", "Borrar Historial"] },
-  { group: "Operaciones",   module: "Scouter Assist", submodules: ["Home", "Busquedas", "Favoritas", "Leads", "Funnel", "Mis Tareas", "Alertas", "Settings", "Editar Compañías"] },
+  // Scouter Assist submodules. Los que comienzan con "Settings →" son
+  // permisos de acciones DENTRO del tab Settings — gating granular sobre
+  // botones que gastan créditos (Lookalike = embeddings Gemini) o
+  // disparan procesos masivos (Generar Tareas = create_daily_tasks RPC).
+  // El "→" indica al admin que es child del tab Settings (la base de
+  // datos guarda el submodule exacto, no jerárquico).
+  { group: "Operaciones",   module: "Scouter Assist", submodules: ["Home", "Busquedas", "Favoritas", "Leads", "Funnel", "Mis Tareas", "Alertas", "Settings", "Editar Compañías", "Recomputar Lookalike", "Generar Tareas"] },
   // Agency QA tiene dos tipos de submódulos:
   //   1) Las 4 categorías de QA por rol (Closers / Chatters / Managers /
   //      Spammers) que controlan qué tab del rail izquierdo ve el usuario.

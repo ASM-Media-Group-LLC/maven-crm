@@ -259,6 +259,30 @@ export interface UpdateSpammerAccountInput {
   active?: boolean;
 }
 
+/** Eliminar una cuenta spammer del tenant. Hard delete — la fila se
+ *  borra de scouter_spammer_accounts y todas las tareas/assignments
+ *  asociados via CASCADE (si están configurados). NO toca el handle
+ *  de IG ni nada externo. */
+export const useDeleteSpammerAccount = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      const { error } = await sb
+        .from("scouter_spammer_accounts")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["spammer-accounts"] });
+      toast.success("Cuenta eliminada");
+    },
+    onError: (e) => {
+      toast.error("No se pudo eliminar", { description: (e as Error).message });
+    },
+  });
+};
+
 /** Update mutable fields: display_name, niche, active. */
 export const useUpdateSpammerAccount = () => {
   const qc = useQueryClient();

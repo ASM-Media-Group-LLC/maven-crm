@@ -13,6 +13,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -48,6 +58,7 @@ import {
   Settings2,
   Play,
   UserCircle2,
+  Trash2,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { COUNTRIES_ALPHA, COUNTRY_FLAGS } from "@/lib/countries";
@@ -63,6 +74,7 @@ import {
   useSpammerAccounts,
   useInsertSpammerAccount,
   useUpdateSpammerAccount,
+  useDeleteSpammerAccount,
   type SpammerAccount,
   type AccountNiche,
 } from "@/hooks/useSpammerAccounts";
@@ -1289,7 +1301,9 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(account.display_name);
   const [niche, setNiche] = useState<AccountNiche>(account.account_niche as AccountNiche);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const updateAccount = useUpdateSpammerAccount();
+  const deleteAccount = useDeleteSpammerAccount();
 
   const handleSave = async () => {
     await updateAccount.mutateAsync({ id: account.id, display_name: displayName, account_niche: niche });
@@ -1298,6 +1312,15 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
 
   const handleToggleActive = () => {
     updateAccount.mutate({ id: account.id, active: !account.active });
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteAccount.mutateAsync(account.id);
+      setConfirmDelete(false);
+    } catch {
+      // toast manejado en el hook
+    }
   };
 
   return (
@@ -1380,6 +1403,7 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
             variant="ghost"
             className="h-7 px-2 text-xs opacity-60 hover:opacity-100"
             onClick={() => setEditing(true)}
+            title="Editar"
           >
             <Pencil className="h-3 w-3" />
           </Button>
@@ -1396,8 +1420,42 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
               <ToggleLeft className="h-5 w-5" />
             )}
           </button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs opacity-60 hover:opacity-100 hover:text-rose-400"
+            onClick={() => setConfirmDelete(true)}
+            title="Eliminar"
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
         </div>
       )}
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar cuenta @{account.instagram_handle}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se borra la cuenta y todo su histórico (scan IA, asignaciones,
+              tareas asociadas). Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-rose-500 hover:bg-rose-600"
+            >
+              {deleteAccount.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Eliminar"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
@@ -1726,6 +1784,10 @@ const ScouterSettings = () => {
   // todavía ve la configuración pero no la puede modificar.
   const { canAccess } = usePermissions();
   const canEditCompanies = canAccess("Scouter Assist", "Editar Compañías");
+  // Acciones de Settings que gastan créditos / disparan procesos
+  // pesados — gated por permisos separados (default solo admin).
+  const canRecomputeLookalike = canAccess("Scouter Assist", "Recomputar Lookalike");
+  const canGenerateTasks = canAccess("Scouter Assist", "Generar Tareas");
 
   const handleNew = () => {
     if (!canEditCompanies) return;
@@ -1822,13 +1884,15 @@ const ScouterSettings = () => {
       )}
 
       {/* Lookalike backfill — admin/manager only */}
-      {canEditCompanies && <LookalikeBackfillSection />}
+      {canRecomputeLookalike && <LookalikeBackfillSection />}
 
       {/* Cuentas Spammer section */}
       <SpammerAccountsSection />
 
-      {/* Generación Diaria section (admin/manager only) */}
-      <DailyGenerationSection />
+      {/* Generación Diaria section — gated por permiso "Generar Tareas".
+          Dispara create_daily_tasks RPC que asigna tareas a spammers;
+          puede ser ruidoso si se ejecuta múltiples veces el mismo día. */}
+      {canGenerateTasks && <DailyGenerationSection />}
     </div>
   );
 };
