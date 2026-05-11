@@ -31,3 +31,4 @@ supabase/.temp/
 scripts/migrate-chatters/node_modules/
 .sdd/
 .claude/scheduled_tasks.lock
+.claude/worktrees/
