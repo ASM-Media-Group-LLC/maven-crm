@@ -385,7 +385,7 @@ export const useMetricDetails = (
           // legacy entered_crm_at, por eso no matcheaba.
           const q = sb
             .from("creator_blu_history")
-            .select("id, creator_id, new_state, changed_at, creator:creators(name)")
+            .select("id, creator_id, new_state, changed_at, creator:creators(name, category)")
             .order("changed_at", { ascending: false })
             .limit(limit);
           const { data, error } = await dateLte(
@@ -399,6 +399,7 @@ export const useMetricDetails = (
             secondary: r.new_state ? "Activada en Blu/Infloww" : "Desactivada de Blu/Infloww",
             date: r.changed_at,
             badge: r.new_state ? "alta" : "baja",
+            category: r.creator?.category ?? undefined,
             leadSource: "creator" as const,
           }));
         }
