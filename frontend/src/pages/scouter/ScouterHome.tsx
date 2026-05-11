@@ -26,12 +26,11 @@ import {
 } from "./leadShared";
 
 // ─── Stat card compacto — versión chica de KpiCard, optimizada para
-// ahorrar vertical space en Home (las 4 cards de la parte superior
-// ocupaban demasiada altura comparadas con la cantidad de info que
-// muestran). Mantenemos el ícono cuadrado coloreado para que la
-// jerarquía visual siga coherente con dashboards globales, pero todo
-// más chico: padding p-3 vs p-4, icon 8x8 vs 10x10, value text-xl vs
-// text-3xl. La gradient corner blur se va — saturaba en chico.
+// ahorrar vertical space en Home. Padding p-3 + icon 8x8 + value
+// text-xl (vs p-4 / 10x10 / text-3xl de los KpiCard grandes).
+// Mantenemos el gradient corner blur del mismo color del ícono así
+// hereda el lenguaje visual del Panel de Control sin que la card
+// crezca.
 const StatCard = ({
   label,
   big,
@@ -48,21 +47,30 @@ const StatCard = ({
   onClick?: () => void;
 }) => {
   const IconEl = Icon ?? Activity;
-  const baseCls = `relative overflow-hidden rounded-lg border bg-card p-3 transition-colors ${
+  const baseCls = `group relative overflow-hidden rounded-lg border bg-card p-3 transition-colors ${
     active ? "border-primary ring-1 ring-primary/40" : "border-border"
   }`;
   const inner = (
-    <div className="flex items-center gap-3">
-      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${color}`}>
-        <IconEl className="h-4 w-4 text-white" />
+    <>
+      {/* Gradient corner blur del color del ícono — mismo lenguaje
+          visual que los KpiCard del Panel de Control. Tamaño reducido
+          (h-20 w-20 vs h-32 w-32 del grande) para no saturar la card
+          compacta. */}
+      <div
+        className={`absolute -right-8 -top-8 h-20 w-20 rounded-full blur-3xl opacity-25 transition-opacity group-hover:opacity-50 ${color}`}
+      />
+      <div className="relative flex items-center gap-3">
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${color}`}>
+          <IconEl className="h-4 w-4 text-white" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] uppercase tracking-wider text-foreground/70 font-semibold leading-none">
+            {label}
+          </p>
+          <p className="mt-1 text-xl font-bold tabular-nums leading-none">{big}</p>
+        </div>
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] uppercase tracking-wider text-foreground/70 font-semibold leading-none">
-          {label}
-        </p>
-        <p className="mt-1 text-xl font-bold tabular-nums leading-none">{big}</p>
-      </div>
-    </div>
+    </>
   );
   if (onClick) {
     return (
