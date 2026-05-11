@@ -47,7 +47,11 @@ async function persistProfilesAsLeads(
   items: ProfileItem[],
   tenantId: string,
   companyId: string | null,
-  discoverySource: string,
+  // discoverySource ahora acepta string (mismo valor para todos los
+  // leads — típico de hashtag discovery: "hashtag:fitness") o función
+  // (per-lead, derivado del item — típico de seed discovery donde cada
+  // lead viene de una cuenta semilla distinta y queremos guardarla).
+  discoverySource: string | ((item: ProfileItem) => string),
 ): Promise<{ inserted: number; updated: number; skippedInLeadgen: number; leadIds: string[] }> {
   const leadIds: string[] = [];
   let inserted = 0;
@@ -125,7 +129,8 @@ async function persistProfilesAsLeads(
       verified: item.verified ?? false,
       photo_data_url: photo,
       link_in_bio_platform: linkPlatform,
-      discovery_source: discoverySource,
+      discovery_source:
+        typeof discoverySource === "function" ? discoverySource(item) : discoverySource,
       tenant_id: tenantId,
     };
 
@@ -179,7 +184,10 @@ export async function handleDiscoverSeed(
     items,
     job.tenant_id,
     job.company_id,
-    "seed",
+    // Por-lead: usamos el handle de la cuenta semilla como fuente. Antes
+    // era hardcoded "seed" para todos y se perdía la trazabilidad de
+    // desde qué cuenta vino cada lead.
+    (item) => `seed:@${item.username ?? "?"}`,
   );
   await enqueueScoreJobs(leadIds, job.tenant_id);
 
