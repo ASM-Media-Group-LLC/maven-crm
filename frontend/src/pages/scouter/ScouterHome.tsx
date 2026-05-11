@@ -433,11 +433,20 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
     status: statusFilter,
     aiQuality,
   });
+  // Si el user filtra por compañía, buscamos el slug para que el filtro
+  // matchee TAMBIÉN target_companies (asignaciones manuales del popup),
+  // no solo company_id (discovery owner). Antes sin slug, los leads que
+  // reasignabas manualmente no aparecían al filtrar por la nueva compañía.
+  const activeCompanySlug =
+    companyFilter !== "all"
+      ? companies.data?.find((c) => c.id === companyFilter)?.slug
+      : undefined;
   const leads = useScouterLeads({
     status: statusFilter,
     search,
     favoritesOnly,
     company: companyFilter !== "all" ? companyFilter : undefined,
+    companySlug: activeCompanySlug,
     country: countryFilter !== "all" ? countryFilter : undefined,
     aiQuality,
     page,

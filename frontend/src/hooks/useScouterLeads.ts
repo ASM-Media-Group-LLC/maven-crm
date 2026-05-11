@@ -137,7 +137,15 @@ interface ListParams {
   limit?: number;
   search?: string;
   favoritesOnly?: boolean;
+  /** UUID de la compañía (FK a scouter_companies.id). El filtro
+   *  matchea por company_id (FK del discovery owner) O por
+   *  target_companies (slugs del array editable, si companySlug también
+   *  viene). Esto permite que un lead que reasignaste manualmente desde
+   *  el popup aparezca en el filtro de su nueva compañía. */
   company?: string;
+  /** Slug de la misma compañía. Se usa en conjunto con `company` para
+   *  el OR filter contra target_companies (que guarda slugs, no UUIDs). */
+  companySlug?: string;
   country?: string;
   aiQuality?: AiQualityFilter;
   page?: number;
@@ -160,6 +168,7 @@ export const useScouterLeads = (params: ListParams = {}) => {
     search = "",
     favoritesOnly = false,
     company,
+    companySlug,
     country,
     aiQuality = "approved",
     page = 1,
@@ -167,7 +176,7 @@ export const useScouterLeads = (params: ListParams = {}) => {
     onlyAssignedToMe = false,
   } = params;
   return useQuery({
-    queryKey: ["scouter-leads", { status, search, favoritesOnly, company, country, aiQuality, page, pageSize, onlyAssignedToMe }],
+    queryKey: ["scouter-leads", { status, search, favoritesOnly, company, companySlug, country, aiQuality, page, pageSize, onlyAssignedToMe }],
     queryFn: async (): Promise<ScouterLeadsResult> => {
       // When favoritesOnly is on, fetch the current user's favorite ids
       // first and constrain the leads query with `id IN (...)`. RLS on
@@ -211,7 +220,14 @@ export const useScouterLeads = (params: ListParams = {}) => {
         .order("created_at", { ascending: false })
         .range(from, to);
       if (status !== "all") q = q.eq("status", status);
-      if (company) q = q.eq("company_id", company);
+      // Filtro de compañía: matchea company_id (discovery owner) O
+      // target_companies (asignaciones manuales del popup). Si solo
+      // viene company sin slug, hacemos eq simple por compat.
+      if (company && companySlug) {
+        q = q.or(`company_id.eq.${company},target_companies.cs.["${companySlug}"]`);
+      } else if (company) {
+        q = q.eq("company_id", company);
+      }
       // "Sin país" es el bucket sintético para NULL — lo traduce a IS NULL.
       if (country === "Sin país") q = q.is("country", null);
       else if (country) q = q.eq("country", country);
