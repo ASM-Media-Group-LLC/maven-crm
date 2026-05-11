@@ -25,16 +25,22 @@ Antes de scorear por mérito, chequeá estos hard signals. Si alguno aplica, el 
 
 3. PAÍS NO MATCHEABLE. Si companyConfig.target_countries no está vacío Y el lead.country es NULL Y la bio no menciona ninguno de los target_countries explícitamente → score ≤ 4, status low_fit. Reason: "país desconocido — no podemos confirmar que sea de [target]". Si lead.country tiene un país que NO está en target_countries → score ≤ 3.
 
-4. TIER FUERA DE RANGO. Si companyConfig.profile_tier menciona "micro" o "<100k" y los followers > 500k → score ≤ 5. Si menciona "macro" y followers < 50k → score ≤ 4. Si profile_tier está vacío, no aplicar.
+4. FOLLOWERS FUERA DE RANGO (HARD CAP). Si companyConfig.followers_max está seteado y followers > followers_max → score ≤ 2, status low_fit. Si companyConfig.followers_min está seteado y followers < followers_min → score ≤ 3. Estos son valores numéricos explícitos que el user configuró — son no-negociables, no soft. Reason: "followers X > max permitido Y (cuenta demasiado grande para esta compañía)".
+
+5. EXCLUDE_KEYWORDS EN BIO. Si companyConfig.exclude_keywords tiene términos Y la bio/nombre del lead contiene CUALQUIERA → score ≤ 3, status low_fit. Reason debe mencionar la palabra exacta (ej. "bio menciona 'lujo' que está en exclude_keywords"). Estos son términos que el user expresamente NO quiere — no negociables. Para Price Shoes ejemplos: "modelo profesional", "top model", "pasarela", "lujo" descalifican.
+
+6. TIER FUERA DE RANGO (SOFT). Si companyConfig.profile_tier menciona "micro" o "<100k" y los followers > 500k → score ≤ 5. Si menciona "macro" y followers < 50k → score ≤ 4. Si profile_tier está vacío, no aplicar.
 
 ═══ PASO 2: SCORING POR MÉRITO (si pasaste los deal-breakers) ═══
 
-- Followers: 50k-500k es sweet spot para mid. Ajustá según companyConfig.profile_tier.
-- Bio: indicadores de monetización propia (link in bio que apunte a OF/Linktree/Beacons/Stan), tono compatible con companyConfig.scoring_notes.
-- Verified: nice-to-have.
-- Categoría manual del scout (si viene): ajustar score según A++/A/B+/B/C+/C.
-- Engagement implícito: bio que menciona "DMs to collab", "active fan base", etc.
-- Coincidencia con scoring_notes de la compañía.
+- Followers: respetar el rango configurado en companyConfig.followers_min/max. Si la cuenta cae justo en el rango, +1 al score base.
+- Bio matching: si companyConfig.bio_keywords está seteado, contar cuántas palabras keyword aparecen en la bio. 0 keywords matched cuando la lista NO está vacía → baja a score base máximo 5 (el lead no se alinea con el tono buscado). 2+ keywords matched → +0.5 al score.
+- Geo_targets (más amplio que target_countries): si la bio menciona una región del geo_targets (ej. "LATAM" en geo y "Mexico City" en bio), suma señal positiva.
+- Content_type: si el companyConfig.content_type es "lifestyle" y la bio es claramente fitness-only → -1. Si matchea → +0.5.
+- Verified: nice-to-have, +0.3 al score.
+- Categoría manual del scout (si viene): ajustar según A++/A/B+/B/C+/C.
+- Engagement implícito: bio que menciona "DMs to collab", "active fan base", monetización propia (OF/Linktree/Beacons/Stan en link_in_bio).
+- Coincidencia con scoring_notes: leer scoring_notes y usarlas como criterio adicional (ej. "priorizar perfiles accesibles, no aspiracionales" → bajar score a luxury brands).
 
 ═══ Output ═══
 
@@ -54,15 +60,34 @@ interface ScoreResult {
 }
 
 export interface ScoreLeadCompanyConfig {
-  // Países objetivo de la compañía. Si está vacío/null, sin restricción.
+  // Países objetivo. Vacío/null = sin restricción.
   target_countries?: string[] | null;
   // "male" | "female" | "any". "any"/vacío = sin restricción.
   target_gender?: "male" | "female" | "any" | null;
   // Texto libre describiendo qué tier de creator busca (ej. "micro creators
   // 5k-50k LATAM" o "macro >500k US"). Si vacío, scorer no aplica deal-breaker.
   profile_tier?: string | null;
-  // Notas adicionales para el scorer (ej. "evitar fitness", "preferir
-  // contenido NSFW soft").
+  // Cap explícito numérico de followers. HARD deal-breaker — caps
+  // score ≤ 2 si followers excede max, ≤ 3 si está por debajo de min.
+  followers_max?: number | null;
+  followers_min?: number | null;
+  // Regiones más amplias (ej. "LATAM", "Latin America"). Útil para
+  // contextualizar — el scorer puede preferir cuentas LATAM aún sin
+  // país exacto detectado.
+  geo_targets?: string[] | null;
+  // Palabras clave que la bio DEBE/PUEDE contener para que el lead
+  // sea fit (ej. "moda", "fashion", "blogger", "lifestyle"). Si la
+  // bio no contiene NINGUNA de estas, baja el score.
+  bio_keywords?: string[] | null;
+  // Palabras clave de bio que DESCALIFICAN al lead (ej. "modelo
+  // profesional", "top model", "lujo", "pasarela"). Si la bio
+  // contiene CUALQUIERA, score ≤ 3 (deal-breaker).
+  exclude_keywords?: string[] | null;
+  // Tipo de contenido buscado (ej. "lifestyle", "fitness", "fashion").
+  // El scorer matchea contra el tono de la bio.
+  content_type?: string | null;
+  // Notas libres del user al scorer (ej. "evitar fitness", "preferir
+  // contenido NSFW soft", "priorizar engagement vs followers").
   scoring_notes?: string | null;
 }
 

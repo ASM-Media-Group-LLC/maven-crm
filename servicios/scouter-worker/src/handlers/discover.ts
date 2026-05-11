@@ -625,11 +625,14 @@ async function persistProfilesAsLeads(
   discoverySource: string | ((item: ProfileItem) => string),
   targetCountries: string[] | null,
   targetGender: "male" | "female" | "any" | null,
+  followersMin: number | null,
+  followersMax: number | null,
 ): Promise<{
   inserted: number;
   updated: number;
   skippedByCountry: number;
   skippedByGender: number;
+  skippedByFollowers: number;
   leadIds: string[];
 }> {
   const leadIds: string[] = [];
@@ -637,12 +640,35 @@ async function persistProfilesAsLeads(
   let updated = 0;
   let skippedByCountry = 0;
   let skippedByGender = 0;
+  let skippedByFollowers = 0;
   const hasCountryFilter = !!(targetCountries && targetCountries.length > 0);
   const hasGenderFilter = targetGender === "male" || targetGender === "female";
 
   for (const item of items) {
     const handle = item.username?.trim().toLowerCase();
     if (!handle) continue;
+
+    // Filtro hard de followers: si la compañía configuró un rango
+    // (Price Shoes max=300k, min=10k) y la cuenta está fuera, skipea.
+    // Es deal-breaker — no scrappeamos perfiles que el user dijo
+    // expresamente que no quiere.
+    const followers = item.followersCount ?? null;
+    if (followers !== null) {
+      if (followersMax !== null && followers > followersMax) {
+        skippedByFollowers += 1;
+        console.log(
+          `[discover] skip @${handle} — followers ${followers} > max ${followersMax}`,
+        );
+        continue;
+      }
+      if (followersMin !== null && followers < followersMin) {
+        skippedByFollowers += 1;
+        console.log(
+          `[discover] skip @${handle} — followers ${followers} < min ${followersMin}`,
+        );
+        continue;
+      }
+    }
 
     const inferredCountry = inferCountry(item);
     if (hasCountryFilter && inferredCountry && !targetCountries!.includes(inferredCountry)) {
@@ -700,32 +726,46 @@ async function persistProfilesAsLeads(
     else updated += 1;
   }
 
-  return { inserted, updated, skippedByCountry, skippedByGender, leadIds };
+  return { inserted, updated, skippedByCountry, skippedByGender, skippedByFollowers, leadIds };
 }
 
-// Lee target_countries + target_gender de la compañía. Si no hay
-// restricción, devuelve los nulls correspondientes.
+// Lee filtros de la compañía. Si no hay restricción, devuelve nulls.
+// Incluye followers_max/min para descartar leads fuera del tier
+// configurado por el user (ej. Price Shoes max=300k).
 async function fetchCompanyFilters(
   companyId: string | null,
-): Promise<{ targetCountries: string[] | null; targetGender: "male" | "female" | "any" | null }> {
-  if (!companyId) return { targetCountries: null, targetGender: null };
+): Promise<{
+  targetCountries: string[] | null;
+  targetGender: "male" | "female" | "any" | null;
+  followersMin: number | null;
+  followersMax: number | null;
+}> {
+  if (!companyId) {
+    return { targetCountries: null, targetGender: null, followersMin: null, followersMax: null };
+  }
   const { data, error } = await sb
     .from("scouter_companies")
     .select("search_config")
     .eq("id", companyId)
     .maybeSingle();
-  if (error || !data) return { targetCountries: null, targetGender: null };
+  if (error || !data) {
+    return { targetCountries: null, targetGender: null, followersMin: null, followersMax: null };
+  }
   const cfg =
     (data as {
       search_config?: {
         target_countries?: string[];
         target_gender?: "male" | "female" | "any";
+        followers_min?: number | null;
+        followers_max?: number | null;
       };
     }).search_config ?? {};
   const countries = cfg.target_countries ?? [];
   return {
     targetCountries: countries.length > 0 ? countries : null,
     targetGender: cfg.target_gender ?? null,
+    followersMin: typeof cfg.followers_min === "number" ? cfg.followers_min : null,
+    followersMax: typeof cfg.followers_max === "number" ? cfg.followers_max : null,
   };
 }
 
@@ -775,16 +815,20 @@ export async function handleDiscoverSeed(
   }
 
   const items = (await runProfileScrape(toScrape, job.tenant_id)) as ProfileItem[];
-  const { targetCountries, targetGender } = await fetchCompanyFilters(job.company_id);
-  const { inserted, updated, skippedByCountry, skippedByGender, leadIds } =
-    await persistProfilesAsLeads(
-      items,
-      job.tenant_id,
-      job.company_id,
-      (item) => `seed:@${item.username ?? "?"}`,
-      targetCountries,
-      targetGender,
-    );
+  const { targetCountries, targetGender, followersMin, followersMax } =
+    await fetchCompanyFilters(job.company_id);
+  const {
+    inserted, updated, skippedByCountry, skippedByGender, skippedByFollowers, leadIds,
+  } = await persistProfilesAsLeads(
+    items,
+    job.tenant_id,
+    job.company_id,
+    (item) => `seed:@${item.username ?? "?"}`,
+    targetCountries,
+    targetGender,
+    followersMin,
+    followersMax,
+  );
   await enqueueScoreJobs(leadIds, job.tenant_id);
 
   const parts: string[] = [];
@@ -793,13 +837,14 @@ export async function handleDiscoverSeed(
   if (skippedBlocked) parts.push(`${skippedBlocked} skip blocklist`);
   if (skippedByCountry) parts.push(`${skippedByCountry} skip país`);
   if (skippedByGender) parts.push(`${skippedByGender} skip sexo`);
+  if (skippedByFollowers) parts.push(`${skippedByFollowers} skip followers`);
   const skipSummary = parts.length > 0 ? `, ${parts.join(", ")}` : "";
   return {
     ok: true,
     message: `discover_seed: ${inserted} nuevos, ${updated} actualizados${skipSummary}.`,
     data: {
       inserted, updated, skippedInLeadgen, skippedScouterFresh, skippedBlocked,
-      skippedByCountry, skippedByGender, leadIds,
+      skippedByCountry, skippedByGender, skippedByFollowers, leadIds,
     },
     apifyItemsProcessed: items.length,
   };
@@ -852,16 +897,20 @@ export async function handleDiscoverHashtag(
 
   // 4) Enriquecer solo los handles que no están en cache.
   const items = (await runProfileScrape(toScrape, job.tenant_id)) as ProfileItem[];
-  const { targetCountries, targetGender } = await fetchCompanyFilters(job.company_id);
-  const { inserted, updated, skippedByCountry, skippedByGender, leadIds } =
-    await persistProfilesAsLeads(
-      items,
-      job.tenant_id,
-      job.company_id,
-      `hashtag:${hashtag}`,
-      targetCountries,
-      targetGender,
-    );
+  const { targetCountries, targetGender, followersMin, followersMax } =
+    await fetchCompanyFilters(job.company_id);
+  const {
+    inserted, updated, skippedByCountry, skippedByGender, skippedByFollowers, leadIds,
+  } = await persistProfilesAsLeads(
+    items,
+    job.tenant_id,
+    job.company_id,
+    `hashtag:${hashtag}`,
+    targetCountries,
+    targetGender,
+    followersMin,
+    followersMax,
+  );
   await enqueueScoreJobs(leadIds, job.tenant_id);
 
   const parts: string[] = [];
@@ -870,6 +919,7 @@ export async function handleDiscoverHashtag(
   if (skippedBlocked) parts.push(`${skippedBlocked} skip blocklist`);
   if (skippedByCountry) parts.push(`${skippedByCountry} skip país`);
   if (skippedByGender) parts.push(`${skippedByGender} skip sexo`);
+  if (skippedByFollowers) parts.push(`${skippedByFollowers} skip followers`);
   const skipSummary = parts.length > 0 ? `, ${parts.join(", ")}` : "";
   return {
     ok: true,
@@ -877,7 +927,7 @@ export async function handleDiscoverHashtag(
     data: {
       authorsFound: authors.length, inserted, updated,
       skippedInLeadgen, skippedScouterFresh, skippedBlocked,
-      skippedByCountry, skippedByGender,
+      skippedByCountry, skippedByGender, skippedByFollowers,
     },
     apifyItemsProcessed: authors.length + items.length,
   };

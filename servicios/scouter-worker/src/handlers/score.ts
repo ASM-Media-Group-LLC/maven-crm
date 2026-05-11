@@ -55,13 +55,21 @@ interface CompanyRow {
     target_countries?: string[];
     target_gender?: "male" | "female" | "any";
     profile_tier?: string | null;
+    followers_max?: number | null;
+    followers_min?: number | null;
+    geo_targets?: string[];
+    bio_keywords?: string[];
+    exclude_keywords?: string[];
+    content_type?: string | null;
     scoring_notes?: string | null;
   } | null;
 }
 
-// Lee la config de scoring de la compañía a la que pertenece el lead.
-// Pasamos solo los campos que el LLM scorer usa para aplicar
-// deal-breakers (sin país, género opuesto, tier wrong, brand-not-human).
+// Lee TODA la config de scoring de la compañía y la pasa al LLM. La
+// idea: el user puso esos filtros expresamente, el scorer tiene que
+// aplicarlos. Antes solo le pasábamos 4 campos y el LLM ignoraba
+// exclude_keywords / bio_keywords / followers_max — que son donde
+// el user gastó tiempo configurando lo que quiere.
 async function fetchScoringConfig(
   companyId: string | null,
 ): Promise<ScoreLeadCompanyConfig | null> {
@@ -78,6 +86,12 @@ async function fetchScoringConfig(
     target_countries: cfg.target_countries ?? null,
     target_gender: cfg.target_gender ?? null,
     profile_tier: cfg.profile_tier ?? null,
+    followers_max: typeof cfg.followers_max === "number" ? cfg.followers_max : null,
+    followers_min: typeof cfg.followers_min === "number" ? cfg.followers_min : null,
+    geo_targets: cfg.geo_targets ?? null,
+    bio_keywords: cfg.bio_keywords ?? null,
+    exclude_keywords: cfg.exclude_keywords ?? null,
+    content_type: cfg.content_type ?? null,
     scoring_notes: cfg.scoring_notes ?? null,
   };
 }
