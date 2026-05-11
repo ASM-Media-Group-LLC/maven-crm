@@ -1305,7 +1305,13 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
       score < (config.low_score_threshold ?? 60));
   if (!shouldNotify) return;
   const recipients = config.notification_emails ?? [];
-  if (recipients.length === 0) return;
+  // El closer que subió la QA (call.uploaded_by) recibe el reporte
+  // automáticamente — sin tener que agregarse a Destinatarios. La edge
+  // function resuelve su email via service role.
+  const uploaderUserId = (call as { uploaded_by?: string | null }).uploaded_by ?? null;
+  // Si no hay destinatarios configurados Y no hay uploader, no hay
+  // forma de mandar el email — abortamos.
+  if (recipients.length === 0 && !uploaderUserId) return;
 
   const a = call.claude_analysis ?? {};
   const outcome = (a.call_outcome as string | null) ?? null;
@@ -1347,7 +1353,15 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
 
   const { error: mailError } = await supabase.functions.invoke(
     "send-notification-email",
-    { body: { to: recipients, subject, html, tag: "qa" } },
+    {
+      body: {
+        to: recipients,
+        subject,
+        html,
+        tag: "qa",
+        also_include_user_ids: uploaderUserId ? [uploaderUserId] : undefined,
+      },
+    },
   );
   if (mailError) {
     throw new Error(
