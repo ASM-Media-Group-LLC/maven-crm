@@ -4,7 +4,15 @@ import { supabase } from "@/integrations/supabase/client";
 
 // Types mirror the scouter_spammer_accounts table. Kept inline here so
 // the rest of the app can import them without a regen step.
-export type ScanStatus = "pending" | "scanning" | "done" | "failed";
+// "awaiting_screenshot" se setea cuando la cuenta está restricted y el
+// scraper no pudo leerla — el frontend muestra drop-zone para que el
+// user suba un screenshot logueado del perfil.
+export type ScanStatus =
+  | "pending"
+  | "scanning"
+  | "done"
+  | "failed"
+  | "awaiting_screenshot";
 
 export interface SpammerAccountAiRedFlag {
   signal: string;
@@ -45,6 +53,11 @@ export interface SpammerAccount {
   // Deal-breaker para outreach: las creators target no pueden ver la
   // cuenta sin estar logueadas. (migration 20260511090000).
   is_restricted: boolean | null;
+  // Path en bucket scouter-screenshots. Para cuentas restricted, el user
+  // sube un screenshot logueado del perfil; Claude vision extrae bio +
+  // nombre + followers para alimentar el análisis. (migration
+  // 20260511100000).
+  manual_screenshot_path: string | null;
   // Análisis IA — null hasta que el scan corra.
   ai_score: number | null;
   ai_analysis: SpammerAccountAiAnalysis | null;
@@ -170,6 +183,54 @@ export const useInsertSpammerAccount = () => {
     },
     onError: (e) => {
       toast.error("No se pudo registrar la cuenta", { description: (e as Error).message });
+    },
+  });
+};
+
+/** Sube un screenshot del perfil para una cuenta restricted y dispara
+ *  re-scan. Claude vision extrae bio/nombre/followers/link y alimenta el
+ *  análisis con data real. */
+export const useUploadSpammerScreenshot = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      accountId,
+      file,
+    }: {
+      accountId: string;
+      file: File;
+    }): Promise<void> => {
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
+      const path = `spammer-profiles/${accountId}-${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("scouter-screenshots")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadErr) throw uploadErr;
+
+      const { error: updateErr } = await sb
+        .from("scouter_spammer_accounts")
+        .update({
+          manual_screenshot_path: path,
+          scan_status: "pending",
+          scan_error: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", accountId);
+      if (updateErr) throw updateErr;
+
+      // Dispara re-scan con el screenshot ya seteado.
+      const { error: invokeErr } = await supabase.functions.invoke(
+        "scouter-spam-account-scan",
+        { body: { account_id: accountId } },
+      );
+      if (invokeErr) throw invokeErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["spammer-accounts"] });
+      toast.success("Screenshot subido — re-escaneando con la data del perfil");
+    },
+    onError: (e) => {
+      toast.error("No se pudo subir el screenshot", { description: (e as Error).message });
     },
   });
 };

@@ -31,6 +31,7 @@ import {
   type SpammerAccountAiRedFlag,
   useRescanSpammerAccount,
   useSpammerAccounts,
+  useUploadSpammerScreenshot,
 } from "@/hooks/useSpammerAccounts";
 import { useTenantProfiles } from "@/hooks/useAgencyQa";
 import { toast } from "sonner";
@@ -592,6 +593,97 @@ const StatBox = ({
   );
 };
 
+// ─── Restricted screenshot zone ────────────────────────────────────
+// Para cuentas que IG marcó como restricted (no podemos scrapear bio /
+// pic / followers sin cookies), el user sube un screenshot logueado del
+// perfil. Claude vision extrae la data y el AI corre el análisis con
+// la cuenta real, no con un snapshot vacío.
+
+const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
+  const uploadMut = useUploadSpammerScreenshot();
+  const hasScreenshot = !!account.manual_screenshot_path;
+  const awaiting = account.scan_status === "awaiting_screenshot";
+
+  const handleFile = (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("El archivo tiene que ser una imagen.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("La imagen no puede pesar más de 10 MB.");
+      return;
+    }
+    uploadMut.mutate({ accountId: account.id, file });
+  };
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border-2 border-dashed p-4 transition-colors",
+        hasScreenshot
+          ? "border-emerald-500/40 bg-emerald-500/5"
+          : "border-amber-500/40 bg-amber-500/5",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <Sparkles
+          className={cn(
+            "h-5 w-5 mt-0.5 shrink-0",
+            hasScreenshot ? "text-emerald-400" : "text-amber-400",
+          )}
+        />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wider mb-1">
+            {hasScreenshot
+              ? "Screenshot cargado — el análisis usa la data real del perfil"
+              : awaiting
+              ? "Pegá un screenshot del perfil"
+              : "Mejorar análisis con screenshot"}
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
+            Como IG oculta la cuenta a viewers no-loggeados, el bot no puede leer
+            bio/foto/link. Sacá un screenshot del perfil desde tu browser (logueado)
+            y subilo acá — Claude vision lo lee y enriquece el análisis con la data real.
+            Esto no cambia que la cuenta esté restricted, pero da un análisis más fiel
+            sobre el contenido y la conversión.
+          </p>
+          <label className="inline-flex">
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              disabled={uploadMut.isPending}
+              onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+            />
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors",
+                uploadMut.isPending
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : hasScreenshot
+                  ? "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                  : "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30",
+              )}
+            >
+              {uploadMut.isPending ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Subiendo…
+                </>
+              ) : hasScreenshot ? (
+                "Reemplazar screenshot"
+              ) : (
+                "Subir screenshot"
+              )}
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Detail dialog ─────────────────────────────────────────────────
 
 const SEVERITY_STYLE: Record<SpammerAccountAiRedFlag["severity"], string> = {
@@ -673,6 +765,11 @@ const SpammerDetailDialog = ({
               </div>
             </div>
           </div>
+        )}
+
+        {/* Screenshot drop-zone — para enriquecer análisis de cuentas restricted */}
+        {r.is_restricted && (
+          <RestrictedScreenshotZone account={r} />
         )}
 
         {/* Bio */}

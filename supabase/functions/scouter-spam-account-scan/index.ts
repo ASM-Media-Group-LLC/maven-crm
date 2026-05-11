@@ -1,6 +1,13 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { encode as encodeBase64 } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+
+// Built-in base64 — evita dependencia de deno.land/std (que está caído
+// upstream con 500 en deploy). btoa() acepta strings binarios, así que
+// pasamos los bytes uno a uno como char codes.
+function encodeBase64(buf: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < buf.length; i++) s += String.fromCharCode(buf[i]);
+  return btoa(s);
+}
 
 // scouter-spam-account-scan — al registrarse una cuenta de spam nueva
 // (o al re-escanear mensualmente), fetcheamos datos públicos del perfil
@@ -72,7 +79,7 @@ Las creadoras grandes son selectivas, ya las contactan muchas agencias. Para res
 
 Antes de aplicar reglas, decidí cuál de estos 4 tipos es la cuenta. Esto define la franja de score base — después ajustás dentro de la franja con las señales positivas/negativas:
 
-A) RESTRICTED (is_restricted=true) — PEOR CASO. IG ocultó la cuenta a viewers no-loggeados. Las creators target ni siquiera pueden validar el perfil al recibir el DM (muro de login, "cuenta restringida", sin info pública). Salir del flag toma weeks: verificar mail+teléfono, eliminar posts NSFW reportados, esperar que IG levante el shadow-flag. Franja: **0-15**. El primer red_flag debe ser literal: "IG marcó la cuenta como restringida — las creators target podrían no verla al recibir el DM".
+A) RESTRICTED (is_restricted=true) — PEOR CASO. IG ocultó la cuenta a viewers no-loggeados. Las creators target ni siquiera pueden validar el perfil al recibir el DM (muro de login, "cuenta restringida", sin info pública). Salir del flag toma weeks: verificar mail+teléfono, eliminar posts NSFW reportados, esperar que IG levante el shadow-flag. Franja: **0-15** sin importar lo que diga el resto del snapshot. El primer red_flag debe ser literal: "IG marcó la cuenta como restringida — las creators target podrían no verla al recibir el DM". Si el snapshot trae bio/nombre/link/followers (vienen de un screenshot manual que el user subió), usalos para enriquecer el análisis — "la cuenta SE ve profesional logueado, pero igual está restringida" — pero NO subas el score arriba de 15 por más linda que sea la cuenta. El problema técnico de visibilidad es lo que mata el outreach.
 
 B) PERFIL PERSONAL sin pretensión de agencia — la cuenta NO se presenta como agencia: bio vacía o personal ("Jorge, BsAs"), username random con números (jorgejunior12748), 0 posts del roster, sin link, sin logo de marca, sin CTA. No es fake-de-agencia; literalmente no intenta serlo. Es accesible (no restricted), las creators sí pueden ver el perfil, pero al chequearlo se dan cuenta que no es agencia y no responden. Franja: **15-30**. El why_not debe decir claro: "No es una cuenta de agencia, es perfil personal — convertila a agencia (bio profesional + posts del roster + link al sitio) o usá otra cuenta para outreach". CLAVE: no acumular red_flags hostiles tipo "cuenta privada" o "bio vacía" como si fuera fake; el problema es de categoría, no de calidad.
 
@@ -129,7 +136,7 @@ Reglas para red_flags por tipo:
 
 Sé estricto y específico. urgent_improvements deben ser cosas que se pueden hacer en una semana. recommendations son acciones más sostenidas. Cita detalles concretos del input — no recomendaciones genéricas.`;
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -198,6 +205,60 @@ serve(async (req) => {
       snapshot = await fetchIgProfile(accountRow.instagram_handle);
     } catch (fetchErr) {
       console.error("ig fetch failed:", fetchErr);
+    }
+
+    // Si la cuenta vino marcada como restricted y el user ya subió un
+    // screenshot manual, lo mandamos a Claude vision para extraer bio +
+    // nombre + followers + link + posts + verified, y mergeamos esos
+    // campos sobre el snapshot vacío. is_restricted queda en true (el
+    // problema real de visibilidad sigue ahí — las creators target topan
+    // con el wall cuando reciban el DM), pero el AI puede analizar con
+    // la data verdadera de la cuenta.
+    if (snapshot?.is_restricted) {
+      const { data: full } = await sb
+        .from("scouter_spammer_accounts")
+        .select("manual_screenshot_path")
+        .eq("id", accountRow.id)
+        .maybeSingle();
+      const path = (full as { manual_screenshot_path?: string | null } | null)
+        ?.manual_screenshot_path;
+      if (path) {
+        try {
+          const enriched = await extractFromScreenshot(
+            sb,
+            ANTHROPIC_API_KEY,
+            SCAN_MODEL,
+            path,
+            accountRow.instagram_handle,
+          );
+          if (enriched) {
+            snapshot = { ...snapshot, ...enriched, is_restricted: true };
+          }
+        } catch (visionErr) {
+          console.warn("vision extract failed:", (visionErr as Error).message);
+        }
+      } else {
+        // Restricted sin screenshot manual: la edge function devuelve OK
+        // pero deja la row marcada para que el frontend pida el upload.
+        // No corremos el AI porque sería análisis fantasma.
+        await sb
+          .from("scouter_spammer_accounts")
+          .update({
+            is_restricted: true,
+            scan_status: "awaiting_screenshot",
+            scan_error: null,
+            last_scanned_at: new Date().toISOString(),
+          })
+          .eq("id", accountRow.id);
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            account_id: accountRow.id,
+            awaiting_screenshot: true,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     // La foto de IG viene como CDN URL con tokens que caducan o que IG
@@ -479,6 +540,151 @@ async function confirmRestrictedViaPosts(handle: string, scKey: string): Promise
   }
 }
 
+// Para cuentas restricted que IG oculta a scrapers, el user sube un
+// screenshot del perfil tomado desde su browser logueado. Acá bajamos
+// la imagen del bucket, la mandamos a Claude vision y le pedimos que
+// extraiga la data estructurada del perfil. El resultado se mergea
+// sobre el snapshot vacío y el AI corre análisis normal con data real.
+async function extractFromScreenshot(
+  sb: ReturnType<typeof createClient>,
+  apiKey: string,
+  model: string,
+  path: string,
+  expectedHandle: string,
+): Promise<Partial<IgProfileSnapshot> | null> {
+  const { data: file, error } = await sb.storage
+    .from("scouter-screenshots")
+    .download(path);
+  if (error || !file) {
+    console.warn("screenshot download failed:", error?.message);
+    return null;
+  }
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const mime = (file as Blob).type || "image/png";
+  const dataUrl = `data:${mime};base64,${encodeBase64(buf)}`;
+
+  const extractPrompt = `Mirá este screenshot de un perfil de Instagram (cuenta @${expectedHandle}). Extraé los siguientes datos visibles del perfil y devolvé SOLO un JSON con esta forma exacta (sin backticks ni texto adicional):
+
+{
+  "full_name": "<string o null — el nombre que figura en grande arriba de la bio>",
+  "biography": "<string o null — el texto completo de la bio>",
+  "external_url": "<string o null — el link en azul abajo de la bio, si tiene>",
+  "followers_count": <int o null>,
+  "following_count": <int o null>,
+  "posts_count": <int o null>,
+  "is_verified": <true si tiene badge azul al lado del nombre, false si no>,
+  "is_business_account": <true si dice "Cuenta empresa" / "Business" o tiene categoría visible, false si no>,
+  "has_profile_pic": <true si se ve la foto de perfil, false si solo el placeholder gris>,
+  "notes": "<string corto: cualquier detalle relevante visible — categoría declarada, ubicación, indicadores de profesionalismo, contenido visible en posts, etc.>"
+}
+
+Los counts pueden venir abreviados (1.2K, 16.5K, 1M); convertilos a número entero. Si algún dato no es visible en el screenshot, usá null. No inventes nada.`;
+
+  const res = await fetchWithTimeout(
+    "https://api.anthropic.com/v1/messages",
+    {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1000,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: mime,
+                  data: dataUrl.split(",")[1],
+                },
+              },
+              { type: "text", text: extractPrompt },
+            ],
+          },
+        ],
+      }),
+    },
+    60_000,
+  );
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    console.warn("vision API error:", res.status, txt.slice(0, 200));
+    return null;
+  }
+
+  const data = (await res.json()) as {
+    content?: Array<{ type: string; text?: string }>;
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    };
+  };
+  if (data.usage) {
+    void (async () => {
+      try {
+        const { logAnthropicUsage } = await import("../_shared/usage.ts");
+        await logAnthropicUsage({
+          operation: "scouter-spam-screenshot-extract",
+          model,
+          usage: data.usage as any,
+          context: { handle: expectedHandle },
+        });
+      } catch {
+        // silent
+      }
+    })();
+  }
+
+  const raw = (data.content ?? [])
+    .filter((c) => c.type === "text" && c.text)
+    .map((c) => c.text!)
+    .join("")
+    .trim();
+  let cleaned = raw;
+  if (cleaned.startsWith("```json")) cleaned = cleaned.slice(7);
+  if (cleaned.startsWith("```")) cleaned = cleaned.slice(3);
+  if (cleaned.endsWith("```")) cleaned = cleaned.slice(0, -3);
+  cleaned = cleaned.trim();
+
+  let parsed: {
+    full_name?: string | null;
+    biography?: string | null;
+    external_url?: string | null;
+    followers_count?: number | null;
+    following_count?: number | null;
+    posts_count?: number | null;
+    is_verified?: boolean | null;
+    is_business_account?: boolean | null;
+    has_profile_pic?: boolean | null;
+  };
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (e) {
+    console.warn("vision JSON parse failed:", (e as Error).message, raw.slice(0, 200));
+    return null;
+  }
+
+  return {
+    full_name: parsed.full_name ?? null,
+    biography: parsed.biography ?? null,
+    external_url: parsed.external_url ?? null,
+    followers_count: parsed.followers_count ?? null,
+    following_count: parsed.following_count ?? null,
+    posts_count: parsed.posts_count ?? null,
+    is_verified: parsed.is_verified ?? null,
+    is_business_account: parsed.is_business_account ?? null,
+  };
+}
+
 // Snapshot mínimo para cuenta confirmada como restricted. El AI lo va
 // a evaluar tomando is_restricted=true como deal-breaker (regla en el
 // system prompt). No tenemos bio/followers/pic porque IG los oculta.
@@ -570,7 +776,11 @@ Restringida por IG: ${snapshot.is_restricted ? "SÍ — IG ocultó la cuenta a v
     snapshot.is_restricted
       ? `
 
-NOTA: la cuenta está marcada como restringida por IG, así que no tenemos visibilidad sobre bio, followers, ni foto desde un viewer no-loggeado. Evaluá pensando que las creators target reciben el DM y al chequear el perfil van a topar con un muro / aviso de cuenta restringida — eso baja la confianza al piso. Aplicá la regla del deal-breaker.`
+NOTA: la cuenta está marcada como restringida por IG. ${
+          snapshot.biography || snapshot.full_name
+            ? "La data de bio/nombre/followers que ves arriba vino de un screenshot que subió el user (perfil real visto logueado). Es contexto válido para entender la cuenta, pero NO cambia el problema central: las creators target que reciban el DM y vayan a chequear el perfil sin estar logueadas en IG van a topar con un muro o aviso de cuenta restringida. Por eso la regla del deal-breaker se mantiene — la cuenta puede verse bárbara logueado pero no sirve para outreach mientras IG la oculte."
+            : "No tenemos visibilidad sobre bio, followers, ni foto desde un viewer no-loggeado. Evaluá pensando que las creators target reciben el DM y al chequear el perfil van a topar con un muro / aviso de cuenta restringida — eso baja la confianza al piso."
+        } Aplicá la regla del deal-breaker.`
       : ""
   }
 
