@@ -167,10 +167,85 @@ const emptyForm: CompanyFormState = {
   logo_light_url: null,
 };
 
+// ─── Auto-crop de padding transparente ─────────────────────────────
+// Muchos PNGs llegan con padding alpha=0 alrededor del logo. Ese aire
+// muerto hace que en el header del Scouter Assist el logo se vea
+// chiquito (object-contain respeta el padding interno del archivo).
+//
+// Acá escaneamos el bitmap, encontramos el bounding box de los píxeles
+// no-transparentes (alpha > ALPHA_THRESHOLD) y devolvemos una versión
+// recortada al ajuste con un 4% de aire de seguridad. Si la imagen ya
+// está bien recortada (savings < 5%), devolvemos el archivo original
+// sin tocar nada.
+const ALPHA_THRESHOLD = 12; // anti-alias / sombras tenues no cuentan
+const PADDING_MARGIN_PCT = 0.04;
+const MIN_SAVINGS_TO_CROP = 0.05;
+
+const autoCropTransparent = async (file: File): Promise<File> => {
+  // SVG no tiene píxeles, queda como está.
+  if (file.type === "image/svg+xml") return file;
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("No se pudo decodificar la imagen."));
+      el.src = objectUrl;
+    });
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    if (!w || !h) return file;
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    const ctx = cv.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0);
+    const px = ctx.getImageData(0, 0, w, h).data;
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const a = px[(y * w + x) * 4 + 3];
+        if (a > ALPHA_THRESHOLD) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return file; // todo transparente, no tocar
+    const bw = maxX - minX + 1;
+    const bh = maxY - minY + 1;
+    const margin = Math.round(Math.min(bw, bh) * PADDING_MARGIN_PCT);
+    const cx = Math.max(0, minX - margin);
+    const cy = Math.max(0, minY - margin);
+    const cw = Math.min(w - cx, bw + 2 * margin);
+    const ch = Math.min(h - cy, bh + 2 * margin);
+    const savings = 1 - (cw * ch) / (w * h);
+    if (savings < MIN_SAVINGS_TO_CROP) return file;
+    const out = document.createElement("canvas");
+    out.width = cw;
+    out.height = ch;
+    const octx = out.getContext("2d");
+    if (!octx) return file;
+    octx.drawImage(cv, cx, cy, cw, ch, 0, 0, cw, ch);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      out.toBlob((b) => resolve(b), "image/png"),
+    );
+    if (!blob) return file;
+    const newName = file.name.replace(/\.[^.]+$/, "") + "-cropped.png";
+    return new File([blob], newName, { type: "image/png" });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
 // ─── Logo uploader ──────────────────────────────────────────────────
 // Sube PNG (transparente) o WebP a storage.objects bucket "company-logos".
 // Recomendación al user: 200×200 mínimo (display real ~32-40px, da
-// margen para retina). Cap server-side: 500KB.
+// margen para retina). Cap server-side: 500KB. El uploader hace
+// auto-crop del padding alpha=0 antes de subir.
 const CompanyLogoUploader = ({
   value,
   onChange,
@@ -218,7 +293,14 @@ const CompanyLogoUploader = ({
 
     setUploading(true);
     try {
-      const ext = (file.name.split(".").pop() || "png").toLowerCase();
+      // Auto-crop del padding transparente para que el logo siempre
+      // ocupe todo el bitmap. Si el original ya está tight, devuelve
+      // el mismo file sin tocar.
+      const original = file;
+      const processed = await autoCropTransparent(original);
+      const wasCropped = processed !== original;
+
+      const ext = wasCropped ? "png" : ((file.name.split(".").pop() || "png").toLowerCase());
       const slugBase = (companyName || "company")
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "_")
@@ -227,11 +309,13 @@ const CompanyLogoUploader = ({
       const path = `${slugBase}-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("company-logos")
-        .upload(path, file, { upsert: false, contentType: file.type });
+        .upload(path, processed, { upsert: false, contentType: processed.type });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("company-logos").getPublicUrl(path);
       onChange(pub.publicUrl);
-      toast.success("Logo subido");
+      toast.success(
+        wasCropped ? "Logo subido (auto-recortado el padding)" : "Logo subido",
+      );
     } catch (e) {
       toast.error("No se pudo subir el logo", { description: (e as Error).message });
     } finally {
@@ -245,52 +329,68 @@ const CompanyLogoUploader = ({
   // light mode → fondo blanco (logos oscuros lucen ahí).
   const previewBg = variant === "dark" ? "bg-zinc-900" : "bg-white";
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3">
-      <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-border overflow-hidden ${previewBg}`}>
-        {value ? (
-          <img src={value} alt="Logo" className="h-full w-full object-contain" />
-        ) : (
-          <Building2 className={`h-6 w-6 ${variant === "dark" ? "text-zinc-600" : "text-zinc-400"}`} />
-        )}
-      </div>
-      <div className="min-w-0 flex-1 space-y-1">
-        <p className="text-xs font-medium">{label}</p>
-        <p className="text-[11px] text-muted-foreground">
-          PNG transparente recomendado · mínimo {MIN_DIM}×{MIN_DIM}px · máx 500KB
-        </p>
-        <div className="flex gap-2 pt-1">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={uploading}
-            onClick={() => inputRef.current?.click()}
-          >
-            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : value ? "Cambiar" : "Subir logo"}
-          </Button>
-          {value && (
+    <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+      <div className="flex items-center gap-3">
+        <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-border overflow-hidden ${previewBg}`}>
+          {value ? (
+            <img src={value} alt="Logo" className="h-full w-full object-contain" />
+          ) : (
+            <Building2 className={`h-6 w-6 ${variant === "dark" ? "text-zinc-600" : "text-zinc-400"}`} />
+          )}
+        </div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-xs font-medium">{label}</p>
+          <p className="text-[11px] text-muted-foreground">
+            PNG transparente · mín {MIN_DIM}×{MIN_DIM}px · máx 500KB · auto-crop al subir
+          </p>
+          <div className="flex gap-2 pt-1">
             <Button
               type="button"
               size="sm"
-              variant="ghost"
-              onClick={() => onChange(null)}
-              className="text-destructive"
+              variant="outline"
+              disabled={uploading}
+              onClick={() => inputRef.current?.click()}
             >
-              Quitar
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : value ? "Cambiar" : "Subir logo"}
             </Button>
-          )}
+            {value && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => onChange(null)}
+                className="text-destructive"
+              >
+                Quitar
+              </Button>
+            )}
+          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/svg+xml,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void handleFile(f);
+            }}
+          />
         </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/png,image/svg+xml,image/webp"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void handleFile(f);
-          }}
-        />
       </div>
+
+      {/* Preview de cómo se ve el logo en el header de Scouter Assist.
+          h-12 coincide con el tamaño que renderiza ScouterAssist.tsx,
+          así el user puede previsualizar antes de salir de Settings. */}
+      {value && (
+        <div className="space-y-1 pt-1 border-t border-border/40">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Preview en el header
+          </p>
+          <div className={`rounded-md px-4 py-3 ${previewBg}`}>
+            <img src={value} alt="Preview" className="h-12 w-auto object-contain" />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
