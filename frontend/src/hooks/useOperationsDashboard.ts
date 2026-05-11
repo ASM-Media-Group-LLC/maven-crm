@@ -155,8 +155,17 @@ export const CATEGORY_ORDER: Record<string, number> = {
   C: 7,
 };
 
-/** Fetch de los items detrás de una métrica. Hasta 100 rows.
- *  Misma lógica de fechas que useOperationsDashboard. */
+/** Result shape del popup: rows visibles (max 100) + el count real
+ *  desde DB. El user reportó: "card dice 3174, popup solo muestra 50".
+ *  Ahora el header del popup muestra el totalCount aunque rows tenga
+ *  100 max — preserva el feedback visual sin hacer queries pesados. */
+export interface MetricDetailsResult {
+  rows: DetailRow[];
+  totalCount: number;
+}
+
+/** Fetch de los items detrás de una métrica. Devuelve hasta 100 rows
+ *  + count real para mostrar en el header. */
 export const useMetricDetails = (
   metric: MetricKey,
   range: DashboardRange,
@@ -166,7 +175,7 @@ export const useMetricDetails = (
     queryKey: ["ops-dashboard-details", metric, toIso(range.from), toIso(range.to)],
     enabled,
     staleTime: 30_000,
-    queryFn: async (): Promise<DetailRow[]> => {
+    queryFn: async (): Promise<MetricDetailsResult> => {
       const fromIso = toIso(range.from);
       const toIsoVal = toIsoEndOfDay(range.to);
 
@@ -177,28 +186,42 @@ export const useMetricDetails = (
 
       switch (metric) {
         case "contacted": {
-          const q = sb
-            .from("leadgen_entries")
+          const baseQ = () => {
+            const q = sb.from("leadgen_entries");
+            return q;
+          };
+          // Count exacto separado del fetch para no traer 10k rows.
+          const countQ = baseQ().select("*", { count: "exact", head: true });
+          const dataQ = baseQ()
             .select("id, model_handle, lg_user_id, phone_e164, status, category_code, created_at")
             .order("created_at", { ascending: false })
             .limit(limit);
-          const { data, error } = await dateLte(dateGte(q, "created_at"), "created_at");
-          if (error) throw error;
-          return (data ?? []).map((r: any) => ({
-            id: r.id,
-            primary: `@${r.model_handle ?? "?"}`,
-            secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
-            date: r.created_at,
-            badge: r.status,
-            category: r.category_code ?? undefined,
-            leadSource: "leadgen" as const,
-          }));
+          const [countRes, dataRes] = await Promise.all([
+            dateLte(dateGte(countQ, "created_at"), "created_at"),
+            dateLte(dateGte(dataQ, "created_at"), "created_at"),
+          ]);
+          if (dataRes.error) throw dataRes.error;
+          return {
+            totalCount: countRes.count ?? 0,
+            rows: (dataRes.data ?? []).map((r: any) => ({
+              id: r.id,
+              primary: `@${r.model_handle ?? "?"}`,
+              secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
+              date: r.created_at,
+              badge: r.status,
+              category: r.category_code ?? undefined,
+              leadSource: "leadgen" as const,
+            })),
+          };
         }
         case "totalLeads": {
-          // Modelos contactadas — leadgen (cualquier fila) + scouter
-          // que tuvo al menos una task 'comment' con screenshot
-          // (filtrado por first_scouter_contact_at). El pool de leads
-          // descubiertos pero no contactadas NO aparece acá.
+          // Modelos contactadas = leadgen (todas) + scouter con
+          // first_scouter_contact_at. Count exacto cross-table.
+          const countQ1 = sb.from("leadgen_entries").select("*", { count: "exact", head: true });
+          const countQ2 = sb
+            .from("scouter_leads")
+            .select("*", { count: "exact", head: true })
+            .not("first_scouter_contact_at", "is", null);
           const q1 = sb
             .from("leadgen_entries")
             .select("id, model_handle, phone_e164, status, category_code, created_at")
@@ -210,11 +233,13 @@ export const useMetricDetails = (
             .not("first_scouter_contact_at", "is", null)
             .order("first_scouter_contact_at", { ascending: false })
             .limit(50);
-          const [{ data: a }, { data: b }] = await Promise.all([
+          const [c1, c2, a, b] = await Promise.all([
+            dateLte(dateGte(countQ1, "created_at"), "created_at"),
+            dateLte(dateGte(countQ2, "first_scouter_contact_at"), "first_scouter_contact_at"),
             dateLte(dateGte(q1, "created_at"), "created_at"),
             dateLte(dateGte(q2, "first_scouter_contact_at"), "first_scouter_contact_at"),
           ]);
-          const aRows = (a ?? []).map((r: any) => ({
+          const aRows = (a.data ?? []).map((r: any) => ({
             id: r.id,
             primary: `@${r.model_handle ?? "?"}`,
             secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
@@ -223,7 +248,7 @@ export const useMetricDetails = (
             category: r.category_code ?? undefined,
             leadSource: "leadgen" as const,
           }));
-          const bRows = (b ?? []).map((r: any) => ({
+          const bRows = (b.data ?? []).map((r: any) => ({
             id: r.id,
             primary: `@${r.instagram_handle ?? "?"}`,
             secondary: r.phone ? `📞 ${r.phone}` : "Sin número",
@@ -232,26 +257,30 @@ export const useMetricDetails = (
             category: r.category ?? undefined,
             leadSource: "scouter" as const,
           }));
-          return [...aRows, ...bRows].sort((x, y) =>
-            (y.date ?? "") < (x.date ?? "") ? -1 : 1,
-          );
+          return {
+            totalCount: (c1.count ?? 0) + (c2.count ?? 0),
+            rows: [...aRows, ...bRows].sort((x, y) =>
+              (y.date ?? "") < (x.date ?? "") ? -1 : 1,
+            ),
+          };
         }
         case "numbersObtained": {
-          // Listamos por phone_first_set_at (primera captura) — coincide
-          // con el conteo del KPI. Leemos de la view consolidada — una
-          // entrada por (handle, phone), con fecha = primera captura
-          // cross-table. El badge muestra de qué tabla salió la captura
-          // ganadora del dedup.
+          // Count exacto + fetch limit 100.
+          const countQ = sb
+            .from("v_model_phone_captures")
+            .select("*", { count: "exact", head: true });
           const q = sb
             .from("v_model_phone_captures")
             .select("source_table, source_id, handle, phone, captured_at")
             .order("captured_at", { ascending: false })
             .limit(limit);
-          const { data, error } = await dateLte(
-            dateGte(q, "captured_at"),
-            "captured_at",
-          );
-          if (error) throw error;
+          const [countRes, dataRes] = await Promise.all([
+            dateLte(dateGte(countQ, "captured_at"), "captured_at"),
+            dateLte(dateGte(q, "captured_at"), "captured_at"),
+          ]);
+          if (dataRes.error) throw dataRes.error;
+          const data = dataRes.data;
+          const totalCount = countRes.count ?? 0;
           // Para las filas que vinieron de closer_creators o
           // closers_contacts, el `source_id` no apunta a creators —
           // resolvemos el handle → creator.id buscando en `creators`
@@ -281,90 +310,99 @@ export const useMetricDetails = (
             scouter_leads: "scouter",
             creators: "creator",
           };
-          return (data ?? []).map((r: any) => {
-            const handleNorm = (r.handle || "").toLowerCase().trim();
-            const match = handleNorm
-              ? creatorByHandle.get(handleNorm)
-              : undefined;
-            // Si encontramos un creator con ese handle, redirigimos el
-            // click a su ficha técnica (creator profile). Si no, usamos
-            // el sourceMap original — leadgen/scouter/creators apuntan
-            // a sus tablas; closer_creators / closers_contacts sin
-            // matching creator quedan sin click (leadSource undefined).
-            const leadSource = match
-              ? ("creator" as const)
-              : sourceMap[r.source_table];
-            const id = match?.id ?? r.source_id;
-            return {
-              id,
-              primary: `@${r.handle || "?"}`,
-              secondary: `📞 ${r.phone}`,
-              date: r.captured_at,
-              badge: r.source_table,
-              category: match?.category ?? undefined,
-              leadSource,
-            };
-          });
+          return {
+            totalCount,
+            rows: (data ?? []).map((r: any) => {
+              const handleNorm = (r.handle || "").toLowerCase().trim();
+              const match = handleNorm
+                ? creatorByHandle.get(handleNorm)
+                : undefined;
+              const leadSource = match
+                ? ("creator" as const)
+                : sourceMap[r.source_table];
+              const id = match?.id ?? r.source_id;
+              return {
+                id,
+                primary: `@${r.handle || "?"}`,
+                secondary: `📞 ${r.phone}`,
+                date: r.captured_at,
+                badge: r.source_table,
+                category: match?.category ?? undefined,
+                leadSource,
+              };
+            }),
+          };
         }
         case "closerCalls":
         case "closes":
         case "onHold":
         case "rejections": {
-          let q = sb
-            .from("qa_calls")
-            .select(
-              "id, call_date, closer:qa_closers(name), model:qa_models(name, category), claude_analysis",
-            )
-            .order("call_date", { ascending: false })
-            .limit(limit);
-          if (metric === "closes")
-            q = q.eq("claude_analysis->>call_outcome", "cerro");
-          if (metric === "onHold")
-            q = q.eq("claude_analysis->>call_outcome", "en_espera");
-          if (metric === "rejections")
-            q = q.eq("claude_analysis->>call_outcome", "no_cerro");
-          const { data, error } = await dateLte(dateGte(q, "call_date"), "call_date");
-          if (error) throw error;
-          return (data ?? []).map((r: any) => ({
-            id: r.id,
-            primary: r.model?.name ?? "Modelo",
-            secondary: r.closer?.name
-              ? `Closer: ${r.closer.name}`
-              : "Closer: ?",
-            date: r.call_date,
-            badge: r.claude_analysis?.call_outcome ?? "—",
-            category: r.model?.category ?? undefined,
-            // Click → abre la página del detalle de la QA call
-            // (AgencyQA usa ?callId=<id> para deeplinkear).
-            linkUrl: `/agency-qa?callId=${r.id}`,
-          }));
+          // Build count + data queries con el mismo filtro de outcome.
+          const buildQ = (mode: "count" | "data") => {
+            let q = sb.from("qa_calls");
+            q = mode === "count"
+              ? q.select("*", { count: "exact", head: true })
+              : q.select(
+                  "id, call_date, closer:qa_closers(name), model:qa_models(name, category), claude_analysis",
+                ).order("call_date", { ascending: false }).limit(limit);
+            if (metric === "closes")
+              q = q.eq("claude_analysis->>call_outcome", "cerro");
+            if (metric === "onHold")
+              q = q.eq("claude_analysis->>call_outcome", "en_espera");
+            if (metric === "rejections")
+              q = q.eq("claude_analysis->>call_outcome", "no_cerro");
+            return q;
+          };
+          const [countRes, dataRes] = await Promise.all([
+            dateLte(dateGte(buildQ("count"), "call_date"), "call_date"),
+            dateLte(dateGte(buildQ("data"), "call_date"), "call_date"),
+          ]);
+          if (dataRes.error) throw dataRes.error;
+          return {
+            totalCount: countRes.count ?? 0,
+            rows: (dataRes.data ?? []).map((r: any) => ({
+              id: r.id,
+              primary: r.model?.name ?? "Modelo",
+              secondary: r.closer?.name
+                ? `Closer: ${r.closer.name}`
+                : "Closer: ?",
+              date: r.call_date,
+              badge: r.claude_analysis?.call_outcome ?? "—",
+              category: r.model?.category ?? undefined,
+              linkUrl: `/agency-qa?callId=${r.id}`,
+            })),
+          };
         }
         case "enteredCrm": {
-          // Mismo source que el card: creator_blu_history JOIN creators.
-          // El card muestra el NETO (altas - bajas) y el popup lista los
-          // eventos individuales. Antes el popup queryeaba la columna
-          // legacy entered_crm_at, por eso no matcheaba.
+          const countQ = sb
+            .from("creator_blu_history")
+            .select("*", { count: "exact", head: true });
           const q = sb
             .from("creator_blu_history")
             .select("id, creator_id, new_state, changed_at, creator:creators(name, category)")
             .order("changed_at", { ascending: false })
             .limit(limit);
-          const { data, error } = await dateLte(
-            dateGte(q, "changed_at"),
-            "changed_at",
-          );
-          if (error) throw error;
-          return (data ?? []).map((r: any) => ({
-            id: r.creator_id,
-            primary: r.creator?.name ?? "(sin nombre)",
-            secondary: r.new_state ? "Activada en Blu/Infloww" : "Desactivada de Blu/Infloww",
-            date: r.changed_at,
-            badge: r.new_state ? "alta" : "baja",
-            category: r.creator?.category ?? undefined,
-            leadSource: "creator" as const,
-          }));
+          const [countRes, dataRes] = await Promise.all([
+            dateLte(dateGte(countQ, "changed_at"), "changed_at"),
+            dateLte(dateGte(q, "changed_at"), "changed_at"),
+          ]);
+          if (dataRes.error) throw dataRes.error;
+          return {
+            totalCount: countRes.count ?? 0,
+            rows: (dataRes.data ?? []).map((r: any) => ({
+              id: r.creator_id,
+              primary: r.creator?.name ?? "(sin nombre)",
+              secondary: r.new_state ? "Activada en Blu/Infloww" : "Desactivada de Blu/Infloww",
+              date: r.changed_at,
+              badge: r.new_state ? "alta" : "baja",
+              category: r.creator?.category ?? undefined,
+              leadSource: "creator" as const,
+            })),
+          };
         }
       }
+      // Fallback - shouldn't reach here pero TS lo necesita.
+      return { rows: [], totalCount: 0 };
     },
   });
 

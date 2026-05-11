@@ -125,6 +125,80 @@ const KpiCard = ({
 
 // ─── Detail dialog ─────────────────────────────────────────────────────
 
+// Paleta por categoría — Elite=oro, A+=violeta intenso, etc. Hace que
+// el popup deje de verse "negro, soso" como reportó el user. Cada
+// header de grupo toma su tono del map; "Sin categoría" cae a gris.
+const CATEGORY_TONES: Record<
+  string,
+  { bg: string; text: string; badge: string; ring: string; line: string; iconBg: string }
+> = {
+  Elite: {
+    bg: "bg-gradient-to-r from-amber-500/20 to-amber-400/10",
+    text: "text-amber-400",
+    badge: "bg-amber-500/30 text-amber-200",
+    ring: "ring-1 ring-amber-400/30",
+    line: "bg-gradient-to-r from-amber-400/40 to-transparent",
+    iconBg: "bg-amber-500/10 group-hover:bg-amber-500/20",
+  },
+  "A+": {
+    bg: "bg-gradient-to-r from-violet-500/20 to-violet-400/10",
+    text: "text-violet-300",
+    badge: "bg-violet-500/30 text-violet-100",
+    ring: "ring-1 ring-violet-400/30",
+    line: "bg-gradient-to-r from-violet-400/40 to-transparent",
+    iconBg: "bg-violet-500/10 group-hover:bg-violet-500/20",
+  },
+  A: {
+    bg: "bg-gradient-to-r from-blue-500/20 to-blue-400/10",
+    text: "text-blue-300",
+    badge: "bg-blue-500/30 text-blue-100",
+    ring: "ring-1 ring-blue-400/30",
+    line: "bg-gradient-to-r from-blue-400/40 to-transparent",
+    iconBg: "bg-blue-500/10 group-hover:bg-blue-500/20",
+  },
+  "B+": {
+    bg: "bg-gradient-to-r from-emerald-500/20 to-emerald-400/10",
+    text: "text-emerald-300",
+    badge: "bg-emerald-500/30 text-emerald-100",
+    ring: "ring-1 ring-emerald-400/30",
+    line: "bg-gradient-to-r from-emerald-400/40 to-transparent",
+    iconBg: "bg-emerald-500/10 group-hover:bg-emerald-500/20",
+  },
+  B: {
+    bg: "bg-gradient-to-r from-teal-500/20 to-teal-400/10",
+    text: "text-teal-300",
+    badge: "bg-teal-500/30 text-teal-100",
+    ring: "ring-1 ring-teal-400/30",
+    line: "bg-gradient-to-r from-teal-400/40 to-transparent",
+    iconBg: "bg-teal-500/10 group-hover:bg-teal-500/20",
+  },
+  "C+": {
+    bg: "bg-gradient-to-r from-orange-500/20 to-orange-400/10",
+    text: "text-orange-300",
+    badge: "bg-orange-500/30 text-orange-100",
+    ring: "ring-1 ring-orange-400/30",
+    line: "bg-gradient-to-r from-orange-400/40 to-transparent",
+    iconBg: "bg-orange-500/10 group-hover:bg-orange-500/20",
+  },
+  C: {
+    bg: "bg-gradient-to-r from-rose-500/20 to-rose-400/10",
+    text: "text-rose-300",
+    badge: "bg-rose-500/30 text-rose-100",
+    ring: "ring-1 ring-rose-400/30",
+    line: "bg-gradient-to-r from-rose-400/40 to-transparent",
+    iconBg: "bg-rose-500/10 group-hover:bg-rose-500/20",
+  },
+};
+const DEFAULT_TONE = {
+  bg: "bg-muted/40",
+  text: "text-muted-foreground",
+  badge: "bg-muted-foreground/20 text-muted-foreground",
+  ring: "",
+  line: "bg-border",
+  iconBg: "bg-muted/40 group-hover:bg-muted",
+};
+const categoryTone = (cat: string) => CATEGORY_TONES[cat] ?? DEFAULT_TONE;
+
 const DetailDialog = ({
   open,
   onOpenChange,
@@ -139,11 +213,13 @@ const DetailDialog = ({
   range: DashboardRange;
 }) => {
   const navigate = useNavigate();
-  const { data, isLoading } = useMetricDetails(
+  const { data: result, isLoading } = useMetricDetails(
     metric ?? "contacted",
     range,
     open && !!metric,
   );
+  const data = result?.rows ?? [];
+  const totalCount = result?.totalCount ?? 0;
   // Lead detail nested dialog: cuando el user clickea una fila con
   // leadSource (lead o creator), abrimos un segundo dialog encima
   // con TODA la info del row.
@@ -153,24 +229,12 @@ const DetailDialog = ({
     title: string;
   } | null>(null);
 
-  // Estado de categorías colapsadas — Set de keys. Click en header
-  // toggea. Inicia con todo expandido al abrir el dialog.
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    if (open) setCollapsed(new Set());
-  }, [open, metric]);
-  const toggleCat = (cat: string) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
-      return next;
-    });
-
   // Agrupado pre-computado. Si NO hay categorías en la data, queda
   // como un solo "grupo" implícito (sin headers).
   const groups = useMemo(() => {
-    if (!data) return { hasCategory: false, list: [] as Array<{ cat: string; rows: DetailRow[] }> };
+    if (!data || data.length === 0) {
+      return { hasCategory: false, list: [] as Array<{ cat: string; rows: DetailRow[] }> };
+    }
     const hasCategory = data.some((r) => r.category);
     if (!hasCategory) return { hasCategory: false, list: [{ cat: "", rows: data }] };
     const map = new Map<string, DetailRow[]>();
@@ -192,62 +256,95 @@ const DetailDialog = ({
     };
   }, [data]);
 
+  // Default: TODO colapsado EXCEPTO la primera categoría con datos
+  // (el user lo pidió: si la primera es Elite, solo Elite expandido).
+  // Se recomputa cada vez que cambia el metric o se reabre el dialog.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!open || !groups.hasCategory || groups.list.length === 0) {
+      setCollapsed(new Set());
+      return;
+    }
+    const allCats = groups.list.map((g) => g.cat);
+    const first = allCats[0];
+    setCollapsed(new Set(allCats.filter((c) => c !== first)));
+  }, [open, metric, groups.hasCategory, groups.list]);
+  const toggleCat = (cat: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
-        {/* Header con título grande, conteo total y, si hay categorías,
-            controles para expandir/colapsar todo. */}
-        <DialogHeader className="px-5 pt-5 pb-3 border-b border-border">
-          <div className="flex items-start justify-between gap-3">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 border-border/40 bg-gradient-to-br from-card via-card to-card/95 shadow-2xl">
+        {/* Header con gradiente sutil + número grande del total real.
+            El user reportó: "card dice 3174 pero popup muestra 50" — ahora
+            el header siempre muestra totalCount aunque rows tenga max 100. */}
+        <DialogHeader className="px-6 pt-5 pb-4 border-b border-border/40 bg-gradient-to-r from-primary/5 via-primary/0 to-primary/5">
+          <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <DialogTitle className="text-lg font-bold tracking-tight">
+              <DialogTitle className="text-lg font-bold tracking-tight flex items-center gap-3">
                 {metricLabel || "Detalle"}
+                {!isLoading && (
+                  <span className="inline-flex items-center rounded-full bg-primary/15 px-2.5 py-0.5 text-sm font-bold text-primary tabular-nums">
+                    {totalCount.toLocaleString("es")}
+                  </span>
+                )}
               </DialogTitle>
-              {!isLoading && data && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {data.length.toLocaleString("es")} {data.length === 1 ? "registro" : "registros"}
+              {!isLoading && data.length > 0 && (
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  {totalCount > data.length
+                    ? `Mostrando los ${data.length} más recientes de ${totalCount.toLocaleString("es")} totales`
+                    : `${data.length.toLocaleString("es")} ${data.length === 1 ? "registro" : "registros"}`}
                   {groups.hasCategory && ` · ${groups.list.length} ${groups.list.length === 1 ? "categoría" : "categorías"}`}
                 </p>
               )}
             </div>
             {groups.hasCategory && groups.list.length > 1 && (
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 mt-1">
                 <button
                   type="button"
                   onClick={() => setCollapsed(new Set())}
-                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  className="rounded-full bg-muted/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   title="Expandir todas"
                 >
-                  Expandir todo
+                  Expandir
                 </button>
-                <span className="text-[11px] text-muted-foreground">·</span>
                 <button
                   type="button"
                   onClick={() =>
                     setCollapsed(new Set(groups.list.map((g) => g.cat)))
                   }
-                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  className="rounded-full bg-muted/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   title="Colapsar todas"
                 >
-                  Colapsar todo
+                  Colapsar
                 </button>
               </div>
             )}
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {isLoading ? (
             <>
               {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
+                <Skeleton key={i} className="h-12 w-full rounded-lg" />
               ))}
             </>
           ) : !data || data.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-12">
-              Sin registros en el rango seleccionado.
-            </p>
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
+              <div className="rounded-full bg-muted/40 p-3">
+                <Users className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                Sin registros en el rango seleccionado.
+              </p>
+            </div>
           ) : !groups.hasCategory ? (
             <div className="space-y-1.5">
               {data.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead))}
@@ -255,33 +352,45 @@ const DetailDialog = ({
           ) : (
             groups.list.map(({ cat, rows }) => {
               const isCollapsed = collapsed.has(cat);
+              const tone = categoryTone(cat);
               return (
-                <div key={cat} className="space-y-1.5">
-                  {/* Header de categoría — clickeable para colapsar/expandir.
-                      Sticky top sobre el bg del dialog para que el contexto
-                      no se pierda al scrollear listas largas. */}
+                <div key={cat} className="space-y-2">
+                  {/* Header con color por categoría (Elite=oro, A+=violeta,
+                      etc). Pill con count, sticky para que se vea
+                      siempre al scrollear. */}
                   <button
                     type="button"
                     onClick={() => toggleCat(cat)}
-                    className="group flex w-full items-center gap-3 pb-2 sticky top-0 bg-background z-[1] hover:opacity-80 transition-opacity"
+                    className="group flex w-full items-center gap-3 sticky top-0 z-[1] bg-gradient-to-r from-background via-background to-background/80 backdrop-blur-sm py-1"
                   >
-                    <div className="flex items-center gap-2 rounded-md bg-primary/10 px-2.5 py-1">
-                      <span className="text-sm font-bold tracking-wide text-primary">
+                    <div
+                      className={`flex items-center gap-2 rounded-full px-3 py-1 transition-transform group-hover:scale-[1.02] ${tone.bg} ${tone.ring}`}
+                    >
+                      <span className={`text-sm font-bold tracking-wide ${tone.text}`}>
                         {cat}
                       </span>
-                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/20 px-1.5 text-[11px] font-bold tabular-nums text-primary">
+                      <span
+                        className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums ${tone.badge}`}
+                      >
                         {rows.length}
                       </span>
                     </div>
-                    <div className="h-px flex-1 bg-border" />
-                    {isCollapsed ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                    ) : (
-                      <ChevronUp className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                    )}
+                    <div className={`h-px flex-1 ${tone.line}`} />
+                    <div className={`shrink-0 rounded-full p-1 transition-colors ${tone.iconBg}`}>
+                      {isCollapsed ? (
+                        <ChevronDown className={`h-3.5 w-3.5 ${tone.text}`} />
+                      ) : (
+                        <ChevronUp className={`h-3.5 w-3.5 ${tone.text}`} />
+                      )}
+                    </div>
                   </button>
+                  {/* Lazy render: solo cuando la categoría está expandida,
+                      generamos sus filas. El user pidió "precarga las
+                      primeras 3 y demás bajo demanda" — como el data ya
+                      vino en memoria, el "lazy" es del DOM (filas
+                      colapsadas no renderean cards). */}
                   {!isCollapsed && (
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 pl-1">
                       {rows.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead))}
                     </div>
                   )}
@@ -291,9 +400,11 @@ const DetailDialog = ({
           )}
         </div>
 
-        {data && data.length === 100 && (
-          <p className="text-[10px] text-muted-foreground text-center py-2 border-t border-border/40">
-            Mostrando los primeros 100 — si querés todos, exportar desde Reports.
+        {data && data.length > 0 && totalCount > data.length && (
+          <p className="text-[10px] text-muted-foreground text-center py-2.5 border-t border-border/40 bg-muted/20">
+            Mostrando los {data.length} más recientes de{" "}
+            <strong className="text-foreground">{totalCount.toLocaleString("es")}</strong> totales —
+            exportar desde Reports para ver el listado completo.
           </p>
         )}
       </DialogContent>
