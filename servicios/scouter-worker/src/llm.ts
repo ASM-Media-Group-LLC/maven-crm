@@ -81,27 +81,61 @@ export interface ScoreLeadInput {
   companyConfig?: ScoreLeadCompanyConfig | null;
 }
 
+// Retry config para 429 de Groq. El TPM gratis de llama-3.1-8b es 6000
+// (≈12 score_lead/min). Cuando se procesa un batch grande seguido,
+// los últimos jobs reciben 429. En lugar de fallar, esperamos y
+// reintentamos — el TPM se resetea cada minuto.
+const RETRY_DELAYS_MS = [15_000, 30_000, 60_000]; // 15s, 30s, 60s
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function fetchGroqWithRetry(body: unknown): Promise<Response> {
+  let attempt = 0;
+  for (;;) {
+    const res = await fetch(GROQ_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    if (res.status !== 429) return res;
+    if (attempt >= RETRY_DELAYS_MS.length) {
+      // Devolvemos el 429 al caller para que se trate como error normal
+      // (el job se marca como failed y el queue puede retry-ar después).
+      return res;
+    }
+    const delay = RETRY_DELAYS_MS[attempt] ?? 60_000;
+    // Mejor lectura del header Retry-After si Groq lo manda
+    const retryAfterHeader = res.headers.get("retry-after");
+    const retryAfter = retryAfterHeader ? parseFloat(retryAfterHeader) * 1000 : null;
+    const wait: number =
+      retryAfter !== null && !Number.isNaN(retryAfter)
+        ? Math.max(retryAfter, 1000)
+        : delay;
+    console.warn(
+      `[scorer] Groq 429 — esperando ${Math.round(wait / 1000)}s (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length})`,
+    );
+    await sleep(wait);
+    attempt += 1;
+  }
+}
+
 export async function scoreLead(input: ScoreLeadInput): Promise<ScoreResult> {
   if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY no configurada.");
 
   const userMessage = JSON.stringify(input, null, 2);
 
-  const res = await fetch(GROQ_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${GROQ_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-      max_tokens: 500,
-      messages: [
-        { role: "system", content: SCORER_SYSTEM_PROMPT },
-        { role: "user", content: userMessage },
-      ],
-    }),
+  const res = await fetchGroqWithRetry({
+    model: GROQ_MODEL,
+    response_format: { type: "json_object" },
+    temperature: 0.2,
+    max_tokens: 500,
+    messages: [
+      { role: "system", content: SCORER_SYSTEM_PROMPT },
+      { role: "user", content: userMessage },
+    ],
   });
 
   if (!res.ok) {

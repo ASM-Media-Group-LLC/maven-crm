@@ -1157,6 +1157,44 @@ export const useScouterJobs = (params: ScouterJobsParams = {}) => {
   });
 };
 
+/** Devuelve counts exactos de jobs activos por status. Útil cuando el
+ *  contador tiene que mostrar el número real (no truncado por limit).
+ *  Usa head + count='exact' — no trae rows, solo el número. */
+export const useScouterJobCounts = () =>
+  useQuery({
+    queryKey: ["scouter-job-counts"],
+    queryFn: async (): Promise<{ queued: number; running: number; queuedByKind: Record<string, number> }> => {
+      const [
+        { count: queued },
+        { count: running },
+        // Para el breakdown por kind, igual head + count en queries paralelas.
+        // Sólo nos interesan los kinds del scouter assistant.
+        { count: discoverQueued },
+        { count: scoreQueued },
+        { count: enrichQueued },
+      ] = await Promise.all([
+        sb.from("scouter_jobs").select("*", { count: "exact", head: true }).eq("status", "queued"),
+        sb.from("scouter_jobs").select("*", { count: "exact", head: true }).eq("status", "running"),
+        sb.from("scouter_jobs").select("*", { count: "exact", head: true })
+          .eq("status", "queued").in("kind", ["discover_seed", "discover_hashtag"]),
+        sb.from("scouter_jobs").select("*", { count: "exact", head: true })
+          .eq("status", "queued").eq("kind", "score_lead"),
+        sb.from("scouter_jobs").select("*", { count: "exact", head: true })
+          .eq("status", "queued").in("kind", ["enrich_handle", "enrich_profile", "refresh_posts"]),
+      ]);
+      return {
+        queued: queued ?? 0,
+        running: running ?? 0,
+        queuedByKind: {
+          discover: discoverQueued ?? 0,
+          score: scoreQueued ?? 0,
+          enrich: enrichQueued ?? 0,
+        },
+      };
+    },
+    refetchInterval: 3_000,
+  });
+
 /** Re-encola un job que quedó en failed. Resetea attempts a 0 para
  *  darle ciclos frescos, mantiene el payload. */
 export const useRetryScouterJob = () => {

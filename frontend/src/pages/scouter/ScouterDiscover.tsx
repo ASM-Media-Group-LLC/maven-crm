@@ -43,6 +43,7 @@ import {
   useToggleScouterAutopilot,
   useSetAutopilotCompaniesFilter,
   useRecentDiscoveredLeads,
+  useScouterJobCounts,
   type AiQualityFilter,
   type ScouterLead,
   type ScouterJob,
@@ -852,9 +853,14 @@ const ScouterDiscover = () => {
   const setAutopilotFilter = useSetAutopilotCompaniesFilter();
   const recentLeads = useRecentDiscoveredLeads(40);
 
-  // Jobs — poll active jobs faster (3s) and all recent jobs for console
-  const activeJobs = useScouterJobs({ status: ["queued", "running"], limit: 20, refetchInterval: 3_000 });
+  // Jobs — usamos useScouterJobs solo para la consola (slice 50 más
+  // recientes). Para el contador "X ejecutando · Y en cola" usamos
+  // useScouterJobCounts que devuelve el número exacto sin traer rows.
+  // Antes el contador estaba limitado a 20 jobs y mentía cuando la
+  // cola real era mayor.
+  const activeJobs = useScouterJobs({ status: ["queued", "running"], limit: 50, refetchInterval: 3_000 });
   const recentJobs = useScouterJobs({ limit: 50, refetchInterval: 5_000 });
+  const jobCounts = useScouterJobCounts();
 
   // Companies + slug del seleccionado (para que el filtro matchee
   // también target_companies, no solo company_id de discovery).
@@ -898,14 +904,13 @@ const ScouterDiscover = () => {
     return map;
   }, [companies.data]);
 
-  // ── Scan state derived from jobs + autopilot status. Si autopilot
-  //    está activo, el botón debe mostrar "scanning" aunque no haya
-  //    jobs ahora — porque sabemos que se van a encolar cuando termine
-  //    el gap. Si está pausado por budget, también queda en "scanning"
-  //    visualmente pero pintamos un indicator extra abajo.
+  // ── Scan state — usa el count exacto del DB para que el contador no
+  //    mienta cuando la cola supera el limit del fetch. Counts vienen
+  //    de useScouterJobCounts (head + exact, sin traer rows).
   const activeJobList = activeJobs.data ?? [];
-  const runningCount = activeJobList.filter((j) => j.status === "running").length;
-  const queuedCount = activeJobList.filter((j) => j.status === "queued").length;
+  const runningCount = jobCounts.data?.running ?? 0;
+  const queuedCount = jobCounts.data?.queued ?? 0;
+  const queuedByKind = jobCounts.data?.queuedByKind ?? { discover: 0, score: 0, enrich: 0 };
   const autopilotActive = autopilot.data?.active ?? true;
   const autopilotPaused = autopilot.data?.paused_reason === "budget";
   const scanState: ScanState =
@@ -1120,6 +1125,13 @@ const ScouterDiscover = () => {
             {(runningCount > 0 || queuedCount > 0) && (
               <div className="font-medium text-emerald-400">
                 {runningCount} ejecutando · {queuedCount} en cola
+                {queuedCount > 0 && (
+                  <div className="text-[10px] opacity-75 mt-0.5">
+                    {queuedByKind.discover > 0 && `${queuedByKind.discover} discover`}
+                    {queuedByKind.score > 0 && (queuedByKind.discover > 0 ? " · " : "") + `${queuedByKind.score} score`}
+                    {queuedByKind.enrich > 0 && ((queuedByKind.discover > 0 || queuedByKind.score > 0) ? " · " : "") + `${queuedByKind.enrich} enrich`}
+                  </div>
+                )}
               </div>
             )}
             {autopilotActive && !autopilotPaused && runningCount === 0 && queuedCount === 0 && (
