@@ -122,7 +122,7 @@ const CreadoresTable = ({ creators }: Props) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["creadores"] });
+      queryClient.invalidateQueries({ queryKey: ["creators"] });
       queryClient.invalidateQueries({ queryKey: ["ops-dashboard"] });
       toast.success(
         bluToggleTarget?.nextState
@@ -142,7 +142,7 @@ const CreadoresTable = ({ creators }: Props) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["creadores"] });
+      queryClient.invalidateQueries({ queryKey: ["creators"] });
       toast.success("Creator eliminado correctamente");
       setDeletingCreator(null);
     },

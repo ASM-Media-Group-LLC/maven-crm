@@ -126,7 +126,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["creadores"] });
+      queryClient.invalidateQueries({ queryKey: ["creators"] });
       toast.success("Creator eliminado correctamente");
       setDeleteOpen(false);
       onOpenChange(false);
