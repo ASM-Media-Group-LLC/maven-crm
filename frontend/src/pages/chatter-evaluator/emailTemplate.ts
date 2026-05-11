@@ -20,7 +20,7 @@ export interface EmailPayload {
   criteria: { label: string; status: "pass" | "partial" | "fail"; statusLabel: string }[];
   feedback: string;
   chatHistory: { role: string; type: string; content: string | null; price: number | null; timestamp: string; from: string }[];
-  /** Base URL del frontend (ej. https://v3.test.maven-ai.me) — para
+  /** Base URL del frontend (ej. https://maven.asmtech.ai) — para
    *  construir el deeplink al workspace en el botón "Ver transcript" del
    *  email. El correo ya no incluye el chat completo; el receptor abre
    *  Maven directo en la sesión. */

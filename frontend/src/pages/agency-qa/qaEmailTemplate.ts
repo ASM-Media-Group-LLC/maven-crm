@@ -28,7 +28,7 @@ export interface QaEmailPayload {
   redFlags: { type: string; description: string; quote: string }[];
   keyMoments: { kind: "positivo" | "negativo"; quote: string; why: string }[];
   improvements: string[];
-  /** Base URL del frontend (ej. https://v3.test.maven-ai.me) — para
+  /** Base URL del frontend (ej. https://maven.asmtech.ai) — para
    *  construir el deeplink al detalle de la QA en el botón "Ver análisis
    *  completo" del email. */
   appUrl: string;

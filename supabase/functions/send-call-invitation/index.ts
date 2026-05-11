@@ -53,7 +53,10 @@ serve(async (req) => {
       });
     }
 
-    const fromEmail = Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@resend.dev";
+    // Si el env var viene como email pelado, le anteponemos "Maven CRM"
+    // para que el receptor vea el display name en vez de "noreply".
+    const rawFrom = Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@mail.maven-ai.me";
+    const fromEmail = rawFrom.includes("<") ? rawFrom : `Maven CRM <${rawFrom}>`;
 
     const results = [];
 

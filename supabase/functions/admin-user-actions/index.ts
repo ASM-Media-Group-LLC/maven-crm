@@ -209,10 +209,12 @@ Deno.serve(async (req) => {
         emailError = "RESEND_API_KEY no configurada";
       } else {
         try {
-          const fromEmail =
-            Deno.env.get("NOTIFICATION_FROM_EMAIL") ||
-            "Maven CRM <noreply@mail.maven-ai.me>";
-          const appUrl = Deno.env.get("APP_URL") || "https://v3.test.maven-ai.me";
+          // Si el env var viene pelado (sin display name), le anteponemos
+          // "Maven CRM" para que Gmail muestre el nombre y no "noreply".
+          const rawFrom =
+            Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@mail.maven-ai.me";
+          const fromEmail = rawFrom.includes("<") ? rawFrom : `Maven CRM <${rawFrom}>`;
+          const appUrl = Deno.env.get("APP_URL") || "https://maven.asmtech.ai";
 
           const html = `
             <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
@@ -336,10 +338,10 @@ Deno.serve(async (req) => {
               .eq("id", user_id)
               .maybeSingle();
             const fullName = (profile as { full_name?: string } | null)?.full_name ?? "";
-            const fromEmail =
-              Deno.env.get("NOTIFICATION_FROM_EMAIL") ||
-              "Maven CRM <noreply@mail.maven-ai.me>";
-            const appUrl = Deno.env.get("APP_URL") || "https://v3.test.maven-ai.me";
+            const rawFrom =
+              Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@mail.maven-ai.me";
+            const fromEmail = rawFrom.includes("<") ? rawFrom : `Maven CRM <${rawFrom}>`;
+            const appUrl = Deno.env.get("APP_URL") || "https://maven.asmtech.ai";
 
             const html = `
               <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">

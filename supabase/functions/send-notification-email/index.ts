@@ -74,9 +74,13 @@ Deno.serve(async (req) => {
       return json(500, { error: "RESEND_API_KEY no configurada" });
     }
 
-    const fromEmail =
-      Deno.env.get("NOTIFICATION_FROM_EMAIL") ||
-      "Maven CRM <noreply@mail.maven-ai.me>";
+    // Normaliza el "from": si el env var viene como email pelado
+    // (`noreply@mail.maven-ai.me`), le anteponemos "Maven CRM <...>" para
+    // que Gmail muestre el display name en vez de "noreply". Si el admin
+    // ya configuró un name (formato `Display <email>`), se respeta.
+    const rawFrom =
+      Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@mail.maven-ai.me";
+    const fromEmail = rawFrom.includes("<") ? rawFrom : `Maven CRM <${rawFrom}>`;
 
     const resp = await fetch("https://api.resend.com/emails", {
       method: "POST",
