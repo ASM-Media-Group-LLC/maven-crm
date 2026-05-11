@@ -24,6 +24,8 @@ import {
   Terminal,
   Radar,
   AlertTriangle,
+  Settings as SettingsIcon,
+  Check,
 } from "lucide-react";
 import {
   useLeadFavoriteIds,
@@ -667,6 +669,32 @@ const ScouterDiscover = () => {
   // ── State
   const [showNewSeed, setShowNewSeed] = useState(false);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+  // Picker de compañías sobre las que correr el discovery. "all" =
+  // todas las activas (comportamiento original). Persistido en
+  // localStorage para que el setting no se resetee al recargar.
+  const [showCompanyPicker, setShowCompanyPicker] = useState(false);
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[] | "all">(
+    () => {
+      try {
+        const raw = window.localStorage.getItem("maven.scouter.discoveryScope");
+        if (raw === "all" || raw === null) return "all";
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : "all";
+      } catch {
+        return "all";
+      }
+    },
+  );
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        "maven.scouter.discoveryScope",
+        selectedCompanyIds === "all" ? "all" : JSON.stringify(selectedCompanyIds),
+      );
+    } catch {
+      /* no-op */
+    }
+  }, [selectedCompanyIds]);
   const [selected, setSelected] = useState<ScouterLead | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -727,10 +755,15 @@ const ScouterDiscover = () => {
 
   // ── Handlers
   const handleStart = useCallback(() => {
-    // Encolar automáticamente todos los tipos de búsqueda sin preguntar.
-    // Por cada compañía activa: encolar sus hashtags + seeds del search_config.
-    // Si ninguna tiene config, usar fallbacks.
-    const companyList = companies.data ?? [];
+    // Encolar búsquedas para las compañías seleccionadas (default: todas
+    // las activas). Si la lista persisted en localStorage tiene ids
+    // específicos, filtramos por ahí. El user puede cambiar el scope
+    // desde el botón ⚙️ "Compañías".
+    const allCompanies = companies.data ?? [];
+    const companyList =
+      selectedCompanyIds === "all"
+        ? allCompanies
+        : allCompanies.filter((c) => selectedCompanyIds.includes(c.id));
     let enqueued = false;
 
     for (const company of companyList) {
@@ -796,7 +829,7 @@ const ScouterDiscover = () => {
         maxLeads: handles.length,
       });
     })();
-  }, [companies.data, enqueueHashtag, enqueueSeed]);
+  }, [companies.data, enqueueHashtag, enqueueSeed, selectedCompanyIds]);
 
   const handleStop = useCallback(() => {
     setShowStopConfirm(true);
@@ -864,15 +897,20 @@ const ScouterDiscover = () => {
               <div className="text-[10px]">Apify hoy: {budgetText}</div>
             )}
           </div>
-          {/* Manual seed button — secondary, always visible */}
+          {/* Picker de compañías — reemplaza el botón "Agregar semilla
+              manual" anterior. El user decide para cuáles compañías
+              correr el discovery (o todas). El setting persiste en
+              localStorage. */}
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => setShowNewSeed(true)}
+            onClick={() => setShowCompanyPicker(true)}
             className="gap-1.5 text-xs text-muted-foreground"
           >
-            <Plus className="h-3.5 w-3.5" />
-            Agregar semilla manual
+            <SettingsIcon className="h-3.5 w-3.5" />
+            Compañías ({selectedCompanyIds === "all"
+              ? "todas"
+              : `${selectedCompanyIds.length}`})
           </Button>
         </div>
 
@@ -943,7 +981,106 @@ const ScouterDiscover = () => {
         onConfirm={handleStopConfirm}
         runningCount={runningCount}
       />
+      <CompanyPickerModal
+        open={showCompanyPicker}
+        onClose={() => setShowCompanyPicker(false)}
+        companies={(companies.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
+        selected={selectedCompanyIds}
+        onChange={setSelectedCompanyIds}
+      />
     </div>
+  );
+};
+
+// ─── Company picker modal ─────────────────────────────────────────────
+// Reemplaza el botón "Agregar semilla manual" del header de búsquedas.
+// El user marca para qué compañías quiere que corra el scouter (o todas).
+// El scope persiste en localStorage del componente padre.
+const CompanyPickerModal = ({
+  open,
+  onClose,
+  companies,
+  selected,
+  onChange,
+}: {
+  open: boolean;
+  onClose: () => void;
+  companies: Array<{ id: string; name: string }>;
+  selected: string[] | "all";
+  onChange: (next: string[] | "all") => void;
+}) => {
+  const allMode = selected === "all";
+  const set = allMode ? new Set<string>() : new Set(selected as string[]);
+
+  const toggle = (id: string) => {
+    if (allMode) {
+      // Salir de "all" → empezar con solo este id deseleccionado
+      const next = companies.filter((c) => c.id !== id).map((c) => c.id);
+      onChange(next);
+      return;
+    }
+    const arr = selected as string[];
+    if (arr.includes(id)) onChange(arr.filter((x) => x !== id));
+    else {
+      const next = [...arr, id];
+      // Si quedaron TODAS marcadas, volvemos al modo "all" canónico
+      if (next.length === companies.length) onChange("all");
+      else onChange(next);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Compañías para el discovery</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-muted-foreground mb-3">
+          Tickeá las compañías para las que querés que el scouter corra
+          búsquedas. Si dejás "Todas" marcado, corre para todas las activas.
+        </p>
+        <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+          <button
+            type="button"
+            onClick={() => onChange("all")}
+            className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
+              allMode
+                ? "border-primary bg-primary/10"
+                : "border-border hover:border-primary/40"
+            }`}
+          >
+            <span className="font-semibold">Todas las compañías</span>
+            {allMode && <Check className="h-4 w-4 text-primary" />}
+          </button>
+          <div className="h-px bg-border/40 my-1" />
+          {companies.map((c) => {
+            const isOn = allMode || set.has(c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => toggle(c.id)}
+                className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
+                  isOn && !allMode
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-primary/40"
+                }`}
+              >
+                <span>{c.name}</span>
+                {isOn && (
+                  <Check
+                    className={`h-4 w-4 ${allMode ? "text-muted-foreground/50" : "text-primary"}`}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <DialogFooter>
+          <Button onClick={onClose}>Listo</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

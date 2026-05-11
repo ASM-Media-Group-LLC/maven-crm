@@ -1664,12 +1664,112 @@ const ScouterSettings = () => {
         />
       )}
 
+      {/* Lookalike backfill — admin/manager only */}
+      {canEditCompanies && <LookalikeBackfillSection />}
+
       {/* Cuentas Spammer section */}
       <SpammerAccountsSection />
 
       {/* Generación Diaria section (admin/manager only) */}
       <DailyGenerationSection />
     </div>
+  );
+};
+
+// ─── Lookalike backfill section ────────────────────────────────────────
+// Botón one-shot que recorre todos los leads que NO tienen embedding
+// todavía y los embedea por batches contra el edge function. Útil para
+// poblar el pool histórico la primera vez (la nueva data ya se embedea
+// automática post-scoring desde el worker).
+const LookalikeBackfillSection = () => {
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<{
+    done: number;
+    total: number;
+    failures: number;
+  } | null>(null);
+
+  const runBackfill = async () => {
+    setRunning(true);
+    setProgress({ done: 0, total: 0, failures: 0 });
+    try {
+      // Buscamos leads que aún no tienen embedding. Cast a any porque
+      // la columna embedding (vector) no está en los types generados.
+      const sb = supabase as unknown as { from: (t: string) => any };
+      const { data: rows, error } = await sb
+        .from("scouter_leads")
+        .select("id")
+        .is("embedding", null);
+      if (error) throw error;
+      const ids = ((rows ?? []) as Array<{ id: string }>).map((r) => r.id);
+      if (ids.length === 0) {
+        toast.success("No hay leads pendientes — todo embedded.");
+        setRunning(false);
+        return;
+      }
+      setProgress({ done: 0, total: ids.length, failures: 0 });
+      // Batch de 50 por request al edge function (genera 50 calls a
+      // Gemini en chunks de 100 internamente, así que cabe holgado).
+      const BATCH = 50;
+      let done = 0;
+      let failures = 0;
+      for (let i = 0; i < ids.length; i += BATCH) {
+        const slice = ids.slice(i, i + BATCH);
+        try {
+          const { error: fnErr } = await supabase.functions.invoke(
+            "scouter-embed-leads",
+            { body: { lead_ids: slice } },
+          );
+          if (fnErr) {
+            failures += slice.length;
+            console.warn("[lookalike-backfill] batch failed", fnErr.message);
+          } else {
+            done += slice.length;
+          }
+        } catch (e) {
+          failures += slice.length;
+          console.warn("[lookalike-backfill] batch exception", (e as Error).message);
+        }
+        setProgress({ done, total: ids.length, failures });
+      }
+      toast.success(
+        `Backfill completo — ${done} embedded${failures > 0 ? `, ${failures} fallidos` : ""}.`,
+      );
+    } catch (e) {
+      toast.error("Backfill falló", { description: (e as Error).message });
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Lookalike / Embeddings</CardTitle>
+        <CardDescription>
+          Embedea los leads sin vector para que el scouter calcule
+          similitud con las semillas de cada compañía. Los nuevos leads
+          se embedean automáticamente al ser scoreados — esto es solo
+          para el backfill histórico.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button onClick={runBackfill} disabled={running} className="gap-1.5">
+          {running ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4" />
+          )}
+          {running ? "Procesando…" : "Recomputar lookalike (backfill)"}
+        </Button>
+        {progress && (
+          <p className="text-xs text-muted-foreground mt-2 tabular-nums">
+            {progress.done.toLocaleString("es")} / {progress.total.toLocaleString("es")} embedded
+            {progress.failures > 0 && ` · ${progress.failures} fallidos`}
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

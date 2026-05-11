@@ -243,6 +243,27 @@ const LeadCard = ({
           }
           return null;
         })()}
+        {/* Lookalike score — sólo si hay similitud computada contra
+            algún seed de la compañía. Color por intensidad: verde alto,
+            azul medio, gris bajo. */}
+        {typeof lead.lookalike_score === "number" && lead.lookalike_seed_handle && (
+          <div className="mt-0.5">
+            <span
+              className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0 text-[8px] font-medium ${
+                lead.lookalike_score >= 0.7
+                  ? "border-emerald-400/60 text-emerald-400"
+                  : lead.lookalike_score >= 0.5
+                    ? "border-blue-400/60 text-blue-400"
+                    : "border-border text-muted-foreground"
+              }`}
+              title={`Similar a @${lead.lookalike_seed_handle} (${Math.round((lead.lookalike_score ?? 0) * 100)}%)`}
+            >
+              <span>≈</span>
+              <span className="truncate max-w-[80px]">@{lead.lookalike_seed_handle}</span>
+              <span className="tabular-nums">{Math.round(lead.lookalike_score * 100)}%</span>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Score progress bar at bottom */}

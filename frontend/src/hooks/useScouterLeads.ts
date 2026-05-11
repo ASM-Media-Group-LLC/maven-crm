@@ -66,6 +66,10 @@ export interface ScouterLead {
   converted_at: string | null;
   converted_to_contact_id: string | null;
   tenant_id: string;
+  // Similitud con el seed más parecido de la misma compañía (0-1).
+  // Se computa post-scoring vía edge function scouter-embed-leads.
+  lookalike_score: number | null;
+  lookalike_seed_handle: string | null;
 }
 
 export interface CompanySearchConfig {

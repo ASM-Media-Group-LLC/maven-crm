@@ -126,6 +126,32 @@ export async function handleScoreLead(
     .eq("id", lead.id);
   if (updateErr) throw updateErr;
 
+  // Embedding + lookalike (fire-and-forget). El edge function pega a
+  // Gemini text-embedding-004, guarda el vector en scouter_leads.embedding
+  // y computa lookalike_score / lookalike_seed_handle contra los seeds
+  // de la compañía. Si falla, NO bloqueamos el job — el scoring ya quedó.
+  void (async () => {
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (!supabaseUrl || !serviceKey) return;
+      const res = await fetch(`${supabaseUrl}/functions/v1/scouter-embed-leads`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ lead_ids: [lead.id] }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        console.warn("[score-lead] embed-leads failed", res.status, txt.slice(0, 200));
+      }
+    } catch (e) {
+      console.warn("[score-lead] embed-leads exception", (e as Error).message);
+    }
+  })();
+
   // Side effect: si quedó high_fit (post-vision), broadcast a la inbox
   // del tenant y encolamos un refresh_posts para enriquecer recent_posts.
   if (finalStatus === "high_fit") {
