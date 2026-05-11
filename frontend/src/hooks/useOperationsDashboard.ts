@@ -68,98 +68,59 @@ const toIsoEndOfDay = (d: Date | undefined): string | null =>
 export const useOperationsDashboard = (range: DashboardRange) =>
   useQuery({
     queryKey: ["ops-dashboard", toIso(range.from), toIso(range.to)],
-    // Bumped 60s → 5min. Las 9 queries de count en paralelo (la más
-    // lenta marca el ritmo) no necesitan refrescarse cada minuto en un
-    // dashboard de overview. refetchInterval también sube.
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
-    // keepPreviousData: al cambiar de rango de fechas, los números
-    // viejos se quedan visibles mientras llega el nuevo resultado.
     placeholderData: keepPreviousData,
     queryFn: async (): Promise<OperationsKpis> => {
       const fromIso = toIso(range.from);
       const toIsoVal = toIsoEndOfDay(range.to);
 
-      const head = (table: string, dateCol: string, filter?: (q: any) => any) => {
-        let q = sb.from(table).select("*", { count: "exact", head: true });
-        if (fromIso) q = q.gte(dateCol, fromIso);
-        if (toIsoVal) q = q.lte(dateCol, toIsoVal);
-        if (filter) q = filter(q);
-        return q;
+      // Una sola RPC en lugar de 10 queries paralelas. operations_dashboard_kpis
+      // hace todas las counts server-side y devuelve un solo jsonb. Beneficios:
+      //   · Un único round-trip a Supabase (vs 10 fetches HTTP).
+      //   · Atómico — si falla, el error es claro (no partial data).
+      //   · El planner agrega los counts en memoria más eficiente.
+      const { data, error } = await (supabase as any).rpc("operations_dashboard_kpis", {
+        p_from: fromIso,
+        p_to: toIsoVal,
+      });
+      if (error) {
+        console.error("operations_dashboard_kpis RPC failed:", error);
+        throw error;
+      }
+      const k = (data ?? {}) as {
+        contacted?: number;
+        scouterContacts?: number;
+        scouterGenerated?: number;
+        numbersObtained?: number;
+        closerCalls?: number;
+        closes?: number;
+        onHold?: number;
+        rejections?: number;
+        enteredCrm?: number;
+        crmAltas?: number;
+        crmBajas?: number;
       };
 
-      // "Números obtenidos" — leemos de la view consolidada
-      // `v_model_phone_captures` que UNIONa las 5 tablas con teléfono y
-      // dedupea por (handle, phone). Una sola modelo aparecida en
-      // varias etapas se cuenta UNA vez. captured_at es la primera
-      // captura cross-team.
-      const [
-        { count: contacted },
-        { count: scouterTotal },
-        { count: scouterRaw },
-        { count: numbersObtainedCount },
-        { count: closerCalls },
-        { count: closes },
-        { count: onHold },
-        { count: rejections },
-        { count: enteredCrm },
-        crmMovementsRes,
-      ] = await Promise.all([
-        head("leadgen_entries", "created_at"),
-        // Scouter "contactadas" = lead con first_scouter_contact_at
-        // poblado (=spammer hizo comment con screenshot). Pool de leads
-        // descubiertos pero no contactadas no entra al funnel.
-        head("scouter_leads",   "first_scouter_contact_at", (q) =>
-          q.not("first_scouter_contact_at", "is", null),
-        ),
-        // Scouter "generadas" — pool entero de descubrimiento. Útil
-        // para la card "Total leads generados" que mide volumen, no
-        // contacto efectivo.
-        head("scouter_leads", "created_at"),
-        head("v_model_phone_captures", "captured_at"),
-        head("qa_calls", "call_date"),
-        head("qa_calls", "call_date", (q) =>
-          q.eq("claude_analysis->>call_outcome", "cerro"),
-        ),
-        head("qa_calls", "call_date", (q) =>
-          q.eq("claude_analysis->>call_outcome", "en_espera"),
-        ),
-        head("qa_calls", "call_date", (q) =>
-          q.eq("claude_analysis->>call_outcome", "no_cerro"),
-        ),
-        head("creators", "entered_crm_at", (q) =>
-          q.not("entered_crm_at", "is", null),
-        ),
-        // Movimientos del CRM — RPC que computa altas/bajas NETAS de
-        // creator.blu_infloww_active en el rango. NULLs OK: el RPC
-        // los trata como "desde el principio" / "hasta ahora".
-        (supabase as any).rpc("crm_movements_in_range", {
-          p_from: fromIso ?? null,
-          p_to: toIsoVal ?? null,
-        }),
-      ]);
-
-      const crmMov = (crmMovementsRes as any)?.data ?? { altas: 0, bajas: 0 };
-
       return {
-        contacted: contacted ?? 0,
-        scouterContacts: scouterTotal ?? 0,
-        scouterGenerated: scouterRaw ?? 0,
-        totalGenerated: (contacted ?? 0) + (scouterRaw ?? 0),
+        contacted: k.contacted ?? 0,
+        scouterContacts: k.scouterContacts ?? 0,
+        scouterGenerated: k.scouterGenerated ?? 0,
+        totalGenerated: (k.contacted ?? 0) + (k.scouterGenerated ?? 0),
         // llgWithPhone / scouterWithPhone se mantienen por compat de la
         // interfaz pero ya no se usan en el dashboard — la view dedupea
         // todo. Los reportamos como 0 para simplicidad.
         llgWithPhone: 0,
         scouterWithPhone: 0,
-        numbersObtained: numbersObtainedCount ?? 0,
-        closerCalls: closerCalls ?? 0,
-        closes: closes ?? 0,
-        onHold: onHold ?? 0,
-        rejections: rejections ?? 0,
-        enteredCrm: enteredCrm ?? 0,
-        crmAltas: crmMov.altas ?? 0,
-        crmBajas: crmMov.bajas ?? 0,
-        totalLeads: (contacted ?? 0) + (scouterTotal ?? 0),
+        numbersObtained: k.numbersObtained ?? 0,
+        closerCalls: k.closerCalls ?? 0,
+        closes: k.closes ?? 0,
+        onHold: k.onHold ?? 0,
+        rejections: k.rejections ?? 0,
+        enteredCrm: k.enteredCrm ?? 0,
+        crmAltas: k.crmAltas ?? 0,
+        crmBajas: k.crmBajas ?? 0,
+        totalLeads: (k.contacted ?? 0) + (k.scouterContacts ?? 0),
       };
     },
   });
