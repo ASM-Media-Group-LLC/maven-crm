@@ -142,6 +142,8 @@ const ClosersContent = () => {
                 statusCounts={statusCounts}
                 platformRevenue={platformRevenue}
                 ofMonetizationTotal={ofMonetizationTotal}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
                 onPipelineClick={(key) => setKpiPopup({ kind: "pipeline", key })}
                 onRevenueClick={(platform) => setKpiPopup({ kind: "revenue", platform })}
               />

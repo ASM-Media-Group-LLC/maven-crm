@@ -1,10 +1,15 @@
-import { Users, CheckCircle, Trophy, XCircle, DollarSign, TrendingUp, Layers, Crown } from "lucide-react";
+import { Users, CheckCircle, Trophy, XCircle, TrendingUp, Layers, Crown } from "lucide-react";
 import KpiCard from "@/components/dashboard/KpiCard";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useBestCloser } from "@/hooks/useOperationsDashboard";
 
 interface Props {
   statusCounts: Record<string, number>;
   platformRevenue: Record<string, number>;
   ofMonetizationTotal: number;
+  dateFrom?: Date;
+  dateTo?: Date;
   onPipelineClick?: (key: "total" | "asignadas" | "confirmadas" | "completadas" | "cerradas" | "no_interesadas") => void;
   onRevenueClick?: (platform: string) => void;
 }
@@ -17,13 +22,39 @@ const fmtMoney = (n: number) => {
   return `$${Math.round(n)}`;
 };
 
-const ClosersKPICards = ({ statusCounts, platformRevenue, ofMonetizationTotal, onPipelineClick, onRevenueClick }: Props) => {
+// Cada plataforma tiene un color distintivo. Mantengo paleta consistente
+// con badges/charts del resto de la app — violet para "premium", verde
+// para revenue principal, etc.
+const PLATFORM_COLORS: Record<string, { bar: string; dot: string }> = {
+  Trafix:     { bar: "bg-violet-500",  dot: "bg-violet-500" },
+  Blu:        { bar: "bg-blue-500",    dot: "bg-blue-500" },
+  Piclink:    { bar: "bg-pink-500",    dot: "bg-pink-500" },
+  LeakHunter: { bar: "bg-amber-500",   dot: "bg-amber-500" },
+  ORA:        { bar: "bg-emerald-500", dot: "bg-emerald-500" },
+};
+
+const ClosersKPICards = ({
+  statusCounts,
+  platformRevenue,
+  ofMonetizationTotal,
+  dateFrom,
+  dateTo,
+  onPipelineClick,
+  onRevenueClick,
+}: Props) => {
   const asignadas = statusCounts["Asignada"] || 0;
   const confirmadas = statusCounts["Confirmada"] || 0;
   const completadas = statusCounts["Completada"] || 0;
   const noInteresadas = statusCounts["No interesada"] || 0;
   const cerradas = confirmadas + completadas;
   const total = asignadas + confirmadas + completadas + noInteresadas;
+
+  // Mismo hook que usa Panel de Control para que sean coherentes — 70%
+  // cierres normalizados + 30% calif QA promedio del rango.
+  const { data: bestCloser, isLoading: bestCloserLoading } = useBestCloser({
+    from: dateFrom,
+    to: dateTo,
+  });
 
   const salePlatforms = ["Trafix", "Blu", "Piclink", "LeakHunter", "ORA"];
   const revPlataformas = salePlatforms.reduce((s, p) => s + (platformRevenue[p] || 0), 0);
@@ -45,17 +76,55 @@ const ClosersKPICards = ({ statusCounts, platformRevenue, ofMonetizationTotal, o
     { label: "Rev. Total", amount: revTotal, icon: Crown, color: "bg-blue-600" },
   ];
 
-  // Breakdown por plataforma — compacto, secundario.
-  const platformBreakdown = [
-    { label: "LeakHunter", key: "LeakHunter" },
-    { label: "Blu", key: "Blu" },
-    { label: "Trafix", key: "Trafix" },
-    { label: "ORA", key: "ORA" },
-    { label: "Piclink", key: "Piclink" },
-  ];
+  // Datos para el stacked bar de plataformas. Si todo es $0, mostramos
+  // un placeholder en vez de barra vacía.
+  const platformBreakdown = salePlatforms.map((p) => ({
+    key: p,
+    amount: platformRevenue[p] || 0,
+  }));
+  const platformsTotal = revPlataformas;
 
   return (
     <div className="space-y-6">
+      {/* Mejor cerrador — hero card de ancho completo. 👑 ámbar a la
+          izquierda, nombre grande + breakdown a la derecha. Si no hay
+          calls en el rango, se muestra un placeholder. */}
+      <Card className="p-5 border-2 border-amber-500/30 relative overflow-hidden">
+        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl opacity-30 bg-amber-500" />
+        <div className="relative flex items-center gap-5">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg">
+            <Crown className="h-8 w-8 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] uppercase tracking-widest text-amber-500/90 font-bold">
+              Mejor cerrador
+            </p>
+            {bestCloserLoading ? (
+              <Skeleton className="mt-1 h-7 w-48" />
+            ) : bestCloser ? (
+              <>
+                <p className="text-2xl font-bold leading-tight mt-1 truncate">
+                  {bestCloser.name}
+                </p>
+                <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                  <span className="tabular-nums">
+                    <strong className="text-foreground">{bestCloser.closes.toLocaleString("es")}</strong> cierres
+                  </span>
+                  <span className="text-border">·</span>
+                  <span className="tabular-nums">
+                    Calif. QA promedio <strong className="text-foreground">{Math.round(bestCloser.avgScore)}/100</strong>
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground mt-1">
+                Sin calls en el rango seleccionado.
+              </p>
+            )}
+          </div>
+        </div>
+      </Card>
+
       {/* Pipeline — primera sección */}
       <div className="space-y-3">
         <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
@@ -94,35 +163,68 @@ const ClosersKPICards = ({ statusCounts, platformRevenue, ofMonetizationTotal, o
         </div>
       </div>
 
-      {/* Breakdown por plataforma — fila compacta de pills clickeables.
-          No usamos KpiCard aquí porque ocupan demasiado espacio para
-          5 ítems secundarios. Estilo minimalista con el mismo lift. */}
+      {/* Por plataforma — stacked bar horizontal + leyenda. Cada
+          segmento es clickeable y abre el popup detalle. Si platformsTotal
+          es 0 (todas en cero), se muestra una barra placeholder gris. */}
       <div className="space-y-3">
         <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
           Por plataforma
         </h3>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
-          {platformBreakdown.map((p) => {
-            const amount = platformRevenue[p.key] || 0;
-            return (
-              <button
-                key={p.key}
-                type="button"
-                onClick={onRevenueClick ? () => onRevenueClick(p.label) : undefined}
-                disabled={!onRevenueClick}
-                className="group flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-all duration-200 ease-out hover:scale-[1.015] hover:border-primary/40 hover:shadow-[0_0_16px_-6px_rgba(255,255,255,0.15)] disabled:cursor-default disabled:hover:scale-100"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium truncate">{p.label}</p>
-                  <p className="text-base font-bold tabular-nums leading-tight truncate">{fmtMoney(amount)}</p>
-                </div>
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted shrink-0">
-                  <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        <Card className="p-4 space-y-3">
+          <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+            {platformsTotal === 0 ? (
+              <div className="h-full w-full bg-muted" />
+            ) : (
+              platformBreakdown
+                .filter((p) => p.amount > 0)
+                .map((p) => {
+                  const pct = (p.amount / platformsTotal) * 100;
+                  const color = PLATFORM_COLORS[p.key]?.bar ?? "bg-slate-500";
+                  return (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={onRevenueClick ? () => onRevenueClick(p.key) : undefined}
+                      disabled={!onRevenueClick}
+                      title={`${p.key}: ${fmtMoney(p.amount)} · ${pct.toFixed(1)}%`}
+                      className={`h-full ${color} transition-opacity hover:opacity-80 disabled:hover:opacity-100`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  );
+                })
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 md:grid-cols-5">
+            {platformBreakdown.map((p) => {
+              const pct = platformsTotal > 0 ? (p.amount / platformsTotal) * 100 : 0;
+              const dot = PLATFORM_COLORS[p.key]?.dot ?? "bg-slate-500";
+              return (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={onRevenueClick ? () => onRevenueClick(p.key) : undefined}
+                  disabled={!onRevenueClick}
+                  className="flex items-center gap-2 text-left transition-opacity hover:opacity-80 disabled:hover:opacity-100"
+                >
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
+                      {p.key}
+                    </p>
+                    <p className="text-sm font-bold tabular-nums leading-tight">
+                      {fmtMoney(p.amount)}
+                      {platformsTotal > 0 && p.amount > 0 && (
+                        <span className="ml-1.5 text-[10px] font-medium text-muted-foreground">
+                          {pct.toFixed(0)}%
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </Card>
       </div>
     </div>
   );
