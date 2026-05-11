@@ -50,6 +50,7 @@ import {
 import { cn } from "@/lib/utils";
 import SpammerAccountsTab from "./panel-de-control/SpammerAccountsTab";
 import ControlGastoTab from "./panel-de-control/ControlGastoTab";
+import ChattersRecruitmentTab from "./panel-de-control/ChattersRecruitmentTab";
 import BestCloserMonthlyDialog from "@/components/dashboard/BestCloserMonthlyDialog";
 
 // ─── KPI card ──────────────────────────────────────────────────────────
@@ -195,14 +196,19 @@ const DetailDialog = ({
               const rows = groups.get(cat)!;
               return (
                 <div key={cat} className="space-y-1.5">
-                  <div className="flex items-center gap-2 pt-2 pb-1">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {cat}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground tabular-nums">
-                      · {rows.length}
-                    </span>
-                    <div className="h-px flex-1 bg-border/40" />
+                  {/* Header de categoría — antes era muy chiquito y pálido,
+                      el user se perdía entre filas. Ahora: chip con
+                      categoría grande + pill con contador. */}
+                  <div className="flex items-center gap-3 pt-3 pb-2 sticky top-0 bg-background z-[1]">
+                    <div className="flex items-center gap-2 rounded-md bg-primary/10 px-2.5 py-1">
+                      <span className="text-sm font-bold tracking-wide text-primary">
+                        {cat}
+                      </span>
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/20 px-1.5 text-[11px] font-bold tabular-nums text-primary">
+                        {rows.length}
+                      </span>
+                    </div>
+                    <div className="h-px flex-1 bg-border" />
                   </div>
                   {rows.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead))}
                 </div>
@@ -685,16 +691,7 @@ const PanelDeControl = () => {
         </TabsContent>
 
         <TabsContent value="chatters" className="mt-4">
-          <Card className="p-12 text-center space-y-3">
-            <div className="mx-auto h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-              <Building2 className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h2 className="text-lg font-semibold">Reclutamiento de chatters</h2>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Pantalla en construcción. Acá vamos a mostrar el funnel de
-              reclutamiento de chatters — contactos, entrevistas, contrataciones.
-            </p>
-          </Card>
+          <ChattersRecruitmentTab range={range} />
         </TabsContent>
 
         <TabsContent value="modelos" className="mt-4 space-y-5">
