@@ -21,9 +21,12 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAddCreadorWithBusiness } from "./useCreadores";
+import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import CommissionTiersEditor, { type CommissionTier } from "@/components/commission/CommissionTiersEditor";
 
-const AGENCIES = ["Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "ORA Agency", "Exchange", "Otra"];
+// Fallback estático sólo si scouter_companies todavía no cargó. La
+// fuente real son las compañías canónicas de la DB.
+const AGENCIES_FALLBACK = ["Kash", "Atomick", "Unlok", "Ora", "Exchange", "PicLink", "LeakHunter", "Trafix", "Proyecto Medellín", "Pagomundo", "BLU"];
 const LANGUAGES = ["Español", "English", "Italiano", "Português", "Français", "Deutsch", "Русский"];
 const STATUSES = [
   { value: "onboarding", label: "En Onboarding" },
@@ -155,6 +158,12 @@ const NuevoCreadorForm = () => {
   const [form, setForm] = useState<FormData>(defaultForm);
   const [step, setStep] = useState(1);
   const mutation = useAddCreadorWithBusiness();
+  const { data: scouterCompanies = [] } = useScouterCompanies();
+  // AGENCIES = compañías canónicas. Si todavía no cargaron, fallback al
+  // listado estático (no se debería usar — solo cubre el primer render).
+  const AGENCIES = scouterCompanies.length > 0
+    ? scouterCompanies.map((c) => c.name)
+    : AGENCIES_FALLBACK;
   const tempId = useMemo(() => crypto.randomUUID(), []);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [uploadModal, setUploadModal] = useState<{ open: boolean; category: UploadCategory }>({ open: false, category: "contracts" });

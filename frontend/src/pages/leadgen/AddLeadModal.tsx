@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { getMiamiDateStr } from "./timezoneUtils";
 import { LEADGEN_COMPANIES } from "./leadgenConstants";
+import { useScouterCompanies, useCreateCompany } from "@/hooks/useScouterLeads";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, X, ChevronsUpDown, Check, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,15 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  // Compañías canónicas — fuente única scouter_companies. Si el user
+  // tipea una nueva, la creamos ahí mismo para que también aparezca
+  // en /scouter-assist, /creadores y donde sea que la lean.
+  const { data: scouterCompanies = [] } = useScouterCompanies();
+  const createCompany = useCreateCompany();
+  const companyNames = scouterCompanies.map((c) => c.name);
+  // Fallback al array hardcodeado por si scouter_companies todavía
+  // no cargó — pero la verdad ya está en DB después de la migration.
+  const companyList = companyNames.length > 0 ? companyNames : LEADGEN_COMPANIES;
 
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
@@ -350,7 +360,44 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                             autoFocus
                           />
                         </FormControl>
-                        <Button type="button" size="sm" onClick={() => { if (customCompany.trim()) { field.onChange(customCompany.trim()); setIsAddingCompany(false); setCustomCompany(""); } }}>OK</Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={createCompany.isPending}
+                          onClick={async () => {
+                            const name = customCompany.trim();
+                            if (!name) return;
+                            // Slug auto-derivado del nombre (lowercase + underscores).
+                            const slug = name
+                              .toLowerCase()
+                              .replace(/[^a-z0-9]+/g, "_")
+                              .replace(/^_|_$/g, "");
+                            // Si ya existe (case-insensitive), no la duplicamos —
+                            // solo la usamos como valor del form.
+                            const existing = scouterCompanies.find(
+                              (c) => c.name.toLowerCase() === name.toLowerCase(),
+                            );
+                            if (existing) {
+                              field.onChange(existing.name);
+                            } else {
+                              try {
+                                const created = await createCompany.mutateAsync({
+                                  slug,
+                                  name,
+                                  active: true,
+                                });
+                                field.onChange(created.name);
+                              } catch {
+                                // El mutation muestra toast en onError
+                                return;
+                              }
+                            }
+                            setIsAddingCompany(false);
+                            setCustomCompany("");
+                          }}
+                        >
+                          {createCompany.isPending ? "..." : "OK"}
+                        </Button>
                         <Button type="button" size="sm" variant="ghost" onClick={() => { setIsAddingCompany(false); setCustomCompany(""); }}>
                           <X className="h-4 w-4" />
                         </Button>
@@ -371,7 +418,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                             <CommandList>
                               <CommandEmpty>No se encontró la compañía.</CommandEmpty>
                               <CommandGroup className="max-h-60 overflow-y-auto">
-                                {LEADGEN_COMPANIES.map((company) => (
+                                {companyList.map((company) => (
                                   <CommandItem key={company} value={company} onSelect={() => field.onChange(company)}>
                                     <Check className={cn("mr-2 h-4 w-4", field.value === company ? "opacity-100" : "opacity-0")} />
                                     {company}

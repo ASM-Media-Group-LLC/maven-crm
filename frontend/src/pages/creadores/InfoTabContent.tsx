@@ -17,6 +17,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWhaticketLink } from "@/hooks/useWhaticketLink";
+import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import { ExternalLink } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
@@ -42,7 +43,8 @@ const countryOptions = [
   "República Dominicana", "Uruguay", "Venezuela",
 ];
 
-const agencyOptions = ["Atomic Agency", "Elite Models", "Kash Agency", "Trafix", "Unlok Platform", "Otra"];
+// Fallback estático — la fuente real son scouter_companies (canónica).
+const AGENCY_OPTIONS_FALLBACK = ["Kash", "Atomick", "Unlok", "Ora", "Exchange", "PicLink", "LeakHunter", "Trafix", "Proyecto Medellín", "Pagomundo", "BLU"];
 const categoryOptions = ["A++", "A+", "A", "B+", "B", "C"];
 const managerOptions = ["Full Management", "Hybrid", "Basic"];
 
@@ -93,6 +95,11 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
   const c = creator;
   const biz = c.creator_business;
   const { data: whaticketUrl } = useWhaticketLink(creatorId);
+  // Compañías canónicas — fuente única scouter_companies.
+  const { data: scouterCompanies = [] } = useScouterCompanies();
+  const agencyOptions = scouterCompanies.length > 0
+    ? scouterCompanies.map((sc) => sc.name)
+    : AGENCY_OPTIONS_FALLBACK;
 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
