@@ -311,6 +311,7 @@ export type LeadPatch = Partial<
     | "platform"
     | "onlyfans_url"
     | "name"
+    | "target_companies"
   >
 >;
 

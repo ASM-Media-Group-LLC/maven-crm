@@ -24,6 +24,7 @@ import {
   useUpdateLead,
   useToggleLeadFavorite,
   useLeadFavoriteIds,
+  useScouterCompanies,
   type LeadPatch,
   type ScouterLead,
 } from "@/hooks/useScouterLeads";
@@ -138,6 +139,11 @@ export const LeadDrawer = ({
   const toggleFavoriteMut = useToggleLeadFavorite();
   const favoriteIdsQ = useLeadFavoriteIds();
   const favoriteIds = favoriteIdsQ.data ?? new Set<string>();
+  // Lista de compañías para el selector manual de target_companies.
+  // La IA pre-asigna las companías que cree que califican, pero el user
+  // puede sobrescribir desde el popup tickeando las que quiere.
+  const companiesQ = useScouterCompanies();
+  const companies = companiesQ.data ?? [];
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<LeadPatch>({});
   // Confirmación para Descartar — los otros 2 quick actions
@@ -477,6 +483,70 @@ export const LeadDrawer = ({
                   ) : (
                     <span>{lead.category ?? "—"}</span>
                   )}
+                </Field>
+
+                {/* Multi-select de compañías que califica. La IA del scouter
+                    arma una propuesta automática (lead.target_companies)
+                    pero suele ser imprecisa — este selector deja al user
+                    tickear/destickear manualmente cuáles aplican. */}
+                <Field label="Compañías que califica" stacked>
+                  {(() => {
+                    const current =
+                      (get("target_companies") as string[] | undefined) ??
+                      (lead.target_companies ?? []);
+                    if (editing) {
+                      return (
+                        <div className="flex flex-wrap gap-1.5">
+                          {companies.length === 0 ? (
+                            <span className="text-xs text-muted-foreground">
+                              No hay compañías cargadas.
+                            </span>
+                          ) : (
+                            companies.map((c) => {
+                              const isOn = current.includes(c.slug);
+                              return (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => {
+                                    const next = isOn
+                                      ? current.filter((s) => s !== c.slug)
+                                      : [...current, c.slug];
+                                    setField("target_companies", next);
+                                  }}
+                                  className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                                    isOn
+                                      ? "border-primary bg-primary/15 text-primary"
+                                      : "border-border text-muted-foreground hover:border-primary/40"
+                                  }`}
+                                >
+                                  {c.name}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      );
+                    }
+                    if (current.length === 0) {
+                      return <span className="text-xs text-muted-foreground">—</span>;
+                    }
+                    return (
+                      <div className="flex flex-wrap gap-1.5">
+                        {current.map((slug) => {
+                          const c = companies.find((co) => co.slug === slug);
+                          return (
+                            <span
+                              key={slug}
+                              className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+                            >
+                              {c?.name ?? slug}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </Field>
 
                 <Field label="Closer asignado">
