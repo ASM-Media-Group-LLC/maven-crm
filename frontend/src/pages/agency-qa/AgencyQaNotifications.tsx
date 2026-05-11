@@ -138,7 +138,7 @@ const AgencyQaNotifications = () => {
           </h3>
 
           <div className="space-y-3">
-            <div className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-muted/20 p-3">
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 p-3">
               <div className="flex-1 space-y-0.5">
                 <Label htmlFor="notify-uploaded">QA cargada</Label>
                 <p className="text-[11px] text-muted-foreground">
@@ -152,7 +152,7 @@ const AgencyQaNotifications = () => {
               />
             </div>
 
-            <div className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-muted/20 p-3">
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 p-3">
               <div className="flex-1 space-y-0.5">
                 <Label htmlFor="notify-analyzed">Análisis IA listo</Label>
                 <p className="text-[11px] text-muted-foreground">
@@ -167,7 +167,7 @@ const AgencyQaNotifications = () => {
               />
             </div>
 
-            <div className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-muted/20 p-3">
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 p-3">
               <div className="flex-1 space-y-0.5">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="notify-low-score">Score bajo</Label>
@@ -193,7 +193,7 @@ const AgencyQaNotifications = () => {
               />
             </div>
 
-            <div className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-muted/20 p-3">
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 p-3">
               <div className="flex-1 space-y-0.5">
                 <Label htmlFor="notify-failed">Análisis falló</Label>
                 <p className="text-[11px] text-muted-foreground">

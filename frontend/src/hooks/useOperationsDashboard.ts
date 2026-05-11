@@ -198,14 +198,26 @@ export const useMetricDetails = (
             .select("id, model_handle, lg_user_id, phone_e164, status, category_code, created_at")
             .order("created_at", { ascending: false })
             .limit(limit);
+          // Enrichment: leemos categoría de TRES tablas porque la
+          // categorización pasa en distintos puntos del funnel.
+          // Prioridad: creators (categoría final) > closer_creators
+          // (closer asignó tier) > closers_contacts (raro pero existe).
+          // El handle viene del row del card.
           const creatorsQ = sb
             .from("creators")
             .select("instagram_handle, category")
-            .not("instagram_handle", "is", null);
-          const [countRes, dataRes, creatorsRes] = await Promise.all([
+            .not("instagram_handle", "is", null)
+            .not("category", "is", null);
+          const closerCreatorsQ = sb
+            .from("closer_creators")
+            .select("model_handle, category_code")
+            .not("model_handle", "is", null)
+            .not("category_code", "is", null);
+          const [countRes, dataRes, creatorsRes, closerRes] = await Promise.all([
             dateLte(dateGte(countQ, "created_at"), "created_at"),
             dateLte(dateGte(dataQ, "created_at"), "created_at"),
             creatorsQ,
+            closerCreatorsQ,
           ]);
           if (dataRes.error) throw dataRes.error;
           const creatorCat = new Map<string, string>();
@@ -213,6 +225,13 @@ export const useMetricDetails = (
             if (!c.category) continue;
             const norm = c.instagram_handle.replace(/^@/, "").toLowerCase().trim();
             if (norm && !creatorCat.has(norm)) creatorCat.set(norm, c.category);
+          }
+          // closer_creators tiene prioridad menor que creators (que
+          // es categoría finalizada), pero mayor que el row source.
+          for (const c of (closerRes.data ?? []) as Array<{ model_handle: string; category_code: string | null }>) {
+            if (!c.category_code) continue;
+            const norm = c.model_handle.replace(/^@/, "").toLowerCase().trim();
+            if (norm && !creatorCat.has(norm)) creatorCat.set(norm, c.category_code);
           }
           return {
             totalCount: countRes.count ?? 0,
@@ -252,24 +271,39 @@ export const useMetricDetails = (
             .not("first_scouter_contact_at", "is", null)
             .order("first_scouter_contact_at", { ascending: false })
             .limit(50);
+          // Enrichment: leemos categoría de TRES tablas porque la
+          // categorización pasa en distintos puntos del funnel.
+          // Prioridad: creators (categoría final) > closer_creators
+          // (closer asignó tier) > closers_contacts (raro pero existe).
+          // El handle viene del row del card.
           const creatorsQ = sb
             .from("creators")
             .select("instagram_handle, category")
-            .not("instagram_handle", "is", null);
-          const [c1, c2, a, b, creatorsRes] = await Promise.all([
+            .not("instagram_handle", "is", null)
+            .not("category", "is", null);
+          const closerCreatorsQ = sb
+            .from("closer_creators")
+            .select("model_handle, category_code")
+            .not("model_handle", "is", null)
+            .not("category_code", "is", null);
+          const [c1, c2, a, b, creatorsRes, closerRes] = await Promise.all([
             dateLte(dateGte(countQ1, "created_at"), "created_at"),
             dateLte(dateGte(countQ2, "first_scouter_contact_at"), "first_scouter_contact_at"),
             dateLte(dateGte(q1, "created_at"), "created_at"),
             dateLte(dateGte(q2, "first_scouter_contact_at"), "first_scouter_contact_at"),
             creatorsQ,
+            closerCreatorsQ,
           ]);
-          // Map handle (normalizado) → category. Para enriquecer rows
-          // sin category propia.
           const creatorCat = new Map<string, string>();
           for (const c of (creatorsRes.data ?? []) as Array<{ instagram_handle: string; category: string | null }>) {
             if (!c.category) continue;
             const norm = c.instagram_handle.replace(/^@/, "").toLowerCase().trim();
             if (norm && !creatorCat.has(norm)) creatorCat.set(norm, c.category);
+          }
+          for (const c of (closerRes.data ?? []) as Array<{ model_handle: string; category_code: string | null }>) {
+            if (!c.category_code) continue;
+            const norm = c.model_handle.replace(/^@/, "").toLowerCase().trim();
+            if (norm && !creatorCat.has(norm)) creatorCat.set(norm, c.category_code);
           }
           const aRows = (a.data ?? []).map((r: any) => {
             const handleNorm = (r.model_handle ?? "").toLowerCase().trim();
@@ -457,10 +491,21 @@ export const useMetricDetails = (
             .select("id, instagram_handle, phone, status, category, created_at")
             .order("created_at", { ascending: false })
             .limit(50);
+          // Enrichment: leemos categoría de TRES tablas porque la
+          // categorización pasa en distintos puntos del funnel.
+          // Prioridad: creators (categoría final) > closer_creators
+          // (closer asignó tier) > closers_contacts (raro pero existe).
+          // El handle viene del row del card.
           const creatorsQ = sb
             .from("creators")
             .select("instagram_handle, category")
-            .not("instagram_handle", "is", null);
+            .not("instagram_handle", "is", null)
+            .not("category", "is", null);
+          const closerCreatorsQ = sb
+            .from("closer_creators")
+            .select("model_handle, category_code")
+            .not("model_handle", "is", null)
+            .not("category_code", "is", null);
           const [c1, c2, a, b, creatorsRes] = await Promise.all([
             dateLte(dateGte(countQ1, "created_at"), "created_at"),
             dateLte(dateGte(countQ2, "created_at"), "created_at"),

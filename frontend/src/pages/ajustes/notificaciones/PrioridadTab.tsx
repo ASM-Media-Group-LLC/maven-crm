@@ -28,7 +28,7 @@ const PrioridadTab = () => {
         {PRIORITY_LEVELS.map(({ key, label, desc, icon: Icon, color }) => (
           <div
             key={key}
-            className="flex items-center justify-between rounded-md border border-border px-4 py-3"
+            className="flex items-center justify-between rounded-xl border border-border px-4 py-3"
           >
             <div className="flex items-start gap-3">
               <Icon className={`h-4 w-4 mt-0.5 ${color}`} />

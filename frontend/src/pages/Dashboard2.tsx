@@ -33,7 +33,7 @@ import { ExternalLink } from "lucide-react";
 import {
   Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -151,8 +151,20 @@ const Dashboard2 = () => {
   // Popup que muestra una lista de creadoras ordenada por una métrica
   // específica. Triggered por click en las KPI cards (Revenue Bruto,
   // Creadoras, etc). null = cerrado.
+  // Lo guardamos en URL (?kpi=revenue) en vez de useState para que al
+  // navegar a un perfil de creadora y dar back, el browser restore el
+  // popup donde el user estaba.
   type KpiList = "revenue" | "creators" | null;
-  const [kpiListOpen, setKpiListOpen] = useState<KpiList>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const kpiListOpen = (searchParams.get("kpi") as KpiList) ?? null;
+  const setKpiListOpen = (next: KpiList) => {
+    setSearchParams((prev) => {
+      const np = new URLSearchParams(prev);
+      if (next) np.set("kpi", next);
+      else np.delete("kpi");
+      return np;
+    });
+  };
 
   // Dialog de ficha técnica de una creadora — se abre desde los
   // cajones de Pareto y de Creator Reports. Muestra foto, todas las
@@ -983,7 +995,7 @@ const Dashboard2 = () => {
                         ) : (
                           <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
                             {activeItems.map((a, i) => (
-                              <div key={i} className="flex items-center gap-3 rounded-md border border-border bg-card/80 px-3 py-2">
+                              <div key={i} className="flex items-center gap-3 rounded-xl border border-border bg-card/80 px-3 py-2">
                                 <span className="text-xs text-muted-foreground tabular-nums w-5 shrink-0">{i + 1}</span>
                                 {a.creator.instagramHandle && (
                                   <a href={`https://instagram.com/${a.creator.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
@@ -1230,7 +1242,7 @@ const Dashboard2 = () => {
                     )}
                   </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-1 mt-2">
+                <div className="space-y-1.5 mt-2">
                   {creators.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-12">
                       Sin datos para este período.
@@ -1245,10 +1257,13 @@ const Dashboard2 = () => {
                           key={c.creatorId}
                           type="button"
                           onClick={() => {
+                            // No cerramos el popup — dejamos ?kpi=… en
+                            // la URL para que al dar back desde el
+                            // perfil, el browser restore el popup
+                            // exactamente donde el user estaba.
                             navigate(`/creadores/${c.creatorId}`);
-                            setKpiListOpen(null);
                           }}
-                          className="flex items-center justify-between w-full gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors cursor-pointer hover:bg-accent hover:border-primary/40 text-left"
+                          className="flex items-center justify-between w-full gap-3 rounded-xl border border-border bg-card px-3 py-2 text-sm transition-colors cursor-pointer hover:bg-accent hover:border-primary/40 text-left"
                         >
                           <div className="min-w-0 flex-1 flex items-center gap-2">
                             <span className="text-[10px] text-muted-foreground tabular-nums w-6 shrink-0">
@@ -2050,7 +2065,7 @@ const Dashboard2 = () => {
                         ) : (
                           <div className="space-y-1.5">
                             {items.map((a, i) => (
-                              <div key={i} className="flex items-center gap-3 rounded-md border border-border bg-card/80 px-3 py-2.5">
+                              <div key={i} className="flex items-center gap-3 rounded-xl border border-border bg-card/80 px-3 py-2.5">
                                 <span className="text-xs text-muted-foreground tabular-nums w-5 shrink-0 font-bold">{i + 1}</span>
                                 <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${a.creator.creatorId}`)}>
                                   {a.creator.name}
@@ -2196,7 +2211,7 @@ const Dashboard2 = () => {
                                 const prev = prevMonthMap.get(c.creatorId) ?? 0;
                                 const pct = prev > 0 ? ((c.total - prev) / prev * 100) : 0;
                                 return (
-                                  <div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border bg-card/80 px-3 py-2">
+                                  <div key={c.creatorId} className="flex items-center gap-3 rounded-xl border border-border bg-card/80 px-3 py-2">
                                     <span className="text-xs text-muted-foreground tabular-nums w-5">{i + 1}</span>
                                     <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
                                     <span className="text-sm tabular-nums font-semibold">{fmtShort(c.total)}</span>
@@ -2217,7 +2232,7 @@ const Dashboard2 = () => {
                           {lowMonetization.length === 0 ? <p className="text-sm text-muted-foreground">Sin creadoras en esta categoría</p> : (
                             <div className="space-y-1.5">
                               {lowMonetization.map((c, i) => (
-                                <div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border bg-card/80 px-3 py-2">
+                                <div key={c.creatorId} className="flex items-center gap-3 rounded-xl border border-border bg-card/80 px-3 py-2">
                                   <span className="text-xs text-muted-foreground tabular-nums w-5">{i + 1}</span>
                                   <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
                                   <span className="text-sm tabular-nums">{fmtShort(c.total)}</span>
@@ -2238,7 +2253,7 @@ const Dashboard2 = () => {
                           {underperforming.length === 0 ? <p className="text-sm text-muted-foreground">Sin creadoras en esta categoría</p> : (
                             <div className="space-y-1.5">
                               {underperforming.map((c, i) => (
-                                <div key={c.creatorId} className="flex items-center gap-3 rounded-md border border-border bg-card/80 px-3 py-2">
+                                <div key={c.creatorId} className="flex items-center gap-3 rounded-xl border border-border bg-card/80 px-3 py-2">
                                   <span className="text-xs text-muted-foreground tabular-nums w-5">{i + 1}</span>
                                   <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
                                   <span className="text-sm tabular-nums">{fmtShort(c.total)}</span>

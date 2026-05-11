@@ -473,7 +473,7 @@ const DetailDialog = ({
                   <button
                     type="button"
                     onClick={() => toggleCat(cat)}
-                    className="group flex w-full items-center gap-3 sticky top-0 z-[1] bg-gradient-to-r from-background via-background to-background/80 backdrop-blur-sm py-1"
+                    className="group flex w-full items-center gap-3 sticky top-0 z-[1] bg-gradient-to-r from-background via-background to-background/80 backdrop-blur-sm py-1.5 px-0.5"
                   >
                     <div
                       className={`flex items-center gap-2 rounded-full px-3 py-1 transition-transform group-hover:scale-[1.02] ${tone.bg} ${tone.ring}`}
@@ -563,7 +563,7 @@ const renderRow = (
       key={row.id}
       onClick={handleRowClick}
       className={cn(
-        "flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors",
+        "flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2 text-sm transition-colors",
         isClickable && "cursor-pointer hover:bg-accent hover:border-primary/40",
       )}
     >
