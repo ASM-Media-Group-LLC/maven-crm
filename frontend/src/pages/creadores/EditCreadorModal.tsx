@@ -22,6 +22,7 @@ import {
 import { useUpdateCreador } from "./useCreadores";
 import { toast } from "@/hooks/use-toast";
 import { buildSocialUrl } from "@/lib/utils";
+import { useModelCategories } from "@/hooks/useModelCategories";
 import type { CreatorWithBusiness } from "./useCreadores";
 
 interface Props {
@@ -30,8 +31,9 @@ interface Props {
   creator: CreatorWithBusiness;
 }
 
-// A++ incluida — match con Closers QA y otros lugares de la app.
-const CATEGORIES = ["A++", "A+", "A", "B+", "B", "C"] as const;
+// Fallback estático sólo si model_categories todavía no cargó.
+// Fuente real: useModelCategories() → tabla canónica model_categories.
+const CATEGORIES_FALLBACK = ["Elite", "A+", "A", "B+", "B", "C+", "C"] as const;
 
 const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   const [form, setForm] = useState({
@@ -52,6 +54,8 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   });
   const [nameError, setNameError] = useState(false);
   const updateMutation = useUpdateCreador();
+  const { data: categories = [] } = useModelCategories();
+  const CATEGORIES = categories.length > 0 ? categories.map((c) => c.code) : CATEGORIES_FALLBACK;
 
   useEffect(() => {
     if (open && creator) {

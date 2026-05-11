@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWhaticketLink } from "@/hooks/useWhaticketLink";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
+import { useModelCategories } from "@/hooks/useModelCategories";
 import { ExternalLink } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
@@ -45,7 +46,7 @@ const countryOptions = [
 
 // Fallback estático — la fuente real son scouter_companies (canónica).
 const AGENCY_OPTIONS_FALLBACK = ["Kash", "Atomick", "Unlok", "Ora", "Exchange", "PicLink", "LeakHunter", "Trafix", "Proyecto Medellín", "Pagomundo", "BLU"];
-const categoryOptions = ["A++", "A+", "A", "B+", "B", "C"];
+const CATEGORY_OPTIONS_FALLBACK = ["Elite", "A+", "A", "B+", "B", "C+", "C"];
 const managerOptions = ["Full Management", "Hybrid", "Basic"];
 
 const countryToCode: Record<string, string> = {
@@ -100,6 +101,11 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
   const agencyOptions = scouterCompanies.length > 0
     ? scouterCompanies.map((sc) => sc.name)
     : AGENCY_OPTIONS_FALLBACK;
+  // Categorías canónicas — fuente única model_categories.
+  const { data: modelCats = [] } = useModelCategories();
+  const categoryOptions = modelCats.length > 0
+    ? modelCats.map((c) => c.code)
+    : CATEGORY_OPTIONS_FALLBACK;
 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);

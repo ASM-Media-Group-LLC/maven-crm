@@ -39,11 +39,12 @@ const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-s
 };
 
 const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
-  "A++": "success-soft",
+  Elite: "success-soft",
   "A+": "success-soft",
   A: "primary-soft",
   "B+": "warning-soft",
   B: "secondary-soft",
+  "C+": "destructive-soft",
   C: "destructive-soft",
 };
 

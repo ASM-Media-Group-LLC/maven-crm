@@ -22,6 +22,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAddCreadorWithBusiness } from "./useCreadores";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
+import { useModelCategories } from "@/hooks/useModelCategories";
 import CommissionTiersEditor, { type CommissionTier } from "@/components/commission/CommissionTiersEditor";
 
 // Fallback estático sólo si scouter_companies todavía no cargó. La
@@ -35,13 +36,15 @@ const STATUSES = [
   { value: "leaving", label: "En Retiro" },
   { value: "terminated", label: "Terminada" },
 ];
-const CATEGORIES = [
-  { value: "A++", label: "A++ (Top Tier)" },
-  { value: "A+", label: "A+ (Premium)" },
-  { value: "A", label: "A (Alta)" },
-  { value: "B+", label: "B+ (Media Alta)" },
-  { value: "B", label: "B (Media)" },
-  { value: "C", label: "C (Básica)" },
+// Fallback estático — la fuente real es model_categories (canónica).
+const CATEGORIES_FALLBACK = [
+  { value: "Elite", label: "Elite (Top Tier)" },
+  { value: "A+",    label: "A+ (Premium)" },
+  { value: "A",     label: "A (Alta)" },
+  { value: "B+",    label: "B+ (Media Alta)" },
+  { value: "B",     label: "B (Media)" },
+  { value: "C+",    label: "C+ (Media Baja)" },
+  { value: "C",     label: "C (Básica)" },
 ];
 const PAYMENT_METHODS = ["PayPal", "Crypto", "Zelle", "Pagomundo", "Directa24", "Paxom", "Cuenta Bancaria Colombia", "Cuenta Bancaria Estados Unidos", "Otro"];
 const COUNTRIES = [
@@ -164,6 +167,11 @@ const NuevoCreadorForm = () => {
   const AGENCIES = scouterCompanies.length > 0
     ? scouterCompanies.map((c) => c.name)
     : AGENCIES_FALLBACK;
+  // Categorías canónicas — fuente única model_categories.
+  const { data: modelCats = [] } = useModelCategories();
+  const CATEGORIES = modelCats.length > 0
+    ? modelCats.map((mc) => ({ value: mc.code, label: mc.label }))
+    : CATEGORIES_FALLBACK;
   const tempId = useMemo(() => crypto.randomUUID(), []);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [uploadModal, setUploadModal] = useState<{ open: boolean; category: UploadCategory }>({ open: false, category: "contracts" });
