@@ -411,7 +411,7 @@ const DetailDialog = ({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 border-border/40 bg-gradient-to-br from-card via-card to-card/95 shadow-2xl">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
         {/* Header con gradiente sutil + número grande del total real.
             El user reportó: "card dice 3174 pero popup muestra 50" — ahora
             el header siempre muestra totalCount aunque rows tenga max 100. */}
