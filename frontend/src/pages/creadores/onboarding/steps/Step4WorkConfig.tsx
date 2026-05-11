@@ -69,6 +69,11 @@ export interface Step4Data {
   plataformaVideollamada: string;
   estrategiaRecuperacion: string;
   interesaDinamicasGrupales: boolean;
+  // Última pregunta del wizard — obligatoria. Si "Sí", la modelo cuenta
+  // como ingresada al CRM (Blu/Infloww) en la métrica de Panel de Control
+  // y dispara una alta (↑). Si "No", se crea sin activar en Blu y se
+  // puede togglear después desde /creadores.
+  bluInflowwActive: boolean | null;
 }
 
 interface Props {
@@ -442,6 +447,54 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
               placeholder="Acuerdos especiales, observaciones..."
               rows={4}
             />
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+
+      {/* Blu / Infloww — última pregunta del wizard, OBLIGATORIA.
+          Determina si la modelo se cuenta como "ingresada al CRM" en
+          Panel de Control. Por default ambos botones sin marcar para
+          que el closer tenga que elegir explícitamente. */}
+      <AccordionItem value="blu-infloww" className="border rounded-lg px-4" data-blu-infloww-section>
+        <AccordionTrigger className="hover:no-underline">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <DollarSign className="h-4 w-4 text-primary" />
+            ¿Modelo activa en Blu / Infloww?
+            <span className="text-rose-500">*</span>
+          </div>
+        </AccordionTrigger>
+        <AccordionContent>
+          <div className="pt-2 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Si está activa en el CRM externo (donde se gestiona su cuenta de
+              OnlyFans), marcá <strong>Sí</strong>. Cuenta como ingreso al CRM en
+              el Panel de Control. Si todavía no, marcá <strong>No</strong> —
+              después se puede activar desde el listado de Creadoras.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onChange("bluInflowwActive", true)}
+                className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
+                  data.bluInflowwActive === true
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    : "border-border bg-card hover:bg-muted/60"
+                }`}
+              >
+                Sí, activa en Blu/Infloww
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange("bluInflowwActive", false)}
+                className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
+                  data.bluInflowwActive === false
+                    ? "border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                    : "border-border bg-card hover:bg-muted/60"
+                }`}
+              >
+                No, todavía no
+              </button>
+            </div>
           </div>
         </AccordionContent>
       </AccordionItem>

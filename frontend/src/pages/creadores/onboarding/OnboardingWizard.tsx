@@ -26,7 +26,7 @@ const STEPS = [
 const initialStep1: Step1Data = { name: "", segundoNombre: "", email: "", phone: "", age: "", country: "", city: "", direccion: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "", apodos: "", edadMostrar: "", ubicacionArtistica: "" };
 const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "", heladoFavorito: "", bebidaFavorita: "", musicaArtistas: "", peliculasTV: "", viajesFavoritos: "", viajesPorVisitar: "", hermanos: "", diaPerfecto: "", comoEresCuandoNadieVe: "", comoQuieresQueTeLlamen: "", respuestaSexoEnPersona: "", respuestaUsuarioGrosero: "", respuestaPedirDesnudos: "", queTeIncomoda: "", horariosSueno: "", deporteEquipo: "", colorFavorito: "", estadoCivil: "", queBuscasPareja: "", mejorAtributoFisico: "", metasLargoPlazo: "", queHacesRelajarte: "", queTeHaceReir: "", queTeMotivaCrear: "", respuestaCuantoCobraEncuentro: "", respuestaMuestraIntimas: "", estrategiaMaterialGratis: "", estrategiaProblemasPersonales: "" };
 const initialStep3Doc: Step2Data = { idDocumentFront: [], idDocumentBack: [], selfieDocument: [], profilePhotos: [], dataConfirmed: false, wishlistUrl: "", instagramHandle: "", tiktokHandle: "", twitterHandle: "", onlyfansUrl: "", otrasPlataformas: "", linkOtrasPlataformas: "" };
-const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD", gfeDisponible: false, personalidadMarca: "", estrategiaRechazo: "", tonoEmocional: "", frasesVenta: "", usuariosVip: "", plataformaVideollamada: "", estrategiaRecuperacion: "", interesaDinamicasGrupales: false };
+const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD", gfeDisponible: false, personalidadMarca: "", estrategiaRechazo: "", tonoEmocional: "", frasesVenta: "", usuariosVip: "", plataformaVideollamada: "", estrategiaRecuperacion: "", interesaDinamicasGrupales: false, bluInflowwActive: null };
 
 interface Props {
   onCancel: () => void;
@@ -164,6 +164,9 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       profile_photo_url: profilePhotoUrl,
       precios_contenido: Object.keys(preciosContenido).length > 0 ? preciosContenido : null,
       notes: step4.notes || null,
+      // Blu/Infloww: el wizard la fuerza obligatoria (validateCurrentStep).
+      // En borrador puede quedar null; al publicar es true|false.
+      blu_infloww_active: step4.bluInflowwActive ?? false,
       last_autosave_at: new Date().toISOString(),
     };
   }, [step1, step2Psy, step3Doc, step4]);
@@ -351,6 +354,21 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       const hasPrice = Object.values(step4.pricing).some((p) => parseFloat(p.price) > 0);
       if (!hasPrice) {
         toast({ title: "Precios requeridos", description: "Define al menos un servicio con precio mayor a 0.", variant: "destructive" });
+        return false;
+      }
+      // Blu/Infloww obligatorio para publicar. Si no se respondió, le
+      // hacemos scroll al accordion y le pedimos al closer que elija.
+      if (step4.bluInflowwActive === null || step4.bluInflowwActive === undefined) {
+        toast({
+          title: "Falta responder Blu / Infloww",
+          description: "Marcá Sí o No al final del wizard antes de publicar.",
+          variant: "destructive",
+        });
+        // Scroll al acordeón (data-attr en Step4WorkConfig) para que sea
+        // imposible no verlo.
+        document
+          .querySelector("[data-blu-infloww-section]")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
         return false;
       }
     }
