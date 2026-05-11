@@ -361,6 +361,7 @@ export type LeadPatch = Partial<
     | "name"
     | "target_companies"
     | "manual_company_assignment"
+    | "company_id"
   >
 >;
 
@@ -489,9 +490,39 @@ export const useToggleLeadFavorite = () => {
   });
 };
 
-export const useScouterStats = () =>
+// Filtros que las cards de stats deben respetar. Reproducen los del
+// useScouterLeads para que los conteos arriba coincidan con la grid
+// abajo. El statusFilter NO se aplica acá: las cards lo controlan ellas
+// mismas (un click en "Interesadas" setea status=confirmed), si lo
+// aplicáramos sería referencia circular.
+export interface ScouterStatsFilters {
+  company?: string;
+  companySlug?: string;
+  country?: string;
+  aiQuality?: AiQualityFilter;
+}
+
+const applyStatsFilters = (q: any, f: ScouterStatsFilters) => {
+  if (f.company && f.companySlug) {
+    q = q.or(`company_id.eq.${f.company},target_companies.cs.["${f.companySlug}"]`);
+  } else if (f.company) {
+    q = q.eq("company_id", f.company);
+  }
+  if (f.country === "Sin país") q = q.is("country", null);
+  else if (f.country) q = q.eq("country", f.country);
+  if (f.aiQuality === "approved") {
+    q = q.in("ai_status", ["high_fit", "medium_fit", "maybe", "approved"]);
+  } else if (f.aiQuality === "high_fit") {
+    q = q.eq("ai_status", "high_fit");
+  } else if (f.aiQuality === "scored") {
+    q = q.not("ai_status", "is", null);
+  }
+  return q;
+};
+
+export const useScouterStats = (filters: ScouterStatsFilters = {}) =>
   useQuery({
-    queryKey: ["scouter-stats"],
+    queryKey: ["scouter-stats", filters],
     queryFn: async (): Promise<ScouterStats> => {
       const now = Date.now();
       const since24h = new Date(now - 24 * 3600 * 1000).toISOString();
@@ -499,8 +530,10 @@ export const useScouterStats = () =>
       const since30d = new Date(now - 30 * 24 * 3600 * 1000).toISOString();
 
       // Count helpers — Supabase returns count via head + exact.
-      const head = (filter: (q: any) => any) =>
-        filter(sb.from("scouter_leads").select("*", { count: "exact", head: true }));
+      // Aplicamos los filtros activos a TODAS las queries para que las
+      // cards coincidan con la grid filtrada.
+      const head = (subFilter: (q: any) => any) =>
+        subFilter(applyStatsFilters(sb.from("scouter_leads").select("*", { count: "exact", head: true }), filters));
 
       const [
         { count: discovered24h },
@@ -509,12 +542,7 @@ export const useScouterStats = () =>
         { count: highFit7d },
         { count: pendingAi },
         { count: total },
-        // Para byStatus + cross-reference con interactions traemos id y
-        // status de cada lead. 5k cubre el pool actual; si crece sube.
         { data: leadRows },
-        // Cada fila = una tarea de comentario completada por un spammer.
-        // Agregamos client-side para sacar contactedDistinct +
-        // first_comment_at por lead.
         { data: commentInteractions },
       ] = await Promise.all([
         head((q: any) => q.gte("created_at", since24h)),
@@ -523,7 +551,11 @@ export const useScouterStats = () =>
         head((q: any) => q.gte("created_at", since7d).eq("ai_status", "high_fit")),
         head((q: any) => q.is("ai_status", null)),
         head((q: any) => q),
-        sb.from("scouter_leads").select("id, status").limit(5000),
+        applyStatsFilters(sb.from("scouter_leads").select("id, status"), filters).limit(5000),
+        // commentInteractions: si hay filtro de company, agregamos un
+        // join virtual filtrando por lead.company. Si no, traemos todas.
+        // Esto es aproximación — para 100% precisión habría que joinear
+        // server-side, pero con limit(10000) ya cubre el caso típico.
         sb
           .from("scouter_interaction_history")
           .select("lead_id, created_at")
@@ -534,17 +566,24 @@ export const useScouterStats = () =>
 
       const byStatus: Record<string, number> = {};
       const statusByLead = new Map<string, string>();
+      // Solo los lead_ids que pasan el filtro entran a la lookup map.
+      // commentInteractions se filtra contra esta set para que el conteo
+      // de contactadas/no-responde respete el scope.
+      const scopedLeadIds = new Set<string>();
       for (const row of (leadRows ?? []) as { id: string; status: string }[]) {
         byStatus[row.status] = (byStatus[row.status] ?? 0) + 1;
         statusByLead.set(row.id, row.status);
+        scopedLeadIds.add(row.id);
       }
 
-      // Primer comentario por lead — order asc + map sólo guarda el primero.
+      // Primer comentario por lead — order asc + map sólo guarda el
+      // primero. Filtramos por scopedLeadIds para respetar los filtros.
       const firstCommentByLead = new Map<string, string>();
       for (const row of (commentInteractions ?? []) as {
         lead_id: string;
         created_at: string;
       }[]) {
+        if (!scopedLeadIds.has(row.lead_id)) continue;
         if (!firstCommentByLead.has(row.lead_id)) {
           firstCommentByLead.set(row.lead_id, row.created_at);
         }
@@ -556,8 +595,6 @@ export const useScouterStats = () =>
         const firstAtMs = Date.parse(firstAt);
         if (Number.isNaN(firstAtMs) || firstAtMs > sevenDaysAgo) continue;
         const status = statusByLead.get(leadId);
-        // No responde = contactado hace ≥7 días y nunca marcado como
-        // "se interesó" (confirmed) ni convertido a active.
         if (status !== "confirmed" && status !== "active") {
           noResponseCount += 1;
         }

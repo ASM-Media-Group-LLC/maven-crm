@@ -423,8 +423,22 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
     setPage(1);
   }, [statusFilter, search, companyFilter, countryFilter, aiQuality]);
 
-  const stats = useScouterStats();
   const companies = useScouterCompanies();
+  // Resolvemos slug acá temprano para pasarlo a stats + leads.
+  const _activeCompanySlug =
+    companyFilter !== "all"
+      ? companies.data?.find((c) => c.id === companyFilter)?.slug
+      : undefined;
+  // Stats respeta los filtros visuales para que los conteos arriba
+  // coincidan con la grilla abajo (antes mostraban totales globales).
+  // statusFilter NO entra acá: las cards lo controlan ellas (un click
+  // setea status=confirmed para Interesadas) — referencia circular.
+  const stats = useScouterStats({
+    company: companyFilter !== "all" ? companyFilter : undefined,
+    companySlug: _activeCompanySlug,
+    country: countryFilter !== "all" ? countryFilter : undefined,
+    aiQuality,
+  });
   // El dropdown de país ahora respeta status + aiQuality del filtro
   // activo, para que el conteo coincida con lo que ves en la grilla.
   // Antes mostraba "México 853" pero la grilla con filtros default
@@ -433,14 +447,10 @@ const ScouterHome = ({ favoritesOnly = false, companyFilter: companyFilterProp, 
     status: statusFilter,
     aiQuality,
   });
-  // Si el user filtra por compañía, buscamos el slug para que el filtro
-  // matchee TAMBIÉN target_companies (asignaciones manuales del popup),
-  // no solo company_id (discovery owner). Antes sin slug, los leads que
-  // reasignabas manualmente no aparecían al filtrar por la nueva compañía.
-  const activeCompanySlug =
-    companyFilter !== "all"
-      ? companies.data?.find((c) => c.id === companyFilter)?.slug
-      : undefined;
+  // Slug de la compañía activa (reutilizado de _activeCompanySlug calculado
+  // arriba para stats). Lo mantenemos como const local con el mismo nombre
+  // para no romper el resto del componente.
+  const activeCompanySlug = _activeCompanySlug;
   const leads = useScouterLeads({
     status: statusFilter,
     search,

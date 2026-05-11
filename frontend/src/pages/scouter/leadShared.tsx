@@ -189,6 +189,24 @@ export const LeadDrawer = ({
       const patch: LeadPatch = { ...draft };
       if ("target_companies" in draft) {
         patch.manual_company_assignment = true;
+        // Si el user desmarcó la company_id que vino del scouter, hay
+        // que sincronizar: si target_companies tiene otras, el trigger
+        // de DB ya pone company_id al primero. Si target_companies
+        // queda vacío, lo seteamos a null explícito para que el lead
+        // deje de pertenecer a esa compañía del scraper.
+        const newTargets = (draft.target_companies ?? []) as string[];
+        const currentCompanySlug = lead.company_id
+          ? companies.find((c) => c.id === lead.company_id)?.slug
+          : null;
+        const stillHasCurrent =
+          currentCompanySlug !== null && newTargets.includes(currentCompanySlug ?? "");
+        if (newTargets.length === 0) {
+          patch.company_id = null as unknown as string;
+        } else if (currentCompanySlug && !stillHasCurrent) {
+          // Reemplazo: company_id pasa a la primera de las nuevas.
+          const firstId = companies.find((c) => c.slug === newTargets[0])?.id ?? null;
+          patch.company_id = firstId as unknown as string;
+        }
       }
       await update.mutateAsync({ id: lead.id, patch });
       toast.success("Lead actualizado");
@@ -481,15 +499,30 @@ export const LeadDrawer = ({
                   )}
                 </Field>
 
-                {/* Multi-select de compañías que califica. La IA del scouter
-                    arma una propuesta automática (lead.target_companies)
-                    pero suele ser imprecisa — este selector deja al user
-                    tickear/destickear manualmente cuáles aplican. */}
+                {/* Multi-select de compañías que califica. Antes solo
+                    miraba target_companies; ahora también incluye la
+                    company_id que el scouter asignó al descubrir el
+                    lead (sino el chip no aparecía marcado y el user
+                    no podía desmarcarla). Al guardar, sincronizamos
+                    target_companies = newSet. Si el set queda vacío,
+                    seteamos company_id=null para sacar el lead de
+                    la compañía del scraper. */}
                 <Field label="Compañías que califica" stacked>
                   {(() => {
+                    // Slug de la company_id del discovery (si existe en
+                    // companies). Es el "owner" original del lead.
+                    const discoverySlug = lead.company_id
+                      ? companies.find((c) => c.id === lead.company_id)?.slug
+                      : null;
+                    // El "current set" mostrado son: las target_companies
+                    // explícitas + la del discovery (si todavía está OK).
+                    const draftedTargets = get("target_companies") as string[] | undefined;
+                    const baseTargets =
+                      draftedTargets !== undefined ? draftedTargets : (lead.target_companies ?? []);
                     const current =
-                      (get("target_companies") as string[] | undefined) ??
-                      (lead.target_companies ?? []);
+                      discoverySlug && !baseTargets.includes(discoverySlug)
+                        ? [discoverySlug, ...baseTargets]
+                        : baseTargets;
                     if (editing) {
                       return (
                         <div className="flex flex-wrap gap-1.5">
@@ -500,6 +533,7 @@ export const LeadDrawer = ({
                           ) : (
                             companies.map((c) => {
                               const isOn = current.includes(c.slug);
+                              const isDiscovery = c.slug === discoverySlug;
                               return (
                                 <button
                                   key={c.id}
@@ -510,6 +544,7 @@ export const LeadDrawer = ({
                                       : [...current, c.slug];
                                     setField("target_companies", next);
                                   }}
+                                  title={isDiscovery ? "Asignada por el scouter al descubrir" : undefined}
                                   className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                                     isOn
                                       ? "border-primary bg-primary/15 text-primary"
@@ -517,6 +552,9 @@ export const LeadDrawer = ({
                                   }`}
                                 >
                                   {c.name}
+                                  {isDiscovery && isOn && (
+                                    <span className="ml-1 text-[9px] opacity-70">(scouter)</span>
+                                  )}
                                 </button>
                               );
                             })
