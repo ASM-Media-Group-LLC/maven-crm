@@ -145,13 +145,14 @@ const ScouterAssist = () => {
         <div className="flex items-center gap-3">
           {showLogo ? (
             // Logo de la compañía filtrada (reemplaza el título).
-            // h-10 = 40px de display real; el upload pidió mín 200x200
-            // así que retina queda cubierto. object-contain para que
-            // PNG transparentes no se distorsionen.
+            // h-16 = 64px de display real (antes era h-10/40px — se veía
+            // chiquito). El upload pidió mín 200x200 así que retina queda
+            // cubierto. object-contain para que PNG transparentes no se
+            // distorsionen.
             <img
               src={logoForTheme!}
               alt={activeCompany!.name}
-              className="h-10 object-contain"
+              className="h-16 max-h-20 object-contain"
             />
           ) : (
             <h1 className="text-2xl font-bold tracking-tight">Maven Scouter Assist</h1>
