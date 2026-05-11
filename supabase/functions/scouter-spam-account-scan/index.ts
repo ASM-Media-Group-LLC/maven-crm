@@ -273,11 +273,69 @@ function jsonError(error: string, status: number): Response {
 }
 
 // ─── IG profile fetch ────────────────────────────────────────────────
-// Reutilizamos el approach de qa-fetch-ig-avatar (web_profile_info API
-// directa de IG con headers que mimetizan un browser). Si IG cambia su
-// API esto se rompe — pero es la fuente más barata y completa.
+// Estrategia: intentar primero ScrapeCreators (paid, con cookies/auth,
+// no se rate-limita desde IPs cloud). Si no hay API key o falla,
+// fallback al endpoint público web_profile_info de IG.
+// El fallback público se rompe seguido porque IG bloquea las IPs de
+// Supabase edge functions.
 async function fetchIgProfile(username: string): Promise<IgProfileSnapshot | null> {
   const u = username.replace(/^@+/, "").toLowerCase();
+  // Intento 1: ScrapeCreators.
+  const scKey = Deno.env.get("SCRAPECREATORS_API_KEY");
+  if (scKey) {
+    try {
+      const scRes = await fetchWithTimeout(
+        `https://api.scrapecreators.com/v1/instagram/profile?handle=${encodeURIComponent(u)}`,
+        { headers: { "x-api-key": scKey } },
+        10000,
+      );
+      if (scRes.ok) {
+        const scData = (await scRes.json().catch(() => null)) as {
+          data?: {
+            user?: {
+              username?: string;
+              full_name?: string;
+              biography?: string;
+              edge_followed_by?: { count?: number };
+              edge_follow?: { count?: number };
+              edge_owner_to_timeline_media?: { count?: number };
+              is_verified?: boolean;
+              is_private?: boolean;
+              is_business_account?: boolean;
+              external_url?: string;
+              profile_pic_url_hd?: string;
+              profile_pic_url?: string;
+            };
+          };
+        } | null;
+        const su = scData?.data?.user;
+        if (su) {
+          return {
+            username: su.username ?? u,
+            full_name: su.full_name ?? null,
+            biography: su.biography ?? null,
+            followers_count: su.edge_followed_by?.count ?? null,
+            following_count: su.edge_follow?.count ?? null,
+            posts_count: su.edge_owner_to_timeline_media?.count ?? null,
+            is_verified: su.is_verified ?? null,
+            is_private: su.is_private ?? null,
+            is_business_account: su.is_business_account ?? null,
+            external_url: su.external_url ?? null,
+            profile_pic_url: su.profile_pic_url_hd ?? su.profile_pic_url ?? null,
+            account_created_year: null,
+          };
+        }
+      } else {
+        const errTxt = await scRes.text().catch(() => "");
+        console.warn("[spam-scan] ScrapeCreators failed, falling back to IG direct:", scRes.status, errTxt.slice(0, 150));
+      }
+    } catch (e) {
+      console.warn("[spam-scan] ScrapeCreators exception, falling back:", (e as Error).message);
+    }
+  }
+
+  // Intento 2 (fallback): web_profile_info público de IG. Frecuentemente
+  // bloqueado desde Supabase edges, pero gratis.
   try {
     const res = await fetchWithTimeout(
       `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(u)}`,
@@ -331,7 +389,7 @@ async function fetchIgProfile(username: string): Promise<IgProfileSnapshot | nul
       is_business_account: u_.is_business_account ?? null,
       external_url: u_.external_url ?? null,
       profile_pic_url: u_.profile_pic_url_hd ?? u_.profile_pic_url ?? null,
-      account_created_year: null, // IG ya no expone esto en web_profile_info.
+      account_created_year: null,
     };
   } catch {
     return null;
