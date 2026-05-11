@@ -145,14 +145,16 @@ const ScouterAssist = () => {
         <div className="flex items-center gap-3">
           {showLogo ? (
             // Logo de la compañía filtrada (reemplaza el título).
-            // h-16 = 64px de display real (antes era h-10/40px — se veía
-            // chiquito). El upload pidió mín 200x200 así que retina queda
-            // cubierto. object-contain para que PNG transparentes no se
-            // distorsionen.
+            // h-24 = 96px de display real. Antes era h-16 (64px) y se
+            // veía chiquito al lado del whitespace del header — si el
+            // PNG uploaded tiene padding interno transparente, la mitad
+            // se "comía". Con h-24 el logo queda dominante en el header
+            // aún con algo de padding interno. Cap a h-32 (128px) por
+            // si subiste un logo cuadrado grande.
             <img
               src={logoForTheme!}
               alt={activeCompany!.name}
-              className="h-16 max-h-20 object-contain"
+              className="h-24 max-h-32 w-auto object-contain"
             />
           ) : (
             <h1 className="text-2xl font-bold tracking-tight">Maven Scouter Assist</h1>
