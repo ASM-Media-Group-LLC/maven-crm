@@ -65,6 +65,7 @@ export interface ScouterLead {
   updated_at: string;
   converted_at: string | null;
   converted_to_contact_id: string | null;
+  tenant_id: string;
 }
 
 export interface CompanySearchConfig {
@@ -352,6 +353,68 @@ export const useUpdateLead = () => {
     },
     onError: (e) => {
       toast.error("No se pudo guardar", { description: (e as Error).message });
+    },
+  });
+};
+
+/** Descartar un lead = mover su handle a scouter_discarded_handles
+ *  (blocklist tenant-global) y BORRAR el row de scouter_leads. La idea
+ *  es que el discovery del worker chequee la blocklist y no vuelva a
+ *  agregar perfiles que el user ya rechazó.
+ *
+ *  Antes el descarte solo seteaba status='discarded' y dejaba el row
+ *  en la tabla, lo cual:
+ *    1. Hinchaba el conteo de leads.
+ *    2. Dejaba al worker reintentando el upsert (no insert nuevo, pero
+ *       igualmente refrescando bio/followers periodicamente).
+ *    3. El handle podía aparecer en otra compañía si el user no lo
+ *       descartaba ahí también.
+ */
+export const useDiscardLead = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      handle,
+      tenantId,
+    }: {
+      id: string;
+      handle: string;
+      tenantId: string;
+    }) => {
+      const cleaned = handle.replace(/^@+/, "").toLowerCase().trim();
+      if (!cleaned) throw new Error("Handle vacío");
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // 1) INSERT en blocklist. ON CONFLICT do nothing — si ya estaba
+      //    bloqueado el handle, igual procedemos con el delete.
+      const { error: insErr } = await sb
+        .from("scouter_discarded_handles")
+        .upsert(
+          {
+            handle: cleaned,
+            tenant_id: tenantId,
+            discarded_by: user?.id ?? null,
+            reason: "user-discard",
+          },
+          { onConflict: "handle,tenant_id", ignoreDuplicates: true },
+        );
+      if (insErr) throw insErr;
+
+      // 2) DELETE del lead activo.
+      const { error: delErr } = await sb
+        .from("scouter_leads")
+        .delete()
+        .eq("id", id);
+      if (delErr) throw delErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scouter-leads"] });
+      qc.invalidateQueries({ queryKey: ["scouter-stats"] });
+      qc.invalidateQueries({ queryKey: ["scouter-countries"] });
+    },
+    onError: (e) => {
+      toast.error("No se pudo descartar", { description: (e as Error).message });
     },
   });
 };

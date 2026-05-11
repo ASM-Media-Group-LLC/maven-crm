@@ -25,6 +25,7 @@ import {
   useToggleLeadFavorite,
   useLeadFavoriteIds,
   useScouterCompanies,
+  useDiscardLead,
   type LeadPatch,
   type ScouterLead,
 } from "@/hooks/useScouterLeads";
@@ -123,6 +124,7 @@ export const LeadDrawer = ({
   onOpenChange: (v: boolean) => void;
 }) => {
   const update = useUpdateLead();
+  const discardLead = useDiscardLead();
   const toggleFavoriteMut = useToggleLeadFavorite();
   const favoriteIdsQ = useLeadFavoriteIds();
   const favoriteIds = favoriteIdsQ.data ?? new Set<string>();
@@ -756,17 +758,29 @@ export const LeadDrawer = ({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Descartar este lead?</AlertDialogTitle>
             <AlertDialogDescription>
-              @{lead.instagram_handle} se va a marcar como descartado y deja
-              de aparecer en tu cola activa. Podés revertirlo después
-              cambiando el estado manualmente desde la tabla de Leads.
+              @{lead.instagram_handle} se va a borrar de la lista activa y
+              su handle queda en la blocklist para que el scouter NO lo
+              vuelva a agregar en futuras búsquedas. Es prácticamente
+              irreversible (tendrías que borrar manualmente la entrada de
+              la blocklist para que reaparezca).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
+              onClick={async () => {
                 setConfirmDiscard(false);
-                handleQuickStatus("discarded");
+                try {
+                  await discardLead.mutateAsync({
+                    id: lead.id,
+                    handle: lead.instagram_handle,
+                    tenantId: lead.tenant_id,
+                  });
+                  toast.success("Lead descartado");
+                  onOpenChange(false);
+                } catch {
+                  /* el hook ya hizo el toast */
+                }
               }}
             >
               Sí, descartar

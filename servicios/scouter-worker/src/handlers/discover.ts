@@ -73,8 +73,9 @@ async function persistProfilesAsLeads(
 
   const existingInLeadgen = new Set<string>();
   const existingInScouter = new Set<string>();
+  const discardedHandles = new Set<string>();
   if (allHandles.length > 0) {
-    const [lgRes, scRes] = await Promise.all([
+    const [lgRes, scRes, dhRes] = await Promise.all([
       sb.from("leadgen_entries").select("model_handle").in("model_handle", allHandles),
       companyId
         ? sb
@@ -83,6 +84,13 @@ async function persistProfilesAsLeads(
             .eq("company_id", companyId)
             .in("instagram_handle", allHandles)
         : Promise.resolve({ data: [] as Array<{ instagram_handle: string }>, error: null }),
+      // Blocklist global por tenant — handles que el user descartó
+      // desde el popup. No queremos reagregarlos NUNCA.
+      sb
+        .from("scouter_discarded_handles")
+        .select("handle")
+        .eq("tenant_id", tenantId)
+        .in("handle", allHandles),
     ]);
     if (lgRes.error) console.error("leadgen dedup query failed", lgRes.error);
     else {
@@ -96,6 +104,12 @@ async function persistProfilesAsLeads(
         existingInScouter.add(row.instagram_handle.toLowerCase());
       }
     }
+    if (dhRes.error) console.error("discarded-handles dedup query failed", dhRes.error);
+    else {
+      for (const row of (dhRes.data ?? []) as { handle: string }[]) {
+        discardedHandles.add(row.handle.toLowerCase());
+      }
+    }
   }
 
   for (const item of items) {
@@ -107,6 +121,13 @@ async function persistProfilesAsLeads(
     if (existingInLeadgen.has(handle) && !existingInScouter.has(handle)) {
       skippedInLeadgen += 1;
       console.log(`[discover] skip @${handle} — ya existe en Lead Gen`);
+      continue;
+    }
+
+    // Blocklist: el user lo descartó manualmente desde el popup. No
+    // se vuelve a agregar a ninguna compañía dentro del mismo tenant.
+    if (discardedHandles.has(handle)) {
+      console.log(`[discover] skip @${handle} — está en blocklist de descartados`);
       continue;
     }
 
