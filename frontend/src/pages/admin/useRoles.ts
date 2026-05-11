@@ -36,28 +36,40 @@ export interface ModuleConfig {
 export const MODULES_CONFIG: ModuleConfig[] = [
   // === Menú principal ===
   { group: "Menú",          module: "Dashboard",     submodules: [] },
-  // Panel de control: dashboard ejecutivo con KPIs del funnel completo
-  // (LLG → número → llamada → cierre → ingreso al CRM). Acceso típico:
-  // admin/manager/supervisor.
-  { group: "Menú",          module: "Panel de control", submodules: [] },
-  { group: "Menú",          module: "Messenger",     submodules: [] },
+  // Panel de control: dashboard ejecutivo. Tabs internos: modelos
+  // (default), chatters reclutamiento, cuentas spammer, control de gasto.
+  { group: "Menú",          module: "Panel de control", submodules: ["Modelos", "Chatters Reclutamiento", "Cuentas Spammer", "Control de Gasto"] },
+  // Messenger: chat interno. La acción crítica es eliminar conversación.
+  { group: "Menú",          module: "Messenger",     submodules: ["Eliminar Conversación"] },
   { group: "Menú",          module: "Cowork",        submodules: [] },
-  { group: "Menú",          module: "Contactos",     submodules: [] },
-  { group: "Menú",          module: "Tareas",        submodules: [] },
-  { group: "Menú",          module: "Eventos",       submodules: [] },
-  { group: "Menú",          module: "SuperContacts", submodules: [] }, // sidebar lo muestra como "Wishlist"
-  { group: "Menú",          module: "Creadores",     submodules: ["Dashboard", "Lista", "Onboarding", "Offboarding", "Personalizados", "Perfil", "Nuevo"] },
+  // Contactos: tabs internos + acciones críticas de eliminar.
+  { group: "Menú",          module: "Contactos",     submodules: ["Dashboard", "Contactos", "Agencias", "Crear Contacto", "Editar Contacto", "Eliminar Contacto", "Crear Agencia", "Eliminar Agencia"] },
+  // Tareas: vistas + delete actions.
+  { group: "Menú",          module: "Tareas",        submodules: ["List", "Kanban", "Analytics", "Docs", "Crear Proyecto", "Eliminar Proyecto", "Crear Tarea", "Eliminar Tarea"] },
+  // Eventos: tabs del detalle del evento + delete.
+  { group: "Menú",          module: "Eventos",       submodules: ["Invitados", "Checklist", "Historial", "Métricas", "Crear Evento", "Editar Evento", "Eliminar Evento"] },
+  { group: "Menú",          module: "SuperContacts", submodules: ["Gráficas", "Productividad", "Agregar Handle", "Pegar Handles", "Importar Archivo"] }, // sidebar lo muestra como "Wishlist"
+  // Creadores: tabs listado + tabs del perfil + acciones críticas de
+  // edición / eliminación / cambios financieros.
+  { group: "Menú",          module: "Creadores",     submodules: [
+    "Dashboard", "Lista", "Onboarding", "Offboarding", "Personalizados", "Perfil", "Nuevo",
+    "Perfil: Info", "Perfil: Lineamientos", "Perfil: Redes", "Perfil: Monetización", "Perfil: Documentos", "Perfil: Notas", "Perfil: Tickets", "Perfil: Historial",
+    "Editar Creator", "Eliminar Creator", "Editar Banking", "Cambiar Plataforma",
+  ] },
   { group: "Menú",          module: "Creator Sales", submodules: ["Dashboard", "Reportes", "IA Ventas", "Auditoría"] },
 
   // === Operaciones ===
-  { group: "Operaciones",   module: "Promolog",      submodules: [] },
-  // LeadGen subtabs: el rail interno tiene Dashboard + Lista + Crear.
-  // El permiso "Eliminar Entradas" hard-gatea el delete button.
-  { group: "Operaciones",   module: "LeadGen",       submodules: ["Dashboard", "Lista", "Crear Entrada", "Eliminar Entradas", "Exportar"] },
-  // Closers subtabs internos: Dashboard (KPIs) y Operaciones (tabla).
-  // Acciones dentro: editar status, asignar closer, comisiones, export.
-  { group: "Operaciones",   module: "Closers",       submodules: ["Dashboard", "Operaciones", "Editar Status", "Asignar Closer", "Editar Comisiones", "Exportar"] },
-  { group: "Operaciones",   module: "Tickets",       submodules: [] },
+  { group: "Operaciones",   module: "Promolog",      submodules: ["Promos", "Rendimiento"] },
+  // LeadGen subtabs: rail interno + acciones críticas.
+  { group: "Operaciones",   module: "LeadGen",       submodules: ["Dashboard", "Lista", "Crear Entrada", "Eliminar Entradas", "Exportar", "Agentes", "Supervisores", "Rendimiento"] },
+  // Closers tabs top-level (Dashboard / Operaciones) + sub-tabs internos
+  // de la tabla Operaciones (status filters) + acciones críticas.
+  { group: "Operaciones",   module: "Closers",       submodules: [
+    "Dashboard", "Operaciones",
+    "Ver Todas", "Ver Nuevo", "Ver Asignadas", "Ver Confirmadas", "Ver Completadas", "Ver No Interesadas",
+    "Editar Status", "Asignar Closer", "Editar Comisiones", "Convertir a Creadora", "Exportar",
+  ] },
+  { group: "Operaciones",   module: "Tickets",       submodules: ["Crear Ticket", "Editar Ticket", "Eliminar Ticket", "Asignar Ticket"] },
   { group: "Operaciones",   module: "Chatters",      submodules: ["Evaluator", "Workspace", "Admin", "Borrar Historial"] },
   // Scouter Assist submodules. Los que comienzan con "Settings →" son
   // permisos de acciones DENTRO del tab Settings — gating granular sobre
