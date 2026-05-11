@@ -20,6 +20,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import FileUploadModal, { type UploadCategory, type UploadedFile } from "@/components/FileUploadModal";
 
 const CATEGORIES = [
@@ -78,7 +79,13 @@ const NuevoContactoForm = () => {
     id: string; name: string; phone?: string; email?: string; agentName?: string; createdAt?: string;
   } | null>(null);
   const [isUpdatingContact, setIsUpdatingContact] = useState(false);
-  const [companies, setCompanies] = useState<string[]>(DEFAULT_COMPANIES);
+  // Compañías canónicas — fuente única scouter_companies, lista fija.
+  // DEFAULT_COMPANIES queda solo como fallback durante loading.
+  const { data: scouterCompanies = [] } = useScouterCompanies();
+  const companies = scouterCompanies.length > 0
+    ? scouterCompanies.map((sc) => sc.name)
+    : DEFAULT_COMPANIES;
+  const setCompanies = (_: any) => {}; // no-op — la lista la maneja scouter_companies
   const [uploadModal, setUploadModal] = useState<{ open: boolean; category: UploadCategory }>({ open: false, category: "piclink" });
   const [profilePhoto, setProfilePhoto] = useState<UploadedFile | null>(null);
   const [extraFiles, setExtraFiles] = useState<UploadedFile[]>([]);
@@ -225,6 +232,7 @@ const NuevoContactoForm = () => {
         platform: form.plataforma,
         physical_appearance: form.categoria || null,
         company: form.compania || null,
+        company_id: scouterCompanies.find((sc) => sc.name === form.compania)?.id ?? null,
         email: form.email || null,
         country_code: form.countryCode,
         phone: form.phone || null,
@@ -300,6 +308,7 @@ const NuevoContactoForm = () => {
         platform: form.plataforma,
         physical_appearance: form.categoria || null,
         company: form.compania || null,
+        company_id: scouterCompanies.find((sc) => sc.name === form.compania)?.id ?? null,
         email: form.email || null,
         country_code: form.countryCode,
         phone: form.phone || null,

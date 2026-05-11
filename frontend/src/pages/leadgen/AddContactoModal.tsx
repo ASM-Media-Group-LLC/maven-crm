@@ -17,6 +17,7 @@ import { enqueueAvatarFetch } from "@/lib/avatarFetch";
 import { checkCreatorExists, checkExistingContact } from "@/lib/lead-validation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { useScouterCompanies } from "@/hooks/useScouterLeads";
 
 const contactoSchema = z.object({
   nombre: z.string().trim().min(1, "Nombre requerido").max(100, "Máximo 100 caracteres"),
@@ -45,6 +46,8 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   const [pendingFormData, setPendingFormData] = useState<ContactoFormValues | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  // Compañías canónicas — lista fija, no se permite texto libre.
+  const { data: scouterCompanies = [] } = useScouterCompanies();
 
   const form = useForm<ContactoFormValues>({
     resolver: zodResolver(contactoSchema),
@@ -141,6 +144,8 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         platform: "Instagram",
         physical_appearance: data.categoriaFisica,
         company: data.compania || null,
+        // Dual-write: lookup company_id desde el name elegido en la lista.
+        company_id: scouterCompanies.find((sc) => sc.name === data.compania)?.id ?? null,
         country_code: data.paisCodigo,
         phone: data.telefono || null,
         notes: data.notas || null,
@@ -214,6 +219,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         platform: "Instagram",
         physical_appearance: pendingFormData.categoriaFisica,
         company: pendingFormData.compania || null,
+        company_id: scouterCompanies.find((sc) => sc.name === pendingFormData.compania)?.id ?? null,
         country_code: pendingFormData.paisCodigo,
         phone: pendingFormData.telefono || null,
         notes: pendingFormData.notas || null,
@@ -306,6 +312,9 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Compañía</FormLabel>
+                    {/* Lista fija desde scouter_companies (canónica).
+                        El value que se guarda es el name — se mapea a
+                        company_id en el insert vía dual-write. */}
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -313,14 +322,9 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="kash-agency">KASH Agency</SelectItem>
-                        <SelectItem value="alvaroletshoot">alvaroletshoot</SelectItem>
-                        <SelectItem value="blue-app">Blue app</SelectItem>
-                        <SelectItem value="piclink">Piclink.me</SelectItem>
-                        <SelectItem value="pagomundo">Pagomundo</SelectItem>
-                        <SelectItem value="exchange">Exchange</SelectItem>
-                        <SelectItem value="unlok">Unlok</SelectItem>
-                        <SelectItem value="ora-miami">Ora Miami</SelectItem>
+                        {scouterCompanies.map((sc) => (
+                          <SelectItem key={sc.id} value={sc.name}>{sc.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

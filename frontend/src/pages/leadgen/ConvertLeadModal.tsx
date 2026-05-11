@@ -32,6 +32,18 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
       // Insert into closers_contacts — the trigger sync_closers_contact_to_creators
       // will automatically create the closer_creators row if phone is present
       const ticketId = lead.ticket_number || `#LG${lead.id.slice(-7).toUpperCase()}`;
+      // Heredamos la company_id del lead (FK ya poblada en backfill).
+      // Si por alguna razón el lead viene sin FK pero con texto, hacemos
+      // un name-match fallback contra scouter_companies.
+      let companyId: string | null = (lead as any).company_id ?? null;
+      if (!companyId && lead.company) {
+        const { data: scRow } = await supabase
+          .from("scouter_companies")
+          .select("id")
+          .ilike("name", lead.company)
+          .maybeSingle();
+        companyId = (scRow as any)?.id ?? null;
+      }
       await supabase.from("closers_contacts").insert({
         name: lead.model_handle,
         handle: lead.model_handle,
@@ -39,9 +51,10 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
         country_code: lead.country_code,
         phone: lead.phone_raw,
         company: lead.company,
+        company_id: companyId,
         ticket_number: ticketId,
         created_by: user.id,
-      });
+      } as any);
 
       // Mark lead as "contactado"
       const { error: updateError } = await supabase
