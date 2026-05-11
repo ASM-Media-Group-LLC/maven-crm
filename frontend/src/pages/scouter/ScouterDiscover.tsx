@@ -1328,18 +1328,28 @@ const CompanyPickerModal = ({
   onChange: (next: string[] | "all") => void;
 }) => {
   const allMode = selected === "all";
-  const set = allMode ? new Set<string>() : new Set(selected as string[]);
+  // Cuando estamos en allMode, internamente todas las compañías están
+  // marcadas — el set tiene que reflejarlo para que los checkmarks
+  // individuales se vean activos en la UI.
+  const set = allMode
+    ? new Set(companies.map((c) => c.id))
+    : new Set(selected as string[]);
 
   const toggle = (id: string) => {
     if (allMode) {
-      // Salir de "all" → empezar con solo este id deseleccionado
-      const next = companies.filter((c) => c.id !== id).map((c) => c.id);
-      onChange(next);
+      // Click en una compañía estando en "Todas" → la intuición es
+      // "elegir solo esta", no "todas excepto esta". El user lo
+      // confirmó: "si selecciono una sola, me muestra todas menos la
+      // que quise seleccionar".
+      onChange([id]);
       return;
     }
     const arr = selected as string[];
-    if (arr.includes(id)) onChange(arr.filter((x) => x !== id));
-    else {
+    if (arr.includes(id)) {
+      const next = arr.filter((x) => x !== id);
+      // Si quedó vacío, volvemos a "all" (sino el bot no busca nada).
+      onChange(next.length === 0 ? "all" : next);
+    } else {
       const next = [...arr, id];
       // Si quedaron TODAS marcadas, volvemos al modo "all" canónico
       if (next.length === companies.length) onChange("all");
@@ -1372,24 +1382,20 @@ const CompanyPickerModal = ({
           </button>
           <div className="h-px bg-border/40 my-1" />
           {companies.map((c) => {
-            const isOn = allMode || set.has(c.id);
+            const isOn = set.has(c.id);
             return (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => toggle(c.id)}
                 className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors ${
-                  isOn && !allMode
+                  isOn
                     ? "border-primary bg-primary/10"
                     : "border-border hover:border-primary/40"
                 }`}
               >
                 <span>{c.name}</span>
-                {isOn && (
-                  <Check
-                    className={`h-4 w-4 ${allMode ? "text-muted-foreground/50" : "text-primary"}`}
-                  />
-                )}
+                {isOn && <Check className="h-4 w-4 text-primary" />}
               </button>
             );
           })}
