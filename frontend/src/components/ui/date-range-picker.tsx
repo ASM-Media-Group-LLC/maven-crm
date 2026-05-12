@@ -158,19 +158,40 @@ function DateRangePicker({
       ? `${format(from, "d MMM yyyy", { locale: es })}`
       : placeholder;
 
+  // Trigger estándar Maven: el botón es VISIBLE — tinte primary + icon
+  // chip + halo en hover. Cualquier sitio de Maven que use este picker
+  // hereda el look automáticamente. Si hay rango activo, el botón resalta
+  // más (gradiente más saturado + chip "Activo").
+  const hasRange = !!from;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           className={cn(
-            "justify-start text-left font-normal",
-            !from && "text-muted-foreground",
+            "group h-10 justify-start gap-2 rounded-lg px-3 text-sm font-medium transition-all",
+            hasRange
+              ? "border-primary/45 bg-gradient-to-r from-primary/15 to-primary/5 text-foreground hover:from-primary/25 hover:to-primary/10 hover:border-primary/65 hover:shadow-[0_0_22px_-6px_hsl(var(--primary)/0.55)]"
+              : "border-primary/30 bg-gradient-to-r from-primary/8 to-primary/[0.03] text-foreground/90 hover:from-primary/15 hover:to-primary/5 hover:border-primary/50 hover:shadow-[0_0_22px_-6px_hsl(var(--primary)/0.45)]",
             className
           )}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {triggerLabel}
+          <div
+            className={cn(
+              "flex h-6 w-6 items-center justify-center rounded-md ring-1 transition-colors",
+              hasRange
+                ? "bg-primary/25 ring-primary/40 group-hover:bg-primary/35 group-hover:ring-primary/55"
+                : "bg-primary/15 ring-primary/25 group-hover:bg-primary/25 group-hover:ring-primary/40"
+            )}
+          >
+            <CalendarIcon className="h-3.5 w-3.5 text-primary" />
+          </div>
+          <span className="truncate">{triggerLabel}</span>
+          {hasRange && (
+            <span className="ml-1 shrink-0 rounded-full bg-primary/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+              Activo
+            </span>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 max-w-[calc(100vw-32px)]" align="center" sideOffset={4} collisionPadding={16}>

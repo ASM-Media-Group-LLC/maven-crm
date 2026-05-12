@@ -7,7 +7,7 @@ import DataTableShell from "@/components/ui/data-table-shell";
 import { useCloserLeads, PLATFORMS, type DateFieldType, type CloserCreatorRow } from "./hooks/useCloserLeads";
 import { useClosersKpiPopup } from "./hooks/useClosersKpiPopup";
 import ClosersKPICards from "./components/ClosersKPICards";
-import KpiDetailDialog from "@/components/dashboard/KpiDetailDialog";
+import ClosersKpiDetailDialog from "./components/ClosersKpiDetailDialog";
 import CloserTable from "./components/LeadTable";
 import AssignCloserDialog from "./components/AssignCloserDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -46,7 +46,7 @@ const ClosersContent = () => {
   const queryClient = useQueryClient();
   type KpiPopupState = { kind: "pipeline"; key: "total" | "asignadas" | "confirmadas" | "completadas" | "cerradas" | "no_interesadas" } | { kind: "revenue"; platform: string };
   const [kpiPopup, setKpiPopup] = useState<KpiPopupState | null>(null);
-  const { data: kpiPopupRows = [] } = useClosersKpiPopup(kpiPopup);
+  const { data: kpiPopupResult, isLoading: kpiPopupLoading } = useClosersKpiPopup(kpiPopup);
   // Subtab top-level — Dashboard (KPI cards) vs Operaciones (tabs/filtros/tabla)
   const [viewTab, setViewTab] = useState<"dashboard" | "operaciones">("dashboard");
 
@@ -315,7 +315,7 @@ const ClosersContent = () => {
         }}
       />
 
-      <KpiDetailDialog
+      <ClosersKpiDetailDialog
         open={kpiPopup !== null}
         onOpenChange={(o) => !o && setKpiPopup(null)}
         title={(() => {
@@ -327,7 +327,9 @@ const ClosersContent = () => {
           return `Revenue ${kpiPopup.platform}`;
         })()}
         subtitle={kpiPopup?.kind === "revenue" ? "Detalle por creadora" : undefined}
-        rows={kpiPopupRows}
+        result={kpiPopupResult}
+        isLoading={kpiPopupLoading}
+        popupKey={kpiPopup ? (kpiPopup.kind === "pipeline" ? `pipeline:${kpiPopup.key}` : `revenue:${kpiPopup.platform}`) : null}
       />
     </main>
   );
