@@ -278,7 +278,7 @@ export default function ReportesPage() {
             {creatorSales.length === 0 ? (
               <div className="col-span-full text-center text-muted-foreground py-12">Sin datos.</div>
             ) : creatorSales.map((r, i) => (
-              <div key={i} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+              <div key={i} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 hover:border-primary/40 transition-colors">
                 <p className="text-sm font-medium truncate">{r.name}</p>
                 <p className="text-xl font-bold text-foreground mt-2">{fmt(r.totalFacturado)}</p>
                 <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
@@ -322,7 +322,7 @@ export default function ReportesPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {methodEntries.map(([method, data]) => (
-                  <div key={method} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                  <div key={method} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 hover:border-primary/40 transition-colors">
                     <p className="text-sm font-medium">{method}</p>
                     <p className="text-xl font-bold text-foreground mt-2">{fmt(data.total)}</p>
                     <p className="text-xs text-muted-foreground mt-1">{data.count} invoices · {grandTotal > 0 ? ((data.total / grandTotal) * 100).toFixed(1) : 0}%</p>
@@ -454,7 +454,7 @@ export default function ReportesPage() {
       {filtered.length === 0 ? (
         <div className="col-span-full text-center text-muted-foreground py-12">Sin reportes.</div>
       ) : filtered.map(r => (
-        <div key={r.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+        <div key={r.id} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 hover:border-primary/40 transition-colors">
           <div className="flex items-center justify-between mb-2">
             <Badge variant="outline" className="text-[10px]">{(r.format || "csv").toUpperCase()}</Badge>
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => setDeleteItem(r)}><Trash2 className="h-3 w-3" /></Button>

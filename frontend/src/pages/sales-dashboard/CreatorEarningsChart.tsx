@@ -50,7 +50,7 @@ const CreatorEarningsChart = ({ rows, earningsMode }: Props) => {
   }, [rows, active, factor]);
 
   return (
-    <div className="rounded-lg border border-border bg-card p-6 space-y-4">
+    <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">Earnings ({earningsMode === "net" ? "Net" : "Gross"})</h3>
       </div>

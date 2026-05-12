@@ -205,7 +205,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 rounded-lg border border-border bg-card p-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 rounded-xl border border-white/10 bg-white/5 p-5">
         {/* Agencia Asignada */}
         {isEditing ? (
           <EditField label="Agencia Asignada">
@@ -308,7 +308,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
         {biz?.commission_type === "tiered" && Array.isArray(biz?.commission_tiers) && (biz.commission_tiers as any[]).length > 0 ? (
           <div className="py-3 sm:col-span-2">
             <p className="text-xs text-muted-foreground mb-1">Comisión por Rangos</p>
-            <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-1">
               {(biz.commission_tiers as any[]).map((t: any, i: number) => (
                 <p key={i} className="text-sm">
                   ${t.min_revenue?.toLocaleString()} – {t.max_revenue != null ? `$${t.max_revenue.toLocaleString()}` : "∞"}: <span className="font-semibold">{t.percentage}%</span>

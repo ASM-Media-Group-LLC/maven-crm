@@ -143,7 +143,7 @@ export default function ControlFinancieroPage() {
             {ccEntries.length === 0 ? (
               <div className="col-span-full text-center text-muted-foreground py-8">Sin datos.</div>
             ) : ccEntries.map(([cc, total]) => (
-              <div key={cc} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+              <div key={cc} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 hover:border-primary/40 transition-colors">
                 <p className="text-sm font-medium truncate">{cc}</p>
                 <p className="text-xl font-bold text-foreground mt-2">{fmt(total)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{egresos > 0 ? ((total / egresos) * 100).toFixed(1) : 0}% del total</p>
@@ -183,7 +183,7 @@ export default function ControlFinancieroPage() {
             {deptEntries.length === 0 ? (
               <div className="col-span-full text-center text-muted-foreground py-8">Sin datos.</div>
             ) : deptEntries.map(([dept, data]) => (
-              <div key={dept} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+              <div key={dept} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 hover:border-primary/40 transition-colors">
                 <p className="text-sm font-medium truncate">{dept}</p>
                 <p className="text-xl font-bold text-foreground mt-2">{fmt(data.totalSalary)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{data.count} empleados · {totalSalaries > 0 ? ((data.totalSalary / totalSalaries) * 100).toFixed(1) : 0}%</p>
@@ -225,7 +225,7 @@ export default function ControlFinancieroPage() {
             {empProductivity.length === 0 ? (
               <div className="col-span-full text-center text-muted-foreground py-8">Sin empleados activos.</div>
             ) : empProductivity.map((e, i) => (
-              <div key={i} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+              <div key={i} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 hover:border-primary/40 transition-colors">
                 <p className="text-sm font-medium truncate">{e.name}</p>
                 <p className="text-xl font-bold text-foreground mt-2">{fmt(e.salary)}</p>
                 <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">

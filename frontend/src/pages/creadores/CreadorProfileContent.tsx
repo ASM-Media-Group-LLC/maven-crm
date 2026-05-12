@@ -95,7 +95,7 @@ function OffboardingSummaryCard({ creatorId }: { creatorId: string }) {
     <div className="mx-6 mt-4">
       <Link
         to={`/creadores/offboarding/${offboarding.id}`}
-        className="flex items-center gap-4 rounded-lg border border-border p-4 hover:bg-muted/40 transition-colors group"
+        className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 hover:border-primary/40 transition-colors group"
       >
         <div className="h-9 w-9 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0">
           <LogOut className="h-4 w-4 text-destructive" />

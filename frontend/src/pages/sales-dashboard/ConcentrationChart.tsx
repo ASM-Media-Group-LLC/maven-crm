@@ -120,7 +120,7 @@ const ConcentrationChart = ({ rows, comparedRows, earningsMode }: Props) => {
   })();
 
   return (
-    <div className="rounded-lg border border-border bg-card p-6 space-y-4">
+    <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">

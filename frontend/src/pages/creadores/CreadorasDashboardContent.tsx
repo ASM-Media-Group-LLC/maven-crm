@@ -470,7 +470,7 @@ const CreadorasDashboardContent = () => {
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                   {stats.map((s) => (
-                    <div key={s.label} className="rounded-lg border border-border bg-card p-3">
+                    <div key={s.label} className="rounded-xl border border-white/10 bg-white/5 p-3">
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{s.label}</p>
                       <p className="text-sm font-medium truncate">{s.value}</p>
                     </div>

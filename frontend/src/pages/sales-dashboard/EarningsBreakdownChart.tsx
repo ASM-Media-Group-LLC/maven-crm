@@ -43,7 +43,7 @@ const EarningsBreakdownChart = ({ rows, earningsMode }: Props) => {
   }, [rows, factor]);
 
   return (
-    <div className="rounded-lg border border-border bg-card p-6 space-y-4">
+    <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-4">
       <h3 className="text-sm font-semibold text-foreground">Earnings breakdown ({earningsMode === "net" ? "Net" : "Gross"})</h3>
       <div className="flex items-start gap-6">
         <div className="h-48 w-48 shrink-0">

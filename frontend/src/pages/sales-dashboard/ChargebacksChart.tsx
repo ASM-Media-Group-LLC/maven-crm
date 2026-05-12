@@ -24,7 +24,7 @@ const ChargebacksChart = ({ rows, earningsMode }: Props) => {
   }, [rows]);
 
   return (
-    <div className="rounded-lg border border-border bg-card p-6 space-y-4">
+    <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-4">
       <h3 className="text-sm font-semibold text-foreground">Chargebacks</h3>
       <div className="h-48">
         {data.length === 0 ? (

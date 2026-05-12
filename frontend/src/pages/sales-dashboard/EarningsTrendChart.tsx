@@ -64,7 +64,7 @@ const EarningsTrendChart = ({ rows, comparedRows, earningsMode }: Props) => {
   const hasComparison = comparedRows && comparedRows.length > 0;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-6 space-y-4">
+    <div className="rounded-xl border border-white/10 bg-white/5 p-6 space-y-4">
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Tendencias de Ganancias
       </h3>
