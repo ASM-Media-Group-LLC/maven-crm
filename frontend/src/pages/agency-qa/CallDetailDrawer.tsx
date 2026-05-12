@@ -47,7 +47,6 @@ import {
   useQaCall,
   useQaAudioSignedUrl,
   scoreColor,
-  OUTCOME_META,
   useQaHumanFeedback,
   useCreateQaHumanFeedback,
   useAnalyzeQaCall,
@@ -55,10 +54,10 @@ import {
   useUpsertQaSectionFeedback,
   useDeleteQaSectionFeedback,
   type CallAnalysis,
-  type CallOutcome,
   type QaSectionFeedback,
   type QaSectionType,
 } from "@/hooks/useAgencyQa";
+import OutcomeBadge from "@/components/agency-qa/OutcomeBadge";
 
 // CallDetailDrawer — opens when a row is clicked in AgencyCalls.
 // Reads claude_analysis (jsonb) and renders the full kash QA report:
@@ -90,20 +89,6 @@ const Avatar = ({ name, dataUrl, size = 36 }: { name: string; dataUrl: string | 
       style={{ width: size, height: size, background: bg }}
     >
       {dataUrl ? <img src={dataUrl} alt="" className="h-full w-full object-cover" /> : initial}
-    </span>
-  );
-};
-
-const OutcomeBadge = ({ outcome }: { outcome: CallOutcome | undefined }) => {
-  if (!outcome || !(outcome in OUTCOME_META)) return null;
-  const c = OUTCOME_META[outcome as keyof typeof OUTCOME_META];
-  return (
-    <span
-      className="inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-bold text-white"
-      style={{ background: c.bg }}
-    >
-      <span aria-hidden>{c.icon}</span>
-      {c.label}
     </span>
   );
 };
@@ -593,7 +578,7 @@ const CallDetailDrawer = ({
                 </span>
               </div>
               <div className="pt-1.5">
-                <OutcomeBadge outcome={a.call_outcome} />
+                <OutcomeBadge outcome={a.call_outcome} size="md" />
                 {a.call_outcome_reason && (
                   <p className="mt-1.5 text-xs text-muted-foreground">{a.call_outcome_reason}</p>
                 )}

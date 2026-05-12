@@ -44,7 +44,6 @@ import { useMyProfile } from "@/hooks/useUserProfile";
 import {
   useQaCall,
   useQaAudioSignedUrl,
-  OUTCOME_META,
   useQaHumanFeedback,
   useCreateQaHumanFeedback,
   useAnalyzeQaCall,
@@ -53,10 +52,10 @@ import {
   useUpsertQaSectionFeedback,
   useDeleteQaSectionFeedback,
   type CallAnalysis,
-  type CallOutcome,
   type QaSectionFeedback,
   type QaSectionType,
 } from "@/hooks/useAgencyQa";
+import OutcomeBadge from "@/components/agency-qa/OutcomeBadge";
 
 // CallDetailPage — port directo de Kash (kash-call-qa/app/calls/[id]/page.tsx)
 // con la paleta de colores de Maven: el dorado (--gold #c9a96e) se reemplaza
@@ -377,32 +376,6 @@ const HeroAvatar = ({
       ) : (
         initial
       )}
-    </span>
-  );
-};
-
-// ─── OutcomePill ───────────────────────────────────────────────
-const OutcomePill = ({
-  outcome,
-  size = "default",
-}: {
-  outcome: CallOutcome | undefined;
-  size?: "default" | "lg";
-}) => {
-  if (!outcome || !(outcome in OUTCOME_META)) return null;
-  const c = OUTCOME_META[outcome as keyof typeof OUTCOME_META];
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-2 rounded-full font-bold text-white shadow-md",
-        size === "lg" ? "h-9 px-4 text-sm" : "h-7 px-3 text-xs"
-      )}
-      style={{ background: c.bg }}
-    >
-      <span aria-hidden className="text-base">
-        {c.icon}
-      </span>
-      {c.label}
     </span>
   );
 };
@@ -1543,7 +1516,7 @@ const CallDetailPage = ({
               <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                 Score IA
               </span>
-              <OutcomePill outcome={analysis.call_outcome} size="lg" />
+              <OutcomeBadge outcome={analysis.call_outcome} size="lg" shadow />
             </div>
           </div>
         </div>

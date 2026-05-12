@@ -23,10 +23,10 @@ import {
   useQaModels,
   useFireQaWebhook,
   scoreColor,
-  OUTCOME_META,
   type QaCallRow,
   type CallOutcome,
 } from "@/hooks/useAgencyQa";
+import OutcomeBadge from "@/components/agency-qa/OutcomeBadge";
 
 // Calls subtab — Kash-style table with model avatar, closer, evaluator,
 // outcome badge, score pill, and resend email button.
@@ -76,22 +76,12 @@ const Avatar = ({
   );
 };
 
-const OutcomeBadge = ({ outcome }: { outcome: CallOutcome }) => {
-  if (!outcome || !(outcome in OUTCOME_META)) {
-    return (
-      <span className="inline-flex h-6 items-center rounded-full bg-muted/40 px-2 text-[11px] font-semibold text-muted-foreground">
-        —
-      </span>
-    );
-  }
-  const c = OUTCOME_META[outcome as keyof typeof OUTCOME_META];
+const OutcomeBadgeWithFallback = ({ outcome }: { outcome: CallOutcome }) => {
+  const badge = <OutcomeBadge outcome={outcome} size="sm" />;
+  if (badge) return badge;
   return (
-    <span
-      className="inline-flex h-6 items-center gap-1 rounded-full px-2.5 text-[11px] font-bold text-white"
-      style={{ background: c.bg }}
-    >
-      <span aria-hidden>{c.icon}</span>
-      {c.label}
+    <span className="inline-flex h-6 items-center rounded-full bg-muted/40 px-2 text-[11px] font-semibold text-muted-foreground">
+      —
     </span>
   );
 };
@@ -327,7 +317,7 @@ const AgencyCalls = ({ onOpenDetail }: AgencyCallsProps) => {
                       {row.evaluator_name}
                     </TableCell>
                     <TableCell>
-                      <OutcomeBadge outcome={outcome} />
+                      <OutcomeBadgeWithFallback outcome={outcome} />
                     </TableCell>
                     <TableCell className="text-right">
                       <ScorePill score={row.claude_score} />
