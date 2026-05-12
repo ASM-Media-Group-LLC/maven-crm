@@ -60,7 +60,7 @@ const Notificaciones = () => {
     <HRLayout>
       <div className="h-full flex flex-col">
         {/* Fixed Header + Filters */}
-        <div className="shrink-0 border-b bg-background px-4 py-4 md:px-6 space-y-4">
+        <div className="shrink-0 border-b border-white/10 bg-background/60 backdrop-blur-xl px-4 py-4 md:px-6 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bell className="h-5 w-5 text-primary" />

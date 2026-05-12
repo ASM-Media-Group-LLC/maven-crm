@@ -80,7 +80,7 @@ const AiSales = () => {
   return (
     <main className="flex flex-1 flex-col overflow-hidden">
       {/* Topbar fijo con VentasSubtabs */}
-      <div className="border-b border-border bg-background px-6 py-3 shrink-0">
+      <div className="border-b border-white/10 bg-background/60 backdrop-blur-xl px-6 py-3 shrink-0">
         <VentasSubtabs />
       </div>
 

@@ -106,7 +106,7 @@ export default function HRIncidentNew() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="shrink-0 border-b bg-background px-6 py-4">
+      <div className="shrink-0 border-b border-white/10 bg-background/60 backdrop-blur-xl px-6 py-4">
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/incidentes")}>
           <ArrowLeft className="h-4 w-4 mr-1" />Volver a Incidentes
         </Button>
@@ -117,7 +117,7 @@ export default function HRIncidentNew() {
       </div>
 
       {/* Stepper */}
-      <div className="shrink-0 border-b bg-background px-6 py-3 space-y-3">
+      <div className="shrink-0 border-b border-white/10 bg-background/60 backdrop-blur-xl px-6 py-3 space-y-3">
         <div className="flex items-center gap-0">
           {STEPS.map((s, i) => {
             const Icon = s.icon;

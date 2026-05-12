@@ -122,7 +122,7 @@ export default function HRPerformanceNew() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="shrink-0 border-b bg-background px-6 py-4">
+      <div className="shrink-0 border-b border-white/10 bg-background/60 backdrop-blur-xl px-6 py-4">
         <Button variant="ghost" size="icon" className="mb-2 -ml-2" onClick={() => navigate("/hr/desempeno")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -133,7 +133,7 @@ export default function HRPerformanceNew() {
       </div>
 
       {/* Stepper */}
-      <div className="shrink-0 border-b bg-background px-6 py-3 space-y-3">
+      <div className="shrink-0 border-b border-white/10 bg-background/60 backdrop-blur-xl px-6 py-3 space-y-3">
         <div className="flex items-center gap-0">
           {STEPS.map((s, i) => {
             const Icon = s.icon;

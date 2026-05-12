@@ -302,7 +302,7 @@ const DashboardContent = () => {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Fixed Header */}
-      <header className="shrink-0 bg-background border-b border-border px-6 py-4">
+      <header className="shrink-0 bg-background/60 backdrop-blur-xl border-b border-white/10 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>

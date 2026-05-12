@@ -76,7 +76,7 @@ const SalesOverview = () => {
       {/* Topbar fijo con VentasSubtabs — misma posición en /sales-overview,
           /salesdashboard, /aisales y /sales-audit para que cambiar de tab
           no genere salto visual. */}
-      <div className="border-b border-border bg-background px-6 py-3 shrink-0">
+      <div className="border-b border-white/10 bg-background/60 backdrop-blur-xl px-6 py-3 shrink-0">
         <VentasSubtabs />
       </div>
       {!isLoading && (

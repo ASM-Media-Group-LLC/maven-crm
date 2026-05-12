@@ -85,7 +85,7 @@ export default function HRDeductionNew() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="shrink-0 border-b bg-background px-6 py-4">
+      <div className="shrink-0 border-b border-white/10 bg-background/60 backdrop-blur-xl px-6 py-4">
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/deducciones")}>
           <ArrowLeft className="h-4 w-4 mr-1" />Volver a Deducciones
         </Button>
