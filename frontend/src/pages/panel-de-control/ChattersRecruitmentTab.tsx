@@ -36,6 +36,7 @@ import {
   type ChattersRange,
 } from "@/hooks/useChattersRecruitment";
 import { cn } from "@/lib/utils";
+import { ListRow } from "@/components/ui/list-row";
 
 // ─── KPI card (mismo lenguaje visual que el tab modelos) ───────────────
 interface KpiCardProps {
@@ -146,10 +147,7 @@ const DetailDialog = ({
             </p>
           ) : (
             data.map((row) => (
-              <div
-                key={row.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2 text-sm"
-              >
+              <ListRow key={row.id} className="justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="font-medium truncate">{row.primary}</p>
                   {row.secondary && (
@@ -173,7 +171,7 @@ const DetailDialog = ({
                     </span>
                   )}
                 </div>
-              </div>
+              </ListRow>
             ))
           )}
         </div>

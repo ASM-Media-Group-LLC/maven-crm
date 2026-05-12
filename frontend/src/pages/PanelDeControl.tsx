@@ -50,6 +50,7 @@ import {
   type DetailRow,
 } from "@/hooks/useOperationsDashboard";
 import { cn } from "@/lib/utils";
+import { ListRow } from "@/components/ui/list-row";
 import SpammerAccountsTab from "./panel-de-control/SpammerAccountsTab";
 import ControlGastoTab from "./panel-de-control/ControlGastoTab";
 import ChattersRecruitmentTab from "./panel-de-control/ChattersRecruitmentTab";
@@ -559,13 +560,11 @@ const renderRow = (
   };
   const isClickable = !!row.linkUrl || !!row.leadSource;
   return (
-    <div
+    <ListRow
       key={row.id}
+      interactive={isClickable}
       onClick={handleRowClick}
-      className={cn(
-        "flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2 text-sm transition-colors",
-        isClickable && "cursor-pointer hover:bg-accent hover:border-primary/40",
-      )}
+      className="justify-between"
     >
       <div className="min-w-0 flex-1">
         <p className="font-medium truncate">{row.primary}</p>
@@ -590,7 +589,7 @@ const renderRow = (
           <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
         )}
       </div>
-    </div>
+    </ListRow>
   );
 };
 

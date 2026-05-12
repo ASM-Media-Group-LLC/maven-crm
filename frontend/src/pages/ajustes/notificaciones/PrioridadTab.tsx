@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ListRow } from "@/components/ui/list-row";
 import { AlertTriangle, AlertCircle, Info } from "lucide-react";
 
 const PRIORITY_LEVELS = [
@@ -26,10 +27,7 @@ const PrioridadTab = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {PRIORITY_LEVELS.map(({ key, label, desc, icon: Icon, color }) => (
-          <div
-            key={key}
-            className="flex items-center justify-between rounded-xl border border-border px-4 py-3"
-          >
+          <ListRow key={key} className="justify-between px-4 py-3">
             <div className="flex items-start gap-3">
               <Icon className={`h-4 w-4 mt-0.5 ${color}`} />
               <div>
@@ -49,7 +47,7 @@ const PrioridadTab = () => {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </ListRow>
         ))}
         <p className="text-[11px] text-muted-foreground px-1">
           Nota: Los modos Popup y Banner estarán disponibles en futuras versiones. Actualmente todas las notificaciones se entregan al Notification Center.

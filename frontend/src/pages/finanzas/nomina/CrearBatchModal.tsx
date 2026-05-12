@@ -5,6 +5,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { listRowBase, listRowInteractive } from "@/components/ui/list-row";
+import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -47,7 +49,7 @@ export default function CrearBatchModal({ open, onClose, periods, onSubmit, isPe
             {eligible.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No hay periodos elegibles para cierre.</p>
             ) : eligible.map(p => (
-              <label key={p.id} className="flex items-center gap-3 rounded-xl border border-border p-3 cursor-pointer hover:bg-muted/30 transition-colors">
+              <label key={p.id} className={cn(listRowBase, listRowInteractive, "p-3")}>
                 <Checkbox checked={selected.includes(p.id)} onCheckedChange={() => toggle(p.id)} />
                 <div className="flex-1">
                   <span className="text-sm font-medium">{p.period_name}</span>

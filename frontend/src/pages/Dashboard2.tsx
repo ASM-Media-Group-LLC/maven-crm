@@ -34,6 +34,7 @@ import {
   Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { ListRow, ListRowButton } from "@/components/ui/list-row";
 import {
   PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -995,7 +996,7 @@ const Dashboard2 = () => {
                         ) : (
                           <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
                             {activeItems.map((a, i) => (
-                              <div key={i} className="flex items-center gap-3 rounded-xl border border-border bg-card/80 px-3 py-2">
+                              <ListRow key={i}>
                                 <span className="text-xs text-muted-foreground tabular-nums w-5 shrink-0">{i + 1}</span>
                                 {a.creator.instagramHandle && (
                                   <a href={`https://instagram.com/${a.creator.instagramHandle.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0">
@@ -1006,7 +1007,7 @@ const Dashboard2 = () => {
                                   {a.creator.name}
                                 </button>
                                 <span className="text-sm text-muted-foreground flex-1">{a.detail}</span>
-                              </div>
+                              </ListRow>
                             ))}
                           </div>
                         )}
@@ -1253,9 +1254,8 @@ const Dashboard2 = () => {
                         kpiListOpen === "revenue" ? b.total - a.total : a.name.localeCompare(b.name),
                       )
                       .map((c, idx) => (
-                        <button
+                        <ListRowButton
                           key={c.creatorId}
-                          type="button"
                           onClick={() => {
                             // No cerramos el popup — dejamos ?kpi=… en
                             // la URL para que al dar back desde el
@@ -1263,7 +1263,7 @@ const Dashboard2 = () => {
                             // exactamente donde el user estaba.
                             navigate(`/creadores/${c.creatorId}`);
                           }}
-                          className="flex items-center justify-between w-full gap-3 rounded-xl border border-border bg-card px-3 py-2 text-sm transition-colors cursor-pointer hover:bg-accent hover:border-primary/40 text-left"
+                          className="justify-between"
                         >
                           <div className="min-w-0 flex-1 flex items-center gap-2">
                             <span className="text-[10px] text-muted-foreground tabular-nums w-6 shrink-0">
@@ -1280,7 +1280,7 @@ const Dashboard2 = () => {
                             </span>
                             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
                           </div>
-                        </button>
+                        </ListRowButton>
                       ))
                   )}
                 </div>
@@ -2065,7 +2065,7 @@ const Dashboard2 = () => {
                         ) : (
                           <div className="space-y-1.5">
                             {items.map((a, i) => (
-                              <div key={i} className="flex items-center gap-3 rounded-xl border border-border bg-card/80 px-3 py-2.5">
+                              <ListRow key={i} className="py-2.5">
                                 <span className="text-xs text-muted-foreground tabular-nums w-5 shrink-0 font-bold">{i + 1}</span>
                                 <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${a.creator.creatorId}`)}>
                                   {a.creator.name}
@@ -2074,7 +2074,7 @@ const Dashboard2 = () => {
                                 <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
                                   {a.creator.activeFans > 0 ? `${a.creator.activeFans} fans` : ""}
                                 </span>
-                              </div>
+                              </ListRow>
                             ))}
                           </div>
                         )}
@@ -2211,12 +2211,12 @@ const Dashboard2 = () => {
                                 const prev = prevMonthMap.get(c.creatorId) ?? 0;
                                 const pct = prev > 0 ? ((c.total - prev) / prev * 100) : 0;
                                 return (
-                                  <div key={c.creatorId} className="flex items-center gap-3 rounded-xl border border-border bg-card/80 px-3 py-2">
+                                  <ListRow key={c.creatorId}>
                                     <span className="text-xs text-muted-foreground tabular-nums w-5">{i + 1}</span>
                                     <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
                                     <span className="text-sm tabular-nums font-semibold">{fmtShort(c.total)}</span>
                                     <span className="text-xs tabular-nums text-emerald-500 font-bold ml-auto">↑{pct.toFixed(0)}%</span>
-                                  </div>
+                                  </ListRow>
                                 );
                               })}
                             </div>
@@ -2232,13 +2232,13 @@ const Dashboard2 = () => {
                           {lowMonetization.length === 0 ? <p className="text-sm text-muted-foreground">Sin creadoras en esta categoría</p> : (
                             <div className="space-y-1.5">
                               {lowMonetization.map((c, i) => (
-                                <div key={c.creatorId} className="flex items-center gap-3 rounded-xl border border-border bg-card/80 px-3 py-2">
+                                <ListRow key={c.creatorId}>
                                   <span className="text-xs text-muted-foreground tabular-nums w-5">{i + 1}</span>
                                   <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
                                   <span className="text-sm tabular-nums">{fmtShort(c.total)}</span>
                                   <span className="text-xs text-muted-foreground">{c.activeFans} fans</span>
                                   <span className="text-xs tabular-nums text-blue-500 font-bold ml-auto">{fmt(c.avgPerFan)}/fan</span>
-                                </div>
+                                </ListRow>
                               ))}
                             </div>
                           )}
@@ -2253,13 +2253,13 @@ const Dashboard2 = () => {
                           {underperforming.length === 0 ? <p className="text-sm text-muted-foreground">Sin creadoras en esta categoría</p> : (
                             <div className="space-y-1.5">
                               {underperforming.map((c, i) => (
-                                <div key={c.creatorId} className="flex items-center gap-3 rounded-xl border border-border bg-card/80 px-3 py-2">
+                                <ListRow key={c.creatorId}>
                                   <span className="text-xs text-muted-foreground tabular-nums w-5">{i + 1}</span>
                                   <button className="font-medium text-sm text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors text-left min-w-[120px]" onClick={() => navigate(`/creadores/${c.creatorId}`)}>{c.name}</button>
                                   <span className="text-sm tabular-nums">{fmtShort(c.total)}</span>
                                   <span className="text-xs text-muted-foreground">{c.activeFans} fans</span>
                                   <span className="text-xs tabular-nums text-purple-500 font-bold ml-auto">{fmt(c.avgPerFan)}/fan</span>
-                                </div>
+                                </ListRow>
                               ))}
                             </div>
                           )}
