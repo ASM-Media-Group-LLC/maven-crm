@@ -208,7 +208,7 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
 
             {/* Instagram */}
             {contacto.instagram && (
-              <div className="flex items-center gap-3 border rounded-md p-3">
+              <div className="flex items-center gap-3 border rounded-xl p-3">
                 <InstagramIcon className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">Instagram / Handle</p>
@@ -227,7 +227,7 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
 
             {/* WhatsApp */}
             {contacto.whatsapp && (
-              <div className="flex items-center gap-3 border rounded-md p-3">
+              <div className="flex items-center gap-3 border rounded-xl p-3">
                 <MessageCircle className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">WhatsApp</p>
@@ -359,7 +359,7 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
               ) : (
                 <div className="space-y-3">
                   {interactions.map((inter: any) => (
-                    <div key={inter.id} className="border rounded-md p-3">
+                    <div key={inter.id} className="border rounded-xl p-3">
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
                           {inter.interaction_type === "llamada" ? (

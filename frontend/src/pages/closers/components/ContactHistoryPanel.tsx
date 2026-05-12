@@ -37,7 +37,7 @@ const ContactHistoryPanel = ({ creatorId }: Props) => {
       </div>
 
       {history.map((h) => (
-        <div key={h.id} className="border border-border rounded-md p-3 space-y-1">
+        <div key={h.id} className="border border-border rounded-xl p-3 space-y-1">
           <div className="flex items-center gap-2 text-xs">
             <span className="text-muted-foreground">{format(new Date(h.contact_date), "dd/MM/yyyy HH:mm")}</span>
             <Badge variant="secondary">{h.channel}</Badge>
@@ -58,7 +58,7 @@ const ContactHistoryPanel = ({ creatorId }: Props) => {
       )}
 
       {showForm && (
-        <div className="border border-border rounded-md p-3 space-y-3">
+        <div className="border border-border rounded-xl p-3 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Canal *</Label>

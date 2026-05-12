@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { ListRow } from "@/components/ui/list-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -92,7 +93,7 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
       </div>
 
       {sales.map((s) => (
-        <div key={s.id} className="flex items-center justify-between text-sm border border-border rounded-md px-2 py-1.5">
+        <ListRow key={s.id} className="justify-between px-2 py-1.5">
           <div className="flex items-center gap-2">
             <span className="font-medium">{s.platform}</span>
             {s.product && <span className="text-muted-foreground">– {s.product}</span>}
@@ -103,7 +104,7 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
               <Trash2 className="h-3 w-3 text-destructive" />
             </Button>
           </div>
-        </div>
+        </ListRow>
       ))}
 
       {!showForm ? (

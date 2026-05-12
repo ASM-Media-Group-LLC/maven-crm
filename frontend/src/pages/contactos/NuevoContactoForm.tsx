@@ -453,7 +453,7 @@ const NuevoContactoForm = () => {
             {extraFiles.length > 0 && (
               <div className="space-y-2 mt-3">
                 {extraFiles.map((f, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                  <div key={i} className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">
                     <div className="flex items-center gap-2 min-w-0">
                       {getFileIcon(f.type)}
                       <span className="truncate">{f.name}</span>
@@ -513,7 +513,7 @@ const NuevoContactoForm = () => {
           </DialogHeader>
           {existingContactData && (
             <div className="space-y-3 py-2">
-              <div className="rounded-md border border-border p-3 space-y-1 text-sm">
+              <div className="rounded-xl border border-border p-3 space-y-1 text-sm">
                 <p><span className="text-muted-foreground">Nombre:</span> <strong>{existingContactData.name}</strong></p>
                 {existingContactData.agentName && (
                   <p><span className="text-muted-foreground">Registrado por:</span> {existingContactData.agentName}</p>

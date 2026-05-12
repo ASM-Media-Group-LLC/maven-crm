@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ListRow } from "@/components/ui/list-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -112,7 +113,7 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Registradas</p>
               {sales.map((s) => (
-                <div key={s.id} className="flex items-center justify-between text-sm border border-border rounded-md px-3 py-2">
+                <ListRow key={s.id} className="justify-between">
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="text-xs">{s.platform}</Badge>
                     {s.product && <span className="text-muted-foreground text-xs">– {s.product}</span>}
@@ -123,7 +124,7 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
                       <Trash2 className="h-3 w-3 text-destructive" />
                     </Button>
                   </div>
-                </div>
+                </ListRow>
               ))}
             </div>
           )}

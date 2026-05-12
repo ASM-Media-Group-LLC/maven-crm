@@ -268,7 +268,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
                 {extraFiles.length > 0 && (
                   <div className="space-y-1.5 mt-2">
                     {extraFiles.map((f, i) => (
-                      <div key={i} className="flex items-center justify-between rounded-md border border-border px-3 py-1.5 text-sm">
+                      <div key={i} className="flex items-center justify-between rounded-xl border border-border px-3 py-1.5 text-sm">
                         <div className="flex items-center gap-2 min-w-0">
                           {getFileIcon(f.type)}
                           <span className="truncate">{f.name}</span>
