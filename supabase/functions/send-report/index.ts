@@ -158,13 +158,41 @@ Deno.serve(async (req) => {
       .from("report_recipients")
       .select("email")
       .eq("schedule_id", schedule_id);
-    const emails = (recipients ?? []).map((r: any) => r.email);
+    const rawEmails = (recipients ?? []).map((r: any) => r.email as string);
+
+    // Filtro de validación — mismo criterio que el frontend para evitar
+    // que Resend devuelva 422 si una dirección tiene formato roto.
+    const isValidEmail = (raw: string): boolean => {
+      const v = (raw ?? "").trim().toLowerCase();
+      if (!v || v.length > 254) return false;
+      const at = v.indexOf("@");
+      if (at < 1 || at !== v.lastIndexOf("@")) return false;
+      const local = v.slice(0, at);
+      const domain = v.slice(at + 1);
+      if (local.startsWith(".") || local.endsWith(".") || local.includes("..")) return false;
+      if (!/^[a-zA-Z0-9._%+-]+$/.test(local)) return false;
+      if (domain.startsWith(".") || domain.endsWith(".") || domain.includes("..")) return false;
+      if (!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) return false;
+      return true;
+    };
+    const emails = rawEmails.filter(isValidEmail);
+    const invalid = rawEmails.filter((e) => !isValidEmail(e));
+    if (invalid.length > 0) {
+      console.warn("[send-report] skipping invalid emails:", invalid);
+    }
     if (emails.length === 0) {
-      console.warn("[send-report] schedule sin destinatarios", schedule_id);
-      return new Response(JSON.stringify({ ok: true, sent: 0, reason: "no_recipients" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.warn("[send-report] no valid recipients", schedule_id, "invalid:", invalid);
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: "Sin destinatarios válidos",
+          invalid_emails: invalid,
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const module = schedule.module as Module;

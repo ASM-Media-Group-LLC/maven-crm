@@ -57,13 +57,30 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
     }
   }, [open, schedule]);
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // Email validation: local part no termina con punto, dominio tiene
+  // al menos un punto, no admite dobles puntos. Mismo criterio que
+  // Resend usa antes de mandar (sino devuelve 422 "Invalid `to` field").
+  const isValidEmail = (raw: string): boolean => {
+    const v = raw.trim().toLowerCase();
+    if (!v || v.length > 254) return false;
+    const at = v.indexOf("@");
+    if (at < 1 || at !== v.lastIndexOf("@")) return false;
+    const local = v.slice(0, at);
+    const domain = v.slice(at + 1);
+    if (local.startsWith(".") || local.endsWith(".") || local.includes("..")) return false;
+    if (!/^[a-zA-Z0-9._%+-]+$/.test(local)) return false;
+    if (domain.startsWith(".") || domain.endsWith(".") || domain.includes("..")) return false;
+    if (!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domain)) return false;
+    return true;
+  };
 
   const addEmail = () => {
     const v = emailInput.trim().toLowerCase();
     if (!v) return;
-    if (!emailRegex.test(v)) {
-      toast.error("Email inválido");
+    if (!isValidEmail(v)) {
+      toast.error("Email inválido", {
+        description: "Verificá que no tenga puntos antes/después del @ y que tenga un dominio válido.",
+      });
       return;
     }
     if (recipients.includes(v)) {
