@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
+import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
+import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import ContactosKPICards from "./ContactosKPICards";
 import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
 import ContactosCardList from "./ContactosCardList";
@@ -84,6 +86,9 @@ const ContactosContent = () => {
   const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
   type KpiKey = "total" | "nuevos" | "convertidos" | "esteMes";
   const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
+  // Estado del collapsed por categoría — mismo patrón que panel/
+  // dashboard v2: default top expandida, resto colapsadas.
+  const [kpiPopupCollapsed, setKpiPopupCollapsed] = useState<Set<string>>(new Set());
   const [viewOpen, setViewOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -494,7 +499,15 @@ const ContactosContent = () => {
       <ContactosAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} defaultTab={analyticsTab} />
 
       {/* KPI POPUP — al clickar un cuadro del Dashboard de Contactos */}
-      <Dialog open={kpiPopup !== null} onOpenChange={(o) => !o && setKpiPopup(null)}>
+      <Dialog
+        open={kpiPopup !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setKpiPopup(null);
+            setKpiPopupCollapsed(new Set());
+          }
+        }}
+      >
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -519,105 +532,164 @@ const ContactosContent = () => {
             <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
               Sin contactos.
             </div>
-          ) : (
-            <div className="space-y-2">
-              {kpiPopupContacts.map((c) => {
-                const cleanHandle = (c.handle || "").replace(/^@/, "");
-                const initials = (c.name || "")
-                  .split(/\s+/)
-                  .map((p) => p[0])
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .join("")
-                  .toUpperCase() || "?";
-                const created = c.created_at
-                  ? new Date(c.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
-                  : "—";
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => {
-                      const fullContacto = allContactos.find((x) => x.id === c.id);
-                      if (fullContacto) {
-                        setKpiPopup(null);
-                        handleView(fullContacto);
-                      } else {
-                        // Si no está en la página actual, abrir popup minimal con lo que hay
-                        const minimal: Contacto = {
-                          id: c.id,
-                          rawCreatedAt: c.created_at || "",
-                          creacion: created,
-                          ticket: "",
-                          nombre: c.name || "",
-                          estado: statusMap[c.status || ""] || c.status || "",
-                          instagram: c.handle || "",
-                          platform: "Instagram",
-                          pais: c.country_code || "",
-                          city: c.city || "",
-                          categoria: c.physical_appearance || "",
-                          whatsapp: "",
-                          interacciones: 0,
-                          creadoPor: "",
-                          email: "",
-                          phone: "",
-                          country_code: c.country_code || "",
-                          company: "",
-                          notes: "",
-                          source: "",
-                          profile_picture_url: c.profile_picture_url || "",
-                          assigned_to: "",
-                          onlyfans_url: "",
-                        };
-                        setKpiPopup(null);
-                        handleView(minimal);
-                      }
-                    }}
-                    className="group w-full rounded-xl border border-border bg-card p-3 text-left transition-all duration-200 ease-out hover:scale-[1.005] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.12)]"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 shrink-0">
-                        {c.profile_picture_url && <AvatarImage src={c.profile_picture_url} alt={c.name || ""} />}
-                        <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          {c.country_code && <span className="text-sm shrink-0">{getCountryFlag(c.country_code)}</span>}
-                          <p className="font-medium text-sm truncate">{c.name || "—"}</p>
-                          {c.physical_appearance && (
-                            <Badge variant="secondary-soft" className="font-normal text-[10px] px-1.5 py-0 shrink-0">
-                              {c.physical_appearance}
-                            </Badge>
-                          )}
-                        </div>
-                        {cleanHandle && (
-                          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                            <InstagramIcon className="h-3 w-3" />
-                            @{cleanHandle}
-                          </p>
-                        )}
+          ) : (() => {
+            // Agrupar por categoría (physical_appearance). Normalizamos
+            // a uppercase para mergear "b" y "B" en el mismo bucket.
+            // Los valores raw lowercase del DB se preservan al
+            // mostrarlos individualmente pero el agrupado usa la forma
+            // canónica.
+            const normalizeCat = (raw: string | null | undefined): string => {
+              const t = (raw ?? "").trim();
+              if (!t) return "Sin categoría";
+              // Mapeo: "b" → "B", "b+" → "B+", etc.
+              const lower = t.toLowerCase();
+              const map: Record<string, string> = {
+                "elite": "Elite",
+                "a+": "A+", "a": "A",
+                "b+": "B+", "b": "B",
+                "c+": "C+", "c": "C",
+              };
+              return map[lower] ?? t;
+            };
+            const buckets = new Map<string, typeof kpiPopupContacts>();
+            for (const c of kpiPopupContacts) {
+              const key = normalizeCat(c.physical_appearance);
+              const arr = buckets.get(key) ?? [];
+              arr.push(c);
+              buckets.set(key, arr);
+            }
+            const sortedCats = Array.from(buckets.keys()).sort((a, b) => {
+              const sa = CATEGORY_ORDER[a] ?? 999;
+              const sb = CATEGORY_ORDER[b] ?? 999;
+              if (sa !== sb) return sa - sb;
+              return a.localeCompare(b);
+            });
+            const effectiveCollapsed = kpiPopupCollapsed.size === 0
+              ? new Set(sortedCats.slice(1))
+              : kpiPopupCollapsed;
+            const toggleCat = (cat: string) => {
+              const base = kpiPopupCollapsed.size === 0
+                ? new Set(sortedCats.slice(1))
+                : new Set(kpiPopupCollapsed);
+              if (base.has(cat)) base.delete(cat);
+              else base.add(cat);
+              setKpiPopupCollapsed(base);
+            };
+            const renderContactRow = (c: typeof kpiPopupContacts[number]) => {
+              const cleanHandle = (c.handle || "").replace(/^@/, "");
+              const initials = (c.name || "")
+                .split(/\s+/)
+                .map((p) => p[0])
+                .filter(Boolean)
+                .slice(0, 2)
+                .join("")
+                .toUpperCase() || "?";
+              const created = c.created_at
+                ? new Date(c.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
+                : "—";
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    const fullContacto = allContactos.find((x) => x.id === c.id);
+                    if (fullContacto) {
+                      setKpiPopup(null);
+                      setKpiPopupCollapsed(new Set());
+                      handleView(fullContacto);
+                    } else {
+                      const minimal: Contacto = {
+                        id: c.id,
+                        rawCreatedAt: c.created_at || "",
+                        creacion: created,
+                        ticket: "",
+                        nombre: c.name || "",
+                        estado: statusMap[c.status || ""] || c.status || "",
+                        instagram: c.handle || "",
+                        platform: "Instagram",
+                        pais: c.country_code || "",
+                        city: c.city || "",
+                        categoria: c.physical_appearance || "",
+                        whatsapp: "",
+                        interacciones: 0,
+                        creadoPor: "",
+                        email: "",
+                        phone: "",
+                        country_code: c.country_code || "",
+                        company: "",
+                        notes: "",
+                        source: "",
+                        profile_picture_url: c.profile_picture_url || "",
+                        assigned_to: "",
+                        onlyfans_url: "",
+                      };
+                      setKpiPopup(null);
+                      setKpiPopupCollapsed(new Set());
+                      handleView(minimal);
+                    }
+                  }}
+                  className="group w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left transition-all duration-200 ease-out hover:bg-white/10 hover:border-primary/40 cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 shrink-0">
+                      {c.profile_picture_url && <AvatarImage src={c.profile_picture_url} alt={c.name || ""} />}
+                      <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {c.country_code && <span className="text-sm shrink-0">{getCountryFlag(c.country_code)}</span>}
+                        <p className="font-medium text-sm truncate">{c.name || "—"}</p>
                       </div>
-                      <div className="hidden sm:flex items-center gap-3 text-right shrink-0">
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Ciudad</p>
-                          <p className="text-xs font-medium truncate max-w-[100px]">{c.city || "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">País</p>
-                          <p className="text-xs font-medium">{c.country_code ? getCountryShortDisplay(c.country_code) : "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Creación</p>
-                          <p className="text-xs font-medium whitespace-nowrap">{created}</p>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                      {cleanHandle && (
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                          <InstagramIcon className="h-3 w-3" />
+                          @{cleanHandle}
+                        </p>
+                      )}
                     </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                    <div className="hidden sm:flex items-center gap-3 text-right shrink-0">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Ciudad</p>
+                        <p className="text-xs font-medium truncate max-w-[100px]">{c.city || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">País</p>
+                        <p className="text-xs font-medium">{c.country_code ? getCountryShortDisplay(c.country_code) : "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Creación</p>
+                        <p className="text-xs font-medium whitespace-nowrap">{created}</p>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                  </div>
+                </button>
+              );
+            };
+            return (
+              <div className="space-y-3">
+                {sortedCats.map((cat) => {
+                  const rows = buckets.get(cat)!;
+                  const isCollapsed = effectiveCollapsed.has(cat);
+                  return (
+                    <div key={cat} className="space-y-2">
+                      <CategorySectionHeader
+                        cat={cat}
+                        count={rows.length}
+                        isCollapsed={isCollapsed}
+                        onToggle={() => toggleCat(cat)}
+                      />
+                      {!isCollapsed && (
+                        <div className="space-y-2 pl-1">
+                          {rows.map(renderContactRow)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </main>
