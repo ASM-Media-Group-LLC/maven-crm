@@ -397,7 +397,7 @@ const DetailDialog = ({
         {/* Header con gradiente sutil + número grande del total real.
             El user reportó: "card dice 3174 pero popup muestra 50" — ahora
             el header siempre muestra totalCount aunque rows tenga max 100. */}
-        <DialogHeader className="px-6 pt-5 pb-4 border-b border-border/40 bg-gradient-to-r from-primary/5 via-primary/0 to-primary/5">
+        <DialogHeader className="px-6 pt-5 pb-4 pr-14 border-b border-border/40 bg-gradient-to-r from-primary/5 via-primary/0 to-primary/5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <DialogTitle className="text-lg font-bold tracking-tight flex items-center gap-3">
@@ -474,7 +474,7 @@ const DetailDialog = ({
                   <button
                     type="button"
                     onClick={() => toggleCat(cat)}
-                    className="group flex w-full items-center gap-3 sticky top-0 z-[1] bg-gradient-to-r from-background via-background to-background/80 backdrop-blur-sm py-1.5 px-0.5"
+                    className="group flex w-full items-center gap-3 sticky top-0 z-[1] py-1.5 px-0.5 bg-card/40 backdrop-blur-md rounded-2xl"
                   >
                     <div
                       className={`flex items-center gap-2 rounded-full px-3 py-1 transition-transform group-hover:scale-[1.02] ${tone.bg} ${tone.ring}`}
