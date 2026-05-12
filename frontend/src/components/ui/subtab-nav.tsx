@@ -33,10 +33,12 @@ const SubtabNavItem = React.forwardRef<HTMLButtonElement, SubtabNavItemProps>(
       ref={ref}
       type={type}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors shrink-0",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-all shrink-0",
         active
-          ? "bg-primary/15 text-primary ring-1 ring-primary/30 shadow-sm hover:bg-primary/20"
-          : "text-muted-foreground hover:bg-white/10 hover:text-foreground",
+          ? // Active: gradient azul metalizado + texto blanco + soft glow
+            "bg-gradient-to-r from-sky-500/25 via-blue-500/30 to-indigo-500/25 text-white ring-1 ring-blue-400/50 shadow-[0_2px_8px_-2px_rgba(59,130,246,0.4)] font-semibold"
+          : // Inactive: text-foreground/70 — más visible que muted
+            "text-foreground/70 hover:bg-white/10 hover:text-foreground",
         className,
       )}
       {...props}
