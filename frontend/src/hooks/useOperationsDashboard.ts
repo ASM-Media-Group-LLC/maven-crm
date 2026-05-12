@@ -558,6 +558,180 @@ export const useMetricDetails = (
     },
   });
 
+// ─── Breakdown por categoría + lazy load por bucket ────────────────────
+//
+// Problema que estamos resolviendo:
+//   leadgen_entries categoriza con un pipeline asíncrono — los 50 leads
+//   más recientes NO tienen category_code aún (la categorización viene
+//   minutos/horas después). Entonces "Total leads generados" / "Modelos
+//   contactadas" mostraban todo como "Sin categoría" en el popup, aunque
+//   el 90% de los leads del mes SÍ están categorizados — pero esos son
+//   los OLDER, no los TOP 50.
+//
+// Solución:
+//   1. Una sola query (RPC) trae el count por categoría — barata, GROUP BY.
+//   2. Lazy fetch de rows por categoría — solo cuando el user expande
+//      ese bucket. React-query cachea por categoría.
+//   3. Default: solo la categoría top (Elite > A+ > ...) está expandida.
+
+export type MetricWithBreakdown = "totalLeads" | "totalGenerated" | "contacted";
+
+export const METRICS_WITH_BREAKDOWN: MetricWithBreakdown[] = [
+  "totalLeads",
+  "totalGenerated",
+  "contacted",
+];
+
+export interface CategoryBreakdownRow {
+  category: string;
+  count: number;
+}
+
+const metricSupportsBreakdown = (m: MetricKey | null): m is MetricWithBreakdown =>
+  !!m && (METRICS_WITH_BREAKDOWN as string[]).includes(m);
+
+/** Counts por categoría para una métrica. Una sola query al RPC. */
+export const useMetricCategoryBreakdown = (
+  metric: MetricKey | null,
+  range: DashboardRange,
+  enabled: boolean,
+) =>
+  useQuery({
+    queryKey: [
+      "metric-cat-breakdown",
+      metric,
+      toIso(range.from),
+      toIso(range.to),
+    ],
+    enabled: enabled && metricSupportsBreakdown(metric),
+    staleTime: 30_000,
+    queryFn: async (): Promise<CategoryBreakdownRow[]> => {
+      const fromIso = toIso(range.from) ?? "1900-01-01";
+      const toIsoVal = toIsoEndOfDay(range.to) ?? "9999-12-31";
+      const { data, error } = await (supabase as any).rpc(
+        "metric_category_breakdown",
+        {
+          p_metric: metric,
+          p_start: fromIso,
+          p_end: toIsoVal,
+        },
+      );
+      if (error) throw error;
+      return ((data ?? []) as Array<{ category: string; count: string | number }>).map(
+        (r) => ({
+          category: r.category,
+          count: Number(r.count),
+        }),
+      );
+    },
+  });
+
+/** Fetch de rows DE UNA categoría específica. enabled controla cuándo
+ *  disparar (= cuando el user expande la sección). React-query cachea
+ *  cada categoría por separado, así expandir/colapsar no re-fetchea. */
+export const useMetricCategoryRows = (
+  metric: MetricKey | null,
+  range: DashboardRange,
+  category: string | null,
+  enabled: boolean,
+) =>
+  useQuery({
+    queryKey: [
+      "metric-cat-rows",
+      metric,
+      toIso(range.from),
+      toIso(range.to),
+      category,
+    ],
+    enabled: enabled && !!category && metricSupportsBreakdown(metric),
+    staleTime: 30_000,
+    queryFn: async (): Promise<DetailRow[]> => {
+      const fromIso = toIso(range.from);
+      const toIsoVal = toIsoEndOfDay(range.to);
+      const dateGte = (q: any, col: string) => (fromIso ? q.gte(col, fromIso) : q);
+      const dateLte = (q: any, col: string) => (toIsoVal ? q.lte(col, toIsoVal) : q);
+      const rowLimit = 50;
+      // El bucket "Sin categoría" en el breakdown equivale a category
+      // IS NULL en la tabla source.
+      const isNullBucket = category === "Sin categoría";
+
+      // ─── contacted (solo leadgen) ─────────────────────────────────────
+      if (metric === "contacted") {
+        let q = sb
+          .from("leadgen_entries")
+          .select("id, model_handle, lg_user_id, phone_e164, status, category_code, created_at")
+          .order("created_at", { ascending: false })
+          .limit(rowLimit);
+        q = isNullBucket ? q.is("category_code", null) : q.eq("category_code", category);
+        const res = await dateLte(dateGte(q, "created_at"), "created_at");
+        if (res.error) throw res.error;
+        return ((res.data ?? []) as any[]).map((r) => ({
+          id: r.id,
+          primary: `@${r.model_handle ?? "?"}`,
+          secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
+          date: r.created_at,
+          badge: r.status,
+          category: isNullBucket ? undefined : (category as string),
+          leadSource: "leadgen" as const,
+        }));
+      }
+
+      // ─── totalLeads / totalGenerated (leadgen + scouter) ───────────────
+      const lgQ = (() => {
+        let q = sb
+          .from("leadgen_entries")
+          .select("id, model_handle, phone_e164, status, category_code, created_at")
+          .order("created_at", { ascending: false })
+          .limit(rowLimit);
+        q = isNullBucket ? q.is("category_code", null) : q.eq("category_code", category);
+        return dateLte(dateGte(q, "created_at"), "created_at");
+      })();
+
+      const slDateCol =
+        metric === "totalLeads" ? "first_scouter_contact_at" : "created_at";
+      const slQ = (() => {
+        let q = sb
+          .from("scouter_leads")
+          .select(`id, instagram_handle, phone, status, category, ${slDateCol}`)
+          .order(slDateCol, { ascending: false })
+          .limit(rowLimit);
+        q = isNullBucket ? q.is("category", null) : q.eq("category", category);
+        if (metric === "totalLeads") {
+          q = q.not("first_scouter_contact_at", "is", null);
+        }
+        return dateLte(dateGte(q, slDateCol), slDateCol);
+      })();
+
+      const [lgRes, slRes] = await Promise.all([lgQ, slQ]);
+      if (lgRes.error) throw lgRes.error;
+      if (slRes.error) throw slRes.error;
+
+      const lgRows: DetailRow[] = ((lgRes.data ?? []) as any[]).map((r) => ({
+        id: r.id,
+        primary: `@${r.model_handle ?? "?"}`,
+        secondary: r.phone_e164 ? `📞 ${r.phone_e164}` : "Sin número",
+        date: r.created_at,
+        badge: "leadgen",
+        category: isNullBucket ? undefined : (category as string),
+        leadSource: "leadgen" as const,
+      }));
+
+      const slRows: DetailRow[] = ((slRes.data ?? []) as any[]).map((r) => ({
+        id: r.id,
+        primary: `@${r.instagram_handle ?? "?"}`,
+        secondary: r.phone ? `📞 ${r.phone}` : "Sin número",
+        date: r[slDateCol],
+        badge: "scouter",
+        category: isNullBucket ? undefined : (category as string),
+        leadSource: "scouter" as const,
+      }));
+
+      return [...lgRows, ...slRows]
+        .sort((a, b) => ((b.date ?? "") < (a.date ?? "") ? -1 : 1))
+        .slice(0, rowLimit);
+    },
+  });
+
 /** Detalle completo de un lead — usado por LeadDetailDialog que se
  *  abre cuando el user clickea una fila en el modal del dashboard.
  *  Trae TODOS los campos de la tabla source para mostrarlos en el popup.

@@ -42,9 +42,12 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import {
   useOperationsDashboard,
   useMetricDetails,
+  useMetricCategoryBreakdown,
+  useMetricCategoryRows,
   useLeadDetail,
   useBestCloser,
   CATEGORY_ORDER,
+  METRICS_WITH_BREAKDOWN,
   type MetricKey,
   type DashboardRange,
   type DetailRow,
@@ -325,13 +328,22 @@ const DetailDialog = ({
   range: DashboardRange;
 }) => {
   const navigate = useNavigate();
-  const { data: result, isLoading } = useMetricDetails(
+  // Metrics como totalLeads / totalGenerated / contacted usan el flow
+  // de breakdown (RPC trae counts por categoría, rows se fetchean
+  // lazy al expandir). El resto sigue con useMetricDetails que trae
+  // los top 100 mezclados.
+  const supportsBreakdown = !!metric && (METRICS_WITH_BREAKDOWN as readonly string[]).includes(metric);
+  const { data: result, isLoading: isLoadingDetails } = useMetricDetails(
     metric ?? "contacted",
     range,
-    open && !!metric,
+    open && !!metric && !supportsBreakdown,
   );
+  const { data: breakdown, isLoading: isLoadingBreakdown } =
+    useMetricCategoryBreakdown(metric, range, open && !!metric);
+  const isLoading = supportsBreakdown ? isLoadingBreakdown : isLoadingDetails;
   const data = result?.rows ?? [];
-  const totalCount = result?.totalCount ?? 0;
+  const breakdownTotal = (breakdown ?? []).reduce((s, b) => s + b.count, 0);
+  const totalCount = supportsBreakdown ? breakdownTotal : (result?.totalCount ?? 0);
   // Lead detail nested dialog: cuando el user clickea una fila con
   // leadSource (lead o creator), abrimos un segundo dialog encima
   // con TODA la info del row.
@@ -341,16 +353,41 @@ const DetailDialog = ({
     title: string;
   } | null>(null);
 
-  // SIEMPRE agrupamos por category. Si la row no tiene category,
-  // cae al bucket "Sin categoría" al final del orden canónico
-  // (Elite → A+ → A → B+ → B → C+ → C → Sin categoría). El user
-  // pidió: "filtra por categorías Elite, A+, no por leadgen". Antes
-  // la heurística cambiaba a agrupar por badge (leadgen/scouter)
-  // cuando ningún row tenía category — confuso. Ahora siempre por
-  // category, los sin clasificar quedan al final visibles.
+  // Groups: ordenadas por CATEGORY_ORDER (Elite → A+ → A → B+ → B →
+  // C+ → C → Sin categoría). En modo breakdown vienen del RPC; en
+  // modo legacy vienen de los rows ya cargados.
+  //
+  // Cada item tiene count (siempre disponible) y rows? (presente solo
+  // en modo legacy — en breakdown los rows se traen lazy al expandir).
   const groups = useMemo(() => {
+    const sortCats = (cats: string[]) =>
+      cats.sort((a, b) => {
+        const sa = CATEGORY_ORDER[a] ?? 999;
+        const sb = CATEGORY_ORDER[b] ?? 999;
+        if (sa !== sb) return sa - sb;
+        return a.localeCompare(b);
+      });
+    if (supportsBreakdown) {
+      if (!breakdown || breakdown.length === 0) {
+        return {
+          hasCategory: false,
+          list: [] as Array<{ cat: string; count: number; rows?: DetailRow[] }>,
+        };
+      }
+      const cats = sortCats(breakdown.map((b) => b.category));
+      return {
+        hasCategory: true,
+        list: cats.map((cat) => ({
+          cat,
+          count: breakdown.find((b) => b.category === cat)!.count,
+        })),
+      };
+    }
     if (!data || data.length === 0) {
-      return { hasCategory: false, list: [] as Array<{ cat: string; rows: DetailRow[] }> };
+      return {
+        hasCategory: false,
+        list: [] as Array<{ cat: string; count: number; rows?: DetailRow[] }>,
+      };
     }
     const map = new Map<string, DetailRow[]>();
     for (const r of data) {
@@ -359,17 +396,16 @@ const DetailDialog = ({
       arr.push(r);
       map.set(key, arr);
     }
-    const sortedKeys = Array.from(map.keys()).sort((a, b) => {
-      const sa = CATEGORY_ORDER[a] ?? 999;
-      const sb = CATEGORY_ORDER[b] ?? 999;
-      if (sa !== sb) return sa - sb;
-      return a.localeCompare(b);
-    });
+    const sortedKeys = sortCats(Array.from(map.keys()));
     return {
       hasCategory: true,
-      list: sortedKeys.map((cat) => ({ cat, rows: map.get(cat)! })),
+      list: sortedKeys.map((cat) => ({
+        cat,
+        count: map.get(cat)!.length,
+        rows: map.get(cat)!,
+      })),
     };
-  }, [data]);
+  }, [supportsBreakdown, breakdown, data]);
 
   // Default: TODO colapsado EXCEPTO la primera categoría con datos
   // (el user lo pidió: si la primera es Elite, solo Elite expandido).
@@ -410,11 +446,13 @@ const DetailDialog = ({
                   </span>
                 )}
               </DialogTitle>
-              {!isLoading && data.length > 0 && (
+              {!isLoading && groups.list.length > 0 && (
                 <p className="text-[11px] text-muted-foreground mt-1.5">
-                  {totalCount > data.length
-                    ? `Mostrando los ${data.length} más recientes de ${totalCount.toLocaleString("es")} totales`
-                    : `${data.length.toLocaleString("es")} ${data.length === 1 ? "registro" : "registros"}`}
+                  {supportsBreakdown
+                    ? `${totalCount.toLocaleString("es")} ${totalCount === 1 ? "registro" : "registros"}`
+                    : totalCount > data.length
+                      ? `Mostrando los ${data.length} más recientes de ${totalCount.toLocaleString("es")} totales`
+                      : `${data.length.toLocaleString("es")} ${data.length === 1 ? "registro" : "registros"}`}
                   {groups.hasCategory && ` · ${groups.list.length} ${groups.list.length === 1 ? "categoría" : "categorías"}`}
                 </p>
               )}
@@ -451,7 +489,7 @@ const DetailDialog = ({
                 <Skeleton key={i} className="h-12 w-full rounded-lg" />
               ))}
             </>
-          ) : !data || data.length === 0 ? (
+          ) : groups.list.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 gap-2">
               <div className="rounded-full bg-muted/40 p-3">
                 <Users className="h-6 w-6 text-muted-foreground" />
@@ -465,57 +503,26 @@ const DetailDialog = ({
               {data.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead))}
             </div>
           ) : (
-            groups.list.map(({ cat, rows }) => {
-              const isCollapsed = collapsed.has(cat);
-              const tone = categoryTone(cat);
-              return (
-                <div key={cat} className="space-y-2">
-                  {/* Header con color por categoría (Elite=oro, A+=violeta,
-                      etc). Pill con count, sticky para que se vea
-                      siempre al scrollear. */}
-                  <button
-                    type="button"
-                    onClick={() => toggleCat(cat)}
-                    className="group flex w-full items-center gap-3 sticky top-0 z-[1] py-1.5 px-0.5 bg-card/40 backdrop-blur-md rounded-2xl"
-                  >
-                    <div
-                      className={`flex items-center gap-2 rounded-full px-3 py-1 transition-transform group-hover:scale-[1.02] ${tone.bg} ${tone.ring}`}
-                    >
-                      <span className={`text-sm font-bold tracking-wide ${tone.text}`}>
-                        {cat}
-                      </span>
-                      <span
-                        className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums ${tone.badge}`}
-                      >
-                        {rows.length}
-                      </span>
-                    </div>
-                    <div className={`h-px flex-1 ${tone.line}`} />
-                    <div className={`shrink-0 rounded-full p-1 transition-colors ${tone.iconBg}`}>
-                      {isCollapsed ? (
-                        <ChevronDown className={`h-3.5 w-3.5 ${tone.text}`} />
-                      ) : (
-                        <ChevronUp className={`h-3.5 w-3.5 ${tone.text}`} />
-                      )}
-                    </div>
-                  </button>
-                  {/* Lazy render: solo cuando la categoría está expandida,
-                      generamos sus filas. El user pidió "precarga las
-                      primeras 3 y demás bajo demanda" — como el data ya
-                      vino en memoria, el "lazy" es del DOM (filas
-                      colapsadas no renderean cards). */}
-                  {!isCollapsed && (
-                    <div className="space-y-1.5 pl-1">
-                      {rows.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead))}
-                    </div>
-                  )}
-                </div>
-              );
-            })
+            groups.list.map((g) => (
+              <CategorySection
+                key={g.cat}
+                cat={g.cat}
+                count={g.count}
+                preloadedRows={g.rows}
+                metric={metric}
+                range={range}
+                supportsBreakdown={supportsBreakdown}
+                isCollapsed={collapsed.has(g.cat)}
+                onToggle={() => toggleCat(g.cat)}
+                navigate={navigate}
+                onOpenChange={onOpenChange}
+                setDetailLead={setDetailLead}
+              />
+            ))
           )}
         </div>
 
-        {data && data.length > 0 && totalCount > data.length && (
+        {!supportsBreakdown && data.length > 0 && totalCount > data.length && (
           <p className="text-[10px] text-muted-foreground text-center py-2.5 border-t border-border/40 bg-muted/20">
             Mostrando los {data.length} más recientes de{" "}
             <strong className="text-foreground">{totalCount.toLocaleString("es")}</strong> totales —
@@ -534,6 +541,101 @@ const DetailDialog = ({
       title={detailLead?.title ?? ""}
     />
     </>
+  );
+};
+
+// Sección de categoría dentro del DetailDialog. Tiene su propio
+// useQuery cuando supportsBreakdown=true — así fetchea rows solo
+// cuando el user expande la sección, y solo una vez (react-query
+// cachea). Cuando supportsBreakdown=false, recibe preloadedRows del
+// padre y no dispara nada nuevo.
+const CategorySection = ({
+  cat,
+  count,
+  preloadedRows,
+  metric,
+  range,
+  supportsBreakdown,
+  isCollapsed,
+  onToggle,
+  navigate,
+  onOpenChange,
+  setDetailLead,
+}: {
+  cat: string;
+  count: number;
+  preloadedRows?: DetailRow[];
+  metric: MetricKey | null;
+  range: DashboardRange;
+  supportsBreakdown: boolean;
+  isCollapsed: boolean;
+  onToggle: () => void;
+  navigate: (path: string) => void;
+  onOpenChange: (o: boolean) => void;
+  setDetailLead: (v: { source: "leadgen" | "scouter" | "creator"; id: string; title: string } | null) => void;
+}) => {
+  const tone = categoryTone(cat);
+  // Lazy fetch: solo cuando supportsBreakdown && expandida. React-query
+  // cachea por (metric, range, cat) — expandir/colapsar no re-fetchea.
+  const { data: lazyRows, isLoading: isLazyLoading } = useMetricCategoryRows(
+    metric,
+    range,
+    supportsBreakdown ? cat : null,
+    supportsBreakdown && !isCollapsed,
+  );
+  const rows = supportsBreakdown ? (lazyRows ?? []) : (preloadedRows ?? []);
+  const showSkeleton = supportsBreakdown && !isCollapsed && isLazyLoading;
+  return (
+    <div className="space-y-2">
+      {/* Header con color por categoría (Elite=oro, A+=violeta, etc).
+          Pill con count, sticky para que se vea siempre al scrollear. */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="group flex w-full items-center gap-3 sticky top-0 z-[1] py-1.5 px-0.5 bg-card/40 backdrop-blur-md rounded-2xl"
+      >
+        <div
+          className={`flex items-center gap-2 rounded-full px-3 py-1 transition-transform group-hover:scale-[1.02] ${tone.bg} ${tone.ring}`}
+        >
+          <span className={`text-sm font-bold tracking-wide ${tone.text}`}>{cat}</span>
+          <span
+            className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums ${tone.badge}`}
+          >
+            {count.toLocaleString("es")}
+          </span>
+        </div>
+        <div className={`h-px flex-1 ${tone.line}`} />
+        <div className={`shrink-0 rounded-full p-1 transition-colors ${tone.iconBg}`}>
+          {isCollapsed ? (
+            <ChevronDown className={`h-3.5 w-3.5 ${tone.text}`} />
+          ) : (
+            <ChevronUp className={`h-3.5 w-3.5 ${tone.text}`} />
+          )}
+        </div>
+      </button>
+      {!isCollapsed && (
+        <div className="space-y-1.5 pl-1">
+          {showSkeleton ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-xl" />
+            ))
+          ) : rows.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic pl-3 py-2">
+              Sin registros visibles para esta categoría.
+            </p>
+          ) : (
+            <>
+              {rows.map((row) => renderRow(row, navigate, onOpenChange, setDetailLead))}
+              {supportsBreakdown && count > rows.length && (
+                <p className="text-[10px] text-muted-foreground text-center py-1.5 italic">
+                  Mostrando los {rows.length} más recientes de {count.toLocaleString("es")} en esta categoría.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 
