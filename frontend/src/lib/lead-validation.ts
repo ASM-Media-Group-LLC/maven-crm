@@ -351,7 +351,9 @@ export async function checkLeadAvailability(handle: string): Promise<LeadAvailab
     }
   }
 
-  // 3. leadgen_entries
+  // 3. leadgen_entries — regla 24h: si el lead ya está en leadgen pero
+  // tiene más de 24 horas, permitimos re-agregarlo (puede ser un nuevo
+  // intento de contacto). Si tiene menos de 24h, bloqueamos.
   const { data: lead } = await supabase
     .from("leadgen_entries")
     .select("id, created_at, lg_user_id")
@@ -373,10 +375,21 @@ export async function checkLeadAvailability(handle: string): Promise<LeadAvailab
       const name = (profile as any)?.full_name;
       if (name) agentLabel = ` por ${name}`;
     }
+    if (created) {
+      const hoursSince = (Date.now() - created.getTime()) / (1000 * 60 * 60);
+      if (hoursSince < 24) {
+        const hoursLeft = Math.ceil(24 - hoursSince);
+        return {
+          kind: "blocked",
+          title: "Lead duplicado — esperá",
+          message: `Este lead fue agregado${agentLabel} hace ${Math.floor(hoursSince)}h. Podrás resubirlo en ~${hoursLeft}h (regla 24h).`,
+        };
+      }
+    }
     return {
-      kind: "blocked",
-      title: "Ya está en LeadGen",
-      message: `Este lead ya fue agregado${agentLabel}${created ? ` (${fmtDateAgo(created)})` : ""}. No se puede duplicar.`,
+      kind: "allowed_with_history",
+      title: "Lead ya existente en LeadGen",
+      message: `Este lead ya fue agregado${agentLabel}${created ? ` ${fmtDateAgo(created)}` : ""}. Se va a crear como entrada repetida (reactivado).`,
     };
   }
 
