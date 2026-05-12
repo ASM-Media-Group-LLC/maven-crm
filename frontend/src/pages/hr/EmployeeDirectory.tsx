@@ -315,7 +315,7 @@ export default function EmployeeDirectory() {
         </div>
 
         {/* Department tab bar */}
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
+        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap">
           <Button variant={!deptFilter ? "secondary" : "ghost"} size="sm" className="text-sm" onClick={() => setDeptFilter("")}>Todos</Button>
           {departments.map((d) => (
             <Button key={d.id} variant={deptFilter === d.id ? "secondary" : "ghost"} size="sm" className="text-sm" onClick={() => setDeptFilter(deptFilter === d.id ? "" : d.id)}>

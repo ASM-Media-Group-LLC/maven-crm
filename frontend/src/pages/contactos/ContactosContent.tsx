@@ -399,7 +399,7 @@ const ContactosContent = () => {
       </header>
 
       <div className="flex-1 flex flex-col overflow-hidden p-6 gap-4">
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 shrink-0">
+        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 shrink-0">
           <Button
             variant={activeTab === "dashboard" ? "secondary" : "ghost"}
             size="sm"

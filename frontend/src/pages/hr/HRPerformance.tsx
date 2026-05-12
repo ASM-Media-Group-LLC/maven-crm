@@ -265,7 +265,7 @@ export default function HRPerformance() {
           </div>
         </div>
         {/* Department Tabs */}
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap mt-4">
+        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap mt-4">
           <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
           {departments.map((d) => (
             <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
@@ -291,7 +291,7 @@ export default function HRPerformance() {
         </div>
 
         {/* Status Tabs */}
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
           {STATUS_TAB_LIST.map((s) => (
             <Button key={s.value} variant={statusTab === s.value ? "secondary" : "ghost"} size="sm" onClick={() => setStatusTab(s.value)}>{s.label}</Button>
           ))}

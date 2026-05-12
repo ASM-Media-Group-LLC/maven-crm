@@ -1,11 +1,12 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { LayoutDashboard, Users, Sparkles, LogOut, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { usePermissions } from "@/hooks/usePermissions";
 
 // Subtabs compartidos por las páginas /creadores/* — mismo patrón que
 // los subtabs de Panel de Control. Click navega entre rutas, la active
-// se calcula del pathname.
+// se calcula del pathname. Usa el componente shared <SubtabNav> para
+// matchear el lenguaje visual de Tabs en el resto del CRM.
 const CreadoresSubtabs = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -25,24 +26,22 @@ const CreadoresSubtabs = () => {
   };
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 shrink-0 overflow-x-auto">
+    <SubtabNav className="shrink-0 overflow-x-auto">
       {tabs.map((tab) => {
         if (!canAccess("Creadores", tab.submodule)) return null;
         const Icon = tab.icon;
         return (
-          <Button
+          <SubtabNavItem
             key={tab.url}
-            variant={isActive(tab) ? "secondary" : "ghost"}
-            size="sm"
+            active={isActive(tab)}
             onClick={() => navigate(tab.url)}
-            className="shrink-0"
           >
             <Icon className="mr-1.5 h-4 w-4" />
             {tab.label}
-          </Button>
+          </SubtabNavItem>
         );
       })}
-    </div>
+    </SubtabNav>
   );
 };
 

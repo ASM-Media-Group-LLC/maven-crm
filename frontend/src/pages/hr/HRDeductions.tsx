@@ -199,7 +199,7 @@ export default function HRDeductions() {
         </div>
 
         {/* Department Tabs */}
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
           <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
           {departments.map((d) => (
             <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
@@ -207,7 +207,7 @@ export default function HRDeductions() {
         </div>
 
         {/* Type Sub-tabs */}
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
           <Button variant={!typeTab ? "secondary" : "ghost"} size="sm" onClick={() => setTypeTab("")}>Todos</Button>
           {DEDUCTION_DISPLAY_TYPES.map((t) => (
             <Button key={t.value} variant={typeTab === t.value ? "secondary" : "ghost"} size="sm" onClick={() => setTypeTab(t.value)}>{t.label}</Button>

@@ -249,7 +249,7 @@ export default function HROffboarding() {
         </div>
 
         {/* Department Tabs */}
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
           <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
           {departments.map((d: any) => (
             <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>

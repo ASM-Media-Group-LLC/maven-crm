@@ -308,7 +308,7 @@ export default function ControlFinancieroPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
+        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap">
           {TABS.map(t => (
             <Button key={t} variant={activeTab === t ? "secondary" : "ghost"} size="sm" onClick={() => { setActiveTab(t); setSearch(""); }}>{t}</Button>
           ))}

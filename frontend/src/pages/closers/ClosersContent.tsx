@@ -14,6 +14,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
@@ -115,24 +116,22 @@ const ClosersContent = () => {
         <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setStatsCollapsed(false); }} className="flex-1 flex flex-col overflow-hidden min-h-0">
           {/* Subtabs top-level — Dashboard vs Operaciones */}
           <div className="shrink-0 px-6 pt-4 pb-2">
-            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-              <Button
-                variant={viewTab === "dashboard" ? "secondary" : "ghost"}
-                size="sm"
+            <SubtabNav>
+              <SubtabNavItem
+                active={viewTab === "dashboard"}
                 onClick={() => setViewTab("dashboard")}
               >
                 <LayoutDashboard className="mr-1.5 h-4 w-4" />
                 Dashboard
-              </Button>
-              <Button
-                variant={viewTab === "operaciones" ? "secondary" : "ghost"}
-                size="sm"
+              </SubtabNavItem>
+              <SubtabNavItem
+                active={viewTab === "operaciones"}
                 onClick={() => setViewTab("operaciones")}
               >
                 <ListChecks className="mr-1.5 h-4 w-4" />
                 Operaciones
-              </Button>
-            </div>
+              </SubtabNavItem>
+            </SubtabNav>
           </div>
 
           {/* DASHBOARD — KPI cards (pipeline + revenue) */}

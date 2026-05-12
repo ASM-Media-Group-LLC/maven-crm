@@ -139,7 +139,7 @@ const EventosContent = () => {
 
           <div className="flex flex-wrap items-center gap-3">
             {/* Project type tabs */}
-            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+            <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
               {projectTabs.map((tab) => (
                 <Button
                   key={tab.value}
@@ -153,7 +153,7 @@ const EventosContent = () => {
             </div>
 
             {/* Status tabs */}
-            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+            <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
               {statusTabs.map((tab) => (
                 <Button
                   key={tab.value}

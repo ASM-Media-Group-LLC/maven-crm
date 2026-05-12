@@ -95,7 +95,7 @@ const AuditoriaRoles = () => {
                   <AuditoriaSummaryCards summary={data.summary} />
 
                   {/* Tabs */}
-                  <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+                  <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
                     {tabs.map((t) => (
                       <Button
                         key={t.key}

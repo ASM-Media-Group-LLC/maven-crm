@@ -34,7 +34,7 @@ const ChatterEvaluatorHeader = () => {
     <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
       <h1 className="text-2xl font-bold mb-4">Chatter Evaluator</h1>
       <div className="flex items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 shrink-0 overflow-x-auto">
+        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 shrink-0 overflow-x-auto">
           {tabs.filter((t) => t.show).map((tab) => {
             const Icon = tab.icon;
             return (

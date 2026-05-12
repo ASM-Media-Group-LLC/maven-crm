@@ -99,7 +99,7 @@ const OnboardingContent = () => {
         </div>
 
         {/* Agency Tabs */}
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
           <Button size="sm" variant={activeTab === "Todas" ? "secondary" : "ghost"} onClick={() => setActiveTab("Todas")}>Todas</Button>
           {agencyOptions.map((a) => (
             <Button key={a} size="sm" variant={activeTab === a ? "secondary" : "ghost"} onClick={() => setActiveTab(a)}>{a}</Button>

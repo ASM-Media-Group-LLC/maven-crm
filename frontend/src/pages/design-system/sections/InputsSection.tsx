@@ -134,7 +134,7 @@ export const InputsSection = () => {
       <div className="space-y-4 max-w-2xl">
         <div className="space-y-2">
           <Label>Tab Bar inline</Label>
-          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+          <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
             <Button variant="secondary" size="sm">Activo</Button>
             <Button variant="ghost" size="sm">Inactivo</Button>
             <Button variant="ghost" size="sm">Inactivo</Button>
@@ -168,7 +168,7 @@ export const InputsSection = () => {
         </div>
 
         <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground space-y-1">
-          <p><strong className="text-foreground">Tab Bar:</strong> <code className="font-mono text-foreground">inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1</code></p>
+          <p><strong className="text-foreground">Tab Bar:</strong> <code className="font-mono text-foreground">inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1</code></p>
           <p><strong className="text-foreground">Select Filters:</strong> placeholder = nombre del campo, nunca "Todos". La opción "Todos" solo aparece dentro del dropdown.</p>
           <p><strong className="text-foreground">Value:</strong> cuando no hay filtro activo, <code className="font-mono text-foreground">value={undefined}</code> para que el placeholder sea visible.</p>
         </div>

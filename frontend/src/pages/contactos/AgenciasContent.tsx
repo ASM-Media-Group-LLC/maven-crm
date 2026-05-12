@@ -85,7 +85,7 @@ const AgenciasContent = () => {
   return (
     <div className="space-y-4">
       {/* Subtabs Dashboard | Agencias — mismo patrón que Contactos / Closers */}
-      <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+      <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
         <Button
           variant={viewTab === "dashboard" ? "secondary" : "ghost"}
           size="sm"

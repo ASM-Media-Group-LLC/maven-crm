@@ -502,7 +502,7 @@ export default function HRAbsences() {
 
         {/* Department Tabs */}
         {departments.length > 0 && (
-          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
+          <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap">
             <Button size="sm" variant={!deptFilter ? "secondary" : "ghost"} className="text-sm" onClick={() => setDeptFilter("")}>Todos</Button>
             {departments.map((d) => (
               <Button key={d.id} size="sm" variant={deptFilter === d.id ? "secondary" : "ghost"} className="text-sm" onClick={() => setDeptFilter(d.id)}>{d.name}</Button>

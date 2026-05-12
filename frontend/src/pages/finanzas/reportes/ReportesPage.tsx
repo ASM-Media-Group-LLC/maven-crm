@@ -480,7 +480,7 @@ export default function ReportesPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
+        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap">
           {REPORT_TABS.map(t => (
             <Button key={t} variant={reportTab === t ? "secondary" : "ghost"} size="sm" onClick={() => { setReportTab(t); setSearch(""); }}>{t}</Button>
           ))}
