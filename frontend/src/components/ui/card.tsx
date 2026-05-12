@@ -2,8 +2,19 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+// Base Card con toque glass: bg semi-transparente + ring blanco sutil
+// + degradado super suave. Da profundidad sin perder legibilidad y
+// matchea el lenguaje visual de los Dialogs glass. Propaga a 150+
+// usos del CRM.
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("rounded-lg border bg-card text-card-foreground shadow-sm", className)} {...props} />
+  <div
+    ref={ref}
+    className={cn(
+      "rounded-xl border border-white/10 bg-card/80 bg-gradient-to-br from-white/[0.02] to-transparent text-card-foreground shadow-sm ring-1 ring-white/5 backdrop-blur-sm",
+      className,
+    )}
+    {...props}
+  />
 ));
 Card.displayName = "Card";
 

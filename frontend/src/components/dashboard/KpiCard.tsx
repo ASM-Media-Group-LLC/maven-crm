@@ -37,7 +37,10 @@ const KpiCard = ({ label, value, subtitle, icon: Icon, color = "bg-blue-500", on
     </>
   );
 
-  const baseCls = "group relative overflow-hidden rounded-xl border border-border bg-card p-4";
+  // Base con tinte glass — bg-card/60 + ring blanco sutil + degradado
+  // de fondo. Combinado con el blur del corner accent da una sensación
+  // de profundidad sin perder legibilidad.
+  const baseCls = "group relative overflow-hidden rounded-xl border border-white/10 bg-card/60 bg-gradient-to-br from-white/[0.03] to-transparent p-4 ring-1 ring-white/5 backdrop-blur-sm";
   const interactiveCls = "text-left transition-all duration-200 ease-out hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]";
 
   if (onClick) {

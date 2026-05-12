@@ -116,6 +116,21 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Atmospheric body gradient — dos manchas radiales sutiles que
+     dan profundidad sin afectar legibilidad. Solo en dark (en light
+     el body queda plano white). El fixed garantiza que el degradado
+     no scrollea con el contenido. */
+  .dark body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 0%, hsl(var(--primary) / 0.08), transparent 60%),
+      radial-gradient(ellipse 60% 80% at 100% 100%, hsl(var(--accent) / 0.05), transparent 60%);
+  }
 }
 
 /* Scrollbar moderno y sutil — global */

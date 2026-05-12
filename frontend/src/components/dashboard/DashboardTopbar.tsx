@@ -19,7 +19,7 @@ const DashboardTopbar = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border bg-background/80 px-4 backdrop-blur-sm">
+      <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-white/10 bg-background/60 px-4 backdrop-blur-xl">
         <SidebarTrigger />
 
         <div className="flex flex-1 justify-center">
