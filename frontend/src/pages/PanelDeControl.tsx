@@ -272,12 +272,12 @@ const BADGE_TONES: Record<string, typeof DEFAULT_TONE> = {
     iconBg: "bg-emerald-500/10 group-hover:bg-emerald-500/20",
   },
   en_espera: {
-    bg: "bg-gradient-to-r from-amber-500/20 to-amber-400/10",
-    text: "text-amber-300",
-    badge: "bg-amber-500/30 text-amber-100",
-    ring: "ring-1 ring-amber-400/30",
-    line: "bg-gradient-to-r from-amber-400/40 to-transparent",
-    iconBg: "bg-amber-500/10 group-hover:bg-amber-500/20",
+    bg: "bg-gradient-to-r from-orange-500/20 to-orange-400/10",
+    text: "text-orange-300",
+    badge: "bg-orange-500/30 text-orange-100",
+    ring: "ring-1 ring-orange-400/30",
+    line: "bg-gradient-to-r from-orange-400/40 to-transparent",
+    iconBg: "bg-orange-500/10 group-hover:bg-orange-500/20",
   },
   no_cerro: {
     bg: "bg-gradient-to-r from-rose-500/20 to-rose-400/10",
