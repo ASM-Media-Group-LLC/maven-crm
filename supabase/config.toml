@@ -27,3 +27,6 @@ verify_jwt = false
 [functions.scouter-generate-tasks]
 verify_jwt = false
 # schedule = "0 6 * * *"  # Not supported by CLI config parser; set via Dashboard
+
+[functions.forgot-password]
+verify_jwt = false  # público — el user todavía no está logueado

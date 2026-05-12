@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { Loader2, ArrowLeft } from "lucide-react";
 
 const ForgotPassword = () => {
@@ -30,9 +29,20 @@ const ForgotPassword = () => {
     }
 
     setLoading(true);
-    await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${getPublicBaseUrl()}/reset-password`,
-    });
+    // Usamos la edge function 'forgot-password' que genera el link
+    // via admin API + manda email custom Maven-branded via Resend.
+    // Esto reemplaza al template default de Supabase que llegaba
+    // genérico y a veces apuntaba mal.
+    try {
+      await supabase.functions.invoke("forgot-password", {
+        body: { email: email.trim() },
+      });
+    } catch (err) {
+      // Ignoramos errores acá — la edge function siempre devuelve 200
+      // OK por anti-enumeration. Cualquier excepción de red es local,
+      // no del backend.
+      console.warn("[forgot-password] invoke failed", err);
+    }
     setLoading(false);
     setSent(true);
   };
