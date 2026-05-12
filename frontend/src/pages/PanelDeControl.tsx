@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { startOfMonth, endOfMonth, startOfDay, format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -407,19 +407,40 @@ const DetailDialog = ({
     };
   }, [supportsBreakdown, breakdown, data]);
 
-  // Default: TODO colapsado EXCEPTO la primera categoría con datos
-  // (el user lo pidió: si la primera es Elite, solo Elite expandido).
-  // Se recomputa cada vez que cambia el metric o se reabre el dialog.
+  // Default por defecto:
+  // - Para metrics con breakdown (totalLeads/totalGenerated/contacted):
+  //   TODO colapsado. Al abrir no se fetchea ninguna categoría — el
+  //   user expande la que quiera ver, eso dispara el lazy fetch.
+  //   Esto hace que la apertura sea instantánea (solo el RPC de counts).
+  // - Para metrics no-breakdown: TODO colapsado excepto la primera
+  //   categoría con datos (mismo comportamiento que antes; el data ya
+  //   está cargado, así que abrirlo no cuesta).
+  //
+  // Cuidado: el useEffect SOLO inicializa una vez por (open, metric).
+  // Sin el ref, groups.list cambia de referencia en cada render
+  // (useMemo retorna nuevo array) y el effect re-iniciaba pisando
+  // los toggles del user.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const initializedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!open || !groups.hasCategory || groups.list.length === 0) {
-      setCollapsed(new Set());
+    const key = open && metric ? `${metric}` : null;
+    if (!key) {
+      initializedFor.current = null;
       return;
     }
+    if (initializedFor.current === key) return; // ya inicializado para este metric
+    if (!groups.hasCategory || groups.list.length === 0) return; // esperando datos
     const allCats = groups.list.map((g) => g.cat);
-    const first = allCats[0];
-    setCollapsed(new Set(allCats.filter((c) => c !== first)));
-  }, [open, metric, groups.hasCategory, groups.list]);
+    if (supportsBreakdown) {
+      // Todas colapsadas — el user expande la que quiera ver.
+      setCollapsed(new Set(allCats));
+    } else {
+      // Solo la primera con datos expandida.
+      const first = allCats[0];
+      setCollapsed(new Set(allCats.filter((c) => c !== first)));
+    }
+    initializedFor.current = key;
+  }, [open, metric, supportsBreakdown, groups.hasCategory, groups.list]);
   const toggleCat = (cat: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
