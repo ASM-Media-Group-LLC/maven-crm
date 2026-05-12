@@ -35,6 +35,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import KpiCard from "@/components/dashboard/KpiCard";
+import { ListRow } from "@/components/ui/list-row";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -1673,33 +1674,31 @@ const PromologContent = () => {
               <p className="text-sm">No hay entradas para mostrar</p>
             </div>
           ) : (
-            <div className="max-h-[500px] overflow-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ticket</TableHead>
-                    <TableHead>Creadora</TableHead>
-                    <TableHead>Red</TableHead>
-                    <TableHead>Plataforma</TableHead>
-                    <TableHead>Resultado</TableHead>
-                    <TableHead>Fecha / Hora</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {kpiModalEntries.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell className="font-mono text-xs">{entry.ticketNumber || "—"}</TableCell>
-                      <TableCell className="font-medium text-sm">{entry.name}</TableCell>
-                      <TableCell className="capitalize text-sm">{entry.network}</TableCell>
-                      <TableCell className="text-sm">{entry.platform}</TableCell>
-                      <TableCell>
-                        <Badge variant={resultToBadgeVariant(entry.result)} className="text-xs">{entry.result}</Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{entry.date} {entry.time}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="max-h-[500px] overflow-auto space-y-1.5">
+              {/* Header labels — sticky para alinearse con las columnas
+                  de cada ListRow. */}
+              <div className="sticky top-0 z-[1] flex items-center gap-3 px-3 pt-1 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground bg-card/40 backdrop-blur-md">
+                <span className="w-12">Ticket</span>
+                <span className="flex-1">Creadora</span>
+                <span className="w-20">Red</span>
+                <span className="w-24">Plataforma</span>
+                <span className="w-20">Resultado</span>
+                <span className="w-32 text-right">Fecha / Hora</span>
+              </div>
+              {kpiModalEntries.map((entry) => (
+                <ListRow key={entry.id}>
+                  <span className="w-12 font-mono text-xs text-muted-foreground">{entry.ticketNumber || "—"}</span>
+                  <span className="flex-1 font-medium text-sm truncate">{entry.name}</span>
+                  <span className="w-20 capitalize text-xs">{entry.network}</span>
+                  <span className="w-24 text-xs">{entry.platform}</span>
+                  <span className="w-20">
+                    <Badge variant={resultToBadgeVariant(entry.result)} className="text-[10px]">{entry.result}</Badge>
+                  </span>
+                  <span className="w-32 text-[10px] text-muted-foreground tabular-nums whitespace-nowrap text-right">
+                    {entry.date} {entry.time}
+                  </span>
+                </ListRow>
+              ))}
             </div>
           )}
         </DialogContent>
