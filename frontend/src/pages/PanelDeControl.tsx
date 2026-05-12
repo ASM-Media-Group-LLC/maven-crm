@@ -1120,8 +1120,16 @@ const PanelDeControl = () => {
       ? Math.round((k.numbersObtained / k.totalLeads) * 1000) / 10
       : 0;
 
+  // Labels para metrics que no viven en `cards` (hero card, sub-KPIs)
+  // — sin esto el header del popup mostraba "Detalle" como fallback.
+  const EXTRA_METRIC_LABELS: Partial<Record<MetricKey, string>> = {
+    totalGenerated: "Total leads Bot+LLG",
+    enteredCrm: "Ingresos al CRM",
+    contacted: "LLG Contactadas",
+  };
   const activeMetricLabel =
-    cards.find((c) => c.key === openMetric)?.label ?? "";
+    cards.find((c) => c.key === openMetric)?.label ??
+    (openMetric ? EXTRA_METRIC_LABELS[openMetric] ?? "" : "");
 
   const [tab, setTab] = useState<"modelos" | "chatters" | "cuentas-spammer" | "control-gasto">("modelos");
 
