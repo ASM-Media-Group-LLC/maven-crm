@@ -10,7 +10,12 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border border-white/10 bg-card/80 bg-gradient-to-br from-white/[0.02] to-transparent text-card-foreground shadow-sm ring-1 ring-white/5 backdrop-blur-sm",
+      // SIN backdrop-blur en Card base — combinado con hover:scale en
+      // children causa repaint glitchy de cards hermanas. El glass se
+      // logra con bg-card/80 + gradient + ring blanco sutil. El blur
+      // queda reservado para Dialog/Popover/Sheet donde no hay hover
+      // de elementos animados.
+      "rounded-xl border border-white/10 bg-card/80 bg-gradient-to-br from-white/[0.02] to-transparent text-card-foreground shadow-sm ring-1 ring-white/5",
       className,
     )}
     {...props}

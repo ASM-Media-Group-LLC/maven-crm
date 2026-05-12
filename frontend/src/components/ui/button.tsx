@@ -14,7 +14,7 @@ const buttonVariants = cva(
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         // Outline glass: bg semi-transparente + ring blanco sutil + hover
         // que se ilumina sin saltar de color a 100% del accent.
-        outline: "border border-white/15 bg-background/40 backdrop-blur-sm hover:bg-white/10 hover:border-primary/40 hover:text-foreground",
+        outline: "border border-white/15 bg-background/40 hover:bg-white/10 hover:border-primary/40 hover:text-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-white/10 hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline",

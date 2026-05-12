@@ -12,10 +12,10 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      // Glass liviano: bg-white/5 + border-white/10 + backdrop-blur.
-      // Hace que el TabsList se vea como una pill flotando sobre el
-      // contenido — match con el lenguaje de los popups y cards.
-      "inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-1 text-muted-foreground backdrop-blur-sm",
+      // Glass liviano sin backdrop-blur — bg-white/5 + border-white/10.
+      // El blur lo quitamos para evitar repaint glitchy combinado con
+      // animaciones de scale en cards cercanas (Chrome bug).
+      "inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-1 text-muted-foreground",
       className,
     )}
     {...props}
