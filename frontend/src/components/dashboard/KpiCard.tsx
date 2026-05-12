@@ -42,7 +42,10 @@ const KpiCard = ({ label, value, subtitle, icon: Icon, color = "bg-blue-500", on
   // hover:scale causa repaint glitchy de cards hermanas en Chrome.
   // El glow del corner accent ya da profundidad suficiente.
   const baseCls = "group relative overflow-hidden rounded-xl border border-white/10 bg-card/60 bg-gradient-to-br from-white/[0.03] to-transparent p-4 ring-1 ring-white/5";
-  const interactiveCls = "text-left transition-all duration-200 ease-out hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]";
+  // Hover suave: solo color de border + ring primario, sin scale ni
+  // shadow grande (el shadow glow desbordado causaba jitter visual
+  // en las cards hermanas). transition-colors limita lo que anima.
+  const interactiveCls = "cursor-pointer text-left transition-colors duration-200 hover:border-primary/40 hover:ring-primary/20 active:opacity-90";
 
   if (onClick) {
     return (
