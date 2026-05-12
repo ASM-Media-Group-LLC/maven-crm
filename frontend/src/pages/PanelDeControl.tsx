@@ -1206,20 +1206,10 @@ const PanelDeControl = () => {
               <p className="text-4xl font-bold tabular-nums leading-none">
                 {k.totalGenerated.toLocaleString("es")}
               </p>
-              <div className="flex flex-wrap items-center gap-1.5 pb-1">
-                <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 ring-1 ring-blue-400/30 px-2 py-0.5 text-[10px] font-bold text-blue-300 tabular-nums">
-                  LLG
-                  <span className="text-blue-100 font-extrabold">
-                    {k.contacted.toLocaleString("es")}
-                  </span>
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-pink-500/15 ring-1 ring-pink-400/30 px-2 py-0.5 text-[10px] font-bold text-pink-300 tabular-nums">
-                  Bot
-                  <span className="text-pink-100 font-extrabold">
-                    {k.scouterGenerated.toLocaleString("es")}
-                  </span>
-                </span>
-              </div>
+              <p className="text-xs text-muted-foreground pb-1">
+                LLG ({k.contacted.toLocaleString("es")}) + Bot (
+                {k.scouterGenerated.toLocaleString("es")})
+              </p>
             </div>
           </div>
         </button>
