@@ -1317,19 +1317,33 @@ const PanelDeControl = () => {
             (↓ rojo) grandes, neto chico abajo. Click abre el popup con
             los eventos individuales (mismo source que el card via
             creator_blu_history). */}
+        {(() => {
+          const balance = k.crmAltas - k.crmBajas;
+          const glowColor =
+            balance > 0
+              ? "bg-emerald-500"
+              : balance < 0
+                ? "bg-rose-500"
+                : "bg-orange-500";
+          const borderHover =
+            balance > 0
+              ? "hover:border-emerald-500/50 hover:shadow-[0_0_24px_-4px_rgba(16,185,129,0.35)]"
+              : balance < 0
+                ? "hover:border-rose-500/50 hover:shadow-[0_0_24px_-4px_rgba(244,63,94,0.35)]"
+                : "hover:border-orange-500/50 hover:shadow-[0_0_24px_-4px_rgba(249,115,22,0.35)]";
+          return (
         <button
           type="button"
           onClick={() => setOpenMetric("enteredCrm")}
-          className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 hover:scale-[1.025] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.15)] active:scale-[0.99]"
+          className={`group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 hover:scale-[1.025] active:scale-[0.99] ${borderHover}`}
         >
-          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-indigo-500 transition-opacity group-hover:opacity-50" />
+          {/* Glow corner — color según el signo del balance. */}
+          <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 transition-opacity group-hover:opacity-50 ${glowColor}`} />
           <div className="relative space-y-3">
-            {/* Logo BLU recreado: pill navy con texto blanco italic
-                bold. Misma altura que los demás icon-badges (h-10)
-                pero con padding horizontal para que el texto BLU
-                respire. */}
-            <div className="flex h-10 items-center justify-center rounded-lg bg-slate-950 px-3 ring-1 ring-white/5 shadow-sm">
-              <span className="text-white text-base font-extrabold italic tracking-tight leading-none">
+            {/* Logo BLU: solo las letras, sin fondo — vive directo
+                sobre el card, como un PNG sin background. */}
+            <div className="flex h-10 items-center">
+              <span className="text-white text-xl font-extrabold italic tracking-tight leading-none">
                 BLU
               </span>
             </div>
@@ -1379,6 +1393,8 @@ const PanelDeControl = () => {
             </div>
           </div>
         </button>
+          );
+        })()}
 
         {/* Mejor cerrador — score compuesto 70% cierres + 30% avg QA.
             Click abre el popup con el ranking por mes. */}
