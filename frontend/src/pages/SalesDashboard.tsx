@@ -104,10 +104,10 @@ const SalesDashboard = () => {
     <main className="flex flex-1 flex-col overflow-hidden">
       {/* Topbar fijo con VentasSubtabs — misma posición en todas las
           tabs de Ventas para que cambiar no genere salto visual. */}
-      <div className="border-b border-white/10 bg-background/60 backdrop-blur-xl px-6 py-3 shrink-0">
+      <div className="border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-3 shrink-0">
         <VentasSubtabs />
       </div>
-      <div className="shrink-0 flex items-center justify-between border-b border-white/10 bg-background/60 backdrop-blur-xl px-6 pt-6 pb-4">
+      <div className="shrink-0 flex items-center justify-between border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4">
             <div>
               <h1 className="text-2xl font-bold text-foreground">Reporte de Ventas</h1>
               <p className="text-sm text-muted-foreground">Rendimiento de ventas y análisis por creadora</p>

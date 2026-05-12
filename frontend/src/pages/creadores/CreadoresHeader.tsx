@@ -10,7 +10,7 @@ interface Props {
 }
 
 const CreadoresHeader = ({ action }: Props) => (
-  <header className="bg-background/60 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
+  <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
     <h1 className="text-2xl font-bold mb-4">Dashboard de Creadores</h1>
     <div className="flex items-center justify-between gap-3">
       <CreadoresSubtabs />

@@ -263,7 +263,7 @@ export default function CollectionsPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <header className="shrink-0 bg-background/60 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
+      <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold text-foreground">Collections</h1>

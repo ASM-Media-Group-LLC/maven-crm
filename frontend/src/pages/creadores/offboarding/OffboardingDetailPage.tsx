@@ -223,7 +223,7 @@ ${form.comentarios || "Sin comentarios"}
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Sticky Header */}
-      <div className="shrink-0 sticky top-0 z-10 bg-background/60 backdrop-blur-xl border-b border-white/10 px-6 py-3 flex items-center gap-3">
+      <div className="shrink-0 sticky top-0 z-10 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 py-3 flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate("/creadores/offboarding")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>

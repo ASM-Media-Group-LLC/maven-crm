@@ -284,7 +284,7 @@ export default function EmployeeDirectory() {
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* ── Header ── */}
-      <header className="bg-background/60 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
+      <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold text-foreground">Empleados Activos</h1>

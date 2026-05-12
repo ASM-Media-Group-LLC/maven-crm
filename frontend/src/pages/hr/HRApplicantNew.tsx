@@ -74,7 +74,7 @@ export default function HRApplicantNew() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 border-b border-white/10 bg-background/60 backdrop-blur-xl px-6 py-4">
+      <div className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-4">
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/candidatos")}>
           <ArrowLeft className="h-4 w-4 mr-1" />Volver a Candidatos
         </Button>

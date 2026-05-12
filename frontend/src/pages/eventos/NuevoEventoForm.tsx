@@ -169,7 +169,7 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Fixed Header */}
-      <header className="bg-background/60 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
+      <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <button
           onClick={() => navigate("/eventos")}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"

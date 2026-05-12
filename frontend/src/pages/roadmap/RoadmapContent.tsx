@@ -168,7 +168,7 @@ const RoadmapContent = () => {
   if (isLoading) {
     return (
       <div className="h-screen overflow-hidden flex flex-col">
-        <div className="shrink-0 bg-background/60 backdrop-blur-xl border-b border-white/10 px-6 py-4">
+        <div className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 py-4">
           <Skeleton className="h-8 w-48" />
         </div>
         <div className="flex-1 overflow-auto p-6 space-y-4">
@@ -183,7 +183,7 @@ const RoadmapContent = () => {
   return (
     <div className="h-screen overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="shrink-0 bg-background/60 backdrop-blur-xl border-b border-white/10 px-6 py-4">
+      <div className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Project Roadmap</h1>

@@ -88,7 +88,7 @@ export default function EmployeeProfile() {
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-      <header className="shrink-0 border-b border-white/10 bg-background/60 backdrop-blur-xl px-6 py-4">
+      <header className="shrink-0 border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/hr/directorio")}>
             <ArrowLeft className="h-5 w-5" />

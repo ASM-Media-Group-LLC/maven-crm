@@ -23,7 +23,7 @@ const SalesAudit = () => {
 
   return (
     <main className="flex flex-1 flex-col overflow-hidden">
-      <div className="border-b border-white/10 bg-background/60 backdrop-blur-xl px-6 py-3 shrink-0">
+      <div className="border-b border-white/10 bg-background/30 backdrop-blur-xl px-6 py-3 shrink-0">
         <VentasSubtabs />
       </div>
       <div className="flex-1 p-4 md:p-6 space-y-6 overflow-auto">
