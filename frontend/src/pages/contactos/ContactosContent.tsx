@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import { ListRowButton } from "@/components/ui/list-row";
+import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import ContactosKPICards from "./ContactosKPICards";
 import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
@@ -399,32 +400,20 @@ const ContactosContent = () => {
       </header>
 
       <div className="flex-1 flex flex-col overflow-hidden p-6 gap-4">
-        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 shrink-0">
-          <Button
-            variant={activeTab === "dashboard" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("dashboard")}
-          >
+        <SubtabNav className="shrink-0">
+          <SubtabNavItem active={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")}>
             <LayoutDashboard className="mr-1.5 h-4 w-4" />
             Dashboard
-          </Button>
-          <Button
-            variant={activeTab === "contactos" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("contactos")}
-          >
+          </SubtabNavItem>
+          <SubtabNavItem active={activeTab === "contactos"} onClick={() => setActiveTab("contactos")}>
             <Users className="mr-1.5 h-4 w-4" />
             Contactos
-          </Button>
-          <Button
-            variant={activeTab === "agencias" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setActiveTab("agencias")}
-          >
+          </SubtabNavItem>
+          <SubtabNavItem active={activeTab === "agencias"} onClick={() => setActiveTab("agencias")}>
             <Building2 className="mr-1.5 h-4 w-4" />
             Agencias
-          </Button>
-        </div>
+          </SubtabNavItem>
+        </SubtabNav>
 
         {activeTab === "dashboard" && (
           <div className="space-y-4 overflow-auto">

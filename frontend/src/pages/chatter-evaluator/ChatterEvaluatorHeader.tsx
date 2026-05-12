@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, History as HistoryIcon, Settings, ListChecks, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SubtabNav, subtabNavItemClass } from "@/components/ui/subtab-nav";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useChatterSessions } from "@/hooks/useChatterEvaluator";
 import { NewSessionDialog } from "./NewSessionDialog";
@@ -34,25 +35,21 @@ const ChatterEvaluatorHeader = () => {
     <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
       <h1 className="text-2xl font-bold mb-4">Chatter Evaluator</h1>
       <div className="flex items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 shrink-0 overflow-x-auto">
+        <SubtabNav className="shrink-0 overflow-x-auto">
           {tabs.filter((t) => t.show).map((tab) => {
             const Icon = tab.icon;
             return (
-              <Button
+              <Link
                 key={tab.url}
-                asChild
-                variant={isActive(tab) ? "secondary" : "ghost"}
-                size="sm"
-                className="shrink-0"
+                to={tab.url}
+                className={subtabNavItemClass(isActive(tab))}
               >
-                <Link to={tab.url}>
-                  <Icon className="mr-1.5 h-4 w-4" />
-                  {tab.label}
-                </Link>
-              </Button>
+                <Icon className="mr-1.5 h-4 w-4" />
+                {tab.label}
+              </Link>
             );
           })}
-        </div>
+        </SubtabNav>
         <div className="flex items-center gap-2 shrink-0">
           {canSeeWorkspace && (
             <Button asChild variant="outline" size="sm" className="gap-1.5">
