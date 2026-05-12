@@ -123,6 +123,18 @@ export const useCloserLeads = () => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [dateField, setDateField] = useState<DateFieldType>("passed_date");
+  // viewAsCloserId — feature admin: ver el módulo "como" otro closer.
+  // Cuando está seteado, las queries filtran assigned_to = viewAsCloserId
+  // y desactivan los privilegios de admin/manager para que el resultado
+  // sea exactamente lo que ese closer ve.
+  const [viewAsCloserId, setViewAsCloserId] = useState<string | null>(null);
+  const [viewAsCloserName, setViewAsCloserName] = useState<string | null>(null);
+
+  // Cuando el admin está impersonando a un closer, los filtros server-side
+  // deben tratarlo como NO-admin y forzar el assigned_to a su id.
+  const effectiveIsAdmin = viewAsCloserId ? false : isAdmin;
+  const effectiveIsManager = viewAsCloserId ? false : isManager;
+  const effectiveUserId = viewAsCloserId ?? user?.id;
 
   const handleTabChange = (tab: string) => { setActiveTab(tab); setPage(0); };
   const handleSetSearch = (v: string) => { setSearch(v); setPage(0); };
@@ -236,9 +248,10 @@ export const useCloserLeads = () => {
         query = query.eq("main_platform", platformFilter);
       }
 
-      // Role-based filter: closers only see assigned
-      if (!isAdmin && !isManager && user?.id) {
-        query = query.eq("assigned_to", user.id);
+      // Role-based filter: closers only see assigned. Si el admin está
+      // viendo "como" un closer (viewAsCloserId), también restringimos.
+      if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
+        query = query.eq("assigned_to", effectiveUserId);
       }
 
       // Date filter server-side for passed_date
@@ -307,7 +320,7 @@ export const useCloserLeads = () => {
   };
 
   const buildCreatorsListKey = (tab: string, pageNum: number) =>
-    ["closer-creators-list", tab, pageNum, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter] as const;
+    ["closer-creators-list", tab, pageNum, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter, viewAsCloserId] as const;
 
   const { data: creatorsData, isLoading } = useQuery({
     queryKey: buildCreatorsListKey(activeTab, page),
@@ -331,24 +344,43 @@ export const useCloserLeads = () => {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, role, activeTab, dateFrom, dateTo, dateField, normalizedSearch, agentFilter, platformFilter]);
+  }, [user?.id, role, activeTab, dateFrom, dateTo, dateField, normalizedSearch, agentFilter, platformFilter, viewAsCloserId]);
 
   const creators = creatorsData?.creators || [];
   const totalCount = creatorsData?.total || 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  // Status counts for KPIs — use server-side RPC
+  // Los 4 queries de KPI respetan dateFrom/dateTo cuando dateField =
+  // "passed_date" — match con lo que hace el listado de Operaciones.
+  // Para closer_creators filtramos por passed_date (la fecha de paso).
+  // Para closer_platform_sales filtramos por created_at (la única
+  // columna de fecha que tiene la tabla de ventas).
+  const dateFromStr = dateFrom?.toISOString();
+  const dateToStr = dateTo?.toISOString();
+  const applyCreatorDate = dateField === "passed_date" && !!dateFrom && !!dateTo;
+  const applySalesDate = !!dateFrom && !!dateTo;
+
+  // Status counts for KPIs — client-side count para soportar date filter.
+  // La RPC get_closer_stage_counts no acepta fechas, así que contamos
+  // acá. 661 rows totales = trivial.
   const { data: statusCounts = {} } = useQuery({
-    queryKey: ["closer-creators-counts", user?.id, role],
+    queryKey: ["closer-creators-counts", user?.id, role, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_closer_stage_counts", {
-        _user_id: user!.id,
-        _is_admin: isAdmin || isManager,
-      });
+      let q = supabase.from("closer_creators").select("stage");
+      if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
+        q = q.eq("assigned_to", effectiveUserId);
+      }
+      if (applyCreatorDate) {
+        const fromStr = dateFrom!.toISOString().split("T")[0];
+        const toStr = dateTo!.toISOString().split("T")[0];
+        q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       const counts: Record<string, number> = {};
-      for (const row of data || []) {
-        counts[row.stage] = Number(row.cnt);
+      for (const row of (data || []) as Array<{ stage: string | null }>) {
+        const s = row.stage || "Sin stage";
+        counts[s] = (counts[s] || 0) + 1;
       }
       return counts;
     },
@@ -358,11 +390,20 @@ export const useCloserLeads = () => {
 
   // Revenue by platform
   const { data: platformRevenue = {} } = useQuery({
-    queryKey: ["closer-platform-revenue", user?.id, role],
+    queryKey: ["closer-platform-revenue", user?.id, role, applySalesDate ? dateFromStr : null, applySalesDate ? dateToStr : null, viewAsCloserId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("closer_platform_sales")
-        .select("platform, price");
+      // Si estamos viendo "como" un closer, embebemos la FK a
+      // closer_creators y filtramos por assigned_to. Sino, query simple.
+      let q = viewAsCloserId
+        ? supabase
+            .from("closer_platform_sales")
+            .select("platform, price, created_at, closer_creators!inner(assigned_to)")
+            .eq("closer_creators.assigned_to", viewAsCloserId)
+        : supabase.from("closer_platform_sales").select("platform, price, created_at");
+      if (applySalesDate) {
+        q = q.gte("created_at", dateFrom!.toISOString()).lte("created_at", dateTo!.toISOString());
+      }
+      const { data, error } = await q;
       if (error) throw error;
       const rev: Record<string, number> = {};
       for (const row of data || []) {
@@ -376,12 +417,21 @@ export const useCloserLeads = () => {
 
   // OF monetization total (estimated_monetization from completed/confirmed)
   const { data: ofMonetizationTotal = 0 } = useQuery({
-    queryKey: ["closer-of-monetization", user?.id, role],
+    queryKey: ["closer-of-monetization", user?.id, role, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("closer_creators")
-        .select("estimated_monetization")
+        .select("estimated_monetization, passed_date")
         .in("stage", ["Completada", "Confirmada"]);
+      if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
+        q = q.eq("assigned_to", effectiveUserId);
+      }
+      if (applyCreatorDate) {
+        const fromStr = dateFrom!.toISOString().split("T")[0];
+        const toStr = dateTo!.toISOString().split("T")[0];
+        q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return (data || []).reduce((s, r) => s + Number(r.estimated_monetization || 0), 0);
     },
@@ -391,11 +441,18 @@ export const useCloserLeads = () => {
 
   // Platform sales grouped by creator (for completadas badges)
   const { data: platformSalesByCreator = {} } = useQuery({
-    queryKey: ["closer-platform-sales-all", user?.id, role],
+    queryKey: ["closer-platform-sales-all", user?.id, role, applySalesDate ? dateFromStr : null, applySalesDate ? dateToStr : null, viewAsCloserId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("closer_platform_sales")
-        .select("creator_id, platform, price");
+      let q = viewAsCloserId
+        ? supabase
+            .from("closer_platform_sales")
+            .select("creator_id, platform, price, created_at, closer_creators!inner(assigned_to)")
+            .eq("closer_creators.assigned_to", viewAsCloserId)
+        : supabase.from("closer_platform_sales").select("creator_id, platform, price, created_at");
+      if (applySalesDate) {
+        q = q.gte("created_at", dateFrom!.toISOString()).lte("created_at", dateTo!.toISOString());
+      }
+      const { data, error } = await q;
       if (error) throw error;
       const map: Record<string, { platform: string; price: number }[]> = {};
       for (const row of data || []) {
@@ -516,5 +573,12 @@ export const useCloserLeads = () => {
     assignCreator,
     isAdmin,
     isManager,
+    viewAsCloserId,
+    viewAsCloserName,
+    setViewAsCloser: (id: string | null, name: string | null) => {
+      setViewAsCloserId(id);
+      setViewAsCloserName(name);
+      setPage(0);
+    },
   };
 };

@@ -65,13 +65,25 @@ type CreatorRow = {
   created_at: string | null;
 };
 
-export function useClosersKpiPopup(state: ClosersKpiPopupState | null) {
+export function useClosersKpiPopup(
+  state: ClosersKpiPopupState | null,
+  opts?: { dateFrom?: Date; dateTo?: Date; dateField?: string; viewAsCloserId?: string | null },
+) {
   const { user } = useAuth();
   const { isAdmin, isManager, role } = useUserRole();
   const userId = user?.id;
 
+  const { dateFrom, dateTo, dateField, viewAsCloserId } = opts ?? {};
+  const applyCreatorDate = dateField === "passed_date" && !!dateFrom && !!dateTo;
+  const applySalesDate = !!dateFrom && !!dateTo;
+  // Cuando el admin está viendo "como" un closer, ignoramos privilegios
+  // y forzamos assigned_to = viewAsCloserId.
+  const effectiveIsAdmin = viewAsCloserId ? false : isAdmin;
+  const effectiveIsManager = viewAsCloserId ? false : isManager;
+  const effectiveUserId = viewAsCloserId ?? userId;
+
   return useQuery<ClosersKpiPopupResult>({
-    queryKey: ["closers-kpi-popup", state, userId, role],
+    queryKey: ["closers-kpi-popup", state, userId, role, applyCreatorDate ? dateFrom?.toISOString() : null, applyCreatorDate ? dateTo?.toISOString() : null, applySalesDate ? "sales" : null, viewAsCloserId ?? null],
     enabled: !!state && !!userId && !!role,
     staleTime: 30_000,
     queryFn: async (): Promise<ClosersKpiPopupResult> => {
@@ -82,15 +94,21 @@ export function useClosersKpiPopup(state: ClosersKpiPopupState | null) {
         const stages = STAGE_BY_KEY[state.key];
         let q = supabase
           .from("closer_creators")
-          .select("id, instagram_handle, stage, assigned_to, estimated_monetization, created_at")
+          .select("id, instagram_handle, stage, assigned_to, estimated_monetization, created_at, passed_date")
           .order("created_at", { ascending: false });
 
         if (stages && stages.length > 0) {
           q = stages.length === 1 ? q.eq("stage", stages[0]) : q.in("stage", stages);
         }
 
-        if (!isAdmin && !isManager && userId) {
-          q = q.eq("assigned_to", userId);
+        if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
+          q = q.eq("assigned_to", effectiveUserId);
+        }
+
+        if (applyCreatorDate) {
+          const fromStr = dateFrom!.toISOString().split("T")[0];
+          const toStr = dateTo!.toISOString().split("T")[0];
+          q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
         }
 
         const { data, error } = await q;
@@ -183,12 +201,21 @@ export function useClosersKpiPopup(state: ClosersKpiPopupState | null) {
       const platform = state.platform;
 
       if (platform === "Rev. OnlyFans") {
-        const { data, error } = await supabase
+        let q = supabase
           .from("closer_creators")
-          .select("id, instagram_handle, estimated_monetization, stage")
+          .select("id, instagram_handle, estimated_monetization, stage, passed_date")
           .in("stage", ["Completada", "Confirmada"])
           .gt("estimated_monetization", 0)
           .order("estimated_monetization", { ascending: false });
+        if (viewAsCloserId) {
+          q = q.eq("assigned_to", viewAsCloserId);
+        }
+        if (applyCreatorDate) {
+          const fromStr = dateFrom!.toISOString().split("T")[0];
+          const toStr = dateTo!.toISOString().split("T")[0];
+          q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
+        }
+        const { data, error } = await q;
         if (error) throw error;
         const rows: ClosersKpiPopupRow[] = (data ?? []).map((r: any) => ({
           id: r.id,
@@ -200,9 +227,16 @@ export function useClosersKpiPopup(state: ClosersKpiPopupState | null) {
       }
 
       if (platform === "Rev. Plataformas") {
-        const { data, error } = await supabase
-          .from("closer_platform_sales")
-          .select("creator_id, platform, price");
+        let q = viewAsCloserId
+          ? supabase
+              .from("closer_platform_sales")
+              .select("creator_id, platform, price, created_at, closer_creators!inner(assigned_to)")
+              .eq("closer_creators.assigned_to", viewAsCloserId)
+          : supabase.from("closer_platform_sales").select("creator_id, platform, price, created_at");
+        if (applySalesDate) {
+          q = q.gte("created_at", dateFrom!.toISOString()).lte("created_at", dateTo!.toISOString());
+        }
+        const { data, error } = await q;
         if (error) throw error;
         const byCreator: Record<string, { total: number; platforms: string[] }> = {};
         for (const r of (data ?? []) as Array<{ creator_id: string; platform: string; price: number | string }>) {
@@ -235,13 +269,28 @@ export function useClosersKpiPopup(state: ClosersKpiPopupState | null) {
       }
 
       if (platform === "Rev. Total") {
-        const [salesRes, ofRes] = await Promise.all([
-          supabase.from("closer_platform_sales").select("creator_id, price"),
-          supabase
-            .from("closer_creators")
-            .select("id, instagram_handle, estimated_monetization, stage")
-            .in("stage", ["Completada", "Confirmada"]),
-        ]);
+        let salesQ = viewAsCloserId
+          ? supabase
+              .from("closer_platform_sales")
+              .select("creator_id, price, created_at, closer_creators!inner(assigned_to)")
+              .eq("closer_creators.assigned_to", viewAsCloserId)
+          : supabase.from("closer_platform_sales").select("creator_id, price, created_at");
+        let ofQ = supabase
+          .from("closer_creators")
+          .select("id, instagram_handle, estimated_monetization, stage, passed_date")
+          .in("stage", ["Completada", "Confirmada"]);
+        if (viewAsCloserId) {
+          ofQ = ofQ.eq("assigned_to", viewAsCloserId);
+        }
+        if (applySalesDate) {
+          salesQ = salesQ.gte("created_at", dateFrom!.toISOString()).lte("created_at", dateTo!.toISOString());
+        }
+        if (applyCreatorDate) {
+          const fromStr = dateFrom!.toISOString().split("T")[0];
+          const toStr = dateTo!.toISOString().split("T")[0];
+          ofQ = ofQ.gte("passed_date", fromStr).lte("passed_date", toStr);
+        }
+        const [salesRes, ofRes] = await Promise.all([salesQ, ofQ]);
         if (salesRes.error) throw salesRes.error;
         if (ofRes.error) throw ofRes.error;
         const byCreator: Record<string, number> = {};
@@ -275,10 +324,20 @@ export function useClosersKpiPopup(state: ClosersKpiPopupState | null) {
       }
 
       if (PLATFORM_KEYS.includes(platform)) {
-        const { data, error } = await supabase
-          .from("closer_platform_sales")
-          .select("creator_id, price")
-          .eq("platform", platform);
+        let q = viewAsCloserId
+          ? supabase
+              .from("closer_platform_sales")
+              .select("creator_id, price, created_at, closer_creators!inner(assigned_to)")
+              .eq("platform", platform)
+              .eq("closer_creators.assigned_to", viewAsCloserId)
+          : supabase
+              .from("closer_platform_sales")
+              .select("creator_id, price, created_at")
+              .eq("platform", platform);
+        if (applySalesDate) {
+          q = q.gte("created_at", dateFrom!.toISOString()).lte("created_at", dateTo!.toISOString());
+        }
+        const { data, error } = await q;
         if (error) throw error;
         const rows = (data ?? []) as Array<{ creator_id: string; price: number | string }>;
         const creatorIds = [...new Set(rows.map((r) => r.creator_id))];

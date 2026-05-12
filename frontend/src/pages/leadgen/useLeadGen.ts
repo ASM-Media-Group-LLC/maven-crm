@@ -137,6 +137,33 @@ export const useLeadGenProfiles = () =>
     staleTime: 5 * 60 * 1000,
   });
 
+/** Lista de LLGs (lead generators) — profiles que tienen al menos una
+ *  entry en leadgen_entries. Se usa en el picker admin "ver como LLG". */
+export const useLeadGenLLGs = () =>
+  useQuery({
+    queryKey: ["leadgen-llgs-list"],
+    queryFn: async () => {
+      const { data: rows, error } = await supabase
+        .from("leadgen_entries")
+        .select("lg_user_id")
+        .not("lg_user_id", "is", null);
+      if (error) throw error;
+      const ids = Array.from(
+        new Set(((rows ?? []) as Array<{ lg_user_id: string | null }>).map((r) => r.lg_user_id).filter(Boolean) as string[]),
+      );
+      if (ids.length === 0) return [] as Array<{ id: string; full_name: string | null }>;
+      const { data: profs, error: pErr } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", ids);
+      if (pErr) throw pErr;
+      return ((profs ?? []) as Array<{ id: string; full_name: string | null }>).sort((a, b) =>
+        (a.full_name ?? "").localeCompare(b.full_name ?? ""),
+      );
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
 /** Fetch QA reviews for entries */
 export const useLeadGenQA = (entryIds: string[]) =>
   useQuery({

@@ -2,12 +2,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, X, UserPlus, LayoutGrid, List, LayoutDashboard, ListChecks } from "lucide-react";
+import { Search, X, UserPlus, LayoutGrid, List, LayoutDashboard, ListChecks, Eye } from "lucide-react";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useCloserLeads, PLATFORMS, type DateFieldType, type CloserCreatorRow } from "./hooks/useCloserLeads";
 import { useClosersKpiPopup } from "./hooks/useClosersKpiPopup";
 import ClosersKPICards from "./components/ClosersKPICards";
 import ClosersKpiDetailDialog from "./components/ClosersKpiDetailDialog";
+import ViewAsCloserPicker from "./components/ViewAsCloserPicker";
 import CloserTable from "./components/LeadTable";
 import AssignCloserDialog from "./components/AssignCloserDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -40,13 +41,14 @@ const ClosersContent = () => {
     dateField, setDateField,
     updateField, updateStage, assignCreator,
     isAdmin, isManager,
+    viewAsCloserId, viewAsCloserName, setViewAsCloser,
   } = useCloserLeads();
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
   type KpiPopupState = { kind: "pipeline"; key: "total" | "asignadas" | "confirmadas" | "completadas" | "cerradas" | "no_interesadas" } | { kind: "revenue"; platform: string };
   const [kpiPopup, setKpiPopup] = useState<KpiPopupState | null>(null);
-  const { data: kpiPopupResult, isLoading: kpiPopupLoading } = useClosersKpiPopup(kpiPopup);
+  const { data: kpiPopupResult, isLoading: kpiPopupLoading } = useClosersKpiPopup(kpiPopup, { dateFrom, dateTo, dateField, viewAsCloserId });
   // Subtab top-level — Dashboard (KPI cards) vs Operaciones (tabs/filtros/tabla)
   const [viewTab, setViewTab] = useState<"dashboard" | "operaciones">("dashboard");
 
@@ -113,13 +115,50 @@ const ClosersContent = () => {
               placeholder="Seleccionar fechas"
             />
             {(isAdmin || isManager) && (
-              <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null, source: "closer" }); setAssignDialogOpen(true); }}>
-                <UserPlus className="h-4 w-4 mr-1" /> Asignar
-              </Button>
+              <>
+                <ViewAsCloserPicker
+                  value={viewAsCloserId}
+                  onChange={(id, name) => setViewAsCloser(id, name)}
+                />
+                <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null, source: "closer" }); setAssignDialogOpen(true); }}>
+                  <UserPlus className="h-4 w-4 mr-1" /> Asignar
+                </Button>
+              </>
             )}
           </div>
         </div>
       </header>
+
+      {/* Banner sticky cuando el admin está viendo "como" otro closer.
+          Gradient violet + chevron, claro y persistente. Click en X
+          cancela la vista. */}
+      {viewAsCloserId && (
+        <div className="shrink-0 border-b border-primary/30 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 px-6 py-2.5 backdrop-blur-md">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/25 ring-1 ring-primary/40">
+                <Eye className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-widest text-primary/80 font-bold leading-tight">
+                  Vista filtrada
+                </p>
+                <p className="text-sm font-semibold truncate">
+                  Viendo el panel como <span className="text-primary">{viewAsCloserName || "este closer"}</span>
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0 text-primary hover:bg-primary/15"
+              onClick={() => setViewAsCloser(null, null)}
+            >
+              <X className="h-4 w-4 mr-1" /> Cancelar vista
+            </Button>
+          </div>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="p-6">

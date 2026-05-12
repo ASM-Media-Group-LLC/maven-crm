@@ -70,6 +70,7 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
       queryClient.invalidateQueries({ queryKey: ["closer-platform-sales-all"] });
       setSelectedPlatforms({});
       toast({ title: "Ventas registradas" });
+      onOpenChange(false);
     },
     onError: (e: Error) => {
       toast({ title: "Error", description: e.message, variant: "destructive" });

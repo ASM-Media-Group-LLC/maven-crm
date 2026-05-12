@@ -3,7 +3,7 @@ import DataTableShell from "@/components/ui/data-table-shell";
 import { useNavigate } from "react-router-dom";
 import {
   Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock,
-  Search, List, LayoutGrid, FileText, Calendar, ChevronLeft, ChevronRight, Shield, Eye,
+  Search, List, LayoutGrid, FileText, Calendar, ChevronLeft, ChevronRight, Shield, Eye, X,
 } from "lucide-react";
 import { format, isSameDay, subDays, startOfWeek, addDays, isToday, isFuture, startOfDay, startOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -36,6 +36,7 @@ import AgentDetailView from "./AgentDetailView";
 import AgentHourlyPerformance from "./AgentHourlyPerformance";
 import LeadGenSupervisorView from "./LeadGenSupervisorView";
 import LeadGenPerformanceView from "./LeadGenPerformanceView";
+import ViewAsLlgPicker from "./ViewAsLlgPicker";
 import AnalyticsSectionBanner from "@/components/analytics/AnalyticsSectionBanner";
 
 const knownStatuses = new Set(["no_response", "contactado", "respondio", "interesado", "no_interesado"]);
@@ -68,12 +69,18 @@ const LeadGenContent = () => {
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [page, setPage] = useState(0);
   const [agentPage, setAgentPage] = useState(1);
+  // viewAsLgUserId — feature admin/owner: ver el panel como otro LLG.
+  // Cuando está seteado, filtramos las queries por lg_user_id = ese id,
+  // simulando lo que vería ese LLG (viewMode='agent').
+  const [viewAsLgUserId, setViewAsLgUserId] = useState<string | null>(null);
+  const [viewAsLgUserName, setViewAsLgUserName] = useState<string | null>(null);
 
   const dateFromStr = dateFrom ? format(dateFrom, "yyyy-MM-dd") : undefined;
   const dateToStr = dateTo ? format(dateTo, "yyyy-MM-dd") : undefined;
 
-  // Fetch entries filtered by date and user scope — server-side paginated
-  const userId = viewMode === "agent" ? user?.id : undefined;
+  // Fetch entries filtered by date and user scope — server-side paginated.
+  // Si el admin está viendo "como" un LLG, el viewAsLgUserId pisa el scope.
+  const userId = viewAsLgUserId ?? (viewMode === "agent" ? user?.id : undefined);
   const { data: paginatedData, isLoading: leadsLoading } = useLeadGenByDateRange(dateFromStr, dateToStr, userId, page);
   const leads = paginatedData?.data || [];
   const totalLeads = paginatedData?.total || 0;
@@ -227,6 +234,16 @@ const LeadGenContent = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {viewMode !== "agent" && (
+              <ViewAsLlgPicker
+                value={viewAsLgUserId}
+                onChange={(id, name) => {
+                  setViewAsLgUserId(id);
+                  setViewAsLgUserName(name);
+                  setPage(0);
+                }}
+              />
+            )}
             <Button size="sm" onClick={() => setAddLeadOpen(true)}>
               <Plus className="h-4 w-4" />
               Agregar Lead
@@ -238,6 +255,39 @@ const LeadGenContent = () => {
           </div>
         </div>
       </header>
+
+      {/* Banner: vista filtrada como otro LLG */}
+      {viewAsLgUserId && (
+        <div className="shrink-0 border-b border-primary/30 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 px-6 py-2.5 backdrop-blur-md">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/25 ring-1 ring-primary/40">
+                <Eye className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-widest text-primary/80 font-bold leading-tight">
+                  Vista filtrada
+                </p>
+                <p className="text-sm font-semibold truncate">
+                  Viendo el panel como <span className="text-primary">{viewAsLgUserName || "este LLG"}</span>
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0 text-primary hover:bg-primary/15"
+              onClick={() => {
+                setViewAsLgUserId(null);
+                setViewAsLgUserName(null);
+                setPage(0);
+              }}
+            >
+              <X className="h-4 w-4 mr-1" /> Cancelar vista
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards — collapse on table scroll */}
       <div className={`shrink-0 px-6 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[200px] opacity-100 pt-4 pb-2"}`}>

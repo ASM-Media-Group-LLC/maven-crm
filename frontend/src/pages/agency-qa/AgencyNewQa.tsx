@@ -128,6 +128,7 @@ const AgencyNewQa = () => {
   const [modelName, setModelName] = useState<string>("");
   const [modelSearch, setModelSearch] = useState<string>("");
   const [modelComboOpen, setModelComboOpen] = useState(false);
+  const modelBlurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [modelCategory, setModelCategory] = useState<ModelCategory | "">("");
   const [modelCountry, setModelCountry] = useState<string>("");
   const [modelIgUrl, setModelIgUrl] = useState<string>("");
@@ -449,79 +450,97 @@ const AgencyNewQa = () => {
 
               <div className="space-y-1.5">
                 <Label htmlFor="model">Modelo *</Label>
-                <Popover open={modelComboOpen} onOpenChange={setModelComboOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
+                {/* Input único + lista inline. La lista se renderiza en flow
+                    del DOM (empuja los demás campos hacia abajo) en vez de
+                    flotar como popover ocluyendo el form. */}
+                <div className="relative">
+                  <Input
+                    id="model"
+                    value={modelName}
+                    placeholder="Buscar modelo en el catálogo…"
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setModelName(v);
+                      setModelSearch(v);
+                      if (selectedModelId) setSelectedModelId("");
+                    }}
+                    onFocus={() => setModelComboOpen(true)}
+                    onBlur={() => {
+                      modelBlurTimeoutRef.current = setTimeout(() => setModelComboOpen(false), 150);
+                    }}
+                    className={cn(selectedModelId && "pr-8")}
+                  />
+                  {selectedModelId && (
+                    <button
                       type="button"
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={modelComboOpen}
-                      className={cn(
-                        "w-full justify-between font-normal",
-                        !modelName && "text-muted-foreground",
-                      )}
+                      onClick={() => {
+                        setSelectedModelId("");
+                        setModelName("");
+                        setModelSearch("");
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 hover:bg-muted/60"
+                      title="Quitar modelo seleccionada"
                     >
-                      {modelName || "Buscar modelo en el catálogo…"}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <Command shouldFilter={false}>
-                      <CommandInput
-                        placeholder="Buscar por handle o nombre…"
-                        value={modelSearch}
-                        onValueChange={setModelSearch}
-                      />
-                      <CommandList>
-                        {modelSearch.trim().length < 2 ? (
-                          <CommandEmpty>Tipeá al menos 2 caracteres…</CommandEmpty>
-                        ) : modelSearchQ.isFetching ? (
-                          <CommandEmpty>Buscando…</CommandEmpty>
-                        ) : (modelSearchQ.data ?? []).length === 0 ? (
-                          <CommandEmpty>
-                            <div className="py-2 text-center">
-                              <p className="text-sm">Sin resultados.</p>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                Si la modelo no existe, creala en{" "}
-                                <a href="/scouter/leads" className="text-primary underline">Scouter</a>{" "}
-                                o{" "}
-                                <a href="/lead-gen" className="text-primary underline">Lead Gen</a>{" "}
-                                primero, después subí la QA.
-                              </p>
-                            </div>
-                          </CommandEmpty>
-                        ) : (
-                          <CommandGroup>
-                            {(modelSearchQ.data ?? []).map((m) => (
-                              <CommandItem
-                                key={m.id}
-                                value={m.id}
-                                onSelect={() => handlePickModel(m)}
-                                className="flex items-center gap-2"
-                              >
-                                <Check
-                                  className={cn(
-                                    "h-3.5 w-3.5",
-                                    selectedModelId === m.id ? "opacity-100" : "opacity-0",
-                                  )}
-                                />
-                                <div className="min-w-0 flex-1">
-                                  <div className="truncate font-medium">
-                                    {m.display_name || m.instagram_handle || "Sin nombre"}
-                                  </div>
-                                  <div className="truncate text-xs text-muted-foreground">
-                                    {m.instagram_handle ? `@${m.instagram_handle}` : "—"}
-                                    {m.country ? ` · ${m.country}` : ""}
-                                  </div>
+                      <X className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
+                {modelComboOpen && !selectedModelId && modelSearch.trim().length >= 2 && (
+                  <div
+                    onMouseDown={() => {
+                      if (modelBlurTimeoutRef.current) {
+                        clearTimeout(modelBlurTimeoutRef.current);
+                        modelBlurTimeoutRef.current = null;
+                      }
+                    }}
+                    className="rounded-lg border border-border/60 bg-card shadow-sm max-h-72 overflow-y-auto"
+                  >
+                    {modelSearchQ.isFetching ? (
+                      <p className="px-3 py-3 text-xs text-muted-foreground text-center">
+                        Buscando…
+                      </p>
+                    ) : (modelSearchQ.data ?? []).length === 0 ? (
+                      <div className="px-3 py-3 text-center">
+                        <p className="text-sm">Sin resultados.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Si la modelo no existe, creala en{" "}
+                          <a href="/scouter/leads" className="text-primary underline">Scouter</a>{" "}
+                          o{" "}
+                          <a href="/lead-gen" className="text-primary underline">Lead Gen</a>{" "}
+                          primero.
+                        </p>
+                      </div>
+                    ) : (
+                      <ul className="divide-y divide-border/40">
+                        {(modelSearchQ.data ?? []).map((m) => (
+                          <li key={m.id}>
+                            <button
+                              type="button"
+                              onClick={() => handlePickModel(m)}
+                              className="w-full text-left px-3 py-2 hover:bg-muted/40 transition-colors flex items-center gap-2"
+                            >
+                              <Check
+                                className={cn(
+                                  "h-3.5 w-3.5 shrink-0",
+                                  selectedModelId === m.id ? "opacity-100" : "opacity-0",
+                                )}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate font-medium">
+                                  {m.display_name || m.instagram_handle || "Sin nombre"}
                                 </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                                <div className="truncate text-xs text-muted-foreground">
+                                  {m.instagram_handle ? `@${m.instagram_handle}` : "—"}
+                                  {m.country ? ` · ${m.country}` : ""}
+                                </div>
+                              </div>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
                 {errors.model && (
                   <p className="text-xs text-rose-400">{errors.model}</p>
                 )}

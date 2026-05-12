@@ -1,17 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 
 // Autocomplete buscable de leadgen_entries — usado en:
@@ -26,8 +17,10 @@ import { cn } from "@/lib/utils";
 //   2. Seleccionar uno del dropdown — onLeadSelect dispara con la row
 //      completa → el caller autollena los demás campos.
 //
-// Flujo unificado: la selección de lead es OBLIGATORIA en submit. Ver
-// validación en cada caller.
+// Implementación: el listado se renderiza INLINE (en el flow del DOM)
+// debajo del input — empuja los demás campos del form hacia abajo en
+// vez de ocluirlos con un popover flotante. Single input: la búsqueda
+// usa directo el `value` del input principal.
 
 export interface LeadAutocompleteLead {
   id: string;
@@ -62,20 +55,19 @@ export function LeadAutocomplete({
   error,
   placeholder = "Nombre completo (o buscá un lead existente)",
 }: Props) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    if (open) setQuery(value || "");
-  }, [open, value]);
+  const trimmed = value.trim();
+  // Mostramos resultados cuando: el input está focuseado, hay 2+ caracteres,
+  // y NO hay lead seleccionado todavía (el user seleccionó uno → ocultamos).
+  const showResults = focused && trimmed.length >= 2 && !selectedLead;
 
   const { data: leads = [], isLoading } = useQuery({
-    queryKey: ["leadgen-search-fuzzy", query],
+    queryKey: ["leadgen-search-fuzzy", trimmed],
     queryFn: async () => {
-      const q = query.trim();
-      if (q.length < 2) return [];
       const { data, error: err } = await (supabase as any).rpc("leadgen_search_fuzzy", {
-        p_query: q,
+        p_query: trimmed,
         p_limit: 20,
         p_min_similarity: 0.2,
       });
@@ -99,71 +91,77 @@ export function LeadAutocomplete({
       }
       return rows;
     },
-    enabled: open,
+    enabled: showResults,
     staleTime: 30_000,
   });
 
+  // Blur con delay para que el click en un resultado funcione
+  // (sino la lista se oculta antes de que dispare el onClick).
+  const handleBlur = () => {
+    blurTimeoutRef.current = setTimeout(() => setFocused(false), 150);
+  };
+
+  // onMouseDown en la lista cancela el blur — permite el click.
+  const handleResultsMouseDown = () => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+  };
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <div className="relative">
-          <Input
-            value={value}
-            onChange={(e) => {
-              onTypedChange(e.target.value);
-              if (selectedLead) onLeadSelect(null);
-              if (!open) setOpen(true);
+    <div className="space-y-2">
+      <div className="relative">
+        <Input
+          value={value}
+          onChange={(e) => {
+            onTypedChange(e.target.value);
+            if (selectedLead) onLeadSelect(null);
+          }}
+          onFocus={() => setFocused(true)}
+          onBlur={handleBlur}
+          placeholder={placeholder}
+          className={cn(error && "border-destructive", "pr-8")}
+        />
+        {selectedLead && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onLeadSelect(null);
             }}
-            onFocus={() => setOpen(true)}
-            placeholder={placeholder}
-            className={cn(error && "border-destructive", "pr-8")}
-          />
-          {selectedLead && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onLeadSelect(null);
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 hover:bg-muted/60"
-              title="Quitar asociación al lead"
-            >
-              <X className="h-3.5 w-3.5 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-[--radix-popover-trigger-width] p-0"
-        align="start"
-        onOpenAutoFocus={(e) => e.preventDefault()}
-      >
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Buscar lead por handle, ticket, notas o teléfono…"
-            value={query}
-            onValueChange={setQuery}
-          />
-          <CommandList>
-            {query.trim().length < 2 ? (
-              <CommandEmpty>Escribí al menos 2 caracteres para buscar.</CommandEmpty>
-            ) : isLoading ? (
-              <CommandEmpty>Buscando…</CommandEmpty>
-            ) : leads.length === 0 ? (
-              <CommandEmpty>
-                Sin leads que matcheen. Si el lead no existe, agregalo primero en LeadGen.
-              </CommandEmpty>
-            ) : (
-              <CommandGroup heading="Leads existentes">
-                {leads.map((lead) => (
-                  <CommandItem
-                    key={lead.id}
-                    value={lead.id}
-                    onSelect={() => {
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 hover:bg-muted/60"
+            title="Quitar asociación al lead"
+          >
+            <X className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        )}
+      </div>
+
+      {showResults && (
+        <div
+          onMouseDown={handleResultsMouseDown}
+          className="rounded-lg border border-border/60 bg-card shadow-sm max-h-72 overflow-y-auto"
+        >
+          {isLoading ? (
+            <p className="px-3 py-3 text-xs text-muted-foreground text-center">
+              Buscando…
+            </p>
+          ) : leads.length === 0 ? (
+            <p className="px-3 py-3 text-xs text-muted-foreground text-center">
+              Sin leads que matcheen. Si el lead no existe, agregalo primero en LeadGen.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/40">
+              {leads.map((lead) => (
+                <li key={lead.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
                       onLeadSelect(lead);
-                      setOpen(false);
+                      setFocused(false);
                     }}
-                    className="flex flex-col items-start gap-0.5 py-2"
+                    className="w-full text-left px-3 py-2 hover:bg-muted/40 transition-colors flex flex-col items-start gap-0.5"
                   >
                     <div className="flex w-full items-center gap-2">
                       <span className="font-medium truncate">
@@ -185,13 +183,13 @@ export function LeadAutocomplete({
                       {lead.city && <span>· {lead.city}</span>}
                       {lead.llgName && <span>· LLG: {lead.llgName}</span>}
                     </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

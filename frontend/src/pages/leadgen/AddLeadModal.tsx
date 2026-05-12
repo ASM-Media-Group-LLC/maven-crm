@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,8 +20,9 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
 import { enqueueAvatarFetch } from "@/lib/avatarFetch";
-import { checkCreatorExists, checkPreviousLead, checkDuplicateOnlyFans, checkScouterLead } from "@/lib/lead-validation";
-import { useQueryClient } from "@tanstack/react-query";
+import { checkLeadAvailability, checkDuplicateOnlyFans, type LeadAvailabilityStatus } from "@/lib/lead-validation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertCircle, Info } from "lucide-react";
 
 
 
@@ -51,7 +52,6 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const [isAddingCompany, setIsAddingCompany] = useState(false);
   const [customCompany, setCustomCompany] = useState("");
-  const [creatorAlert, setCreatorAlert] = useState<{ name: string; id: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -76,6 +76,25 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       notes: "",
     },
   });
+
+  // Disponibilidad del lead — corre debounced cuando el LLG escribe la
+  // URL. El resultado se muestra como banner inline arriba del form y
+  // bloquea el submit si la modelo no se puede agregar.
+  const watchedSourceLink = form.watch("source_link");
+  const [debouncedSourceLink, setDebouncedSourceLink] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSourceLink(watchedSourceLink || ""), 450);
+    return () => clearTimeout(t);
+  }, [watchedSourceLink]);
+  const debouncedHandle = debouncedSourceLink ? normalizeHandle(debouncedSourceLink) : "";
+  const availability = useQuery<LeadAvailabilityStatus>({
+    queryKey: ["lead-availability", debouncedHandle],
+    queryFn: () => checkLeadAvailability(debouncedHandle),
+    enabled: debouncedHandle.length >= 2,
+    staleTime: 30_000,
+  });
+  const availabilityResult = availability.data;
+  const isBlockedByAvailability = availabilityResult?.kind === "blocked";
 
   // Auto-detect platform when URL changes
   const handleUrlChange = (value: string, onChange: (v: string) => void) => {
@@ -114,47 +133,25 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         return;
       }
 
-      // VALIDATION 1: Check if creator exists (status-aware)
-      const creatorCheck = await checkCreatorExists(data.source_link, data.onlyfans_url);
-      if (creatorCheck.exists) {
-        if (creatorCheck.isActive) {
-          setCreatorAlert({ name: creatorCheck.creatorName!, id: creatorCheck.creatorId! });
-          setIsSubmitting(false);
-          return;
-        }
-        // Inactive creator — allow as reactivated (warning style, not destructive)
+      // VALIDATION: chequeo unificado de disponibilidad del lead. Cubre
+      // creators (activa/inactiva), closer_creators (en proceso/no
+      // interesada), leadgen_entries (duplicado) y scouter_leads (info).
+      // Si el banner inline ya dijo "blocked", el submit ni se intenta;
+      // re-chequeamos acá como safety final por si el LLG cambió la URL
+      // después del debounce.
+      const finalCheck = await checkLeadAvailability(normalizedHandle);
+      if (finalCheck.kind === "blocked") {
         toast({
-          title: "⚠️ Creadora inactiva detectada",
-          description: `${creatorCheck.creatorName} tiene estado "${creatorCheck.creatorStatus}". Se registrará como lead reactivado.`,
+          title: `❌ ${finalCheck.title}`,
+          description: finalCheck.message,
+          variant: "destructive",
         });
+        setIsSubmitting(false);
+        return;
       }
 
-      // VALIDATION 2: Check handle in leads with 24h rule
-      const previousCheck = await checkPreviousLead(data.source_link, data.onlyfans_url);
-      let recordType = creatorCheck.exists ? "reactivado" : "nuevo";
-      if (previousCheck.existed) {
-        const lastDate = previousCheck.lastEntryDate ? new Date(previousCheck.lastEntryDate) : null;
-        const hoursSince = lastDate ? (Date.now() - lastDate.getTime()) / (1000 * 60 * 60) : Infinity;
-        if (hoursSince < 24) {
-          const hoursRemaining = Math.ceil(24 - hoursSince);
-          const agentInfo = previousCheck.lastAgentName ? ` por ${previousCheck.lastAgentName}` : "";
-          const hoursAgo = Math.floor(hoursSince);
-          toast({
-            title: "❌ Lead duplicado (bloqueo 24h)",
-            description: `Este lead fue subido hace ${hoursAgo}h${agentInfo}. Podrás resubirlo en ~${hoursRemaining}h.`,
-            variant: "destructive",
-          });
-          setIsSubmitting(false);
-          return;
-        }
-        recordType = "reactivado";
-        toast({
-          title: "⚠️ Modelo reactivada",
-          description: `Esta modelo ya existía en el sistema (último registro: ${lastDate ? lastDate.toLocaleDateString("es-CO") : "desconocido"}). Se creará como lead reactivado.`,
-        });
-      }
-
-      // VALIDATION 3: Check duplicate OnlyFans URL
+      // VALIDATION: OnlyFans URL duplicada — chequeo separado porque
+      // matchea por URL completa, no por handle.
       if (data.onlyfans_url?.trim()) {
         const ofCheck = await checkDuplicateOnlyFans(data.onlyfans_url);
         if (ofCheck.existsInLeads || ofCheck.existsInContacts) {
@@ -170,23 +167,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         }
       }
 
-      // VALIDATION 4: Check handle in Scouter Assist (cross-system dedup).
-      // Si el handle ya vive en scouter_leads, bloqueamos — independiente
-      // del status (incluso rejected) porque significa que el equipo ya
-      // tomó una decisión sobre ese perfil y no queremos duplicarlo.
-      const scouterCheck = await checkScouterLead(data.source_link);
-      if (scouterCheck.exists) {
-        const dateInfo = scouterCheck.createdAt
-          ? ` (desde ${new Date(scouterCheck.createdAt).toLocaleDateString("es-CO")})`
-          : "";
-        toast({
-          title: "❌ Lead ya existe en Scouter Assist",
-          description: `Este @ ya está en Scouter Assist con status "${scouterCheck.status}"${dateInfo}. No se puede duplicar.`,
-          variant: "destructive",
-        });
-        setIsSubmitting(false);
-        return;
-      }
+      const recordType = finalCheck.kind === "allowed_with_history" ? "reactivado" : "nuevo";
 
       // Dual-write: derivamos company_id desde el name elegido (puede
       // ser una compañía recién creada via useCreateCompany — la lista
@@ -283,6 +264,30 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                   </FormItem>
                 )}
               />
+
+              {/* Banner de disponibilidad — corre en vivo cuando el LLG
+                  cambia la URL. Rojo si bloquea, amarillo si permite con
+                  historial, oculto si es nuevo. */}
+              {availabilityResult && availabilityResult.kind !== "new" && (
+                <div
+                  className={cn(
+                    "rounded-lg border p-3 flex items-start gap-2.5",
+                    availabilityResult.kind === "blocked"
+                      ? "border-destructive/40 bg-destructive/10 text-destructive"
+                      : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                  )}
+                >
+                  {availabilityResult.kind === "blocked" ? (
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  ) : (
+                    <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold leading-tight">{availabilityResult.title}</p>
+                    <p className="text-xs mt-1 leading-snug">{availabilityResult.message}</p>
+                  </div>
+                </div>
+              )}
 
               <FormField
                 control={form.control}
@@ -487,31 +492,13 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
             </div>
 
             <DialogFooter className="pt-4">
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
+              <Button type="submit" className="w-full" disabled={isSubmitting || isBlockedByAvailability}>
                 <Plus className="mr-2 h-4 w-4" />
-                {isSubmitting ? "Guardando..." : "Guardar Lead"}
+                {isSubmitting ? "Guardando..." : isBlockedByAvailability ? "No se puede agregar" : "Guardar Lead"}
               </Button>
             </DialogFooter>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
-
-    {/* Creator exists alert */}
-    <Dialog open={!!creatorAlert} onOpenChange={(o) => !o && setCreatorAlert(null)}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Creadora existente</DialogTitle>
-          <DialogDescription>
-            Esta creadora ya forma parte de la agencia: <strong>{creatorAlert?.name}</strong>
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="flex gap-2">
-          <Button variant="outline" onClick={() => setCreatorAlert(null)}>Cancelar</Button>
-          <Button onClick={() => { navigate(`/creadoras/${creatorAlert?.id}`); setCreatorAlert(null); onOpenChange(false); }}>
-            Ver perfil
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
     </>
