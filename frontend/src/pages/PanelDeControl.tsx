@@ -1353,7 +1353,7 @@ const PanelDeControl = () => {
             {/* Logo BLU dentro de un cuadrado h-10 w-10 (mismo
                 footprint que los icon-badges de los otros cards). */}
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 ring-1 ring-white/5">
-              <span className="text-white text-[11px] font-extrabold italic tracking-tight leading-none">
+              <span className="text-white text-[13px] font-extrabold italic tracking-tight leading-none">
                 BLU
               </span>
             </div>
