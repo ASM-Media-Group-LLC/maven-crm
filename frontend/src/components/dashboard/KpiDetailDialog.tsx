@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { ListRow } from "@/components/ui/list-row";
 
 export type KpiRowTone = "default" | "success" | "destructive" | "warning";
 
@@ -35,12 +36,9 @@ const KpiDetailDialog = ({ open, onOpenChange, title, subtitle, rows, emptyText 
             {emptyText}
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {rows.map((r, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3"
-              >
+              <ListRow key={i} className="justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">{r.primary}</p>
                   {r.secondary && <p className="text-[11px] text-muted-foreground truncate">{r.secondary}</p>}
@@ -53,7 +51,7 @@ const KpiDetailDialog = ({ open, onOpenChange, title, subtitle, rows, emptyText 
                     {r.right}
                   </Badge>
                 )}
-              </div>
+              </ListRow>
             ))}
           </div>
         )}

@@ -4,14 +4,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { ListRow } from "@/components/ui/list-row";
 import type { CreatorComparison } from "./usePeriodComparison";
 
 interface Props {
@@ -48,29 +41,27 @@ const CardDetailModal = ({ open, onOpenChange, cardType, creators }: Props) => {
         {creators.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No hay datos para este periodo.</p>
         ) : (
-          <div className="max-h-[500px] overflow-auto">
-          <Table>
-            <TableHeader className="sticky top-0 z-10 bg-card">
-              <TableRow>
-                <TableHead>Creadora</TableHead>
-                <TableHead className="text-right">Actual</TableHead>
-                <TableHead className="text-right">Anterior</TableHead>
-                <TableHead className="text-right">Variación</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {creators.map((c) => (
-                <TableRow key={c.creatorKey}>
-                  <TableCell className="font-medium">{c.artisticName || "—"}</TableCell>
-                  <TableCell className="text-right">{fmt(c.currentEarnings)}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">{fmt(c.previousEarnings)}</TableCell>
-                  <TableCell className={`text-right ${c.changePercent >= 0 ? "text-success" : "text-destructive"}`}>
-                    {c.changePercent >= 0 ? "+" : ""}{c.changePercent.toFixed(1)}%
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="max-h-[500px] overflow-auto space-y-1.5">
+            {/* Header simulando una tabla — labels chiquitos arriba de
+                las columnas, alineados con los valores de cada row. */}
+            <div className="flex items-center gap-3 px-3 pt-1 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span className="flex-1">Creadora</span>
+              <span className="w-20 text-right">Actual</span>
+              <span className="w-20 text-right">Anterior</span>
+              <span className="w-16 text-right">Variación</span>
+            </div>
+            {creators.map((c) => (
+              <ListRow key={c.creatorKey}>
+                <span className="flex-1 font-medium truncate">{c.artisticName || "—"}</span>
+                <span className="w-20 text-right tabular-nums">{fmt(c.currentEarnings)}</span>
+                <span className="w-20 text-right text-muted-foreground tabular-nums">{fmt(c.previousEarnings)}</span>
+                <span
+                  className={`w-16 text-right tabular-nums font-semibold ${c.changePercent >= 0 ? "text-success" : "text-destructive"}`}
+                >
+                  {c.changePercent >= 0 ? "+" : ""}{c.changePercent.toFixed(1)}%
+                </span>
+              </ListRow>
+            ))}
           </div>
         )}
       </DialogContent>

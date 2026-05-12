@@ -9,6 +9,9 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCreadores, type CreatorWithBusiness } from "./useCreadores";
+import { ListRowButton } from "@/components/ui/list-row";
+import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
+import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -33,6 +36,9 @@ const CreadorasDashboardContent = () => {
   const { allCreators, isLoading } = useCreadores(emptyFilters);
   type StatusKey = "active" | "onboarding" | "paused" | "leaving" | "terminated";
   const [statusPopup, setStatusPopup] = useState<StatusKey | null>(null);
+  // Estado del collapse por categoría — default: top expandida, resto
+  // colapsadas (mismo patrón que panel de control y dashboard v2).
+  const [popupCollapsed, setPopupCollapsed] = useState<Set<string>>(new Set());
   // Ficha técnica de la creadora — abierta desde Últimas Incorporaciones
   // y al clickar dentro del popup de status. Muestra foto + IG + perfil.
   const [creatorDetail, setCreatorDetail] = useState<CreatorWithBusiness | null>(null);
@@ -327,7 +333,7 @@ const CreadorasDashboardContent = () => {
                     key={c.id}
                     type="button"
                     onClick={() => setCreatorDetail(c)}
-                    className="group w-full rounded-xl border border-border bg-card p-3 text-left transition-all duration-200 ease-out hover:scale-[1.005] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.12)]"
+                    className="group w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left transition-colors hover:bg-white/10 hover:border-primary/40"
                   >
                     <div className="flex items-center gap-3">
                       <Avatar className="h-10 w-10 shrink-0">
@@ -509,7 +515,15 @@ const CreadorasDashboardContent = () => {
       </Dialog>
 
       {/* STATUS POPUP — abierto al clickar un cuadro de status */}
-      <Dialog open={statusPopup !== null} onOpenChange={(o) => !o && setStatusPopup(null)}>
+      <Dialog
+        open={statusPopup !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setStatusPopup(null);
+            setPopupCollapsed(new Set());
+          }
+        }}
+      >
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -522,83 +536,120 @@ const CreadorasDashboardContent = () => {
           </DialogHeader>
 
           {popupCreators.length === 0 ? (
-            <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-12 text-center text-sm text-muted-foreground">
               Sin creadoras en este estado.
             </div>
-          ) : (
-            <div className="space-y-2">
-              {popupCreators.map((c) => {
-                const handle = (c.instagram_handle || "").replace(/^@/, "");
-                const initials = (c.artistic_name || c.name || "")
-                  .split(/\s+/)
-                  .map((p) => p[0])
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .join("")
-                  .toUpperCase() || "?";
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => {
-                      setStatusPopup(null);
-                      navigate(`/creadores/${c.id}`);
-                    }}
-                    className="group w-full rounded-xl border border-border bg-card p-3 text-left transition-all duration-200 ease-out hover:scale-[1.005] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.12)]"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 shrink-0">
-                        {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} alt={c.artistic_name || c.name || ""} />}
-                        <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{c.artistic_name || c.name || "Sin nombre"}</p>
-                        {handle && (
-                          <p className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
-                            <Instagram className="h-3 w-3 shrink-0" />
-                            @{handle}
-                          </p>
-                        )}
-                      </div>
-                      <div className="hidden sm:flex items-center gap-4 text-right shrink-0">
-                        {(c.creator_business?.company?.name || c.creator_business?.assigned_agency) && (
-                          <div>
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Agencia</p>
-                            <p className="text-xs font-medium truncate max-w-[110px]">{c.creator_business?.company?.name ?? c.creator_business?.assigned_agency}</p>
-                          </div>
-                        )}
-                        {c.country && (
-                          <div>
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">País</p>
-                            <p className="text-xs font-medium truncate max-w-[80px]">{c.country}</p>
-                          </div>
-                        )}
-                        {c.category && (
-                          <div>
-                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Categoría</p>
-                            <p className="text-xs font-medium">{c.category}</p>
-                          </div>
-                        )}
-                      </div>
-                      {handle && (
-                        <a
-                          href={`https://instagram.com/${handle}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"
-                          title="Abrir Instagram"
-                        >
-                          <Instagram className="h-4 w-4" />
-                        </a>
+          ) : (() => {
+            // Agrupar por categoría — mismo estándar que panel /
+            // dashboard v2 / contactos.
+            const buckets = new Map<string, typeof popupCreators>();
+            for (const c of popupCreators) {
+              const key = c.category ?? "Sin categoría";
+              const arr = buckets.get(key) ?? [];
+              arr.push(c);
+              buckets.set(key, arr);
+            }
+            const sortedCats = Array.from(buckets.keys()).sort((a, b) => {
+              const sa = CATEGORY_ORDER[a] ?? 999;
+              const sb = CATEGORY_ORDER[b] ?? 999;
+              if (sa !== sb) return sa - sb;
+              return a.localeCompare(b);
+            });
+            const effectiveCollapsed = popupCollapsed.size === 0
+              ? new Set(sortedCats.slice(1))
+              : popupCollapsed;
+            const toggleCat = (cat: string) => {
+              const base = popupCollapsed.size === 0
+                ? new Set(sortedCats.slice(1))
+                : new Set(popupCollapsed);
+              if (base.has(cat)) base.delete(cat);
+              else base.add(cat);
+              setPopupCollapsed(base);
+            };
+            const renderCreatorRow = (c: typeof popupCreators[number]) => {
+              const handle = (c.instagram_handle || "").replace(/^@/, "");
+              const initials = (c.artistic_name || c.name || "")
+                .split(/\s+/)
+                .map((p) => p[0])
+                .filter(Boolean)
+                .slice(0, 2)
+                .join("")
+                .toUpperCase() || "?";
+              return (
+                <ListRowButton
+                  key={c.id}
+                  onClick={() => {
+                    setStatusPopup(null);
+                    setPopupCollapsed(new Set());
+                    navigate(`/creadores/${c.id}`);
+                  }}
+                  className="group"
+                >
+                  <Avatar className="h-8 w-8 shrink-0">
+                    {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} alt={c.artistic_name || c.name || ""} />}
+                    <AvatarFallback className="text-[10px] font-semibold">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{c.artistic_name || c.name || "Sin nombre"}</p>
+                    {handle && (
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1 truncate">
+                        <Instagram className="h-2.5 w-2.5 shrink-0" />
+                        @{handle}
+                      </p>
+                    )}
+                  </div>
+                  <div className="hidden sm:flex items-center gap-3 text-right shrink-0">
+                    {(c.creator_business?.company?.name || c.creator_business?.assigned_agency) && (
+                      <span className="text-[10px] text-muted-foreground truncate max-w-[110px]">
+                        {c.creator_business?.company?.name ?? c.creator_business?.assigned_agency}
+                      </span>
+                    )}
+                    {c.country && (
+                      <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">
+                        {c.country}
+                      </span>
+                    )}
+                  </div>
+                  {handle && (
+                    <a
+                      href={`https://instagram.com/${handle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-muted-foreground hover:text-pink-500 transition-colors shrink-0"
+                      title="Abrir Instagram"
+                    >
+                      <Instagram className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                </ListRowButton>
+              );
+            };
+            return (
+              <div className="space-y-3">
+                {sortedCats.map((cat) => {
+                  const rows = buckets.get(cat)!;
+                  const isCollapsed = effectiveCollapsed.has(cat);
+                  return (
+                    <div key={cat} className="space-y-2">
+                      <CategorySectionHeader
+                        cat={cat}
+                        count={rows.length}
+                        isCollapsed={isCollapsed}
+                        onToggle={() => toggleCat(cat)}
+                      />
+                      {!isCollapsed && (
+                        <div className="space-y-1.5 pl-1">
+                          {rows.map(renderCreatorRow)}
+                        </div>
                       )}
-                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
                     </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </main>

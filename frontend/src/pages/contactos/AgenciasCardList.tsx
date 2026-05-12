@@ -43,7 +43,7 @@ const AgenciasCardList = ({ agencias, onView, onEdit, onDelete }: Props) => {
             key={a.id}
             type="button"
             onClick={() => onView?.(a)}
-            className="group w-full rounded-xl border border-border bg-card p-3 text-left transition-all duration-200 ease-out hover:scale-[1.005] hover:border-primary/40 hover:shadow-[0_0_24px_-4px_rgba(255,255,255,0.12)]"
+            className="group w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left transition-colors hover:bg-white/10 hover:border-primary/40"
           >
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12 shrink-0">
