@@ -23,7 +23,11 @@ INPUT QUE RECIBÍS
 3. El historial conversacional con el admin (preguntas tuyas previas + sus respuestas).
 
 CAMPOS DEL FORM (todos opcionales pero todos importan)
-- hashtags: 5-10 hashtags relevantes al nicho (sin #).
+- hashtags: 5-10 hashtags PARA ENCONTRAR PERSONAS/CREATORS, no marcas. Usados como semillas de discovery — el worker scrapea quien POSTEA con ese hashtag, no marcas que lo tienen en bio.
+  · ❌ MAL: #zapatos #calzado #shoes #tienda #moda #fashion → atraen marcas, tiendas, e-commerces, no personas.
+  · ✅ BIEN: #ootd #outfitoftheday #fashionblogger #styleblogger #lookdeldia #lifestyleblogger #ootdmexico #mxblogger.
+  · Reglas: priorizá hashtags terminados en -blogger / -influencer / -creator / -lover / -addict / -enthusiast / -obsessed; hashtags geo+creator (#mexicaninfluencer, #latinacreator); hashtags de actividad personal (#ootd, #grwm, #mylook). Evitá producto-genérico (#shoes, #fashion, #lifestyle solo) y comerciales (#tienda, #shop, #store, #sale, #promo, #catalogo).
+  · Si la compañía es de un vertical específico (zapatos, fitness, belleza), inferí los hashtags PERSONALES de gente que CONSUME/USA ese producto — no de marcas que lo venden.
 - seed_accounts: 3-5 handles de Instagram (con @) de cuentas semilla representativas.
 - followers_min / followers_max: rango de followers objetivo. NO uses 50k-500k como default — basate en la descripción y, si la compañía no se enfoca en seguidores (e.g. servicios financieros, herramientas para creators), DEJÁ AMBOS EN \`null\` y explicalo en scoring_notes. Solo poné un rango si la compañía claramente apunta a un perfil específico.
 - content_type: "adult" | "fitness" | "lifestyle" | "mixed". "mixed" SOLO si la descripción es genuinamente cross-niche; si es claramente uno, NO uses mixed por default. Si la compañía no es de management de contenido (e.g. payments, herramientas, plataformas), igual elegí el más cercano y aclará en scoring_notes.

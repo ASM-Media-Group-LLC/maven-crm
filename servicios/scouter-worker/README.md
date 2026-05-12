@@ -7,7 +7,7 @@ Worker backend del módulo Scouter Assist en Maven CRM. Drena la queue de
 |---|---|
 | `discover_seed` | Toma una lista explícita de @handles de Instagram, los enriquece con Apify, los inserta como `scouter_leads` y dispara `score_lead` para cada uno. |
 | `discover_hashtag` | Descubre autores que postean con un hashtag, los enriquece y persiste igual que `discover_seed`. |
-| `score_lead` | Toma un lead existente y lo manda al LLM scorer (Groq por default). Escribe `ai_score` / `ai_status` / `ai_reason`. Si queda `high_fit`, inserta una notificación en `scouter_notifications`. |
+| `score_lead` | Toma un lead existente y lo manda al LLM scorer (Anthropic Claude por default, Groq como fallback). Escribe `ai_score` / `ai_status` / `ai_reason`. Si queda `high_fit`, inserta una notificación en `scouter_notifications`. |
 | `enrich_profile` | Refresca followers / bio / verificado de un lead sin re-scorearlo. |
 
 ## Stack
@@ -15,7 +15,7 @@ Worker backend del módulo Scouter Assist en Maven CRM. Drena la queue de
 - **Runtime**: Bun 1.1 (Node-compat). Lo elegimos porque Maven ya usa Bun en el frontend (lockfile `bun.lock` en root) y los handlers son código TypeScript simple. Si en algún momento conviene migrar a Node puro, cambiar el Dockerfile alcanza.
 - **DB**: Supabase Postgres con service-role key (bypass RLS — todos los queries filtran por `tenant_id` explícitamente).
 - **Discovery**: Apify ([instagram-profile-scraper](https://apify.com/apify/instagram-profile-scraper) + [instagram-hashtag-scraper](https://apify.com/apify/instagram-hashtag-scraper) por default; configurables vía env).
-- **Scorer**: Groq llama-3.1-8b-instant (configurable). Mismo provider que `qa-analyze`.
+- **Scorer**: Anthropic Claude Haiku 4.5 por default. Se eligió sobre Groq llama-3.1-8b porque llama 8B ignoraba los hard constraints del prompt (ej. daba score 6.5 a brand accounts aún diciendo en `reason` "no es persona humana"). Switcheable a Groq via env `SCORER_PROVIDER=groq` si hace falta volver. Modelos configurables: `ANTHROPIC_SCORER_MODEL`, `GROQ_SCORER_MODEL`.
 
 ## Cómo correrlo localmente
 
