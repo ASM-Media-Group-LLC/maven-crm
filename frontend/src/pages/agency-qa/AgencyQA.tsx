@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -178,6 +178,8 @@ const ClosersQaSection = () => {
   // "abrir el detalle en el mismo espacio" (con back button).
   // El deeplink desde el email (`?callId=<uuid>`) lo abre automáticamente.
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const urlCallId = searchParams.get("callId");
   const [detailCallId, setDetailCallId] = useState<string | null>(urlCallId);
 
@@ -195,8 +197,18 @@ const ClosersQaSection = () => {
     setActive("qa-history");
   };
   const closeCallDetail = () => {
+    // Si el user llegó aquí navegando desde otra pantalla del CRM
+    // (ej. popup de Panel de Control), location.key !== 'default' y
+    // tenemos history para volver. navigate(-1) lo lleva al popup
+    // exactamente donde estaba (el openMetric del panel vive en URL).
+    //
+    // Si entró directo por deeplink (?callId=...), no hay history —
+    // caemos al comportamiento de limpiar el param y mostrar la lista.
+    if (location.key !== "default") {
+      navigate(-1);
+      return;
+    }
     setDetailCallId(null);
-    // Limpia el query param sin agregar history entry redundante.
     const next = new URLSearchParams(searchParams);
     next.delete("callId");
     setSearchParams(next, { replace: true });

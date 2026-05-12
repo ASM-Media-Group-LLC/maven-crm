@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ListRow } from "@/components/ui/list-row";
 import { Crown } from "lucide-react";
 import { useBestCloserByMonth } from "@/hooks/useOperationsDashboard";
 
@@ -24,11 +25,11 @@ const BestCloserMonthlyDialog = ({ open, onOpenChange }: Props) => {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
           {isLoading ? (
             <>
               {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
+                <Skeleton key={i} className="h-16 w-full rounded-xl" />
               ))}
             </>
           ) : !data || data.length === 0 ? (
@@ -38,10 +39,7 @@ const BestCloserMonthlyDialog = ({ open, onOpenChange }: Props) => {
             </p>
           ) : (
             data.map((m) => (
-              <div
-                key={m.month}
-                className="flex items-center gap-3 rounded-lg border border-border bg-card p-3"
-              >
+              <ListRow key={m.month} className="p-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-amber-600">
                   <Crown className="h-5 w-5 text-white" />
                 </div>
@@ -61,7 +59,7 @@ const BestCloserMonthlyDialog = ({ open, onOpenChange }: Props) => {
                     <p className="text-sm text-muted-foreground">Sin ganador</p>
                   )}
                 </div>
-              </div>
+              </ListRow>
             ))
           )}
         </div>

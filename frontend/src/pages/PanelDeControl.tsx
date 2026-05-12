@@ -16,7 +16,7 @@ import {
   Crown,
   Instagram,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -483,8 +483,11 @@ const renderRow = (
 ) => {
   const handleRowClick = () => {
     if (row.linkUrl) {
+      // NO cerramos el popup — el openMetric vive en URL, así que al
+      // dar back desde la página destino (ej. QA history) el browser
+      // restore el popup donde estábamos. Si cerráramos el popup acá,
+      // el query param se borraría y el back no podría restaurarlo.
       navigate(row.linkUrl);
-      onOpenChange(false);
       return;
     }
     if (row.leadSource) {
@@ -815,7 +818,18 @@ const PanelDeControl = () => {
     from: startOfMonth(today),
     to: endOfMonth(today),
   });
-  const [openMetric, setOpenMetric] = useState<MetricKey | null>(null);
+  // openMetric en URL — así si el user navega a otra página (ej. QA
+  // history) y vuelve con back, el popup se restaura automáticamente.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openMetric = (searchParams.get("metric") as MetricKey | null) ?? null;
+  const setOpenMetric = (next: MetricKey | null) => {
+    setSearchParams((prev) => {
+      const np = new URLSearchParams(prev);
+      if (next) np.set("metric", next);
+      else np.delete("metric");
+      return np;
+    });
+  };
   const [bestCloserMonthlyOpen, setBestCloserMonthlyOpen] = useState(false);
   const { data, isLoading } = useOperationsDashboard(range);
   const { data: bestCloser, isLoading: bestCloserLoading } = useBestCloser(range);
