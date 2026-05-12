@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { differenceInCalendarDays, setYear, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowLeft, Phone, Cake, Download, LogOut, ChevronRight, CheckCircle2 } from "lucide-react";
@@ -119,6 +119,16 @@ function OffboardingSummaryCard({ creatorId }: { creatorId: string }) {
 const CreadorProfileContent = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Si el user llegó a este perfil desde otra ruta del CRM (ej. popup
+  // de Dashboard v2, tab Creadoras, lista de tickets…), volvemos un
+  // step atrás en el history para preservar el contexto (filtros,
+  // popup abierto, scroll position). Si entró directo por URL
+  // (location.key === "default"), caemos a /creadores como antes.
+  const goBack = () => {
+    if (location.key !== "default") navigate(-1);
+    else navigate("/creadores");
+  };
   const { data: creator, isLoading } = useCreadorById(id ?? "");
   const { isAgent, isAdmin, isManager } = useUserRole();
   const [statusModalOpen, setStatusModalOpen] = useState(false);
@@ -136,7 +146,7 @@ const CreadorProfileContent = () => {
   if (!creator) {
     return (
       <main className="flex-1 p-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/creadores")} className="gap-1.5 mb-4">
+        <Button variant="ghost" size="sm" onClick={goBack} className="gap-1.5 mb-4">
           <ArrowLeft className="h-4 w-4" /> Volver
         </Button>
         <p className="text-muted-foreground">Creadora no encontrada.</p>
@@ -165,7 +175,7 @@ const CreadorProfileContent = () => {
   return (
     <main className="flex-1 overflow-y-auto">
       <div className="px-6 pt-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/creadores")} className="gap-1.5 text-muted-foreground">
+        <Button variant="ghost" size="sm" onClick={goBack} className="gap-1.5 text-muted-foreground">
           <ArrowLeft className="h-4 w-4" /> Volver
         </Button>
       </div>
