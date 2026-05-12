@@ -197,7 +197,8 @@ Deno.serve(async (req) => {
     }
     const rawFrom = Deno.env.get("NOTIFICATION_FROM_EMAIL") || "noreply@mail.maven-ai.me";
     const fromEmail = rawFrom.includes("<") ? rawFrom : `Maven CRM <${rawFrom}>`;
-    const subject = `Maven CRM · Reporte ${PERIOD_LABEL[period]} ${MODULE_LABEL[module]}`;
+    const customSubject = (schedule.email_subject ?? "").trim();
+    const subject = customSubject || `Maven CRM · Reporte ${PERIOD_LABEL[period]} ${MODULE_LABEL[module]}`;
 
     const resp = await fetch("https://api.resend.com/emails", {
       method: "POST",

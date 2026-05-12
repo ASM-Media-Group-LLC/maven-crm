@@ -20,6 +20,7 @@ export interface ReportSchedule {
   module: ReportModule;
   period: ReportPeriod;
   dispatch_hour: number; // 0-23, hora Miami
+  email_subject: string | null; // null = subject auto-generado
   is_active: boolean;
   last_dispatched_at: string | null;
   created_at: string;
@@ -72,6 +73,7 @@ export interface CreateScheduleInput {
   module: ReportModule;
   period: ReportPeriod;
   dispatch_hour: number;
+  email_subject: string | null;
   recipients: Array<{ email: string; user_id?: string | null }>;
 }
 
@@ -88,6 +90,7 @@ export function useCreateReportSchedule() {
           module: input.module,
           period: input.period,
           dispatch_hour: input.dispatch_hour,
+          email_subject: input.email_subject,
           created_by: user?.id ?? null,
         })
         .select()

@@ -27,6 +27,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
   const [module, setModule] = useState<ReportModule>("llg");
   const [period, setPeriod] = useState<ReportPeriod>("weekly");
   const [dispatchHour, setDispatchHour] = useState<number>(8);
+  const [emailSubject, setEmailSubject] = useState<string>("");
   const [recipients, setRecipients] = useState<string[]>([]);
   const [emailInput, setEmailInput] = useState("");
   const [saving, setSaving] = useState(false);
@@ -42,12 +43,14 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
         setModule(schedule.module);
         setPeriod(schedule.period);
         setDispatchHour(schedule.dispatch_hour ?? 8);
+        setEmailSubject(schedule.email_subject ?? "");
         setRecipients(schedule.recipients.map((r) => r.email));
       } else {
         setName("");
         setModule("llg");
         setPeriod("weekly");
         setDispatchHour(8);
+        setEmailSubject("");
         setRecipients([]);
       }
       setEmailInput("");
@@ -85,10 +88,11 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
     setSaving(true);
     try {
       const recipientsPayload = recipients.map((email) => ({ email, user_id: null }));
+      const subjectPayload = emailSubject.trim() ? emailSubject.trim() : null;
       if (isEdit && schedule) {
         await updateSchedule.mutateAsync({
           id: schedule.id,
-          patch: { name: name.trim(), module, period, dispatch_hour: dispatchHour },
+          patch: { name: name.trim(), module, period, dispatch_hour: dispatchHour, email_subject: subjectPayload },
           recipients: recipientsPayload,
         });
         toast.success("Reporte actualizado");
@@ -98,6 +102,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           module,
           period,
           dispatch_hour: dispatchHour,
+          email_subject: subjectPayload,
           recipients: recipientsPayload,
         });
         toast.success("Reporte creado");
@@ -127,6 +132,20 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
               placeholder="Ej: Reporte semanal LLGs"
               maxLength={120}
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="report-subject">Asunto del email (opcional)</Label>
+            <Input
+              id="report-subject"
+              value={emailSubject}
+              onChange={(e) => setEmailSubject(e.target.value)}
+              placeholder={`Maven CRM · Reporte ${period === "daily" ? "diario" : period === "weekly" ? "semanal" : period === "monthly" ? "mensual" : "anual"} ${module === "llg" ? "LLGs" : module === "closers" ? "Closers" : "Chatters"}`}
+              maxLength={200}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Si lo dejás vacío, se genera automático según módulo y periodicidad.
+            </p>
           </div>
 
           <div className="grid grid-cols-3 gap-3">

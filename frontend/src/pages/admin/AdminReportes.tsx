@@ -4,6 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
   useReportSchedules,
@@ -48,13 +58,22 @@ const AdminReportes = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ReportScheduleWithRecipients | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  // Confirm dialogs Maven-styled — reemplazo del confirm() nativo.
+  const [sendConfirm, setSendConfirm] = useState<ReportScheduleWithRecipients | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<ReportScheduleWithRecipients | null>(null);
 
-  const handleSendNow = async (s: ReportScheduleWithRecipients) => {
+  const handleSendNow = (s: ReportScheduleWithRecipients) => {
     if (s.recipients.length === 0) {
       toast.error("Agregá al menos un destinatario antes de enviar");
       return;
     }
-    if (!confirm(`Enviar el reporte "${s.name}" ahora a ${s.recipients.length} destinatario${s.recipients.length === 1 ? "" : "s"}?`)) return;
+    setSendConfirm(s);
+  };
+
+  const confirmSendNow = async () => {
+    if (!sendConfirm) return;
+    const s = sendConfirm;
+    setSendConfirm(null);
     setSendingId(s.id);
     try {
       await sendNow.mutateAsync(s.id);
@@ -73,8 +92,12 @@ const AdminReportes = () => {
     setModalOpen(true);
   };
 
-  const handleDelete = async (s: ReportScheduleWithRecipients) => {
-    if (!confirm(`¿Borrar el reporte "${s.name}"?`)) return;
+  const handleDelete = (s: ReportScheduleWithRecipients) => setDeleteConfirm(s);
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    const s = deleteConfirm;
+    setDeleteConfirm(null);
     try {
       await deleteSchedule.mutateAsync(s.id);
       toast.success("Reporte eliminado");
@@ -230,6 +253,48 @@ const AdminReportes = () => {
         }}
         schedule={editing}
       />
+
+      <AlertDialog open={!!sendConfirm} onOpenChange={(o) => !o && setSendConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Enviar reporte ahora</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se va a enviar <strong>"{sendConfirm?.name}"</strong> al instante a{" "}
+              <strong>
+                {sendConfirm?.recipients.length} destinatario
+                {sendConfirm && sendConfirm.recipients.length === 1 ? "" : "s"}
+              </strong>
+              . La próxima ejecución programada del cron <strong>no se modifica</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSendNow}>
+              <Send className="h-3.5 w-3.5 mr-1.5" /> Enviar ahora
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => !o && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Borrar reporte</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Seguro que querés borrar <strong>"{deleteConfirm?.name}"</strong>? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Borrar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
