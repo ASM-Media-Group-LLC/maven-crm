@@ -1196,7 +1196,7 @@ export const OUTCOME_META: Record<
 > = {
   cerro:     { label: "Exitoso",   bg: "rgb(22 163 74)",  icon: "✓" },
   no_cerro:  { label: "Rechazado", bg: "rgb(220 38 38)",  icon: "✗" },
-  en_espera: { label: "En espera", bg: "rgb(234 88 12)",  icon: "⏳" },
+  en_espera: { label: "En espera", bg: "rgb(202 138 4)",  icon: "⏳" },
 };
 
 // ─── QA Config (notificaciones globales) ──────────────────────────────

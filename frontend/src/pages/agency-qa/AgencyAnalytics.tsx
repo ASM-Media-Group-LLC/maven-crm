@@ -50,7 +50,7 @@ const WINDOW_OPTIONS: Array<{ value: QaWindow; label: string }> = [
 const OUTCOME_COLORS: Record<string, string> = {
   cerro:     "#16a34a",
   no_cerro:  "#dc2626",
-  en_espera: "#ea580c",
+  en_espera: "#ca8a04",
   unscored:  "#71717a",
 };
 const OUTCOME_LABELS: Record<string, string> = {
