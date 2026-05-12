@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
+import { ListRowButton } from "@/components/ui/list-row";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import ContactosKPICards from "./ContactosKPICards";
 import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
@@ -588,9 +589,8 @@ const ContactosContent = () => {
                 ? new Date(c.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
                 : "—";
               return (
-                <button
+                <ListRowButton
                   key={c.id}
-                  type="button"
                   onClick={() => {
                     const fullContacto = allContactos.find((x) => x.id === c.id);
                     if (fullContacto) {
@@ -628,42 +628,37 @@ const ContactosContent = () => {
                       handleView(minimal);
                     }
                   }}
-                  className="group w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left transition-all duration-200 ease-out hover:bg-white/10 hover:border-primary/40 cursor-pointer"
+                  className="group"
                 >
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10 shrink-0">
-                      {c.profile_picture_url && <AvatarImage src={c.profile_picture_url} alt={c.name || ""} />}
-                      <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        {c.country_code && <span className="text-sm shrink-0">{getCountryFlag(c.country_code)}</span>}
-                        <p className="font-medium text-sm truncate">{c.name || "—"}</p>
-                      </div>
-                      {cleanHandle && (
-                        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                          <InstagramIcon className="h-3 w-3" />
-                          @{cleanHandle}
-                        </p>
-                      )}
+                  <Avatar className="h-8 w-8 shrink-0">
+                    {c.profile_picture_url && <AvatarImage src={c.profile_picture_url} alt={c.name || ""} />}
+                    <AvatarFallback className="text-[10px] font-semibold">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      {c.country_code && <span className="text-xs shrink-0">{getCountryFlag(c.country_code)}</span>}
+                      <p className="font-medium text-sm truncate">{c.name || "—"}</p>
                     </div>
-                    <div className="hidden sm:flex items-center gap-3 text-right shrink-0">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Ciudad</p>
-                        <p className="text-xs font-medium truncate max-w-[100px]">{c.city || "—"}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">País</p>
-                        <p className="text-xs font-medium">{c.country_code ? getCountryShortDisplay(c.country_code) : "—"}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Creación</p>
-                        <p className="text-xs font-medium whitespace-nowrap">{created}</p>
-                      </div>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                    {cleanHandle && (
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <InstagramIcon className="h-2.5 w-2.5" />
+                        @{cleanHandle}
+                      </p>
+                    )}
                   </div>
-                </button>
+                  <div className="hidden sm:flex items-center gap-3 text-right shrink-0">
+                    <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">
+                      {c.city || "—"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {c.country_code ? getCountryShortDisplay(c.country_code) : "—"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
+                      {created}
+                    </span>
+                  </div>
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                </ListRowButton>
               );
             };
             return (
@@ -680,7 +675,7 @@ const ContactosContent = () => {
                         onToggle={() => toggleCat(cat)}
                       />
                       {!isCollapsed && (
-                        <div className="space-y-2 pl-1">
+                        <div className="space-y-1.5 pl-1">
                           {rows.map(renderContactRow)}
                         </div>
                       )}
