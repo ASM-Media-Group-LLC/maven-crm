@@ -26,6 +26,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
   const [name, setName] = useState("");
   const [module, setModule] = useState<ReportModule>("llg");
   const [period, setPeriod] = useState<ReportPeriod>("weekly");
+  const [dispatchHour, setDispatchHour] = useState<number>(8);
   const [recipients, setRecipients] = useState<string[]>([]);
   const [emailInput, setEmailInput] = useState("");
   const [saving, setSaving] = useState(false);
@@ -40,11 +41,13 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
         setName(schedule.name);
         setModule(schedule.module);
         setPeriod(schedule.period);
+        setDispatchHour(schedule.dispatch_hour ?? 8);
         setRecipients(schedule.recipients.map((r) => r.email));
       } else {
         setName("");
         setModule("llg");
         setPeriod("weekly");
+        setDispatchHour(8);
         setRecipients([]);
       }
       setEmailInput("");
@@ -85,7 +88,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       if (isEdit && schedule) {
         await updateSchedule.mutateAsync({
           id: schedule.id,
-          patch: { name: name.trim(), module, period },
+          patch: { name: name.trim(), module, period, dispatch_hour: dispatchHour },
           recipients: recipientsPayload,
         });
         toast.success("Reporte actualizado");
@@ -94,6 +97,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           name: name.trim(),
           module,
           period,
+          dispatch_hour: dispatchHour,
           recipients: recipientsPayload,
         });
         toast.success("Reporte creado");
@@ -125,7 +129,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label>Módulo *</Label>
               <Select value={module} onValueChange={(v) => setModule(v as ReportModule)}>
@@ -150,6 +154,21 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                   <SelectItem value="weekly">Semanal</SelectItem>
                   <SelectItem value="monthly">Mensual</SelectItem>
                   <SelectItem value="annual">Anual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Hora envío *</Label>
+              <Select value={String(dispatchHour)} onValueChange={(v) => setDispatchHour(Number(v))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <SelectItem key={h} value={String(h)}>
+                      {String(h).padStart(2, "0")}:00 (Miami)
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -195,12 +214,15 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
             )}
           </div>
 
-          {/* Pista del rango que cubriría según period */}
+          {/* Pista del rango que cubriría según period + hora elegida */}
           <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 text-[11px] text-muted-foreground">
-            {period === "daily" && "Cada día a las 8:00 AM Miami recibirás los datos del día anterior (00:00 a 23:59)."}
-            {period === "weekly" && "Cada lunes 8:00 AM Miami recibirás los datos de la semana pasada (lunes 00:00 a domingo 23:59)."}
-            {period === "monthly" && "El día 1 de cada mes a las 8:00 AM Miami recibirás los datos del mes pasado."}
-            {period === "annual" && "El 1 de enero a las 8:00 AM Miami recibirás los datos del año anterior."}
+            {(() => {
+              const hh = `${String(dispatchHour).padStart(2, "0")}:00`;
+              if (period === "daily") return `Cada día a las ${hh} Miami recibirás los datos del día anterior (00:00 a 23:59).`;
+              if (period === "weekly") return `Cada lunes ${hh} Miami recibirás los datos de la semana pasada (lunes 00:00 a domingo 23:59).`;
+              if (period === "monthly") return `El día 1 de cada mes a las ${hh} Miami recibirás los datos del mes pasado.`;
+              return `El 1 de enero a las ${hh} Miami recibirás los datos del año anterior.`;
+            })()}
           </div>
         </div>
 

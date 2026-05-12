@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Mail, Trash2, Edit3, Power, Clock, Send } from "lucide-react";
+import { Plus, Mail, Trash2, Edit3, Power, Clock, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import {
   useReportSchedules,
   useDeleteReportSchedule,
   useUpdateReportSchedule,
+  useSendReportNow,
   type ReportScheduleWithRecipients,
   type ReportModule,
   type ReportPeriod,
@@ -43,8 +44,29 @@ const AdminReportes = () => {
   const { data: schedules = [], isLoading } = useReportSchedules();
   const deleteSchedule = useDeleteReportSchedule();
   const updateSchedule = useUpdateReportSchedule();
+  const sendNow = useSendReportNow();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ReportScheduleWithRecipients | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+
+  const handleSendNow = async (s: ReportScheduleWithRecipients) => {
+    if (s.recipients.length === 0) {
+      toast.error("Agregá al menos un destinatario antes de enviar");
+      return;
+    }
+    if (!confirm(`Enviar el reporte "${s.name}" ahora a ${s.recipients.length} destinatario${s.recipients.length === 1 ? "" : "s"}?`)) return;
+    setSendingId(s.id);
+    try {
+      await sendNow.mutateAsync(s.id);
+      toast.success("Reporte enviado", {
+        description: "El email se mandó a los destinatarios. La próxima ejecución programada no se modificó.",
+      });
+    } catch (e: any) {
+      toast.error("Error al enviar", { description: e.message });
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   const handleEdit = (s: ReportScheduleWithRecipients) => {
     setEditing(s);
@@ -131,7 +153,7 @@ const AdminReportes = () => {
                         className={`inline-flex items-center gap-1 rounded-full ring-1 px-2 py-0.5 text-[10px] font-bold ${PERIOD_TONES[s.period]}`}
                       >
                         <Clock className="h-3 w-3" />
-                        {PERIOD_LABELS[s.period]}
+                        {PERIOD_LABELS[s.period]} · {String(s.dispatch_hour ?? 8).padStart(2, "0")}:00 Miami
                       </span>
                       {!s.is_active && (
                         <Badge variant="secondary" className="text-[10px]">
@@ -158,6 +180,21 @@ const AdminReportes = () => {
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => handleSendNow(s)}
+                      disabled={sendingId === s.id || s.recipients.length === 0}
+                      title="Enviar ahora"
+                    >
+                      {sendingId === s.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Send className="h-3.5 w-3.5" />
+                      )}
+                      Enviar ahora
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"

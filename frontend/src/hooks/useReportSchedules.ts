@@ -19,6 +19,7 @@ export interface ReportSchedule {
   name: string;
   module: ReportModule;
   period: ReportPeriod;
+  dispatch_hour: number; // 0-23, hora Miami
   is_active: boolean;
   last_dispatched_at: string | null;
   created_at: string;
@@ -70,6 +71,7 @@ export interface CreateScheduleInput {
   name: string;
   module: ReportModule;
   period: ReportPeriod;
+  dispatch_hour: number;
   recipients: Array<{ email: string; user_id?: string | null }>;
 }
 
@@ -85,6 +87,7 @@ export function useCreateReportSchedule() {
           name: input.name,
           module: input.module,
           period: input.period,
+          dispatch_hour: input.dispatch_hour,
           created_by: user?.id ?? null,
         })
         .select()
@@ -135,6 +138,25 @@ export function useUpdateReportSchedule() {
           if (rErr) throw rErr;
         }
       }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["report-schedules"] });
+    },
+  });
+}
+
+// Envío manual: invoca send-report con el JWT del admin. El backend
+// computa el rango del period del schedule (mismo cálculo que usa el
+// cron) y manda el email al instante. No modifica el próximo cron.
+export function useSendReportNow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (schedule_id: string) => {
+      const { data, error } = await supabase.functions.invoke("send-report", {
+        body: { schedule_id },
+      });
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["report-schedules"] });

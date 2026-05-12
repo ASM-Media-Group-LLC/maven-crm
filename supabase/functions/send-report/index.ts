@@ -15,7 +15,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-cron-token",
 };
 
 type Module = "llg" | "closers" | "chatters";
@@ -47,15 +47,74 @@ const fmtMiami = (iso: string) => {
   }).format(d);
 };
 
+// ─── Range helpers (Miami TZ) ───────────────────────────────────────────
+const MIAMI_TZ = "America/New_York";
+function miamiParts(d: Date = new Date()) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: MIAMI_TZ, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour12: false,
+  });
+  const parts: Record<string, string> = {};
+  for (const p of fmt.formatToParts(d)) if (p.type !== "literal") parts[p.type] = p.value;
+  return { year: parseInt(parts.year), month: parseInt(parts.month), day: parseInt(parts.day), weekday: parts.weekday };
+}
+function miamiOffsetMin(d: Date): number {
+  const utc = new Date(d.toLocaleString("en-US", { timeZone: "UTC" }));
+  const miami = new Date(d.toLocaleString("en-US", { timeZone: MIAMI_TZ }));
+  return (miami.getTime() - utc.getTime()) / 60_000;
+}
+function miamiToUtc(y: number, mo: number, d: number, h: number, mi: number, s: number): Date {
+  const naive = new Date(Date.UTC(y, mo - 1, d, h, mi, s));
+  return new Date(naive.getTime() - miamiOffsetMin(naive) * 60_000);
+}
+function computeRangeForPeriod(period: Period, now: Date): { from: string; to: string } {
+  const m = miamiParts(now);
+  if (period === "daily") {
+    const yest = new Date(Date.UTC(m.year, m.month - 1, m.day));
+    yest.setUTCDate(yest.getUTCDate() - 1);
+    return {
+      from: miamiToUtc(yest.getUTCFullYear(), yest.getUTCMonth() + 1, yest.getUTCDate(), 0, 0, 0).toISOString(),
+      to: miamiToUtc(yest.getUTCFullYear(), yest.getUTCMonth() + 1, yest.getUTCDate(), 23, 59, 59).toISOString(),
+    };
+  }
+  if (period === "weekly") {
+    const today = new Date(Date.UTC(m.year, m.month - 1, m.day));
+    const lastMon = new Date(today.getTime() - 7 * 86_400_000);
+    const lastSun = new Date(today.getTime() - 1 * 86_400_000);
+    return {
+      from: miamiToUtc(lastMon.getUTCFullYear(), lastMon.getUTCMonth() + 1, lastMon.getUTCDate(), 0, 0, 0).toISOString(),
+      to: miamiToUtc(lastSun.getUTCFullYear(), lastSun.getUTCMonth() + 1, lastSun.getUTCDate(), 23, 59, 59).toISOString(),
+    };
+  }
+  if (period === "monthly") {
+    const prevMo = m.month === 1 ? 12 : m.month - 1;
+    const prevY = m.month === 1 ? m.year - 1 : m.year;
+    const lastDay = new Date(Date.UTC(prevY, prevMo, 0)).getUTCDate();
+    return {
+      from: miamiToUtc(prevY, prevMo, 1, 0, 0, 0).toISOString(),
+      to: miamiToUtc(prevY, prevMo, lastDay, 23, 59, 59).toISOString(),
+    };
+  }
+  const prevY = m.year - 1;
+  return {
+    from: miamiToUtc(prevY, 1, 1, 0, 0, 0).toISOString(),
+    to: miamiToUtc(prevY, 12, 31, 23, 59, 59).toISOString(),
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Auth: solo invocaciones internas (dispatch-reports o frontend admin
-  // con el secret). Mismo X-Cron-Token que dispatch-reports valida.
+  // Auth: aceptamos DOS modos:
+  //  · X-Cron-Token (interno desde dispatch-reports y pg_cron)
+  //  · JWT válido en Authorization (frontend admin "Enviar ahora")
+  // Cualquiera de los dos basta. El JWT lo valida supabase-js al crear
+  // el client con el header del request.
   const cronToken = req.headers.get("X-Cron-Token");
   const expected = Deno.env.get("CRON_INTERNAL_TOKEN");
-  if (!expected || cronToken !== expected) {
-    console.warn("[send-report] invalid or missing X-Cron-Token");
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const hasCronToken = !!expected && cronToken === expected;
+  const hasJwt = authHeader.toLowerCase().startsWith("bearer ") && authHeader.length > 20;
+  if (!hasCronToken && !hasJwt) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -63,14 +122,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { schedule_id, from, to } = (await req.json()) as {
+    const { schedule_id, from: fromArg, to: toArg } = (await req.json()) as {
       schedule_id?: string;
       from?: string;
       to?: string;
     };
-    if (!schedule_id || !from || !to) {
+    if (!schedule_id) {
       return new Response(
-        JSON.stringify({ error: "schedule_id, from y to son requeridos" }),
+        JSON.stringify({ error: "schedule_id es requerido" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -110,6 +169,16 @@ Deno.serve(async (req) => {
 
     const module = schedule.module as Module;
     const period = schedule.period as Period;
+
+    // Si dispatch-reports pasó from/to, los usamos. Si vino del botón
+    // "Enviar ahora" sin rango, computamos el rango del period en Miami.
+    let from = fromArg;
+    let to = toArg;
+    if (!from || !to) {
+      const r = computeRangeForPeriod(period, new Date());
+      from = r.from;
+      to = r.to;
+    }
 
     // 2. Métricas por módulo
     const rows = await fetchModuleMetrics(admin, module, from, to);

@@ -107,9 +107,16 @@ function computeRange(period: "daily" | "weekly" | "monthly" | "annual", now: Da
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
-// Decide si un schedule debe dispararse hoy según period.
-function shouldDispatchToday(period: "daily" | "weekly" | "monthly" | "annual", now: Date): boolean {
+// Decide si un schedule debe dispararse AHORA según period + dispatch_hour.
+// El cron corre cada hora; chequeamos period para "hoy es el día" y
+// dispatch_hour para "es esta hora".
+function shouldDispatchNow(
+  period: "daily" | "weekly" | "monthly" | "annual",
+  dispatchHour: number,
+  now: Date,
+): boolean {
   const m = miamiParts(now);
+  if (m.hour !== dispatchHour) return false;
   if (period === "daily") return true;
   if (period === "weekly") return m.weekday === "Mon";
   if (period === "monthly") return m.day === 1;
@@ -141,13 +148,13 @@ Deno.serve(async (req) => {
 
     const { data: schedules, error } = await admin
       .from("report_schedules")
-      .select("id, period, is_active")
+      .select("id, period, dispatch_hour, is_active")
       .eq("is_active", true);
     if (error) throw error;
 
     const now = new Date();
     const due = (schedules ?? []).filter((s: any) =>
-      shouldDispatchToday(s.period as any, now),
+      shouldDispatchNow(s.period as any, Number(s.dispatch_hour ?? 8), now),
     );
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
