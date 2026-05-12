@@ -5,8 +5,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, X, UserPlus, LayoutGrid, List, LayoutDashboard, ListChecks } from "lucide-react";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useCloserLeads, PLATFORMS, type DateFieldType, type CloserCreatorRow } from "./hooks/useCloserLeads";
+import { useClosersKpiPopup } from "./hooks/useClosersKpiPopup";
 import ClosersKPICards from "./components/ClosersKPICards";
-import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import KpiDetailDialog from "@/components/dashboard/KpiDetailDialog";
 import CloserTable from "./components/LeadTable";
 import AssignCloserDialog from "./components/AssignCloserDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -45,6 +46,7 @@ const ClosersContent = () => {
   const queryClient = useQueryClient();
   type KpiPopupState = { kind: "pipeline"; key: "total" | "asignadas" | "confirmadas" | "completadas" | "cerradas" | "no_interesadas" } | { kind: "revenue"; platform: string };
   const [kpiPopup, setKpiPopup] = useState<KpiPopupState | null>(null);
+  const { data: kpiPopupRows = [] } = useClosersKpiPopup(kpiPopup);
   // Subtab top-level — Dashboard (KPI cards) vs Operaciones (tabs/filtros/tabla)
   const [viewTab, setViewTab] = useState<"dashboard" | "operaciones">("dashboard");
 
@@ -325,46 +327,7 @@ const ClosersContent = () => {
           return `Revenue ${kpiPopup.platform}`;
         })()}
         subtitle={kpiPopup?.kind === "revenue" ? "Detalle por creadora" : undefined}
-        rows={(() => {
-          if (!kpiPopup) return [];
-          if (kpiPopup.kind === "pipeline") {
-            // CloserCreatorRow usa `stage` (no `status`) y `instagram_handle`
-            // (no `name`/`artistic_name`). Antes el popup salía vacío
-            // porque filtraba por un campo que no existe → siempre 0
-            // matches.
-            const filterByStage = (stages: string[]): CloserCreatorRow[] =>
-              creators.filter((c: CloserCreatorRow) => stages.includes(c.stage ?? ""));
-            let list: CloserCreatorRow[] = [];
-            switch (kpiPopup.key) {
-              case "total": list = creators; break;
-              case "asignadas": list = filterByStage(["Asignada"]); break;
-              case "confirmadas": list = filterByStage(["Confirmada"]); break;
-              case "completadas": list = filterByStage(["Completada"]); break;
-              case "cerradas": list = filterByStage(["Confirmada", "Completada"]); break;
-              case "no_interesadas": list = filterByStage(["No interesada"]); break;
-            }
-            const tone = (stage: string): KpiRow["rightTone"] =>
-              stage === "Completada" || stage === "Confirmada" ? "success" :
-              stage === "No interesada" ? "destructive" :
-              stage === "Asignada" ? "warning" : "default";
-            return list.map((c): KpiRow => ({
-              primary: c.instagram_handle ? `@${c.instagram_handle}` : "Sin handle",
-              secondary: c.agent_name ?? "Sin asignar",
-              right: c.stage ?? "—",
-              rightTone: tone(c.stage ?? ""),
-            }));
-          }
-          if (kpiPopup.kind === "revenue") {
-            const platformKey = kpiPopup.platform;
-            const sales = (platformSalesByCreator?.[platformKey] ?? []) as Array<{ creator_name?: string; amount?: number }>;
-            return sales.map((s): KpiRow => ({
-              primary: s.creator_name ?? "Sin creador",
-              right: `$${(Number(s.amount) || 0).toLocaleString()}`,
-              rightTone: "success",
-            }));
-          }
-          return [];
-        })()}
+        rows={kpiPopupRows}
       />
     </main>
   );
