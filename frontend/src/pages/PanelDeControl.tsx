@@ -15,8 +15,6 @@ import {
   ArrowDown,
   Crown,
   Instagram,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -55,6 +53,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ListRow } from "@/components/ui/list-row";
 import OutcomeBadge from "@/components/agency-qa/OutcomeBadge";
+import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import { OUTCOME_META } from "@/hooks/useAgencyQa";
 import SpammerAccountsTab from "./panel-de-control/SpammerAccountsTab";
 import ControlGastoTab from "./panel-de-control/ControlGastoTab";
@@ -130,189 +129,9 @@ const KpiCard = ({
 );
 
 // ─── Detail dialog ─────────────────────────────────────────────────────
-
-// Paleta por categoría — Elite=oro, A+=violeta intenso, etc. Hace que
-// el popup deje de verse "negro, soso" como reportó el user. Cada
-// header de grupo toma su tono del map; "Sin categoría" cae a gris.
-const CATEGORY_TONES: Record<
-  string,
-  { bg: string; text: string; badge: string; ring: string; line: string; iconBg: string }
-> = {
-  Elite: {
-    bg: "bg-gradient-to-r from-amber-500/20 to-amber-400/10",
-    text: "text-amber-400",
-    badge: "bg-amber-500/30 text-amber-200",
-    ring: "ring-1 ring-amber-400/30",
-    line: "bg-gradient-to-r from-amber-400/40 to-transparent",
-    iconBg: "bg-amber-500/10 group-hover:bg-amber-500/20",
-  },
-  "A+": {
-    bg: "bg-gradient-to-r from-violet-500/20 to-violet-400/10",
-    text: "text-violet-300",
-    badge: "bg-violet-500/30 text-violet-100",
-    ring: "ring-1 ring-violet-400/30",
-    line: "bg-gradient-to-r from-violet-400/40 to-transparent",
-    iconBg: "bg-violet-500/10 group-hover:bg-violet-500/20",
-  },
-  A: {
-    bg: "bg-gradient-to-r from-blue-500/20 to-blue-400/10",
-    text: "text-blue-300",
-    badge: "bg-blue-500/30 text-blue-100",
-    ring: "ring-1 ring-blue-400/30",
-    line: "bg-gradient-to-r from-blue-400/40 to-transparent",
-    iconBg: "bg-blue-500/10 group-hover:bg-blue-500/20",
-  },
-  "B+": {
-    bg: "bg-gradient-to-r from-emerald-500/20 to-emerald-400/10",
-    text: "text-emerald-300",
-    badge: "bg-emerald-500/30 text-emerald-100",
-    ring: "ring-1 ring-emerald-400/30",
-    line: "bg-gradient-to-r from-emerald-400/40 to-transparent",
-    iconBg: "bg-emerald-500/10 group-hover:bg-emerald-500/20",
-  },
-  B: {
-    bg: "bg-gradient-to-r from-teal-500/20 to-teal-400/10",
-    text: "text-teal-300",
-    badge: "bg-teal-500/30 text-teal-100",
-    ring: "ring-1 ring-teal-400/30",
-    line: "bg-gradient-to-r from-teal-400/40 to-transparent",
-    iconBg: "bg-teal-500/10 group-hover:bg-teal-500/20",
-  },
-  "C+": {
-    bg: "bg-gradient-to-r from-orange-500/20 to-orange-400/10",
-    text: "text-orange-300",
-    badge: "bg-orange-500/30 text-orange-100",
-    ring: "ring-1 ring-orange-400/30",
-    line: "bg-gradient-to-r from-orange-400/40 to-transparent",
-    iconBg: "bg-orange-500/10 group-hover:bg-orange-500/20",
-  },
-  C: {
-    bg: "bg-gradient-to-r from-rose-500/20 to-rose-400/10",
-    text: "text-rose-300",
-    badge: "bg-rose-500/30 text-rose-100",
-    ring: "ring-1 ring-rose-400/30",
-    line: "bg-gradient-to-r from-rose-400/40 to-transparent",
-    iconBg: "bg-rose-500/10 group-hover:bg-rose-500/20",
-  },
-};
-const DEFAULT_TONE = {
-  bg: "bg-muted/40",
-  text: "text-muted-foreground",
-  badge: "bg-muted-foreground/20 text-muted-foreground",
-  ring: "",
-  line: "bg-border",
-  iconBg: "bg-muted/40 group-hover:bg-muted",
-};
-
-// Tones para badges (status / source / outcome) cuando agrupamos por
-// badge en vez de categoría (la mayoría de leadgen_entries tienen
-// category_code=null, entonces agrupamos por status). Cada valor de
-// badge mapea a un tono visual coherente.
-const BADGE_TONES: Record<string, typeof DEFAULT_TONE> = {
-  // Sources
-  leadgen: {
-    bg: "bg-gradient-to-r from-indigo-500/20 to-indigo-400/10",
-    text: "text-indigo-300",
-    badge: "bg-indigo-500/30 text-indigo-100",
-    ring: "ring-1 ring-indigo-400/30",
-    line: "bg-gradient-to-r from-indigo-400/40 to-transparent",
-    iconBg: "bg-indigo-500/10 group-hover:bg-indigo-500/20",
-  },
-  scouter: {
-    bg: "bg-gradient-to-r from-pink-500/20 to-pink-400/10",
-    text: "text-pink-300",
-    badge: "bg-pink-500/30 text-pink-100",
-    ring: "ring-1 ring-pink-400/30",
-    line: "bg-gradient-to-r from-pink-400/40 to-transparent",
-    iconBg: "bg-pink-500/10 group-hover:bg-pink-500/20",
-  },
-  // Status closer
-  Nuevo: {
-    bg: "bg-gradient-to-r from-blue-500/20 to-blue-400/10",
-    text: "text-blue-300",
-    badge: "bg-blue-500/30 text-blue-100",
-    ring: "ring-1 ring-blue-400/30",
-    line: "bg-gradient-to-r from-blue-400/40 to-transparent",
-    iconBg: "bg-blue-500/10 group-hover:bg-blue-500/20",
-  },
-  Asignada: {
-    bg: "bg-gradient-to-r from-violet-500/20 to-violet-400/10",
-    text: "text-violet-300",
-    badge: "bg-violet-500/30 text-violet-100",
-    ring: "ring-1 ring-violet-400/30",
-    line: "bg-gradient-to-r from-violet-400/40 to-transparent",
-    iconBg: "bg-violet-500/10 group-hover:bg-violet-500/20",
-  },
-  Confirmada: {
-    bg: "bg-gradient-to-r from-emerald-500/20 to-emerald-400/10",
-    text: "text-emerald-300",
-    badge: "bg-emerald-500/30 text-emerald-100",
-    ring: "ring-1 ring-emerald-400/30",
-    line: "bg-gradient-to-r from-emerald-400/40 to-transparent",
-    iconBg: "bg-emerald-500/10 group-hover:bg-emerald-500/20",
-  },
-  Completada: {
-    bg: "bg-gradient-to-r from-teal-500/20 to-teal-400/10",
-    text: "text-teal-300",
-    badge: "bg-teal-500/30 text-teal-100",
-    ring: "ring-1 ring-teal-400/30",
-    line: "bg-gradient-to-r from-teal-400/40 to-transparent",
-    iconBg: "bg-teal-500/10 group-hover:bg-teal-500/20",
-  },
-  "No interesada": {
-    bg: "bg-gradient-to-r from-rose-500/20 to-rose-400/10",
-    text: "text-rose-300",
-    badge: "bg-rose-500/30 text-rose-100",
-    ring: "ring-1 ring-rose-400/30",
-    line: "bg-gradient-to-r from-rose-400/40 to-transparent",
-    iconBg: "bg-rose-500/10 group-hover:bg-rose-500/20",
-  },
-  // QA outcomes
-  cerro: {
-    bg: "bg-gradient-to-r from-emerald-500/20 to-emerald-400/10",
-    text: "text-emerald-300",
-    badge: "bg-emerald-500/30 text-emerald-100",
-    ring: "ring-1 ring-emerald-400/30",
-    line: "bg-gradient-to-r from-emerald-400/40 to-transparent",
-    iconBg: "bg-emerald-500/10 group-hover:bg-emerald-500/20",
-  },
-  en_espera: {
-    bg: "bg-gradient-to-r from-amber-500/20 to-amber-400/10",
-    text: "text-amber-300",
-    badge: "bg-amber-500/30 text-amber-100",
-    ring: "ring-1 ring-amber-400/30",
-    line: "bg-gradient-to-r from-amber-400/40 to-transparent",
-    iconBg: "bg-amber-500/10 group-hover:bg-amber-500/20",
-  },
-  no_cerro: {
-    bg: "bg-gradient-to-r from-rose-500/20 to-rose-400/10",
-    text: "text-rose-300",
-    badge: "bg-rose-500/30 text-rose-100",
-    ring: "ring-1 ring-rose-400/30",
-    line: "bg-gradient-to-r from-rose-400/40 to-transparent",
-    iconBg: "bg-rose-500/10 group-hover:bg-rose-500/20",
-  },
-  // CRM movement
-  alta: {
-    bg: "bg-gradient-to-r from-emerald-500/20 to-emerald-400/10",
-    text: "text-emerald-300",
-    badge: "bg-emerald-500/30 text-emerald-100",
-    ring: "ring-1 ring-emerald-400/30",
-    line: "bg-gradient-to-r from-emerald-400/40 to-transparent",
-    iconBg: "bg-emerald-500/10 group-hover:bg-emerald-500/20",
-  },
-  baja: {
-    bg: "bg-gradient-to-r from-rose-500/20 to-rose-400/10",
-    text: "text-rose-300",
-    badge: "bg-rose-500/30 text-rose-100",
-    ring: "ring-1 ring-rose-400/30",
-    line: "bg-gradient-to-r from-rose-400/40 to-transparent",
-    iconBg: "bg-rose-500/10 group-hover:bg-rose-500/20",
-  },
-};
-
-const categoryTone = (cat: string) =>
-  CATEGORY_TONES[cat] ?? BADGE_TONES[cat] ?? DEFAULT_TONE;
+// CATEGORY_TONES, BADGE_TONES, DEFAULT_TONE y categoryTone() viven en
+// components/dashboard/categoryTones.ts — compartidos con Dashboard v2
+// y cualquier otro popup que liste modelos por categoría.
 
 const DetailDialog = ({
   open,
@@ -609,7 +428,6 @@ const CategorySection = ({
   onOpenChange: (o: boolean) => void;
   setDetailLead: (v: { source: "leadgen" | "scouter" | "creator"; id: string; title: string } | null) => void;
 }) => {
-  const tone = categoryTone(cat);
   // Lazy fetch: solo cuando supportsBreakdown && expandida. React-query
   // cachea por (metric, range, cat) — expandir/colapsar no re-fetchea.
   const { data: lazyRows, isLoading: isLazyLoading } = useMetricCategoryRows(
@@ -622,32 +440,12 @@ const CategorySection = ({
   const showSkeleton = supportsBreakdown && !isCollapsed && isLazyLoading;
   return (
     <div className="space-y-2">
-      {/* Header con color por categoría (Elite=oro, A+=violeta, etc).
-          Pill con count, sticky para que se vea siempre al scrollear. */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="group flex w-full items-center gap-3 sticky top-0 z-[1] py-1.5 px-0.5 bg-card/40 backdrop-blur-md rounded-2xl"
-      >
-        <div
-          className={`flex items-center gap-2 rounded-full px-3 py-1 transition-transform group-hover:scale-[1.02] ${tone.bg} ${tone.ring}`}
-        >
-          <span className={`text-sm font-bold tracking-wide ${tone.text}`}>{cat}</span>
-          <span
-            className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums ${tone.badge}`}
-          >
-            {count.toLocaleString("es")}
-          </span>
-        </div>
-        <div className={`h-px flex-1 ${tone.line}`} />
-        <div className={`shrink-0 rounded-full p-1 transition-colors ${tone.iconBg}`}>
-          {isCollapsed ? (
-            <ChevronDown className={`h-3.5 w-3.5 ${tone.text}`} />
-          ) : (
-            <ChevronUp className={`h-3.5 w-3.5 ${tone.text}`} />
-          )}
-        </div>
-      </button>
+      <CategorySectionHeader
+        cat={cat}
+        count={count}
+        isCollapsed={isCollapsed}
+        onToggle={onToggle}
+      />
       {!isCollapsed && (
         <div className="space-y-1.5 pl-1">
           {showSkeleton ? (

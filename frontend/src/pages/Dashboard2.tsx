@@ -35,6 +35,8 @@ import {
 } from "@/components/ui/tooltip";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ListRow, ListRowButton } from "@/components/ui/list-row";
+import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
+import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import {
   PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -50,6 +52,7 @@ interface CreatorSummary {
   instagramHandle: string | null;
   profilePhotoUrl: string | null;
   platform: string;
+  category: string | null;
   total: number;
   net: number;
   subs: number;
@@ -158,6 +161,10 @@ const Dashboard2 = () => {
   type KpiList = "revenue" | "creators" | null;
   const [searchParams, setSearchParams] = useSearchParams();
   const kpiListOpen = (searchParams.get("kpi") as KpiList) ?? null;
+  // Estado de colapsado del KPI list popup — mismo patrón que panel
+  // de control: por defecto solo la categoría top (Elite > A+ > ...)
+  // expandida, el resto colapsadas.
+  const [kpiCollapsed, setKpiCollapsed] = useState<Set<string>>(new Set());
   const setKpiListOpen = (next: KpiList) => {
     setSearchParams((prev) => {
       const np = new URLSearchParams(prev);
@@ -165,6 +172,9 @@ const Dashboard2 = () => {
       else np.delete("kpi");
       return np;
     });
+    // Reset el collapsed state al cerrar o cambiar de KPI, así la
+    // próxima apertura vuelve al default (top expandido, resto colapsado).
+    setKpiCollapsed(new Set());
   };
 
   // Dialog de ficha técnica de una creadora — se abre desde los
@@ -236,19 +246,20 @@ const Dashboard2 = () => {
     queryFn: async () => {
       const [{ data: biz }, { data: crs }] = await Promise.all([
         supabase.from("creator_business").select("creator_id, main_platform"),
-        supabase.from("creators").select("id, instagram_handle, profile_photo_url, name"),
+        supabase.from("creators").select("id, instagram_handle, profile_photo_url, name, category"),
       ]);
-      const map: Record<string, { platform: string; ig: string | null; photo: string | null; name: string | null }> = {};
+      const map: Record<string, { platform: string; ig: string | null; photo: string | null; name: string | null; category: string | null }> = {};
       for (const r of biz ?? []) {
-        if (r.creator_id) map[r.creator_id] = { platform: r.main_platform || "", ig: null, photo: null, name: null };
+        if (r.creator_id) map[r.creator_id] = { platform: r.main_platform || "", ig: null, photo: null, name: null, category: null };
       }
       for (const c of crs ?? []) {
         if (map[c.id]) {
           map[c.id].ig = c.instagram_handle || null;
           map[c.id].photo = c.profile_photo_url || null;
           map[c.id].name = c.name || null;
+          map[c.id].category = c.category || null;
         } else {
-          map[c.id] = { platform: "", ig: c.instagram_handle || null, photo: c.profile_photo_url || null, name: c.name || null };
+          map[c.id] = { platform: "", ig: c.instagram_handle || null, photo: c.profile_photo_url || null, name: c.name || null, category: c.category || null };
         }
       }
       return map;
@@ -287,6 +298,7 @@ const Dashboard2 = () => {
           instagramHandle: info?.ig || null,
           profilePhotoUrl: info?.photo || null,
           platform: plat || "OnlyFans",
+          category: info?.category || null,
           total: r.total_earnings_gross ?? 0,
           net: (r.total_earnings_gross ?? 0) * 0.8,
           subs: r.subscription_gross ?? 0,
@@ -1243,46 +1255,95 @@ const Dashboard2 = () => {
                     )}
                   </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-1.5 mt-2">
+                <div className="space-y-3 mt-2">
                   {creators.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-12">
                       Sin datos para este período.
                     </p>
-                  ) : (
-                    [...creators]
-                      .sort((a, b) =>
-                        kpiListOpen === "revenue" ? b.total - a.total : a.name.localeCompare(b.name),
-                      )
-                      .map((c, idx) => (
-                        <ListRowButton
-                          key={c.creatorId}
-                          onClick={() => {
-                            // No cerramos el popup — dejamos ?kpi=… en
-                            // la URL para que al dar back desde el
-                            // perfil, el browser restore el popup
-                            // exactamente donde el user estaba.
-                            navigate(`/creadores/${c.creatorId}`);
-                          }}
-                          className="justify-between"
-                        >
-                          <div className="min-w-0 flex-1 flex items-center gap-2">
-                            <span className="text-[10px] text-muted-foreground tabular-nums w-6 shrink-0">
-                              {idx + 1}.
-                            </span>
-                            <span className="font-medium truncate">{c.name}</span>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="text-xs font-bold tabular-nums text-emerald-500">
-                              {fmtK(c.total)}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground tabular-nums w-12 text-right">
-                              {c.activeFans?.toLocaleString() ?? 0} fans
-                            </span>
-                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                          </div>
-                        </ListRowButton>
-                      ))
-                  )}
+                  ) : (() => {
+                    // Agrupar por categoría — mismo estándar que panel
+                    // de control. Default: solo la categoría top expandida.
+                    const sorted = [...creators].sort((a, b) =>
+                      kpiListOpen === "revenue" ? b.total - a.total : a.name.localeCompare(b.name),
+                    );
+                    const buckets = new Map<string, typeof sorted>();
+                    for (const c of sorted) {
+                      const key = c.category ?? "Sin categoría";
+                      const arr = buckets.get(key) ?? [];
+                      arr.push(c);
+                      buckets.set(key, arr);
+                    }
+                    const sortedCats = Array.from(buckets.keys()).sort((a, b) => {
+                      const sa = CATEGORY_ORDER[a] ?? 999;
+                      const sb = CATEGORY_ORDER[b] ?? 999;
+                      if (sa !== sb) return sa - sb;
+                      return a.localeCompare(b);
+                    });
+                    // Inicializar collapsed si está vacío: todas menos la
+                    // primera. Usamos un computed default — el state se
+                    // actualiza solo cuando el user clickea.
+                    const effectiveCollapsed = kpiCollapsed.size === 0
+                      ? new Set(sortedCats.slice(1))
+                      : kpiCollapsed;
+                    const toggleCat = (cat: string) => {
+                      // Si todavía estamos con el default (size === 0),
+                      // materializamos el estado actual antes de toggle.
+                      const base = kpiCollapsed.size === 0
+                        ? new Set(sortedCats.slice(1))
+                        : new Set(kpiCollapsed);
+                      if (base.has(cat)) base.delete(cat);
+                      else base.add(cat);
+                      setKpiCollapsed(base);
+                    };
+                    let globalIdx = 0;
+                    return sortedCats.map((cat) => {
+                      const rows = buckets.get(cat)!;
+                      const isCollapsed = effectiveCollapsed.has(cat);
+                      return (
+                        <div key={cat} className="space-y-2">
+                          <CategorySectionHeader
+                            cat={cat}
+                            count={rows.length}
+                            isCollapsed={isCollapsed}
+                            onToggle={() => toggleCat(cat)}
+                          />
+                          {!isCollapsed && (
+                            <div className="space-y-1.5 pl-1">
+                              {rows.map((c) => {
+                                globalIdx++;
+                                const myIdx = globalIdx;
+                                return (
+                                  <ListRowButton
+                                    key={c.creatorId}
+                                    onClick={() => {
+                                      navigate(`/creadores/${c.creatorId}`);
+                                    }}
+                                    className="justify-between"
+                                  >
+                                    <div className="min-w-0 flex-1 flex items-center gap-2">
+                                      <span className="text-[10px] text-muted-foreground tabular-nums w-6 shrink-0">
+                                        {myIdx}.
+                                      </span>
+                                      <span className="font-medium truncate">{c.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 shrink-0">
+                                      <span className="text-xs font-bold tabular-nums text-emerald-500">
+                                        {fmtK(c.total)}
+                                      </span>
+                                      <span className="text-[10px] text-muted-foreground tabular-nums w-12 text-right">
+                                        {c.activeFans?.toLocaleString() ?? 0} fans
+                                      </span>
+                                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </div>
+                                  </ListRowButton>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </DialogContent>
             </Dialog>
