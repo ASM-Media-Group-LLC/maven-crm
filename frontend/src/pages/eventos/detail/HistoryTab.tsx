@@ -43,7 +43,7 @@ const HistoryTab = ({ eventId }: Props) => {
           log.event_guests?.guest_name ||
           "Invitado";
         return (
-          <div key={log.id} className="flex items-start gap-3 p-3 rounded-md border border-border">
+          <div key={log.id} className="flex items-start gap-3 p-3 rounded-xl border border-white/10 bg-white/5">
             <div className="h-2 w-2 rounded-full bg-primary mt-2 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm">

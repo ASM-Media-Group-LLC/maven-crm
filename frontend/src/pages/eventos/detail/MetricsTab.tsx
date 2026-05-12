@@ -34,7 +34,7 @@ const MetricsTab = ({ eventId }: Props) => {
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {cards.map((c) => (
-          <div key={c.label} className="rounded-lg border border-border p-4 space-y-1">
+          <div key={c.label} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-1">
             <div className="flex items-center gap-2">
               <c.icon className={`h-4 w-4 ${c.color}`} />
               <span className="text-xs text-muted-foreground">{c.label}</span>
@@ -49,7 +49,7 @@ const MetricsTab = ({ eventId }: Props) => {
 
       {/* Attendance rate bar */}
       {total > 0 && (
-        <div className="rounded-lg border border-border p-4 space-y-2">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
           <p className="text-sm font-medium">Tasa de confirmación</p>
           <div className="h-3 bg-muted rounded-full overflow-hidden flex">
             <div className="h-full bg-primary transition-all" style={{ width: `${pct(confirmed + attended)}%` }} />

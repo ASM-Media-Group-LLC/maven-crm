@@ -434,7 +434,7 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
                   </div>
 
                   {/* Video call toggle */}
-                  <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
                     <div className="flex items-center gap-3">
                       <Video className="h-5 w-5 text-primary" />
                       <div>

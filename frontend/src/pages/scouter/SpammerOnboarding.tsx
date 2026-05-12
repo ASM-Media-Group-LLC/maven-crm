@@ -184,7 +184,7 @@ const Step1 = ({
 // ─── Step 2: Profile preview (v1 placeholder — no live scrape) ─────────────
 
 const ProfilePlaceholder = ({ handle }: { handle: string }) => (
-  <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+  <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
     {/* Avatar placeholder */}
     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted border border-border">
       <User className="h-5 w-5 text-muted-foreground" />

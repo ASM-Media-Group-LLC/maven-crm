@@ -453,7 +453,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               const revenue = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
               const followUpPending = c.stage === "Asignada" && isFollowUpPending(c.last_contact_date);
               return (
-                <div key={c.id} className="rounded-lg border border-border bg-card p-4 space-y-3 hover:shadow-md transition-shadow">
+                <div key={c.id} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3 hover:bg-white/10 hover:border-primary/40 transition-colors">
                   <div className="flex items-start justify-between">
                     <a href={`https://instagram.com/${c.instagram_handle.replace("@", "")}`} target="_blank" rel="noopener noreferrer"
                       className="text-primary hover:underline font-semibold flex items-center gap-1">

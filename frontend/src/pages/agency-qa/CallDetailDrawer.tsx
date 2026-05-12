@@ -374,7 +374,7 @@ const KeyMomentsBlock = ({
     <Section title="Momentos clave">
       <ul className="space-y-2">
         {moments.map((m, i) => (
-          <li key={i} className="rounded-md border border-border/60 bg-card p-2.5">
+          <li key={i} className="rounded-xl border border-white/10 bg-white/5 p-2.5">
             <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider">
               <span style={{ color: m.kind === "positivo" ? "rgb(22 163 74)" : "rgb(220 38 38)" }}>
                 {m.kind === "positivo" ? "✓ Positivo" : "✗ Negativo"}
@@ -478,7 +478,7 @@ const ModelSignalsBlock = ({ signals }: { signals: NonNullable<CallAnalysis["mod
         </div>
         <ul className="space-y-1.5">
           {signals.objections.map((o, i) => (
-            <li key={i} className="rounded-md border border-border/60 bg-card p-2 text-xs">
+            <li key={i} className="rounded-xl border border-white/10 bg-white/5 p-2 text-xs">
               <div className="font-semibold">{o.topic}</div>
               <p className="text-muted-foreground">{o.description}</p>
               <blockquote className="mt-1 border-l-2 border-border pl-2 italic">"{o.quote}"</blockquote>
@@ -501,7 +501,7 @@ const SignalCard = ({ label, level, reason }: { label: string; level: string; re
       ? "rgb(220 38 38)"
       : "rgb(148 163 184)";
   return (
-    <div className="rounded-md border border-border/60 bg-card p-2.5">
+    <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           {label}
@@ -803,7 +803,7 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
           Cargando feedback…
         </div>
       ) : last ? (
-        <div className="rounded-md border border-border/60 bg-muted/30 p-2.5">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <MessageSquareQuote className="h-3 w-3" />
@@ -840,7 +840,7 @@ const FeedbackSection = ({ callId }: { callId: string }) => {
       )}
 
       {(showHistory || !last) && (
-        <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-2.5">
+        <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-2.5">
           <div className="space-y-1">
             <Label htmlFor="feedback-text" className="text-xs">
               Feedback (qué corregir / agregar)

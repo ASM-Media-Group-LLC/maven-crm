@@ -42,7 +42,7 @@ const LinksTab = ({ eventId, internalToken, externalToken, externalLinkExpiresAt
   return (
     <div className="space-y-6">
       {/* Internal link */}
-      <div className="rounded-lg border border-border p-4 space-y-3">
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Link2 className="h-4 w-4 text-primary" />
           <h4 className="text-sm font-semibold">Enlace Interno</h4>
@@ -59,7 +59,7 @@ const LinksTab = ({ eventId, internalToken, externalToken, externalLinkExpiresAt
       </div>
 
       {/* External sharelink */}
-      <div className="rounded-lg border border-border p-4 space-y-3">
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
         <div className="flex items-center gap-2">
           <ExternalLink className="h-4 w-4 text-accent" />
           <h4 className="text-sm font-semibold">Sharelink Externo</h4>
