@@ -1324,8 +1324,14 @@ const PanelDeControl = () => {
         >
           <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 bg-indigo-500 transition-opacity group-hover:opacity-50" />
           <div className="relative space-y-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500">
-              <Building2 className="h-5 w-5 text-white" />
+            {/* Logo BLU recreado: pill navy con texto blanco italic
+                bold. Misma altura que los demás icon-badges (h-10)
+                pero con padding horizontal para que el texto BLU
+                respire. */}
+            <div className="flex h-10 items-center justify-center rounded-lg bg-slate-950 px-3 ring-1 ring-white/5 shadow-sm">
+              <span className="text-white text-base font-extrabold italic tracking-tight leading-none">
+                BLU
+              </span>
             </div>
             <div>
               <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
@@ -1345,9 +1351,31 @@ const PanelDeControl = () => {
                   </span>
                 </div>
               )}
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Neto: {(k.crmAltas - k.crmBajas).toLocaleString("es")} · altas / bajas en Blu/Infloww
-              </p>
+              {/* Balance chip: verde si > 0, naranja si = 0, rojo si
+                  < 0. Sustituye al "Neto: X" texto plano. */}
+              {!isLoading && (() => {
+                const balance = k.crmAltas - k.crmBajas;
+                const tone =
+                  balance > 0
+                    ? "bg-emerald-500/15 ring-emerald-400/30 text-emerald-300"
+                    : balance < 0
+                      ? "bg-rose-500/15 ring-rose-400/30 text-rose-300"
+                      : "bg-orange-500/15 ring-orange-400/30 text-orange-300";
+                const sign = balance > 0 ? "+" : "";
+                return (
+                  <div className="mt-1.5">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full ring-1 px-2 py-0.5 text-[10px] font-bold tabular-nums ${tone}`}
+                    >
+                      Balance
+                      <span className="font-extrabold">
+                        {sign}
+                        {balance.toLocaleString("es")}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </button>
