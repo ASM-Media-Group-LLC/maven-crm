@@ -311,7 +311,7 @@ export default function EmployeeProfile() {
                     <p className="text-sm text-muted-foreground text-center py-4">Sin registros de nómina</p>
                   ) : (
                     payrollHistory.slice(0, 5).map((pd: any) => (
-                      <div key={pd.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                      <div key={pd.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition-colors">
                         <div>
                           <p className="font-medium">{pd.payroll_periods?.period_name ?? "—"}</p>
                           <p className="text-xs text-muted-foreground">Bruto: ${Number(pd.gross_salary || 0).toLocaleString("es-CO")} · Neto: ${Number(pd.net_total || 0).toLocaleString("es-CO")}</p>
@@ -336,7 +336,7 @@ export default function EmployeeProfile() {
                     <p className="text-sm text-muted-foreground text-center py-4">Sin comisiones registradas</p>
                   ) : (
                     empCommissions.slice(0, 5).map((c: any) => (
-                      <div key={c.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                      <div key={c.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition-colors">
                         <div>
                           <p className="font-medium">{c.period}</p>
                           <p className="text-xs text-muted-foreground">{c.commission_type} · Est: ${Number(c.estimated_amount || 0).toLocaleString("es-CO")}</p>
@@ -361,7 +361,7 @@ export default function EmployeeProfile() {
                     <p className="text-sm text-muted-foreground text-center py-4">Sin deducciones registradas</p>
                   ) : (
                     empDeductions.slice(0, 5).map((d: any) => (
-                      <div key={d.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                      <div key={d.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition-colors">
                         <div>
                           <p className="font-medium">{d.deduction_type}</p>
                           <p className="text-xs text-muted-foreground">{d.month_year} · ${Number(d.amount || 0).toLocaleString("es-CO")}</p>

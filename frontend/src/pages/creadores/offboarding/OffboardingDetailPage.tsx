@@ -351,7 +351,7 @@ ${form.comentarios || "Sin comentarios"}
                     <p className="text-xs text-muted-foreground">Aún no hay aprobaciones registradas.</p>
                   )}
                   {approvals.map((a) => (
-                    <div key={a.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                    <div key={a.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 transition-colors">
                       <span className="text-sm font-medium">{getApproverName(a.approver_id)}</span>
                       {a.approved ? (
                         <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px]">
@@ -388,7 +388,7 @@ ${form.comentarios || "Sin comentarios"}
                   {CHECKLIST_ITEMS.map((item) => (
                     <label
                       key={item.key}
-                      className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors"
+                      className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 cursor-pointer hover:bg-white/10 hover:border-primary/40 transition-colors"
                     >
                       <Checkbox
                         checked={!!offboarding[item.key]}

@@ -202,7 +202,7 @@ export default function HRPermisoNew() {
             <Label>Documento de soporte</Label>
             <p className="text-xs text-muted-foreground">Imagen o PDF (máx. 10 MB)</p>
             {file ? (
-              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
+              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                 {file.type.startsWith("image/") ? (
                   <Image className="h-4 w-4 text-muted-foreground shrink-0" />
                 ) : (

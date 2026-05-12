@@ -148,7 +148,7 @@ const ChangeStatusModal = ({
           {/* Current status */}
           <div className="space-y-1.5">
             <Label className="text-muted-foreground text-xs">Estado Actual</Label>
-            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
+            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               {currentOption && (
                 <span className={`h-2.5 w-2.5 rounded-full ${currentOption.color}`} />
               )}
