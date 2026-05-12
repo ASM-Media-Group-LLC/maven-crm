@@ -1232,7 +1232,27 @@ const PanelDeControl = () => {
             </div>
             <div>
               <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
-                Mejor cerrador <span className="text-muted-foreground font-normal normal-case">· {format(new Date(), "MMMM yyyy", { locale: es })}</span>
+                Mejor cerrador{" "}
+                <span className="text-muted-foreground font-normal normal-case">
+                  ·{" "}
+                  {(() => {
+                    // Mostrar el rango real del filtro (no la fecha actual).
+                    // Si from y to caen en el mismo mes, "MMMM yyyy".
+                    // Si abarcan meses distintos, "MMM yyyy - MMM yyyy" (o
+                    // sin el yyyy si es el mismo año).
+                    if (!range.from || !range.to) return "";
+                    const sameMonth =
+                      range.from.getFullYear() === range.to.getFullYear() &&
+                      range.from.getMonth() === range.to.getMonth();
+                    if (sameMonth) {
+                      return format(range.from, "MMMM yyyy", { locale: es });
+                    }
+                    const sameYear = range.from.getFullYear() === range.to.getFullYear();
+                    return sameYear
+                      ? `${format(range.from, "MMM", { locale: es })} - ${format(range.to, "MMM yyyy", { locale: es })}`
+                      : `${format(range.from, "MMM yyyy", { locale: es })} - ${format(range.to, "MMM yyyy", { locale: es })}`;
+                  })()}
+                </span>
               </p>
               {bestCloserLoading ? (
                 <Skeleton className="mt-1 h-7 w-32" />
