@@ -51,6 +51,7 @@ import {
 } from "@/hooks/useOperationsDashboard";
 import { cn } from "@/lib/utils";
 import { ListRow } from "@/components/ui/list-row";
+import { OUTCOME_META } from "@/hooks/useAgencyQa";
 import SpammerAccountsTab from "./panel-de-control/SpammerAccountsTab";
 import ControlGastoTab from "./panel-de-control/ControlGastoTab";
 import ChattersRecruitmentTab from "./panel-de-control/ChattersRecruitmentTab";
@@ -575,11 +576,30 @@ const renderRow = (
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        {row.badge && (
-          <Badge variant="outline" className="text-[10px]">
-            {row.badge}
-          </Badge>
-        )}
+        {row.badge && (() => {
+          // Si el badge es un outcome de QA (cerro / en_espera /
+          // no_cerro), renderizamos con el mismo lenguaje visual
+          // que la tabla de Calls — pill solid con color del
+          // outcome + label traducido. Para cualquier otro badge,
+          // cae al outline genérico.
+          const meta = OUTCOME_META[row.badge as keyof typeof OUTCOME_META];
+          if (meta) {
+            return (
+              <span
+                className="inline-flex h-5 items-center gap-1 rounded-full px-2 text-[10px] font-bold text-white"
+                style={{ background: meta.bg }}
+              >
+                <span aria-hidden>{meta.icon}</span>
+                {meta.label}
+              </span>
+            );
+          }
+          return (
+            <Badge variant="outline" className="text-[10px]">
+              {row.badge}
+            </Badge>
+          );
+        })()}
         {row.date && (
           <span className="text-[10px] text-muted-foreground tabular-nums">
             {format(new Date(row.date), "d MMM", { locale: es })}
