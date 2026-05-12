@@ -1,5 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, UserPlus, Upload, Save, X, ImageIcon, Film, FileText, Check, ChevronsUpDown, Plus, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -80,24 +79,6 @@ const NuevoContactoForm = () => {
     id: string; name: string; phone?: string; email?: string; agentName?: string; createdAt?: string;
   } | null>(null);
   const [isUpdatingContact, setIsUpdatingContact] = useState(false);
-  // Lead seleccionado del autocomplete (de leadgen_entries). Si está
-  // presente, al submit guardamos closers_contacts.leadgen_entry_id = id
-  // — la attribution del LLG original se hace via JOIN a leadgen_entries.
-  const [selectedLead, setSelectedLead] = useState<{
-    id: string;
-    model_handle: string | null;
-    ticket_number: string | null;
-    phone_raw: string | null;
-    phone_e164: string | null;
-    country_code: string | null;
-    city: string | null;
-    company: string | null;
-    platform: string | null;
-    onlyfans_url: string | null;
-    notes: string | null;
-    lg_user_id: string | null;
-    llgName?: string | null; // resolved via profiles JOIN abajo
-  } | null>(null);
   // Compañías canónicas — fuente única scouter_companies, lista fija.
   // DEFAULT_COMPANIES queda solo como fallback durante loading.
   const { data: scouterCompanies = [] } = useScouterCompanies();
@@ -159,13 +140,6 @@ const NuevoContactoForm = () => {
     const e: Record<string, string> = {};
     if (!form.nombre.trim()) e.nombre = "El nombre es obligatorio";
     if (!form.accountLink.trim()) e.accountLink = "El link de la cuenta es obligatorio";
-    // Regla nueva: el contacto debe venir de un lead existente —
-    // mantiene el flujo unificado LeadGen → Contactos. Si no aparece
-    // en el autocomplete, el LLG debe crear primero el lead en
-    // LeadGen y volver acá.
-    if (!selectedLead) {
-      e.nombre = "Tenés que seleccionar un lead existente. Si no aparece, andá a LeadGen y agregalo primero.";
-    }
     if (Object.keys(e).length > 0) {
       setErrors(e);
       toast({ title: "Revisa los campos marcados", variant: "destructive" });
@@ -270,22 +244,9 @@ const NuevoContactoForm = () => {
         created_by: user?.id || "",
         status: "new",
         record_type: recordType,
-        // Si el contacto vino de un lead via autocomplete, guardamos la
-        // referencia. El LLG que logueó el lead se lee via JOIN a
-        // leadgen_entries.lg_user_id (no denormalizado acá).
-        leadgen_entry_id: selectedLead?.id ?? null,
       } as any);
 
       if (error) throw error;
-
-      // Si vino de un lead, marcamos el lead como 'contactado' — espejo
-      // de lo que hace ConvertLeadModal cuando el flow es desde LeadGen.
-      if (selectedLead?.id) {
-        await supabase
-          .from("leadgen_entries")
-          .update({ status: "contactado" } as any)
-          .eq("id", selectedLead.id);
-      }
 
       // Avatar fetch async — el worker baja foto IG y la pone en
       // models.avatar_url (idempotente). No bloqueamos el submit.
@@ -359,15 +320,8 @@ const NuevoContactoForm = () => {
         created_by: user?.id || "",
         status: "new",
         record_type: "reactivado",
-        leadgen_entry_id: selectedLead?.id ?? null,
       } as any);
       if (error) throw error;
-      if (selectedLead?.id) {
-        await supabase
-          .from("leadgen_entries")
-          .update({ status: "contactado" } as any)
-          .eq("id", selectedLead.id);
-      }
       if (handle) void enqueueAvatarFetch(handle);
       toast({ title: "Contacto guardado exitosamente" });
       navigate("/contactos");
@@ -402,49 +356,7 @@ const NuevoContactoForm = () => {
         <div className="space-y-6 rounded-lg border border-border p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Nombre del Contacto *" error={errors.nombre}>
-              <LeadAutocomplete
-                value={form.nombre}
-                onTypedChange={(v) => set("nombre", v)}
-                selectedLead={selectedLead}
-                onLeadSelect={(lead) => {
-                  setSelectedLead(lead);
-                  if (!lead) return;
-                  // Auto-fill todos los campos que vienen del lead. El
-                  // user puede seguir editando — esto es un atajo, no un
-                  // lock. El campo "nombre" queda con el handle del lead
-                  // como mejor inferencia inicial.
-                  setForm((prev) => ({
-                    ...prev,
-                    nombre: lead.model_handle ?? prev.nombre,
-                    accountLink:
-                      lead.model_handle && lead.platform?.toLowerCase() === "instagram"
-                        ? `https://instagram.com/${lead.model_handle.replace(/^@/, "")}`
-                        : prev.accountLink,
-                    phone: lead.phone_raw || prev.phone,
-                    countryCode: lead.country_code
-                      ? lead.country_code.startsWith("+")
-                        ? lead.country_code
-                        : `+${lead.country_code}`
-                      : prev.countryCode,
-                    ciudad: lead.city ?? prev.ciudad,
-                    ticket: lead.ticket_number ?? prev.ticket,
-                    compania: lead.company ?? prev.compania,
-                    plataforma: lead.platform ?? prev.plataforma,
-                    onlyfansUrl: lead.onlyfans_url ?? prev.onlyfansUrl,
-                    notas: lead.notes ?? prev.notas,
-                  }));
-                }}
-                error={!!errors.nombre}
-              />
-              {selectedLead && (
-                <p className="mt-1.5 text-[11px] text-muted-foreground">
-                  Desde lead{" "}
-                  <code className="rounded bg-muted/40 px-1 py-0.5">
-                    {selectedLead.ticket_number || `#${selectedLead.id.slice(0, 6)}`}
-                  </code>
-                  {selectedLead.llgName && ` · logueado por ${selectedLead.llgName}`}
-                </p>
-              )}
+              <Input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder="Nombre completo" className={errors.nombre ? "border-destructive" : ""} />
             </Field>
             <Field label="Categoría Física *" error={errors.categoria}>
               <Select value={form.categoria} onValueChange={(v) => set("categoria", v)}>
@@ -561,7 +473,7 @@ const NuevoContactoForm = () => {
       <footer className="border-t border-border bg-background px-6 py-4 shrink-0">
         <div className="flex justify-end gap-3">
           <Button variant="outline" onClick={() => navigate("/contactos")}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={isSaving || !selectedLead}>
+          <Button onClick={handleSubmit} disabled={isSaving}>
             <Save className="mr-2 h-4 w-4" /> {isSaving ? "Guardando..." : "Guardar Contacto"}
           </Button>
         </div>
@@ -622,19 +534,9 @@ const NuevoContactoForm = () => {
             <Button onClick={handleUpdateExistingContact} disabled={isUpdatingContact} className="w-full">
               {isUpdatingContact ? "Actualizando..." : "Actualizar contacto"}
             </Button>
-            {/* "Crear nuevo registro" solo disponible si el duplicado
-                NO tiene teléfono — la regla es que un handle con tel
-                ya registrado no se vuelve a meter. */}
-            {!existingContactData?.phone && (
-              <Button variant="outline" onClick={handleCreateNewAnyway} disabled={isSaving} className="w-full">
-                Crear nuevo registro
-              </Button>
-            )}
-            {existingContactData?.phone && (
-              <p className="text-xs text-muted-foreground text-center px-2">
-                Este handle ya tiene un teléfono registrado. No se permite duplicar.
-              </p>
-            )}
+            <Button variant="outline" onClick={handleCreateNewAnyway} disabled={isSaving} className="w-full">
+              Crear nuevo registro
+            </Button>
             <Button variant="ghost" onClick={() => setExistingContactData(null)} className="w-full">
               Cancelar
             </Button>
@@ -718,183 +620,6 @@ function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySe
         )}
       </PopoverContent>
     </Popover>
-  );
-}
-
-// ─── LeadAutocomplete ─────────────────────────────────────────────────
-// Buscable. El user puede:
-//   1. Tipear libremente (modo manual) — onTypedChange dispara, sin lead.
-//   2. Tipear y ver dropdown con leads de leadgen_entries que matcheen
-//      por model_handle/ticket_number/notes (server-side search).
-//   3. Seleccionar uno → onLeadSelect dispara con la row completa →
-//      el form padre autollena nombre/phone/ticket/compania/etc.
-//
-// El JOIN a profiles trae el nombre del LLG que logueó el lead, para
-// mostrarlo abajo del nombre seleccionado ("logueado por Juan Pérez").
-interface LeadAutocompleteLead {
-  id: string;
-  model_handle: string | null;
-  ticket_number: string | null;
-  phone_raw: string | null;
-  phone_e164: string | null;
-  country_code: string | null;
-  city: string | null;
-  company: string | null;
-  platform: string | null;
-  onlyfans_url: string | null;
-  notes: string | null;
-  lg_user_id: string | null;
-  llgName?: string | null;
-}
-
-interface LeadAutocompleteProps {
-  value: string;
-  onTypedChange: (v: string) => void;
-  selectedLead: LeadAutocompleteLead | null;
-  onLeadSelect: (lead: LeadAutocompleteLead | null) => void;
-  error?: boolean;
-}
-
-function LeadAutocomplete({ value, onTypedChange, selectedLead, onLeadSelect, error }: LeadAutocompleteProps) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-
-  // Sync query a value cuando se abre — así si ya escribió algo en el
-  // input, se muestra como término de búsqueda en el dropdown.
-  useEffect(() => {
-    if (open) setQuery(value || "");
-  }, [open, value]);
-
-  // Búsqueda fuzzy via RPC. Aguanta typos ("paola" encuentra "paula"
-  // con similarity 0.5+) y busca en handle/ticket/notes/phone con
-  // pg_trgm. Mejor que ILIKE para errores de tipeo del LLG.
-  const { data: leads = [], isLoading } = useQuery({
-    queryKey: ["leadgen-search-fuzzy", query],
-    queryFn: async () => {
-      const q = query.trim();
-      if (q.length < 2) return [];
-      const { data, error: err } = await (supabase as any).rpc("leadgen_search_fuzzy", {
-        p_query: q,
-        p_limit: 20,
-        p_min_similarity: 0.2,
-      });
-      if (err) throw err;
-      const rows = (data ?? []) as LeadAutocompleteLead[];
-
-      // Enriquecer con nombre del LLG que logueó cada lead — un solo
-      // query por batch.
-      const userIds = Array.from(
-        new Set(rows.map((r) => r.lg_user_id).filter(Boolean) as string[]),
-      );
-      if (userIds.length > 0) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id, full_name")
-          .in("id", userIds);
-        const nameById = new Map<string, string>();
-        for (const p of profs ?? []) nameById.set(p.id as string, (p as any).full_name);
-        for (const r of rows) {
-          if (r.lg_user_id) r.llgName = nameById.get(r.lg_user_id) ?? null;
-        }
-      }
-      return rows;
-    },
-    enabled: open,
-    staleTime: 30_000,
-  });
-
-  return (
-    <div>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <div className="relative">
-            <Input
-              value={value}
-              onChange={(e) => {
-                onTypedChange(e.target.value);
-                // Si el user edita después de seleccionar, deshacemos
-                // la asociación al lead (deja de venir "desde lead X").
-                if (selectedLead) onLeadSelect(null);
-                if (!open) setOpen(true);
-              }}
-              onFocus={() => setOpen(true)}
-              placeholder="Nombre completo (o buscá un lead existente)"
-              className={cn(error && "border-destructive", "pr-8")}
-            />
-            {selectedLead && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onLeadSelect(null);
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 hover:bg-muted/60"
-                title="Quitar asociación al lead"
-              >
-                <X className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-[--radix-popover-trigger-width] p-0"
-          align="start"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="Buscar lead por handle, ticket o notas…"
-              value={query}
-              onValueChange={setQuery}
-            />
-            <CommandList>
-              {query.trim().length < 2 ? (
-                <CommandEmpty>Escribí al menos 2 caracteres para buscar.</CommandEmpty>
-              ) : isLoading ? (
-                <CommandEmpty>Buscando…</CommandEmpty>
-              ) : leads.length === 0 ? (
-                <CommandEmpty>Sin leads que matcheen. Podés tipear el nombre manualmente.</CommandEmpty>
-              ) : (
-                <CommandGroup heading="Leads existentes">
-                  {leads.map((lead) => (
-                    <CommandItem
-                      key={lead.id}
-                      value={lead.id}
-                      onSelect={() => {
-                        onLeadSelect(lead);
-                        setOpen(false);
-                      }}
-                      className="flex flex-col items-start gap-0.5 py-2"
-                    >
-                      <div className="flex w-full items-center gap-2">
-                        <span className="font-medium truncate">
-                          @{lead.model_handle ?? "?"}
-                        </span>
-                        {lead.ticket_number && (
-                          <code className="text-[10px] text-muted-foreground bg-muted/40 px-1 py-0.5 rounded">
-                            {lead.ticket_number}
-                          </code>
-                        )}
-                        {lead.phone_raw && (
-                          <span className="text-[10px] text-emerald-500 font-bold ml-auto shrink-0">
-                            📞 ya tiene tel
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex w-full items-center gap-2 text-[10px] text-muted-foreground">
-                        {lead.company && <span>{lead.company}</span>}
-                        {lead.city && <span>· {lead.city}</span>}
-                        {lead.llgName && <span>· LLG: {lead.llgName}</span>}
-                      </div>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              )}
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    </div>
   );
 }
 

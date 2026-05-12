@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AlertTriangle } from "lucide-react";
+import { LeadAutocomplete, type LeadAutocompleteLead } from "@/components/leadgen/LeadAutocomplete";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,11 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   } | null>(null);
   const [isUpdatingContact, setIsUpdatingContact] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<ContactoFormValues | null>(null);
+  // Lead obligatorio: el contacto debe venir de un lead existente en
+  // leadgen_entries. Flujo unificado LG → Contactos: el LLG primero
+  // loguea el lead, después acá lo selecciona al conseguir el tel.
+  const [selectedLead, setSelectedLead] = useState<LeadAutocompleteLead | null>(null);
+  const [leadError, setLeadError] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   // Compañías canónicas — lista fija, no se permite texto libre.
@@ -65,6 +71,14 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   const queryClient = useQueryClient();
 
   const onSubmit = async (data: ContactoFormValues) => {
+    // Regla nueva del flujo unificado: el contacto debe venir de un
+    // lead. Si no aparece en el autocomplete, el LLG debe crear el
+    // lead primero en LeadGen.
+    if (!selectedLead) {
+      setLeadError("Tenés que seleccionar un lead existente. Si no aparece, agregalo primero en LeadGen.");
+      return;
+    }
+    setLeadError(null);
     setIsSubmitting(true);
     try {
       // VALIDATION 1: Check if creator exists (status-aware)
@@ -151,9 +165,22 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         notes: data.notas || null,
         created_by: user?.id ?? "",
         record_type: recordType,
-      });
+        // Flujo unificado: link al lead origen. La attribution del LLG
+        // original se lee via JOIN a leadgen_entries.lg_user_id.
+        leadgen_entry_id: selectedLead?.id ?? null,
+      } as any);
 
       if (error) throw error;
+
+      // Marcar el lead como contactado — sync espejo del ConvertLeadModal.
+      if (selectedLead?.id) {
+        await supabase
+          .from("leadgen_entries")
+          .update({ status: "contactado" } as any)
+          .eq("id", selectedLead.id);
+        queryClient.invalidateQueries({ queryKey: ["leadgen-entries"] });
+        queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
+      }
 
       // Avatar fetch async — el worker descarga foto IG y la pone en
       // models.avatar_url (idempotente). No bloqueamos el submit.
@@ -162,7 +189,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
       toast({ title: "Contacto guardado exitosamente" });
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
-      form.reset();
+      form.reset(); setSelectedLead(null); setLeadError(null);
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Error al guardar contacto", description: err.message, variant: "destructive" });
@@ -197,7 +224,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
       setExistingContactData(null);
       setPendingFormData(null);
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
-      form.reset();
+      form.reset(); setSelectedLead(null); setLeadError(null);
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Error al actualizar", description: err.message, variant: "destructive" });
@@ -225,13 +252,20 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         notes: pendingFormData.notas || null,
         created_by: user?.id ?? "",
         record_type: "reactivado",
-      });
+        leadgen_entry_id: selectedLead?.id ?? null,
+      } as any);
       if (error) throw error;
+      if (selectedLead?.id) {
+        await supabase
+          .from("leadgen_entries")
+          .update({ status: "contactado" } as any)
+          .eq("id", selectedLead.id);
+      }
       void enqueueAvatarFetch(normalizedIg || pendingFormData.instagram);
       toast({ title: "Contacto guardado exitosamente" });
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
-      form.reset();
+      form.reset(); setSelectedLead(null); setLeadError(null);
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Error al guardar contacto", description: err.message, variant: "destructive" });
@@ -257,10 +291,51 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                 name="nombre"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nombre *</FormLabel>
+                    <FormLabel>Nombre del Lead *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Nombre completo" {...field} />
+                      <LeadAutocomplete
+                        value={field.value}
+                        onTypedChange={(v) => field.onChange(v)}
+                        selectedLead={selectedLead}
+                        onLeadSelect={(lead) => {
+                          setSelectedLead(lead);
+                          setLeadError(null);
+                          if (!lead) return;
+                          // Autollenar del lead seleccionado.
+                          if (lead.model_handle) {
+                            field.onChange(lead.model_handle);
+                            form.setValue(
+                              "instagram",
+                              lead.platform?.toLowerCase() === "instagram"
+                                ? `https://instagram.com/${lead.model_handle.replace(/^@/, "")}`
+                                : lead.model_handle,
+                            );
+                          }
+                          if (lead.company) form.setValue("compania", lead.company);
+                          if (lead.country_code) {
+                            const cc = lead.country_code.startsWith("+")
+                              ? lead.country_code
+                              : `+${lead.country_code}`;
+                            form.setValue("paisCodigo", cc);
+                          }
+                          if (lead.phone_raw) form.setValue("telefono", lead.phone_raw);
+                          if (lead.notes) form.setValue("notas", lead.notes);
+                        }}
+                        error={!!leadError}
+                      />
                     </FormControl>
+                    {selectedLead && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Desde lead{" "}
+                        <code className="rounded bg-muted/40 px-1 py-0.5">
+                          {selectedLead.ticket_number || `#${selectedLead.id.slice(0, 6)}`}
+                        </code>
+                        {selectedLead.llgName && ` · logueado por ${selectedLead.llgName}`}
+                      </p>
+                    )}
+                    {leadError && (
+                      <p className="text-xs text-destructive mt-1">{leadError}</p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -367,7 +442,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || !selectedLead}>
                 {isSubmitting ? "Guardando..." : "Guardar"}
               </Button>
             </DialogFooter>
@@ -411,9 +486,17 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
           <Button onClick={handleUpdateExistingContact} disabled={isUpdatingContact} className="w-full">
             {isUpdatingContact ? "Actualizando..." : "Actualizar contacto"}
           </Button>
-          <Button variant="outline" onClick={handleCreateNewAnyway} disabled={isSubmitting} className="w-full">
-            Crear nuevo registro
-          </Button>
+          {/* Regla: si el dup ya tiene tel, no se puede crear duplicado. */}
+          {!existingContactData?.phone && (
+            <Button variant="outline" onClick={handleCreateNewAnyway} disabled={isSubmitting} className="w-full">
+              Crear nuevo registro
+            </Button>
+          )}
+          {existingContactData?.phone && (
+            <p className="text-xs text-muted-foreground text-center px-2">
+              Este handle ya tiene un teléfono registrado. No se permite duplicar.
+            </p>
+          )}
           <Button variant="ghost" onClick={() => { setExistingContactData(null); setPendingFormData(null); }} className="w-full">
             Cancelar
           </Button>
