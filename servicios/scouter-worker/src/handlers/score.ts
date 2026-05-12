@@ -140,6 +140,65 @@ export async function handleScoreLead(
   let finalReason = result.reason;
   let lookScore: number | null = null;
 
+  // ─── Post-procesador determinístico (defensa contra LLM fallido) ──────
+  // Aunque el prompt dice "deal-breaker → score ≤ 3", a veces el modelo
+  // identifica el deal-breaker en `reason` pero devuelve score 5+. Acá
+  // hacemos string-matching sobre lo que la IA MISMA escribió y, si
+  // detectamos un deal-breaker, forzamos low_fit + score ≤ 2.5.
+  //
+  // También chequeamos el handle/name del lead directamente (regex) por
+  // si la IA no lo notó — sufijos tipo _shoes, _store, oficial, etc.
+  // son brand-determinísticos.
+  const dealBreakerPatterns = [
+    /no\s+es\s+persona/i,
+    /\bg[eé]nero\s+(incorrecto|opuesto|equivocado)/i,
+    /no\s+es\s+(persona\s+)?(femenin|masculin)/i,
+    /pa[ií]s\s+(desconocido|no\s+matche|no\s+coincide|equivocado)/i,
+    /\bdeal[\s-]?breaker\b/i,
+    /followers?\s+fuera\s+de\s+rango/i,
+    /\bmarca\b(?!\s+(personal|propia))/i, // "marca" pero no "marca personal"
+    /\b(tienda|store|shop|brand)\b.*(no\s+es\s+persona|brand|comercio)/i,
+    /no\s+humana?\b/i,
+  ];
+  // Tokens determinísticos de brand: palabras que casi nunca aparecen
+  // en handles personales. Las buscamos como substring porque el LLM
+  // no las catchea bien y los handles brand pueden ser arbitrarios
+  // ("@mochishoesin" tiene "shoes" en el medio, no como suffix).
+  const brandTokens = [
+    "shoes", "shoe", "zapat", "calzad", "boots",
+    "tienda", "store", "shop", "mall", "outlet", "boutique", "market",
+    "oficial", "official",
+    "network", "magazine", "newscom", "noticias",
+    "tacos", "burgers", "restaurant", "cafe", "bistro",
+    "hotel", "resort",
+    ".store", ".shop", ".id",  // dominios y suffix Indonesia (brand)
+  ];
+  const brandPhrases = [
+    /\bnetwork\s*com\b/i,
+    /shopping\d*\s*(oficial|official)/i,
+  ];
+  const handleLower = `${lead.instagram_handle ?? ""} ${lead.name ?? ""}`.toLowerCase();
+  const handleHasBrandToken = brandTokens.some((t) => handleLower.includes(t)) ||
+    brandPhrases.some((p) => p.test(handleLower));
+
+  const reasonText = result.reason;
+  const reasonHitsDealBreaker = dealBreakerPatterns.some((p) => p.test(reasonText));
+
+  if ((reasonHitsDealBreaker || handleHasBrandToken) && result.status !== "low_fit") {
+    const guards: string[] = [];
+    if (reasonHitsDealBreaker) guards.push("reason menciona deal-breaker");
+    if (handleHasBrandToken) {
+      const matched = brandTokens.filter((t) => handleLower.includes(t));
+      guards.push(`handle/name contiene token brand: ${matched.slice(0, 3).join(", ")}`);
+    }
+    finalScore = Math.min(result.score, 2.5);
+    finalStatus = "low_fit";
+    finalReason = `[guard] ${guards.join(" + ")}. Original: ${result.reason}`;
+    console.log(
+      `[score-guard] ${lead.instagram_handle} forced low_fit (was ${result.status} ${result.score}): ${guards.join(", ")}`,
+    );
+  }
+
   // ─── Vision step (solo borderline 5k-15k followers) ────────────────────
   // Si el lead cae en la franja borderline Y tenemos foto, corremos
   // analyzeLook. Si el look es alto, podemos rescatarlo de low_fit.
