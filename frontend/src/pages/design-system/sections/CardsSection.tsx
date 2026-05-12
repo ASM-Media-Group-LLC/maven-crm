@@ -7,8 +7,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ListRow, ListRowButton } from "@/components/ui/list-row";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
-import { Users, TrendingUp, Clock, AlertTriangle, DollarSign, BarChart3 } from "lucide-react";
+import { ArrowRight, Users, TrendingUp, Clock, AlertTriangle, DollarSign, BarChart3 } from "lucide-react";
 
 export const CardsSection = () => (
   <section id="cards" className="space-y-8">
@@ -153,6 +154,55 @@ export const CardsSection = () => (
         <p><strong className="text-foreground">glass-card:</strong> <code className="font-mono text-foreground">backdrop-blur-2xl bg-white/[0.03] border-white/[0.08] shadow accent glow</code></p>
         <p><strong className="text-foreground">glass-card-subtle:</strong> <code className="font-mono text-foreground">backdrop-blur-md bg-white/[0.02] border-white/[0.06] sin shadow</code></p>
         <p><strong className="text-foreground">Regla:</strong> Solo usar sobre fondos oscuros. En light mode usar <code className="font-mono text-foreground">Card</code> estándar.</p>
+      </div>
+    </div>
+
+    {/* ListRow / ListRowButton */}
+    <div>
+      <h3 className="text-xl font-medium mb-2 text-muted-foreground">ListRow / ListRowButton</h3>
+      <p className="text-sm text-muted-foreground mb-4 max-w-2xl">
+        Componente estándar para <strong className="text-foreground">filas dentro de popups o listas</strong>{" "}
+        (panel de control, Dashboard v2, notificaciones, etc). Glass liviano que combina con el degradado del{" "}
+        <code className="font-mono text-primary">Dialog</code> sin pelearse. Cualquier cambio al look de filas se
+        hace una sola vez en <code className="font-mono text-primary">components/ui/list-row.tsx</code> y propaga
+        global — nunca escribir clases largas inline.
+      </p>
+
+      <div className="space-y-1.5 rounded-2xl bg-gradient-to-br from-primary/10 via-transparent to-transparent border border-white/10 p-4 backdrop-blur-md">
+        <ListRow>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium truncate">@danyancatsq</p>
+            <p className="text-xs text-muted-foreground truncate">📞 +52 55 4130 3094</p>
+          </div>
+          <span className="text-[10px] text-muted-foreground">1 may</span>
+        </ListRow>
+        <ListRow interactive>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium truncate">@martina.smith</p>
+            <p className="text-xs text-muted-foreground truncate">📞 +52 55 4130 5520</p>
+          </div>
+          <span className="text-[10px] text-muted-foreground">2 may</span>
+          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+        </ListRow>
+        <ListRowButton>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium truncate">@elizabethloaiza</p>
+            <p className="text-xs text-muted-foreground truncate">📞 +52 55 4130 1010</p>
+          </div>
+          <span className="text-[10px] text-muted-foreground">3 may</span>
+          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+        </ListRowButton>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-2">
+        <p><strong className="text-foreground">Base:</strong> <code className="font-mono text-foreground">flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm</code></p>
+        <p><strong className="text-foreground">Hover (interactive=true):</strong> <code className="font-mono text-foreground">cursor-pointer hover:bg-white/10 hover:border-primary/40</code></p>
+        <p><strong className="text-foreground">Props:</strong></p>
+        <ul className="list-disc list-inside space-y-0.5 text-xs">
+          <li><code className="font-mono text-foreground">&lt;ListRow&gt;</code> — renderea <code>div</code>. Acepta <code>interactive</code> bool + todos los attrs de HTMLDivElement (onClick, etc).</li>
+          <li><code className="font-mono text-foreground">&lt;ListRowButton&gt;</code> — renderea <code>button</code> con interactive ON por default. Para filas 100% clickables con accesibilidad por teclado.</li>
+        </ul>
+        <p><strong className="text-foreground">Para otros elementos HTML</strong> (ej. <code>&lt;label&gt;</code> con checkbox dentro): importar las clases <code className="font-mono text-foreground">listRowBase</code> y <code className="font-mono text-foreground">listRowInteractive</code> y aplicar con <code>cn()</code>.</p>
       </div>
     </div>
 

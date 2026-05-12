@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Info, ArrowUpDown, MoreHorizontal } from "lucide-react";
+import OutcomeBadge from "@/components/agency-qa/OutcomeBadge";
 
 const solidBadges = ["default", "secondary", "destructive", "success", "warning", "info"] as const;
 const softBadges = ["primary-soft", "secondary-soft", "destructive-soft", "success-soft", "warning-soft"] as const;
@@ -375,6 +376,50 @@ export const DataDisplaySection = () => {
         {softBadges.map((v) => (
           <Badge key={v} variant={v}>{v}</Badge>
         ))}
+      </div>
+    </div>
+
+    {/* OutcomeBadge (QA) */}
+    <div>
+      <h3 className="text-xl font-medium mb-2 text-muted-foreground">OutcomeBadge (QA)</h3>
+      <p className="text-sm text-muted-foreground mb-4 max-w-2xl">
+        Pill estandarizada para mostrar el outcome de una llamada de QA (cerro / en_espera / no_cerro). Color y label
+        vienen de <code className="font-mono text-primary">OUTCOME_META</code> en{" "}
+        <code className="font-mono text-primary">hooks/useAgencyQa.ts</code>. Antes había 4 implementaciones duplicadas
+        (AgencyCalls, CallDetailDrawer, CallDetailPage, panel popup) — ahora un único componente con size variants.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <OutcomeBadge outcome="cerro" size="xs" />
+        <OutcomeBadge outcome="en_espera" size="xs" />
+        <OutcomeBadge outcome="no_cerro" size="xs" />
+        <span className="text-[10px] text-muted-foreground">xs</span>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <OutcomeBadge outcome="cerro" size="sm" />
+        <OutcomeBadge outcome="en_espera" size="sm" />
+        <OutcomeBadge outcome="no_cerro" size="sm" />
+        <span className="text-[10px] text-muted-foreground">sm — default, usado en tabla de Calls</span>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <OutcomeBadge outcome="cerro" size="md" />
+        <OutcomeBadge outcome="en_espera" size="md" />
+        <OutcomeBadge outcome="no_cerro" size="md" />
+        <span className="text-[10px] text-muted-foreground">md — drawer y detail</span>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <OutcomeBadge outcome="cerro" size="lg" shadow />
+        <OutcomeBadge outcome="en_espera" size="lg" shadow />
+        <OutcomeBadge outcome="no_cerro" size="lg" shadow />
+        <span className="text-[10px] text-muted-foreground">lg + shadow — header de detalle</span>
+      </div>
+      <div className="mt-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-1">
+        <p><strong className="text-foreground">Props:</strong></p>
+        <ul className="list-disc list-inside space-y-0.5 text-xs">
+          <li><code className="font-mono text-foreground">outcome</code> — <code>"cerro" | "en_espera" | "no_cerro" | null</code>. Si es null o no matchea, no renderea nada.</li>
+          <li><code className="font-mono text-foreground">size</code> — <code>"xs" | "sm" | "md" | "lg"</code>. Default <code>sm</code>.</li>
+          <li><code className="font-mono text-foreground">shadow</code> — boolean. Agrega shadow-md (úsalo solo en lg).</li>
+          <li><code className="font-mono text-foreground">labelOverride</code> — <code>Partial&lt;Record&lt;string, string&gt;&gt;</code> opcional. Permite override del label por outcome — ej. el panel usa <code>{`{ cerro: "Cerró" }`}</code> en vez de "Exitoso".</li>
+        </ul>
       </div>
     </div>
 
