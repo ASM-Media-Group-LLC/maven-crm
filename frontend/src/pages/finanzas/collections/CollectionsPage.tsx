@@ -477,7 +477,7 @@ export default function CollectionsPage() {
                 {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-lg" />) : filteredCobros.length === 0 ? (
                   <div className="col-span-full text-center text-muted-foreground py-12">Sin cobros encontrados.</div>
                 ) : filteredCobros.map(inv => (
-                  <div key={inv.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                  <div key={inv.id} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-muted/30 transition-colors">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-mono text-muted-foreground">#{inv.invoice_number}</span>
                       <div className="flex items-center gap-1">

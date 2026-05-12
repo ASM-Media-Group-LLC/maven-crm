@@ -20,7 +20,7 @@ const EscalabilidadSection = () => {
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Tablas con soporte multi-tenant</h4>
             <div className="flex flex-wrap gap-2">
               {["task_projects", "tasks", "deals", "profiles", "creators", "events"].map((t) => (
-                <span key={t} className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-mono">{t}</span>
+                <span key={t} className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-mono">{t}</span>
               ))}
             </div>
           </div>

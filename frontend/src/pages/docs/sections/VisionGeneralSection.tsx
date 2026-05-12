@@ -110,7 +110,7 @@ const VisionGeneralSection = () => {
             { mod: "Closers", desc: "Pipeline de deals con seguimiento de etapas de cierre comercial." },
             { mod: "Tickets", desc: "Sistema de soporte interno vinculado a creadores con prioridades y estados." },
           ].map((item) => (
-            <div key={item.mod} className="rounded-lg border border-border bg-card p-4 space-y-1">
+            <div key={item.mod} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-1">
               <h3 className="text-sm font-medium">{item.mod}</h3>
               <p className="text-xs text-muted-foreground">{item.desc}</p>
             </div>

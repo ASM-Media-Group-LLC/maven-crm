@@ -223,7 +223,7 @@ const AudienceSelector = ({
           {CHANNELS.map((ch) => (
             <label
               key={ch.value}
-              className="flex items-center gap-2.5 rounded-lg border border-border p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+              className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/5 p-3 cursor-pointer hover:bg-muted/50 transition-colors"
             >
               <Checkbox
                 checked={deliveryChannels.includes(ch.value)}

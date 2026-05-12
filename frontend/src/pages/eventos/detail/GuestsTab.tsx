@@ -83,7 +83,7 @@ const GuestsTab = ({ eventId }: Props) => {
   return (
     <div className="space-y-4">
       {/* Summary */}
-      <div className="flex flex-wrap gap-4 rounded-lg border border-border p-3">
+      <div className="flex flex-wrap gap-4 rounded-xl border border-white/10 bg-white/5 p-3">
         {summaryItems.map((s) => (
           <div key={s.label} className="text-center min-w-[60px]">
             <p className="text-lg font-bold">{s.count}</p>

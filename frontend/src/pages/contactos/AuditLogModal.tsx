@@ -158,7 +158,7 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
             <div className="flex flex-col gap-4 flex-1 min-h-0">
               {/* KPIs */}
               <div className="grid grid-cols-4 gap-3 shrink-0">
-                <div className="rounded-lg border border-border p-3">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-muted-foreground">Total cambios</p>
                   <p className="text-2xl font-bold">{changes.length}</p>
                 </div>
@@ -166,11 +166,11 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
                   <p className="text-xs text-amber-500">⚠ Sospechosos (&gt;24h)</p>
                   <p className="text-2xl font-bold text-amber-500">{suspicious.length}</p>
                 </div>
-                <div className="rounded-lg border border-border p-3">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-muted-foreground">Agentes involucrados</p>
                   <p className="text-2xl font-bold">{agentIds.length}</p>
                 </div>
-                <div className="rounded-lg border border-border p-3">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-muted-foreground">Mostrando</p>
                   <p className="text-2xl font-bold">{filtered.length}</p>
                 </div>

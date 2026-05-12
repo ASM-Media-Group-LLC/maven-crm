@@ -31,7 +31,7 @@ export const AvatarsSection = () => (
       <p className="text-sm text-muted-foreground">Cuatro tamaños estándar con sus casos de uso.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {avatarSizes.map((size) => (
-          <div key={size.label} className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div key={size.label} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
             <div className="flex items-center justify-center h-20">
               <Avatar className={size.className}>
                 <AvatarImage src="/placeholder.svg" alt="Avatar ejemplo" />

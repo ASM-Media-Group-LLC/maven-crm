@@ -78,7 +78,7 @@ export const CardsSection = () => (
         <DashboardMetricCard label="Muted (default)" value="42" icon={BarChart3} subtitle="Sin color especial" color="muted" />
       </div>
 
-      <div className="mt-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-2">
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground space-y-2">
         <p><strong className="text-foreground">Props:</strong></p>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -150,7 +150,7 @@ export const CardsSection = () => (
           </p>
         </div>
       </div>
-      <div className="mt-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-1">
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground space-y-1">
         <p><strong className="text-foreground">glass-card:</strong> <code className="font-mono text-foreground">backdrop-blur-2xl bg-white/[0.03] border-white/[0.08] shadow accent glow</code></p>
         <p><strong className="text-foreground">glass-card-subtle:</strong> <code className="font-mono text-foreground">backdrop-blur-md bg-white/[0.02] border-white/[0.06] sin shadow</code></p>
         <p><strong className="text-foreground">Regla:</strong> Solo usar sobre fondos oscuros. En light mode usar <code className="font-mono text-foreground">Card</code> estándar.</p>
@@ -194,7 +194,7 @@ export const CardsSection = () => (
         </ListRowButton>
       </div>
 
-      <div className="mt-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-2">
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground space-y-2">
         <p><strong className="text-foreground">Base:</strong> <code className="font-mono text-foreground">flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm</code></p>
         <p><strong className="text-foreground">Hover (interactive=true):</strong> <code className="font-mono text-foreground">cursor-pointer hover:bg-white/10 hover:border-primary/40</code></p>
         <p><strong className="text-foreground">Props:</strong></p>

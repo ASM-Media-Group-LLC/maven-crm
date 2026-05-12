@@ -231,7 +231,7 @@ export default function HRMonitoring() {
             </div>
 
             {/* Connection status */}
-            <div className="flex items-center gap-3 rounded-lg border border-border p-3">
+            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
               <div className={`h-3 w-3 rounded-full ${config?.sync_enabled ? "bg-green-500" : config?.api_token_set ? "bg-amber-500" : "bg-muted-foreground/40"}`} />
               <div className="flex-1">
                 <p className="text-sm font-medium">

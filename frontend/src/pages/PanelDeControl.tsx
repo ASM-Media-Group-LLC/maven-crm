@@ -1322,7 +1322,7 @@ const FunnelStep = ({
   value: number;
   color: string;
 }) => (
-  <div className="rounded-md border border-border bg-card/40 px-3 py-1.5">
+  <div className="rounded-xl border border-white/10 bg-white/5/40 px-3 py-1.5">
     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
       {label}
     </p>

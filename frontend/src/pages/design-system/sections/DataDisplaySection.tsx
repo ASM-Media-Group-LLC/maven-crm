@@ -412,7 +412,7 @@ export const DataDisplaySection = () => {
         <OutcomeBadge outcome="no_cerro" size="lg" shadow />
         <span className="text-[10px] text-muted-foreground">lg + shadow — header de detalle</span>
       </div>
-      <div className="mt-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-1">
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground space-y-1">
         <p><strong className="text-foreground">Props:</strong></p>
         <ul className="list-disc list-inside space-y-0.5 text-xs">
           <li><code className="font-mono text-foreground">outcome</code> — <code>"cerro" | "en_espera" | "no_cerro" | null</code>. Si es null o no matchea, no renderea nada.</li>

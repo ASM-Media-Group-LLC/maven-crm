@@ -161,7 +161,7 @@ export const LangSelect = ({ onDark }: LangSelectProps) => {
   const [lang, setLang] = useChatterLang();
   const cls = onDark
     ? "rounded-md border border-white/30 bg-white/10 px-2 py-1 text-[11px] font-bold text-white outline-none hover:border-white"
-    : "rounded-md border border-border bg-card px-2 py-1 text-[11px] font-bold text-foreground outline-none hover:border-foreground";
+    : "rounded-xl border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-bold text-foreground outline-none hover:border-foreground";
   return (
     <select
       value={lang}

@@ -80,7 +80,7 @@ export const IconsSection = () => (
       <p className="text-sm text-muted-foreground">Solo se permiten estos 4 tamaños. No usar valores arbitrarios.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {sizes.map((size) => (
-          <div key={size.label} className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div key={size.label} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
             <div className="flex items-center justify-center h-16">
               <Settings className={size.className} aria-hidden="true" />
             </div>
@@ -100,7 +100,7 @@ export const IconsSection = () => (
       <p className="text-sm text-muted-foreground">Los iconos solo deben usar estos colores semánticos.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {allowedColors.map((color) => (
-          <div key={color.label} className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div key={color.label} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
             <div className="flex items-center justify-center h-12">
               <Info className={`h-6 w-6 ${color.className}`} aria-hidden="true" />
             </div>
@@ -135,17 +135,17 @@ export const IconsSection = () => (
         Importar desde <code className="bg-muted px-1.5 py-0.5 rounded text-xs">@/components/icons/[Name]Icon</code>.
       </p>
       <div className="grid grid-cols-3 sm:grid-cols-3 gap-4 max-w-md">
-        <div className="rounded-lg border border-border bg-card p-4 flex flex-col items-center gap-3">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col items-center gap-3">
           <InstagramIcon className="h-6 w-6" />
           <span className="text-xs text-muted-foreground">InstagramIcon</span>
           <span className="text-[10px] text-muted-foreground">Con gradiente</span>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4 flex flex-col items-center gap-3">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col items-center gap-3">
           <TikTokIcon className="h-6 w-6" />
           <span className="text-xs text-muted-foreground">TikTokIcon</span>
           <span className="text-[10px] text-muted-foreground">currentColor</span>
         </div>
-        <div className="rounded-lg border border-border bg-card p-4 flex flex-col items-center gap-3">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col items-center gap-3">
           <XIconCustom className="h-6 w-6" />
           <span className="text-xs text-muted-foreground">XIcon</span>
           <span className="text-[10px] text-muted-foreground">currentColor</span>

@@ -295,7 +295,7 @@ export default function HorasVariablesPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {horasExtraFiltered.map(d => (
-                  <div key={d.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                  <div key={d.id} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-muted/30 transition-colors">
                     <p className="text-sm font-medium">{d.employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : "—"}</p>
                     <p className="text-xl font-bold text-foreground mt-2">{Number(d.overtime_hours) || 0}h</p>
                     <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
@@ -390,7 +390,7 @@ export default function HorasVariablesPage() {
                   const status = getBankStatus(d);
                   const hasHours = Number(d.hour_bank_hours) > 0;
                   return (
-                    <div key={d.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                    <div key={d.id} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-muted/30 transition-colors">
                       <div className="flex items-center justify-between mb-2">
                         <Badge variant={status === "Acumuladas" ? "secondary" : status === "Pagadas" ? "default" : "outline"} className="text-[10px]">{status}</Badge>
                       </div>
@@ -497,7 +497,7 @@ export default function HorasVariablesPage() {
                   const empName = c.employees ? `${(c as any).employees.first_name} ${(c as any).employees.last_name}` : "—";
                   const creatorName = (c as any).creators?.artistic_name || (c as any).creators?.name || "—";
                   return (
-                    <div key={c.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                    <div key={c.id} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-muted/30 transition-colors">
                       <div className="flex items-center justify-between mb-2">
                         <Badge variant="outline" className="text-[10px]">{(c as any).commission_type === "comercial" ? "Comercial" : "Laboral"}</Badge>
                         <Badge variant={badge.variant} className="text-[10px]">{badge.label}</Badge>

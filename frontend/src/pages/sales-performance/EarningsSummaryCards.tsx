@@ -33,7 +33,7 @@ const EarningsSummaryCards = ({ rows }: EarningsSummaryCardsProps) => {
       {cards.map((c) => (
         <div
           key={c.label}
-          className="rounded-lg border border-border bg-card p-4 space-y-1"
+          className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-1"
         >
           <span className="text-2xl font-bold text-foreground">{c.value}</span>
           <p className="text-xs text-muted-foreground">{c.label}</p>

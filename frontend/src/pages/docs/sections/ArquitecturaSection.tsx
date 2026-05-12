@@ -60,7 +60,7 @@ const ArquitecturaSection = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {moduleGroups.map((group) => (
-            <div key={group.category} className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <div key={group.category} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group.category}</h3>
               <div className="space-y-1.5">
                 {group.modules.map((mod) => (
@@ -168,7 +168,7 @@ const ArquitecturaSection = () => {
             { tech: "TanStack Query", desc: "Gestion de estado asincronico con cache inteligente, revalidacion automatica y optimistic updates." },
             { tech: "Tailwind CSS", desc: "Framework de utilidades CSS con sistema de tokens de diseno, soporte dark mode y componentes shadcn/ui." },
           ].map((item) => (
-            <div key={item.tech} className="rounded-lg border border-border bg-card p-4 space-y-2">
+            <div key={item.tech} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
               <h3 className="text-sm font-medium">{item.tech}</h3>
               <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
             </div>

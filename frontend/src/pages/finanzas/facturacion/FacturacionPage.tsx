@@ -378,7 +378,7 @@ export default function FacturacionPage() {
         const badge = STATUS_BADGE[displayStatus] ?? STATUS_BADGE.borrador;
         const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
         return (
-          <div key={inv.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+          <div key={inv.id} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-muted/30 transition-colors">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono text-muted-foreground">#{inv.invoice_number}</span>
               <Badge variant={badge.variant as any}>{badge.label}</Badge>

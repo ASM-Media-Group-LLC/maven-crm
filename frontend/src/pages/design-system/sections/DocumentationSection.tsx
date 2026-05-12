@@ -240,7 +240,7 @@ export const DocumentationSection = () => (
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {a11yChecklist.map((item) => (
-          <div key={item.label} className="rounded-lg border border-border bg-card p-4 flex items-start gap-3">
+          <div key={item.label} className="rounded-xl border border-white/10 bg-white/5 p-4 flex items-start gap-3">
             <div className="h-5 w-5 rounded border-2 border-muted-foreground/30 flex items-center justify-center shrink-0 mt-0.5">
               <Check className="h-3 w-3 text-muted-foreground/30" aria-hidden="true" />
             </div>

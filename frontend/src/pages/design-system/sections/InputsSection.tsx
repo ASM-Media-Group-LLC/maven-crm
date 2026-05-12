@@ -167,7 +167,7 @@ export const InputsSection = () => {
           </div>
         </div>
 
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-1">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground space-y-1">
           <p><strong className="text-foreground">Tab Bar:</strong> <code className="font-mono text-foreground">inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1</code></p>
           <p><strong className="text-foreground">Select Filters:</strong> placeholder = nombre del campo, nunca "Todos". La opción "Todos" solo aparece dentro del dropdown.</p>
           <p><strong className="text-foreground">Value:</strong> cuando no hay filtro activo, <code className="font-mono text-foreground">value={undefined}</code> para que el placeholder sea visible.</p>
@@ -210,7 +210,7 @@ export const InputsSection = () => {
           />
         </div>
 
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-1">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground space-y-1">
           <p><strong className="text-foreground">Props:</strong></p>
           <p><code className="font-mono text-foreground">value</code>: <code className="font-mono">string</code> (formato <code className="font-mono">yyyy-MM-dd</code>)</p>
           <p><code className="font-mono text-foreground">onChange</code>: <code className="font-mono">(value: string) =&gt; void</code></p>
@@ -240,7 +240,7 @@ export const InputsSection = () => {
           />
         </div>
 
-        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-1">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground space-y-1">
           <p><strong className="text-foreground">Props:</strong></p>
           <p><code className="font-mono text-foreground">from</code>: <code className="font-mono">Date | undefined</code></p>
           <p><code className="font-mono text-foreground">to</code>: <code className="font-mono">Date | undefined</code></p>

@@ -83,7 +83,7 @@ const CategoryAuditLog = ({ open }: Props) => {
       <div className="space-y-4">
         {/* Summary cards */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-lg border border-border p-3">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
             <p className="text-xs text-muted-foreground">Total cambios</p>
             <p className="text-2xl font-bold">{changes.length}</p>
           </div>
@@ -91,7 +91,7 @@ const CategoryAuditLog = ({ open }: Props) => {
             <p className="text-xs text-amber-500">⚠ Sospechosos (&gt;24h)</p>
             <p className="text-2xl font-bold text-amber-500">{suspicious.length}</p>
           </div>
-          <div className="rounded-lg border border-border p-3">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
             <p className="text-xs text-muted-foreground">Agentes involucrados</p>
             <p className="text-2xl font-bold">{agentIds.length}</p>
           </div>
