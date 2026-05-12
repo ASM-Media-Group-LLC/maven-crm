@@ -1340,10 +1340,10 @@ const PanelDeControl = () => {
           {/* Glow corner — color según el signo del balance. */}
           <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 transition-opacity group-hover:opacity-50 ${glowColor}`} />
           <div className="relative space-y-3">
-            {/* Logo BLU: solo las letras, sin fondo — vive directo
-                sobre el card, como un PNG sin background. */}
-            <div className="flex h-10 items-center">
-              <span className="text-white text-xl font-extrabold italic tracking-tight leading-none">
+            {/* Logo BLU dentro de un cuadrado h-10 w-10 (mismo
+                footprint que los icon-badges de los otros cards). */}
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 ring-1 ring-white/5">
+              <span className="text-white text-[11px] font-extrabold italic tracking-tight leading-none">
                 BLU
               </span>
             </div>
