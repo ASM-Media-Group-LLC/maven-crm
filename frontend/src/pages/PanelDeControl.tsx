@@ -408,13 +408,14 @@ const DetailDialog = ({
   }, [supportsBreakdown, breakdown, data]);
 
   // Default por defecto:
-  // - Para metrics con breakdown (totalLeads/totalGenerated/contacted):
-  //   TODO colapsado. Al abrir no se fetchea ninguna categoría — el
-  //   user expande la que quiera ver, eso dispara el lazy fetch.
-  //   Esto hace que la apertura sea instantánea (solo el RPC de counts).
-  // - Para metrics no-breakdown: TODO colapsado excepto la primera
-  //   categoría con datos (mismo comportamiento que antes; el data ya
-  //   está cargado, así que abrirlo no cuesta).
+  // - totalLeads y totalGenerated: TODO colapsado (los pidió el user).
+  //   Al abrir no se fetchea ninguna categoría — solo el RPC de
+  //   counts (~28ms). Apertura instantánea + ninguna data se trae
+  //   hasta que el user expanda una categoría.
+  // - Resto de metrics (incluido contacted): primera categoría con
+  //   datos expandida — comportamiento original.
+  const isAllCollapsedByDefault =
+    metric === "totalLeads" || metric === "totalGenerated";
   //
   // Cuidado: el useEffect SOLO inicializa una vez por (open, metric).
   // Sin el ref, groups.list cambia de referencia en cada render
@@ -431,7 +432,7 @@ const DetailDialog = ({
     if (initializedFor.current === key) return; // ya inicializado para este metric
     if (!groups.hasCategory || groups.list.length === 0) return; // esperando datos
     const allCats = groups.list.map((g) => g.cat);
-    if (supportsBreakdown) {
+    if (isAllCollapsedByDefault) {
       // Todas colapsadas — el user expande la que quiera ver.
       setCollapsed(new Set(allCats));
     } else {
@@ -440,7 +441,7 @@ const DetailDialog = ({
       setCollapsed(new Set(allCats.filter((c) => c !== first)));
     }
     initializedFor.current = key;
-  }, [open, metric, supportsBreakdown, groups.hasCategory, groups.list]);
+  }, [open, metric, isAllCollapsedByDefault, groups.hasCategory, groups.list]);
   const toggleCat = (cat: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
