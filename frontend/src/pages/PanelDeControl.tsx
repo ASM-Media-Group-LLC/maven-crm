@@ -69,7 +69,7 @@ interface KpiCardProps {
   value: number;
   icon: React.ReactNode;
   gradient: string;
-  hint?: string;
+  hint?: React.ReactNode;
   loading: boolean;
   onClick: () => void;
 }
@@ -120,9 +120,9 @@ const KpiCard = ({
           </p>
         )}
         {hint && (
-          <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">
+          <div className="text-[10px] text-muted-foreground mt-1">
             {hint}
-          </p>
+          </div>
         )}
       </div>
     </div>
@@ -1052,7 +1052,7 @@ const PanelDeControl = () => {
     value: number;
     icon: React.ReactNode;
     gradient: string;
-    hint: string;
+    hint: React.ReactNode;
   }> = [
     {
       key: "totalLeads",
@@ -1060,7 +1060,22 @@ const PanelDeControl = () => {
       value: k.totalLeads,
       icon: <Users className="h-5 w-5 text-white" />,
       gradient: "bg-blue-500",
-      hint: `LLG: ${k.contacted.toLocaleString("es")} · Scouter: ${k.scouterContacts.toLocaleString("es")}`,
+      hint: (
+        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 ring-1 ring-blue-400/30 px-2 py-0.5 text-[10px] font-bold text-blue-300 tabular-nums">
+            LLG
+            <span className="text-blue-100 font-extrabold">
+              {k.contacted.toLocaleString("es")}
+            </span>
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-pink-500/15 ring-1 ring-pink-400/30 px-2 py-0.5 text-[10px] font-bold text-pink-300 tabular-nums">
+            Bot
+            <span className="text-pink-100 font-extrabold">
+              {k.scouterContacts.toLocaleString("es")}
+            </span>
+          </span>
+        </div>
+      ),
     },
     {
       key: "numbersObtained",
