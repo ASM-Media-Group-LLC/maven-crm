@@ -93,7 +93,7 @@ const ClosersContent = () => {
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+      <header className="bg-background/60 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Closers</h1>
@@ -153,7 +153,7 @@ const ClosersContent = () => {
           {/* OPERACIONES — tabs + filtros + tabla */}
           {viewTab === "operaciones" && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="shrink-0 px-6 pt-2 pb-2 space-y-4 bg-background border-b border-border">
+          <div className="shrink-0 px-6 pt-2 pb-2 space-y-4 bg-background/60 backdrop-blur-xl border-b border-white/10">
             <TabsList className="flex-wrap">
               {TABS.map((tab) => (
                 <TabsTrigger key={tab.value} value={tab.value}>

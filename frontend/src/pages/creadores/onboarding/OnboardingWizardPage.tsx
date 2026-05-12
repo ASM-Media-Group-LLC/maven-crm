@@ -18,7 +18,7 @@ const OnboardingWizardPage = () => {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="shrink-0 bg-background px-6 pt-4 pb-2 border-b">
+            <div className="shrink-0 bg-background/60 backdrop-blur-xl px-6 pt-4 pb-2 border-b border-white/10">
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>

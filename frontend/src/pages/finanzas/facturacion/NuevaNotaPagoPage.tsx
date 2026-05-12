@@ -96,7 +96,7 @@ export default function NuevaNotaPagoPage() {
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header */}
-      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+      <header className="bg-background/60 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <nav className="text-sm text-muted-foreground mb-2">
           <button onClick={() => navigate("/finanzas/facturacion/invoices")} className="hover:text-foreground transition-colors">Facturación</button>
           <span className="mx-2">›</span>

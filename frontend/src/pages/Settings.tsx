@@ -413,7 +413,7 @@ const SettingsRightPane = ({
     };
     return (
       <section className="min-w-0 flex-1 overflow-y-auto">
-        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-6 py-3 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/10 bg-background/60 px-6 py-3 backdrop-blur-xl">
           <Button variant="ghost" size="sm" onClick={goBack} className="gap-1.5">
             <ArrowLeft className="h-4 w-4" />
             Volver al menú

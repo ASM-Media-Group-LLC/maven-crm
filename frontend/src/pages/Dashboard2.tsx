@@ -623,7 +623,7 @@ const Dashboard2 = () => {
   return (
           <main className="flex-1 overflow-auto">
             {/* ══════ COMPACT HEADER ══════ */}
-            <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-3">
+            <div className="sticky top-0 z-20 bg-background/60 backdrop-blur-xl border-b border-white/10 px-6 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <h1 className="text-lg font-bold text-foreground tracking-tight">

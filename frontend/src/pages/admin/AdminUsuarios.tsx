@@ -88,7 +88,7 @@ const AdminUsuarios = () => {
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
             {/* Fixed Header */}
-            <header className="bg-background px-6 pt-6 pb-4 border-b shrink-0">
+            <header className="bg-background/60 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
               <button
                 type="button"
                 onClick={() => navigate("/settings")}

@@ -396,7 +396,7 @@ export default function ConfiguracionPage() {
   // ── Main view (sin redirección — secciones abren modal) ──
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
+      <header className="shrink-0 bg-background/60 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
         <h1 className="text-xl font-semibold text-foreground">Configuración Financiera</h1>
         <p className="text-sm text-muted-foreground">Parámetros y plantillas del módulo de finanzas</p>
       </header>

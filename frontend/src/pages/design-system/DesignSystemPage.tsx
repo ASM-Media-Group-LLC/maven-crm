@@ -38,7 +38,7 @@ const DesignSystemPage = () => {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header */}
-      <div className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+      <div className="bg-background/60 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">Design System</h1>
