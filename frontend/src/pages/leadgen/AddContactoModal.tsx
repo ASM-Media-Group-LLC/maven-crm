@@ -301,15 +301,15 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                           setSelectedLead(lead);
                           setLeadError(null);
                           if (!lead) return;
-                          // Autollenar del lead seleccionado.
+                          // Autollenar del lead seleccionado. LeadGen es
+                          // IG-first, así que siempre armamos la URL de
+                          // instagram a partir del handle (aunque platform
+                          // del lead sea distinto, el campo del form se
+                          // llama "Link de Instagram").
                           if (lead.model_handle) {
+                            const cleanHandle = lead.model_handle.replace(/^@/, "");
                             field.onChange(lead.model_handle);
-                            form.setValue(
-                              "instagram",
-                              lead.platform?.toLowerCase() === "instagram"
-                                ? `https://instagram.com/${lead.model_handle.replace(/^@/, "")}`
-                                : lead.model_handle,
-                            );
+                            form.setValue("instagram", `https://instagram.com/${cleanHandle}`);
                           }
                           if (lead.company) form.setValue("compania", lead.company);
                           if (lead.country_code) {

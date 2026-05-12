@@ -17,12 +17,14 @@ import {
   KeyRound,
   LogOut,
   User as UserIcon,
+  Send,
 } from "lucide-react";
 // Sub-páginas que antes se navegaban como rutas separadas (perdiendo el
 // rail de Settings). Ahora se renderizan embebidas en el panel derecho
 // vía ?sub=<key>.
 import AdminUsuarios from "@/pages/admin/AdminUsuarios";
 import AuditoriaRoles from "@/pages/admin/AuditoriaRoles";
+import AdminReportes from "@/pages/admin/AdminReportes";
 import DesignSystem from "@/pages/DesignSystem";
 import Docs from "@/pages/Docs";
 import Roadmap from "@/pages/Roadmap";
@@ -222,6 +224,14 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
             description="Historial de cambios de roles y permisos."
           />
         )}
+        {isAdmin && (
+          <Row
+            to="/settings?sub=reportes"
+            icon={Send}
+            title="Reportes programados"
+            description="Reportes automáticos por email — LLGs, Closers, Chatters."
+          />
+        )}
       </CardContent>
     </Card>
   </div>
@@ -398,6 +408,7 @@ const SettingsRightPane = ({
   const SUB_PAGES: Record<string, { title: string; render: () => JSX.Element }> = {
     usuarios:        { title: "Usuarios",       render: () => <AdminUsuarios /> },
     auditoria:       { title: "Auditoría",      render: () => <AuditoriaRoles /> },
+    reportes:        { title: "Reportes",       render: () => <AdminReportes /> },
     "design-system": { title: "Design System",  render: () => <DesignSystem /> },
     docs:            { title: "Docs",           render: () => <Docs /> },
     roadmap:         { title: "Roadmap",        render: () => <Roadmap /> },
