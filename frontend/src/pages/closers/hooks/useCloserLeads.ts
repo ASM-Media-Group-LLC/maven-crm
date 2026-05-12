@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -134,12 +134,12 @@ export const useCloserLeads = () => {
   // Normalize search for server-side filtering
   const normalizedSearch = search ? normalizeHandle(search) : "";
 
-  // Main query: closer_creators (all tabs except pendiente_lg) or leadgen_entries (pendiente_lg tab)
-  const { data: creatorsData, isLoading } = useQuery({
-    queryKey: ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter],
-    queryFn: async () => {
+  // Extraído como función con `tab` + `pageNum` parametrizados para poder
+  // prefetchear las otras tabs cuando se monta el componente — así al
+  // cambiar de tab los datos ya están en caché y no se ve el skeleton.
+  const fetchCreatorsForTab = async (tab: string, pageNum: number) => {
       // ── Nuevo tab: closer_creators with stage 'Nuevo' ──
-      if (activeTab === "nuevo") {
+      if (tab === "nuevo") {
         let query = supabase
           .from("closer_creators")
           .select("*", { count: "exact" })
@@ -158,7 +158,7 @@ export const useCloserLeads = () => {
           query = query.gte("created_at", fromStr).lte("created_at", toStr);
         }
 
-        const from = page * PAGE_SIZE;
+        const from = pageNum * PAGE_SIZE;
         query = query.range(from, from + PAGE_SIZE - 1);
 
         const { data, error, count } = await query;
@@ -208,7 +208,7 @@ export const useCloserLeads = () => {
       }
 
       // ── All other tabs: fetch from closer_creators ──
-      const stageFilter = TAB_STAGE_MAP[activeTab] || [];
+      const stageFilter = TAB_STAGE_MAP[tab] || [];
 
       let query = supabase
         .from("closer_creators")
@@ -248,7 +248,7 @@ export const useCloserLeads = () => {
         query = query.gte("passed_date", fromStr).lte("passed_date", toStr);
       }
 
-      const from = page * PAGE_SIZE;
+      const from = pageNum * PAGE_SIZE;
       query = query.range(from, from + PAGE_SIZE - 1);
 
       const { data, error, count } = await query;
@@ -304,11 +304,34 @@ export const useCloserLeads = () => {
       }));
 
       return { creators: enriched, total: count || 0 };
-    },
-    
+  };
+
+  const buildCreatorsListKey = (tab: string, pageNum: number) =>
+    ["closer-creators-list", tab, pageNum, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter] as const;
+
+  const { data: creatorsData, isLoading } = useQuery({
+    queryKey: buildCreatorsListKey(activeTab, page),
+    queryFn: () => fetchCreatorsForTab(activeTab, page),
     enabled: !!user?.id && !!role,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
+
+  // Prefetch las demás tabs en segundo plano para que al cambiar
+  // de tab los datos ya estén en caché — elimina el flash de loading
+  // en el primer ingreso a cada tab. Se reactiva cuando cambian filtros.
+  useEffect(() => {
+    if (!user?.id || !role) return;
+    const otherTabs = Object.keys(TAB_STAGE_MAP).filter((t) => t !== activeTab);
+    for (const t of otherTabs) {
+      queryClient.prefetchQuery({
+        queryKey: buildCreatorsListKey(t, 0),
+        queryFn: () => fetchCreatorsForTab(t, 0),
+        staleTime: 30_000,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, role, activeTab, dateFrom, dateTo, dateField, normalizedSearch, agentFilter, platformFilter]);
 
   const creators = creatorsData?.creators || [];
   const totalCount = creatorsData?.total || 0;
@@ -392,7 +415,7 @@ export const useCloserLeads = () => {
   // Optimistic update
   const optimisticUpdate = (id: string, updates: Partial<CloserCreatorRow>) => {
     queryClient.setQueryData(
-      ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter],
+      buildCreatorsListKey(activeTab, page),
       (old: { creators: CloserCreatorRow[]; total: number } | undefined) => {
         if (!old) return old;
         return {

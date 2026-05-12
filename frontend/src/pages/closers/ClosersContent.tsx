@@ -100,11 +100,22 @@ const ClosersContent = () => {
             <h1 className="text-2xl font-bold">Closers</h1>
             <p className="text-sm text-muted-foreground">Pipeline de cierre de modelos</p>
           </div>
-          {(isAdmin || isManager) && (
-            <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null, source: "closer" }); setAssignDialogOpen(true); }}>
-              <UserPlus className="h-4 w-4 mr-1" /> Asignar
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <DateRangePicker
+              from={dateFrom}
+              to={dateTo}
+              onApply={(from, to) => {
+                setDateFrom(from);
+                setDateTo(to);
+              }}
+              placeholder="Seleccionar fechas"
+            />
+            {(isAdmin || isManager) && (
+              <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null, source: "closer" }); setAssignDialogOpen(true); }}>
+                <UserPlus className="h-4 w-4 mr-1" /> Asignar
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -228,16 +239,6 @@ const ClosersContent = () => {
                   <SelectItem value="lg_entry_date">Fecha LeadGen</SelectItem>
                 </SelectContent>
               </Select>
-
-              <DateRangePicker
-                from={dateFrom}
-                to={dateTo}
-                onApply={(from, to) => {
-                  setDateFrom(from);
-                  setDateTo(to);
-                }}
-                placeholder="Seleccionar fechas"
-              />
 
               {hasFilters && (
                 <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setAgentFilter(null); setPlatformFilter(null); setDateFrom(undefined); setDateTo(undefined); }}>
