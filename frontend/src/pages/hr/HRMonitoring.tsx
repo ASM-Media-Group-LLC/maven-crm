@@ -243,7 +243,7 @@ export default function HRMonitoring() {
               </div>
             </div>
 
-            <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3">
+            <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/5 p-3">
               <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
               <p className="text-xs text-muted-foreground">
                 El API Token de Hubstaff se configura como secret seguro desde el panel de administración. Aquí solo se gestiona el Organization ID y el estado de la conexión.

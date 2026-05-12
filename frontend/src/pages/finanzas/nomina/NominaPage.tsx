@@ -430,7 +430,7 @@ export default function NominaPage() {
             <AlertDialogTitle>¿Cerrar el Mes?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <p>Esta acción cerrará {batchPeriods.length} periodo(s) abierto(s) y generará los archivos bancarios correspondientes.</p>
-              <div className="rounded-md border border-border p-3 bg-muted/50 space-y-1 text-sm">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3 bg-muted/50 space-y-1 text-sm">
                 <p>Periodos a cerrar: <span className="font-medium">{batchPeriods.length}</span></p>
                 <p>Monto total neto: <span className="font-medium">{fmt(batchPeriods.reduce((s, p) => s + (Number(p.net_total) || 0), 0))}</span></p>
               </div>

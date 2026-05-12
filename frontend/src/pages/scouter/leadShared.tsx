@@ -463,7 +463,7 @@ export const LeadDrawer = ({
               )}
             </div>
 
-            <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+            <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-3">
               <div className="grid grid-cols-1 gap-2">
                 <Field label="Status">
                   {editing ? (

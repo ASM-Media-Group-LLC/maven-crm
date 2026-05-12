@@ -237,7 +237,7 @@ export default function NuevoInvoicePage() {
 
             {/* Commission summary */}
             {creatorId && dateFrom && dateTo && (
-              <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm">
                 {loadingCommissions ? (
                   <p className="text-muted-foreground">Buscando comisiones...</p>
                 ) : commissions.length > 0 ? (

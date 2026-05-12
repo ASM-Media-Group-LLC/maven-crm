@@ -774,7 +774,7 @@ const SpammerDetailDialog = ({
 
         {/* Bio */}
         {r.bio && (
-          <div className="rounded-md border border-border/40 bg-muted/20 p-3 text-xs italic text-foreground/80">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs italic text-foreground/80">
             "{r.bio}"
           </div>
         )}
@@ -872,7 +872,7 @@ const SpammerDetailDialog = ({
             )}
           </div>
         ) : (
-          <div className="rounded-md border border-border/40 bg-muted/20 p-3 text-xs italic text-muted-foreground">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs italic text-muted-foreground">
             {r.scan_status === "failed"
               ? `Scan fallido: ${r.scan_error ?? "error desconocido"}`
               : r.scan_status === "scanning" || r.scan_status === "pending"

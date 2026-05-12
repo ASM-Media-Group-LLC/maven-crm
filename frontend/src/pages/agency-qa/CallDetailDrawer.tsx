@@ -94,7 +94,7 @@ const Avatar = ({ name, dataUrl, size = 36 }: { name: string; dataUrl: string | 
 };
 
 const Section = ({ title, children, hint }: { title: string; children: React.ReactNode; hint?: string }) => (
-  <section className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+  <section className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
     <div className="flex items-center justify-between gap-2">
       <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{title}</h3>
       {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}

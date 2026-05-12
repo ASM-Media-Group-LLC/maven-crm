@@ -390,7 +390,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         </DialogHeader>
         {existingContactData && (
           <div className="space-y-3 py-2">
-            <div className="rounded-md border border-border p-3 space-y-1 text-sm">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-1 text-sm">
               <p><span className="text-muted-foreground">Nombre:</span> <strong>{existingContactData.name}</strong></p>
               {existingContactData.agentName && (
                 <p><span className="text-muted-foreground">Registrado por:</span> {existingContactData.agentName}</p>

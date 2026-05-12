@@ -352,7 +352,7 @@ const CompanyLogoUploader = ({
   // light mode → fondo blanco (logos oscuros lucen ahí).
   const previewBg = variant === "dark" ? "bg-zinc-900" : "bg-white";
   return (
-    <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+    <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-3">
       <div className="flex items-center gap-3">
         <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-border overflow-hidden ${previewBg}`}>
           {value ? (
