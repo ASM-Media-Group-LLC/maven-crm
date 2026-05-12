@@ -580,17 +580,22 @@ const renderRow = (
           // Si el badge es un outcome de QA (cerro / en_espera /
           // no_cerro), renderizamos con el mismo lenguaje visual
           // que la tabla de Calls — pill solid con color del
-          // outcome + label traducido. Para cualquier otro badge,
-          // cae al outline genérico.
+          // outcome + label en castellano. Para cualquier otro
+          // badge, cae al outline genérico.
           const meta = OUTCOME_META[row.badge as keyof typeof OUTCOME_META];
           if (meta) {
+            // Override del label: user pidió "Cerró" (con tilde) en
+            // vez del "Exitoso" que muestra el resto de QA, y
+            // "En espera" / "Rechazado" se mantienen.
+            const label =
+              row.badge === "cerro" ? "Cerró" : meta.label;
             return (
               <span
                 className="inline-flex h-5 items-center gap-1 rounded-full px-2 text-[10px] font-bold text-white"
                 style={{ background: meta.bg }}
               >
                 <span aria-hidden>{meta.icon}</span>
-                {meta.label}
+                {label}
               </span>
             );
           }
