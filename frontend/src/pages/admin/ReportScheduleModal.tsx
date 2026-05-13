@@ -7,14 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { X, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   useCreateReportSchedule,
   useUpdateReportSchedule,
   useTenantRoles,
+  useRolePermissions,
   roleToModule,
   type ReportPeriod,
   type ReportScheduleWithRecipients,
 } from "@/hooks/useReportSchedules";
+import { filterMetricsByPermissions, DEFAULT_METRICS_BY_MODULE } from "@/hooks/reportMetricsCatalog";
 
 interface Props {
   open: boolean;
@@ -29,6 +32,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
   const [period, setPeriod] = useState<ReportPeriod>("weekly");
   const [dispatchHour, setDispatchHour] = useState<number>(8);
   const [emailSubject, setEmailSubject] = useState<string>("");
+  const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
   const [recipients, setRecipients] = useState<string[]>([]);
   const [emailInput, setEmailInput] = useState("");
   const [saving, setSaving] = useState(false);
@@ -36,17 +40,24 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
   const createSchedule = useCreateReportSchedule();
   const updateSchedule = useUpdateReportSchedule();
   const { data: roles = [] } = useTenantRoles();
+  const { data: rolePermissions = [] } = useRolePermissions(roleName);
+
+  // Catálogo filtrado por permisos del rol elegido.
+  const availableMetrics = roleName
+    ? filterMetricsByPermissions(roleToModule(roleName), rolePermissions)
+    : [];
 
   // Reset/hydrate state cuando abre el modal.
   useEffect(() => {
     if (open) {
       if (schedule) {
         setName(schedule.name);
-        // role_name puede estar null en schedules viejos — fallback a module.
-        setRoleName(schedule.role_name ?? (schedule.module === "closers" ? "closer" : schedule.module === "chatters" ? "Chatter Supervisor" : "employee"));
+        const inferredRole = schedule.role_name ?? (schedule.module === "closers" ? "closer" : schedule.module === "chatters" ? "Chatter Supervisor" : "employee");
+        setRoleName(inferredRole);
         setPeriod(schedule.period);
         setDispatchHour(schedule.dispatch_hour ?? 8);
         setEmailSubject(schedule.email_subject ?? "");
+        setSelectedMetrics(schedule.metrics ?? DEFAULT_METRICS_BY_MODULE[schedule.module] ?? []);
         setRecipients(schedule.recipients.map((r) => r.email));
       } else {
         setName("");
@@ -54,11 +65,24 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
         setPeriod("weekly");
         setDispatchHour(8);
         setEmailSubject("");
+        setSelectedMetrics(DEFAULT_METRICS_BY_MODULE.llg);
         setRecipients([]);
       }
       setEmailInput("");
     }
   }, [open, schedule]);
+
+  // Si el rol cambia mid-edición, sincronizar las métricas con el default
+  // del módulo del nuevo rol (las anteriores podrían no aplicar).
+  useEffect(() => {
+    if (!roleName || !open) return;
+    const newModule = roleToModule(roleName);
+    // Si NO hay schedule (creación), o el module cambió, resetear al default.
+    const currentModule = schedule?.module;
+    if (currentModule !== newModule) {
+      setSelectedMetrics(DEFAULT_METRICS_BY_MODULE[newModule] ?? []);
+    }
+  }, [roleName, open, schedule]);
 
   // Email validation: local part no termina con punto, dominio tiene
   // al menos un punto, no admite dobles puntos. Mismo criterio que
@@ -109,11 +133,16 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       toast.error("Elegí un rol");
       return;
     }
+    if (selectedMetrics.length === 0) {
+      toast.error("Seleccioná al menos una métrica");
+      return;
+    }
     setSaving(true);
     try {
       const recipientsPayload = recipients.map((email) => ({ email, user_id: null }));
       const subjectPayload = emailSubject.trim() ? emailSubject.trim() : null;
       const derivedModule = roleToModule(roleName);
+      const metricsPayload = selectedMetrics.length > 0 ? selectedMetrics : null;
       if (isEdit && schedule) {
         await updateSchedule.mutateAsync({
           id: schedule.id,
@@ -124,6 +153,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
             period,
             dispatch_hour: dispatchHour,
             email_subject: subjectPayload,
+            metrics: metricsPayload,
           },
           recipients: recipientsPayload,
         });
@@ -136,6 +166,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           period,
           dispatch_hour: dispatchHour,
           email_subject: subjectPayload,
+          metrics: metricsPayload,
           recipients: recipientsPayload,
         });
         toast.success("Reporte creado");
@@ -206,6 +237,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                 <SelectContent>
                   <SelectItem value="daily">Diario</SelectItem>
                   <SelectItem value="weekly">Semanal</SelectItem>
+                  <SelectItem value="quincenal">Quincenal</SelectItem>
                   <SelectItem value="monthly">Mensual</SelectItem>
                   <SelectItem value="annual">Anual</SelectItem>
                 </SelectContent>
@@ -274,9 +306,48 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
               const hh = `${String(dispatchHour).padStart(2, "0")}:00`;
               if (period === "daily") return `Cada día a las ${hh} Miami recibirás los datos del día anterior (00:00 a 23:59).`;
               if (period === "weekly") return `Cada lunes ${hh} Miami recibirás los datos de la semana pasada (lunes 00:00 a domingo 23:59).`;
+              if (period === "quincenal") return `Los días 1 y 16 a las ${hh} Miami recibirás los datos de los 15 días previos.`;
               if (period === "monthly") return `El día 1 de cada mes a las ${hh} Miami recibirás los datos del mes pasado.`;
               return `El 1 de enero a las ${hh} Miami recibirás los datos del año anterior.`;
             })()}
+          </div>
+
+          {/* Métricas disponibles según permisos del rol */}
+          <div className="space-y-2">
+            <Label>Métricas a incluir *</Label>
+            {availableMetrics.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground italic">
+                {roleName
+                  ? `El rol "${roleName}" no tiene permisos para ninguna métrica de este módulo.`
+                  : "Elegí un rol para ver las métricas disponibles."}
+              </p>
+            ) : (
+              <div className="rounded-md border border-border/60 bg-muted/10 p-2.5 max-h-48 overflow-y-auto space-y-1.5">
+                {availableMetrics.map((m) => {
+                  const isSelected = selectedMetrics.includes(m.key);
+                  return (
+                    <label
+                      key={m.key}
+                      className="flex items-center gap-2.5 text-sm cursor-pointer hover:bg-muted/40 rounded px-1.5 py-1 transition-colors"
+                    >
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) => {
+                          if (checked) setSelectedMetrics([...selectedMetrics, m.key]);
+                          else setSelectedMetrics(selectedMetrics.filter((k) => k !== m.key));
+                        }}
+                      />
+                      {m.label}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {availableMetrics.length > 0 && (
+              <p className="text-[10px] text-muted-foreground">
+                Métricas disponibles según los permisos del rol "{roleName}" en role_permissions.
+              </p>
+            )}
           </div>
         </div>
 

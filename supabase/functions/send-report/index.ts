@@ -213,7 +213,15 @@ Deno.serve(async (req) => {
     const rows = await fetchModuleMetrics(admin, module, from, to);
 
     // 3. HTML
-    const html = renderReportHtml({ name: schedule.name, module, period, from, to, rows });
+    const html = renderReportHtml({
+      name: schedule.name,
+      module,
+      period,
+      from,
+      to,
+      rows,
+      metrics: (schedule.metrics as string[] | null) ?? null,
+    });
 
     // Preview mode: devuelve HTML + subject sin mandar email ni tocar
     // last_dispatched_at. Usado por el toggle "Vista previa" en UI admin.
@@ -276,9 +284,52 @@ Deno.serve(async (req) => {
 
 // ─── Métricas por módulo ────────────────────────────────────────────────
 
+// Catálogo de métricas (key → { label, module }). Espejo del catálogo
+// del frontend en hooks/reportMetricsCatalog.ts. Si agregás una nueva
+// métrica, ACTUALIZÁ LOS DOS.
+const METRIC_CATALOG: Record<string, { label: string; module: Module }> = {
+  "llg.nuevos":          { label: "Leads Nuevos",         module: "llg" },
+  "llg.recuperacion":    { label: "Leads Recuperación",   module: "llg" },
+  "llg.numeros":         { label: "Núm. obtenidos",       module: "llg" },
+  "llg.conversion":      { label: "Conv.",                module: "llg" },
+  "closer.asignadas":    { label: "Asignadas",            module: "closers" },
+  "closer.confirmadas":  { label: "Confirmadas",          module: "closers" },
+  "closer.completadas":  { label: "Completadas",          module: "closers" },
+  "closer.llamadas":     { label: "Llamadas",             module: "closers" },
+  "closer.qa_avg":       { label: "Nota QA",              module: "closers" },
+  "closer.cerradas":     { label: "Cerradas",             module: "closers" },
+  "closer.no_cerradas":  { label: "No cerradas",          module: "closers" },
+  "chatter.evaluadas":   { label: "Evaluadas",            module: "chatters" },
+  "chatter.aprobadas":   { label: "Aprobadas",            module: "chatters" },
+  "chatter.reprobadas":  { label: "Reprobadas",           module: "chatters" },
+  "chatter.exito":       { label: "% éxito",              module: "chatters" },
+  "chatter.score_avg":   { label: "Score prom",           module: "chatters" },
+};
+
+const DEFAULT_METRICS_BY_MODULE: Record<Module, string[]> = {
+  llg: ["llg.nuevos", "llg.recuperacion", "llg.numeros", "llg.conversion"],
+  closers: [
+    "closer.asignadas",
+    "closer.confirmadas",
+    "closer.completadas",
+    "closer.llamadas",
+    "closer.qa_avg",
+    "closer.cerradas",
+    "closer.no_cerradas",
+  ],
+  chatters: [
+    "chatter.evaluadas",
+    "chatter.aprobadas",
+    "chatter.reprobadas",
+    "chatter.exito",
+    "chatter.score_avg",
+  ],
+};
+
 interface MetricRow {
   name: string;
-  cells: Array<{ label: string; value: string }>;
+  // Cada celda lleva su metric key para poder filtrar al renderizar.
+  cells: Array<{ key: string; value: string }>;
 }
 
 async function fetchModuleMetrics(
@@ -332,10 +383,10 @@ async function fetchLlgMetrics(
       return {
         name: nameMap[id] ?? "Sin nombre",
         cells: [
-          { label: "Leads Nuevos", value: String(m.nuevos) },
-          { label: "Leads Recuperación", value: String(m.recuperacion) },
-          { label: "Números obtenidos", value: String(m.phones) },
-          { label: "Conversión", value: total > 0 ? `${Math.round((m.phones / total) * 100)}%` : "—" },
+          { key: "llg.nuevos", value: String(m.nuevos) },
+          { key: "llg.recuperacion", value: String(m.recuperacion) },
+          { key: "llg.numeros", value: String(m.phones) },
+          { key: "llg.conversion", value: total > 0 ? `${Math.round((m.phones / total) * 100)}%` : "—" },
         ],
       };
     });
@@ -421,13 +472,13 @@ async function fetchCloserMetrics(
         name: nameMap[id] ?? "Sin nombre",
         sortKey: c.cerradas,
         cells: [
-          { label: "Asignadas", value: String(m.asignadas) },
-          { label: "Confirmadas", value: String(m.confirmadas) },
-          { label: "Completadas", value: String(m.completadas) },
-          { label: "Llamadas", value: String(c.count) },
-          { label: "Nota QA prom", value: avgQa != null ? `${avgQa}/100` : "—" },
-          { label: "Cerradas", value: String(c.cerradas) },
-          { label: "No cerradas", value: String(c.noCerradas) },
+          { key: "closer.asignadas", value: String(m.asignadas) },
+          { key: "closer.confirmadas", value: String(m.confirmadas) },
+          { key: "closer.completadas", value: String(m.completadas) },
+          { key: "closer.llamadas", value: String(c.count) },
+          { key: "closer.qa_avg", value: avgQa != null ? `${avgQa}/100` : "—" },
+          { key: "closer.cerradas", value: String(c.cerradas) },
+          { key: "closer.no_cerradas", value: String(c.noCerradas) },
         ],
       };
     })
@@ -473,11 +524,11 @@ async function fetchChatterMetrics(
       name,
       sortKey: m.aprobadas,
       cells: [
-        { label: "Evaluadas", value: String(m.total) },
-        { label: "Aprobadas", value: String(m.aprobadas) },
-        { label: "Reprobadas", value: String(m.reprobadas) },
-        { label: "% éxito", value: m.total > 0 ? `${Math.round((m.aprobadas / m.total) * 100)}%` : "—" },
-        { label: "Score prom", value: m.scored > 0 ? `${Math.round(m.scoreSum / m.scored)}` : "—" },
+        { key: "chatter.evaluadas", value: String(m.total) },
+        { key: "chatter.aprobadas", value: String(m.aprobadas) },
+        { key: "chatter.reprobadas", value: String(m.reprobadas) },
+        { key: "chatter.exito", value: m.total > 0 ? `${Math.round((m.aprobadas / m.total) * 100)}%` : "—" },
+        { key: "chatter.score_avg", value: m.scored > 0 ? `${Math.round(m.scoreSum / m.scored)}` : "—" },
       ],
     }))
     .sort((a, b) => b.sortKey - a.sortKey)
@@ -506,27 +557,28 @@ function renderReportHtml(args: {
   from: string;
   to: string;
   rows: MetricRow[];
+  metrics: string[] | null;
 }): string {
-  const { name, module, period, from, to, rows } = args;
+  const { name, module, period, from, to, rows, metrics } = args;
   const fromLabel = fmtMiami(from);
   const toLabel = fmtMiami(to);
-  const colHeaders =
-    module === "llg"
-      ? ["Persona", "Leads Nuevos", "Leads Recuperación", "Núm. obtenidos", "Conv."]
-      : module === "closers"
-        ? ["Persona", "Asignadas", "Confirmadas", "Completadas", "Llamadas", "Nota QA", "Cerradas", "No cerradas"]
-        : ["Persona", "Evaluadas", "Aprobadas", "Reprobadas", "% éxito", "Score prom"];
+  // Si el schedule define metrics, usamos ese orden. Si no, el default
+  // del módulo.
+  const metricKeys = metrics && metrics.length > 0 ? metrics : DEFAULT_METRICS_BY_MODULE[module];
+  const colHeaders = ["Persona", ...metricKeys.map((k) => METRIC_CATALOG[k]?.label ?? k)];
 
   const tableRows = rows
-    .map(
-      (r) =>
-        `<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px 12px;font-weight:600;">${escapeHtml(r.name)}</td>${r.cells
-          .map(
-            (c) =>
-              `<td style="padding:8px 12px;text-align:right;font-variant-numeric:tabular-nums;color:#111827;">${escapeHtml(c.value)}</td>`,
-          )
-          .join("")}</tr>`,
-    )
+    .map((r) => {
+      const cellsByKey: Record<string, string> = {};
+      for (const c of r.cells) cellsByKey[c.key] = c.value;
+      const cellsHtml = metricKeys
+        .map(
+          (k) =>
+            `<td style="padding:8px 12px;text-align:right;font-variant-numeric:tabular-nums;color:#111827;">${escapeHtml(cellsByKey[k] ?? "—")}</td>`,
+        )
+        .join("");
+      return `<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px 12px;font-weight:600;">${escapeHtml(r.name)}</td>${cellsHtml}</tr>`;
+    })
     .join("");
 
   const emptyState = rows.length === 0

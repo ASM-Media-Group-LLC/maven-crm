@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 // schedules cuya period matchea HOY. Ver supabase/functions/dispatch-reports.
 
 export type ReportModule = "llg" | "closers" | "chatters";
-export type ReportPeriod = "daily" | "weekly" | "monthly" | "annual";
+export type ReportPeriod = "daily" | "weekly" | "quincenal" | "monthly" | "annual";
 
 // Mapeo rol → módulo de reporte. El UI muestra "rol" pero internamente
 // las queries se agrupan por uno de los 3 módulos disponibles. Roles
@@ -36,10 +36,11 @@ export interface ReportSchedule {
   tenant_id: string;
   name: string;
   module: ReportModule;
-  role_name: string | null; // rol elegido en UI (closer, employee, etc)
+  role_name: string | null;
   period: ReportPeriod;
-  dispatch_hour: number; // 0-23, hora Miami
-  email_subject: string | null; // null = subject auto-generado
+  dispatch_hour: number;
+  email_subject: string | null;
+  metrics: string[] | null; // null = set default del módulo
   is_active: boolean;
   last_dispatched_at: string | null;
   created_at: string;
@@ -65,6 +66,33 @@ export interface RoleOption {
   name: string;
   description: string | null;
   is_system: boolean;
+}
+
+// Permisos del rol — los (module, submodule) accesibles. Usados para
+// filtrar el catálogo de métricas en el modal de reportes.
+export function useRolePermissions(roleName: string | null | undefined) {
+  return useQuery<Array<{ module: string; submodule: string | null }>>({
+    queryKey: ["role-permissions-for-reports", roleName],
+    enabled: !!roleName,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      // role_name → roles_config.id → role_permissions
+      const { data: role, error: roleErr } = await (supabase as any)
+        .from("roles_config")
+        .select("id")
+        .eq("name", roleName!)
+        .maybeSingle();
+      if (roleErr) throw roleErr;
+      if (!role?.id) return [];
+      const { data, error } = await (supabase as any)
+        .from("role_permissions")
+        .select("module, submodule")
+        .eq("role_id", role.id)
+        .eq("can_access", true);
+      if (error) throw error;
+      return ((data ?? []) as Array<{ module: string; submodule: string | null }>);
+    },
+  });
 }
 
 export function useTenantRoles() {
@@ -115,10 +143,11 @@ export function useReportSchedules() {
 export interface CreateScheduleInput {
   name: string;
   role_name: string;
-  module: ReportModule; // derivado de role_name vía roleToModule
+  module: ReportModule;
   period: ReportPeriod;
   dispatch_hour: number;
   email_subject: string | null;
+  metrics: string[] | null;
   recipients: Array<{ email: string; user_id?: string | null }>;
 }
 
@@ -137,6 +166,7 @@ export function useCreateReportSchedule() {
           period: input.period,
           dispatch_hour: input.dispatch_hour,
           email_subject: input.email_subject,
+          metrics: input.metrics,
           created_by: user?.id ?? null,
         })
         .select()

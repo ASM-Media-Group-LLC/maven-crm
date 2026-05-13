@@ -64,8 +64,27 @@ function miamiDateToUtc(year: number, month: number, day: number, hour: number, 
 // Calcula el rango (from, to) ISO UTC que cubre el reporte ejecutado HOY
 // para un period dado. Asume que el cron corre 8am Miami; usamos eso
 // como "now".
-function computeRange(period: "daily" | "weekly" | "monthly" | "annual", now: Date): { from: string; to: string } {
+function computeRange(period: "daily" | "weekly" | "quincenal" | "monthly" | "annual", now: Date): { from: string; to: string } {
   const m = miamiParts(now);
+
+  if (period === "quincenal") {
+    // Quincenal: corre los días 1 y 16.
+    //   · día 16 → mes actual, día 1 al día 15.
+    //   · día 1  → mes anterior, día 16 al último.
+    if (m.day === 16) {
+      return {
+        from: miamiDateToUtc(m.year, m.month, 1, 0, 0, 0).toISOString(),
+        to: miamiDateToUtc(m.year, m.month, 15, 23, 59, 59).toISOString(),
+      };
+    }
+    const prevMo = m.month === 1 ? 12 : m.month - 1;
+    const prevY = m.month === 1 ? m.year - 1 : m.year;
+    const lastDay = new Date(Date.UTC(prevY, prevMo, 0)).getUTCDate();
+    return {
+      from: miamiDateToUtc(prevY, prevMo, 16, 0, 0, 0).toISOString(),
+      to: miamiDateToUtc(prevY, prevMo, lastDay, 23, 59, 59).toISOString(),
+    };
+  }
 
   if (period === "daily") {
     // Ayer 00:00 → ayer 23:59:59.999 Miami
@@ -111,7 +130,7 @@ function computeRange(period: "daily" | "weekly" | "monthly" | "annual", now: Da
 // El cron corre cada hora; chequeamos period para "hoy es el día" y
 // dispatch_hour para "es esta hora".
 function shouldDispatchNow(
-  period: "daily" | "weekly" | "monthly" | "annual",
+  period: "daily" | "weekly" | "quincenal" | "monthly" | "annual",
   dispatchHour: number,
   now: Date,
 ): boolean {
@@ -119,6 +138,7 @@ function shouldDispatchNow(
   if (m.hour !== dispatchHour) return false;
   if (period === "daily") return true;
   if (period === "weekly") return m.weekday === "Mon";
+  if (period === "quincenal") return m.day === 1 || m.day === 16;
   if (period === "monthly") return m.day === 1;
   if (period === "annual") return m.day === 1 && m.month === 1;
   return false;
