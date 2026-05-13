@@ -10,27 +10,35 @@
 
 import { drainBatch } from "./queue.ts";
 
-const POLL_MS = parseInt(process.env.WORKER_POLL_INTERVAL_MS ?? "15000", 10);
+// Polling adaptativo: si la queue está vacía VARIOS ciclos seguidos,
+// dormimos más tiempo entre polls. Apenas aparece trabajo, volvemos al
+// intervalo rápido. Evita 5.760 polls vacíos/día cuando no hay tráfico.
+const POLL_MS_FAST = parseInt(process.env.WORKER_POLL_INTERVAL_MS ?? "15000", 10);
+const POLL_MS_SLOW = parseInt(process.env.WORKER_POLL_INTERVAL_SLOW_MS ?? "60000", 10);
+const IDLE_THRESHOLD = parseInt(process.env.WORKER_IDLE_THRESHOLD ?? "5", 10);
 
 let running = true;
+let idleStreak = 0;
 
 async function loop(): Promise<void> {
-  console.log(`scouter-worker arrancando (poll cada ${POLL_MS}ms)…`);
+  console.log(`scouter-worker arrancando (poll ${POLL_MS_FAST}ms fast / ${POLL_MS_SLOW}ms slow tras ${IDLE_THRESHOLD} vacíos)…`);
   while (running) {
     try {
       const processed = await drainBatch();
       if (processed === 0) {
-        // No había nada que hacer, dormimos hasta el siguiente tick.
-        await sleep(POLL_MS);
+        idleStreak++;
+        const interval = idleStreak >= IDLE_THRESHOLD ? POLL_MS_SLOW : POLL_MS_FAST;
+        await sleep(interval);
       } else {
-        // Si encontramos jobs y los procesamos, intentamos de nuevo
-        // inmediatamente — puede haber más esperando (e.g. discover
-        // enqueueó N score_lead).
+        // Hubo trabajo — resetear el contador y polear rápido por si
+        // hay más jobs esperando (e.g. discover enqueueó N score_lead).
+        idleStreak = 0;
         await sleep(500);
       }
     } catch (e) {
       console.error("loop tick error", e);
-      await sleep(POLL_MS);
+      idleStreak = 0; // ante error, no entrar en modo slow
+      await sleep(POLL_MS_FAST);
     }
   }
   console.log("scouter-worker detenido.");

@@ -1153,7 +1153,10 @@ export const useScouterJobs = (params: ScouterJobsParams = {}) => {
       if (error) throw error;
       return (data ?? []) as ScouterJob[];
     },
-    refetchInterval: customInterval ?? 10_000,
+    // Default 30s (era 10s) — alineado con la pieza de eficiencia de
+    // scouter_jobs. Si una caller necesita más frecuente puede pasar
+    // customInterval explícito.
+    refetchInterval: customInterval ?? 30_000,
   });
 };
 
@@ -1192,7 +1195,11 @@ export const useScouterJobCounts = () =>
         },
       };
     },
-    refetchInterval: 3_000,
+    // 30s en vez de 3s — bajamos ~5x el sobreconsumo de queries del
+    // dashboard Scouter. UX casi indistinguible (refresca medio minuto
+    // tarde) pero ahorra 25.000 queries/día por admin que tenga la
+    // pestaña abierta.
+    refetchInterval: 30_000,
   });
 
 /** Re-encola un job que quedó en failed. Resetea attempts a 0 para
