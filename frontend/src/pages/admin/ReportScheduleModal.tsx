@@ -17,7 +17,7 @@ import {
   type ReportPeriod,
   type ReportScheduleWithRecipients,
 } from "@/hooks/useReportSchedules";
-import { filterMetricsByPermissions, DEFAULT_METRICS_BY_MODULE } from "@/hooks/reportMetricsCatalog";
+import { filterMetricsByPermissions, DEFAULT_METRICS_BY_MODULE, METRICS_CATALOG } from "@/hooks/reportMetricsCatalog";
 
 interface Props {
   open: boolean;
@@ -70,7 +70,20 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
         setDispatchUseSecondDay(dom.length > 1);
         setDispatchMonthOfYear(schedule.dispatch_month_of_year ?? 1);
         setEmailSubject(schedule.email_subject ?? "");
-        setSelectedMetrics(schedule.metrics ?? DEFAULT_METRICS_BY_MODULE[schedule.module] ?? []);
+        // Auto-clean: si el schedule trae metrics inconsistentes con el
+        // módulo (e.g. data legacy con module='llg' pero metrics=[closer.*]),
+        // las descartamos. Si después del filtro no queda nada, usamos el
+        // default del módulo.
+        const persisted = schedule.metrics ?? [];
+        const consistent = persisted.filter((k) => {
+          const def = METRICS_CATALOG.find((m) => m.key === k);
+          return def && def.module === schedule.module;
+        });
+        setSelectedMetrics(
+          consistent.length > 0
+            ? consistent
+            : DEFAULT_METRICS_BY_MODULE[schedule.module] ?? [],
+        );
         setRecipients(schedule.recipients.map((r) => r.email));
       } else {
         setName("");
@@ -160,7 +173,14 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       const recipientsPayload = recipients.map((email) => ({ email, user_id: null }));
       const subjectPayload = emailSubject.trim() ? emailSubject.trim() : null;
       const derivedModule = roleToModule(roleName);
-      const metricsPayload = selectedMetrics.length > 0 ? selectedMetrics : null;
+      // Defensive clamp al guardar: solo persistimos métricas que pertenecen
+      // al módulo derivado del rol elegido. Evita que el schedule quede
+      // con metrics inconsistentes con su módulo.
+      const consistentMetrics = selectedMetrics.filter((k) => {
+        const def = METRICS_CATALOG.find((m) => m.key === k);
+        return def && def.module === derivedModule;
+      });
+      const metricsPayload = consistentMetrics.length > 0 ? consistentMetrics : null;
       // Payload de días según period — los campos no aplicables van NULL.
       let dispatchWeekdaysPayload: number[] | null = null;
       let dispatchDaysOfMonthPayload: number[] | null = null;

@@ -209,8 +209,9 @@ Deno.serve(async (req) => {
       to = r.to;
     }
 
-    // 2. Métricas por módulo
-    const rows = await fetchModuleMetrics(admin, module, from, to);
+    // 2. Métricas por módulo (filtra por role_name si está seteado)
+    const roleName = (schedule.role_name as string | null) ?? null;
+    const rows = await fetchModuleMetrics(admin, module, from, to, roleName);
 
     // 3. HTML
     const html = renderReportHtml({
@@ -221,6 +222,7 @@ Deno.serve(async (req) => {
       to,
       rows,
       metrics: (schedule.metrics as string[] | null) ?? null,
+      roleName,
     });
 
     // Preview mode: devuelve HTML + subject sin mandar email ni tocar
@@ -328,6 +330,10 @@ const DEFAULT_METRICS_BY_MODULE: Record<Module, string[]> = {
 
 interface MetricRow {
   name: string;
+  // user_id presente cuando la métrica se agrupa por usuario Maven
+  // (LLG/Closers). NULL para chatters (agrupados por chatter_name externo).
+  // Se usa internamente para el filtro por role_name y se omite en render.
+  user_id?: string | null;
   // Cada celda lleva su metric key para poder filtrar al renderizar.
   cells: Array<{ key: string; value: string }>;
 }
@@ -337,10 +343,28 @@ async function fetchModuleMetrics(
   module: Module,
   from: string,
   to: string,
+  roleName: string | null,
 ): Promise<MetricRow[]> {
-  if (module === "llg") return fetchLlgMetrics(admin, from, to);
-  if (module === "closers") return fetchCloserMetrics(admin, from, to);
-  return fetchChatterMetrics(admin, from, to);
+  let rows: MetricRow[];
+  if (module === "llg") rows = await fetchLlgMetrics(admin, from, to);
+  else if (module === "closers") rows = await fetchCloserMetrics(admin, from, to);
+  else rows = await fetchChatterMetrics(admin, from, to);
+
+  // Filtro por role_name: si el schedule especifica un rol, solo
+  // incluimos rows cuyo user_id pertenezca a un user con ese rol en
+  // user_roles. No aplica a chatters (no son users del sistema).
+  if (roleName && module !== "chatters") {
+    const { data: usersWithRole } = await admin
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", roleName);
+    const allowed = new Set(
+      ((usersWithRole ?? []) as Array<{ user_id: string }>).map((r) => r.user_id),
+    );
+    rows = rows.filter((r) => !r.user_id || allowed.has(r.user_id));
+  }
+
+  return rows;
 }
 
 async function fetchLlgMetrics(
@@ -382,6 +406,7 @@ async function fetchLlgMetrics(
       const total = m.nuevos + m.recuperacion;
       return {
         name: nameMap[id] ?? "Sin nombre",
+        user_id: id,
         cells: [
           { key: "llg.nuevos", value: String(m.nuevos) },
           { key: "llg.recuperacion", value: String(m.recuperacion) },
@@ -469,6 +494,7 @@ async function fetchCloserMetrics(
       const avgQa = c.scored > 0 ? Math.round(c.scoreSum / c.scored) : null;
       return {
         name: nameMap[id] ?? "Sin nombre",
+        user_id: id,
         sortKey: c.cerradas,
         cells: [
           { key: "closer.asignadas", value: String(m.asignadas) },
@@ -557,14 +583,28 @@ function renderReportHtml(args: {
   to: string;
   rows: MetricRow[];
   metrics: string[] | null;
+  roleName?: string | null;
 }): string {
-  const { name, module, period, from, to, rows, metrics } = args;
+  const { name, module, period, from, to, rows, metrics, roleName } = args;
   const fromLabel = fmtMiami(from);
   const toLabel = fmtMiami(to);
-  // Si el schedule define metrics, usamos ese orden. Si no, el default
-  // del módulo.
-  const metricKeys = metrics && metrics.length > 0 ? metrics : DEFAULT_METRICS_BY_MODULE[module];
+
+  // Clamp defensivo: si el schedule tiene metrics, solo aceptamos las
+  // que pertenezcan al módulo correcto. Esto protege contra schedules
+  // antiguos creados antes del módulo de validación frontend (o data
+  // corrupta donde module='llg' pero metrics=['closer.*']).
+  // Si después del clamp no queda ninguna, fallback al default del módulo.
+  const rawMetrics = metrics && metrics.length > 0 ? metrics : null;
+  const filtered = rawMetrics?.filter((k) => METRIC_CATALOG[k]?.module === module) ?? [];
+  const metricKeys =
+    filtered.length > 0 ? filtered : DEFAULT_METRICS_BY_MODULE[module];
+
   const colHeaders = ["Persona", ...metricKeys.map((k) => METRIC_CATALOG[k]?.label ?? k)];
+
+  // Padding compacto + font-size chico para que entren hasta 8 columnas
+  // sin que Gmail recorte. mso-line-height para Outlook.
+  const cellPad = "5px 6px";
+  const cellHtmlBase = `padding:${cellPad};font-variant-numeric:tabular-nums;color:#111827;white-space:nowrap;`;
 
   const tableRows = rows
     .map((r) => {
@@ -573,32 +613,40 @@ function renderReportHtml(args: {
       const cellsHtml = metricKeys
         .map(
           (k) =>
-            `<td style="padding:8px 12px;text-align:right;font-variant-numeric:tabular-nums;color:#111827;">${escapeHtml(cellsByKey[k] ?? "—")}</td>`,
+            `<td style="${cellHtmlBase}text-align:right;">${escapeHtml(cellsByKey[k] ?? "—")}</td>`,
         )
         .join("");
-      return `<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:8px 12px;font-weight:600;">${escapeHtml(r.name)}</td>${cellsHtml}</tr>`;
+      return `<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:${cellPad};font-weight:600;color:#111827;">${escapeHtml(r.name)}</td>${cellsHtml}</tr>`;
     })
     .join("");
 
   const emptyState = rows.length === 0
-    ? `<tr><td colspan="${colHeaders.length}" style="padding:24px;text-align:center;color:#6b7280;font-style:italic;">Sin actividad registrada en el rango.</td></tr>`
+    ? `<tr><td colspan="${colHeaders.length}" style="padding:24px;text-align:center;color:#6b7280;font-style:italic;">Sin actividad registrada en el rango${roleName ? ` para el rol "${escapeHtml(roleName)}"` : ""}.</td></tr>`
     : "";
+
+  // Línea de contexto debajo del título: rol si está, sino fallback al
+  // módulo (compat con schedules legacy sin role_name).
+  const contextLine = roleName
+    ? `Rol: <strong>${escapeHtml(roleName)}</strong>`
+    : `Módulo: <strong>${MODULE_LABEL[module]}</strong>`;
 
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:720px;margin:0;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
-      <div style="background:linear-gradient(135deg,#6d28d9,#4338ca);padding:28px 24px;color:#ffffff;">
+      <div style="background:linear-gradient(135deg,#6d28d9,#4338ca);padding:24px 22px;color:#ffffff;">
         <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;opacity:0.85;text-transform:uppercase;">Maven CRM · Reporte ${PERIOD_LABEL[period]}</div>
         <h1 style="font-size:22px;font-weight:700;margin:6px 0 0;line-height:1.3;">${escapeHtml(name)}</h1>
-        <p style="font-size:12px;opacity:0.9;margin:8px 0 0;line-height:1.5;">
-          Módulo: <strong>${MODULE_LABEL[module]}</strong><br/>
-          Rango (hora Miami): <strong>${fromLabel} → ${toLabel}</strong>
-        </p>
+        <!-- Usamos table en vez de p+br para evitar que Gmail colapse
+             líneas como "Trimmed content" entre emails del mismo schedule. -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 0;font-size:12px;line-height:1.5;color:#ffffff;">
+          <tr><td style="padding:0;opacity:0.9;">${contextLine}</td></tr>
+          <tr><td style="padding:0;opacity:0.9;">Rango (hora Miami): <strong>${fromLabel} → ${toLabel}</strong></td></tr>
+        </table>
       </div>
-      <div style="padding:20px 18px;">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <div style="padding:16px 14px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:auto;">
           <thead>
-            <tr style="background:#f9fafb;color:#374151;text-transform:uppercase;font-size:10px;letter-spacing:0.8px;">
-              ${colHeaders.map((h, i) => `<th style="padding:10px 12px;text-align:${i === 0 ? "left" : "right"};font-weight:700;">${escapeHtml(h)}</th>`).join("")}
+            <tr style="background:#f9fafb;color:#374151;text-transform:uppercase;font-size:9px;letter-spacing:0.6px;">
+              ${colHeaders.map((h, i) => `<th style="padding:8px 6px;text-align:${i === 0 ? "left" : "right"};font-weight:700;white-space:nowrap;">${escapeHtml(h)}</th>`).join("")}
             </tr>
           </thead>
           <tbody>
