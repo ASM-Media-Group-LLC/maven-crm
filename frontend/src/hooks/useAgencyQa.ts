@@ -135,7 +135,7 @@ export const useQaCalls = (params: ListParams = {}) => {
       let q = sb
         .from("qa_calls")
         .select(
-          "*, model:qa_models(name, avatar_data_url, ig_url), closer:qa_closers(name)",
+          "*, model:qa_models(name, avatar_data_url, ig_url), closer:profiles!closer_id(name:full_name)",
         )
         .order("created_at", { ascending: false })
         .limit(limit);
@@ -526,27 +526,25 @@ export const useDeleteQaCall = () => {
 
 export type ModelCategory = "A++" | "A+" | "A" | "B+" | "B" | "C+" | "C";
 
-/** Upsert a closer by name. If a row with that exact (case-insensitive)
- *  name exists, return its id; otherwise insert a new active closer. */
+/** Devuelve el profile_id de un closer dado su nombre. Post unify
+ *  identity, el closer YA es un user de Maven (profile), así que solo
+ *  lo buscamos por full_name en profiles. Si no aparece, devuelve error
+ *  y la UI debe pedirle al admin crearlo en Settings → Usuarios. */
 export const useUpsertQaCloser = () =>
   useMutation({
     mutationFn: async (name: string): Promise<string> => {
       const trimmed = name.trim();
       if (!trimmed) throw new Error("Nombre del closer vacío.");
       const { data: existing, error: lookupErr } = await sb
-        .from("qa_closers")
+        .from("profiles")
         .select("id")
-        .ilike("name", trimmed)
+        .ilike("full_name", trimmed)
         .maybeSingle();
       if (lookupErr) throw lookupErr;
-      if (existing?.id) return existing.id as string;
-      const { data: created, error: insertErr } = await sb
-        .from("qa_closers")
-        .insert({ name: trimmed, active: true })
-        .select("id")
-        .single();
-      if (insertErr) throw insertErr;
-      return created.id as string;
+      if (!existing?.id) {
+        throw new Error(`No existe un user con nombre "${trimmed}". Creálo en Settings → Administración → Usuarios.`);
+      }
+      return existing.id as string;
     },
   });
 
@@ -902,7 +900,7 @@ export const useQaCall = (id: string | null) =>
       const { data, error } = await sb
         .from("qa_calls")
         .select(
-          "*, model:qa_models(name, avatar_data_url, ig_url), closer:qa_closers(name)",
+          "*, model:qa_models(name, avatar_data_url, ig_url), closer:profiles!closer_id(name:full_name)",
         )
         .eq("id", id)
         .maybeSingle();
@@ -956,7 +954,7 @@ export const useQaModelsWithStats = () =>
           sb
             .from("qa_calls")
             .select(
-              "id, model_id, claude_score, claude_analysis, call_date, closer:qa_closers(name)",
+              "id, model_id, claude_score, claude_analysis, call_date, closer:profiles!closer_id(name:full_name)",
             )
             .order("call_date", { ascending: false })
             .limit(2000),
@@ -998,17 +996,26 @@ export const useQaModelsWithStats = () =>
     },
   });
 
+// Post unify identity: el roster de closers viene de user_roles
+// (role='closer') joineado con profiles. La forma del retorno mantiene
+// la shape {id, name, active, created_at} para compat con consumidores.
 export const useQaClosers = () =>
   useQuery({
     queryKey: ["qa-closers"],
     queryFn: async (): Promise<QaCloser[]> => {
       const { data, error } = await sb
-        .from("qa_closers")
-        .select("*")
-        .eq("active", true)
-        .order("name", { ascending: true });
+        .from("user_roles")
+        .select("user_id, profiles!user_id(id, full_name, created_at)")
+        .eq("role", "closer");
       if (error) throw error;
-      return (data ?? []) as QaCloser[];
+      return ((data ?? []) as any[])
+        .map((r) => ({
+          id: r.user_id as string,
+          name: (r.profiles?.full_name as string) ?? "Sin nombre",
+          active: true,
+          created_at: (r.profiles?.created_at as string) ?? new Date().toISOString(),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
     },
   });
 
@@ -1064,7 +1071,7 @@ export const useQaAnalytics = (window: QaWindow = "30d") =>
       let q = sb
         .from("qa_calls")
         .select(
-          "id, model_id, closer_id, claude_score, claude_analysis, call_date, created_at, model:qa_models(name), closer:qa_closers(name)",
+          "id, model_id, closer_id, claude_score, claude_analysis, call_date, created_at, model:qa_models(name), closer:profiles!closer_id(name:full_name)",
         )
         .order("call_date", { ascending: false })
         .limit(5000);
@@ -1279,7 +1286,7 @@ const fireQaWebhookInBackground = async ({ callId }: FireInput): Promise<void> =
     sb
       .from("qa_calls")
       .select(
-        "*, model:qa_models(name, category, ig_url), closer:qa_closers(name)",
+        "*, model:qa_models(name, category, ig_url), closer:profiles!closer_id(name:full_name)",
       )
       .eq("id", callId)
       .maybeSingle(),
@@ -1422,7 +1429,7 @@ export const useQaChatSessions = () =>
     queryFn: async (): Promise<QaChatSessionRow[]> => {
       const { data, error } = await sb
         .from("qa_chat_sessions")
-        .select("*, closer:qa_closers(name)")
+        .select("*, closer:profiles!closer_id(name:full_name)")
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as QaChatSessionRow[];

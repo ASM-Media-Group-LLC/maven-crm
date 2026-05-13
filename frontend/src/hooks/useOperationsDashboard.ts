@@ -425,7 +425,7 @@ export const useMetricDetails = (
             q = mode === "count"
               ? q.select("*", { count: "exact", head: true })
               : q.select(
-                  "id, call_date, closer:qa_closers(name), model:qa_models(name, category), claude_analysis",
+                  "id, call_date, closer:profiles!closer_id(name:full_name), model:qa_models(name, category), claude_analysis",
                 ).order("call_date", { ascending: false }).limit(limit);
             if (metric === "closes")
               q = q.eq("claude_analysis->>call_outcome", "cerro");
@@ -792,7 +792,7 @@ export const useBestCloser = (range: DashboardRange) =>
       const toIsoVal = toIsoEndOfDay(range.to);
       let q = sb
         .from("qa_calls")
-        .select("closer_id, claude_score, claude_analysis, closer:qa_closers(name)")
+        .select("closer_id, claude_score, claude_analysis, closer:profiles!closer_id(name:full_name)")
         .not("closer_id", "is", null);
       if (fromIso) q = q.gte("call_date", fromIso.slice(0, 10));
       if (toIsoVal) q = q.lte("call_date", toIsoVal.slice(0, 10));
@@ -875,7 +875,7 @@ export const useBestCloserByMonth = () =>
       const since = `${MIN_MONTH}-01`;
       const { data, error } = await sb
         .from("qa_calls")
-        .select("closer_id, call_date, claude_score, claude_analysis, closer:qa_closers(name)")
+        .select("closer_id, call_date, claude_score, claude_analysis, closer:profiles!closer_id(name:full_name)")
         .not("closer_id", "is", null)
         .gte("call_date", since);
       if (error) throw error;

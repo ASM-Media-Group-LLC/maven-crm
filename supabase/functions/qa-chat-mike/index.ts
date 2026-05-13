@@ -159,7 +159,7 @@ serve(async (req) => {
     let qasQuery = sb
       .from("qa_calls")
       .select(
-        "call_date, claude_score, claude_analysis, closer:qa_closers(name), model:qa_models(name, category)",
+        "call_date, claude_score, claude_analysis, closer:profiles!closer_id(name:full_name), model:qa_models(name, category)",
       )
       .order("call_date", { ascending: false })
       .order("created_at", { ascending: false })

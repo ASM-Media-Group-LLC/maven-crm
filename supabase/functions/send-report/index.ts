@@ -426,20 +426,8 @@ async function fetchCloserMetrics(
     if (c.completed_date && c.completed_date >= from && c.completed_date <= to) byUser[c.assigned_to].completadas++;
   }
 
-  // qa_calls.closer_id usa qa_closers.id (NO profiles.id). Mapeamos
-  // qa_closer_id → profile_id via qa_closers.profile_id para unificar
-  // el espacio de IDs con closer_creators.assigned_to. Sin esto, un
-  // mismo closer (Miguel García) aparecía 2 veces en el reporte: una
-  // desde closer_creators (resuelto vía profiles) y otra desde qa_calls
-  // como "Sin nombre" (sin match en profiles).
-  const { data: qaClosers } = await admin
-    .from("qa_closers")
-    .select("id, profile_id, name");
-  const qaCloserToProfile: Record<string, { profile_id: string | null; name: string | null }> = {};
-  for (const qc of (qaClosers ?? []) as Array<{ id: string; profile_id: string | null; name: string | null }>) {
-    qaCloserToProfile[qc.id] = { profile_id: qc.profile_id, name: qc.name };
-  }
-
+  // qa_calls.closer_id ahora apunta directo a profiles.id (post unify
+  // identity migration). Sin indirection por qa_closers.
   const { data: calls } = await admin
     .from("qa_calls")
     .select("closer_id, claude_score, call_date, claude_analysis");
@@ -449,7 +437,6 @@ async function fetchCloserMetrics(
     scored: number;
     cerradas: number;
     noCerradas: number;
-    fallbackName: string | null;
   }> = {};
   for (const k of (calls ?? []) as Array<{
     closer_id: string | null;
@@ -459,25 +446,17 @@ async function fetchCloserMetrics(
   }>) {
     if (!k.closer_id) continue;
     if (!k.call_date || k.call_date < from || k.call_date > to) continue;
-    // Resolver al profile_id (espacio unificado con closer_creators).
-    // Si qa_closer no tiene profile_id (legado), agrupamos por qa_closer_id
-    // y guardamos el name de qa_closers como fallback.
-    const mapping = qaCloserToProfile[k.closer_id];
-    const userKey = mapping?.profile_id ?? k.closer_id;
-    if (!callsByUser[userKey]) {
-      callsByUser[userKey] = {
-        count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0,
-        fallbackName: mapping?.name ?? null,
-      };
+    if (!callsByUser[k.closer_id]) {
+      callsByUser[k.closer_id] = { count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0 };
     }
-    callsByUser[userKey].count++;
+    callsByUser[k.closer_id].count++;
     if (k.claude_score != null) {
-      callsByUser[userKey].scoreSum += Number(k.claude_score);
-      callsByUser[userKey].scored++;
+      callsByUser[k.closer_id].scoreSum += Number(k.claude_score);
+      callsByUser[k.closer_id].scored++;
     }
     const outcome = (k.claude_analysis as any)?.call_outcome as string | undefined;
-    if (outcome === "cerro") callsByUser[userKey].cerradas++;
-    else if (outcome === "en_espera" || outcome === "no_cerro") callsByUser[userKey].noCerradas++;
+    if (outcome === "cerro") callsByUser[k.closer_id].cerradas++;
+    else if (outcome === "en_espera" || outcome === "no_cerro") callsByUser[k.closer_id].noCerradas++;
   }
 
   const allIds = Array.from(new Set([...Object.keys(byUser), ...Object.keys(callsByUser)]));
@@ -486,15 +465,10 @@ async function fetchCloserMetrics(
   return allIds
     .map((id) => {
       const m = byUser[id] ?? { asignadas: 0, confirmadas: 0, completadas: 0 };
-      const c = callsByUser[id] ?? { count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0, fallbackName: null };
+      const c = callsByUser[id] ?? { count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0 };
       const avgQa = c.scored > 0 ? Math.round(c.scoreSum / c.scored) : null;
-      // Orden de resolución del nombre:
-      //   1. profiles.full_name (caso normal, vía profile_id resuelto)
-      //   2. qa_closers.name (fallback si qa_closer no tiene profile_id)
-      //   3. "Sin nombre" (último recurso — closer huérfano)
-      const displayName = nameMap[id] ?? c.fallbackName ?? "Sin nombre";
       return {
-        name: displayName,
+        name: nameMap[id] ?? "Sin nombre",
         sortKey: c.cerradas,
         cells: [
           { key: "closer.asignadas", value: String(m.asignadas) },

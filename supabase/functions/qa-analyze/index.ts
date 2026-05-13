@@ -132,7 +132,7 @@ serve(async (req) => {
     const { data: call, error: callErr } = await supabase
       .from("qa_calls")
       .select(
-        "id, transcript, audio_metrics, closer_id, model_id, closer:qa_closers(name), model:qa_models(name, category, country)",
+        "id, transcript, audio_metrics, closer_id, model_id, closer:profiles!closer_id(name:full_name), model:qa_models(name, category, country)",
       )
       .eq("id", callId)
       .maybeSingle();
