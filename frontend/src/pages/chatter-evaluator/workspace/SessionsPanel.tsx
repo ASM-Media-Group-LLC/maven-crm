@@ -170,6 +170,10 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
 
   // Unread counts por sesión — el RPC filtra por examiner_user_id =
   // auth.uid() así sólo trae las del user logueado.
+  //
+  // Polling cada 2s para que el ping de notificación cross-session
+  // tenga lag mínimo. El RPC es barato (un count + filter por user),
+  // 2s no estresa el DB y da feedback perceptual "tiempo real".
   const unreadQ = useQuery({
     queryKey: ["chatter-sessions-unread"],
     queryFn: async (): Promise<Record<string, number>> => {
@@ -182,26 +186,49 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
       return map;
     },
     refetchOnWindowFocus: true,
-    staleTime: 5_000,
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: false,
+    staleTime: 1_500,
   });
   const unreadById = unreadQ.data ?? {};
 
-  // Ref para que el handler de realtime tenga el selectedId más reciente
-  // sin tener que re-subscribirse cada vez que cambia la sesión activa.
-  // Sin esto, el cleanup + new subscribe en cada switch sería costoso y
-  // podría perder eventos en el delay entre unmount y subscribe.
+  // Ping de notificación cross-session: cuando el unread count de una
+  // sesión sube (vs el snapshot anterior) y NO es la sesión activa,
+  // sonar. Usa el polling del unread RPC en vez de un listener
+  // realtime separado — eso es lo que rompió el realtime del ChatPanel
+  // en PR #139 (dos subscriptions overlapping a chatter_messages).
+  //
+  // Lag perceptual: hasta ~2s (intervalo del polling). Aceptable para
+  // "tenés mensaje pendiente en otra conversación".
+  //
+  // Skip del primer render (prev=null) para no sonar al cargar la
+  // app si ya había mensajes pendientes de antes.
+  const prevUnreadRef = useRef<Record<string, number> | null>(null);
   const selectedIdRef = useRef(selectedId);
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+  useEffect(() => {
+    const prev = prevUnreadRef.current;
+    prevUnreadRef.current = unreadById;
+    if (!prev) return;
+    for (const [sessionId, count] of Object.entries(unreadById)) {
+      const prevCount = prev[sessionId] ?? 0;
+      if (count > prevCount && sessionId !== selectedIdRef.current) {
+        playSoundFile("notification");
+        break;
+      }
+    }
+  }, [unreadById]);
 
   // Realtime — refresca la lista cuando otra persona crea, cierra o
-  // edita una sesión, refresca los unread counts cuando entra un mensaje
-  // nuevo de cualquier sesión, y dispara el ping de notificación cuando
-  // llega un mensaje del chatter en una sesión que NO es la activa
-  // (la activa la maneja ChatPanel con su propia lógica). Así el
-  // examiner se entera de mensajes en otras conversaciones sin tener
-  // que estar mirándolas.
+  // edita una sesión. NOTA: ya NO escuchamos chatter_messages aquí
+  // porque tener dos subscriptions overlapping a la misma tabla
+  // (esta sin filter + la del ChatPanel con filter por session_id)
+  // hacía que el evento se ruteara solo a una, rompiendo el realtime
+  // del chat (notif sonaba pero mensaje no aparecía). La actualización
+  // de unread counts y el sonido de notificación cross-session se
+  // re-implementan después con un mecanismo que no compita.
   useEffect(() => {
     const channel = supabase
       .channel("chatter-sessions-list")
@@ -211,21 +238,6 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
         () => {
           qc.invalidateQueries({ queryKey: ["chatter-sessions"] });
           qc.invalidateQueries({ queryKey: ["chatter-sessions-unread"] });
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chatter_messages" },
-        (payload) => {
-          qc.invalidateQueries({ queryKey: ["chatter-sessions-unread"] });
-          // Ping de notificación SOLO si el mensaje es del chatter y
-          // entra en una sesión distinta a la abierta (la abierta la
-          // maneja ChatPanel para no duplicar el sonido).
-          const row = (payload as { new?: Record<string, unknown> }).new;
-          if (!row) return;
-          if (row.role !== "chatter") return;
-          if (row.session_id === selectedIdRef.current) return;
-          playSoundFile("notification");
         },
       )
       .subscribe();
