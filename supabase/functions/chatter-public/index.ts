@@ -80,6 +80,26 @@ Deno.serve(async (req) => {
   if (!session) return json(404, { ok: false, error: "session not found" });
   if (session.status === "ended") return json(403, { ok: false, error: "session ended" });
 
+  // Defense in depth: si la sesión está en active pero el tiempo expiró,
+  // la marcamos ended antes de aceptar cualquier acción. El pg_cron job
+  // hace lo mismo cada minuto, pero acá garantizamos consistencia frente
+  // a writes que entran entre tick y tick del cron.
+  if (
+    session.status === "active" &&
+    session.started_at &&
+    typeof session.duration_minutes === "number"
+  ) {
+    const startedMs = new Date(session.started_at).getTime();
+    const expiresMs = startedMs + session.duration_minutes * 60_000;
+    if (Date.now() >= expiresMs) {
+      await supa
+        .from("chatter_sessions")
+        .update({ status: "ended", ended_at: new Date().toISOString() })
+        .eq("id", body.sessionId);
+      return json(403, { ok: false, error: "session_expired" });
+    }
+  }
+
   switch (body.action) {
     case "send": {
       const content = (body.content ?? "").trim();

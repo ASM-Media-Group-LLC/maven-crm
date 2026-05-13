@@ -42,6 +42,7 @@ import {
   useDeleteExaminerMessage,
   useEditExaminerMessage,
   useToggleMessageReaction,
+  useAutoEndExpiredChatterSession,
 } from "@/hooks/useChatterEvaluator";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyProfile } from "@/hooks/useUserProfile";
@@ -567,6 +568,10 @@ const formatRemaining = (ms: number): string => {
 
 export const ChatPanel = ({ session }: Props) => {
   const messagesQ = useChatterMessages(session?.id ?? null);
+
+  // Auto-end client-side cuando el tiempo expira (3ra capa de defensa,
+  // junto a pg_cron y chatter-public edge function).
+  useAutoEndExpiredChatterSession(session);
   const profilesQ = useChatterProfiles();
   const configQ = useChatterConfig();
   const sendMut = useSendChatterMessage();

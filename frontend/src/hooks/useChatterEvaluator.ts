@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -912,6 +913,49 @@ export const useRenameChatterSession = () => {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
   });
+};
+
+// Auto-end client-side: cuando el cliente detecta que la sesión expiró
+// (now >= started_at + duration_minutes), hace UPDATE status='ended'
+// inmediato. Es la 3ra capa de defensa — el pg_cron y el edge function
+// también lo hacen, pero esto da feedback instantáneo en la UI sin
+// esperar al próximo tick del cron (lag hasta 60s).
+//
+// Idempotente: el UPDATE solo afecta filas con status='active'. Si otro
+// cliente (o el cron) ya la marcó ended, este UPDATE no hace nada.
+export const useAutoEndExpiredChatterSession = (
+  session: ChatterSession | null | undefined,
+) => {
+  useEffect(() => {
+    if (!session) return;
+    if (session.status !== "active") return;
+    if (!session.started_at) return;
+
+    const startedMs = new Date(session.started_at).getTime();
+    const expiresMs = startedMs + (session.duration_minutes || 0) * 60_000;
+    const remainingMs = expiresMs - Date.now();
+
+    // Si ya expiró, dispara update inmediato.
+    if (remainingMs <= 0) {
+      void sb
+        .from("chatter_sessions")
+        .update({ status: "ended", ended_at: new Date().toISOString() })
+        .eq("id", session.id)
+        .eq("status", "active");
+      return;
+    }
+
+    // Programa el update para el momento exacto de expiración. Si el user
+    // recarga o cambia de sesión antes, el cleanup cancela el timer.
+    const timer = setTimeout(() => {
+      void sb
+        .from("chatter_sessions")
+        .update({ status: "ended", ended_at: new Date().toISOString() })
+        .eq("id", session.id)
+        .eq("status", "active");
+    }, remainingMs);
+    return () => clearTimeout(timer);
+  }, [session?.id, session?.status, session?.started_at, session?.duration_minutes]);
 };
 
 export const useExtendChatterSession = () => {

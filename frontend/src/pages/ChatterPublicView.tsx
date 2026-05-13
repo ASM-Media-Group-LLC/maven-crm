@@ -1229,10 +1229,12 @@ const ChatterPublicView = () => {
             {lang === "en" ? "Chat with" : "Chat con"} {fanName}
           </span>
           <div className="flex items-center gap-2">
-            {/* Mobile timer chip */}
+            {/* Mobile timer chip — mientras la sesión está waiting muestra
+                un placeholder (el countdown solo arranca cuando el chatter
+                manda su primer mensaje). */}
             <div className="md:hidden flex items-center gap-1 rounded-md bg-muted px-2 py-1 font-mono text-xs">
               <Clock className="h-3 w-3" />
-              {formatRemaining(remainingMs)}
+              {session.status === "waiting" ? "—:—" : formatRemaining(remainingMs)}
             </div>
             <LangSelect />
             <VolumeControl />
