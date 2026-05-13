@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -12,12 +12,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import {
   useChatterProfiles,
+  useChatterEvaluators,
   useCreateChatterSession,
 } from "@/hooks/useChatterEvaluator";
+import { useAuth } from "@/hooks/useAuth";
 import type { ChatterProfile, ChatterSession } from "./types";
 
 interface Props {
@@ -129,18 +133,33 @@ const SuccessView = ({
   );
 };
 
+const initials = (name: string) => name.trim().slice(0, 1).toUpperCase() || "U";
+
 export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
+  const { user } = useAuth();
   const profilesQ = useChatterProfiles();
+  const evaluatorsQ = useChatterEvaluators();
   const createMut = useCreateChatterSession();
   const [profileId, setProfileId] = useState<string | null>(null);
   const [chatterName, setChatterName] = useState("");
   const [duration, setDuration] = useState(60);
+  const [examinerUserId, setExaminerUserId] = useState<string>("");
   const [created, setCreated] = useState<ChatterSession | null>(null);
+
+  // Default a "yo mismo" cuando el user está disponible (mismo
+  // comportamiento que antes: si no tocás el select, la sesión queda
+  // asignada al creador).
+  useEffect(() => {
+    if (open && user?.id && !examinerUserId) {
+      setExaminerUserId(user.id);
+    }
+  }, [open, user?.id, examinerUserId]);
 
   const reset = () => {
     setProfileId(null);
     setChatterName("");
     setDuration(60);
+    setExaminerUserId(user?.id ?? "");
     setCreated(null);
   };
 
@@ -154,20 +173,52 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
       toast.error("Falta perfil o nombre del chatter");
       return;
     }
+    if (!examinerUserId) {
+      toast.error("Falta el examinador");
+      return;
+    }
     try {
       const session = await createMut.mutateAsync({
         profileId,
         chatterName: chatterName.trim(),
         durationMinutes: duration,
+        examinerUserId,
       });
       setCreated(session);
-      toast.success("Sesión creada");
+      const assignedToSelf = examinerUserId === user?.id;
+      toast.success(
+        assignedToSelf
+          ? "Sesión creada"
+          : "Sesión creada y asignada al examinador",
+      );
     } catch (e) {
       toast.error("No se pudo crear la sesión", {
         description: (e as Error).message,
       });
     }
   };
+
+  // Lista para el select de "Asignar a". Siempre asegurar que el current
+  // user aparezca como primera opción aunque la query aún esté cargando o
+  // su rol falte momentáneamente en la lista.
+  const evaluators = evaluatorsQ.data ?? [];
+  const orderedEvaluators = (() => {
+    if (!user?.id) return evaluators;
+    const self = evaluators.find((e) => e.user_id === user.id);
+    const rest = evaluators.filter((e) => e.user_id !== user.id);
+    if (self) return [self, ...rest];
+    // Si por algún motivo el user actual no apareció en la query (rol
+    // legacy / cache stale), igual lo agregamos como primera opción para
+    // no romper el flujo de "asignar a mí mismo".
+    return [
+      {
+        user_id: user.id,
+        full_name: user.user_metadata?.full_name || user.email || "Yo",
+        avatar_url: (user.user_metadata?.avatar_url as string | undefined) ?? null,
+      },
+      ...rest,
+    ];
+  })();
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -196,6 +247,39 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
                   onSelect={setProfileId}
                 />
               )}
+            </div>
+
+            <div>
+              <Label htmlFor="examiner">Asignar a (examinador)</Label>
+              <Select value={examinerUserId} onValueChange={setExaminerUserId}>
+                <SelectTrigger id="examiner">
+                  <SelectValue placeholder={evaluatorsQ.isLoading ? "Cargando…" : "Elegí examinador"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {orderedEvaluators.map((ev) => {
+                    const isSelf = ev.user_id === user?.id;
+                    return (
+                      <SelectItem key={ev.user_id} value={ev.user_id}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={ev.avatar_url ?? ""} />
+                            <AvatarFallback className="text-[10px]">
+                              {initials(ev.full_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>
+                            {isSelf ? "Yo · " : ""}
+                            {ev.full_name}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                La sesión aparece en el workspace del examinador asignado. Si te elegís a vos mismo, queda en tu workspace como siempre.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px]">

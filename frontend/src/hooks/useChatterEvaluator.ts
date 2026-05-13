@@ -764,6 +764,10 @@ export type CreateSessionInput = {
   chatterName: string;
   durationMinutes?: number;
   examinerName?: string;
+  // Si se omite, la sesión se asigna al user actual (comportamiento legacy).
+  // Si se pasa, la sesión se asigna a ese user — debe tener permiso
+  // Chatters → Evaluator (validado en el RLS del INSERT).
+  examinerUserId?: string;
 };
 
 export const useCreateChatterSession = () => {
@@ -775,26 +779,122 @@ export const useCreateChatterSession = () => {
       if (!userData.user) throw new Error("No autenticado");
 
       const id = genSessionId();
+      const examinerUserId = input.examinerUserId ?? userData.user.id;
+      const examinerName = input.examinerName ?? null;
+      const durationMinutes = input.durationMinutes ?? 60;
       const row = {
         id,
-        examiner_user_id: userData.user.id,
-        examiner_name: input.examinerName ?? null,
+        examiner_user_id: examinerUserId,
+        examiner_name: examinerName,
         profile_id: input.profileId,
         chatter_name: input.chatterName,
         status: "waiting" as const,
-        duration_minutes: input.durationMinutes ?? 60,
+        duration_minutes: durationMinutes,
+        // Audit: quién originó la sesión (puede diferir del examiner cuando
+        // se asignó a otro evaluator). Distinto de examiner_user_id solo en
+        // ese caso.
+        created_by: userData.user.id,
       };
-      const { data, error } = await sb
-        .from("chatter_sessions")
-        .insert(row)
-        .select("*")
-        .single();
+      // Importante: NO usamos `.select("*").single()` aquí porque el RLS
+      // de SELECT solo deja al examiner asignado leer la sesión. Cuando
+      // el creador la asigna a OTRO user, el SELECT post-INSERT devuelve
+      // 0 filas y rompe el flujo. Armamos el ChatterSession localmente
+      // con los defaults (created_at se llena server-side pero el
+      // SuccessView solo usa id/chatter_name/duration_minutes).
+      const { error } = await sb.from("chatter_sessions").insert(row);
       if (error) throw error;
-      return data as ChatterSession;
+      const session: ChatterSession = {
+        id,
+        examiner_user_id: examinerUserId,
+        examiner_name: examinerName,
+        profile_id: input.profileId,
+        chatter_name: input.chatterName,
+        status: "waiting",
+        duration_minutes: durationMinutes,
+        started_at: null,
+        ended_at: null,
+        expires_at: null,
+        active_device_id: null,
+        active_device_claimed_at: null,
+        typing_chatter: false,
+        typing_fan: false,
+        typing_chatter_at: null,
+        typing_fan_at: null,
+        read_by_chatter_at: null,
+        read_by_examiner_at: null,
+        created_at: new Date().toISOString(),
+      };
+      return session;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
   });
 };
+
+// Lista de users que tienen permiso "Chatters → Evaluator", para poblar el
+// selector de "Asignar a" del NewSessionDialog. Devuelve user_id + nombre
+// + avatar (resuelto vía profiles). El RLS de INSERT también lo valida
+// del lado server, así que esto es solo para UX.
+export interface ChatterEvaluatorOption {
+  user_id: string;
+  full_name: string;
+  avatar_url: string | null;
+}
+
+export const useChatterEvaluators = () =>
+  useQuery({
+    queryKey: ["chatter-evaluators"],
+    queryFn: async (): Promise<ChatterEvaluatorOption[]> => {
+      // 1. Roles que tienen permiso Chatters → Evaluator
+      const { data: perms, error: pErr } = await sb
+        .from("role_permissions")
+        .select("role_id, roles_config!inner(name)")
+        .eq("module", "Chatters")
+        .eq("submodule", "Evaluator")
+        .eq("can_access", true);
+      if (pErr) throw pErr;
+      const evaluatorRoleNames = Array.from(
+        new Set(
+          ((perms ?? []) as Array<{ roles_config: { name: string } | null }>)
+            .map((p) => p.roles_config?.name)
+            .filter((n): n is string => !!n),
+        ),
+      );
+      if (evaluatorRoleNames.length === 0) return [];
+
+      // 2. Users que tienen alguno de esos roles
+      const { data: rolesData, error: rErr } = await sb
+        .from("user_roles")
+        .select("user_id")
+        .in("role", evaluatorRoleNames);
+      if (rErr) throw rErr;
+      const userIds = Array.from(
+        new Set(
+          ((rolesData ?? []) as Array<{ user_id: string }>).map((r) => r.user_id),
+        ),
+      );
+      if (userIds.length === 0) return [];
+
+      // 3. Profile info de esos users
+      const { data: profilesData, error: profErr } = await sb
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .in("id", userIds);
+      if (profErr) throw profErr;
+
+      return ((profilesData ?? []) as Array<{
+        id: string;
+        full_name: string | null;
+        avatar_url: string | null;
+      }>)
+        .map((p) => ({
+          user_id: p.id,
+          full_name: p.full_name || "Sin nombre",
+          avatar_url: p.avatar_url ?? null,
+        }))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name, "es"));
+    },
+    staleTime: 5 * 60_000,
+  });
 
 export const useRenameChatterSession = () => {
   const qc = useQueryClient();
