@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Plus, X, CircleDot, CircleDashed, Loader2 } from "lucide-react";
+import { Plus, X, Clock, CircleDot, CircleDashed, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -119,7 +119,8 @@ const SessionRow = ({
               todo el espacio disponible. Los chips de tiempo y $ son
               shrink-0 (anchura fija, no compiten por ancho). */}
           <span className="min-w-0 flex-1 truncate">{profile?.name ?? "?"}</span>
-          <span className="shrink-0 whitespace-nowrap">
+          <span className="flex shrink-0 items-center gap-0.5 whitespace-nowrap">
+            <Clock className="h-2.5 w-2.5" />
             {formatRelative(session.created_at)}
           </span>
           <span className="shrink-0 whitespace-nowrap font-mono font-bold text-emerald-500">

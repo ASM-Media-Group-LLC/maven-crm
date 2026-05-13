@@ -297,12 +297,13 @@ const WorkspaceContent = () => {
             />
           </aside>
         )}
-        {/* Sessions rail — 220px alcanza para avatar + nombre del chatter
-            + nombre del perfil + tiempo relativo sin truncar. Pasamos
-            selectedId/onSelect para que el click navegue al chat (antes
-            no estaban wireados y los rows no respondían al click).
-            El listado de sesiones cerradas vive en /chatter-evaluator/history. */}
-        <aside className="w-[220px] shrink-0 border-r border-border min-h-0">
+        {/* Sessions rail — 260px para que entre cómodo: avatar + nombre
+            del chatter + nombre del perfil + tiempo relativo + $ gastado
+            sin truncar. Pasamos selectedId/onSelect para que el click
+            navegue al chat (antes no estaban wireados y los rows no
+            respondían al click). El listado de sesiones cerradas vive
+            en /chatter-evaluator/history. */}
+        <aside className="w-[260px] shrink-0 border-r border-border min-h-0">
           <SessionsPanel selectedId={selectedId} onSelect={setSelectedId} />
         </aside>
         <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
