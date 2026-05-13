@@ -24,10 +24,16 @@ const BATCH_SIZE = parseInt(process.env.WORKER_BATCH_SIZE ?? "3", 10);
 const JOB_TIMEOUT_MS = parseInt(process.env.WORKER_JOB_TIMEOUT_MS ?? "120000", 10);
 
 async function fetchQueuedJobs(): Promise<ScouterJob[]> {
+  // Respetar next_retry_at: si el job está esperando su backoff, NO lo
+  // pickeamos. Sin este filtro, el worker re-pickeaba jobs en estado
+  // "provider-paused" cada 15s, generando 2 UPDATEs por ciclo y un
+  // disk IO storm (~500k updates en una semana, ver Phase IO fix).
+  const nowIso = new Date().toISOString();
   const { data, error } = await sb
     .from("scouter_jobs")
     .select("*")
     .eq("status", "queued")
+    .or(`next_retry_at.is.null,next_retry_at.lte.${nowIso}`)
     .order("priority", { ascending: false })
     .order("created_at", { ascending: true })
     .limit(BATCH_SIZE);
@@ -78,14 +84,17 @@ async function markFailed(
   errMsg: string,
   exhausted: boolean,
 ): Promise<void> {
+  // Backoff exponencial para retries: 2^attempts minutos (1, 2, 4, 8…)
+  // capeado a 30 min. Con max_attempts=3, el cap nunca se alcanza, pero
+  // dejamos el límite por seguridad.
+  const backoffMin = Math.min(2 ** job.attempts, 30);
+  const nextRetryAt = exhausted ? null : new Date(Date.now() + backoffMin * 60_000).toISOString();
   const { error } = await sb
     .from("scouter_jobs")
     .update({
       status: exhausted ? "failed" : "queued",
       last_error: errMsg.slice(0, 1000),
-      // Si todavía no se gastaron los attempts, vuelve a la queue para
-      // que el siguiente tick lo reintente.
-      ...(exhausted ? { completed_at: new Date().toISOString() } : {}),
+      ...(exhausted ? { completed_at: new Date().toISOString() } : { next_retry_at: nextRetryAt }),
     })
     .eq("id", job.id);
   if (error) console.error("markFailed error", error);
@@ -109,15 +118,22 @@ function isProviderPausedError(msg: string): boolean {
   );
 }
 
-// Rollback del attempt incrementado en markRunning + devuelve el job a
-// queued. El próximo tick va a re-intentarlo sin penalizar el contador.
+// Rollback del attempt + devuelve el job a queued con backoff de 30 min.
+// CRÍTICO: sin next_retry_at el worker re-pickeaba este job cada 15s
+// (ciclo de polling) generando 2 UPDATEs por ciclo. Eso explicaba el
+// disk IO storm con 530k updates / semana en una tabla de 3k rows.
+// Con 30 min de espera caen a ~96 ciclos/día → ~200 updates/día por
+// job paused (vs ~5.700 sin backoff).
+const PROVIDER_PAUSED_BACKOFF_MIN = 30;
 async function rescheduleNoAttempt(job: ScouterJob, errMsg: string): Promise<void> {
+  const nextRetryAt = new Date(Date.now() + PROVIDER_PAUSED_BACKOFF_MIN * 60_000).toISOString();
   const { error } = await sb
     .from("scouter_jobs")
     .update({
       status: "queued",
       attempts: job.attempts, // restaura — markRunning había puesto attempts+1
       started_at: null,
+      next_retry_at: nextRetryAt,
       last_error: `provider-paused: ${errMsg.slice(0, 800)}`,
     })
     .eq("id", job.id);

@@ -27,6 +27,7 @@ export interface ScouterJob {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
+  next_retry_at: string | null;
 }
 
 // Payloads esperados por kind. El handler valida runtime — esto es
