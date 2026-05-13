@@ -845,56 +845,25 @@ export const useChatterEvaluators = () =>
   useQuery({
     queryKey: ["chatter-evaluators"],
     queryFn: async (): Promise<ChatterEvaluatorOption[]> => {
-      // Espejo de has_chatter_evaluator_access en el backend. Incluye:
-      //   · admins (bypass)
-      //   · roles con permiso Chatters → Evaluator
-      //   · roles con permiso Chatters / NULL (acceso al módulo entero)
-      const { data: perms, error: pErr } = await sb
-        .from("role_permissions")
-        .select("role_id, submodule, roles_config!inner(name)")
-        .eq("module", "Chatters")
-        .eq("can_access", true)
-        .or("submodule.eq.Evaluator,submodule.is.null");
-      if (pErr) throw pErr;
-      const evaluatorRoleNames = new Set(
-        ((perms ?? []) as Array<{ roles_config: { name: string } | null }>)
-          .map((p) => p.roles_config?.name)
-          .filter((n): n is string => !!n),
+      // Usa la RPC list_chatter_evaluators (SECURITY DEFINER) en vez de
+      // queries directos. Razón: el RLS de user_roles bloquea a
+      // non-admins de ver filas distintas a las suyas; sin la RPC, un
+      // Chatter Supervisor (non-admin) solo se veía a sí mismo en el
+      // select. La función server-side bypasea RLS y aplica la lógica
+      // de permisos en su query interno.
+      const { data, error } = await supabase.rpc(
+        "list_chatter_evaluators" as never,
       );
-      // Admin siempre bypass — incluso si su rol no tiene entries explícitas.
-      evaluatorRoleNames.add("admin");
-
-      // 2. Users que tienen alguno de esos roles
-      const { data: rolesData, error: rErr } = await sb
-        .from("user_roles")
-        .select("user_id")
-        .in("role", [...evaluatorRoleNames]);
-      if (rErr) throw rErr;
-      const userIds = Array.from(
-        new Set(
-          ((rolesData ?? []) as Array<{ user_id: string }>).map((r) => r.user_id),
-        ),
-      );
-      if (userIds.length === 0) return [];
-
-      // 3. Profile info de esos users
-      const { data: profilesData, error: profErr } = await sb
-        .from("profiles")
-        .select("id, full_name, avatar_url")
-        .in("id", userIds);
-      if (profErr) throw profErr;
-
-      return ((profilesData ?? []) as Array<{
-        id: string;
+      if (error) throw error;
+      return ((data ?? []) as Array<{
+        user_id: string;
         full_name: string | null;
         avatar_url: string | null;
-      }>)
-        .map((p) => ({
-          user_id: p.id,
-          full_name: p.full_name || "Sin nombre",
-          avatar_url: p.avatar_url ?? null,
-        }))
-        .sort((a, b) => a.full_name.localeCompare(b.full_name, "es"));
+      }>).map((row) => ({
+        user_id: row.user_id,
+        full_name: row.full_name || "Sin nombre",
+        avatar_url: row.avatar_url ?? null,
+      }));
     },
     staleTime: 5 * 60_000,
   });
