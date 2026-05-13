@@ -1,6 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
+
+export interface RoleMember {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+}
 
 export interface RoleConfig {
   id: string;
@@ -12,6 +19,7 @@ export interface RoleConfig {
   updated_at: string;
   user_count: number;
   user_names: string[];
+  members: RoleMember[];
 }
 
 export interface RolePermission {
@@ -122,17 +130,28 @@ export const useRoles = () => {
 
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, full_name");
+        .select("id, full_name, avatar_url");
 
-      const profilesMap = new Map<string, string>();
-      profiles?.forEach((p) => profilesMap.set(p.id, p.full_name || "Sin nombre"));
+      const profilesMap = new Map<string, { full_name: string; avatar_url: string | null }>();
+      profiles?.forEach((p) =>
+        profilesMap.set(p.id, { full_name: p.full_name || "Sin nombre", avatar_url: p.avatar_url ?? null })
+      );
 
       return (rolesData || []).map((r) => {
         const usersWithRole = (userRoles || []).filter((ur) => ur.role === r.name);
+        const members: RoleMember[] = usersWithRole.map((ur) => {
+          const p = profilesMap.get(ur.user_id);
+          return {
+            id: ur.user_id,
+            full_name: p?.full_name || "Sin nombre",
+            avatar_url: p?.avatar_url ?? null,
+          };
+        });
         return {
           ...r,
           user_count: usersWithRole.length,
-          user_names: usersWithRole.map((ur) => profilesMap.get(ur.user_id) || "Sin nombre"),
+          user_names: members.map((m) => m.full_name),
+          members,
         };
       }) as RoleConfig[];
     },
@@ -185,6 +204,44 @@ export const useRoles = () => {
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  // Asignar un usuario a un rol. Backend usa "1 rol por usuario": si el user ya tenía otro rol, se reemplaza.
+  const assignUserToRole = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      return adminInvoke("manage-user-roles", { action: "assign_role", user_id: userId, role });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["roles-config"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      toast({ title: "Usuario asignado" });
+    },
+    onError: (e: Error) => {
+      if (e instanceof SessionExpiredError) {
+        toast({ title: "Sesión expirada", description: e.message, variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: e.message, variant: "destructive" });
+      }
+    },
+  });
+
+  // Quitar a un usuario de un rol (deja al user sin rol asignado).
+  const removeUserFromRole = useMutation({
+    mutationFn: async ({ userId }: { userId: string }) => {
+      return adminInvoke("manage-user-roles", { action: "remove_role", user_id: userId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["roles-config"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      toast({ title: "Usuario removido del rol" });
+    },
+    onError: (e: Error) => {
+      if (e instanceof SessionExpiredError) {
+        toast({ title: "Sesión expirada", description: e.message, variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: e.message, variant: "destructive" });
+      }
+    },
+  });
+
   return {
     roles,
     isLoading,
@@ -192,9 +249,13 @@ export const useRoles = () => {
     updateRole: updateRole.mutate,
     deleteRole: deleteRole.mutate,
     toggleActive: toggleActive.mutate,
+    assignUserToRole: assignUserToRole.mutate,
+    removeUserFromRole: removeUserFromRole.mutate,
     isCreating: createRole.isPending,
     isUpdating: updateRole.isPending,
     isDeleting: deleteRole.isPending,
+    isAssigning: assignUserToRole.isPending,
+    isRemoving: removeUserFromRole.isPending,
   };
 };
 

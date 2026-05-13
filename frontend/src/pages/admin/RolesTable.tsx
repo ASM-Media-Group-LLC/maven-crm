@@ -11,9 +11,10 @@ interface RolesTableProps {
   onDelete: (role: RoleConfig) => void;
   onSetPermissions: (role: RoleConfig) => void;
   onToggleActive: (role: RoleConfig) => void;
+  onManageUsers: (role: RoleConfig) => void;
 }
 
-const RolesTable = ({ roles, onEdit, onDelete, onSetPermissions, onToggleActive }: RolesTableProps) => (
+const RolesTable = ({ roles, onEdit, onDelete, onSetPermissions, onToggleActive, onManageUsers }: RolesTableProps) => (
   <div className="rounded-md border">
     <Table>
       <TableHeader>
@@ -40,15 +41,22 @@ const RolesTable = ({ roles, onEdit, onDelete, onSetPermissions, onToggleActive 
               {role.description || "—"}
             </TableCell>
             <TableCell>
-              <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onManageUsers(role)}
+                className="flex items-center gap-1 rounded px-1 py-1 -mx-1 -my-1 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring transition-colors text-left"
+                title="Gestionar usuarios de este rol"
+              >
                 {role.user_names.slice(0, 2).map((name, i) => (
                   <Badge key={i} variant="secondary" className="text-xs">{name}</Badge>
                 ))}
                 {role.user_count > 2 && (
                   <Badge variant="outline" className="text-xs">+{role.user_count - 2}</Badge>
                 )}
-                {role.user_count === 0 && <span className="text-muted-foreground text-sm">—</span>}
-              </div>
+                {role.user_count === 0 && (
+                  <span className="text-muted-foreground text-sm">— Agregar</span>
+                )}
+              </button>
             </TableCell>
             <TableCell>
               <Switch

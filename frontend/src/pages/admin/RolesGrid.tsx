@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Pencil, Trash2, Settings2, MoreVertical, Users } from "lucide-react";
+import { Pencil, Trash2, Settings2, MoreVertical, Users, UserCog } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { RoleConfig } from "./useRoles";
 
@@ -12,9 +12,10 @@ interface RolesGridProps {
   onDelete: (role: RoleConfig) => void;
   onSetPermissions: (role: RoleConfig) => void;
   onToggleActive: (role: RoleConfig) => void;
+  onManageUsers: (role: RoleConfig) => void;
 }
 
-const RolesGrid = ({ roles, onEdit, onDelete, onSetPermissions, onToggleActive }: RolesGridProps) => (
+const RolesGrid = ({ roles, onEdit, onDelete, onSetPermissions, onToggleActive, onManageUsers }: RolesGridProps) => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
     {roles.map((role) => (
       <Card key={role.id} className="group hover:shadow-md transition-shadow relative">
@@ -27,6 +28,9 @@ const RolesGrid = ({ roles, onEdit, onDelete, onSetPermissions, onToggleActive }
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onManageUsers(role)}>
+                  <UserCog className="h-4 w-4 mr-2" /> Gestionar usuarios
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onSetPermissions(role)}>
                   <Settings2 className="h-4 w-4 mr-2" /> Permisos
                 </DropdownMenuItem>
@@ -57,9 +61,16 @@ const RolesGrid = ({ roles, onEdit, onDelete, onSetPermissions, onToggleActive }
               {role.is_system && (
                 <Badge variant="outline" className="text-xs">Sistema</Badge>
               )}
-              <Badge variant="secondary" className="text-xs">
-                {role.user_count} usuario{role.user_count !== 1 ? "s" : ""}
-              </Badge>
+              <button
+                type="button"
+                onClick={() => onManageUsers(role)}
+                className="focus:outline-none focus:ring-2 focus:ring-ring rounded-full"
+                title="Gestionar usuarios de este rol"
+              >
+                <Badge variant="secondary" className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors">
+                  {role.user_count} usuario{role.user_count !== 1 ? "s" : ""}
+                </Badge>
+              </button>
             </div>
 
             <div className="flex items-center gap-2 text-sm">

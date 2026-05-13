@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
 import { useRoles, type RoleConfig } from "./useRoles";
@@ -8,6 +8,7 @@ import CreateRoleModal from "./CreateRoleModal";
 import EditRoleModal from "./EditRoleModal";
 import DeleteRoleDialog from "./DeleteRoleDialog";
 import SetPermissionsModal from "./SetPermissionsModal";
+import ManageRoleUsersModal from "./ManageRoleUsersModal";
 
 interface RolesContentProps {
   search?: string;
@@ -17,10 +18,37 @@ interface RolesContentProps {
 }
 
 const RolesContent = ({ search = "", view, createOpen, onCreateOpenChange }: RolesContentProps) => {
-  const { roles, isLoading, createRole, updateRole, deleteRole, toggleActive, isCreating, isUpdating, isDeleting } = useRoles();
+  const {
+    roles,
+    isLoading,
+    createRole,
+    updateRole,
+    deleteRole,
+    toggleActive,
+    assignUserToRole,
+    removeUserFromRole,
+    isCreating,
+    isUpdating,
+    isDeleting,
+    isAssigning,
+    isRemoving,
+  } = useRoles();
   const [editRole, setEditRole] = useState<RoleConfig | null>(null);
   const [deleteRoleState, setDeleteRoleState] = useState<RoleConfig | null>(null);
   const [permRole, setPermRole] = useState<RoleConfig | null>(null);
+  const [manageUsersRoleId, setManageUsersRoleId] = useState<string | null>(null);
+
+  // Mantenemos siempre la versión fresca del rol seleccionado para que el
+  // modal refleje cambios (asignar/quitar usuarios) sin cerrarse.
+  const manageUsersRole = manageUsersRoleId
+    ? roles.find((r) => r.id === manageUsersRoleId) ?? null
+    : null;
+
+  useEffect(() => {
+    if (manageUsersRoleId && !roles.some((r) => r.id === manageUsersRoleId)) {
+      setManageUsersRoleId(null);
+    }
+  }, [roles, manageUsersRoleId]);
 
   const filteredRoles = search.trim()
     ? roles.filter((r) => r.name.toLowerCase().includes(search.toLowerCase()))
@@ -43,6 +71,7 @@ const RolesContent = ({ search = "", view, createOpen, onCreateOpenChange }: Rol
           onDelete={setDeleteRoleState}
           onSetPermissions={setPermRole}
           onToggleActive={(role) => toggleActive({ id: role.id, is_active: !role.is_active })}
+          onManageUsers={(role) => setManageUsersRoleId(role.id)}
         />
       ) : (
         <RolesGrid
@@ -51,6 +80,7 @@ const RolesContent = ({ search = "", view, createOpen, onCreateOpenChange }: Rol
           onDelete={setDeleteRoleState}
           onSetPermissions={setPermRole}
           onToggleActive={(role) => toggleActive({ id: role.id, is_active: !role.is_active })}
+          onManageUsers={(role) => setManageUsersRoleId(role.id)}
         />
       )}
 
@@ -88,6 +118,15 @@ const RolesContent = ({ search = "", view, createOpen, onCreateOpenChange }: Rol
         onOpenChange={(o) => !o && setPermRole(null)}
         roleId={permRole?.id ?? null}
         roleName={permRole?.name ?? ""}
+      />
+
+      <ManageRoleUsersModal
+        open={!!manageUsersRole}
+        onOpenChange={(o) => !o && setManageUsersRoleId(null)}
+        role={manageUsersRole}
+        onAssign={(userId, role) => assignUserToRole({ userId, role })}
+        onRemove={(userId) => removeUserFromRole({ userId })}
+        isMutating={isAssigning || isRemoving}
       />
     </div>
   );
