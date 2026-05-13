@@ -850,6 +850,8 @@ const PanelDeControl = () => {
     crmAltas: 0,
     crmBajas: 0,
     totalLeads: 0,
+    leadsNuevas: 0,
+    leadsExistentes: 0,
   };
 
   // Tasa de números obtenidos / total leads generados (incluye scouter
@@ -887,16 +889,16 @@ const PanelDeControl = () => {
       gradient: "bg-blue-500",
       hint: (
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 ring-1 ring-blue-400/30 px-2 py-0.5 text-[10px] font-bold text-blue-300 tabular-nums">
-            LLG
-            <span className="text-blue-100 font-extrabold">
-              {k.contacted.toLocaleString("es")}
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 ring-1 ring-emerald-400/30 px-2 py-0.5 text-[10px] font-bold text-emerald-300 tabular-nums">
+            Nuevas
+            <span className="text-emerald-100 font-extrabold">
+              {k.leadsNuevas.toLocaleString("es")}
             </span>
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-pink-500/15 ring-1 ring-pink-400/30 px-2 py-0.5 text-[10px] font-bold text-pink-300 tabular-nums">
-            Bot
-            <span className="text-pink-100 font-extrabold">
-              {k.scouterContacts.toLocaleString("es")}
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 ring-1 ring-amber-400/30 px-2 py-0.5 text-[10px] font-bold text-amber-300 tabular-nums">
+            Existentes
+            <span className="text-amber-100 font-extrabold">
+              {k.leadsExistentes.toLocaleString("es")}
             </span>
           </span>
         </div>

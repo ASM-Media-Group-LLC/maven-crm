@@ -27,6 +27,10 @@ export interface OperationsKpis {
   // `totalLeads` — todo modelo contactado por cualquier equipo cuyo
   // teléfono ya fue capturado.
   numbersObtained: number;
+  // Breakdown del card "Modelos contactadas" — entries con record_type
+  // 'nuevo' (o NULL legacy) vs 'reactivado' (re-ingresados con la regla 24h).
+  leadsNuevas: number;
+  leadsExistentes: number;
   closerCalls: number;     // Llamadas para cierre (qa_calls — closer crea New QA)
   closes: number;          // Cerró (call_outcome=cerro)
   onHold: number;          // En espera (call_outcome=en_espera)
@@ -104,6 +108,8 @@ export const useOperationsDashboard = (range: DashboardRange) =>
         enteredCrm?: number;
         crmAltas?: number;
         crmBajas?: number;
+        leadsNuevas?: number;
+        leadsExistentes?: number;
       };
 
       return {
@@ -117,6 +123,8 @@ export const useOperationsDashboard = (range: DashboardRange) =>
         llgWithPhone: 0,
         scouterWithPhone: 0,
         numbersObtained: k.numbersObtained ?? 0,
+        leadsNuevas: k.leadsNuevas ?? 0,
+        leadsExistentes: k.leadsExistentes ?? 0,
         closerCalls: k.closerCalls ?? 0,
         closes: k.closes ?? 0,
         onHold: k.onHold ?? 0,
