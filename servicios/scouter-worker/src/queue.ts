@@ -23,13 +23,39 @@ import type { JobResult, ScouterJob } from "./types.ts";
 const BATCH_SIZE = parseInt(process.env.WORKER_BATCH_SIZE ?? "3", 10);
 const JOB_TIMEOUT_MS = parseInt(process.env.WORKER_JOB_TIMEOUT_MS ?? "120000", 10);
 
+/**
+ * Devuelve los tenant_ids cuyo autopilot está active=true. Si NULL
+ * (error de lectura), el caller debe asumir "sin filtro" — fallback
+ * conservador para no apagar el worker por un glitch de DB.
+ */
+async function getActiveTenantIds(): Promise<string[] | null> {
+  const { data, error } = await sb
+    .from("scouter_autopilot")
+    .select("tenant_id")
+    .eq("active", true);
+  if (error) {
+    console.warn("[autopilot-gate] read error, proceeding without filter:", error.message);
+    return null;
+  }
+  return ((data ?? []) as Array<{ tenant_id: string }>).map((r) => r.tenant_id);
+}
+
 async function fetchQueuedJobs(): Promise<ScouterJob[]> {
+  // Gate del autopilot: si el toggle está OFF para todos los tenants,
+  // ni siquiera miramos scouter_jobs. Esto cierra el ciclo donde el
+  // worker seguía poleando aunque vos pausaras desde "búsquedas" — los
+  // jobs antes seguían pickeándose y fallando con "budget agotado".
+  // Con el gate, paused = cero escrituras a scouter_jobs.
+  const activeTenants = await getActiveTenantIds();
+  if (activeTenants !== null && activeTenants.length === 0) {
+    return [];
+  }
+
   // Respetar next_retry_at: si el job está esperando su backoff, NO lo
   // pickeamos. Sin este filtro, el worker re-pickeaba jobs en estado
-  // "provider-paused" cada 15s, generando 2 UPDATEs por ciclo y un
-  // disk IO storm (~500k updates en una semana, ver Phase IO fix).
+  // "provider-paused" cada 15s, generando 2 UPDATEs por ciclo.
   const nowIso = new Date().toISOString();
-  const { data, error } = await sb
+  let q = sb
     .from("scouter_jobs")
     .select("*")
     .eq("status", "queued")
@@ -37,6 +63,11 @@ async function fetchQueuedJobs(): Promise<ScouterJob[]> {
     .order("priority", { ascending: false })
     .order("created_at", { ascending: true })
     .limit(BATCH_SIZE);
+  // Solo aplicamos el filtro si tenemos lista válida de tenants activos.
+  if (activeTenants !== null && activeTenants.length > 0) {
+    q = q.in("tenant_id", activeTenants);
+  }
+  const { data, error } = await q;
   if (error) {
     console.error("fetchQueuedJobs error", error);
     return [];
