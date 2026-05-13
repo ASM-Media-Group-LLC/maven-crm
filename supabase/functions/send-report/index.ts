@@ -426,11 +426,20 @@ async function fetchCloserMetrics(
     if (c.completed_date && c.completed_date >= from && c.completed_date <= to) byUser[c.assigned_to].completadas++;
   }
 
-  // qa_calls por closer_id en el rango — origen de:
-  //   · count        = llamadas hechas
-  //   · avg_qa       = nota promedio (claude_score)
-  //   · cerradas     = outcome 'cerro'
-  //   · no_cerradas  = outcome 'en_espera' o 'no_cerro' (equivalen matemáticamente)
+  // qa_calls.closer_id usa qa_closers.id (NO profiles.id). Mapeamos
+  // qa_closer_id → profile_id via qa_closers.profile_id para unificar
+  // el espacio de IDs con closer_creators.assigned_to. Sin esto, un
+  // mismo closer (Miguel García) aparecía 2 veces en el reporte: una
+  // desde closer_creators (resuelto vía profiles) y otra desde qa_calls
+  // como "Sin nombre" (sin match en profiles).
+  const { data: qaClosers } = await admin
+    .from("qa_closers")
+    .select("id, profile_id, name");
+  const qaCloserToProfile: Record<string, { profile_id: string | null; name: string | null }> = {};
+  for (const qc of (qaClosers ?? []) as Array<{ id: string; profile_id: string | null; name: string | null }>) {
+    qaCloserToProfile[qc.id] = { profile_id: qc.profile_id, name: qc.name };
+  }
+
   const { data: calls } = await admin
     .from("qa_calls")
     .select("closer_id, claude_score, call_date, claude_analysis");
@@ -440,6 +449,7 @@ async function fetchCloserMetrics(
     scored: number;
     cerradas: number;
     noCerradas: number;
+    fallbackName: string | null;
   }> = {};
   for (const k of (calls ?? []) as Array<{
     closer_id: string | null;
@@ -449,15 +459,25 @@ async function fetchCloserMetrics(
   }>) {
     if (!k.closer_id) continue;
     if (!k.call_date || k.call_date < from || k.call_date > to) continue;
-    if (!callsByUser[k.closer_id]) callsByUser[k.closer_id] = { count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0 };
-    callsByUser[k.closer_id].count++;
+    // Resolver al profile_id (espacio unificado con closer_creators).
+    // Si qa_closer no tiene profile_id (legado), agrupamos por qa_closer_id
+    // y guardamos el name de qa_closers como fallback.
+    const mapping = qaCloserToProfile[k.closer_id];
+    const userKey = mapping?.profile_id ?? k.closer_id;
+    if (!callsByUser[userKey]) {
+      callsByUser[userKey] = {
+        count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0,
+        fallbackName: mapping?.name ?? null,
+      };
+    }
+    callsByUser[userKey].count++;
     if (k.claude_score != null) {
-      callsByUser[k.closer_id].scoreSum += Number(k.claude_score);
-      callsByUser[k.closer_id].scored++;
+      callsByUser[userKey].scoreSum += Number(k.claude_score);
+      callsByUser[userKey].scored++;
     }
     const outcome = (k.claude_analysis as any)?.call_outcome as string | undefined;
-    if (outcome === "cerro") callsByUser[k.closer_id].cerradas++;
-    else if (outcome === "en_espera" || outcome === "no_cerro") callsByUser[k.closer_id].noCerradas++;
+    if (outcome === "cerro") callsByUser[userKey].cerradas++;
+    else if (outcome === "en_espera" || outcome === "no_cerro") callsByUser[userKey].noCerradas++;
   }
 
   const allIds = Array.from(new Set([...Object.keys(byUser), ...Object.keys(callsByUser)]));
@@ -466,10 +486,15 @@ async function fetchCloserMetrics(
   return allIds
     .map((id) => {
       const m = byUser[id] ?? { asignadas: 0, confirmadas: 0, completadas: 0 };
-      const c = callsByUser[id] ?? { count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0 };
+      const c = callsByUser[id] ?? { count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0, fallbackName: null };
       const avgQa = c.scored > 0 ? Math.round(c.scoreSum / c.scored) : null;
+      // Orden de resolución del nombre:
+      //   1. profiles.full_name (caso normal, vía profile_id resuelto)
+      //   2. qa_closers.name (fallback si qa_closer no tiene profile_id)
+      //   3. "Sin nombre" (último recurso — closer huérfano)
+      const displayName = nameMap[id] ?? c.fallbackName ?? "Sin nombre";
       return {
-        name: nameMap[id] ?? "Sin nombre",
+        name: displayName,
         sortKey: c.cerradas,
         cells: [
           { key: "closer.asignadas", value: String(m.asignadas) },
@@ -586,7 +611,7 @@ function renderReportHtml(args: {
     : "";
 
   return `
-    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:720px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:720px;margin:0;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
       <div style="background:linear-gradient(135deg,#6d28d9,#4338ca);padding:28px 24px;color:#ffffff;">
         <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;opacity:0.85;text-transform:uppercase;">Maven CRM · Reporte ${PERIOD_LABEL[period]}</div>
         <h1 style="font-size:22px;font-weight:700;margin:6px 0 0;line-height:1.3;">${escapeHtml(name)}</h1>
