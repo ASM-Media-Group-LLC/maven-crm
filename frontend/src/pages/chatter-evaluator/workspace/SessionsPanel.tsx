@@ -49,6 +49,7 @@ const SessionRow = ({
   profile,
   active,
   unread,
+  totalSpent,
   isTyping,
   onSelect,
   onEnd,
@@ -57,6 +58,7 @@ const SessionRow = ({
   profile: ChatterProfile | null;
   active: boolean;
   unread: number;
+  totalSpent: number;
   isTyping: boolean;
   onSelect: () => void;
   onEnd: () => void;
@@ -117,6 +119,14 @@ const SessionRow = ({
           <span>·</span>
           <Clock className="h-2.5 w-2.5" />
           <span>{formatRelative(session.created_at)}</span>
+          {totalSpent > 0 && (
+            <>
+              <span>·</span>
+              <span className="font-mono font-bold text-amber-500">
+                ${totalSpent}
+              </span>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -191,6 +201,33 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
     staleTime: 1_500,
   });
   const unreadById = unreadQ.data ?? {};
+
+  // Total gastado por el fan en cada sesión (suma de tips + purchases).
+  // Mismo cálculo que `chatterTotalSpent` en ChatterPublicView, pero
+  // agregado por session_id desde el backend con un RPC. Polling 5s —
+  // los tips/purchases entran con menos frecuencia que mensajes normales.
+  const totalSpentQ = useQuery({
+    queryKey: ["chatter-sessions-total-spent"],
+    queryFn: async (): Promise<Record<string, number>> => {
+      const { data, error } = await supabase.rpc(
+        "chatter_sessions_total_spent" as never,
+      );
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      for (const row of (data ?? []) as Array<{
+        session_id: string;
+        total_spent: number | string;
+      }>) {
+        map[row.session_id] = Number(row.total_spent) || 0;
+      }
+      return map;
+    },
+    refetchOnWindowFocus: true,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: false,
+    staleTime: 4_000,
+  });
+  const totalSpentById = totalSpentQ.data ?? {};
 
   // Ping de notificación cross-session: cuando el unread count de una
   // sesión sube (vs el snapshot anterior) y NO es la sesión activa,
@@ -301,6 +338,7 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
               profile={profilesById.get(s.profile_id) ?? null}
               active={s.id === selectedId}
               unread={unreadById[s.id] ?? 0}
+              totalSpent={totalSpentById[s.id] ?? 0}
               isTyping={isTyping}
               onSelect={() => onSelect(s.id)}
               onEnd={() => setEndTarget(s.id)}
