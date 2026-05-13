@@ -755,15 +755,36 @@ export const useChatterEvaluationStats = (customRange?: {
     },
   });
 
-export const useChatterSessions = (status?: "active-only" | "all") =>
+/**
+ * Lista de sesiones para el workspace + header.
+ *
+ * scope:
+ *   · "own"    → sólo las del user logueado (default). Para el workspace
+ *                rail y el badge del header. Aunque el RLS permita ver
+ *                todas a un user con data_scope='all', en el workspace
+ *                queremos ver SÓLO lo propio para que el examinador no
+ *                se sature con las sesiones de sus colegas.
+ *   · "global" → todas las que el RLS deje ver. Para la página History,
+ *                donde scope='all' debe mostrar las sesiones de todos.
+ */
+export const useChatterSessions = (
+  status?: "active-only" | "all",
+  scope: "own" | "global" = "own",
+) =>
   useQuery({
-    queryKey: ["chatter-sessions", status ?? "all"],
+    queryKey: ["chatter-sessions", status ?? "all", scope],
     queryFn: async (): Promise<ChatterSession[]> => {
       let q = sb
         .from("chatter_sessions")
         .select("*")
         .order("created_at", { ascending: false });
       if (status === "active-only") q = q.neq("status", "ended");
+      if (scope === "own") {
+        const { data: userData } = await supabase.auth.getUser();
+        const uid = userData.user?.id;
+        if (!uid) return [];
+        q = q.eq("examiner_user_id", uid);
+      }
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as ChatterSession[];

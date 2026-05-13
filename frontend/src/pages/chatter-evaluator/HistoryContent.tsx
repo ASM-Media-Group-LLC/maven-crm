@@ -53,7 +53,10 @@ const fmtDate = (iso: string): string => {
 };
 
 const HistoryContent = () => {
-  const sessionsQ = useChatterSessions("all");
+  // scope='global' → admin/role con data_scope='all' ve sesiones de TODOS
+  // los examiners. Roles con data_scope='self' siguen viendo sólo las
+  // propias (el RLS aplica el filtro por examiner_user_id).
+  const sessionsQ = useChatterSessions("all", "global");
   const profilesQ = useChatterProfiles();
   const deleteMut = useDeleteChatterSession();
   const resendMut = useResendChatterEmail();
