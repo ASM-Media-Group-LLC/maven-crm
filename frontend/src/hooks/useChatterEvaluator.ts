@@ -552,7 +552,7 @@ export interface RangeCounters {
   successRatePct: number;
 }
 
-export type StatsRange = "week" | "month" | "all";
+export type StatsRange = "week" | "month" | "all" | "custom";
 
 export interface ChatterEvaluationStats extends RangeCounters {
   /** Counters por rango — el componente elige cuál renderizar según
@@ -598,9 +598,18 @@ const startOfMonth = (now: Date): Date => {
   return d;
 };
 
-export const useChatterEvaluationStats = () =>
+export const useChatterEvaluationStats = (customRange?: {
+  from?: Date;
+  to?: Date;
+}) =>
   useQuery({
-    queryKey: ["chatter-evaluation-stats"],
+    // Incluímos el rango custom en la queryKey para que React Query refetchee
+    // (y recalcule el bucket `custom`) cuando el user cambia las fechas.
+    queryKey: [
+      "chatter-evaluation-stats",
+      customRange?.from?.toISOString() ?? null,
+      customRange?.to?.toISOString() ?? null,
+    ],
     queryFn: async (): Promise<ChatterEvaluationStats> => {
       // Join inverso: cada evaluación trae su sesión y, vía la sesión,
       // Solo necesitamos verdict + fecha — los charts agregan por
@@ -630,7 +639,19 @@ export const useChatterEvaluationStats = () =>
         week: blank(),
         month: blank(),
         all: blank(),
+        custom: blank(),
       };
+
+      // Rango custom — el user eligió un from/to en el DateRangePicker.
+      // Si está incompleto (sólo from o sólo to) lo ignoramos. El bucket
+      // `custom` se llena sólo cuando hay ambos extremos.
+      const customFromTs = customRange?.from
+        ? new Date(customRange.from).setHours(0, 0, 0, 0)
+        : null;
+      const customToTs = customRange?.to
+        ? new Date(customRange.to).setHours(23, 59, 59, 999)
+        : null;
+      const hasCustom = customFromTs !== null && customToTs !== null;
       const tally = (acc: Acc, r: Row) => {
         acc.total++;
         if (r.verdict === "apto") acc.approved++;
@@ -676,6 +697,9 @@ export const useChatterEvaluationStats = () =>
         tally(accs.all, r);
         if (ts >= monthStart) tally(accs.month, r);
         if (ts >= weekStart) tally(accs.week, r);
+        if (hasCustom && ts >= customFromTs! && ts <= customToTs!) {
+          tally(accs.custom, r);
+        }
 
         // Daily — solo dentro de la ventana de 30 días.
         if (ts >= cutoff) {
@@ -719,6 +743,7 @@ export const useChatterEvaluationStats = () =>
         week: finalize(accs.week),
         month: finalize(accs.month),
         all: finalize(accs.all),
+        custom: finalize(accs.custom),
       };
 
       return {

@@ -114,8 +114,15 @@ const StatCard = ({
 const ChatterEvaluatorContent = () => {
   const profilesQ = useChatterProfiles();
   const vaultCountsQ = useChatterVaultCounts();
-  const statsQ = useChatterEvaluationStats();
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
+  // Pasamos el rango custom al hook para que recompute el bucket `custom`
+  // cuando el user elige fechas en el DateRangePicker. Si no hay rango
+  // completo, el hook ignora customRange y los buckets week/month/all
+  // siguen siendo los únicos válidos.
+  const statsQ = useChatterEvaluationStats({
+    from: dateRange.from,
+    to: dateRange.to,
+  });
   type KpiKey = "total" | "approved" | "rejected" | "rate";
   const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   // Rango activo para los stat cards — los charts ya tienen su propia
@@ -143,7 +150,10 @@ const ChatterEvaluatorContent = () => {
               to={dateRange.to}
               onApply={(from, to) => {
                 setDateRange({ from, to });
-                if (from && to) setStatsRange("all");
+                // Si el user eligió un rango completo, los KPI cards lo
+                // usan via bucket "custom" (computado en el hook). Si
+                // limpia el picker, volvemos al default "week".
+                if (from && to) setStatsRange("custom");
                 else setStatsRange("week");
               }}
               placeholder="Seleccionar fechas"
