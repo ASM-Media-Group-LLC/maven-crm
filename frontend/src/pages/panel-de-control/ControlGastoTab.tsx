@@ -85,22 +85,29 @@ const useCaps = () =>
     staleTime: 5 * 60 * 1000,
   });
 
-// Pulls del 1° del mes en curso hasta ahora — el período natural de
-// los caps de los providers (Anthropic factura mensual, ElevenLabs
-// también, ScrapeCreators idem).
-const useUsageThisMonth = () =>
+// Pulls de uso de APIs en el rango pedido. Sin filtro de fecha → mes
+// en curso (1ro a ahora). LIMIT subido a 50k para cubrir volumen real
+// (Claude + ScrapeCreators generan cientos de calls/día). Si en el
+// futuro hace falta más, mover a un RPC agregado.
+const useUsageInRange = (from: Date | undefined, to: Date | undefined) =>
   useQuery({
-    queryKey: ["api-usage-this-month"],
+    queryKey: ["api-usage-range", from?.toISOString() ?? null, to?.toISOString() ?? null],
     queryFn: async (): Promise<UsageRow[]> => {
-      const since = new Date();
-      since.setUTCDate(1);
-      since.setUTCHours(0, 0, 0, 0);
+      // Default: mes en curso si no vino rango.
+      const since = from ?? (() => {
+        const d = new Date();
+        d.setUTCDate(1);
+        d.setUTCHours(0, 0, 0, 0);
+        return d;
+      })();
+      const until = to ?? new Date();
       const { data, error } = await (supabase as any)
         .from("api_usage_log")
         .select("provider, occurred_at, cost_usd, operation, model")
         .gte("occurred_at", since.toISOString())
+        .lte("occurred_at", until.toISOString())
         .order("occurred_at", { ascending: false })
-        .limit(5000);
+        .limit(50000);
       if (error) throw error;
       return (data ?? []) as UsageRow[];
     },
@@ -109,9 +116,13 @@ const useUsageThisMonth = () =>
 
 // ─── Component ───────────────────────────────────────────────────────
 
-const ControlGastoTab = () => {
+interface ControlGastoTabProps {
+  range?: { from: Date | undefined; to: Date | undefined };
+}
+
+const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
   const capsQ = useCaps();
-  const usageQ = useUsageThisMonth();
+  const usageQ = useUsageInRange(range?.from, range?.to);
   const caps = capsQ.data ?? [];
   const usage = usageQ.data ?? [];
 

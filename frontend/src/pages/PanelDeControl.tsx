@@ -1011,7 +1011,7 @@ const PanelDeControl = () => {
         </TabsContent>
 
         <TabsContent value="control-gasto" className="mt-4">
-          <ControlGastoTab />
+          <ControlGastoTab range={range} />
         </TabsContent>
 
         <TabsContent value="chatters" className="mt-4">
