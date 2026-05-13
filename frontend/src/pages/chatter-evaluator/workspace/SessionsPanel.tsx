@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Plus, X, Clock, CircleDot, CircleDashed, Loader2 } from "lucide-react";
+import { Plus, X, CircleDot, CircleDashed, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -114,13 +114,15 @@ const SessionRow = ({
           <span>escribiendo…</span>
         </div>
       ) : (
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          <span className="truncate">{profile?.name ?? "?"}</span>
-          <span>·</span>
-          <Clock className="h-2.5 w-2.5" />
-          <span>{formatRelative(session.created_at)}</span>
-          <span>·</span>
-          <span className="font-mono font-bold text-emerald-500">
+        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          {/* Nombre del modelo: flex-1 + min-w-0 + truncate para que tome
+              todo el espacio disponible. Los chips de tiempo y $ son
+              shrink-0 (anchura fija, no compiten por ancho). */}
+          <span className="min-w-0 flex-1 truncate">{profile?.name ?? "?"}</span>
+          <span className="shrink-0 whitespace-nowrap">
+            {formatRelative(session.created_at)}
+          </span>
+          <span className="shrink-0 whitespace-nowrap font-mono font-bold text-emerald-500">
             ${totalSpent}
           </span>
         </div>
