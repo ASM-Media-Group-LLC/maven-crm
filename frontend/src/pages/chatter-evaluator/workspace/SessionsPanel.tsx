@@ -336,7 +336,30 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
               unread={unreadById[s.id] ?? 0}
               totalSpent={totalSpentById[s.id] ?? 0}
               isTyping={isTyping}
-              onSelect={() => onSelect(s.id)}
+              onSelect={() => {
+                // Marcar la sesión como leída INMEDIATAMENTE al click —
+                // antes esto se hacía solo en el useEffect del ChatPanel,
+                // que tenía race con el polling del unread (cada 2s) y
+                // dejaba el badge stuck en el count viejo cuando el user
+                // navegaba rápido entre sesiones. Ahora:
+                //   1. Optimistic update del badge a 0
+                //   2. UPDATE de read_by_examiner_at = now() (fire-and-
+                //      forget — el polling natural sincroniza después)
+                //   3. Switch a la sesión
+                // El effect del ChatPanel sigue funcionando para mensajes
+                // nuevos que entran MIENTRAS el examiner mira la sesión.
+                if (!document.hidden && document.hasFocus()) {
+                  qc.setQueryData<Record<string, number>>(
+                    ["chatter-sessions-unread"],
+                    (prev) => ({ ...(prev ?? {}), [s.id]: 0 }),
+                  );
+                  void supabase
+                    .from("chatter_sessions" as never)
+                    .update({ read_by_examiner_at: new Date().toISOString() } as never)
+                    .eq("id", s.id as never);
+                }
+                onSelect(s.id);
+              }}
               onEnd={() => setEndTarget(s.id)}
             />
           );
