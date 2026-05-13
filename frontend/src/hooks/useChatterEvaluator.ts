@@ -743,6 +743,11 @@ export const useChatterSessions = (status?: "active-only" | "all") =>
       if (error) throw error;
       return (data ?? []) as ChatterSession[];
     },
+    // Polling fallback contra realtime degradado (mismo razonamiento que
+    // en useChatterMessages). 5s para la lista — un poco más relajado
+    // porque las sesiones cambian con menos frecuencia que los mensajes.
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: false,
   });
 
 export const useChatterSession = (sessionId: string | null | undefined) =>
@@ -1130,6 +1135,14 @@ export const useChatterMessages = (sessionId: string | null | undefined) =>
       if (error) throw error;
       return (data ?? []) as ChatterMessage[];
     },
+    // Polling fallback: si el realtime falla (channel degradado, ventana
+    // larga abierta, browser throttling cuando la tab está en background),
+    // garantizamos que los mensajes lleguen al menos cada 4 segundos sin
+    // necesidad de refresh manual. Si realtime funciona, el polling es
+    // virtualmente gratis — pega contra el cache fresco de la última
+    // invalidate.
+    refetchInterval: 4_000,
+    refetchIntervalInBackground: false,
   });
 
 export type SendMessageInput = {
