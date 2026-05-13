@@ -350,21 +350,69 @@ async function fetchModuleMetrics(
   else if (module === "closers") rows = await fetchCloserMetrics(admin, from, to);
   else rows = await fetchChatterMetrics(admin, from, to);
 
-  // Filtro por role_name: si el schedule especifica un rol, solo
-  // incluimos rows cuyo user_id pertenezca a un user con ese rol en
-  // user_roles. No aplica a chatters (no son users del sistema).
+  // Filtro por role_name: si el schedule especifica un rol, mostramos
+  // TODOS los users con ese rol — incluso si no tuvieron actividad en
+  // el período (con métricas en 0). Esto refleja la lista completa de
+  // gente del rol, no solo quienes aparecieron en las tablas operativas.
+  // No aplica a chatters (no son users del sistema).
   if (roleName && module !== "chatters") {
     const { data: usersWithRole } = await admin
       .from("user_roles")
       .select("user_id")
       .eq("role", roleName);
-    const allowed = new Set(
+    const roleUserIds = new Set(
       ((usersWithRole ?? []) as Array<{ user_id: string }>).map((r) => r.user_id),
     );
-    rows = rows.filter((r) => !r.user_id || allowed.has(r.user_id));
+
+    // 1. Mantener solo los rows cuyos user_id estén en el rol.
+    rows = rows.filter((r) => !r.user_id || roleUserIds.has(r.user_id));
+
+    // 2. Agregar users del rol que no tienen actividad en el rango
+    //    (las celdas quedan en 0/"—"). Ordenados al final por nombre.
+    const presentIds = new Set(
+      rows.map((r) => r.user_id).filter((id): id is string => !!id),
+    );
+    const missingIds = [...roleUserIds].filter((id) => !presentIds.has(id));
+    if (missingIds.length > 0) {
+      const nameMap = await resolveNames(admin, missingIds);
+      const emptyCells = makeEmptyCells(module);
+      const emptyRows = missingIds
+        .map((id) => ({
+          name: nameMap[id] ?? "Sin nombre",
+          user_id: id,
+          cells: emptyCells,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, "es"));
+      rows = [...rows, ...emptyRows];
+    }
   }
 
   return rows;
+}
+
+// Celdas vacías (todas en 0 / "—") para users que están en el rol pero
+// no tienen actividad en el rango. El orden de keys matchea el catálogo.
+function makeEmptyCells(module: Module): Array<{ key: string; value: string }> {
+  if (module === "llg") {
+    return [
+      { key: "llg.nuevos", value: "0" },
+      { key: "llg.recuperacion", value: "0" },
+      { key: "llg.numeros", value: "0" },
+      { key: "llg.conversion", value: "—" },
+    ];
+  }
+  if (module === "closers") {
+    return [
+      { key: "closer.asignadas", value: "0" },
+      { key: "closer.confirmadas", value: "0" },
+      { key: "closer.completadas", value: "0" },
+      { key: "closer.llamadas", value: "0" },
+      { key: "closer.qa_avg", value: "—" },
+      { key: "closer.cerradas", value: "0" },
+      { key: "closer.no_cerradas", value: "0" },
+    ];
+  }
+  return [];
 }
 
 async function fetchLlgMetrics(
