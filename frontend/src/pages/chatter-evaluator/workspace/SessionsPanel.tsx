@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, X, Clock, CircleDot, CircleDashed, Loader2 } from "lucide-react";
@@ -9,6 +9,7 @@ import {
   useChatterProfiles,
   useEndChatterSession,
 } from "@/hooks/useChatterEvaluator";
+import { playSoundFile } from "./VolumeControl";
 import { NewSessionDialog } from "../NewSessionDialog";
 import {
   AlertDialog,
@@ -185,9 +186,22 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   });
   const unreadById = unreadQ.data ?? {};
 
+  // Ref para que el handler de realtime tenga el selectedId más reciente
+  // sin tener que re-subscribirse cada vez que cambia la sesión activa.
+  // Sin esto, el cleanup + new subscribe en cada switch sería costoso y
+  // podría perder eventos en el delay entre unmount y subscribe.
+  const selectedIdRef = useRef(selectedId);
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
   // Realtime — refresca la lista cuando otra persona crea, cierra o
-  // edita una sesión, y refresca los unread counts cuando entra un
-  // mensaje nuevo de cualquier sesión.
+  // edita una sesión, refresca los unread counts cuando entra un mensaje
+  // nuevo de cualquier sesión, y dispara el ping de notificación cuando
+  // llega un mensaje del chatter en una sesión que NO es la activa
+  // (la activa la maneja ChatPanel con su propia lógica). Así el
+  // examiner se entera de mensajes en otras conversaciones sin tener
+  // que estar mirándolas.
   useEffect(() => {
     const channel = supabase
       .channel("chatter-sessions-list")
@@ -202,7 +216,17 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "chatter_messages" },
-        () => qc.invalidateQueries({ queryKey: ["chatter-sessions-unread"] }),
+        (payload) => {
+          qc.invalidateQueries({ queryKey: ["chatter-sessions-unread"] });
+          // Ping de notificación SOLO si el mensaje es del chatter y
+          // entra en una sesión distinta a la abierta (la abierta la
+          // maneja ChatPanel para no duplicar el sonido).
+          const row = (payload as { new?: Record<string, unknown> }).new;
+          if (!row) return;
+          if (row.role !== "chatter") return;
+          if (row.session_id === selectedIdRef.current) return;
+          playSoundFile("notification");
+        },
       )
       .subscribe();
     return () => {
