@@ -844,28 +844,30 @@ export const useChatterEvaluators = () =>
   useQuery({
     queryKey: ["chatter-evaluators"],
     queryFn: async (): Promise<ChatterEvaluatorOption[]> => {
-      // 1. Roles que tienen permiso Chatters → Evaluator
+      // Espejo de has_chatter_evaluator_access en el backend. Incluye:
+      //   · admins (bypass)
+      //   · roles con permiso Chatters → Evaluator
+      //   · roles con permiso Chatters / NULL (acceso al módulo entero)
       const { data: perms, error: pErr } = await sb
         .from("role_permissions")
-        .select("role_id, roles_config!inner(name)")
+        .select("role_id, submodule, roles_config!inner(name)")
         .eq("module", "Chatters")
-        .eq("submodule", "Evaluator")
-        .eq("can_access", true);
+        .eq("can_access", true)
+        .or("submodule.eq.Evaluator,submodule.is.null");
       if (pErr) throw pErr;
-      const evaluatorRoleNames = Array.from(
-        new Set(
-          ((perms ?? []) as Array<{ roles_config: { name: string } | null }>)
-            .map((p) => p.roles_config?.name)
-            .filter((n): n is string => !!n),
-        ),
+      const evaluatorRoleNames = new Set(
+        ((perms ?? []) as Array<{ roles_config: { name: string } | null }>)
+          .map((p) => p.roles_config?.name)
+          .filter((n): n is string => !!n),
       );
-      if (evaluatorRoleNames.length === 0) return [];
+      // Admin siempre bypass — incluso si su rol no tiene entries explícitas.
+      evaluatorRoleNames.add("admin");
 
       // 2. Users que tienen alguno de esos roles
       const { data: rolesData, error: rErr } = await sb
         .from("user_roles")
         .select("user_id")
-        .in("role", evaluatorRoleNames);
+        .in("role", [...evaluatorRoleNames]);
       if (rErr) throw rErr;
       const userIds = Array.from(
         new Set(
