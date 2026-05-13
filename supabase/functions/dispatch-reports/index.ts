@@ -68,21 +68,15 @@ function computeRange(period: "daily" | "weekly" | "quincenal" | "monthly" | "an
   const m = miamiParts(now);
 
   if (period === "quincenal") {
-    // Quincenal: corre los días 1 y 16.
-    //   · día 16 → mes actual, día 1 al día 15.
-    //   · día 1  → mes anterior, día 16 al último.
-    if (m.day === 16) {
-      return {
-        from: miamiDateToUtc(m.year, m.month, 1, 0, 0, 0).toISOString(),
-        to: miamiDateToUtc(m.year, m.month, 15, 23, 59, 59).toISOString(),
-      };
-    }
-    const prevMo = m.month === 1 ? 12 : m.month - 1;
-    const prevY = m.month === 1 ? m.year - 1 : m.year;
-    const lastDay = new Date(Date.UTC(prevY, prevMo, 0)).getUTCDate();
+    // Últimos 15 días terminando ayer Miami — independiente de qué día(s)
+    // del mes elija el user. Le da consistencia: siempre te llega un
+    // resumen de "los 15 días previos".
+    const todayUtc = new Date(Date.UTC(m.year, m.month - 1, m.day));
+    const yest = new Date(todayUtc.getTime() - 1 * 86_400_000);
+    const start = new Date(todayUtc.getTime() - 15 * 86_400_000);
     return {
-      from: miamiDateToUtc(prevY, prevMo, 16, 0, 0, 0).toISOString(),
-      to: miamiDateToUtc(prevY, prevMo, lastDay, 23, 59, 59).toISOString(),
+      from: miamiDateToUtc(start.getUTCFullYear(), start.getUTCMonth() + 1, start.getUTCDate(), 0, 0, 0).toISOString(),
+      to: miamiDateToUtc(yest.getUTCFullYear(), yest.getUTCMonth() + 1, yest.getUTCDate(), 23, 59, 59).toISOString(),
     };
   }
 
@@ -99,13 +93,14 @@ function computeRange(period: "daily" | "weekly" | "quincenal" | "monthly" | "an
   }
 
   if (period === "weekly") {
-    // Semana pasada: lunes 00:00 → domingo 23:59:59 Miami.
-    // "Hoy" Miami debería ser lunes (gating ya filtra eso).
+    // Últimos 7 días terminando ayer Miami — independiente de qué día
+    // se dispare. Si user pickea Lun+Mié+Vie, cada reporte cubre los 7
+    // días previos a su día (sin solapamiento total).
     const todayUtc = new Date(Date.UTC(m.year, m.month - 1, m.day));
-    const lastMonday = new Date(todayUtc.getTime() - 7 * 86_400_000);
-    const lastSunday = new Date(todayUtc.getTime() - 1 * 86_400_000);
-    const from = miamiDateToUtc(lastMonday.getUTCFullYear(), lastMonday.getUTCMonth() + 1, lastMonday.getUTCDate(), 0, 0, 0);
-    const to = miamiDateToUtc(lastSunday.getUTCFullYear(), lastSunday.getUTCMonth() + 1, lastSunday.getUTCDate(), 23, 59, 59);
+    const yest = new Date(todayUtc.getTime() - 1 * 86_400_000);
+    const start = new Date(todayUtc.getTime() - 7 * 86_400_000);
+    const from = miamiDateToUtc(start.getUTCFullYear(), start.getUTCMonth() + 1, start.getUTCDate(), 0, 0, 0);
+    const to = miamiDateToUtc(yest.getUTCFullYear(), yest.getUTCMonth() + 1, yest.getUTCDate(), 23, 59, 59);
     return { from: from.toISOString(), to: to.toISOString() };
   }
 
@@ -129,18 +124,40 @@ function computeRange(period: "daily" | "weekly" | "quincenal" | "monthly" | "an
 // Decide si un schedule debe dispararse AHORA según period + dispatch_hour.
 // El cron corre cada hora; chequeamos period para "hoy es el día" y
 // dispatch_hour para "es esta hora".
+// Mapeo de weekday string → ISO numérico (1=Mon ... 7=Sun) usado en
+// dispatch_weekdays. Intl.DateTimeFormat devuelve "Mon", "Tue", etc en
+// inglés (locale "en-US").
+const WEEKDAY_TO_ISO: Record<string, number> = {
+  Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7,
+};
+
 function shouldDispatchNow(
   period: "daily" | "weekly" | "quincenal" | "monthly" | "annual",
   dispatchHour: number,
+  schedule: { dispatch_weekdays: number[] | null; dispatch_days_of_month: number[] | null; dispatch_month_of_year: number | null },
   now: Date,
 ): boolean {
   const m = miamiParts(now);
   if (m.hour !== dispatchHour) return false;
   if (period === "daily") return true;
-  if (period === "weekly") return m.weekday === "Mon";
-  if (period === "quincenal") return m.day === 1 || m.day === 16;
-  if (period === "monthly") return m.day === 1;
-  if (period === "annual") return m.day === 1 && m.month === 1;
+  if (period === "weekly") {
+    const todayIso = WEEKDAY_TO_ISO[m.weekday] ?? 0;
+    const days = schedule.dispatch_weekdays ?? [1];
+    return days.includes(todayIso);
+  }
+  if (period === "quincenal") {
+    const days = schedule.dispatch_days_of_month ?? [1, 16];
+    return days.includes(m.day);
+  }
+  if (period === "monthly") {
+    const day = schedule.dispatch_days_of_month?.[0] ?? 1;
+    return m.day === day;
+  }
+  if (period === "annual") {
+    const day = schedule.dispatch_days_of_month?.[0] ?? 1;
+    const month = schedule.dispatch_month_of_year ?? 1;
+    return m.day === day && m.month === month;
+  }
   return false;
 }
 
@@ -168,13 +185,22 @@ Deno.serve(async (req) => {
 
     const { data: schedules, error } = await admin
       .from("report_schedules")
-      .select("id, period, dispatch_hour, is_active")
+      .select("id, period, dispatch_hour, dispatch_weekdays, dispatch_days_of_month, dispatch_month_of_year, is_active")
       .eq("is_active", true);
     if (error) throw error;
 
     const now = new Date();
     const due = (schedules ?? []).filter((s: any) =>
-      shouldDispatchNow(s.period as any, Number(s.dispatch_hour ?? 8), now),
+      shouldDispatchNow(
+        s.period as any,
+        Number(s.dispatch_hour ?? 8),
+        {
+          dispatch_weekdays: s.dispatch_weekdays ?? null,
+          dispatch_days_of_month: s.dispatch_days_of_month ?? null,
+          dispatch_month_of_year: s.dispatch_month_of_year ?? null,
+        },
+        now,
+      ),
     );
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

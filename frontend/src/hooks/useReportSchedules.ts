@@ -39,6 +39,15 @@ export interface ReportSchedule {
   role_name: string | null;
   period: ReportPeriod;
   dispatch_hour: number;
+  // Día(s) en que dispara según period:
+  //   weekly    → dispatch_weekdays (1=Mon ... 7=Sun)
+  //   quincenal → dispatch_days_of_month (1-2 valores, 1-28)
+  //   monthly   → dispatch_days_of_month (1 valor)
+  //   annual    → dispatch_days_of_month (1 valor) + dispatch_month_of_year (1-12)
+  //   daily     → ignora todo
+  dispatch_weekdays: number[] | null;
+  dispatch_days_of_month: number[] | null;
+  dispatch_month_of_year: number | null;
   email_subject: string | null;
   metrics: string[] | null; // null = set default del módulo
   is_active: boolean;
@@ -146,6 +155,9 @@ export interface CreateScheduleInput {
   module: ReportModule;
   period: ReportPeriod;
   dispatch_hour: number;
+  dispatch_weekdays: number[] | null;
+  dispatch_days_of_month: number[] | null;
+  dispatch_month_of_year: number | null;
   email_subject: string | null;
   metrics: string[] | null;
   recipients: Array<{ email: string; user_id?: string | null }>;
@@ -165,6 +177,9 @@ export function useCreateReportSchedule() {
           role_name: input.role_name,
           period: input.period,
           dispatch_hour: input.dispatch_hour,
+          dispatch_weekdays: input.dispatch_weekdays,
+          dispatch_days_of_month: input.dispatch_days_of_month,
+          dispatch_month_of_year: input.dispatch_month_of_year,
           email_subject: input.email_subject,
           metrics: input.metrics,
           created_by: user?.id ?? null,

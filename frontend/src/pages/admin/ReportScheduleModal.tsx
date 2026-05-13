@@ -31,6 +31,12 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
   const [roleName, setRoleName] = useState<string>("");
   const [period, setPeriod] = useState<ReportPeriod>("weekly");
   const [dispatchHour, setDispatchHour] = useState<number>(8);
+  // Días en que dispara — semantics depende del period (ver ReportSchedule).
+  const [dispatchWeekdays, setDispatchWeekdays] = useState<number[]>([1]); // weekly → Lun
+  const [dispatchDayOfMonth, setDispatchDayOfMonth] = useState<number>(1); // monthly/annual
+  const [dispatchDayOfMonth2, setDispatchDayOfMonth2] = useState<number>(16); // quincenal segundo día
+  const [dispatchUseSecondDay, setDispatchUseSecondDay] = useState<boolean>(true); // quincenal: ¿usa el 2do día?
+  const [dispatchMonthOfYear, setDispatchMonthOfYear] = useState<number>(1); // annual → mes
   const [emailSubject, setEmailSubject] = useState<string>("");
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
   const [recipients, setRecipients] = useState<string[]>([]);
@@ -56,6 +62,13 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
         setRoleName(inferredRole);
         setPeriod(schedule.period);
         setDispatchHour(schedule.dispatch_hour ?? 8);
+        // Día/s del schedule
+        setDispatchWeekdays(schedule.dispatch_weekdays ?? [1]);
+        const dom = schedule.dispatch_days_of_month ?? [1];
+        setDispatchDayOfMonth(dom[0] ?? 1);
+        setDispatchDayOfMonth2(dom[1] ?? 16);
+        setDispatchUseSecondDay(dom.length > 1);
+        setDispatchMonthOfYear(schedule.dispatch_month_of_year ?? 1);
         setEmailSubject(schedule.email_subject ?? "");
         setSelectedMetrics(schedule.metrics ?? DEFAULT_METRICS_BY_MODULE[schedule.module] ?? []);
         setRecipients(schedule.recipients.map((r) => r.email));
@@ -64,6 +77,11 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
         setRoleName("employee");
         setPeriod("weekly");
         setDispatchHour(8);
+        setDispatchWeekdays([1]);
+        setDispatchDayOfMonth(1);
+        setDispatchDayOfMonth2(16);
+        setDispatchUseSecondDay(true);
+        setDispatchMonthOfYear(1);
         setEmailSubject("");
         setSelectedMetrics(DEFAULT_METRICS_BY_MODULE.llg);
         setRecipients([]);
@@ -143,6 +161,28 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       const subjectPayload = emailSubject.trim() ? emailSubject.trim() : null;
       const derivedModule = roleToModule(roleName);
       const metricsPayload = selectedMetrics.length > 0 ? selectedMetrics : null;
+      // Payload de días según period — los campos no aplicables van NULL.
+      let dispatchWeekdaysPayload: number[] | null = null;
+      let dispatchDaysOfMonthPayload: number[] | null = null;
+      let dispatchMonthOfYearPayload: number | null = null;
+      if (period === "weekly") {
+        if (dispatchWeekdays.length === 0) {
+          toast.error("Elegí al menos un día de la semana");
+          setSaving(false);
+          return;
+        }
+        dispatchWeekdaysPayload = [...dispatchWeekdays].sort((a, b) => a - b);
+      } else if (period === "quincenal") {
+        dispatchDaysOfMonthPayload = dispatchUseSecondDay
+          ? [dispatchDayOfMonth, dispatchDayOfMonth2].sort((a, b) => a - b)
+          : [dispatchDayOfMonth];
+      } else if (period === "monthly") {
+        dispatchDaysOfMonthPayload = [dispatchDayOfMonth];
+      } else if (period === "annual") {
+        dispatchDaysOfMonthPayload = [dispatchDayOfMonth];
+        dispatchMonthOfYearPayload = dispatchMonthOfYear;
+      }
+
       if (isEdit && schedule) {
         await updateSchedule.mutateAsync({
           id: schedule.id,
@@ -152,6 +192,9 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
             role_name: roleName,
             period,
             dispatch_hour: dispatchHour,
+            dispatch_weekdays: dispatchWeekdaysPayload,
+            dispatch_days_of_month: dispatchDaysOfMonthPayload,
+            dispatch_month_of_year: dispatchMonthOfYearPayload,
             email_subject: subjectPayload,
             metrics: metricsPayload,
           },
@@ -165,6 +208,9 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           module: derivedModule,
           period,
           dispatch_hour: dispatchHour,
+          dispatch_weekdays: dispatchWeekdaysPayload,
+          dispatch_days_of_month: dispatchDaysOfMonthPayload,
+          dispatch_month_of_year: dispatchMonthOfYearPayload,
           email_subject: subjectPayload,
           metrics: metricsPayload,
           recipients: recipientsPayload,
@@ -300,15 +346,140 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
             )}
           </div>
 
-          {/* Pista del rango que cubriría según period + hora elegida */}
+          {/* Selector de días según periodicidad. daily no muestra nada. */}
+          {period === "weekly" && (
+            <div className="space-y-1.5">
+              <Label>Días de la semana *</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { v: 1, l: "Lun" }, { v: 2, l: "Mar" }, { v: 3, l: "Mié" },
+                  { v: 4, l: "Jue" }, { v: 5, l: "Vie" }, { v: 6, l: "Sáb" }, { v: 7, l: "Dom" },
+                ].map((d) => {
+                  const isSelected = dispatchWeekdays.includes(d.v);
+                  return (
+                    <button
+                      key={d.v}
+                      type="button"
+                      onClick={() => {
+                        setDispatchWeekdays((prev) =>
+                          isSelected ? prev.filter((x) => x !== d.v) : [...prev, d.v]
+                        );
+                      }}
+                      className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground ring-1 ring-primary"
+                          : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
+                      }`}
+                    >
+                      {d.l}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                El reporte se manda en cada uno de los días elegidos.
+              </p>
+            </div>
+          )}
+
+          {period === "quincenal" && (
+            <div className="space-y-1.5">
+              <Label>Días del mes *</Label>
+              <div className="flex items-center gap-2">
+                <Select value={String(dispatchDayOfMonth)} onValueChange={(v) => setDispatchDayOfMonth(Number(v))}>
+                  <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                      <SelectItem key={d} value={String(d)}>Día {d}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                  <Checkbox
+                    checked={dispatchUseSecondDay}
+                    onCheckedChange={(v) => setDispatchUseSecondDay(!!v)}
+                  />
+                  + un 2do día
+                </label>
+                {dispatchUseSecondDay && (
+                  <Select value={String(dispatchDayOfMonth2)} onValueChange={(v) => setDispatchDayOfMonth2(Number(v))}>
+                    <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                        <SelectItem key={d} value={String(d)}>Día {d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Cap a día 28 para evitar conflictos con febrero.
+              </p>
+            </div>
+          )}
+
+          {period === "monthly" && (
+            <div className="space-y-1.5">
+              <Label>Día del mes *</Label>
+              <Select value={String(dispatchDayOfMonth)} onValueChange={(v) => setDispatchDayOfMonth(Number(v))}>
+                <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                    <SelectItem key={d} value={String(d)}>Día {d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {period === "annual" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Mes *</Label>
+                <Select value={String(dispatchMonthOfYear)} onValueChange={(v) => setDispatchMonthOfYear(Number(v))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
+                      .map((m, i) => (<SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Día *</Label>
+                <Select value={String(dispatchDayOfMonth)} onValueChange={(v) => setDispatchDayOfMonth(Number(v))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                      <SelectItem key={d} value={String(d)}>{d}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* Pista del rango que cubriría según period + días + hora elegidos */}
           <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 text-[11px] text-muted-foreground">
             {(() => {
               const hh = `${String(dispatchHour).padStart(2, "0")}:00`;
+              const weekdayLabels = ["", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+              const monthLabels = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
               if (period === "daily") return `Cada día a las ${hh} Miami recibirás los datos del día anterior (00:00 a 23:59).`;
-              if (period === "weekly") return `Cada lunes ${hh} Miami recibirás los datos de la semana pasada (lunes 00:00 a domingo 23:59).`;
-              if (period === "quincenal") return `Los días 1 y 16 a las ${hh} Miami recibirás los datos de los 15 días previos.`;
-              if (period === "monthly") return `El día 1 de cada mes a las ${hh} Miami recibirás los datos del mes pasado.`;
-              return `El 1 de enero a las ${hh} Miami recibirás los datos del año anterior.`;
+              if (period === "weekly") {
+                const list = dispatchWeekdays.length === 0 ? "(elegí días)"
+                  : dispatchWeekdays.sort((a, b) => a - b).map((d) => weekdayLabels[d]).join(", ");
+                return `Los ${list} a las ${hh} Miami recibirás los últimos 7 días.`;
+              }
+              if (period === "quincenal") {
+                const list = dispatchUseSecondDay
+                  ? `días ${Math.min(dispatchDayOfMonth, dispatchDayOfMonth2)} y ${Math.max(dispatchDayOfMonth, dispatchDayOfMonth2)}`
+                  : `día ${dispatchDayOfMonth}`;
+                return `Los ${list} de cada mes a las ${hh} Miami recibirás los últimos 15 días.`;
+              }
+              if (period === "monthly") {
+                return `El día ${dispatchDayOfMonth} de cada mes a las ${hh} Miami recibirás los datos del mes pasado.`;
+              }
+              return `El ${dispatchDayOfMonth} de ${monthLabels[dispatchMonthOfYear]} a las ${hh} Miami recibirás los datos del año anterior.`;
             })()}
           </div>
 
