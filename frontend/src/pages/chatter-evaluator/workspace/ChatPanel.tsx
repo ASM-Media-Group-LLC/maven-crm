@@ -821,35 +821,26 @@ export const ChatPanel = ({ session }: Props) => {
     }
   }, [messagesQ.data, session?.id]);
 
-  // Realtime: subscribe ONLY a chatter_messages para esta sesión. Antes
-  // este mismo canal también se subscribía a chatter_sessions UPDATE
-  // (filter id=eq.X) para refrescar typing/read_at en vivo, pero eso
-  // creaba un overlap con la subscription de SessionsPanel a chatter_sessions
-  // (no filter). Bajo carga multi-cliente (≥2 examiners conectados), el
-  // bus de postgres_changes de Supabase routea el evento a SOLO UNO de
-  // los listeners cuando hay subscriptions overlapping sobre la misma
-  // tabla en el mismo client — el mismo bug que arregló PR #142 para
-  // chatter_messages, pero que quedó vivo para chatter_sessions. Como
-  // las dos .on() viven en el mismo .channel(), el conflicto de routing
-  // arrastraba al listener de chatter_messages y los mensajes dejaban
-  // de aparecer en realtime.
+  // Realtime via Broadcast nativo de Supabase (no postgres_changes).
   //
-  // Ya no es necesario porque SessionsPanel invalida el query
-  // `chatter-sessions` en cada UPDATE → WorkspaceContent re-deriva
-  // `selectedSession` desde la lista → la prop `session` que llega
-  // acá se actualiza con typing_chatter_at, read_by_chatter_at, etc.
+  // Por qué Broadcast: postgres_changes evalúa RLS por cada row y se rompe
+  // silenciosamente bajo carga multi-cliente o con policies que tienen
+  // joins/funciones. Tras 5 migraciones intentando estabilizarlo (denormalize
+  // examiner_user_id, dropear global policy, republicar tabla...) decidimos
+  // moverlo a Broadcast — push directo servidor→canal, sin WAL ni RLS-por-row,
+  // recomendación oficial de Supabase para chat-like.
+  //
+  // El trigger AFTER INSERT en chatter_messages invoca realtime.send() con
+  // topic = 'chatter-session:{session_id}' y event = 'new_message'. Acá nos
+  // suscribimos a ese mismo topic y, al recibir el evento, invalidamos la
+  // query — el refetch trae el mensaje completo con RLS aplicado.
   useEffect(() => {
     if (!session?.id) return;
     const channel = supabase
-      .channel(`chatter-messages:${session.id}`)
+      .channel(`chatter-session:${session.id}`)
       .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "chatter_messages",
-          filter: `session_id=eq.${session.id}`,
-        },
+        "broadcast",
+        { event: "new_message" },
         () => {
           qc.invalidateQueries({ queryKey: ["chatter-messages", session.id] });
         },

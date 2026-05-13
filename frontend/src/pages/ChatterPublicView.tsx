@@ -817,19 +817,23 @@ const ChatterPublicView = () => {
     };
   }, [sessionId, tabState, sessionQ.data?.status]);
 
-  // Realtime subscription on messages
+  // Realtime via Broadcast (no postgres_changes). Ver comentario en
+  // ChatPanel.tsx — postgres_changes era inestable en multi-cliente y
+  // lo migramos a un trigger AFTER INSERT que invoca realtime.send.
+  //
+  // Canal compartido con el ChatPanel del examiner: cuando cualquiera
+  // de los dos lados inserta, ambos reciben el broadcast e invalidan
+  // su query de mensajes. El bucket de session updates (typing/read_at)
+  // sigue por postgres_changes en un canal aparte porque no está en el
+  // hot path del bug (la inestabilidad apareció bajo carga de inserts
+  // de mensajes).
   useEffect(() => {
     if (!sessionId || !claimed) return;
     const channel = supabaseAnon
-      .channel(`chatter-public-messages:${sessionId}`)
+      .channel(`chatter-session:${sessionId}`)
       .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "chatter_messages",
-          filter: `session_id=eq.${sessionId}`,
-        },
+        "broadcast",
+        { event: "new_message" },
         () => qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] }),
       )
       .on(
