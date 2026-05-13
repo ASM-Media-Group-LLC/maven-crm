@@ -49,7 +49,7 @@ const ReportPreviewToggle = ({ scheduleId }: { scheduleId: string }) => {
         {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </button>
       {open && (
-        <div className="mt-2 rounded-lg border border-border/60 bg-white">
+        <div className="mt-2 w-full rounded-lg border border-border/60 bg-white">
           {isLoading ? (
             <div className="p-6 text-center text-xs text-muted-foreground">
               Generando preview…
@@ -60,15 +60,23 @@ const ReportPreviewToggle = ({ scheduleId }: { scheduleId: string }) => {
             </div>
           ) : preview ? (
             <div className="space-y-2 p-3">
-              <div className="rounded bg-muted/30 px-3 py-2 text-[11px]">
+              <div className="rounded bg-muted/30 px-3 py-2 text-[11px] text-foreground">
                 <div><span className="font-semibold text-muted-foreground">Asunto:</span> {preview.subject}</div>
-                <div className="text-muted-foreground">{preview.row_count} {preview.row_count === 1 ? "fila" : "filas"} · rango usado: {new Date(preview.from).toLocaleString("es-CO")} → {new Date(preview.to).toLocaleString("es-CO")}</div>
+                <div className="text-muted-foreground">
+                  {preview.row_count} {preview.row_count === 1 ? "fila" : "filas"} · rango usado: {new Date(preview.from).toLocaleString("es-CO")} → {new Date(preview.to).toLocaleString("es-CO")}
+                </div>
               </div>
-              <div
-                className="overflow-auto max-h-[480px] rounded border border-border/40"
-                // El HTML viene de nuestra propia function send-report — fuente confiable.
-                dangerouslySetInnerHTML={{ __html: preview.html }}
-              />
+              {/* Wrapper full-width con scroll horizontal SOLO si el email
+                  excede el ancho disponible. El email tiene max-width:720px
+                  fijo en su template, así que en cards >720px se centra
+                  con espacio a los lados. */}
+              <div className="w-full overflow-x-auto rounded border border-border/40 bg-slate-50 p-3">
+                <div
+                  className="mx-auto"
+                  // El HTML viene de nuestra propia function send-report — fuente confiable.
+                  dangerouslySetInnerHTML={{ __html: preview.html }}
+                />
+              </div>
             </div>
           ) : null}
         </div>
@@ -242,7 +250,6 @@ const AdminReportes = () => {
                         Último envío: {new Date(s.last_dispatched_at).toLocaleString("es-CO")}
                       </p>
                     )}
-                    <ReportPreviewToggle scheduleId={s.id} />
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <Button
@@ -281,6 +288,9 @@ const AdminReportes = () => {
                     </Button>
                   </div>
                 </div>
+                {/* Vista previa full-width — fuera del flex row para que
+                    al expandirse ocupe todo el ancho de la Card. */}
+                <ReportPreviewToggle scheduleId={s.id} />
               </CardContent>
             </Card>
           ))}
