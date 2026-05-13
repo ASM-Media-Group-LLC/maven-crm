@@ -119,14 +119,10 @@ const SessionRow = ({
           <span>·</span>
           <Clock className="h-2.5 w-2.5" />
           <span>{formatRelative(session.created_at)}</span>
-          {totalSpent > 0 && (
-            <>
-              <span>·</span>
-              <span className="font-mono font-bold text-amber-500">
-                ${totalSpent}
-              </span>
-            </>
-          )}
+          <span>·</span>
+          <span className="font-mono font-bold text-emerald-500">
+            ${totalSpent}
+          </span>
         </div>
       )}
     </div>
