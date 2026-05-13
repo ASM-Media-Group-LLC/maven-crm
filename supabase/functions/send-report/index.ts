@@ -19,11 +19,12 @@ const corsHeaders = {
 };
 
 type Module = "llg" | "closers" | "chatters";
-type Period = "daily" | "weekly" | "monthly" | "annual";
+type Period = "daily" | "weekly" | "quincenal" | "monthly" | "annual";
 
 const PERIOD_LABEL: Record<Period, string> = {
   daily: "diario",
   weekly: "semanal",
+  quincenal: "quincenal",
   monthly: "mensual",
   annual: "anual",
 };
@@ -83,6 +84,16 @@ function computeRangeForPeriod(period: Period, now: Date): { from: string; to: s
     return {
       from: miamiToUtc(lastMon.getUTCFullYear(), lastMon.getUTCMonth() + 1, lastMon.getUTCDate(), 0, 0, 0).toISOString(),
       to: miamiToUtc(lastSun.getUTCFullYear(), lastSun.getUTCMonth() + 1, lastSun.getUTCDate(), 23, 59, 59).toISOString(),
+    };
+  }
+  if (period === "quincenal") {
+    // Últimos 15 días terminando ayer Miami — mismo cálculo que dispatch-reports.
+    const today = new Date(Date.UTC(m.year, m.month - 1, m.day));
+    const yest = new Date(today.getTime() - 1 * 86_400_000);
+    const start = new Date(today.getTime() - 15 * 86_400_000);
+    return {
+      from: miamiToUtc(start.getUTCFullYear(), start.getUTCMonth() + 1, start.getUTCDate(), 0, 0, 0).toISOString(),
+      to: miamiToUtc(yest.getUTCFullYear(), yest.getUTCMonth() + 1, yest.getUTCDate(), 23, 59, 59).toISOString(),
     };
   }
   if (period === "monthly") {

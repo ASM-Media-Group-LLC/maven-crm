@@ -88,6 +88,7 @@ const ReportPreviewToggle = ({ scheduleId }: { scheduleId: string }) => {
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   daily: "Diario",
   weekly: "Semanal",
+  quincenal: "Quincenal",
   monthly: "Mensual",
   annual: "Anual",
 };
@@ -95,6 +96,7 @@ const PERIOD_LABELS: Record<ReportPeriod, string> = {
 const PERIOD_TONES: Record<ReportPeriod, string> = {
   daily: "bg-emerald-500/15 text-emerald-300 ring-emerald-400/30",
   weekly: "bg-blue-500/15 text-blue-300 ring-blue-400/30",
+  quincenal: "bg-cyan-500/15 text-cyan-300 ring-cyan-400/30",
   monthly: "bg-violet-500/15 text-violet-300 ring-violet-400/30",
   annual: "bg-amber-500/15 text-amber-300 ring-amber-400/30",
 };
