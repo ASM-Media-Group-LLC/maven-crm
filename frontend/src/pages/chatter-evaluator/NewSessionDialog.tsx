@@ -75,9 +75,11 @@ const ProfilePicker = ({
 
 const SuccessView = ({
   session,
+  examinerName,
   onClose,
 }: {
   session: ChatterSession;
+  examinerName: string;
   onClose: () => void;
 }) => {
   const [copied, setCopied] = useState(false);
@@ -101,9 +103,13 @@ const SuccessView = ({
         <p className="text-sm">
           Sesión creada para <strong>{session.chatter_name}</strong>.
         </p>
+        <p className="mt-0.5 text-sm">
+          Examinador: <strong>{examinerName}</strong>
+        </p>
         <p className="mt-1 text-xs text-muted-foreground">
           Comparte este link con el aspirante (no necesita cuenta de Maven). La
-          sesión expira en {session.duration_minutes} min.
+          sesión expira en {session.duration_minutes} min después del primer
+          mensaje del chatter.
         </p>
       </div>
       <Card className="p-3">
@@ -233,7 +239,14 @@ export const NewSessionDialog = ({ open, onOpenChange }: Props) => {
         </DialogHeader>
 
         {created ? (
-          <SuccessView session={created} onClose={() => handleClose(false)} />
+          <SuccessView
+            session={created}
+            examinerName={
+              orderedEvaluators.find((e) => e.user_id === created.examiner_user_id)?.full_name
+                ?? (created.examiner_user_id === user?.id ? "Yo" : "Sin nombre")
+            }
+            onClose={() => handleClose(false)}
+          />
         ) : (
           <div className="space-y-4">
             <div>
