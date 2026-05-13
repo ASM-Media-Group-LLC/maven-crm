@@ -28,6 +28,7 @@ import {
   Settings as SettingsIcon,
   Check,
 } from "lucide-react";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   useLeadFavoriteIds,
   useScouterLeads,
@@ -848,6 +849,12 @@ const ScouterDiscover = () => {
   const enqueueHashtag = useEnqueueDiscoveryHashtag();
   const cancelJob = useCancelScouterJob();
   const budget = useScouterApifyBudget();
+  const { isAdmin, isManager } = useUserRole();
+  // El toggle del autopilot pausa el Scouter para TODO el CRM, no por
+  // user. Lo ocultamos a roles operativos (closer, spammer, LLG, etc) —
+  // solo admin/manager pueden activar/desactivar. Backend tiene RLS
+  // que enforcea esto a nivel DB también (defensa en profundidad).
+  const canControlAutopilot = isAdmin || isManager;
   const autopilot = useScouterAutopilot();
   const toggleAutopilot = useToggleScouterAutopilot();
   const setAutopilotFilter = useSetAutopilotCompaniesFilter();
@@ -1115,11 +1122,13 @@ const ScouterDiscover = () => {
       <div className="grid gap-5 md:grid-cols-[auto_1fr]">
         {/* Left: button + stats */}
         <div className="flex flex-col items-center gap-3">
-          <DiscoverButton
-            state={scanState}
-            onStart={handleStart}
-            onStop={handleStop}
-          />
+          {canControlAutopilot && (
+            <DiscoverButton
+              state={scanState}
+              onStart={handleStart}
+              onStop={handleStop}
+            />
+          )}
           {/* Queue stats + autopilot status */}
           <div className="text-center text-[11px] text-muted-foreground space-y-0.5">
             {(runningCount > 0 || queuedCount > 0) && (
