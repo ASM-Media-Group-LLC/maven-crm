@@ -66,7 +66,7 @@ const SessionRow = ({
   <button
     type="button"
     onClick={onSelect}
-    className={`group relative flex w-full items-center gap-2 rounded-md p-2 text-left transition-colors ${
+    className={`group relative flex w-full items-center gap-1.5 rounded-md p-1.5 text-left transition-colors ${
       active ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-muted"
     }`}
   >
@@ -82,7 +82,7 @@ const SessionRow = ({
         {unread > 99 ? "99+" : unread}
       </span>
     )}
-    <div className="aspect-square h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
+    <div className="aspect-square h-9 w-9 shrink-0 overflow-hidden rounded-full bg-muted">
       {profile?.avatar_url ? (
         <img
           src={profile.avatar_url}
@@ -114,7 +114,7 @@ const SessionRow = ({
           <span>escribiendo…</span>
         </div>
       ) : (
-        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
           {/* Nombre del modelo: flex-1 + min-w-0 + truncate para que tome
               todo el espacio disponible. Los chips de tiempo y $ son
               shrink-0 (anchura fija, no compiten por ancho). */}
