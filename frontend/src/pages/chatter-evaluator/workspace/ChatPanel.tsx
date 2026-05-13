@@ -821,9 +821,23 @@ export const ChatPanel = ({ session }: Props) => {
     }
   }, [messagesQ.data, session?.id]);
 
-  // Realtime: subscribe to chatter_messages inserts/updates for this session
-  // so messages from the chatter side (Phase 5) appear instantly here
-  // without polling. Cleanup on session change / unmount.
+  // Realtime: subscribe ONLY a chatter_messages para esta sesión. Antes
+  // este mismo canal también se subscribía a chatter_sessions UPDATE
+  // (filter id=eq.X) para refrescar typing/read_at en vivo, pero eso
+  // creaba un overlap con la subscription de SessionsPanel a chatter_sessions
+  // (no filter). Bajo carga multi-cliente (≥2 examiners conectados), el
+  // bus de postgres_changes de Supabase routea el evento a SOLO UNO de
+  // los listeners cuando hay subscriptions overlapping sobre la misma
+  // tabla en el mismo client — el mismo bug que arregló PR #142 para
+  // chatter_messages, pero que quedó vivo para chatter_sessions. Como
+  // las dos .on() viven en el mismo .channel(), el conflicto de routing
+  // arrastraba al listener de chatter_messages y los mensajes dejaban
+  // de aparecer en realtime.
+  //
+  // Ya no es necesario porque SessionsPanel invalida el query
+  // `chatter-sessions` en cada UPDATE → WorkspaceContent re-deriva
+  // `selectedSession` desde la lista → la prop `session` que llega
+  // acá se actualiza con typing_chatter_at, read_by_chatter_at, etc.
   useEffect(() => {
     if (!session?.id) return;
     const channel = supabase
@@ -838,22 +852,6 @@ export const ChatPanel = ({ session }: Props) => {
         },
         () => {
           qc.invalidateQueries({ queryKey: ["chatter-messages", session.id] });
-        },
-      )
-      .on(
-        // Also invalidate the sessions list so updates from the chatter side
-        // (typing_chatter, read_by_chatter_at) reach this component live.
-        // The selected session in WorkspaceContent is derived from that list.
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "chatter_sessions",
-          filter: `id=eq.${session.id}`,
-        },
-        () => {
-          qc.invalidateQueries({ queryKey: ["chatter-sessions"] });
-          qc.invalidateQueries({ queryKey: ["chatter-session", session.id] });
         },
       )
       .subscribe();

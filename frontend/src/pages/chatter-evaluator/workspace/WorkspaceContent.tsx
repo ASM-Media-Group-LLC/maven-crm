@@ -304,7 +304,14 @@ const WorkspaceContent = () => {
           <SessionsPanel selectedId={selectedId} onSelect={setSelectedId} />
         </aside>
         <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <ChatPanel session={selectedSession} />
+          {/* key por session.id → React remonta el ChatPanel cuando el
+              examinador cambia de sesión. Sin esto, el componente reusa
+              su estado local (input draft, uploading, recording, dialogs
+              abiertos, etc.) entre sesiones, así que un "hola" tipeado
+              en la sesión A aparecía en B/C/etc. Remount = state limpia
+              por sesión. Cuesto: si había draft sin enviar al cambiar,
+              se pierde — es el trade-off aceptado para evitar el leak. */}
+          <ChatPanel key={selectedSession?.id ?? "none"} session={selectedSession} />
         </section>
         {!infoHidden && (
           <aside className="w-[320px] shrink-0 border-l border-border min-h-0">
