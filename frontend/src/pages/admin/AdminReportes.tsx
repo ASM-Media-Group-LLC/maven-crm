@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Mail, Trash2, Edit3, Power, Clock, Send, Loader2 } from "lucide-react";
+import { Plus, Mail, Trash2, Edit3, Power, Clock, Send, Loader2, Eye, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,8 +20,8 @@ import {
   useDeleteReportSchedule,
   useUpdateReportSchedule,
   useSendReportNow,
+  useReportPreview,
   type ReportScheduleWithRecipients,
-  type ReportModule,
   type ReportPeriod,
 } from "@/hooks/useReportSchedules";
 import ReportScheduleModal from "./ReportScheduleModal";
@@ -30,10 +30,51 @@ import ReportScheduleModal from "./ReportScheduleModal";
 // CRUD de reports programados. Los reports se mandan via cron diario y
 // la función dispatch-reports decide cuáles disparar HOY según period.
 
-const MODULE_LABELS: Record<ReportModule, string> = {
-  llg: "LLGs",
-  closers: "Closers",
-  chatters: "Chatters",
+// Toggle inline que carga la vista previa del email cuando se expande.
+// Cargada lazy: el query a send-report (preview_only=true) sólo corre
+// cuando el user hace click en "Vista previa".
+const ReportPreviewToggle = ({ scheduleId }: { scheduleId: string }) => {
+  const [open, setOpen] = useState(false);
+  const { data: preview, isLoading, isError, error } = useReportPreview(scheduleId, open);
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/20 px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
+      >
+        <Eye className="h-3 w-3" />
+        Vista previa del email
+        {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+      </button>
+      {open && (
+        <div className="mt-2 rounded-lg border border-border/60 bg-white">
+          {isLoading ? (
+            <div className="p-6 text-center text-xs text-muted-foreground">
+              Generando preview…
+            </div>
+          ) : isError ? (
+            <div className="p-4 text-center text-xs text-destructive">
+              Error al generar preview: {(error as any)?.message ?? "desconocido"}
+            </div>
+          ) : preview ? (
+            <div className="space-y-2 p-3">
+              <div className="rounded bg-muted/30 px-3 py-2 text-[11px]">
+                <div><span className="font-semibold text-muted-foreground">Asunto:</span> {preview.subject}</div>
+                <div className="text-muted-foreground">{preview.row_count} {preview.row_count === 1 ? "fila" : "filas"} · rango usado: {new Date(preview.from).toLocaleString("es-CO")} → {new Date(preview.to).toLocaleString("es-CO")}</div>
+              </div>
+              <div
+                className="overflow-auto max-h-[480px] rounded border border-border/40"
+                // El HTML viene de nuestra propia function send-report — fuente confiable.
+                dangerouslySetInnerHTML={{ __html: preview.html }}
+              />
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
 };
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
@@ -169,8 +210,8 @@ const AdminReportes = () => {
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-base truncate">{s.name}</p>
-                      <Badge variant="outline" className="text-[10px]">
-                        {MODULE_LABELS[s.module]}
+                      <Badge variant="outline" className="text-[10px] capitalize">
+                        {s.role_name || s.module}
                       </Badge>
                       <span
                         className={`inline-flex items-center gap-1 rounded-full ring-1 px-2 py-0.5 text-[10px] font-bold ${PERIOD_TONES[s.period]}`}
@@ -201,6 +242,7 @@ const AdminReportes = () => {
                         Último envío: {new Date(s.last_dispatched_at).toLocaleString("es-CO")}
                       </p>
                     )}
+                    <ReportPreviewToggle scheduleId={s.id} />
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <Button

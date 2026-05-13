@@ -10,7 +10,8 @@ import { toast } from "sonner";
 import {
   useCreateReportSchedule,
   useUpdateReportSchedule,
-  type ReportModule,
+  useTenantRoles,
+  roleToModule,
   type ReportPeriod,
   type ReportScheduleWithRecipients,
 } from "@/hooks/useReportSchedules";
@@ -24,7 +25,7 @@ interface Props {
 const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
   const isEdit = !!schedule;
   const [name, setName] = useState("");
-  const [module, setModule] = useState<ReportModule>("llg");
+  const [roleName, setRoleName] = useState<string>("");
   const [period, setPeriod] = useState<ReportPeriod>("weekly");
   const [dispatchHour, setDispatchHour] = useState<number>(8);
   const [emailSubject, setEmailSubject] = useState<string>("");
@@ -34,20 +35,22 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
 
   const createSchedule = useCreateReportSchedule();
   const updateSchedule = useUpdateReportSchedule();
+  const { data: roles = [] } = useTenantRoles();
 
   // Reset/hydrate state cuando abre el modal.
   useEffect(() => {
     if (open) {
       if (schedule) {
         setName(schedule.name);
-        setModule(schedule.module);
+        // role_name puede estar null en schedules viejos — fallback a module.
+        setRoleName(schedule.role_name ?? (schedule.module === "closers" ? "closer" : schedule.module === "chatters" ? "Chatter Supervisor" : "employee"));
         setPeriod(schedule.period);
         setDispatchHour(schedule.dispatch_hour ?? 8);
         setEmailSubject(schedule.email_subject ?? "");
         setRecipients(schedule.recipients.map((r) => r.email));
       } else {
         setName("");
-        setModule("llg");
+        setRoleName("employee");
         setPeriod("weekly");
         setDispatchHour(8);
         setEmailSubject("");
@@ -102,21 +105,34 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       toast.error("Agregá al menos un destinatario");
       return;
     }
+    if (!roleName) {
+      toast.error("Elegí un rol");
+      return;
+    }
     setSaving(true);
     try {
       const recipientsPayload = recipients.map((email) => ({ email, user_id: null }));
       const subjectPayload = emailSubject.trim() ? emailSubject.trim() : null;
+      const derivedModule = roleToModule(roleName);
       if (isEdit && schedule) {
         await updateSchedule.mutateAsync({
           id: schedule.id,
-          patch: { name: name.trim(), module, period, dispatch_hour: dispatchHour, email_subject: subjectPayload },
+          patch: {
+            name: name.trim(),
+            module: derivedModule,
+            role_name: roleName,
+            period,
+            dispatch_hour: dispatchHour,
+            email_subject: subjectPayload,
+          },
           recipients: recipientsPayload,
         });
         toast.success("Reporte actualizado");
       } else {
         await createSchedule.mutateAsync({
           name: name.trim(),
-          module,
+          role_name: roleName,
+          module: derivedModule,
           period,
           dispatch_hour: dispatchHour,
           email_subject: subjectPayload,
@@ -157,25 +173,27 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
               id="report-subject"
               value={emailSubject}
               onChange={(e) => setEmailSubject(e.target.value)}
-              placeholder={`Maven CRM · Reporte ${period === "daily" ? "diario" : period === "weekly" ? "semanal" : period === "monthly" ? "mensual" : "anual"} ${module === "llg" ? "LLGs" : module === "closers" ? "Closers" : "Chatters"}`}
+              placeholder={`Maven CRM · Reporte ${period === "daily" ? "diario" : period === "weekly" ? "semanal" : period === "monthly" ? "mensual" : "anual"} ${roleName || "rol"}`}
               maxLength={200}
             />
             <p className="text-[11px] text-muted-foreground">
-              Si lo dejás vacío, se genera automático según módulo y periodicidad.
+              Si lo dejás vacío, se genera automático según rol y periodicidad.
             </p>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <Label>Módulo *</Label>
-              <Select value={module} onValueChange={(v) => setModule(v as ReportModule)}>
+              <Label>Rol *</Label>
+              <Select value={roleName} onValueChange={(v) => setRoleName(v)}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Elegí un rol" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="llg">LLGs</SelectItem>
-                  <SelectItem value="closers">Closers</SelectItem>
-                  <SelectItem value="chatters">Chatters</SelectItem>
+                  {roles.map((r) => (
+                    <SelectItem key={r.id} value={r.name}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

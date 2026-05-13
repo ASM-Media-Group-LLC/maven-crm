@@ -13,11 +13,30 @@ import { useAuth } from "@/hooks/useAuth";
 export type ReportModule = "llg" | "closers" | "chatters";
 export type ReportPeriod = "daily" | "weekly" | "monthly" | "annual";
 
+// Mapeo rol → módulo de reporte. El UI muestra "rol" pero internamente
+// las queries se agrupan por uno de los 3 módulos disponibles. Roles
+// "estratégicos" (admin/manager/supervisor) caen al LLG por default;
+// Fase 2 va a permitir cherry-pick de métricas según permisos del rol.
+export const ROLE_TO_MODULE: Record<string, ReportModule> = {
+  closer: "closers",
+  "Chatter Supervisor": "chatters",
+  employee: "llg",
+  spammer: "llg",
+  agent: "llg",
+  admin: "llg",
+  manager: "llg",
+  supervisor: "llg",
+};
+
+export const roleToModule = (roleName: string): ReportModule =>
+  ROLE_TO_MODULE[roleName] ?? "llg";
+
 export interface ReportSchedule {
   id: string;
   tenant_id: string;
   name: string;
   module: ReportModule;
+  role_name: string | null; // rol elegido en UI (closer, employee, etc)
   period: ReportPeriod;
   dispatch_hour: number; // 0-23, hora Miami
   email_subject: string | null; // null = subject auto-generado
@@ -39,6 +58,31 @@ export interface ReportScheduleWithRecipients extends ReportSchedule {
 }
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech — único tenant hoy
+
+// Lista de roles activos del tenant — para el dropdown del modal.
+export interface RoleOption {
+  id: string;
+  name: string;
+  description: string | null;
+  is_system: boolean;
+}
+
+export function useTenantRoles() {
+  return useQuery<RoleOption[]>({
+    queryKey: ["tenant-roles-for-reports"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("roles_config")
+        .select("id, name, description, is_system, is_active")
+        .eq("is_active", true)
+        .order("is_system", { ascending: false })
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as RoleOption[];
+    },
+    staleTime: 5 * 60_000,
+  });
+}
 
 export function useReportSchedules() {
   return useQuery<ReportScheduleWithRecipients[]>({
@@ -70,7 +114,8 @@ export function useReportSchedules() {
 
 export interface CreateScheduleInput {
   name: string;
-  module: ReportModule;
+  role_name: string;
+  module: ReportModule; // derivado de role_name vía roleToModule
   period: ReportPeriod;
   dispatch_hour: number;
   email_subject: string | null;
@@ -88,6 +133,7 @@ export function useCreateReportSchedule() {
           tenant_id: TENANT_ID,
           name: input.name,
           module: input.module,
+          role_name: input.role_name,
           period: input.period,
           dispatch_hour: input.dispatch_hour,
           email_subject: input.email_subject,
@@ -144,6 +190,32 @@ export function useUpdateReportSchedule() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["report-schedules"] });
+    },
+  });
+}
+
+// Preview del email — invoca send-report con preview_only=true.
+// Devuelve { html, subject, from, to, row_count } sin mandar email
+// ni tocar last_dispatched_at. Usado por el toggle "Vista previa".
+export interface ReportPreview {
+  html: string;
+  subject: string;
+  from: string;
+  to: string;
+  row_count: number;
+}
+
+export function useReportPreview(schedule_id: string | null, enabled: boolean) {
+  return useQuery<ReportPreview>({
+    queryKey: ["report-preview", schedule_id],
+    enabled: !!schedule_id && enabled,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("send-report", {
+        body: { schedule_id, preview_only: true },
+      });
+      if (error) throw error;
+      return data as ReportPreview;
     },
   });
 }

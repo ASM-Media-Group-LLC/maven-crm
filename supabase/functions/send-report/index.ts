@@ -122,10 +122,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { schedule_id, from: fromArg, to: toArg } = (await req.json()) as {
+    const { schedule_id, from: fromArg, to: toArg, preview_only } = (await req.json()) as {
       schedule_id?: string;
       from?: string;
       to?: string;
+      preview_only?: boolean;
     };
     if (!schedule_id) {
       return new Response(
@@ -214,6 +215,17 @@ Deno.serve(async (req) => {
     // 3. HTML
     const html = renderReportHtml({ name: schedule.name, module, period, from, to, rows });
 
+    // Preview mode: devuelve HTML + subject sin mandar email ni tocar
+    // last_dispatched_at. Usado por el toggle "Vista previa" en UI admin.
+    if (preview_only) {
+      const customSubject = (schedule.email_subject ?? "").trim();
+      const subject = customSubject || `Maven CRM · Reporte ${PERIOD_LABEL[period]} ${MODULE_LABEL[module]}`;
+      return new Response(
+        JSON.stringify({ ok: true, preview: true, html, subject, from, to, row_count: rows.length }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // 4. Resend
     const resendKey = Deno.env.get("RESEND_API_KEY");
     if (!resendKey) {
@@ -290,31 +302,43 @@ async function fetchLlgMetrics(
   const toDate = to.slice(0, 10);
   const { data: leads, error } = await admin
     .from("leadgen_entries")
-    .select("lg_user_id, phone_e164, phone_raw")
+    .select("lg_user_id, phone_e164, phone_raw, record_type")
     .gte("entry_date", fromDate)
     .lte("entry_date", toDate);
   if (error) throw error;
 
-  const byUser: Record<string, { leads: number; phones: number }> = {};
-  for (const l of (leads ?? []) as Array<{ lg_user_id: string | null; phone_e164: string | null; phone_raw: string | null }>) {
+  // Split: NUEVOS (record_type 'nuevo' o NULL legacy) vs RECUPERACIÓN
+  // (record_type 'reactivado' — duplicados re-ingresados post lock 24h).
+  const byUser: Record<string, { nuevos: number; recuperacion: number; phones: number }> = {};
+  for (const l of (leads ?? []) as Array<{
+    lg_user_id: string | null;
+    phone_e164: string | null;
+    phone_raw: string | null;
+    record_type: string | null;
+  }>) {
     if (!l.lg_user_id) continue;
-    if (!byUser[l.lg_user_id]) byUser[l.lg_user_id] = { leads: 0, phones: 0 };
-    byUser[l.lg_user_id].leads++;
+    if (!byUser[l.lg_user_id]) byUser[l.lg_user_id] = { nuevos: 0, recuperacion: 0, phones: 0 };
+    if (l.record_type === "reactivado") byUser[l.lg_user_id].recuperacion++;
+    else byUser[l.lg_user_id].nuevos++;
     if (l.phone_e164 || l.phone_raw) byUser[l.lg_user_id].phones++;
   }
 
   const ids = Object.keys(byUser);
   const nameMap = await resolveNames(admin, ids);
   return Object.entries(byUser)
-    .sort((a, b) => b[1].leads - a[1].leads)
-    .map(([id, m]) => ({
-      name: nameMap[id] ?? "Sin nombre",
-      cells: [
-        { label: "Leads ingresados", value: String(m.leads) },
-        { label: "Números obtenidos", value: String(m.phones) },
-        { label: "Conversión", value: m.leads > 0 ? `${Math.round((m.phones / m.leads) * 100)}%` : "—" },
-      ],
-    }));
+    .sort((a, b) => (b[1].nuevos + b[1].recuperacion) - (a[1].nuevos + a[1].recuperacion))
+    .map(([id, m]) => {
+      const total = m.nuevos + m.recuperacion;
+      return {
+        name: nameMap[id] ?? "Sin nombre",
+        cells: [
+          { label: "Leads Nuevos", value: String(m.nuevos) },
+          { label: "Leads Recuperación", value: String(m.recuperacion) },
+          { label: "Números obtenidos", value: String(m.phones) },
+          { label: "Conversión", value: total > 0 ? `${Math.round((m.phones / total) * 100)}%` : "—" },
+        ],
+      };
+    });
 }
 
 async function fetchCloserMetrics(
@@ -331,7 +355,11 @@ async function fetchCloserMetrics(
     .select("assigned_to, stage, passed_date, confirmed_date, completed_date, updated_at");
   if (error) throw error;
 
-  const byUser: Record<string, { asignadas: number; confirmadas: number; completadas: number; no_cerradas: number }> = {};
+  // Stage counts: asignadas / confirmadas / completadas en el rango.
+  // No usamos stage='No interesada' acá para "no cerradas" — esa métrica
+  // ahora viene del outcome de qa_calls (en_espera + no_cerro = mismo
+  // resultado matemático). "Cerradas" también viene del QA (outcome='cerro').
+  const byUser: Record<string, { asignadas: number; confirmadas: number; completadas: number }> = {};
   for (const c of (creators ?? []) as Array<{
     assigned_to: string | null;
     stage: string | null;
@@ -341,29 +369,44 @@ async function fetchCloserMetrics(
     updated_at: string | null;
   }>) {
     if (!c.assigned_to) continue;
-    if (!byUser[c.assigned_to]) byUser[c.assigned_to] = { asignadas: 0, confirmadas: 0, completadas: 0, no_cerradas: 0 };
+    if (!byUser[c.assigned_to]) byUser[c.assigned_to] = { asignadas: 0, confirmadas: 0, completadas: 0 };
     if (c.passed_date && c.passed_date >= fromDate && c.passed_date <= toDate) byUser[c.assigned_to].asignadas++;
     if (c.confirmed_date && c.confirmed_date >= from && c.confirmed_date <= to) byUser[c.assigned_to].confirmadas++;
     if (c.completed_date && c.completed_date >= from && c.completed_date <= to) byUser[c.assigned_to].completadas++;
-    if (c.stage === "No interesada" && c.updated_at && c.updated_at >= from && c.updated_at <= to)
-      byUser[c.assigned_to].no_cerradas++;
   }
 
-  // Llamadas + avg QA score por closer_id en el rango.
+  // qa_calls por closer_id en el rango — origen de:
+  //   · count        = llamadas hechas
+  //   · avg_qa       = nota promedio (claude_score)
+  //   · cerradas     = outcome 'cerro'
+  //   · no_cerradas  = outcome 'en_espera' o 'no_cerro' (equivalen matemáticamente)
   const { data: calls } = await admin
     .from("qa_calls")
-    .select("closer_id, claude_score, created_at")
-    .gte("created_at", from)
-    .lte("created_at", to);
-  const callsByUser: Record<string, { count: number; scoreSum: number; scored: number }> = {};
-  for (const k of (calls ?? []) as Array<{ closer_id: string | null; claude_score: number | null }>) {
+    .select("closer_id, claude_score, call_date, claude_analysis");
+  const callsByUser: Record<string, {
+    count: number;
+    scoreSum: number;
+    scored: number;
+    cerradas: number;
+    noCerradas: number;
+  }> = {};
+  for (const k of (calls ?? []) as Array<{
+    closer_id: string | null;
+    claude_score: number | null;
+    call_date: string | null;
+    claude_analysis: Record<string, unknown> | null;
+  }>) {
     if (!k.closer_id) continue;
-    if (!callsByUser[k.closer_id]) callsByUser[k.closer_id] = { count: 0, scoreSum: 0, scored: 0 };
+    if (!k.call_date || k.call_date < from || k.call_date > to) continue;
+    if (!callsByUser[k.closer_id]) callsByUser[k.closer_id] = { count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0 };
     callsByUser[k.closer_id].count++;
     if (k.claude_score != null) {
       callsByUser[k.closer_id].scoreSum += Number(k.claude_score);
       callsByUser[k.closer_id].scored++;
     }
+    const outcome = (k.claude_analysis as any)?.call_outcome as string | undefined;
+    if (outcome === "cerro") callsByUser[k.closer_id].cerradas++;
+    else if (outcome === "en_espera" || outcome === "no_cerro") callsByUser[k.closer_id].noCerradas++;
   }
 
   const allIds = Array.from(new Set([...Object.keys(byUser), ...Object.keys(callsByUser)]));
@@ -371,21 +414,20 @@ async function fetchCloserMetrics(
 
   return allIds
     .map((id) => {
-      const m = byUser[id] ?? { asignadas: 0, confirmadas: 0, completadas: 0, no_cerradas: 0 };
-      const c = callsByUser[id] ?? { count: 0, scoreSum: 0, scored: 0 };
+      const m = byUser[id] ?? { asignadas: 0, confirmadas: 0, completadas: 0 };
+      const c = callsByUser[id] ?? { count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0 };
       const avgQa = c.scored > 0 ? Math.round(c.scoreSum / c.scored) : null;
-      const cerradas = m.confirmadas + m.completadas;
       return {
         name: nameMap[id] ?? "Sin nombre",
-        sortKey: cerradas,
+        sortKey: c.cerradas,
         cells: [
           { label: "Asignadas", value: String(m.asignadas) },
           { label: "Confirmadas", value: String(m.confirmadas) },
           { label: "Completadas", value: String(m.completadas) },
-          { label: "Cerradas", value: String(cerradas) },
-          { label: "No cerradas", value: String(m.no_cerradas) },
           { label: "Llamadas", value: String(c.count) },
-          { label: "Calif QA prom", value: avgQa != null ? `${avgQa}/100` : "—" },
+          { label: "Nota QA prom", value: avgQa != null ? `${avgQa}/100` : "—" },
+          { label: "Cerradas", value: String(c.cerradas) },
+          { label: "No cerradas", value: String(c.noCerradas) },
         ],
       };
     })
@@ -470,9 +512,9 @@ function renderReportHtml(args: {
   const toLabel = fmtMiami(to);
   const colHeaders =
     module === "llg"
-      ? ["Persona", "Leads", "Núm. obtenidos", "Conv."]
+      ? ["Persona", "Leads Nuevos", "Leads Recuperación", "Núm. obtenidos", "Conv."]
       : module === "closers"
-        ? ["Persona", "Asignadas", "Confirmadas", "Completadas", "Cerradas", "No cerradas", "Llamadas", "QA prom"]
+        ? ["Persona", "Asignadas", "Confirmadas", "Completadas", "Llamadas", "Nota QA", "Cerradas", "No cerradas"]
         : ["Persona", "Evaluadas", "Aprobadas", "Reprobadas", "% éxito", "Score prom"];
 
   const tableRows = rows
