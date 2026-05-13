@@ -1,26 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Plus, X, Clock, CircleDot, CircleDashed, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { Plus, X, Clock, CircleDot, CircleDashed } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   useChatterSessions,
   useChatterProfiles,
-  useEndChatterSession,
 } from "@/hooks/useChatterEvaluator";
 import { playSoundFile } from "./VolumeControl";
 import { NewSessionDialog } from "../NewSessionDialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import type { ChatterSession, ChatterProfile } from "../types";
 
 interface Props {
@@ -157,16 +145,43 @@ const SessionRow = ({
 // dejó de escribir. Misma lógica que el original Roleplaychatters.
 const TYPING_TIMEOUT_MS = 3500;
 
-// SessionsPanel — listado de sesiones ABIERTAS (status !== 'ended').
-// Antes tenía tabs Abiertas/Cerradas; el listado de cerradas se movió
-// al tab History del rail derecho. El header ahora solo tiene "+ Nueva".
+// SessionsPanel — listado de sesiones activas + ended pendientes de
+// dismiss por el user. Antes tenía tabs Abiertas/Cerradas; el listado
+// de cerradas se movió al tab History del rail derecho. El header ahora
+// solo tiene "+ Nueva".
+//
+// El concepto de "dismiss del workspace" es local al usuario: cuando
+// hace click en la X del SessionRow, la sesión deja de aparecer en su
+// rail. Eso NO toca el status de la DB (la sesión queda exactamente
+// como estaba). Persistido en localStorage para que sobreviva refreshes.
+const DISMISSED_STORAGE_KEY = "chatter:dismissed-sessions";
+
+const loadDismissedFromStorage = (): Set<string> => {
+  try {
+    const raw = window.localStorage.getItem(DISMISSED_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+};
+
+const persistDismissed = (set: Set<string>) => {
+  try {
+    window.localStorage.setItem(DISMISSED_STORAGE_KEY, JSON.stringify([...set]));
+  } catch {
+    // best effort
+  }
+};
+
 export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   const sessionsQ = useChatterSessions("all");
   const profilesQ = useChatterProfiles();
-  const endMut = useEndChatterSession();
   const qc = useQueryClient();
   const [newOpen, setNewOpen] = useState(false);
-  const [endTarget, setEndTarget] = useState<string | null>(null);
+  // dismissed local del workspace (persist en localStorage)
+  const [dismissed, setDismissed] = useState<Set<string>>(loadDismissedFromStorage);
 
   // Tick cada segundo para que el "escribiendo" auto-expire al envejecer
   // typing_chatter_at más allá de TYPING_TIMEOUT_MS sin necesidad de
@@ -288,21 +303,27 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
     return m;
   }, [profilesQ.data]);
 
-  // Solo sesiones abiertas — las cerradas viven en /chatter-evaluator/history.
+  // Mostramos en el rail:
+  //   · Todas las sesiones activas (waiting/active) que NO están dismissed
+  //   · Sesiones ended que el user todavía NO dismisseó (típicamente
+  //     porque está terminando la evaluación final)
+  // Las ended dismissed quedan en el historial (/chatter-evaluator/history).
   const open = useMemo(
-    () => (sessionsQ.data ?? []).filter((s) => s.status !== "ended"),
-    [sessionsQ.data],
+    () => (sessionsQ.data ?? []).filter((s) => !dismissed.has(s.id)),
+    [sessionsQ.data, dismissed],
   );
 
-  const confirmEnd = async () => {
-    if (!endTarget) return;
-    try {
-      await endMut.mutateAsync(endTarget);
-      if (selectedId === endTarget) onSelect(null);
-      setEndTarget(null);
-    } catch (e) {
-      toast.error("No se pudo cerrar", { description: (e as Error).message });
-    }
+  // Quitar una sesión del workspace del user (no toca el status del DB).
+  // Si era la sesión activa, también la des-seleccionamos para que el
+  // ChatPanel se vacíe.
+  const dismissFromWorkspace = (sessionId: string) => {
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      next.add(sessionId);
+      persistDismissed(next);
+      return next;
+    });
+    if (selectedId === sessionId) onSelect(null);
   };
 
   return (
@@ -363,39 +384,13 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
                 }
                 onSelect(s.id);
               }}
-              onEnd={() => setEndTarget(s.id)}
+              onEnd={() => dismissFromWorkspace(s.id)}
             />
           );
         })}
       </div>
 
       <NewSessionDialog open={newOpen} onOpenChange={setNewOpen} />
-
-      <AlertDialog open={!!endTarget} onOpenChange={(o) => !o && setEndTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cerrar sesión</AlertDialogTitle>
-            <AlertDialogDescription>
-              El aspirante ya no podrá enviar mensajes y el link se invalida.
-              La sesión queda como "cerrada" en el historial.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={endMut.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-rose-500 hover:bg-rose-600"
-              onClick={(e) => {
-                e.preventDefault();
-                void confirmEnd();
-              }}
-              disabled={endMut.isPending}
-            >
-              {endMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Cerrar sesión
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

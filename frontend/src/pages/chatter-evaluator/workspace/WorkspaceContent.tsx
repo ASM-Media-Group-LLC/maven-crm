@@ -137,17 +137,15 @@ const WorkspaceContent = () => {
     }
   }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Clear selectedId si la sesión ya no existe en la lista, O si pasó
-  // a "ended" (la cerraron desde otro lado, otro evaluador, o la
-  // submitearon). El workspace es para sesiones VIVAS — las cerradas
-  // se ven en /chatter-evaluator/history. Sin este reset, la última
-  // sesión cerrada se quedaba pegada en pantalla y no había forma de
-  // volver al estado "vacío" sin recargar.
+  // Clear selectedId si la sesión ya no existe en la lista. NO reseteamos
+  // automáticamente cuando pasa a "ended" — el examinador necesita ver
+  // la sesión todavía para mandar la evaluación final. La sesión solo
+  // sale del workspace cuando el usuario hace click en la X del SessionRow.
   useEffect(() => {
     if (!selectedId) return;
     if (sessionsQ.isLoading) return;
     const found = sessionsList.find((s) => s.id === selectedId);
-    if (!found || found.status === "ended") {
+    if (!found) {
       setSelectedId(null);
     }
   }, [selectedId, sessionsList, sessionsQ.isLoading]);
