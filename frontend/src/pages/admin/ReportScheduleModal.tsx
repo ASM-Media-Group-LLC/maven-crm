@@ -103,17 +103,19 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
     }
   }, [open, schedule]);
 
-  // Si el rol cambia mid-edición, sincronizar las métricas con el default
-  // del módulo del nuevo rol (las anteriores podrían no aplicar).
-  useEffect(() => {
-    if (!roleName || !open) return;
-    const newModule = roleToModule(roleName);
-    // Si NO hay schedule (creación), o el module cambió, resetear al default.
-    const currentModule = schedule?.module;
-    if (currentModule !== newModule) {
+  // Cuando el USER cambia el rol manualmente, si el nuevo rol mapea a un
+  // módulo distinto, reseteamos selectedMetrics al default del nuevo módulo.
+  // Importante: este handler reemplaza al useEffect previo, que se disparaba
+  // también durante la hidratación inicial y stompeaba las métricas que el
+  // primer useEffect acababa de cargar.
+  const handleRoleChange = (newRole: string) => {
+    const oldModule = roleName ? roleToModule(roleName) : null;
+    const newModule = roleToModule(newRole);
+    if (oldModule && oldModule !== newModule) {
       setSelectedMetrics(DEFAULT_METRICS_BY_MODULE[newModule] ?? []);
     }
-  }, [roleName, open, schedule]);
+    setRoleName(newRole);
+  };
 
   // Email validation: local part no termina con punto, dominio tiene
   // al menos un punto, no admite dobles puntos. Mismo criterio que
@@ -281,7 +283,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label>Rol *</Label>
-              <Select value={roleName} onValueChange={(v) => setRoleName(v)}>
+              <Select value={roleName} onValueChange={handleRoleChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Elegí un rol" />
                 </SelectTrigger>

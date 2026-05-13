@@ -39,6 +39,12 @@ export const METRICS_CATALOG: MetricDef[] = [
     requires: [{ module: "LeadGen", submodule: null }],
   },
   {
+    key: "llg.total",
+    label: "Total Leads (nuevos + recuperación)",
+    module: "llg",
+    requires: [{ module: "LeadGen", submodule: null }],
+  },
+  {
     key: "llg.numeros",
     label: "Números obtenidos",
     module: "llg",
@@ -130,7 +136,7 @@ export const METRICS_CATALOG: MetricDef[] = [
 
 // Default por módulo cuando schedule.metrics es NULL (backward compat).
 export const DEFAULT_METRICS_BY_MODULE: Record<ReportModule, string[]> = {
-  llg: ["llg.nuevos", "llg.recuperacion", "llg.numeros", "llg.conversion"],
+  llg: ["llg.nuevos", "llg.recuperacion", "llg.total", "llg.numeros", "llg.conversion"],
   closers: [
     "closer.asignadas",
     "closer.confirmadas",

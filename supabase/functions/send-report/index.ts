@@ -292,6 +292,7 @@ Deno.serve(async (req) => {
 const METRIC_CATALOG: Record<string, { label: string; module: Module }> = {
   "llg.nuevos":          { label: "Leads Nuevos",         module: "llg" },
   "llg.recuperacion":    { label: "Leads Recuperación",   module: "llg" },
+  "llg.total":           { label: "Total Leads",          module: "llg" },
   "llg.numeros":         { label: "Núm. obtenidos",       module: "llg" },
   "llg.conversion":      { label: "Conv.",                module: "llg" },
   "closer.asignadas":    { label: "Asignadas",            module: "closers" },
@@ -309,7 +310,7 @@ const METRIC_CATALOG: Record<string, { label: string; module: Module }> = {
 };
 
 const DEFAULT_METRICS_BY_MODULE: Record<Module, string[]> = {
-  llg: ["llg.nuevos", "llg.recuperacion", "llg.numeros", "llg.conversion"],
+  llg: ["llg.nuevos", "llg.recuperacion", "llg.total", "llg.numeros", "llg.conversion"],
   closers: [
     "closer.asignadas",
     "closer.confirmadas",
@@ -397,6 +398,7 @@ function makeEmptyCells(module: Module): Array<{ key: string; value: string }> {
     return [
       { key: "llg.nuevos", value: "0" },
       { key: "llg.recuperacion", value: "0" },
+      { key: "llg.total", value: "0" },
       { key: "llg.numeros", value: "0" },
       { key: "llg.conversion", value: "—" },
     ];
@@ -458,6 +460,7 @@ async function fetchLlgMetrics(
         cells: [
           { key: "llg.nuevos", value: String(m.nuevos) },
           { key: "llg.recuperacion", value: String(m.recuperacion) },
+          { key: "llg.total", value: String(total) },
           { key: "llg.numeros", value: String(m.phones) },
           { key: "llg.conversion", value: total > 0 ? `${Math.round((m.phones / total) * 100)}%` : "—" },
         ],
