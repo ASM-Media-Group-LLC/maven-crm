@@ -1,14 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Plus, X, Clock, CircleDot, CircleDashed } from "lucide-react";
+import { Plus, X, Clock, CircleDot, CircleDashed, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   useChatterSessions,
   useChatterProfiles,
+  useEndChatterSession,
 } from "@/hooks/useChatterEvaluator";
 import { playSoundFile } from "./VolumeControl";
 import { NewSessionDialog } from "../NewSessionDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { ChatterSession, ChatterProfile } from "../types";
 
 interface Props {
@@ -180,8 +192,12 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   const profilesQ = useChatterProfiles();
   const qc = useQueryClient();
   const [newOpen, setNewOpen] = useState(false);
+  const endMut = useEndChatterSession();
   // dismissed local del workspace (persist en localStorage)
   const [dismissed, setDismissed] = useState<Set<string>>(loadDismissedFromStorage);
+  // Sesión en proceso de confirmar "terminar y cerrar" (sólo cuando
+  // la sesión todavía está viva — para ended dismisseamos directo).
+  const [endConfirm, setEndConfirm] = useState<ChatterSession | null>(null);
 
   // Tick cada segundo para que el "escribiendo" auto-expire al envejecer
   // typing_chatter_at más allá de TYPING_TIMEOUT_MS sin necesidad de
@@ -326,6 +342,34 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
     if (selectedId === sessionId) onSelect(null);
   };
 
+  // Click en la X del SessionRow:
+  //   · status='ended' → dismiss directo (la sesión ya está terminada
+  //     en DB; cerrarla del workspace es puramente local).
+  //   · status vivo (waiting/active) → pedir confirmación antes de
+  //     terminar la sesión en DB Y dismissearla del workspace. Avisar
+  //     al user que al cerrarla pierde la posibilidad de mandar la
+  //     evaluación.
+  const handleEndClick = (session: ChatterSession) => {
+    if (session.status === "ended") {
+      dismissFromWorkspace(session.id);
+    } else {
+      setEndConfirm(session);
+    }
+  };
+
+  const confirmEndAndDismiss = async () => {
+    if (!endConfirm) return;
+    const sessionId = endConfirm.id;
+    try {
+      await endMut.mutateAsync(sessionId);
+      dismissFromWorkspace(sessionId);
+      setEndConfirm(null);
+      toast.success("Sesión terminada y cerrada del workspace");
+    } catch (e) {
+      toast.error("No se pudo terminar", { description: (e as Error).message });
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
       {/* Header del rail (220px). Con esa anchura ya entra el label y el
@@ -384,13 +428,52 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
                 }
                 onSelect(s.id);
               }}
-              onEnd={() => dismissFromWorkspace(s.id)}
+              onEnd={() => handleEndClick(s)}
             />
           );
         })}
       </div>
 
       <NewSessionDialog open={newOpen} onOpenChange={setNewOpen} />
+
+      <AlertDialog
+        open={!!endConfirm}
+        onOpenChange={(o) => !o && !endMut.isPending && setEndConfirm(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cerrar sesión activa</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p>Esta sesión todavía está abierta. Si la cerrás del workspace ahora:</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  <li>
+                    Se <strong>termina la sesión para el chatter</strong> — no podrá enviar más mensajes y el link se invalida.
+                  </li>
+                  <li>
+                    <strong>NO vas a poder enviar la evaluación</strong> después porque la sesión sale de tu workspace.
+                  </li>
+                </ul>
+                <p className="mt-2">¿Estás seguro?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={endMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmEndAndDismiss();
+              }}
+              disabled={endMut.isPending}
+            >
+              {endMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Terminar y cerrar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
