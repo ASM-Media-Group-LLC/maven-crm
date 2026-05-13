@@ -118,13 +118,13 @@ function isProviderPausedError(msg: string): boolean {
   );
 }
 
-// Rollback del attempt + devuelve el job a queued con backoff de 30 min.
+// Rollback del attempt + devuelve el job a queued con backoff.
 // CRÍTICO: sin next_retry_at el worker re-pickeaba este job cada 15s
 // (ciclo de polling) generando 2 UPDATEs por ciclo. Eso explicaba el
 // disk IO storm con 530k updates / semana en una tabla de 3k rows.
-// Con 30 min de espera caen a ~96 ciclos/día → ~200 updates/día por
-// job paused (vs ~5.700 sin backoff).
-const PROVIDER_PAUSED_BACKOFF_MIN = 30;
+// Con 3h de espera caen a ~16 ciclos/día → ~32 updates/día por job
+// paused (vs ~5.700 sin backoff). Reducción ~180x.
+const PROVIDER_PAUSED_BACKOFF_MIN = 180;
 async function rescheduleNoAttempt(job: ScouterJob, errMsg: string): Promise<void> {
   const nextRetryAt = new Date(Date.now() + PROVIDER_PAUSED_BACKOFF_MIN * 60_000).toISOString();
   const { error } = await sb
