@@ -1176,6 +1176,13 @@ export const useChatterMessages = (sessionId: string | null | undefined) =>
       if (error) throw error;
       return (data ?? []) as ChatterMessage[];
     },
+    // staleTime 0 — el QueryClient global tiene 5min por default (deliberado
+    // para sidebar/permisos), pero para mensajes necesitamos refetch al
+    // remount del ChatPanel: cuando el examiner cambia de sesión B → A,
+    // la broadcast de mensajes nuevos en A nunca llegó (ChatPanel estaba
+    // subscripto al topic de B), así que al volver a A queremos garantizar
+    // que se trae el estado actual del DB y no la cache de 5min atrás.
+    staleTime: 0,
   });
 
 export type SendMessageInput = {
