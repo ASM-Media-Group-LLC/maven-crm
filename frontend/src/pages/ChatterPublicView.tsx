@@ -1217,8 +1217,9 @@ const ChatterPublicView = () => {
         </div>
       </aside>
 
-      {/* CENTER — chat */}
-      <section className="flex min-w-0 flex-1 flex-col">
+      {/* CENTER — chat. `relative` para que el TipPopup (absolute inset-0)
+          se contenga acá adentro en vez de cubrir toda la viewport. */}
+      <section className="relative flex min-w-0 flex-1 flex-col">
         {/* Chat header */}
         <header className="flex items-center justify-between gap-3 border-b bg-card px-5 py-3">
           {/* Mobile-only: the fan avatar sits in the chat header since the
@@ -1375,6 +1376,10 @@ const ChatterPublicView = () => {
             </Button>
           </div>
         </div>
+
+        {/* TipPopup contenido dentro del CENTER (section relative) — sólo
+            cubre el chat, no la viewport entera. */}
+        <TipPopup amount={tipAmount} onDone={() => setTipAmount(null)} />
       </section>
 
       {/* RIGHT — full character info (matches the original right panel) */}
@@ -1477,7 +1482,6 @@ const ChatterPublicView = () => {
         </DialogContent>
       </Dialog>
       <MediaViewer url={mediaUrl} onClose={() => setMediaUrl(null)} />
-      <TipPopup amount={tipAmount} onDone={() => setTipAmount(null)} />
 
       <AlertDialog open={!!confirmDelMsg} onOpenChange={(o) => !o && setConfirmDelMsg(null)}>
         <AlertDialogContent>

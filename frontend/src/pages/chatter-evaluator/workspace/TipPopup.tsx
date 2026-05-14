@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { playSoundFile } from "./VolumeControl";
 
-// Mirrors the original Roleplaychatters showTipPopup (index.html line 5360):
-// fullscreen overlay, emoji that scales with amount, confetti shower, big
-// dollar amount, fades out after ~2.5s. The emoji set/size/confetti count
-// thresholds are kept identical to the original so a $5 tip looks exactly
-// the same as it did before.
+// Inspired by the original Roleplaychatters showTipPopup (index.html line 5360),
+// pero contenida — sólo cubre el ChatPanel/ChatterPublicView en vez de la
+// viewport entera. El padre tiene que ser `position: relative` para que el
+// `absolute inset-0` de acá se ancle bien. Mantiene la animación: emoji
+// grande, confetti, monto en oro, fade out a los ~2.5s.
 
 const tierForAmount = (amount: number) => {
   if (amount <= 5)   return { emoji: "🪙🪙",                sizePx: 80,  confettiCount: 8,  sound: "tiny" };
@@ -75,7 +75,7 @@ export const TipPopup = ({ amount, onDone }: TipPopupProps) => {
 
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden bg-black/60 transition-opacity duration-200"
+      className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center overflow-hidden bg-black/40 transition-opacity duration-200"
       style={{ opacity: visible ? 1 : 0 }}
       aria-live="polite"
     >

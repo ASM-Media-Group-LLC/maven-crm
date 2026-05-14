@@ -1145,7 +1145,9 @@ export const ChatPanel = ({ session }: Props) => {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    // `relative` para que TipPopup (absolute inset-0) se contenga dentro
+    // del ChatPanel en vez de cubrir toda la viewport.
+    <div className="relative flex h-full flex-col">
       {/* Header — mirrors the original Roleplaychatters chat-header
           (index.html line 3382): identity on the left, 4 live metrics
           in the center, action buttons on the right. */}
