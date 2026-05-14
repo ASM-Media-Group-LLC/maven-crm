@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ import {
   TrendingUp,
   UserCog,
   Users as UsersIcon,
+  X,
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,7 +33,8 @@ import {
   type SpammerAccountAiRedFlag,
   useRescanSpammerAccount,
   useSpammerAccounts,
-  useUploadSpammerScreenshot,
+  useUploadSpammerScreenshots,
+  useRemoveSpammerScreenshot,
 } from "@/hooks/useSpammerAccounts";
 import { useTenantProfiles } from "@/hooks/useAgencyQa";
 import { toast } from "sonner";
@@ -600,28 +603,61 @@ const StatBox = ({
 // la cuenta real, no con un snapshot vacío.
 
 const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
-  const uploadMut = useUploadSpammerScreenshot();
-  const hasScreenshot = !!account.manual_screenshot_path;
+  const uploadMut = useUploadSpammerScreenshots();
+  const removeMut = useRemoveSpammerScreenshot();
+  const paths = account.manual_screenshot_paths ?? [];
+  const hasScreenshots = paths.length > 0;
   const awaiting = account.scan_status === "awaiting_screenshot";
+  // Cache de signed URLs por path. Cada thumbnail necesita una URL
+  // firmada porque el bucket scouter-screenshots es privado.
+  const [urlsByPath, setUrlsByPath] = useState<Record<string, string>>({});
 
-  const handleFile = (file: File | null) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("El archivo tiene que ser una imagen.");
+  useEffect(() => {
+    let cancelled = false;
+    if (paths.length === 0) {
+      setUrlsByPath({});
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("La imagen no puede pesar más de 10 MB.");
-      return;
+    (async () => {
+      const missing = paths.filter((p) => !urlsByPath[p]);
+      if (missing.length === 0) return;
+      const updates: Record<string, string> = {};
+      for (const path of missing) {
+        const { data } = await supabase.storage
+          .from("scouter-screenshots")
+          .createSignedUrl(path, 60 * 60);
+        if (data?.signedUrl) updates[path] = data.signedUrl;
+      }
+      if (!cancelled && Object.keys(updates).length > 0) {
+        setUrlsByPath((prev) => ({ ...prev, ...updates }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paths.join("|")]);
+
+  const handleFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    for (const f of files) {
+      if (!f.type.startsWith("image/")) {
+        toast.error(`"${f.name}" no es una imagen.`);
+        return;
+      }
+      if (f.size > 10 * 1024 * 1024) {
+        toast.error(`"${f.name}" pesa más de 10 MB.`);
+        return;
+      }
     }
-    uploadMut.mutate({ accountId: account.id, file });
+    uploadMut.mutate({ accountId: account.id, files, existingPaths: paths });
   };
 
   return (
     <div
       className={cn(
-        "rounded-lg border-2 border-dashed p-4 transition-colors",
-        hasScreenshot
+        "rounded-lg border-2 border-dashed p-4 transition-colors space-y-3",
+        hasScreenshots
           ? "border-emerald-500/40 bg-emerald-500/5"
           : "border-amber-500/40 bg-amber-500/5",
       )}
@@ -630,38 +666,44 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
         <Sparkles
           className={cn(
             "h-5 w-5 mt-0.5 shrink-0",
-            hasScreenshot ? "text-emerald-400" : "text-amber-400",
+            hasScreenshots ? "text-emerald-400" : "text-amber-400",
           )}
         />
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider mb-1">
-            {hasScreenshot
-              ? "Screenshot cargado — el análisis usa la data real del perfil"
+            {hasScreenshots
+              ? `${paths.length} screenshot${paths.length > 1 ? "s" : ""} cargado${paths.length > 1 ? "s" : ""} — el análisis usa la data real`
               : awaiting
-              ? "Pegá un screenshot del perfil"
-              : "Mejorar análisis con screenshot"}
+              ? "Pegá uno o varios screenshots del perfil"
+              : "Mejorar análisis con screenshots"}
           </p>
           <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
             Como IG oculta la cuenta a viewers no-loggeados, el bot no puede leer
-            bio/foto/link. Sacá un screenshot del perfil desde tu browser (logueado)
-            y subilo acá — Claude vision lo lee y enriquece el análisis con la data real.
-            Esto no cambia que la cuenta esté restricted, pero da un análisis más fiel
-            sobre el contenido y la conversión.
+            bio/foto/link. Sacá screenshots del perfil desde tu browser
+            (logueado) y subilos acá — podés agregar varios (bio, posts, link,
+            etc) y Claude vision los lee y enriquece el análisis.
           </p>
           <label className="inline-flex">
             <input
               type="file"
               accept="image/*"
+              multiple
               className="sr-only"
               disabled={uploadMut.isPending}
-              onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                handleFiles(files);
+                // Limpia el input para que el mismo file pueda re-subirse
+                // si el user lo quiere (típico al editar).
+                e.target.value = "";
+              }}
             />
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors",
                 uploadMut.isPending
                   ? "bg-muted text-muted-foreground cursor-not-allowed"
-                  : hasScreenshot
+                  : hasScreenshots
                   ? "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
                   : "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30",
               )}
@@ -671,15 +713,66 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
                   <Loader2 className="h-3 w-3 animate-spin" />
                   Subiendo…
                 </>
-              ) : hasScreenshot ? (
-                "Reemplazar screenshot"
+              ) : hasScreenshots ? (
+                "Agregar más screenshots"
               ) : (
-                "Subir screenshot"
+                "Subir screenshots"
               )}
             </span>
           </label>
         </div>
       </div>
+
+      {/* Galería de thumbnails con X para remover. Grid responsivo,
+          aspect-square para que las miniaturas sean uniformes aunque las
+          fuentes sean de aspecto distinto. */}
+      {hasScreenshots && (
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+          {paths.map((path) => {
+            const url = urlsByPath[path];
+            const removing =
+              removeMut.isPending && removeMut.variables?.path === path;
+            return (
+              <div
+                key={path}
+                className="group relative aspect-square overflow-hidden rounded-md border border-white/10 bg-muted"
+              >
+                {url ? (
+                  <img
+                    src={url}
+                    alt="Screenshot del perfil"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    removeMut.mutate({
+                      accountId: account.id,
+                      path,
+                      existingPaths: paths,
+                    })
+                  }
+                  disabled={removing}
+                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity hover:bg-rose-500 group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
+                  aria-label="Quitar screenshot"
+                  title="Quitar screenshot"
+                >
+                  {removing ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <X className="h-3 w-3" />
+                  )}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

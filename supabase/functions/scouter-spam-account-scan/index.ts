@@ -217,22 +217,48 @@ Deno.serve(async (req) => {
     if (snapshot?.is_restricted) {
       const { data: full } = await sb
         .from("scouter_spammer_accounts")
-        .select("manual_screenshot_path")
+        .select("manual_screenshot_path, manual_screenshot_paths")
         .eq("id", accountRow.id)
         .maybeSingle();
-      const path = (full as { manual_screenshot_path?: string | null } | null)
-        ?.manual_screenshot_path;
-      if (path) {
+      const row = full as
+        | {
+            manual_screenshot_path?: string | null;
+            manual_screenshot_paths?: string[] | null;
+          }
+        | null;
+      // Soportamos el array nuevo (manual_screenshot_paths) + fallback al
+      // campo legacy single (manual_screenshot_path). Si hay varias, las
+      // procesamos todas y mergeamos los resultados — campos populados en
+      // una screenshot pisan los nulls de las anteriores.
+      const arrayPaths = (row?.manual_screenshot_paths ?? []).filter(
+        (p): p is string => !!p,
+      );
+      const legacyPath = row?.manual_screenshot_path;
+      const paths =
+        arrayPaths.length > 0 ? arrayPaths : legacyPath ? [legacyPath] : [];
+      if (paths.length > 0) {
         try {
-          const enriched = await extractFromScreenshot(
-            sb,
-            ANTHROPIC_API_KEY,
-            SCAN_MODEL,
-            path,
-            accountRow.instagram_handle,
-          );
-          if (enriched) {
-            snapshot = { ...snapshot, ...enriched, is_restricted: true };
+          let merged: Partial<IgProfileSnapshot> = {};
+          for (const path of paths) {
+            const enriched = await extractFromScreenshot(
+              sb,
+              ANTHROPIC_API_KEY,
+              SCAN_MODEL,
+              path,
+              accountRow.instagram_handle,
+            );
+            if (enriched) {
+              // Merge: campos non-null/non-empty del screenshot nuevo pisan
+              // los anteriores. Permite ir refinando con más capturas.
+              for (const [k, v] of Object.entries(enriched)) {
+                if (v !== null && v !== undefined && v !== "") {
+                  (merged as Record<string, unknown>)[k] = v;
+                }
+              }
+            }
+          }
+          if (Object.keys(merged).length > 0) {
+            snapshot = { ...snapshot, ...merged, is_restricted: true };
           }
         } catch (visionErr) {
           console.warn("vision extract failed:", (visionErr as Error).message);

@@ -53,11 +53,14 @@ export interface SpammerAccount {
   // Deal-breaker para outreach: las creators target no pueden ver la
   // cuenta sin estar logueadas. (migration 20260511090000).
   is_restricted: boolean | null;
-  // Path en bucket scouter-screenshots. Para cuentas restricted, el user
-  // sube un screenshot logueado del perfil; Claude vision extrae bio +
-  // nombre + followers para alimentar el análisis. (migration
-  // 20260511100000).
+  // Path en bucket scouter-screenshots. Legacy single-screenshot field —
+  // ahora se usa manual_screenshot_paths (array). Se conserva para
+  // backwards-compat con scans que todavía leen el field antiguo.
   manual_screenshot_path: string | null;
+  // Lista de paths con screenshots manuales del perfil. Múltiples
+  // capturas para enriquecer mejor el análisis IA (bio, posts, link, etc).
+  // (migration 20260514_spammer_manual_screenshots_array)
+  manual_screenshot_paths: string[];
   // Análisis IA — null hasta que el scan corra.
   ai_score: number | null;
   ai_analysis: SpammerAccountAiAnalysis | null;
@@ -187,30 +190,44 @@ export const useInsertSpammerAccount = () => {
   });
 };
 
-/** Sube un screenshot del perfil para una cuenta restricted y dispara
- *  re-scan. Claude vision extrae bio/nombre/followers/link y alimenta el
- *  análisis con data real. */
-export const useUploadSpammerScreenshot = () => {
+/** Sube uno o varios screenshots del perfil para una cuenta restricted y
+ *  dispara re-scan. Los paths se APPENDEAN al array existente (no se
+ *  reemplazan), así el user puede ir agregando capturas de a una sin
+ *  perder las anteriores. Claude vision lee todas y enriquece el análisis. */
+export const useUploadSpammerScreenshots = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
       accountId,
-      file,
+      files,
+      existingPaths,
     }: {
       accountId: string;
-      file: File;
+      files: File[];
+      /** Array actual de paths para appender — pasamos desde la UI para
+       *  evitar un round-trip extra de SELECT. */
+      existingPaths: string[];
     }): Promise<void> => {
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
-      const path = `spammer-profiles/${accountId}-${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage
-        .from("scouter-screenshots")
-        .upload(path, file, { upsert: true, contentType: file.type });
-      if (uploadErr) throw uploadErr;
+      const uploadedPaths: string[] = [];
+      for (const file of files) {
+        const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
+        const path = `spammer-profiles/${accountId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from("scouter-screenshots")
+          .upload(path, file, { upsert: true, contentType: file.type });
+        if (uploadErr) throw uploadErr;
+        uploadedPaths.push(path);
+      }
+
+      const nextPaths = [...existingPaths, ...uploadedPaths];
 
       const { error: updateErr } = await sb
         .from("scouter_spammer_accounts")
         .update({
-          manual_screenshot_path: path,
+          manual_screenshot_paths: nextPaths,
+          // Backwards-compat con el scan que todavía lee la columna
+          // single — apuntamos al primer screenshot.
+          manual_screenshot_path: nextPaths[0] ?? null,
           scan_status: "pending",
           scan_error: null,
           updated_at: new Date().toISOString(),
@@ -218,7 +235,7 @@ export const useUploadSpammerScreenshot = () => {
         .eq("id", accountId);
       if (updateErr) throw updateErr;
 
-      // Dispara re-scan con el screenshot ya seteado.
+      // Dispara re-scan con todos los screenshots actualizados.
       const { error: invokeErr } = await supabase.functions.invoke(
         "scouter-spam-account-scan",
         { body: { account_id: accountId } },
@@ -227,12 +244,80 @@ export const useUploadSpammerScreenshot = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["spammer-accounts"] });
-      toast.success("Screenshot subido — re-escaneando con la data del perfil");
+      toast.success("Screenshots subidos — re-escaneando con la data del perfil");
     },
     onError: (e) => {
-      toast.error("No se pudo subir el screenshot", { description: (e as Error).message });
+      toast.error("No se pudieron subir los screenshots", {
+        description: (e as Error).message,
+      });
     },
   });
+};
+
+/** Quita un screenshot específico del array. Borra el objeto de storage
+ *  y dispara re-scan para que el análisis se reconstruya sin esa foto. */
+export const useRemoveSpammerScreenshot = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      accountId,
+      path,
+      existingPaths,
+    }: {
+      accountId: string;
+      path: string;
+      existingPaths: string[];
+    }): Promise<void> => {
+      // Borra el objeto del storage. Si falla, seguimos — peor caso es
+      // un objeto huérfano, no rompemos la operación lógica.
+      try {
+        await supabase.storage.from("scouter-screenshots").remove([path]);
+      } catch (e) {
+        console.warn("storage.remove failed:", (e as Error).message);
+      }
+
+      const nextPaths = existingPaths.filter((p) => p !== path);
+      const { error: updateErr } = await sb
+        .from("scouter_spammer_accounts")
+        .update({
+          manual_screenshot_paths: nextPaths,
+          manual_screenshot_path: nextPaths[0] ?? null,
+          scan_status: nextPaths.length > 0 ? "pending" : "awaiting_screenshot",
+          scan_error: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", accountId);
+      if (updateErr) throw updateErr;
+
+      // Sólo re-escanea si queda al menos un screenshot — sin fotos no
+      // tiene sentido correr el AI sobre data fantasma.
+      if (nextPaths.length > 0) {
+        await supabase.functions.invoke("scouter-spam-account-scan", {
+          body: { account_id: accountId },
+        });
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["spammer-accounts"] });
+      toast.success("Screenshot eliminado");
+    },
+    onError: (e) => {
+      toast.error("No se pudo eliminar", { description: (e as Error).message });
+    },
+  });
+};
+
+/** @deprecated usar useUploadSpammerScreenshots. Wrapper de un solo file
+ *  por compat con callers viejos. */
+export const useUploadSpammerScreenshot = () => {
+  const mut = useUploadSpammerScreenshots();
+  return {
+    ...mut,
+    mutate: ({ accountId, file }: { accountId: string; file: File }) =>
+      mut.mutate({ accountId, files: [file], existingPaths: [] }),
+    mutateAsync: ({ accountId, file }: { accountId: string; file: File }) =>
+      mut.mutateAsync({ accountId, files: [file], existingPaths: [] }),
+  };
 };
 
 /** Re-escanea una cuenta existente. Útil para el botón manual del
