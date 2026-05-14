@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -403,6 +403,24 @@ const SettingsRightPane = ({
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const sub = searchParams.get("sub");
+
+  // Cuando el user cambia de tab en el rail izquierdo, limpiamos el
+  // ?sub= del URL. Sin esto, el sub-page del tab anterior (ej. Reportes
+  // programados de Administración) quedaba pegado al cambiar a otro tab
+  // (ej. Mi cuenta) — el sub-param es del scope de Administración pero
+  // no se invalidaba al salir de ahí. Sólo limpiamos cuando hay un sub
+  // activo para no escribir al URL en cada render.
+  useEffect(() => {
+    if (sub) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("sub");
+      setSearchParams(next, { replace: true });
+    }
+    // Dependencia sólo en `active`. Cuando el user clickea una sub-page
+    // adentro del mismo tab, `active` no cambia, así que este effect no
+    // dispara. Sólo dispara al cambiar de tab.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 
   // Cuáles sub-keys son embeddable. Cualquier otra cosa se ignora.
   const SUB_PAGES: Record<string, { title: string; render: () => JSX.Element }> = {
