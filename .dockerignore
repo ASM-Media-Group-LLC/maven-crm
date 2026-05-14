@@ -1,0 +1,58 @@
+# El Dockerfile de la raíz construye SÓLO el frontend (Vite + nginx).
+# Excluimos del build context todo lo que no participa de esa compilación:
+#
+#   · servicios/   → scouter-worker (Node.js, deploy aparte vía su propio Dockerfile)
+#   · supabase/    → migrations + edge functions (deploy vía MCP / Supabase CLI)
+#   · docs/, .sdd/, .claude/, .lovable/, .atl/  → docs internos y herramientas de dev
+#   · *.md         → STATE / ROADMAP / README, sólo legibles para humanos
+#   · .env*        → el Dockerfile ya los borra explícitamente en línea 19,
+#                    los excluimos antes para no enviarlos al daemon
+#   · bun.lock/bun.lockb → el Dockerfile usa npm install, los lockfiles de
+#                          Bun son duplicados que no se consumen
+#   · node_modules / dist → ya gitignored, defensivo igual
+#
+# Beneficio: cualquier push que toque sólo SQL/edge functions/docs ya no
+# invalida las layers de Docker después de `COPY . .`, así que esos deploys
+# pueden reusar la cache de build. Imagen final un poco más limpia.
+
+# Build artifacts
+node_modules
+**/node_modules
+dist
+dist-ssr
+
+# Sub-proyectos que deployan aparte
+servicios
+supabase
+
+# Herramientas y docs sólo para devs
+docs
+.git
+.gitignore
+.github
+.claude
+.sdd
+.lovable
+.atl
+.vscode
+.idea
+
+# Markdown del root (README / STATE / ROADMAP) — no participan del build
+README.md
+STATE.md
+ROADMAP.md
+
+# Logs y temporales
+*.log
+.DS_Store
+.cache
+
+# Variables de entorno (el Dockerfile además las borra explícito)
+.env
+.env.*
+
+# Lockfiles que NO usa el Dockerfile (usa package-lock.json via npm)
+bun.lock
+bun.lockb
+pnpm-lock.yaml
+yarn.lock
