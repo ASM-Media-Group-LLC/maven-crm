@@ -31,6 +31,24 @@ interface UsageRow {
   model: string | null;
 }
 
+interface UsageTotal {
+  provider: string;
+  calls: number;
+  cost_usd: number;
+}
+
+interface UsageDaily {
+  day: string;
+  provider: string;
+  cost_usd: number;
+}
+
+interface UsageSummary {
+  totals: UsageTotal[];
+  daily: UsageDaily[];
+  recent: UsageRow[];
+}
+
 interface ProviderSummary {
   provider: string;
   label: string;
@@ -85,15 +103,19 @@ const useCaps = () =>
     staleTime: 5 * 60 * 1000,
   });
 
-// Pulls de uso de APIs en el rango pedido. Sin filtro de fecha → mes
-// en curso (1ro a ahora). LIMIT subido a 50k para cubrir volumen real
-// (Claude + ScrapeCreators generan cientos de calls/día). Si en el
-// futuro hace falta más, mover a un RPC agregado.
-const useUsageInRange = (from: Date | undefined, to: Date | undefined) =>
+// Usa RPC agregado server-side. Antes hacíamos SELECT directo con
+// .limit(50000), pero PostgREST de Supabase capa a 1000 rows por defecto
+// (db-max-rows) → el dashboard mostraba sólo los últimos 1000 registros,
+// que en producción con miles de calls/día de ScrapeCreators significaba:
+//   · KPIs subreportados (mostraba 1000 calls cuando había 2968)
+//   · Filtro de fecha sin efecto perceptible (siempre los mismos 1000
+//     rows más recientes, independiente del rango)
+// El RPC agrega en Postgres y devuelve un único JSON con totals + daily
+// + recent — un solo round-trip y sin tocar el cap de PostgREST.
+const useUsageSummary = (from: Date | undefined, to: Date | undefined) =>
   useQuery({
-    queryKey: ["api-usage-range", from?.toISOString() ?? null, to?.toISOString() ?? null],
-    queryFn: async (): Promise<UsageRow[]> => {
-      // Default: mes en curso si no vino rango.
+    queryKey: ["api-usage-summary", from?.toISOString() ?? null, to?.toISOString() ?? null],
+    queryFn: async (): Promise<UsageSummary> => {
       const since = from ?? (() => {
         const d = new Date();
         d.setUTCDate(1);
@@ -101,17 +123,21 @@ const useUsageInRange = (from: Date | undefined, to: Date | undefined) =>
         return d;
       })();
       const until = to ?? new Date();
-      const { data, error } = await (supabase as any)
-        .from("api_usage_log")
-        .select("provider, occurred_at, cost_usd, operation, model")
-        .gte("occurred_at", since.toISOString())
-        .lte("occurred_at", until.toISOString())
-        .order("occurred_at", { ascending: false })
-        .limit(50000);
+      const { data, error } = await (supabase as any).rpc("api_usage_summary", {
+        _from: since.toISOString(),
+        _to: until.toISOString(),
+      });
       if (error) throw error;
-      return (data ?? []) as UsageRow[];
+      const summary = (data ?? {}) as Partial<UsageSummary>;
+      return {
+        totals: summary.totals ?? [],
+        daily: summary.daily ?? [],
+        recent: summary.recent ?? [],
+      };
     },
     refetchInterval: 60_000,
+    // staleTime 0 → al cambiar el rango se refetchea inmediato.
+    staleTime: 0,
   });
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -122,11 +148,14 @@ interface ControlGastoTabProps {
 
 const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
   const capsQ = useCaps();
-  const usageQ = useUsageInRange(range?.from, range?.to);
+  const summaryQ = useUsageSummary(range?.from, range?.to);
   const caps = capsQ.data ?? [];
-  const usage = usageQ.data ?? [];
+  const totals = summaryQ.data?.totals ?? [];
+  const daily = summaryQ.data?.daily ?? [];
+  const recent = summaryQ.data?.recent ?? [];
 
-  // Per-provider summary
+  // Per-provider summary (los 3 fijos para que la UI siempre muestre las 3
+  // cards aunque algún provider no tenga calls en el rango).
   const summaries = useMemo<ProviderSummary[]>(() => {
     const providers = ["anthropic", "elevenlabs", "scrapecreators"];
     return providers.map((p) => {
@@ -134,8 +163,9 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
       const cap = capRow?.cost_usd_cap_monthly ?? 0;
       const amber = (capRow?.amber_pct ?? 50) / 100;
       const red = (capRow?.red_pct ?? 90) / 100;
-      const rows = usage.filter((u) => u.provider === p);
-      const monthSpend = rows.reduce((s, r) => s + Number(r.cost_usd ?? 0), 0);
+      const totalRow = totals.find((t) => t.provider === p);
+      const monthSpend = Number(totalRow?.cost_usd ?? 0);
+      const calls = Number(totalRow?.calls ?? 0);
       const pct = cap > 0 ? monthSpend / cap : 0;
       const status: ProviderSummary["status"] =
         pct >= red ? "red" : pct >= amber ? "amber" : "green";
@@ -148,19 +178,20 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
         cap,
         pctOfCap: pct,
         status,
-        callsThisMonth: rows.length,
+        callsThisMonth: calls,
       };
     });
-  }, [caps, usage]);
+  }, [caps, totals]);
 
-  // Daily chart data — agrupado por día y provider
+  // Daily chart data — el RPC ya devuelve agrupado por día+provider;
+  // sólo necesitamos transformar al shape que Recharts espera (un objeto
+  // por día con un campo por provider).
   const chartData = useMemo(() => {
     const byDay = new Map<string, Record<string, number>>();
-    for (const r of usage) {
-      const day = r.occurred_at.slice(0, 10);
-      const row = byDay.get(day) ?? {};
+    for (const r of daily) {
+      const row = byDay.get(r.day) ?? {};
       row[r.provider] = (row[r.provider] ?? 0) + Number(r.cost_usd ?? 0);
-      byDay.set(day, row);
+      byDay.set(r.day, row);
     }
     const days = Array.from(byDay.keys()).sort();
     return days.map((day) => ({
@@ -169,11 +200,10 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
       elevenlabs: byDay.get(day)?.elevenlabs ?? 0,
       scrapecreators: byDay.get(day)?.scrapecreators ?? 0,
     }));
-  }, [usage]);
+  }, [daily]);
 
   const totalMonth = summaries.reduce((s, p) => s + p.monthSpend, 0);
   const totalCap = summaries.reduce((s, p) => s + p.cap, 0);
-  const recent = usage.slice(0, 50);
 
   const totalPct = totalCap > 0 ? totalMonth / totalCap : 0;
 
@@ -186,7 +216,7 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
         <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-30 bg-indigo-500" />
         <div className="relative">
           <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">
-            Total mes en curso
+            Total en el rango
           </p>
           <div className="flex items-end gap-3 mt-2">
             <p className="text-4xl font-bold tabular-nums leading-none">
@@ -292,10 +322,10 @@ const ControlGastoTab = ({ range }: ControlGastoTabProps = {}) => {
 
       {/* Gráfico diario */}
       <Card className="p-4">
-        <h2 className="text-sm font-semibold mb-3">Gasto diario (mes en curso)</h2>
+        <h2 className="text-sm font-semibold mb-3">Gasto diario (rango seleccionado)</h2>
         {chartData.length === 0 ? (
           <p className="text-xs text-muted-foreground py-8 text-center">
-            Sin actividad en el mes en curso todavía.
+            Sin actividad en el rango seleccionado.
           </p>
         ) : (
           <div className="h-64">
