@@ -109,76 +109,37 @@ export default defineConfig(({ mode }) => ({
         // stays small enough for the workbox precache and the browser
         // can cache them independently across deploys (vendor versions
         // change less often than app code).
-        // Estrategia (2026-05-14):
-        //   1. Vendor base (react/router/query/supabase/radix base): siempre
-        //      en el bundle inicial — todo el shell depende de eso.
-        //   2. Vendors específicos (charts/dnd/pdf): NO preloadeados,
-        //      cargan on-demand cuando una página los importa. Pdf por
-        //      ejemplo sólo se usa en Facturación.
-        //   3. Páginas: chunk por módulo (carpeta `pages/<modulo>/`). HR
-        //      entero en un solo chunk, Finanzas entero en otro, etc.
-        //      El AppShell hace prefetch de los chunks accesibles por
-        //      permisos del user en idle, así la nav se siente instantánea.
-        manualChunks(id) {
-          // Vendors base — siempre en bundle inicial.
-          if (id.includes('node_modules')) {
-            if (id.match(/react-dom|react-router-dom|\/react\//)) return 'vendor-react';
-            if (id.includes('@tanstack/react-query')) return 'vendor-query';
-            if (id.includes('@supabase/supabase-js')) return 'vendor-supabase';
-            if (id.includes('@radix-ui')) return 'vendor-radix';
-            if (id.includes('lucide-react')) return 'vendor-icons';
-            if (id.includes('date-fns')) return 'vendor-date';
-            // Vendors específicos — NO en bundle inicial, cargan con la página que los usa.
-            if (id.includes('recharts')) return 'vendor-charts';
-            if (id.includes('@hello-pangea/dnd')) return 'vendor-dnd';
-            if (id.includes('jspdf')) return 'vendor-pdf';
-            // Resto de node_modules: cae al chunk de quien lo importe.
-            return undefined;
-          }
-
-          // Páginas por módulo — un chunk por carpeta de feature. El
-          // AppShell prefetchea estos en idle según permisos.
-          if (id.includes('/pages/hr/')) return 'mod-hr';
-          if (id.includes('/pages/finanzas/')) return 'mod-finanzas';
-          if (id.includes('/pages/creadores/')) return 'mod-creadores';
-          if (id.includes('/pages/eventos/')) return 'mod-eventos';
-          if (id.includes('/pages/chatter-evaluator/')) return 'mod-chatter';
-          if (id.includes('/pages/scouter/')) return 'mod-scouter';
-          if (id.includes('/pages/agency-qa/')) return 'mod-agency-qa';
-          if (id.includes('/pages/proyectomp/')) return 'mod-proyectomp';
-          if (id.includes('/pages/sales-')) return 'mod-sales';
-          if (id.includes('/pages/sales-audit/') || id.includes('/pages/sales-dashboard/')) return 'mod-sales';
-          if (id.includes('/pages/leadgen/')) return 'mod-leadgen';
-          if (id.includes('/pages/promolog/')) return 'mod-promolog';
-          if (id.includes('/pages/messenger/')) return 'mod-messenger';
-          if (id.includes('/pages/closers/')) return 'mod-closers';
-          if (id.includes('/pages/tareas/')) return 'mod-tareas';
-          if (id.includes('/pages/contactos/')) return 'mod-contactos';
-          if (id.includes('/pages/cowork/')) return 'mod-cowork';
-          if (id.includes('/pages/supercontacts/')) return 'mod-supercontacts';
-          if (id.includes('/pages/admin/')) return 'mod-admin';
-          if (id.includes('/pages/panel-de-control/')) return 'mod-dashboard';
-          if (id.includes('/pages/hr-')) return 'mod-hr';
-
-          // Páginas top-level que no tienen carpeta dedicada — agruparlas
-          // por nombre.
-          if (id.match(/\/pages\/(LeadGen|LeadGenBaseDatos)\.tsx$/)) return 'mod-leadgen';
-          if (id.match(/\/pages\/(Closers)\.tsx$/)) return 'mod-closers';
-          if (id.match(/\/pages\/(Promolog)\.tsx$/)) return 'mod-promolog';
-          if (id.match(/\/pages\/(Tareas|TareaProject)\.tsx$/)) return 'mod-tareas';
-          if (id.match(/\/pages\/(Contactos|NuevoContacto)\.tsx$/)) return 'mod-contactos';
-          if (id.match(/\/pages\/(Eventos|NuevoEvento|EditEvento|EventoDetail)\.tsx$/)) return 'mod-eventos';
-          if (id.match(/\/pages\/(Creadores|NuevoCreador|CreadorProfile)\.tsx$/)) return 'mod-creadores';
-          if (id.match(/\/pages\/(Chatter\w+)\.tsx$/)) return 'mod-chatter';
-          if (id.match(/\/pages\/(Messenger)\.tsx$/)) return 'mod-messenger';
-          if (id.match(/\/pages\/(Tickets)\.tsx$/)) return 'mod-tickets';
-          if (id.match(/\/pages\/(SuperContacts)\.tsx$/)) return 'mod-supercontacts';
-          if (id.match(/\/pages\/(Dashboard|Dashboard2|PanelDeControl)\.tsx$/)) return 'mod-dashboard';
-          if (id.match(/\/pages\/(SalesDashboard|SalesAudit|SalesOverview|AiSales)\.tsx$/)) return 'mod-sales';
-          // Notificaciones / Settings / DesignSystem / Docs / Roadmap quedan
-          // en el bundle común (son comunes y chicos) — Vite los emite
-          // como chunks individuales si son lazy, o agrupados si no.
-          return undefined;
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-query": ["@tanstack/react-query"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-radix": [
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-popover",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-select",
+            "@radix-ui/react-tabs",
+            "@radix-ui/react-tooltip",
+            "@radix-ui/react-alert-dialog",
+            "@radix-ui/react-accordion",
+            "@radix-ui/react-checkbox",
+            "@radix-ui/react-label",
+            "@radix-ui/react-progress",
+            "@radix-ui/react-radio-group",
+            "@radix-ui/react-scroll-area",
+            "@radix-ui/react-separator",
+            "@radix-ui/react-slider",
+            "@radix-ui/react-slot",
+            "@radix-ui/react-switch",
+            "@radix-ui/react-toast",
+            "@radix-ui/react-toggle",
+            "@radix-ui/react-toggle-group",
+          ],
+          "vendor-charts": ["recharts"],
+          "vendor-date": ["date-fns"],
+          "vendor-icons": ["lucide-react"],
+          "vendor-dnd": ["@hello-pangea/dnd"],
+          "vendor-pdf": ["jspdf", "jspdf-autotable"],
         },
       },
     },

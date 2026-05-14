@@ -7,21 +7,18 @@ import ClariAiFab from "@/components/ClariAiFab";
 import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
 import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
 import { useUserRole } from "@/hooks/useUserRole";
-import { useAppPrefetch } from "@/hooks/useAppPrefetch";
 
 // Persistent shell for protected pages. Mounting Sidebar + Topbar (plus
 // global overlays like the ClariAi FAB and announcement popups) at the
 // route layout level — instead of inside every page wrapper — lets
 // React Router swap only the inner content via <Outlet />.
 //
-// Las páginas ahora son lazy() (ver App.tsx). Para que la nav siga
-// sintiéndose nativa, useAppPrefetch carga en idle los chunks de los
-// módulos a los que el user tiene acceso, después que cargan permisos.
-// Cuando el user clickea HR/Finanzas/etc. el chunk ya está cacheado.
+// All sidebar-reachable pages are imported eagerly in App.tsx, so we
+// don't need a runtime prefetch step here — the chunks are already in
+// the initial bundle and nav is instant.
 const AppShell = () => {
   const { popups } = useAnnouncementsByChannel();
   const { isAdmin } = useUserRole();
-  useAppPrefetch();
 
   return (
     <SidebarProvider>
