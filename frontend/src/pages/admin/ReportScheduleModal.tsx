@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus } from "lucide-react";
+import { X, Plus, ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -515,30 +515,103 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                   : "Elegí un rol para ver las métricas disponibles."}
               </p>
             ) : (
-              <div className="rounded-md border border-border/60 bg-muted/10 p-2.5 max-h-48 overflow-y-auto space-y-1.5">
-                {availableMetrics.map((m) => {
-                  const isSelected = selectedMetrics.includes(m.key);
-                  return (
-                    <label
-                      key={m.key}
-                      className="flex items-center gap-2.5 text-sm cursor-pointer hover:bg-muted/40 rounded px-1.5 py-1 transition-colors"
-                    >
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={(checked) => {
-                          if (checked) setSelectedMetrics([...selectedMetrics, m.key]);
-                          else setSelectedMetrics(selectedMetrics.filter((k) => k !== m.key));
-                        }}
-                      />
-                      {m.label}
-                    </label>
+              <div className="rounded-md border border-border/60 bg-muted/10 p-2.5 max-h-72 overflow-y-auto space-y-1.5">
+                {/* Las seleccionadas van primero, en el ORDEN que el user
+                    eligió — eso define el orden de columnas en el correo.
+                    Las disponibles (no seleccionadas) van debajo en el orden
+                    del catálogo. Las seleccionadas tienen flechas ▲▼ para
+                    reordenar; las disponibles sólo el check para agregar. */}
+                {(() => {
+                  // Selected: respetan el orden de selectedMetrics.
+                  const selectedInOrder = selectedMetrics
+                    .map((k) => availableMetrics.find((m) => m.key === k))
+                    .filter((m): m is (typeof availableMetrics)[number] => !!m);
+                  const unselected = availableMetrics.filter(
+                    (m) => !selectedMetrics.includes(m.key),
                   );
-                })}
+
+                  const moveMetric = (key: string, direction: -1 | 1) => {
+                    const idx = selectedMetrics.indexOf(key);
+                    if (idx < 0) return;
+                    const next = [...selectedMetrics];
+                    const swapIdx = idx + direction;
+                    if (swapIdx < 0 || swapIdx >= next.length) return;
+                    [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+                    setSelectedMetrics(next);
+                  };
+
+                  return (
+                    <>
+                      {selectedInOrder.map((m, idx) => (
+                        <div
+                          key={m.key}
+                          className="flex items-center gap-2 text-sm rounded px-1.5 py-1 bg-primary/5 ring-1 ring-primary/15"
+                        >
+                          <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          <span className="w-5 shrink-0 text-center text-[10px] font-mono text-muted-foreground tabular-nums">
+                            {idx + 1}
+                          </span>
+                          <Checkbox
+                            checked
+                            onCheckedChange={() =>
+                              setSelectedMetrics(
+                                selectedMetrics.filter((k) => k !== m.key),
+                              )
+                            }
+                          />
+                          <span className="flex-1 truncate">{m.label}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={idx === 0}
+                            onClick={() => moveMetric(m.key, -1)}
+                            className="h-6 w-6 shrink-0"
+                            aria-label="Subir"
+                            title="Subir"
+                          >
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={idx === selectedInOrder.length - 1}
+                            onClick={() => moveMetric(m.key, 1)}
+                            className="h-6 w-6 shrink-0"
+                            aria-label="Bajar"
+                            title="Bajar"
+                          >
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                      {selectedInOrder.length > 0 && unselected.length > 0 && (
+                        <div className="my-1.5 border-t border-border/40" />
+                      )}
+                      {unselected.map((m) => (
+                        <label
+                          key={m.key}
+                          className="flex items-center gap-2.5 text-sm cursor-pointer hover:bg-muted/40 rounded px-1.5 py-1 transition-colors"
+                        >
+                          <Checkbox
+                            checked={false}
+                            onCheckedChange={() =>
+                              setSelectedMetrics([...selectedMetrics, m.key])
+                            }
+                          />
+                          {m.label}
+                        </label>
+                      ))}
+                    </>
+                  );
+                })()}
               </div>
             )}
             {availableMetrics.length > 0 && (
               <p className="text-[10px] text-muted-foreground">
-                Métricas disponibles según los permisos del rol "{roleName}" en role_permissions.
+                Métricas seleccionadas aparecen arriba en el orden de las
+                columnas del correo. Usá ▲▼ para reordenar.
               </p>
             )}
           </div>
