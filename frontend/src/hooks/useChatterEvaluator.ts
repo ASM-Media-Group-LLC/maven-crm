@@ -1126,6 +1126,35 @@ export const useDeleteChatterSession = () => {
   });
 };
 
+/**
+ * Borra varias sesiones en una sola query (`.in("id", ids)`) en vez de un loop
+ * con N requests. Devuelve cuántas filas se borraron realmente — si la RLS
+ * deja al user borrar sólo las suyas y seleccionó algunas de otros, ese
+ * count va a ser menor que `ids.length`. La UI lo usa para avisar al user.
+ *
+ * Por qué importa: el bulk delete del History antes hacía un await por sesión
+ * + onSuccess invalidate por cada uno. Con 50 sesiones eran 50 invalidaciones
+ * en cadena (UI colgada 10+s). Además, las DELETE con cero filas afectadas
+ * no devuelven error de Supabase, así que el loop creía que todo OK aunque
+ * la RLS bloqueara silenciosamente.
+ */
+export const useBulkDeleteChatterSessions = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]): Promise<{ requested: number; deleted: number }> => {
+      if (ids.length === 0) return { requested: 0, deleted: 0 };
+      const { data, error } = await sb
+        .from("chatter_sessions")
+        .delete()
+        .in("id", ids)
+        .select("id"); // pedimos las filas borradas para contar
+      if (error) throw error;
+      return { requested: ids.length, deleted: (data ?? []).length };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-sessions"] }),
+  });
+};
+
 export const useEndChatterSession = () => {
   const qc = useQueryClient();
   return useMutation({

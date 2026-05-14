@@ -25,6 +25,7 @@ import {
   useChatterSessions,
   useChatterProfiles,
   useDeleteChatterSession,
+  useBulkDeleteChatterSessions,
   useResendChatterEmail,
 } from "@/hooks/useChatterEvaluator";
 import type { ChatterSession, ChatterProfile } from "./types";
@@ -60,6 +61,7 @@ const HistoryContent = () => {
   const sessionsQ = useChatterSessions("all", "global");
   const profilesQ = useChatterProfiles();
   const deleteMut = useDeleteChatterSession();
+  const bulkDeleteMut = useBulkDeleteChatterSessions();
   const resendMut = useResendChatterEmail();
   const [resendingId, setResendingId] = useState<string | null>(null);
 
@@ -194,30 +196,32 @@ const HistoryContent = () => {
   const confirmBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     setBulkDeleting(true);
-    // Borramos secuencial para que el toast/feedback sea coherente y
-    // para que un fallo no deje selecciones a mitad de camino. El hook
-    // ya invalida la query post-success.
     const ids = Array.from(selectedIds);
-    let okCount = 0;
-    const errors: string[] = [];
-    for (const id of ids) {
-      try {
-        await deleteMut.mutateAsync(id);
-        okCount++;
-      } catch (e) {
-        errors.push((e as Error).message);
+    try {
+      // Bulk DELETE en una sola query — antes era un loop con N awaits +
+      // N invalidaciones que colgaba la UI con muchas sesiones.
+      const { requested, deleted } = await bulkDeleteMut.mutateAsync(ids);
+      setBulkDeleting(false);
+      setBulkConfirmOpen(false);
+      setSelectedIds(new Set());
+      if (deleted === requested) {
+        toast.success(`${deleted} sesion${deleted > 1 ? "es" : ""} eliminada${deleted > 1 ? "s" : ""}`);
+      } else if (deleted === 0) {
+        // RLS rechazó todo: la policy de DELETE pide examiner_user_id =
+        // auth.uid(), así que un admin que ve sesiones de otros en el
+        // History no las puede borrar (esa policy no acompañó al global
+        // read scope todavía).
+        toast.error("No se pudo eliminar ninguna sesión", {
+          description: "Sólo podés borrar tus propias sesiones. Las que creaste otros examiners requieren un permiso que todavía no está habilitado.",
+        });
+      } else {
+        toast.warning(`${deleted} de ${requested} eliminadas`, {
+          description: `${requested - deleted} no se pudieron borrar (probablemente eran de otros examiners).`,
+        });
       }
-    }
-    setBulkDeleting(false);
-    setBulkConfirmOpen(false);
-    setSelectedIds(new Set());
-    if (errors.length === 0) {
-      toast.success(`${okCount} sesiones eliminadas`);
-    } else {
-      toast.error(
-        `Se eliminaron ${okCount} de ${ids.length}. Fallaron ${errors.length}.`,
-        { description: errors[0] },
-      );
+    } catch (e) {
+      setBulkDeleting(false);
+      toast.error("Error al eliminar", { description: (e as Error).message });
     }
   };
 
