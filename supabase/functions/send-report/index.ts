@@ -436,27 +436,64 @@ async function fetchLlgMetrics(
   // entry_date es DATE — comparamos contra YYYY-MM-DD de from/to.
   const fromDate = from.slice(0, 10);
   const toDate = to.slice(0, 10);
-  const { data: leads, error } = await admin
+
+  // Query 1: LEADS creados en el rango (nuevos / recuperacion / total).
+  // Atribución por lg_user_id (el LLG que creó el lead).
+  const { data: leads, error: leadsErr } = await admin
     .from("leadgen_entries")
-    .select("lg_user_id, phone_e164, phone_raw, record_type")
+    .select("lg_user_id, record_type")
     .gte("entry_date", fromDate)
     .lte("entry_date", toDate);
-  if (error) throw error;
+  if (leadsErr) throw leadsErr;
+
+  // Query 2: TELÉFONOS obtenidos en el rango. La fuente correcta es
+  // closers_contacts — cuando un LLG agrega un contacto desde el modal
+  // de LeadGen y escribe un número, se guarda acá (NO en
+  // leadgen_entries.phone_*, donde queda NULL). Atribución por
+  // created_by del contacto (quien clickeó "Guardar").
+  //
+  // Filtros:
+  //   · created_at en rango (cuando se obtuvo el número, no cuando se
+  //     creó el lead — un LLG puede tantear semanas y registrar el
+  //     número mucho después de crear el lead).
+  //   · phone IS NOT NULL (contacto agregado SIN número no cuenta —
+  //     coherente con la regla acordada con el user).
+  //   · leadgen_entry_id IS NOT NULL (sólo contactos que vinieron del
+  //     flujo LeadGen → AddContactoModal; contactos creados desde
+  //     otros flujos no atribuyen a LLG).
+  const { data: contacts, error: contactsErr } = await admin
+    .from("closers_contacts")
+    .select("created_by, phone, leadgen_entry_id")
+    .gte("created_at", from)
+    .lte("created_at", to)
+    .not("phone", "is", null)
+    .not("leadgen_entry_id", "is", null);
+  if (contactsErr) throw contactsErr;
 
   // Split: NUEVOS (record_type 'nuevo' o NULL legacy) vs RECUPERACIÓN
   // (record_type 'reactivado' — duplicados re-ingresados post lock 24h).
   const byUser: Record<string, { nuevos: number; recuperacion: number; phones: number }> = {};
   for (const l of (leads ?? []) as Array<{
     lg_user_id: string | null;
-    phone_e164: string | null;
-    phone_raw: string | null;
     record_type: string | null;
   }>) {
     if (!l.lg_user_id) continue;
     if (!byUser[l.lg_user_id]) byUser[l.lg_user_id] = { nuevos: 0, recuperacion: 0, phones: 0 };
     if (l.record_type === "reactivado") byUser[l.lg_user_id].recuperacion++;
     else byUser[l.lg_user_id].nuevos++;
-    if (l.phone_e164 || l.phone_raw) byUser[l.lg_user_id].phones++;
+  }
+
+  // Contar teléfonos por quien creó el contacto. Si el user creó
+  // contactos pero no creó leads en el mismo rango, igual aparece (con
+  // 0 nuevos / 0 recuperacion). Es el comportamiento esperado: queremos
+  // ver TODOS los LLG que obtuvieron números esta semana.
+  for (const c of (contacts ?? []) as Array<{
+    created_by: string | null;
+    phone: string | null;
+  }>) {
+    if (!c.created_by || !c.phone) continue;
+    if (!byUser[c.created_by]) byUser[c.created_by] = { nuevos: 0, recuperacion: 0, phones: 0 };
+    byUser[c.created_by].phones++;
   }
 
   const ids = Object.keys(byUser);

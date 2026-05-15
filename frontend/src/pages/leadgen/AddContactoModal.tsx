@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -37,6 +37,30 @@ interface AddContactoModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/**
+ * Extrae el handle de Instagram de un input que puede ser:
+ *   · "https://www.instagram.com/usuario/?source=..."
+ *   · "instagram.com/usuario"
+ *   · "@usuario"
+ *   · "usuario"
+ *
+ * Devuelve null si no parece un handle válido (input muy corto, vacío,
+ * sólo símbolos, etc.). Usado para el reverse lookup IG → lead en
+ * AddContactoModal — necesita disparar SÓLO cuando el user metió algo
+ * que parezca un handle real, no en cada tecla.
+ */
+function extractIgHandle(input: string): string | null {
+  if (!input) return null;
+  const cleaned = input.trim();
+  // URL completo de Instagram
+  const url = cleaned.match(/instagram\.com\/([a-zA-Z0-9._]+)/i);
+  if (url) return url[1].toLowerCase().replace(/\/$/, "");
+  // @user o user
+  const at = cleaned.match(/^@?([a-zA-Z0-9._]{3,30})$/);
+  if (at) return at[1].toLowerCase();
+  return null;
+}
+
 
 const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,6 +93,74 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   });
 
   const queryClient = useQueryClient();
+
+  // Auto-fill centralizado cuando se selecciona un lead (desde el
+  // autocomplete por nombre O desde el reverse lookup por IG link).
+  // El callback inline de LeadAutocomplete sólo hace setSelectedLead;
+  // este effect maneja todos los side-effects para no duplicar lógica.
+  useEffect(() => {
+    if (!selectedLead) return;
+    const lead = selectedLead;
+    if (lead.model_handle) {
+      form.setValue("nombre", lead.model_handle);
+      const cleanHandle = lead.model_handle.replace(/^@/, "");
+      form.setValue("instagram", `https://instagram.com/${cleanHandle}`);
+    }
+    if (lead.company) form.setValue("compania", lead.company);
+    if (lead.country_code) {
+      const cc = lead.country_code.startsWith("+")
+        ? lead.country_code
+        : `+${lead.country_code}`;
+      form.setValue("paisCodigo", cc);
+    }
+    if (lead.phone_raw) form.setValue("telefono", lead.phone_raw);
+    if (lead.notes) form.setValue("notas", lead.notes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLead?.id]);
+
+  // Reverse lookup: si el user pega un link de IG (o un @user) y todavía
+  // no seleccionó un lead, buscamos el lead por handle y lo seteamos.
+  // Eso dispara el useEffect de arriba que auto-llena nombre + resto.
+  // Mirror simétrico del autocomplete por nombre que llena el IG link.
+  const igFieldValue = form.watch("instagram");
+  useEffect(() => {
+    if (selectedLead) return; // ya hay lead — no pisar
+    if (!igFieldValue) return;
+    const handle = extractIgHandle(igFieldValue);
+    if (!handle) return;
+
+    let cancelled = false;
+    // Debounce 400ms para no disparar query en cada tecla.
+    const t = setTimeout(async () => {
+      if (cancelled) return;
+      const { data } = await supabase
+        .from("leadgen_entries")
+        .select(
+          "id, model_handle, ticket_number, phone_raw, phone_e164, country_code, city, company, platform, onlyfans_url, notes, lg_user_id",
+        )
+        .ilike("model_handle", handle)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (cancelled) return;
+      const lead = (data ?? [])[0];
+      if (!lead) return;
+      // Enriquecer con el nombre del LLG (mismo patrón que LeadAutocomplete).
+      let llgName: string | null = null;
+      if (lead.lg_user_id) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", lead.lg_user_id)
+          .maybeSingle();
+        llgName = (prof as { full_name?: string } | null)?.full_name ?? null;
+      }
+      setSelectedLead({ ...lead, llgName } as LeadAutocompleteLead);
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [igFieldValue, selectedLead]);
 
   const onSubmit = async (data: ContactoFormValues) => {
     // Regla nueva del flujo unificado: el contacto debe venir de un
@@ -300,26 +392,10 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                         onLeadSelect={(lead) => {
                           setSelectedLead(lead);
                           setLeadError(null);
-                          if (!lead) return;
-                          // Autollenar del lead seleccionado. LeadGen es
-                          // IG-first, así que siempre armamos la URL de
-                          // instagram a partir del handle (aunque platform
-                          // del lead sea distinto, el campo del form se
-                          // llama "Link de Instagram").
-                          if (lead.model_handle) {
-                            const cleanHandle = lead.model_handle.replace(/^@/, "");
-                            field.onChange(lead.model_handle);
-                            form.setValue("instagram", `https://instagram.com/${cleanHandle}`);
-                          }
-                          if (lead.company) form.setValue("compania", lead.company);
-                          if (lead.country_code) {
-                            const cc = lead.country_code.startsWith("+")
-                              ? lead.country_code
-                              : `+${lead.country_code}`;
-                            form.setValue("paisCodigo", cc);
-                          }
-                          if (lead.phone_raw) form.setValue("telefono", lead.phone_raw);
-                          if (lead.notes) form.setValue("notas", lead.notes);
+                          // Auto-fill se maneja en el useEffect arriba
+                          // (centralizado para que funcione también
+                          // cuando el lead viene del reverse lookup por
+                          // IG link, no sólo del autocomplete por nombre).
                         }}
                         error={!!leadError}
                       />
