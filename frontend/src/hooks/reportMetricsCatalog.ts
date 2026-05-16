@@ -77,6 +77,12 @@ export const METRICS_CATALOG: MetricDef[] = [
     requires: [{ module: "Closers", submodule: null }],
   },
   {
+    key: "closer.no_interesadas",
+    label: "No interesadas",
+    module: "closers",
+    requires: [{ module: "Closers", submodule: null }],
+  },
+  {
     key: "closer.llamadas",
     label: "Llamadas realizadas",
     module: "closers",
@@ -141,6 +147,7 @@ export const DEFAULT_METRICS_BY_MODULE: Record<ReportModule, string[]> = {
     "closer.asignadas",
     "closer.confirmadas",
     "closer.completadas",
+    "closer.no_interesadas",
     "closer.llamadas",
     "closer.qa_avg",
     "closer.cerradas",

@@ -309,6 +309,7 @@ const METRIC_CATALOG: Record<string, { label: string; module: Module }> = {
   "closer.asignadas":    { label: "Asignadas",            module: "closers" },
   "closer.confirmadas":  { label: "Confirmadas",          module: "closers" },
   "closer.completadas":  { label: "Completadas",          module: "closers" },
+  "closer.no_interesadas": { label: "No interesadas",     module: "closers" },
   "closer.llamadas":     { label: "Llamadas",             module: "closers" },
   "closer.qa_avg":       { label: "Nota QA",              module: "closers" },
   "closer.cerradas":     { label: "Cerradas",             module: "closers" },
@@ -326,6 +327,7 @@ const DEFAULT_METRICS_BY_MODULE: Record<Module, string[]> = {
     "closer.asignadas",
     "closer.confirmadas",
     "closer.completadas",
+    "closer.no_interesadas",
     "closer.llamadas",
     "closer.qa_avg",
     "closer.cerradas",
@@ -419,6 +421,7 @@ function makeEmptyCells(module: Module): Array<{ key: string; value: string }> {
       { key: "closer.asignadas", value: "0" },
       { key: "closer.confirmadas", value: "0" },
       { key: "closer.completadas", value: "0" },
+      { key: "closer.no_interesadas", value: "0" },
       { key: "closer.llamadas", value: "0" },
       { key: "closer.qa_avg", value: "—" },
       { key: "closer.cerradas", value: "0" },
@@ -546,24 +549,29 @@ async function fetchCloserMetrics(
   // Rows con assigned_to=null se agrupan bajo UNASSIGNED_KEY y se
   // renderean como fila "Sin asignar" si tienen actividad.
   const UNASSIGNED_KEY = "__unassigned__";
+  // No interesada no tiene date column propia → la contamos por stage
+  // actual. Si una lead progresó a No interesada en algún momento, su
+  // stage va a estar ahí (es terminal — no se vuelve a mover).
   const { data: creators, error } = await admin
     .from("closer_creators")
-    .select("assigned_to, passed_date, confirmed_date, completed_date")
-    .or("passed_date.not.is.null,confirmed_date.not.is.null,completed_date.not.is.null");
+    .select("assigned_to, stage, passed_date, confirmed_date, completed_date")
+    .or("passed_date.not.is.null,confirmed_date.not.is.null,completed_date.not.is.null,stage.eq.No interesada");
   if (error) throw error;
 
-  const byUser: Record<string, { asignadas: number; confirmadas: number; completadas: number }> = {};
+  const byUser: Record<string, { asignadas: number; confirmadas: number; completadas: number; noInteresadas: number }> = {};
   for (const c of (creators ?? []) as Array<{
     assigned_to: string | null;
+    stage: string | null;
     passed_date: string | null;
     confirmed_date: string | null;
     completed_date: string | null;
   }>) {
     const key = c.assigned_to ?? UNASSIGNED_KEY;
-    if (!byUser[key]) byUser[key] = { asignadas: 0, confirmadas: 0, completadas: 0 };
+    if (!byUser[key]) byUser[key] = { asignadas: 0, confirmadas: 0, completadas: 0, noInteresadas: 0 };
     if (c.passed_date) byUser[key].asignadas++;
     if (c.confirmed_date) byUser[key].confirmadas++;
     if (c.completed_date) byUser[key].completadas++;
+    if (c.stage === "No interesada") byUser[key].noInteresadas++;
   }
 
   // qa_calls.closer_id ahora apunta directo a profiles.id (post unify
@@ -618,7 +626,7 @@ async function fetchCloserMetrics(
 
   return allIds
     .map((id) => {
-      const m = byUser[id] ?? { asignadas: 0, confirmadas: 0, completadas: 0 };
+      const m = byUser[id] ?? { asignadas: 0, confirmadas: 0, completadas: 0, noInteresadas: 0 };
       const c = callsByUser[id] ?? { count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0 };
       const avgQa = c.scored > 0 ? Math.round(c.scoreSum / c.scored) : null;
       const isUnassigned = id === UNASSIGNED_KEY;
@@ -638,6 +646,7 @@ async function fetchCloserMetrics(
           { key: "closer.asignadas", value: String(m.asignadas) },
           { key: "closer.confirmadas", value: String(m.confirmadas) },
           { key: "closer.completadas", value: String(m.completadas) },
+          { key: "closer.no_interesadas", value: String(m.noInteresadas) },
           { key: "closer.llamadas", value: String(c.count) },
           { key: "closer.qa_avg", value: avgQa != null ? `${avgQa}/100` : "—" },
           { key: "closer.cerradas", value: String(c.cerradas) },
