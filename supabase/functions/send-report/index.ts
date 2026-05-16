@@ -524,40 +524,40 @@ async function fetchCloserMetrics(
   const fromDate = from.slice(0, 10);
   const toDate = to.slice(0, 10);
 
-  // closer_creators por assigned_to — métricas por etapa en el rango.
+  // SEMÁNTICA 2026-05-16: las columnas de pipeline (Asignadas /
+  // Confirmadas / Completadas) ahora cuentan el ESTADO ACTUAL por
+  // closer — no las transiciones del período. Coincide con lo que el
+  // operador ve en Maven → Closers → Operaciones (tabs por stage).
+  // Las métricas de actividad (Llamadas, Nota QA, Cerradas, No cerradas)
+  // siguen siendo period-based porque vienen de qa_calls.call_date.
+  //
+  // Por qué no por período: el conteo "transiciones en el rango" daba
+  // 0 para reportes diarios/quincenales cuando las leads se asignaron
+  // hace más tiempo. El equipo veía 12 Asignadas en el operaciones tab
+  // y 0 en el reporte — la diferencia es exactamente la definición de
+  // la métrica. Snapshot de estado es lo que mentalmente espera el
+  // operador al leer "Asignadas".
+  //
+  // Rows con assigned_to=null se agrupan bajo UNASSIGNED_KEY y se
+  // renderean como fila "Sin asignar" (data integrity visible — leads
+  // en pipeline que nadie reclamó todavía).
+  const UNASSIGNED_KEY = "__unassigned__";
   const { data: creators, error } = await admin
     .from("closer_creators")
-    .select("assigned_to, stage, passed_date, confirmed_date, completed_date, updated_at");
+    .select("assigned_to, stage")
+    .in("stage", ["Asignada", "Confirmada", "Completada"]);
   if (error) throw error;
 
-  // Stage counts: asignadas / confirmadas / completadas en el rango.
-  // No usamos stage='No interesada' acá para "no cerradas" — esa métrica
-  // ahora viene del outcome de qa_calls (en_espera + no_cerro = mismo
-  // resultado matemático). "Cerradas" también viene del QA (outcome='cerro').
-  //
-  // BUG-FIX 2026-05-16: las rows con assigned_to=null se saltaban
-  // (`if (!c.assigned_to) continue;`), entonces 9 de las 18 leads
-  // históricas con stage <> 'Nuevo' no aparecían en el reporte aunque
-  // SÍ aparecen en el tab "Closers/Operaciones" (que cuenta por stage,
-  // sin agrupar por closer). Para que ambas vistas coincidan, ahora las
-  // agrupamos bajo la clave especial UNASSIGNED_KEY y las renderizamos
-  // como una fila "Sin asignar". Si quedan en 0 (no hay huérfanos en
-  // el rango), la fila no se emite.
-  const UNASSIGNED_KEY = "__unassigned__";
   const byUser: Record<string, { asignadas: number; confirmadas: number; completadas: number }> = {};
   for (const c of (creators ?? []) as Array<{
     assigned_to: string | null;
     stage: string | null;
-    passed_date: string | null;
-    confirmed_date: string | null;
-    completed_date: string | null;
-    updated_at: string | null;
   }>) {
     const key = c.assigned_to ?? UNASSIGNED_KEY;
     if (!byUser[key]) byUser[key] = { asignadas: 0, confirmadas: 0, completadas: 0 };
-    if (c.passed_date && c.passed_date >= fromDate && c.passed_date <= toDate) byUser[key].asignadas++;
-    if (c.confirmed_date && c.confirmed_date >= from && c.confirmed_date <= to) byUser[key].confirmadas++;
-    if (c.completed_date && c.completed_date >= from && c.completed_date <= to) byUser[key].completadas++;
+    if (c.stage === "Asignada") byUser[key].asignadas++;
+    else if (c.stage === "Confirmada") byUser[key].confirmadas++;
+    else if (c.stage === "Completada") byUser[key].completadas++;
   }
 
   // qa_calls.closer_id ahora apunta directo a profiles.id (post unify
