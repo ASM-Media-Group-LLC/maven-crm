@@ -165,6 +165,15 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
     label: string;
   } | null>(null);
 
+  // Mismo flow para "Reenviar email": el correo automático ya se mandó al
+  // terminar el análisis, entonces cualquier reenvío manual es duplicado.
+  // El popup evita los clicks accidentales / repetidos de múltiples users
+  // sobre la misma QA (caso real: 2026-05-15 sergiocarvajal7).
+  const [pendingResend, setPendingResend] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+
   const myUserId = user?.id ?? null;
   const myName = useMemo(() => {
     return (
@@ -195,11 +204,18 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
       .slice(0, 30);
   }, [callsQ.data, isAdmin, myUserId, myName]);
 
-  const handleResendEmail = async (e: React.MouseEvent, callId: string) => {
+  const askResend = (e: React.MouseEvent, callId: string, label: string) => {
     e.stopPropagation();
+    setPendingResend({ id: callId, label });
+  };
+
+  const confirmResend = async () => {
+    if (!pendingResend) return;
+    const target = pendingResend;
     try {
-      await fireWebhook.mutateAsync({ callId });
+      await fireWebhook.mutateAsync({ callId: target.id });
       toast.success("Email reenviado");
+      setPendingResend(null);
     } catch (err) {
       toast.error("No se pudo reenviar el email", {
         description: (err as Error).message,
@@ -358,7 +374,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                         <div className="flex items-center justify-end gap-1">
                           <button
                             type="button"
-                            onClick={(e) => handleResendEmail(e, call.id)}
+                            onClick={(e) => askResend(e, call.id, label)}
                             disabled={fireWebhook.isPending}
                             className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50"
                             title="Reenviar email"
@@ -422,6 +438,50 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                 </>
               ) : (
                 "Borrar"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm resend dialog — estilo Maven. El correo automático ya
+          salió al terminar el análisis, así que cada reenvío manual genera
+          un duplicado para los recipients. Le pedimos confirmación para
+          evitar clicks repetidos. */}
+      <AlertDialog
+        open={!!pendingResend}
+        onOpenChange={(open) => !open && setPendingResend(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" />
+              Reenviar email del QA
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Vas a reenviar el reporte de <strong>{pendingResend?.label}</strong>{" "}
+              a todos los destinatarios configurados.
+              <br />
+              El correo automático ya se mandó al terminar el análisis. Solo
+              reenvíalo si necesitás una segunda copia.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={fireWebhook.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmResend}
+              disabled={fireWebhook.isPending}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {fireWebhook.isPending ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Reenviando…
+                </>
+              ) : (
+                "Reenviar"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

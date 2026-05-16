@@ -552,9 +552,21 @@ async function fetchCloserMetrics(
 
   // qa_calls.closer_id ahora apunta directo a profiles.id (post unify
   // identity migration). Sin indirection por qa_closers.
+  //
+  // BUG-FIX 2026-05-16: el filtro de rango se hacía en JS con
+  //   `k.call_date < from || k.call_date > to`
+  // donde `call_date` es DATE (`"2026-05-15"`) y `from`/`to` venían
+  // como ISO completo (`"2026-05-15T05:00:00.000Z"`). La comparación
+  // lexicográfica `"2026-05-15" < "2026-05-15T05:..."` siempre daba
+  // TRUE (prefijo más corto), entonces TODAS las calls quedaban
+  // filtradas y el reporte salía con llamadas/qa_avg/cerradas/no_cerradas
+  // en cero. Lo movemos a SQL — Postgres compara DATE vs DATE bien sin
+  // depender del formato textual.
   const { data: calls } = await admin
     .from("qa_calls")
-    .select("closer_id, claude_score, call_date, claude_analysis");
+    .select("closer_id, claude_score, call_date, claude_analysis")
+    .gte("call_date", fromDate)
+    .lte("call_date", toDate);
   const callsByUser: Record<string, {
     count: number;
     scoreSum: number;
@@ -569,7 +581,6 @@ async function fetchCloserMetrics(
     claude_analysis: Record<string, unknown> | null;
   }>) {
     if (!k.closer_id) continue;
-    if (!k.call_date || k.call_date < from || k.call_date > to) continue;
     if (!callsByUser[k.closer_id]) {
       callsByUser[k.closer_id] = { count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0 };
     }

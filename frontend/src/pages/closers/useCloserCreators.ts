@@ -114,6 +114,10 @@ export const useCloserCreators = () => {
   const updateStage = useMutation({
     mutationFn: async ({ id, stage }: { id: string; stage: string }) => {
       const updates: Record<string, unknown> = { stage };
+      // BUG-FIX 2026-05-16: setear passed_date al pasar a "Asignada"
+      // — sin esto el reporte contaba 0 asignadas (idéntico al fix en
+      // useCloserLeads).
+      if (stage === "Asignada") updates.passed_date = new Date().toISOString().slice(0, 10);
       if (stage === "Confirmada") updates.confirmed_date = new Date().toISOString();
       if (stage === "Completada") updates.completed_date = new Date().toISOString();
       const { error } = await supabase.from("closer_creators").update(updates).eq("id", id);

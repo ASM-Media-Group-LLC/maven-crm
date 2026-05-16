@@ -506,6 +506,11 @@ export const useCloserLeads = () => {
   const updateStage = useMutation({
     mutationFn: async ({ id, stage }: { id: string; stage: string }) => {
       const updates: Record<string, unknown> = { stage };
+      // BUG-FIX 2026-05-16: passed_date no se estaba seteando cuando una
+      // lead pasaba a "Asignada", entonces el reporte de closers contaba
+      // 0 asignadas en cualquier rango. Ahora se setea igual que
+      // confirmed_date/completed_date al cambiar de stage.
+      if (stage === "Asignada") updates.passed_date = new Date().toISOString().slice(0, 10);
       if (stage === "Confirmada") updates.confirmed_date = new Date().toISOString();
       if (stage === "Completada") updates.completed_date = new Date().toISOString();
       const { error } = await supabase.from("closer_creators").update(updates).eq("id", id);
@@ -535,6 +540,10 @@ export const useCloserLeads = () => {
       const updates: Record<string, unknown> = { assigned_to };
       if (current?.stage === "Nuevo") {
         updates.stage = "Asignada";
+        // Setear passed_date al pasar de Nuevo → Asignada para que el
+        // reporte de closers cuente correctamente las asignaciones en
+        // el rango (mismo patrón que confirmed_date/completed_date).
+        updates.passed_date = new Date().toISOString().slice(0, 10);
       }
 
       const { error } = await supabase.from("closer_creators").update(updates).eq("id", id);

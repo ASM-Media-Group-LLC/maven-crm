@@ -23,6 +23,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Radar,
   RadarChart,
   PolarGrid,
@@ -1373,10 +1383,17 @@ const CallDetailPage = ({
 
   const lastFb = feedbackHistoryQ.data;
 
+  // El correo automático ya salió cuando terminó qa-analyze. Cualquier
+  // reenvío manual genera un duplicado para los recipients, así que
+  // pedimos confirmación antes de mandar (mismo flow que el "Borrar QA"
+  // en AgencyQaHistory). Evita los double-clicks accidentales y los
+  // dobles envíos cuando varios users entran al mismo call.
+  const [resendOpen, setResendOpen] = useState(false);
   const handleResend = async () => {
     try {
       await fireWebhook.mutateAsync({ callId: call.id });
       toast.success("Email reenviado");
+      setResendOpen(false);
     } catch (err) {
       toast.error("No se pudo reenviar el email", {
         description: (err as Error).message,
@@ -1401,7 +1418,7 @@ const CallDetailPage = ({
             type="button"
             variant="outline"
             size="sm"
-            onClick={handleResend}
+            onClick={() => setResendOpen(true)}
             disabled={fireWebhook.isPending}
             className="gap-1.5"
           >
@@ -1412,6 +1429,46 @@ const CallDetailPage = ({
             )}
             Reenviar email
           </Button>
+          <AlertDialog open={resendOpen} onOpenChange={setResendOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5 text-primary" />
+                  Reenviar email del QA
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Vas a reenviar el reporte de{" "}
+                  <strong>
+                    {call.model?.name ?? "(sin modelo)"} ·{" "}
+                    {call.closer?.name ?? "(sin closer)"}
+                  </strong>{" "}
+                  a todos los destinatarios configurados.
+                  <br />
+                  El correo automático ya se mandó al terminar el análisis.
+                  Solo reenvíalo si necesitás una segunda copia.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={fireWebhook.isPending}>
+                  Cancelar
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleResend}
+                  disabled={fireWebhook.isPending}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {fireWebhook.isPending ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      Reenviando…
+                    </>
+                  ) : (
+                    "Reenviar"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
