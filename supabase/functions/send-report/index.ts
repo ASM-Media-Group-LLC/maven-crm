@@ -524,40 +524,46 @@ async function fetchCloserMetrics(
   const fromDate = from.slice(0, 10);
   const toDate = to.slice(0, 10);
 
-  // SEMÁNTICA 2026-05-16: las columnas de pipeline (Asignadas /
-  // Confirmadas / Completadas) ahora cuentan el ESTADO ACTUAL por
-  // closer — no las transiciones del período. Coincide con lo que el
-  // operador ve en Maven → Closers → Operaciones (tabs por stage).
-  // Las métricas de actividad (Llamadas, Nota QA, Cerradas, No cerradas)
-  // siguen siendo period-based porque vienen de qa_calls.call_date.
+  // SEMÁNTICA 2026-05-16 (v3): las columnas de pipeline cuentan
+  // MILESTONES CUMULATIVOS por closer, no estados mutuamente
+  // exclusivos. Cada lead suma en TODAS las etapas que cruzó:
+  //   · Asignadas  ← passed_date NOT NULL (la lead fue asignada)
+  //   · Confirmadas ← confirmed_date NOT NULL (además fue confirmada)
+  //   · Completadas ← completed_date NOT NULL (además fue completada)
   //
-  // Por qué no por período: el conteo "transiciones en el rango" daba
-  // 0 para reportes diarios/quincenales cuando las leads se asignaron
-  // hace más tiempo. El equipo veía 12 Asignadas en el operaciones tab
-  // y 0 en el reporte — la diferencia es exactamente la definición de
-  // la métrica. Snapshot de estado es lo que mentalmente espera el
-  // operador al leer "Asignadas".
+  // Por qué cumulativo y no mutuamente exclusivo: un closer que pasó
+  // una lead Asignada → Confirmada hizo DOS cosas (asignar Y confirmar),
+  // entonces debería aparecer con +1 en ambas columnas. La versión
+  // "snapshot del stage actual" (v2) mostraba Ruben con 0 Asignadas y
+  // 1 Confirmada — operador dijo que se pierde el crédito del trabajo
+  // de asignación.
+  //
+  // Tradeoff: los totales del reporte NO suman exacto el operaciones
+  // tab (que es mutually exclusive). Pero cada fila refleja el
+  // recorrido real del closer, que es lo que importa para evaluar
+  // performance.
   //
   // Rows con assigned_to=null se agrupan bajo UNASSIGNED_KEY y se
-  // renderean como fila "Sin asignar" (data integrity visible — leads
-  // en pipeline que nadie reclamó todavía).
+  // renderean como fila "Sin asignar" si tienen actividad.
   const UNASSIGNED_KEY = "__unassigned__";
   const { data: creators, error } = await admin
     .from("closer_creators")
-    .select("assigned_to, stage")
-    .in("stage", ["Asignada", "Confirmada", "Completada"]);
+    .select("assigned_to, passed_date, confirmed_date, completed_date")
+    .or("passed_date.not.is.null,confirmed_date.not.is.null,completed_date.not.is.null");
   if (error) throw error;
 
   const byUser: Record<string, { asignadas: number; confirmadas: number; completadas: number }> = {};
   for (const c of (creators ?? []) as Array<{
     assigned_to: string | null;
-    stage: string | null;
+    passed_date: string | null;
+    confirmed_date: string | null;
+    completed_date: string | null;
   }>) {
     const key = c.assigned_to ?? UNASSIGNED_KEY;
     if (!byUser[key]) byUser[key] = { asignadas: 0, confirmadas: 0, completadas: 0 };
-    if (c.stage === "Asignada") byUser[key].asignadas++;
-    else if (c.stage === "Confirmada") byUser[key].confirmadas++;
-    else if (c.stage === "Completada") byUser[key].completadas++;
+    if (c.passed_date) byUser[key].asignadas++;
+    if (c.confirmed_date) byUser[key].confirmadas++;
+    if (c.completed_date) byUser[key].completadas++;
   }
 
   // qa_calls.closer_id ahora apunta directo a profiles.id (post unify
