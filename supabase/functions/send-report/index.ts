@@ -534,6 +534,16 @@ async function fetchCloserMetrics(
   // No usamos stage='No interesada' acá para "no cerradas" — esa métrica
   // ahora viene del outcome de qa_calls (en_espera + no_cerro = mismo
   // resultado matemático). "Cerradas" también viene del QA (outcome='cerro').
+  //
+  // BUG-FIX 2026-05-16: las rows con assigned_to=null se saltaban
+  // (`if (!c.assigned_to) continue;`), entonces 9 de las 18 leads
+  // históricas con stage <> 'Nuevo' no aparecían en el reporte aunque
+  // SÍ aparecen en el tab "Closers/Operaciones" (que cuenta por stage,
+  // sin agrupar por closer). Para que ambas vistas coincidan, ahora las
+  // agrupamos bajo la clave especial UNASSIGNED_KEY y las renderizamos
+  // como una fila "Sin asignar". Si quedan en 0 (no hay huérfanos en
+  // el rango), la fila no se emite.
+  const UNASSIGNED_KEY = "__unassigned__";
   const byUser: Record<string, { asignadas: number; confirmadas: number; completadas: number }> = {};
   for (const c of (creators ?? []) as Array<{
     assigned_to: string | null;
@@ -543,11 +553,11 @@ async function fetchCloserMetrics(
     completed_date: string | null;
     updated_at: string | null;
   }>) {
-    if (!c.assigned_to) continue;
-    if (!byUser[c.assigned_to]) byUser[c.assigned_to] = { asignadas: 0, confirmadas: 0, completadas: 0 };
-    if (c.passed_date && c.passed_date >= fromDate && c.passed_date <= toDate) byUser[c.assigned_to].asignadas++;
-    if (c.confirmed_date && c.confirmed_date >= from && c.confirmed_date <= to) byUser[c.assigned_to].confirmadas++;
-    if (c.completed_date && c.completed_date >= from && c.completed_date <= to) byUser[c.assigned_to].completadas++;
+    const key = c.assigned_to ?? UNASSIGNED_KEY;
+    if (!byUser[key]) byUser[key] = { asignadas: 0, confirmadas: 0, completadas: 0 };
+    if (c.passed_date && c.passed_date >= fromDate && c.passed_date <= toDate) byUser[key].asignadas++;
+    if (c.confirmed_date && c.confirmed_date >= from && c.confirmed_date <= to) byUser[key].confirmadas++;
+    if (c.completed_date && c.completed_date >= from && c.completed_date <= to) byUser[key].completadas++;
   }
 
   // qa_calls.closer_id ahora apunta directo a profiles.id (post unify
@@ -595,17 +605,29 @@ async function fetchCloserMetrics(
   }
 
   const allIds = Array.from(new Set([...Object.keys(byUser), ...Object.keys(callsByUser)]));
-  const nameMap = await resolveNames(admin, allIds);
+  // resolveNames consulta profiles — el sentinel UNASSIGNED_KEY no es
+  // un UUID válido, lo excluimos del lookup y le ponemos label manual.
+  const realIds = allIds.filter((id) => id !== UNASSIGNED_KEY);
+  const nameMap = await resolveNames(admin, realIds);
 
   return allIds
     .map((id) => {
       const m = byUser[id] ?? { asignadas: 0, confirmadas: 0, completadas: 0 };
       const c = callsByUser[id] ?? { count: 0, scoreSum: 0, scored: 0, cerradas: 0, noCerradas: 0 };
       const avgQa = c.scored > 0 ? Math.round(c.scoreSum / c.scored) : null;
+      const isUnassigned = id === UNASSIGNED_KEY;
       return {
-        name: nameMap[id] ?? "Sin nombre",
-        user_id: id,
-        sortKey: c.cerradas,
+        // "Sin asignar" cuando es el bucket de huérfanos. Para que el
+        // operador del reporte sepa que hay leads sin closer (data
+        // integrity issue que conviene rastrear).
+        name: isUnassigned ? "Sin asignar" : (nameMap[id] ?? "Sin nombre"),
+        // user_id null para el bucket virtual — algunos consumers de
+        // MetricRow pueden filtrar por esta clave; mejor null que un
+        // sentinel que parezca UUID.
+        user_id: isUnassigned ? null : id,
+        // Las filas "Sin asignar" van al final del listado (sortKey
+        // negativo). El sort normal es por cerradas DESC.
+        sortKey: isUnassigned ? -1 : c.cerradas,
         cells: [
           { key: "closer.asignadas", value: String(m.asignadas) },
           { key: "closer.confirmadas", value: String(m.confirmadas) },
@@ -616,6 +638,15 @@ async function fetchCloserMetrics(
           { key: "closer.no_cerradas", value: String(c.noCerradas) },
         ],
       };
+    })
+    // "Sin asignar" sólo aparece si hay actividad en el rango. Si todas
+    // las métricas son 0, sería ruido — un row vacío al final del
+    // reporte sin valor informativo.
+    .filter((row) => {
+      if (row.user_id !== null) return true;
+      return row.cells.some(
+        (cell) => cell.value !== "0" && cell.value !== "—",
+      );
     })
     .sort((a, b) => b.sortKey - a.sortKey)
     .map(({ sortKey: _sortKey, ...rest }) => rest);
