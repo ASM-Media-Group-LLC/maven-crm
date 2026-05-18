@@ -1,7 +1,7 @@
 import {
   Bell, CheckSquare, Users, Calendar, Briefcase, DollarSign,
   FileText, UserCheck, ShieldAlert, MessageSquare, ClipboardList,
-  AlertTriangle, type LucideIcon,
+  AlertTriangle, Clock, HelpCircle, type LucideIcon,
 } from "lucide-react";
 
 // ─── Deep link resolver ────────────────────────────────────────────
@@ -26,6 +26,7 @@ export function resolveDeepLink(
     contract: `/hr/empleado/${referenceId}#contrato`,
     lead: `/leadgen?id=${referenceId}`,
     deal: `/closers?id=${referenceId}`,
+    closer_creator: `/closers?id=${referenceId}`,
     conversation: `/messenger?chat=${referenceId}`,
     announcement: `/hr/anuncios?id=${referenceId}`,
   };
@@ -62,6 +63,9 @@ const TYPE_ICONS: Record<string, LucideIcon> = {
   verification_rejected: ShieldAlert,
   task_assignment: CheckSquare,
   project_assignment: ClipboardList,
+  closer_assigned: UserCheck,
+  closer_contact_overdue: AlertTriangle,
+  closer_contact_decision: HelpCircle,
 };
 
 export function getTypeIcon(type: string): LucideIcon {
@@ -171,6 +175,11 @@ export const NOTIFICATION_TYPES_BY_MODULE: Record<string, { type: string; label:
   Tickets: [
     { type: "ticket_assigned", label: "Ticket asignado" },
     { type: "ticket_escalated", label: "Ticket escalado" },
+  ],
+  Closers: [
+    { type: "closer_assigned", label: "Lead asignada" },
+    { type: "closer_contact_overdue", label: "Contacto vencido" },
+    { type: "closer_contact_decision", label: "Decisión pendiente (6 contactos hechos)" },
   ],
   Comunicación: [
     { type: "announcement", label: "Anuncio publicado" },

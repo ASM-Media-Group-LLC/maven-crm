@@ -29,7 +29,7 @@ const ALL_TABS = [
 
 const ClosersContent = () => {
   const {
-    creators, isLoading, statusCounts, platformRevenue, platformSalesByCreator, ofMonetizationTotal,
+    creators, isLoading, statusCounts, alertCounts, platformRevenue, platformSalesByCreator, ofMonetizationTotal,
     totalCount, totalPages, page, setPage,
     search, setSearch,
     activeTab, setActiveTab,
@@ -206,25 +206,45 @@ const ClosersContent = () => {
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="shrink-0 px-6 pt-2 pb-2 space-y-4 bg-background/30 backdrop-blur-xl border-b border-white/10">
             <TabsList className="flex-wrap">
-              {TABS.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value}>
-                  {tab.label}
-                  {statusCounts[
-                    tab.value === "todas" ? "" :
-                    tab.value === "nuevo" ? "Nuevo" :
-                    tab.value === "asignadas" ? "Asignada" :
-                    tab.value === "confirmadas" ? "Confirmada" :
-                    tab.value === "completadas" ? "Completada" :
-                    "No interesada"
-                  ] ? ` (${statusCounts[
-                    tab.value === "nuevo" ? "Nuevo" :
-                    tab.value === "asignadas" ? "Asignada" :
-                    tab.value === "confirmadas" ? "Confirmada" :
-                    tab.value === "completadas" ? "Completada" :
-                    "No interesada"
-                  ]})` : ""}
-                </TabsTrigger>
-              ))}
+              {TABS.map((tab) => {
+                const stageKey =
+                  tab.value === "todas" ? "" :
+                  tab.value === "nuevo" ? "Nuevo" :
+                  tab.value === "asignadas" ? "Asignada" :
+                  tab.value === "confirmadas" ? "Confirmada" :
+                  tab.value === "completadas" ? "Completada" :
+                  "No interesada";
+                const count = statusCounts[stageKey];
+                // Dot rojo (vencidos) + naranja (decisión) sólo en el
+                // tab Asignaciones — los otros stages no tienen cadencia
+                // que vigilar.
+                const isAsignadas = tab.value === "asignadas";
+                const hasOverdue = isAsignadas && (alertCounts?.overdue ?? 0) > 0;
+                const hasDecision = isAsignadas && (alertCounts?.decision ?? 0) > 0;
+                const overdueLabel = hasOverdue
+                  ? `${alertCounts.overdue} contacto${alertCounts.overdue === 1 ? "" : "s"} vencido${alertCounts.overdue === 1 ? "" : "s"}`
+                  : "";
+                const decisionLabel = hasDecision
+                  ? `${alertCounts.decision} con decisión pendiente`
+                  : "";
+                const dotTitle = [overdueLabel, decisionLabel].filter(Boolean).join(" · ");
+                return (
+                  <TabsTrigger key={tab.value} value={tab.value} className="relative">
+                    {tab.label}
+                    {count ? ` (${count})` : ""}
+                    {(hasOverdue || hasDecision) && (
+                      <span
+                        title={dotTitle}
+                        className={
+                          "ml-1.5 inline-block h-2 w-2 rounded-full " +
+                          (hasOverdue ? "bg-destructive animate-pulse" : "bg-orange-500")
+                        }
+                        aria-label={dotTitle}
+                      />
+                    )}
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
 
             <div className="flex items-center gap-3 overflow-x-auto">

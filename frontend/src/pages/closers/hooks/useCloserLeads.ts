@@ -69,7 +69,9 @@ export const SALE_PLATFORMS = ["Trafix", "Blu", "Piclink", "LeakHunter", "ORA"] 
 export const CHANNELS = ["Instagram", "WhatsApp", "Telegram"] as const;
 export const RESULTS = ["Contestó", "No contestó", "Interesada", "No interesada", "Pendiente"] as const;
 
-// Contact follow-up sequence: days from passed_date
+// Cadencia de contactos: días desde passed_date donde el closer debe
+// haber realizado cada contacto. Espejada en SQL en la función
+// public.check_closer_contact_alerts() — si cambia, actualizar ambos.
 const CONTACT_SEQUENCE = [1, 3, 5, 8, 15, 29];
 
 export const getNextContactDate = (passedDate: string | null, contactCount: number): Date | null => {
@@ -81,10 +83,41 @@ export const getNextContactDate = (passedDate: string | null, contactCount: numb
   return next;
 };
 
+// Devuelve true si el próximo contacto de la cadencia ya venció.
+// Definición: deadline = medianoche al final del día N (passed_date + N).
+// Pasada esa medianoche (current_date > passed_date + N), está vencido.
+// Mismo cálculo que el SQL cron — ver migration 20260516170000.
+export const isContactOverdue = (
+  passedDate: string | null,
+  contactCount: number,
+): boolean => {
+  if (!passedDate || contactCount >= 6) return false;
+  const next = getNextContactDate(passedDate, contactCount);
+  if (!next) return false;
+  // current_date > deadline_date (comparación de fechas, ignorando hora)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadline = new Date(next);
+  deadline.setHours(0, 0, 0, 0);
+  return today > deadline;
+};
+
+// Devuelve true si el closer ya hizo los 6 contactos y la lead sigue
+// en stage='Asignada' — necesita decidir: seguir o marcar No interesada.
+export const needsContactDecision = (
+  stage: string | null,
+  contactCount: number,
+): boolean => {
+  return stage === "Asignada" && contactCount >= 6;
+};
+
+// DEPRECATED — kept for backward compat. Use isContactOverdue.
+// La lógica anterior (`> 3 días desde último contacto`) no respetaba
+// la cadencia real y disparaba falsos positivos.
 export const isFollowUpPending = (lastContactDate: string | null): boolean => {
   if (!lastContactDate) return true;
   const diff = Date.now() - new Date(lastContactDate).getTime();
-  return diff > 3 * 24 * 60 * 60 * 1000; // >3 days
+  return diff > 3 * 24 * 60 * 60 * 1000;
 };
 
 export type DateFieldType = "passed_date" | "lg_entry_date";
@@ -360,6 +393,57 @@ export const useCloserLeads = () => {
   const applyCreatorDate = dateField === "passed_date" && !!dateFrom && !!dateTo;
   const applySalesDate = !!dateFrom && !!dateTo;
 
+  // Conteo de alertas en Asignaciones: cuántas leads están vencidas
+  // (contacto programado pasó la fecha) y cuántas en decisión pendiente
+  // (6 contactos hechos, stage='Asignada'). Filtrado por closer si el
+  // user no es admin/manager. Se usa para el dot rojo en el tab.
+  const { data: alertCounts = { overdue: 0, decision: 0 } } = useQuery({
+    queryKey: ["closer-alert-counts", user?.id, role, viewAsCloserId],
+    queryFn: async () => {
+      const targetUserId = effectiveUserId;
+      let creatorsQ = supabase
+        .from("closer_creators")
+        .select("id, passed_date, assigned_to")
+        .eq("stage", "Asignada")
+        .not("passed_date", "is", null);
+      if (!effectiveIsAdmin && !effectiveIsManager && targetUserId) {
+        creatorsQ = creatorsQ.eq("assigned_to", targetUserId);
+      } else if (viewAsCloserId) {
+        // Admin viendo como un closer específico
+        creatorsQ = creatorsQ.eq("assigned_to", viewAsCloserId);
+      }
+      const { data: asignadas, error } = await creatorsQ;
+      if (error) throw error;
+      const ids = (asignadas || []).map((r) => (r as any).id as string);
+      if (ids.length === 0) return { overdue: 0, decision: 0 };
+
+      const { data: history } = await supabase
+        .from("closer_contact_history")
+        .select("creator_id")
+        .in("creator_id", ids);
+      const contactCountByLead: Record<string, number> = {};
+      for (const h of (history || []) as Array<{ creator_id: string }>) {
+        contactCountByLead[h.creator_id] = (contactCountByLead[h.creator_id] || 0) + 1;
+      }
+
+      let overdue = 0;
+      let decision = 0;
+      for (const r of (asignadas || []) as Array<{ id: string; passed_date: string | null }>) {
+        const count = contactCountByLead[r.id] || 0;
+        if (needsContactDecision("Asignada", count)) {
+          decision++;
+        } else if (isContactOverdue(r.passed_date, count)) {
+          overdue++;
+        }
+      }
+      return { overdue, decision };
+    },
+    enabled: !!user?.id && !!role,
+    staleTime: 30_000,
+    refetchInterval: 60_000, // refresh cada minuto — el cron crea
+    // notificaciones cada 3h pero el visual local se actualiza más rápido
+  });
+
   // Status counts for KPIs — client-side count para soportar date filter.
   // La RPC get_closer_stage_counts no acepta fechas, así que contamos
   // acá. 661 rows totales = trivial.
@@ -563,6 +647,7 @@ export const useCloserLeads = () => {
     creators,
     isLoading,
     statusCounts,
+    alertCounts,
     platformRevenue,
     platformSalesByCreator,
     ofMonetizationTotal,

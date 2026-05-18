@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, ExternalLink, Phone, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown } from "lucide-react";
-import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, isFollowUpPending, getNextContactDate } from "../hooks/useCloserLeads";
+import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, isContactOverdue, needsContactDecision, getNextContactDate } from "../hooks/useCloserLeads";
 import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
 import { format } from "date-fns";
@@ -451,7 +451,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {sortedCreators.map((c) => {
               const revenue = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
-              const followUpPending = c.stage === "Asignada" && isFollowUpPending(c.last_contact_date);
+              // Estado de alertas: vencido (rojo) o decisión pendiente (naranja).
+              // Espejo de la lógica de check_closer_contact_alerts() en SQL.
+              const contactOverdue = isContactOverdue(c.passed_date, c.contact_count);
+              const decisionPending = needsContactDecision(c.stage, c.contact_count);
               return (
                 <div key={c.id} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3 hover:bg-white/10 hover:border-primary/40 transition-colors">
                   <div className="flex items-start justify-between">
@@ -498,9 +501,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                   </div>
 
                   <div className="flex items-center gap-1 pt-1">
-                    {followUpPending && (
-                      <Badge variant="destructive" className="text-[10px] h-5 gap-0.5">
-                        <AlertTriangle className="h-3 w-3" /> Follow-up
+                    {contactOverdue && (
+                      <Badge variant="destructive" className="text-[10px] h-5 gap-0.5" title="Contacto vencido — el closer no respetó la cadencia">
+                        <AlertTriangle className="h-3 w-3" /> Vencido
+                      </Badge>
+                    )}
+                    {decisionPending && (
+                      <Badge className="text-[10px] h-5 gap-0.5 bg-orange-500 hover:bg-orange-600 text-white" title="6 contactos hechos — decidir si seguir o marcar No interesada">
+                        <AlertTriangle className="h-3 w-3" /> Decidir
                       </Badge>
                     )}
                     {c.phone && c.resolved_whatsapp_phone && (
@@ -649,7 +657,12 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
 
   const renderRow = (c: CloserCreatorRow, idx: number) => {
     const revenue = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
-    const followUpPending = c.stage === "Asignada" && isFollowUpPending(c.last_contact_date);
+    // Estado de alertas: rojo (vencido) o naranja (decisión pendiente).
+    // Calculado en el cliente para no esperar el cron — el cron sólo se
+    // encarga de la notificación en la campanita, el badge visual es
+    // instantáneo.
+    const contactOverdue = isContactOverdue(c.passed_date, c.contact_count);
+    const decisionPending = needsContactDecision(c.stage, c.contact_count);
     const isLastAttempt = c.contact_count >= 6;
     const nextDate = getNextContactDate(c.passed_date, c.contact_count);
     const isCloser = isCloserRow(c);
@@ -699,12 +712,17 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
             <TableCell>
               <div className="flex gap-1">
-                {followUpPending && (
-                  <Badge variant="destructive" className="text-[10px] h-5 gap-0.5 whitespace-nowrap">
-                    <AlertTriangle className="h-3 w-3" /> Follow-up
+                {contactOverdue && (
+                  <Badge variant="destructive" className="text-[10px] h-5 gap-0.5 whitespace-nowrap" title="El contacto programado venció">
+                    <AlertTriangle className="h-3 w-3" /> Vencido
                   </Badge>
                 )}
-                {isLastAttempt && (
+                {decisionPending && (
+                  <Badge className="text-[10px] h-5 gap-0.5 whitespace-nowrap bg-orange-500 hover:bg-orange-600 text-white" title="6 contactos hechos — decidir si seguir o marcar No interesada">
+                    <AlertTriangle className="h-3 w-3" /> Decidir
+                  </Badge>
+                )}
+                {isLastAttempt && !decisionPending && (
                   <Badge className="text-[10px] h-5 bg-warning/20 text-warning gap-0.5 whitespace-nowrap">
                     <Clock className="h-3 w-3" /> Último intento
                   </Badge>
