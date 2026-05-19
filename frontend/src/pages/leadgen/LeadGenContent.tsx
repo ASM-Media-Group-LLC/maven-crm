@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock,
   Search, List, LayoutGrid, FileText, Calendar, ChevronLeft, ChevronRight, Shield, Eye, X,
+  ArrowUpDown, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { format, isSameDay, subDays, startOfWeek, addDays, isToday, isFuture, startOfDay, startOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -176,9 +177,29 @@ const LeadGenContent = () => {
 
   // Agent stats — from dedicated server-side query (all leads in range, not just current page)
   const { data: agentStatsRaw } = useLeadGenAgentStats(dateFromStr, dateToStr);
+
+  // Sort state para la tabla de agentes. Default: total desc — los más
+  // productivos arriba (mismo comportamiento que antes).
+  type AgentSortKey = "name" | "total" | "a+" | "a" | "b+" | "b" | "c" | "nuevos" | "recuperacion" | "phones";
+  const [agentSortKey, setAgentSortKey] = useState<AgentSortKey>("total");
+  const [agentSortDir, setAgentSortDir] = useState<"asc" | "desc">("desc");
+
+  const toggleAgentSort = useCallback((key: AgentSortKey) => {
+    setAgentSortKey((prev) => {
+      if (prev === key) {
+        // Mismo column → invertir dirección
+        setAgentSortDir((d) => (d === "desc" ? "asc" : "desc"));
+        return prev;
+      }
+      // Nueva column → empieza desc (lo más útil para "quién tiene más X")
+      setAgentSortDir("desc");
+      return key;
+    });
+  }, []);
+
   const agentStats = useMemo(() => {
     if (!agentStatsRaw) return [];
-    return Object.entries(agentStatsRaw)
+    const rows = Object.entries(agentStatsRaw)
       .filter(([agentId]) => !!profilesMap[agentId])
       .map(([agentId, stats]) => ({
         id: agentId,
@@ -192,8 +213,30 @@ const LeadGenContent = () => {
         phones: stats.phones ?? 0,
         nuevos: stats.nuevos ?? 0,
         recuperacion: stats.recuperacion ?? 0,
-      })).sort((a, b) => b.total - a.total);
-  }, [agentStatsRaw, profilesMap]);
+      }));
+
+    const cmp = (a: typeof rows[number], b: typeof rows[number]): number => {
+      let av: number | string;
+      let bv: number | string;
+      switch (agentSortKey) {
+        case "name":         av = a.name.toLowerCase(); bv = b.name.toLowerCase(); break;
+        case "total":        av = a.total;              bv = b.total;              break;
+        case "a+":           av = a.byQuality["a+"] ?? 0; bv = b.byQuality["a+"] ?? 0; break;
+        case "a":            av = a.byQuality["a"] ?? 0;  bv = b.byQuality["a"] ?? 0;  break;
+        case "b+":           av = a.byQuality["b+"] ?? 0; bv = b.byQuality["b+"] ?? 0; break;
+        case "b":            av = a.byQuality["b"] ?? 0;  bv = b.byQuality["b"] ?? 0;  break;
+        case "c":            av = a.byQuality["c"] ?? 0;  bv = b.byQuality["c"] ?? 0;  break;
+        case "nuevos":       av = a.nuevos;             bv = b.nuevos;             break;
+        case "recuperacion": av = a.recuperacion;       bv = b.recuperacion;       break;
+        case "phones":       av = a.phones;             bv = b.phones;             break;
+      }
+      if (av < bv) return agentSortDir === "asc" ? -1 : 1;
+      if (av > bv) return agentSortDir === "asc" ? 1 : -1;
+      // Tie-break por nombre para que el orden sea estable
+      return a.name.localeCompare(b.name, "es");
+    };
+    return rows.sort(cmp);
+  }, [agentStatsRaw, profilesMap, agentSortKey, agentSortDir]);
 
   const handleDateApply = useCallback((from: Date | undefined, to: Date | undefined) => {
     setDateFrom(from);
@@ -497,31 +540,42 @@ const LeadGenContent = () => {
                   <Table className="min-w-[700px]">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">Total</TableHead>
-                        <TableHead
-                          className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center"
-                          title="Leads nuevos (record_type ≠ reactivado)"
-                        >
-                          Nuevos
-                        </TableHead>
-                        <TableHead
-                          className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center"
-                          title="Leads recuperación (record_type = reactivado)"
-                        >
-                          Recup.
-                        </TableHead>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">A+</TableHead>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">A</TableHead>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">B+</TableHead>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">B</TableHead>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">C</TableHead>
-                        <TableHead
-                          className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center"
-                          title="Teléfonos obtenidos en el rango"
-                        >
-                          Tel
-                        </TableHead>
+                        {/* Sortable headers: click toggle desc/asc.
+                            Orden: Agente → Total → calidades (A+/A/B+/B/C)
+                            → Nuevos → Recup → Tel → Acciones. */}
+                        <AgentSortHead label="Agente" sortKey="name"
+                          currentKey={agentSortKey} dir={agentSortDir}
+                          onSort={toggleAgentSort} align="left" />
+                        <AgentSortHead label="Total" sortKey="total"
+                          currentKey={agentSortKey} dir={agentSortDir}
+                          onSort={toggleAgentSort} />
+                        <AgentSortHead label="A+" sortKey="a+"
+                          currentKey={agentSortKey} dir={agentSortDir}
+                          onSort={toggleAgentSort} />
+                        <AgentSortHead label="A" sortKey="a"
+                          currentKey={agentSortKey} dir={agentSortDir}
+                          onSort={toggleAgentSort} />
+                        <AgentSortHead label="B+" sortKey="b+"
+                          currentKey={agentSortKey} dir={agentSortDir}
+                          onSort={toggleAgentSort} />
+                        <AgentSortHead label="B" sortKey="b"
+                          currentKey={agentSortKey} dir={agentSortDir}
+                          onSort={toggleAgentSort} />
+                        <AgentSortHead label="C" sortKey="c"
+                          currentKey={agentSortKey} dir={agentSortDir}
+                          onSort={toggleAgentSort} />
+                        <AgentSortHead label="Nuevos" sortKey="nuevos"
+                          currentKey={agentSortKey} dir={agentSortDir}
+                          onSort={toggleAgentSort}
+                          tooltip="Leads nuevos (record_type ≠ reactivado)" />
+                        <AgentSortHead label="Recup." sortKey="recuperacion"
+                          currentKey={agentSortKey} dir={agentSortDir}
+                          onSort={toggleAgentSort}
+                          tooltip="Leads recuperación (record_type = reactivado)" />
+                        <AgentSortHead label="Tel" sortKey="phones"
+                          currentKey={agentSortKey} dir={agentSortDir}
+                          onSort={toggleAgentSort}
+                          tooltip="Teléfonos obtenidos en el rango" />
                         <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -539,13 +593,13 @@ const LeadGenContent = () => {
                             </div>
                           </TableCell>
                           <TableCell className="text-center"><Badge>{ag.total}</Badge></TableCell>
-                          <TableCell className="text-center font-medium">{ag.nuevos}</TableCell>
-                          <TableCell className="text-center font-medium">{ag.recuperacion}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["a+"] || 0}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["a"] || 0}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["b+"] || 0}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["b"] || 0}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["c"] || 0}</TableCell>
+                          <TableCell className="text-center font-medium">{ag.nuevos}</TableCell>
+                          <TableCell className="text-center font-medium">{ag.recuperacion}</TableCell>
                           <TableCell className="text-center">
                             {/* Teléfonos obtenidos en el rango — destacado
                                 cuando hay >0 para que se note el ranking. */}
@@ -695,5 +749,53 @@ function AgentsWeeklyCalendar({
     </Card>
   );
 }
+
+// ─── AgentSortHead ───────────────────────────────────────────────────
+// Header de columna clickeable que ordena la tabla de agentes. Por
+// convención: el primer click ordena DESC (mostrar el que más tiene
+// primero — el caso de uso típico cuando rankeás performance). Click
+// repetido sobre la misma columna invierte la dirección.
+//
+// El icono cambia según el estado:
+//   · ArrowUpDown gris claro → columna inactiva
+//   · ArrowDown sólido → ordenando DESC por esta columna
+//   · ArrowUp sólido → ordenando ASC por esta columna
+const AgentSortHead = ({
+  label,
+  sortKey,
+  currentKey,
+  dir,
+  onSort,
+  align = "center",
+  tooltip,
+}: {
+  label: string;
+  sortKey: string;
+  currentKey: string;
+  dir: "asc" | "desc";
+  onSort: (key: any) => void;
+  align?: "left" | "center";
+  tooltip?: string;
+}) => {
+  const active = currentKey === sortKey;
+  const Icon = !active ? ArrowUpDown : dir === "desc" ? ArrowDown : ArrowUp;
+  return (
+    <TableHead
+      className={`sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] ${align === "center" ? "text-center" : ""}`}
+      title={tooltip}
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className={`h-7 px-2 -mx-2 text-xs font-medium ${align === "center" ? "justify-center w-full" : ""} ${active ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        onClick={() => onSort(sortKey)}
+      >
+        {label}
+        <Icon className={`ml-1 h-3 w-3 ${active ? "text-foreground" : "text-muted-foreground/50"}`} />
+      </Button>
+    </TableHead>
+  );
+};
 
 export default LeadGenContent;
