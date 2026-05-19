@@ -186,9 +186,12 @@ const LeadGenContent = () => {
         total: stats.total,
         byQuality: stats.byQuality,
         firstLead: stats.firstLead,
-        // Teléfonos registrados por este agente en el rango. Default 0
-        // si el RPC viejo (sin la columna) está activo.
+        // Defaults a 0 si el RPC viejo está activo. Mismo criterio que
+        // el reporte programado de LLGs (record_type 'reactivado' →
+        // recuperacion; el resto → nuevos).
         phones: stats.phones ?? 0,
+        nuevos: stats.nuevos ?? 0,
+        recuperacion: stats.recuperacion ?? 0,
       })).sort((a, b) => b.total - a.total);
   }, [agentStatsRaw, profilesMap]);
 
@@ -460,6 +463,11 @@ const LeadGenContent = () => {
                             <p className="font-semibold text-sm">{ag.name}</p>
                             <p className="text-xs text-muted-foreground">
                               {ag.total} leads
+                              {(ag.nuevos > 0 || ag.recuperacion > 0) && (
+                                <span className="ml-1.5">
+                                  ({ag.nuevos} nv · {ag.recuperacion} rec)
+                                </span>
+                              )}
                               {ag.phones > 0 && (
                                 <span className="ml-1.5 text-primary font-medium">· {ag.phones} tel</span>
                               )}
@@ -491,6 +499,18 @@ const LeadGenContent = () => {
                       <TableRow>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">Total</TableHead>
+                        <TableHead
+                          className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center"
+                          title="Leads nuevos (record_type ≠ reactivado)"
+                        >
+                          Nuevos
+                        </TableHead>
+                        <TableHead
+                          className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center"
+                          title="Leads recuperación (record_type = reactivado)"
+                        >
+                          Recup.
+                        </TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">A+</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">A</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">B+</TableHead>
@@ -519,6 +539,8 @@ const LeadGenContent = () => {
                             </div>
                           </TableCell>
                           <TableCell className="text-center"><Badge>{ag.total}</Badge></TableCell>
+                          <TableCell className="text-center font-medium">{ag.nuevos}</TableCell>
+                          <TableCell className="text-center font-medium">{ag.recuperacion}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["a+"] || 0}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["a"] || 0}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["b+"] || 0}</TableCell>
@@ -540,7 +562,7 @@ const LeadGenContent = () => {
                       ))}
                       {agentStats.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                             No hay agentes con leads en este rango
                           </TableCell>
                         </TableRow>

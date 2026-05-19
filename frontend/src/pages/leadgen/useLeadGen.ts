@@ -286,14 +286,16 @@ export const useLeadGenAgentStats = (dateFrom?: string, dateTo?: string) =>
         p_date_to: dateTo ?? null,
       });
       if (error) throw error;
-      // Shape: { [user_id]: { total, byQuality, firstLead, phones } }
+      // Shape: { [user_id]: { total, byQuality, firstLead, phones, nuevos, recuperacion } }
       // phones agregado 2026-05-19 (migration 20260519180000) — cuenta
       // teléfonos registrados por el agente en el rango (closers_contacts
       // con created_by=agente, phone NOT NULL, created_at en rango).
-      // Mismo criterio que el reporte programado de LLGs.
+      // nuevos/recuperacion agregados 2026-05-19 (migration 20260519190000):
+      // mismo split que el reporte programado (record_type='reactivado' →
+      // recuperacion; el resto → nuevos).
       //
-      // Backward-compat: si el RPC viejo todavía está deployado (sin la
-      // columna phones), defaulteamos a 0 al consumir en el componente.
+      // Backward-compat: si el RPC viejo todavía está deployado (sin las
+      // columnas nuevas), defaulteamos a 0 al consumir en el componente.
       return (data ?? {}) as Record<
         string,
         {
@@ -301,6 +303,8 @@ export const useLeadGenAgentStats = (dateFrom?: string, dateTo?: string) =>
           byQuality: Record<string, number>;
           firstLead: string;
           phones?: number;
+          nuevos?: number;
+          recuperacion?: number;
         }
       >;
     },
