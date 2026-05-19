@@ -457,57 +457,65 @@ const LeadGenContent = () => {
         )}
       </div>
 
-      {/* Filters bar */}
-      <div className="shrink-0 px-6 py-3 flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar lead..."
-            className="pl-9 h-9"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-        </div>
-        {/* El date picker vive en el header arriba a la derecha
-            (global). Acá quedan sólo los filtros tab-specific. */}
-        {(activeTab === "leads" || activeTab === "leads-hora") && (
-          <>
-            <Select value={qualityFilter || undefined} onValueChange={(v) => setQualityFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todos</SelectItem>
-                {QUALITY_OPTIONS.map(q => (
-                  <SelectItem key={q.value} value={q.value.toLowerCase()}>{q.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={agencyFilter || undefined} onValueChange={(v) => setAgencyFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Agencia" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todos</SelectItem>
-                {LEADGEN_COMPANIES.map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </>
-        )}
-        {(activeTab === "leads" || activeTab === "agentes") && (
-          <div className="ml-auto flex gap-1">
-            <Button variant={listView === "list" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setListView("list")}>
-              <List className="h-4 w-4" />
-            </Button>
-            <Button variant={listView === "grid" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setListView("grid")}>
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            {activeTab === "agentes" && (
-              <Button variant={listView === "calendar" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setListView("calendar")}>
-                <Calendar className="h-4 w-4" />
+      {/* Filters bar — visible sólo en tabs que tienen algún filtro
+          o toggle. En Dashboard / Supervisores / Rendimiento esta
+          barra entera desaparece (ya no muestra search vacío). */}
+      {(activeTab === "leads" || activeTab === "leads-hora" || activeTab === "agentes") && (
+        <div className="shrink-0 px-6 py-3 flex items-center gap-3 flex-wrap">
+          {/* Buscar lead → SOLO en tabs de leads. Search filtra el
+              listado de la tabla — no aplica a Agentes ni a otros. */}
+          {(activeTab === "leads" || activeTab === "leads-hora") && (
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar lead..."
+                className="pl-9 h-9"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </div>
+          )}
+          {/* Filtros de categoría/agencia: sólo aplican al listado
+              de leads (incluso "leads-hora" comparte el dataset). */}
+          {(activeTab === "leads" || activeTab === "leads-hora") && (
+            <>
+              <Select value={qualityFilter || undefined} onValueChange={(v) => setQualityFilter(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  {QUALITY_OPTIONS.map(q => (
+                    <SelectItem key={q.value} value={q.value.toLowerCase()}>{q.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={agencyFilter || undefined} onValueChange={(v) => setAgencyFilter(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Agencia" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  {LEADGEN_COMPANIES.map(c => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
+          {(activeTab === "leads" || activeTab === "agentes") && (
+            <div className="ml-auto flex gap-1">
+              <Button variant={listView === "list" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setListView("list")}>
+                <List className="h-4 w-4" />
               </Button>
-            )}
-          </div>
-        )}
-      </div>
+              <Button variant={listView === "grid" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setListView("grid")}>
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              {activeTab === "agentes" && (
+                <Button variant={listView === "calendar" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setListView("calendar")}>
+                  <Calendar className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tab content - fills remaining space */}
       <div className="flex-1 min-h-0 flex flex-col px-6 pb-4" ref={scrollRef}>
