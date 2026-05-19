@@ -58,7 +58,7 @@ BEGIN
     'Closers',
     'closer_assigned:' || NEW.id::text || ':' || NEW.assigned_to::text
   )
-  ON CONFLICT (automation_key) DO NOTHING;
+  ON CONFLICT (automation_key) WHERE automation_key IS NOT NULL DO NOTHING;
 
   RETURN NEW;
 END;
@@ -122,7 +122,7 @@ BEGIN
         'Closers',
         'closer_contact_decision:' || rec.id::text
       )
-      ON CONFLICT (automation_key) DO NOTHING;
+      ON CONFLICT (automation_key) WHERE automation_key IS NOT NULL DO NOTHING;
       CONTINUE;
     END IF;
 
@@ -156,7 +156,7 @@ BEGIN
         'Closers',
         'closer_contact_overdue:' || rec.id::text || ':' || next_idx::text
       )
-      ON CONFLICT (automation_key) DO NOTHING;
+      ON CONFLICT (automation_key) WHERE automation_key IS NOT NULL DO NOTHING;
     END IF;
   END LOOP;
 END;
