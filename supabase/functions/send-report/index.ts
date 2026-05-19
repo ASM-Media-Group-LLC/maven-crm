@@ -461,16 +461,22 @@ async function fetchLlgMetrics(
   //     número mucho después de crear el lead).
   //   · phone IS NOT NULL (contacto agregado SIN número no cuenta —
   //     coherente con la regla acordada con el user).
-  //   · leadgen_entry_id IS NOT NULL (sólo contactos que vinieron del
-  //     flujo LeadGen → AddContactoModal; contactos creados desde
-  //     otros flujos no atribuyen a LLG).
+  //
+  // BUG-FIX 2026-05-19: antes filtrábamos `leadgen_entry_id IS NOT NULL`
+  // para "excluir otros flujos", pero la exclusión por flujo ya la hace
+  // el role filter (`role_name='LLG'` en fetchModuleMetrics) — si un
+  // closer crea un contacto, no aparece en el LLG report por su rol,
+  // FK o no. El FK quedaba NULL en casos legítimos (el LLG agregaba
+  // un contacto SIN seleccionar lead pre-existente del autocomplete),
+  // y esos números se perdían. Sacamos el filtro: Yeison, Gislaine,
+  // Paula tenían TODOS sus phones en 0 porque sus contactos no tienen
+  // FK (legítimos pero excluidos).
   const { data: contacts, error: contactsErr } = await admin
     .from("closers_contacts")
-    .select("created_by, phone, leadgen_entry_id")
+    .select("created_by, phone")
     .gte("created_at", from)
     .lte("created_at", to)
-    .not("phone", "is", null)
-    .not("leadgen_entry_id", "is", null);
+    .not("phone", "is", null);
   if (contactsErr) throw contactsErr;
 
   // Split: NUEVOS (record_type 'nuevo' o NULL legacy) vs RECUPERACIÓN
