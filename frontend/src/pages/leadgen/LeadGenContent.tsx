@@ -186,6 +186,9 @@ const LeadGenContent = () => {
         total: stats.total,
         byQuality: stats.byQuality,
         firstLead: stats.firstLead,
+        // Teléfonos registrados por este agente en el rango. Default 0
+        // si el RPC viejo (sin la columna) está activo.
+        phones: stats.phones ?? 0,
       })).sort((a, b) => b.total - a.total);
   }, [agentStatsRaw, profilesMap]);
 
@@ -455,7 +458,12 @@ const LeadGenContent = () => {
                           </Avatar>
                           <div>
                             <p className="font-semibold text-sm">{ag.name}</p>
-                            <p className="text-xs text-muted-foreground">{ag.total} leads</p>
+                            <p className="text-xs text-muted-foreground">
+                              {ag.total} leads
+                              {ag.phones > 0 && (
+                                <span className="ml-1.5 text-primary font-medium">· {ag.phones} tel</span>
+                              )}
+                            </p>
                           </div>
                         </div>
                         <div className="grid grid-cols-5 gap-px rounded-lg overflow-hidden border">
@@ -488,6 +496,12 @@ const LeadGenContent = () => {
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">B+</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">B</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">C</TableHead>
+                        <TableHead
+                          className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center"
+                          title="Teléfonos obtenidos en el rango"
+                        >
+                          Tel
+                        </TableHead>
                         <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -510,6 +524,13 @@ const LeadGenContent = () => {
                           <TableCell className="text-center font-medium">{ag.byQuality["b+"] || 0}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["b"] || 0}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["c"] || 0}</TableCell>
+                          <TableCell className="text-center">
+                            {/* Teléfonos obtenidos en el rango — destacado
+                                cuando hay >0 para que se note el ranking. */}
+                            <span className={ag.phones > 0 ? "font-semibold text-primary" : "text-muted-foreground"}>
+                              {ag.phones}
+                            </span>
+                          </TableCell>
                           <TableCell className="sticky right-0 bg-card w-[80px]" onClick={(e) => e.stopPropagation()}>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedAgent({ id: ag.id, name: ag.name })}>
                               <Eye className="h-4 w-4" />
@@ -519,7 +540,7 @@ const LeadGenContent = () => {
                       ))}
                       {agentStats.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                             No hay agentes con leads en este rango
                           </TableCell>
                         </TableRow>
