@@ -67,9 +67,13 @@ const LeadGenContent = () => {
     return "owner";
   }, [dataScope]);
 
-  // Date range state with today as default
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  // Date range state — default al mes vigente (día 1 → hoy).
+  // Antes era undefined/undefined (todo el histórico) — pero LeadGen
+  // tiene 19k+ leads en backlog y para el operador típico la métrica
+  // útil es "qué pasó este mes". El usuario puede ampliar el rango
+  // con el picker arriba a la derecha cuando quiera ver más atrás.
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
+  const [dateTo, setDateTo] = useState<Date | undefined>(() => new Date());
   const [page, setPage] = useState(0);
   const [agentPage, setAgentPage] = useState(1);
   // viewAsLgUserId — feature admin/owner: ver el panel como otro LLG.
