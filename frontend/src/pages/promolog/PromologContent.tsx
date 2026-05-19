@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isSameDay, addDays, startOfWeek, isToday, isFuture, startOfDay } from "date-fns";
@@ -633,21 +634,22 @@ const PromologContent = () => {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — SubtabNav (glow azul gradient + ring) para match
+          con Closers / LeadGen / Creadores / etc. */}
       <div className="shrink-0 px-6 pb-2">
-        <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
+        <SubtabNav>
           {tabItems.filter(tab => isManagement || tab.id !== "agentes").map((tab) => (
-            <Button
+            <SubtabNavItem
               key={tab.id}
-              variant={activeTab === tab.id ? "secondary" : "ghost"}
-              size="sm"
+              active={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
+              className="gap-1.5"
             >
-              <tab.icon className="mr-1.5 h-4 w-4" />
+              <tab.icon className="h-4 w-4" />
               {tab.label}
-            </Button>
+            </SubtabNavItem>
           ))}
-        </div>
+        </SubtabNav>
       </div>
 
       {/* Promos tab */}

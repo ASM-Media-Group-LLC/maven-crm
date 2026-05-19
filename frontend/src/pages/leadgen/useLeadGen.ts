@@ -123,6 +123,54 @@ export const useLeadGenByDateRange = (
     placeholderData: keepPreviousData,
   });
 
+/** Phones obtenidos por día en el rango — para el chart del Dashboard.
+ *  Si no hay rango, default últimos 30 días (a partir de hoy).
+ *  Mismo criterio que el resto: closers_contacts.created_at + phone NOT
+ *  NULL (no filtramos por created_by — el chart muestra el agregado del
+ *  equipo, no per-user). */
+export const useLeadGenPhonesDaily = (dateFrom?: string, dateTo?: string) =>
+  useQuery({
+    queryKey: ["leadgen-phones-daily", dateFrom, dateTo],
+    queryFn: async () => {
+      // Default: últimos 30 días terminando HOY.
+      const to = dateTo ? new Date(dateTo) : new Date();
+      const from = dateFrom
+        ? new Date(dateFrom)
+        : new Date(to.getTime() - 29 * 24 * 60 * 60 * 1000);
+      // Normalizamos a inicio/fin del día.
+      const fromIso = new Date(from.setHours(0, 0, 0, 0)).toISOString();
+      const toIso = new Date(to.setHours(23, 59, 59, 999)).toISOString();
+
+      const { data, error } = await supabase
+        .from("closers_contacts")
+        .select("created_at")
+        .not("phone", "is", null)
+        .gte("created_at", fromIso)
+        .lte("created_at", toIso);
+      if (error) throw error;
+
+      // Agrupar por día (YYYY-MM-DD)
+      const byDay: Record<string, number> = {};
+      for (const row of (data ?? []) as Array<{ created_at: string }>) {
+        const day = row.created_at.slice(0, 10);
+        byDay[day] = (byDay[day] || 0) + 1;
+      }
+
+      // Construir array de días — incluso los días sin actividad
+      // aparecen con 0 para que el chart se vea continuo.
+      const days: Array<{ date: string; count: number; label: string }> = [];
+      const start = new Date(fromIso);
+      const end = new Date(toIso);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const key = d.toISOString().slice(0, 10);
+        const label = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+        days.push({ date: key, count: byDay[key] || 0, label });
+      }
+      return days;
+    },
+    staleTime: 60_000,
+  });
+
 /** Fetch profiles for agent names */
 export const useLeadGenProfiles = () =>
   useQuery({

@@ -1,5 +1,6 @@
-import { Star, TrendingUp, ArrowUpRight, ArrowRight, ArrowDownRight, Users, PhoneCall } from "lucide-react";
+import { Star, TrendingUp, ArrowUpRight, ArrowRight, ArrowDownRight, Users, PhoneCall, Trophy, Phone } from "lucide-react";
 import KpiCard from "@/components/dashboard/KpiCard";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatCompact } from "@/lib/format";
 
 interface ActiveFilter {
@@ -13,10 +14,19 @@ export interface SummaryStats {
   byQuality: Record<string, number>;
 }
 
+export interface MejorLlg {
+  name: string;
+  phones: number;
+}
+
 interface Props {
   stats: SummaryStats;
   activeFilter?: ActiveFilter;
   onFilterChange?: (filter: ActiveFilter) => void;
+  // Mejor LLG del rango (top en `phones`). Si no hay actividad → null.
+  mejorLlg?: MejorLlg | null;
+  // Etiqueta legible del rango actual ("Mayo 2026", "Últimos 7 días", etc.)
+  rangeLabel?: string;
 }
 
 // Cards de categorías de leads — patrón estándar KpiCard. Click toggles
@@ -29,7 +39,54 @@ const categoryConfig = [
   { key: "c", label: "C", icon: ArrowDownRight, color: "bg-slate-500" },
 ];
 
-const LeadGenCantidadCard = ({ stats, activeFilter, onFilterChange }: Props) => {
+// Helper para iniciales del avatar — máximo 2 chars en uppercase.
+const initials = (name: string): string => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "??";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+};
+
+// Card "hero" para Mejor LLG — span 2 en md, 3 en lg → layout
+// horizontal con avatar + nombre completo + métrica destacada. Mismo
+// estilo glass que las demás KpiCards (gradient corner + glow ámbar
+// para el "trophy").
+const MejorLlgCard = ({ data, rangeLabel }: { data: MejorLlg | null; rangeLabel?: string }) => (
+  <div className="group relative overflow-hidden rounded-xl border border-white/10 bg-card/60 bg-gradient-to-br from-amber-500/[0.05] to-transparent p-4 ring-1 ring-amber-400/10 md:col-span-2 lg:col-span-3">
+    {/* Glow ámbar más fuerte que las demás cards — esta es la métrica destacada */}
+    <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-30 bg-amber-500 transition-opacity group-hover:opacity-50" />
+    <div className="relative space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500">
+          <Trophy className="h-5 w-5 text-white" />
+        </div>
+        <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">Mejor LLG</p>
+      </div>
+      {data ? (
+        <div className="flex items-center gap-3">
+          <Avatar className="h-12 w-12">
+            <AvatarFallback className="bg-amber-500/20 text-amber-200 font-semibold">
+              {initials(data.name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-bold leading-tight truncate" title={data.name}>{data.name}</p>
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
+              <Phone className="h-3.5 w-3.5" />
+              <span className="font-semibold text-foreground tabular-nums">{data.phones}</span>
+              <span>teléfono{data.phones === 1 ? "" : "s"}</span>
+              {rangeLabel && <span className="text-muted-foreground/60">· {rangeLabel}</span>}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">Sin actividad en el rango.</p>
+      )}
+    </div>
+  </div>
+);
+
+const LeadGenCantidadCard = ({ stats, activeFilter, onFilterChange, mejorLlg, rangeLabel }: Props) => {
   const { total, qa, byQuality } = stats;
 
   const handleClick = (key: string) => {
@@ -41,8 +98,20 @@ const LeadGenCantidadCard = ({ stats, activeFilter, onFilterChange }: Props) => 
     }
   };
 
+  // Grid responsive:
+  //   · 2 cols mobile (mejor llg span 2, demás 1×7 wraps)
+  //   · 4 cols md (mejor llg span 2 + total + qa fila 1, 5 categorías filas 2-3)
+  //   · 5 cols lg (mejor llg span 3 + total + qa = fila 1 completa,
+  //     5 categorías = fila 2 completa) ← layout balanceado en pantalla grande
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-7">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-5">
+      {/* Row 1 lg: Mejor LLG (span 3) + Total + QA */}
+      <MejorLlgCard data={mejorLlg ?? null} rangeLabel={rangeLabel} />
+
+      <KpiCard label="Total" value={formatCompact(total)} icon={Users} color="bg-violet-500" />
+      <KpiCard label="QA" value={formatCompact(qa)} icon={PhoneCall} color="bg-blue-500" />
+
+      {/* Row 2 lg: 5 categorías ocupan toda la fila */}
       {categoryConfig.map((cat) => {
         const count = byQuality[cat.key] ?? 0;
         const isActive = activeFilter?.type === "categoria" && activeFilter.value === cat.key;
@@ -58,9 +127,6 @@ const LeadGenCantidadCard = ({ stats, activeFilter, onFilterChange }: Props) => 
           />
         );
       })}
-
-      <KpiCard label="Total" value={formatCompact(total)} icon={Users} color="bg-violet-500" />
-      <KpiCard label="QA" value={formatCompact(qa)} icon={PhoneCall} color="bg-blue-500" />
     </div>
   );
 };

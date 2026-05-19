@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock,
   Search, List, LayoutGrid, FileText, Calendar, ChevronLeft, ChevronRight, Shield, Eye, X,
-  ArrowUpDown, ArrowUp, ArrowDown,
+  ArrowUpDown, ArrowUp, ArrowDown, LayoutDashboard,
 } from "lucide-react";
 import { format, isSameDay, subDays, startOfWeek, addDays, isToday, isFuture, startOfDay, startOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -18,8 +18,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 
-import { useLeadGenByDateRange, useLeadGenProfiles, useLeadGenAgentStats, useLeadGenSummaryStats } from "./useLeadGen";
+import { useLeadGenByDateRange, useLeadGenProfiles, useLeadGenAgentStats, useLeadGenSummaryStats, useLeadGenPhonesDaily } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,6 +38,7 @@ import AgentDetailView from "./AgentDetailView";
 import AgentHourlyPerformance from "./AgentHourlyPerformance";
 import LeadGenSupervisorView from "./LeadGenSupervisorView";
 import LeadGenPerformanceView from "./LeadGenPerformanceView";
+import LeadGenDashboardExtras from "./LeadGenDashboardExtras";
 import ViewAsLlgPicker from "./ViewAsLlgPicker";
 import AnalyticsSectionBanner from "@/components/analytics/AnalyticsSectionBanner";
 
@@ -104,11 +106,15 @@ const LeadGenContent = () => {
   const tabs = useMemo(() => {
     if (viewMode === "agent") {
       return [
+        // El agente NO ve el subtab Dashboard porque hoy las KPIs son
+        // del equipo entero — no aportan a su vista personal. Si en el
+        // futuro hacemos KPIs per-agent, agregar acá.
         { id: "leads", label: "Leads", icon: CheckSquare },
         { id: "leads-hora", label: "Rendimiento por Hora", icon: Clock },
       ];
     }
     const baseTabs = [
+      { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
       { id: "leads", label: "Leads", icon: CheckSquare },
       { id: "agentes", label: "Agentes", icon: Users },
     ];
@@ -119,13 +125,21 @@ const LeadGenContent = () => {
     return baseTabs;
   }, [viewMode]);
 
-  // UI state
-  const [statsCollapsed, setStatsCollapsed] = useState(false);
+  // UI state.
+  // Antes manejábamos `statsCollapsed` para encoger las KPI cards en
+  // scroll. Ya no aplica: las KPIs viven solo en el subtab Dashboard,
+  // los otros tabs no las muestran y por ende usan toda la altura.
+  // El scrollRef + handleContentScroll quedan como noop por si algún
+  // tab futuro quiere reaccionar al scroll del contenido.
   const scrollRef = useRef<HTMLDivElement>(null);
-  const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setStatsCollapsed(e.currentTarget.scrollTop > 40);
+  const handleContentScroll = useCallback((_e: React.UIEvent<HTMLDivElement>) => {
+    // noop por ahora
   }, []);
-  const [activeTab, setActiveTab] = useState("leads");
+  // Default landing: Dashboard para supervisor/owner (vista analítica).
+  // Para el agente, su default sigue siendo Leads (su trabajo diario).
+  const [activeTab, setActiveTab] = useState<string>(
+    viewMode === "agent" ? "leads" : "dashboard",
+  );
   const [listView, setListView] = useState<"list" | "grid" | "calendar">("list");
   const [weekOffset, setWeekOffset] = useState(0);
   const [addLeadOpen, setAddLeadOpen] = useState(false);
@@ -196,6 +210,68 @@ const LeadGenContent = () => {
       return key;
     });
   }, []);
+
+  // Mejor LLG del rango = agente con más phones registrados.
+  // Derivado del mismo agentStatsRaw — no hace falta query extra.
+  // Tiebreaker (decidido con el operador): primero phones DESC,
+  // después leads nuevos DESC (si dos LLGs tienen mismos phones, gana
+  // el que metió más nuevos), después alfabético para que sea estable.
+  const mejorLlg = useMemo(() => {
+    if (!agentStatsRaw) return null;
+    const rows = Object.entries(agentStatsRaw)
+      .filter(([id]) => !!profilesMap[id])
+      .map(([id, s]) => ({
+        name: profilesMap[id] || "Agente",
+        phones: s.phones ?? 0,
+        nuevos: s.nuevos ?? 0,
+      }))
+      .filter((r) => r.phones > 0)
+      .sort((a, b) =>
+        b.phones - a.phones
+        || b.nuevos - a.nuevos
+        || a.name.localeCompare(b.name, "es"),
+      );
+    return rows[0] ? { name: rows[0].name, phones: rows[0].phones } : null;
+  }, [agentStatsRaw, profilesMap]);
+
+  // Top 3 LLGs para el ranking del dashboard. Mismo orden de
+  // tiebreaker que mejorLlg, sólo que cortamos a 3.
+  const topLlgs = useMemo(() => {
+    if (!agentStatsRaw) return [];
+    return Object.entries(agentStatsRaw)
+      .filter(([id]) => !!profilesMap[id])
+      .map(([id, s]) => ({
+        name: profilesMap[id] || "Agente",
+        phones: s.phones ?? 0,
+        nuevos: s.nuevos ?? 0,
+      }))
+      .filter((r) => r.phones > 0)
+      .sort((a, b) =>
+        b.phones - a.phones
+        || b.nuevos - a.nuevos
+        || a.name.localeCompare(b.name, "es"),
+      )
+      .slice(0, 3);
+  }, [agentStatsRaw, profilesMap]);
+
+  // Phones por día — alimenta el chart del dashboard. Default últimos
+  // 30 días si no hay filtro activo.
+  const { data: phonesDaily = [], isLoading: phonesDailyLoading } = useLeadGenPhonesDaily(
+    dateFromStr,
+    dateToStr,
+  );
+
+  // Etiqueta legible del rango para mostrar en la card hero. Si el
+  // operador no eligió rango, no mostramos label — sería engañoso decir
+  // "mayo 2026" cuando el conteo cubre todos los datos históricos.
+  const rangeLabel = useMemo(() => {
+    if (!dateFrom || !dateTo) return undefined;
+    // Si from y to caen en el mismo mes/año, mostramos "Mayo 2026".
+    // Si no, formato corto "4 may → 18 may".
+    const sameMonth = dateFrom.getMonth() === dateTo.getMonth() && dateFrom.getFullYear() === dateTo.getFullYear();
+    if (sameMonth) return format(dateFrom, "MMMM yyyy", { locale: es });
+    return `${format(dateFrom, "d MMM", { locale: es })} → ${format(dateTo, "d MMM", { locale: es })}`;
+  }, [dateFrom, dateTo]);
 
   const agentStats = useMemo(() => {
     if (!agentStatsRaw) return [];
@@ -283,6 +359,17 @@ const LeadGenContent = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Date picker global — visible en TODOS los subtabs.
+                Antes vivía en la filter bar (sólo Leads / Agentes).
+                Ahora persiste arriba a la derecha porque también
+                alimenta los KPIs del Dashboard. */}
+            <DateRangePicker
+              from={dateFrom}
+              to={dateTo}
+              onApply={handleDateApply}
+              placeholder="Selecciona fechas"
+              className="h-9"
+            />
             {viewMode !== "agent" && (
               <ViewAsLlgPicker
                 value={viewAsLgUserId}
@@ -338,24 +425,26 @@ const LeadGenContent = () => {
         </div>
       )}
 
-      {/* KPI Cards — collapse on table scroll */}
-      <div className={`shrink-0 px-6 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[200px] opacity-100 pt-4 pb-2"}`}>
-        <LeadGenCantidadCard stats={statsForCard} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
-      </div>
-
-      {/* Tab bar */}
+      {/* Tab bar — usamos SubtabNav (gradient azul + ring + shadow)
+          para que match con Closers / Creadores / Ventas / Contactos /
+          Chatter Evaluator. Antes era un grupo de Buttons sin glow. */}
       <div className="shrink-0 px-6 py-2 flex items-center justify-between gap-4">
-        <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
+        <SubtabNav>
           {tabs.map(tab => {
             const Icon = tab.icon;
             return (
-              <Button key={tab.id} variant={activeTab === tab.id ? "secondary" : "ghost"} size="sm" onClick={() => setActiveTab(tab.id)} className="text-xs">
+              <SubtabNavItem
+                key={tab.id}
+                active={activeTab === tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="gap-1.5"
+              >
                 <Icon className="h-3.5 w-3.5" />
                 {tab.label}
-              </Button>
+              </SubtabNavItem>
             );
           })}
-        </div>
+        </SubtabNav>
         {viewMode !== "agent" && (
           <Button variant="outline" size="sm" onClick={() => navigate("/leadgen/base-datos")}>
             <Database className="h-4 w-4" />
@@ -375,13 +464,8 @@ const LeadGenContent = () => {
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
-        <DateRangePicker
-          from={dateFrom}
-          to={dateTo}
-          onApply={handleDateApply}
-          placeholder="Selecciona fechas"
-          className="h-9"
-        />
+        {/* El date picker vive en el header arriba a la derecha
+            (global). Acá quedan sólo los filtros tab-specific. */}
         {(activeTab === "leads" || activeTab === "leads-hora") && (
           <>
             <Select value={qualityFilter || undefined} onValueChange={(v) => setQualityFilter(v === "__all__" ? "" : v)}>
@@ -423,6 +507,30 @@ const LeadGenContent = () => {
 
       {/* Tab content - fills remaining space */}
       <div className="flex-1 min-h-0 flex flex-col px-6 pb-4" ref={scrollRef}>
+        {/* === DASHBOARD TAB ===
+            KPI overview (Mejor LLG hero + Total + QA + 5 categorías)
+            + extras (Top 3 LLGs, chart phones/día, donut). Cuando el
+            operador navega a otros tabs, todo este bloque desaparece
+            para ganar espacio vertical en las listas. */}
+        {activeTab === "dashboard" && (
+          <div className="flex-1 min-h-0 overflow-auto pt-4 pb-2 space-y-3">
+            <LeadGenCantidadCard
+              stats={statsForCard}
+              activeFilter={activeFilter}
+              onFilterChange={setActiveFilter}
+              mejorLlg={mejorLlg}
+              rangeLabel={rangeLabel}
+            />
+            <LeadGenDashboardExtras
+              topLlgs={topLlgs}
+              phonesDaily={phonesDaily}
+              byQuality={statsForCard.byQuality}
+              rangeLabel={rangeLabel}
+              loading={phonesDailyLoading}
+            />
+          </div>
+        )}
+
         {/* === LEADS TAB === */}
         {activeTab === "leads-hora" && (
           <div className="flex-1 min-h-0 overflow-auto" onScroll={handleContentScroll}>
