@@ -467,11 +467,51 @@ Deno.serve(async (req) => {
       // 2. Delete auth user. Si esto falla (FK rara, lock, etc.) NO
       // devolvemos éxito — el frontend tiene que ver el error para
       // que el admin no asuma que el usuario quedó borrado.
+      //
+      // Fallback: gotrue.deleteUser surfacea "Database error deleting
+      // user" genérico que oculta el error PG real (FK violation,
+      // trigger fail, etc.). Si falla, intentamos un DELETE directo
+      // a auth.users con el service role — eso sí devuelve el FK
+      // violation específico para diagnosticar y arreglar el purge.
       const { error: deleteError } = await adminClient.auth.admin.deleteUser(user_id);
       if (deleteError) {
-        console.error("[delete_user] delete auth user failed:", deleteError.message);
+        console.error(
+          "[delete_user] gotrue deleteUser failed:",
+          JSON.stringify({
+            message: deleteError.message,
+            status: (deleteError as { status?: number }).status,
+            code: (deleteError as { code?: string }).code,
+            name: deleteError.name,
+          }),
+        );
+        // Probar DELETE directo para obtener el FK violation real
+        let pgErrorDetail: string | null = null;
+        try {
+          const { error: pgErr } = await adminClient.rpc("app_force_delete_auth_user", {
+            p_user_id: user_id,
+          });
+          if (pgErr) {
+            pgErrorDetail = pgErr.message;
+            console.error("[delete_user] direct delete also failed:", pgErr.message);
+          } else {
+            // El DELETE directo funcionó — gotrue habrá fallado por
+            // razones de su propio side (sesiones colgadas, etc.).
+            console.log(`[delete_user] Successfully deleted via direct DELETE for user_id=${user_id}`);
+            return new Response(JSON.stringify({ success: true }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } catch (e) {
+          console.warn(
+            "[delete_user] app_force_delete_auth_user RPC not available:",
+            (e as Error).message,
+          );
+        }
         return new Response(
-          JSON.stringify({ error: `Error eliminando usuario: ${deleteError.message}` }),
+          JSON.stringify({
+            error: `Error eliminando usuario: ${deleteError.message}`,
+            detail: pgErrorDetail,
+          }),
           {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
