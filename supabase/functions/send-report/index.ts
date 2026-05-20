@@ -959,20 +959,25 @@ function renderTableSection(args: {
     ? `<tr><td colspan="${colHeaders.length}" style="padding:24px;text-align:center;color:#6b7280;font-style:italic;">Sin actividad en el rango.</td></tr>`
     : "";
 
+  // Mezclamos header + tabla en UN solo <table> con un <thead> de
+  // dos filas (título de sección + columnas). Esto evita el chip
+  // "trimmed content" de Gmail, que aparece cuando hay <div> sueltos
+  // entre tablas — Gmail los interpreta como contenido cuoteado y
+  // los colapsa. El header principal del email ya usa este patrón.
   return `
-    <div style="margin-top:18px;">
-      <div style="font-size:12px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:#4338ca;padding:8px 6px 10px;border-bottom:2px solid #ede9fe;">
-        ${escapeHtml(sectionTitle)}
-      </div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:auto;margin-top:8px;">
-        <thead>
-          <tr style="background:#f9fafb;color:#374151;text-transform:uppercase;font-size:9px;letter-spacing:0.6px;">
-            ${colHeaders.map((h, i) => `<th style="padding:8px 6px;text-align:${i === 0 ? "left" : "right"};font-weight:700;white-space:nowrap;">${escapeHtml(h)}</th>`).join("")}
-          </tr>
-        </thead>
-        <tbody>${tableRows}${emptyState}</tbody>
-      </table>
-    </div>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;font-size:12px;table-layout:auto;margin-top:18px;">
+      <thead>
+        <tr>
+          <th colspan="${colHeaders.length}" style="text-align:left;padding:8px 6px 10px;font-size:12px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:#4338ca;border-bottom:2px solid #ede9fe;">
+            ${escapeHtml(sectionTitle)}
+          </th>
+        </tr>
+        <tr style="background:#f9fafb;color:#374151;text-transform:uppercase;font-size:9px;letter-spacing:0.6px;">
+          ${colHeaders.map((h, i) => `<th style="padding:8px 6px;text-align:${i === 0 ? "left" : "right"};font-weight:700;white-space:nowrap;">${escapeHtml(h)}</th>`).join("")}
+        </tr>
+      </thead>
+      <tbody>${tableRows}${emptyState}</tbody>
+    </table>
   `;
 }
 
