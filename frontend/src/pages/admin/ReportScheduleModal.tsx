@@ -315,16 +315,18 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* max-h + overflow-y-auto para que el form sea scrolleable
-          cuando es alto (e.g., combinado con muchos roles + métricas).
-          Antes el modal se "bugeaba" porque crecía fuera del viewport
-          sin scroll. */}
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      {/* Layout: header fijo + middle scrolleable + footer fijo.
+          La scrollbar vive DENTRO del padding del middle así no se
+          mete con los bordes redondeados del modal (antes la
+          scrollbar se salía del border-radius y quedaba feo).
+          overflow-hidden en DialogContent + overflow-y-auto en el
+          wrapper interno. */}
+      <DialogContent className="max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle>{isEdit ? "Editar reporte" : "Nuevo reporte"}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 flex-1 overflow-y-auto -mx-2 px-2">
           <div className="space-y-1.5">
             <Label htmlFor="report-name">Nombre *</Label>
             <Input
@@ -796,7 +798,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear reporte"}
