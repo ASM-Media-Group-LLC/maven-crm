@@ -633,7 +633,12 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
             })()}
           </div>
 
-          {/* Métricas disponibles según permisos del rol */}
+          {/* Métricas disponibles según permisos del rol.
+              Single mode: lista plana con selected al top + unselected
+                abajo, ordenables con ▲▼.
+              Combined mode: AGRUPADAS por módulo (LLG / Closers /
+                Chatters) con header de sección. Dentro de cada grupo,
+                mismo patrón (selected al top, unselected abajo). */}
           <div className="space-y-2">
             <Label>Métricas a incluir *</Label>
             {availableMetrics.length === 0 ? (
@@ -644,11 +649,6 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
               </p>
             ) : (
               <div className="rounded-md border border-border/60 bg-muted/10 p-2.5 max-h-72 overflow-y-auto space-y-1.5">
-                {/* Las seleccionadas van primero, en el ORDEN que el user
-                    eligió — eso define el orden de columnas en el correo.
-                    Las disponibles (no seleccionadas) van debajo en el orden
-                    del catálogo. Las seleccionadas tienen flechas ▲▼ para
-                    reordenar; las disponibles sólo el check para agregar. */}
                 {(() => {
                   // Selected: respetan el orden de selectedMetrics.
                   const selectedInOrder = selectedMetrics
@@ -658,6 +658,11 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                     (m) => !selectedMetrics.includes(m.key),
                   );
 
+                  // Reorder dentro de selectedMetrics. En combined este
+                  // reorder mueve dentro del array global, pero el efecto
+                  // visible es solo dentro del grupo del mismo módulo
+                  // (cada sección del email se renderiza con sus
+                  // métricas en el orden global, filtrando las suyas).
                   const moveMetric = (key: string, direction: -1 | 1) => {
                     const idx = selectedMetrics.indexOf(key);
                     if (idx < 0) return;
@@ -668,69 +673,121 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                     setSelectedMetrics(next);
                   };
 
+                  // Render de una fila de métrica seleccionada
+                  const renderSelectedRow = (m: typeof availableMetrics[number], globalIdx: number, isFirst: boolean, isLast: boolean) => (
+                    <div
+                      key={m.key}
+                      className="flex items-center gap-2 text-sm rounded px-1.5 py-1 bg-primary/5 ring-1 ring-primary/15"
+                    >
+                      <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="w-5 shrink-0 text-center text-[10px] font-mono text-muted-foreground tabular-nums">
+                        {globalIdx + 1}
+                      </span>
+                      <Checkbox
+                        checked
+                        onCheckedChange={() =>
+                          setSelectedMetrics(
+                            selectedMetrics.filter((k) => k !== m.key),
+                          )
+                        }
+                      />
+                      <span className="flex-1 truncate">{m.label}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={isFirst}
+                        onClick={() => moveMetric(m.key, -1)}
+                        className="h-6 w-6 shrink-0"
+                        aria-label="Subir"
+                        title="Subir"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={isLast}
+                        onClick={() => moveMetric(m.key, 1)}
+                        className="h-6 w-6 shrink-0"
+                        aria-label="Bajar"
+                        title="Bajar"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  );
+
+                  // Render de una fila de métrica no-seleccionada
+                  const renderUnselectedRow = (m: typeof availableMetrics[number]) => (
+                    <label
+                      key={m.key}
+                      className="flex items-center gap-2.5 text-sm cursor-pointer hover:bg-muted/40 rounded px-1.5 py-1 transition-colors"
+                    >
+                      <Checkbox
+                        checked={false}
+                        onCheckedChange={() =>
+                          setSelectedMetrics([...selectedMetrics, m.key])
+                        }
+                      />
+                      {m.label}
+                    </label>
+                  );
+
+                  // Combined mode: agrupar por módulo
+                  if (roleName === COMBINED_ROLE_SENTINEL) {
+                    const MODULE_LABELS: Record<string, string> = {
+                      llg: "LLG",
+                      closers: "Closers",
+                      chatters: "Chatters",
+                    };
+                    // Determinar qué módulos están realmente involucrados
+                    // según los roles que el admin tildó. Si no hay roles
+                    // seleccionados, mostrar las 3 familias.
+                    const involvedModules = combinedRoles.length > 0
+                      ? Array.from(new Set(combinedRoles.map((r) => roleToModule(r))))
+                      : ["llg", "closers", "chatters"];
+
+                    return (
+                      <>
+                        {involvedModules.map((mod, modIdx) => {
+                          const moduleSelected = selectedInOrder.filter((m) => m.module === mod);
+                          const moduleUnselected = unselected.filter((m) => m.module === mod);
+                          if (moduleSelected.length === 0 && moduleUnselected.length === 0) return null;
+                          return (
+                            <div key={mod} className={modIdx > 0 ? "pt-2 mt-2 border-t border-border/40" : ""}>
+                              <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/80 px-1 pb-1">
+                                {MODULE_LABELS[mod] ?? mod}
+                              </p>
+                              <div className="space-y-1.5">
+                                {moduleSelected.map((m) =>
+                                  renderSelectedRow(
+                                    m,
+                                    selectedMetrics.indexOf(m.key),
+                                    selectedMetrics.indexOf(m.key) === 0,
+                                    selectedMetrics.indexOf(m.key) === selectedMetrics.length - 1,
+                                  ),
+                                )}
+                                {moduleUnselected.map((m) => renderUnselectedRow(m))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    );
+                  }
+
+                  // Single mode: lista plana clásica
                   return (
                     <>
-                      {selectedInOrder.map((m, idx) => (
-                        <div
-                          key={m.key}
-                          className="flex items-center gap-2 text-sm rounded px-1.5 py-1 bg-primary/5 ring-1 ring-primary/15"
-                        >
-                          <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                          <span className="w-5 shrink-0 text-center text-[10px] font-mono text-muted-foreground tabular-nums">
-                            {idx + 1}
-                          </span>
-                          <Checkbox
-                            checked
-                            onCheckedChange={() =>
-                              setSelectedMetrics(
-                                selectedMetrics.filter((k) => k !== m.key),
-                              )
-                            }
-                          />
-                          <span className="flex-1 truncate">{m.label}</span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            disabled={idx === 0}
-                            onClick={() => moveMetric(m.key, -1)}
-                            className="h-6 w-6 shrink-0"
-                            aria-label="Subir"
-                            title="Subir"
-                          >
-                            <ChevronUp className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            disabled={idx === selectedInOrder.length - 1}
-                            onClick={() => moveMetric(m.key, 1)}
-                            className="h-6 w-6 shrink-0"
-                            aria-label="Bajar"
-                            title="Bajar"
-                          >
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      ))}
+                      {selectedInOrder.map((m, idx) =>
+                        renderSelectedRow(m, idx, idx === 0, idx === selectedInOrder.length - 1),
+                      )}
                       {selectedInOrder.length > 0 && unselected.length > 0 && (
                         <div className="my-1.5 border-t border-border/40" />
                       )}
-                      {unselected.map((m) => (
-                        <label
-                          key={m.key}
-                          className="flex items-center gap-2.5 text-sm cursor-pointer hover:bg-muted/40 rounded px-1.5 py-1 transition-colors"
-                        >
-                          <Checkbox
-                            checked={false}
-                            onCheckedChange={() =>
-                              setSelectedMetrics([...selectedMetrics, m.key])
-                            }
-                          />
-                          {m.label}
-                        </label>
-                      ))}
+                      {unselected.map((m) => renderUnselectedRow(m))}
                     </>
                   );
                 })()}
@@ -738,8 +795,9 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
             )}
             {availableMetrics.length > 0 && (
               <p className="text-[10px] text-muted-foreground">
-                Métricas seleccionadas aparecen arriba en el orden de las
-                columnas del correo. Usá ▲▼ para reordenar.
+                {roleName === COMBINED_ROLE_SENTINEL
+                  ? "Métricas agrupadas por rol — cada grupo es una sección del email. Usá ▲▼ para reordenar dentro del grupo."
+                  : "Métricas seleccionadas aparecen arriba en el orden de las columnas del correo. Usá ▲▼ para reordenar."}
               </p>
             )}
           </div>
