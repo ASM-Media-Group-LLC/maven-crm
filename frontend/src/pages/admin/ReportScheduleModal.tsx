@@ -321,7 +321,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           scrollbar se salía del border-radius y quedaba feo).
           overflow-hidden en DialogContent + overflow-y-auto en el
           wrapper interno. */}
-      <DialogContent className="max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="shrink-0">
           <DialogTitle>{isEdit ? "Editar reporte" : "Nuevo reporte"}</DialogTitle>
         </DialogHeader>
@@ -374,34 +374,6 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              {/* Multi-select de roles combinados — visible sólo cuando
-                  el admin eligió "Combinado". Cada rol marcado genera
-                  una sección en el email. Min 2 para guardar.
-                  Layout: checkboxes en grid de 2 columnas para no
-                  alargar la ventana (antes era 1 col = 11 filas
-                  verticales). */}
-              {roleName === COMBINED_ROLE_SENTINEL && (
-                <div className="mt-2 rounded-md border border-border bg-muted/30 p-2 space-y-1.5">
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                    Roles a combinar ({combinedRoles.length})
-                  </p>
-                  {roles.length === 0 ? (
-                    <p className="text-xs text-muted-foreground italic">Cargando roles…</p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                      {roles.map((r) => (
-                        <label key={r.id} className="flex items-center gap-2 cursor-pointer text-sm">
-                          <Checkbox
-                            checked={combinedRoles.includes(r.name)}
-                            onCheckedChange={() => toggleCombinedRole(r.name)}
-                          />
-                          <span className="truncate">{r.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
             <div className="space-y-1.5">
               <Label>Periodicidad *</Label>
@@ -434,6 +406,34 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
               </Select>
             </div>
           </div>
+
+          {/* Multi-select de roles combinados — full-width fuera del
+              grid de 3 columnas para que los nombres no se trunquen.
+              Cada rol marcado genera una sección en el email. Min 2
+              para guardar. Layout responsive: 2 cols mobile → 3 md →
+              4 cols lg. */}
+          {roleName === COMBINED_ROLE_SENTINEL && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                Roles a combinar ({combinedRoles.length})
+              </p>
+              {roles.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">Cargando roles…</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-4 gap-y-1.5">
+                  {roles.map((r) => (
+                    <label key={r.id} className="flex items-center gap-2 cursor-pointer text-sm">
+                      <Checkbox
+                        checked={combinedRoles.includes(r.name)}
+                        onCheckedChange={() => toggleCombinedRole(r.name)}
+                      />
+                      <span className="truncate">{r.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label>Destinatarios *</Label>
