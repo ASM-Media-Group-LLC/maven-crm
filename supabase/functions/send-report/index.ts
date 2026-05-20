@@ -18,8 +18,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-cron-token",
 };
 
-type Module = "llg" | "closers" | "chatters";
+type Module = "llg" | "closers" | "chatters" | "combined";
 type Period = "daily" | "weekly" | "quincenal" | "monthly" | "annual";
+
+// "combined" = un email único con sección LLG + sección Closers.
+// Pedido por Alvaro 2026-05-20: en vez de 2 emails separados, recibir
+// un solo email con ambas tablas. Internamente, el flow es: levantar
+// las dos vistas individualmente (con sus respectivos role filters) y
+// renderearlas concatenadas.
 
 const PERIOD_LABEL: Record<Period, string> = {
   daily: "diario",
@@ -33,6 +39,7 @@ const MODULE_LABEL: Record<Module, string> = {
   llg: "LLGs",
   closers: "Closers",
   chatters: "Chatters",
+  combined: "LLG + Closers",
 };
 
 const fmtMiami = (iso: string) => {
@@ -220,21 +227,47 @@ Deno.serve(async (req) => {
       to = r.to;
     }
 
-    // 2. Métricas por módulo (filtra por role_name si está seteado)
+    // 2. Métricas + HTML.
+    //    "combined" = caso especial: levantamos las 2 vistas (LLG + Closers)
+    //    individualmente con sus respectivos role filters, y renderizamos
+    //    un email único con 2 secciones. Para módulos normales, el flow
+    //    sigue siendo 1 fetch + 1 render.
     const roleName = (schedule.role_name as string | null) ?? null;
-    const rows = await fetchModuleMetrics(admin, module, from, to, roleName);
+    const metricsConfig = (schedule.metrics as string[] | null) ?? null;
+    let html: string;
+    let rowCount: number;
 
-    // 3. HTML
-    const html = renderReportHtml({
-      name: schedule.name,
-      module,
-      period,
-      from,
-      to,
-      rows,
-      metrics: (schedule.metrics as string[] | null) ?? null,
-      roleName,
-    });
+    if (module === "combined") {
+      // Cada submódulo aplica su propio role filter para que las filas
+      // sean coherentes con el rol del sub-reporte (LLG vs closer).
+      // Si el admin no quiso filtrar por rol específico, los pasamos
+      // hardcoded para que la sección incluya a TODOS los del rol.
+      const llgRows = await fetchModuleMetrics(admin, "llg", from, to, "LLG");
+      const closerRows = await fetchModuleMetrics(admin, "closers", from, to, "closer");
+      html = renderCombinedReportHtml({
+        name: schedule.name,
+        period,
+        from,
+        to,
+        llgRows,
+        closerRows,
+        metrics: metricsConfig,
+      });
+      rowCount = llgRows.length + closerRows.length;
+    } else {
+      const rows = await fetchModuleMetrics(admin, module, from, to, roleName);
+      html = renderReportHtml({
+        name: schedule.name,
+        module,
+        period,
+        from,
+        to,
+        rows,
+        metrics: metricsConfig,
+        roleName,
+      });
+      rowCount = rows.length;
+    }
 
     // Preview mode: devuelve HTML + subject sin mandar email ni tocar
     // last_dispatched_at. Usado por el toggle "Vista previa" en UI admin.
@@ -242,7 +275,7 @@ Deno.serve(async (req) => {
       const customSubject = (schedule.email_subject ?? "").trim();
       const subject = customSubject || `Maven CRM · Reporte ${PERIOD_LABEL[period]} ${MODULE_LABEL[module]}`;
       return new Response(
-        JSON.stringify({ ok: true, preview: true, html, subject, from, to, row_count: rows.length }),
+        JSON.stringify({ ok: true, preview: true, html, subject, from, to, row_count: rowCount }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -282,7 +315,7 @@ Deno.serve(async (req) => {
       .update({ last_dispatched_at: new Date().toISOString() })
       .eq("id", schedule_id);
 
-    return new Response(JSON.stringify({ ok: true, sent: emails.length, rows: rows.length }), {
+    return new Response(JSON.stringify({ ok: true, sent: emails.length, rows: rowCount }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -339,6 +372,23 @@ const DEFAULT_METRICS_BY_MODULE: Record<Module, string[]> = {
     "chatter.reprobadas",
     "chatter.exito",
     "chatter.score_avg",
+  ],
+  // Combinado = LLG defaults + Closer defaults. El renderer detecta el
+  // prefijo (llg.* vs closer.*) y arma 2 tablas separadas.
+  combined: [
+    "llg.nuevos",
+    "llg.recuperacion",
+    "llg.total",
+    "llg.numeros",
+    "llg.conversion",
+    "closer.asignadas",
+    "closer.confirmadas",
+    "closer.completadas",
+    "closer.no_interesadas",
+    "closer.llamadas",
+    "closer.qa_avg",
+    "closer.cerradas",
+    "closer.no_cerradas",
   ],
 };
 
@@ -839,6 +889,107 @@ function renderReportHtml(args: {
             ${tableRows}${emptyState}
           </tbody>
         </table>
+      </div>
+      <div style="background:#f9fafb;padding:14px 24px;text-align:center;border-top:1px solid #e5e7eb;">
+        <p style="color:#9ca3af;font-size:11px;margin:0;">Enviado por Maven CRM · No respondas a este correo.</p>
+      </div>
+    </div>
+  `;
+}
+
+// Helper interno: arma SOLO la tabla (sin header / footer / wrapper),
+// para reuso desde renderCombinedReportHtml. Espejo del cuerpo de
+// renderReportHtml.
+function renderTableSection(args: {
+  module: Module;
+  rows: MetricRow[];
+  metrics: string[] | null;
+  sectionTitle: string;
+}): string {
+  const { module, rows, metrics, sectionTitle } = args;
+
+  const rawMetrics = metrics && metrics.length > 0 ? metrics : null;
+  const filtered = rawMetrics?.filter((k) => METRIC_CATALOG[k]?.module === module) ?? [];
+  const metricKeys =
+    filtered.length > 0 ? filtered : DEFAULT_METRICS_BY_MODULE[module];
+
+  const colHeaders = ["Persona", ...metricKeys.map((k) => METRIC_CATALOG[k]?.label ?? k)];
+  const cellPad = "5px 6px";
+  const cellHtmlBase = `padding:${cellPad};font-variant-numeric:tabular-nums;color:#111827;white-space:nowrap;`;
+
+  const tableRows = rows
+    .map((r) => {
+      const cellsByKey: Record<string, string> = {};
+      for (const c of r.cells) cellsByKey[c.key] = c.value;
+      const cellsHtml = metricKeys
+        .map((k) => `<td style="${cellHtmlBase}text-align:right;">${escapeHtml(cellsByKey[k] ?? "—")}</td>`)
+        .join("");
+      return `<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:${cellPad};font-weight:600;color:#111827;">${escapeHtml(r.name)}</td>${cellsHtml}</tr>`;
+    })
+    .join("");
+
+  const emptyState = rows.length === 0
+    ? `<tr><td colspan="${colHeaders.length}" style="padding:24px;text-align:center;color:#6b7280;font-style:italic;">Sin actividad en el rango.</td></tr>`
+    : "";
+
+  return `
+    <div style="margin-top:18px;">
+      <div style="font-size:12px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:#4338ca;padding:8px 6px 10px;border-bottom:2px solid #ede9fe;">
+        ${escapeHtml(sectionTitle)}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:auto;margin-top:8px;">
+        <thead>
+          <tr style="background:#f9fafb;color:#374151;text-transform:uppercase;font-size:9px;letter-spacing:0.6px;">
+            ${colHeaders.map((h, i) => `<th style="padding:8px 6px;text-align:${i === 0 ? "left" : "right"};font-weight:700;white-space:nowrap;">${escapeHtml(h)}</th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>${tableRows}${emptyState}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// Reporte combinado: header único + 2 secciones (LLG y Closers).
+// Se usa cuando module='combined' (pedido por Alvaro 2026-05-20).
+function renderCombinedReportHtml(args: {
+  name: string;
+  period: Period;
+  from: string;
+  to: string;
+  llgRows: MetricRow[];
+  closerRows: MetricRow[];
+  metrics: string[] | null;
+}): string {
+  const { name, period, from, to, llgRows, closerRows, metrics } = args;
+  const fromLabel = fmtMiami(from);
+  const toLabel = fmtMiami(to);
+
+  const llgSection = renderTableSection({
+    module: "llg",
+    rows: llgRows,
+    metrics,
+    sectionTitle: "LLGs",
+  });
+  const closerSection = renderTableSection({
+    module: "closers",
+    rows: closerRows,
+    metrics,
+    sectionTitle: "Closers",
+  });
+
+  return `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:720px;margin:0;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+      <div style="background:linear-gradient(135deg,#6d28d9,#4338ca);padding:24px 22px;color:#ffffff;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;opacity:0.85;text-transform:uppercase;">Maven CRM · Reporte ${PERIOD_LABEL[period]} combinado</div>
+        <h1 style="font-size:22px;font-weight:700;margin:6px 0 0;line-height:1.3;">${escapeHtml(name)}</h1>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 0;font-size:12px;line-height:1.5;color:#ffffff;">
+          <tr><td style="padding:0;opacity:0.9;">Vista: <strong>LLG + Closers</strong></td></tr>
+          <tr><td style="padding:0;opacity:0.9;">Rango (hora Miami): <strong>${fromLabel} → ${toLabel}</strong></td></tr>
+        </table>
+      </div>
+      <div style="padding:16px 14px;">
+        ${llgSection}
+        ${closerSection}
       </div>
       <div style="background:#f9fafb;padding:14px 24px;text-align:center;border-top:1px solid #e5e7eb;">
         <p style="color:#9ca3af;font-size:11px;margin:0;">Enviado por Maven CRM · No respondas a este correo.</p>

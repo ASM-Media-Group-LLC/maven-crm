@@ -14,6 +14,7 @@ import {
   useTenantRoles,
   useRolePermissions,
   roleToModule,
+  COMBINED_ROLE_SENTINEL,
   type ReportPeriod,
   type ReportScheduleWithRecipients,
 } from "@/hooks/useReportSchedules";
@@ -58,7 +59,12 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
     if (open) {
       if (schedule) {
         setName(schedule.name);
-        const inferredRole = schedule.role_name ?? (schedule.module === "closers" ? "closer" : schedule.module === "chatters" ? "Chatter Supervisor" : "employee");
+        const inferredRole = schedule.role_name ?? (
+          schedule.module === "closers" ? "closer" :
+          schedule.module === "chatters" ? "Chatter Supervisor" :
+          schedule.module === "combined" ? COMBINED_ROLE_SENTINEL :
+          "employee"
+        );
         setRoleName(inferredRole);
         setPeriod(schedule.period);
         setDispatchHour(schedule.dispatch_hour ?? 8);
@@ -74,10 +80,16 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
         // módulo (e.g. data legacy con module='llg' pero metrics=[closer.*]),
         // las descartamos. Si después del filtro no queda nada, usamos el
         // default del módulo.
+        //
+        // Caso especial 'combined': acepta tanto llg.* como closer.*
         const persisted = schedule.metrics ?? [];
         const consistent = persisted.filter((k) => {
           const def = METRICS_CATALOG.find((m) => m.key === k);
-          return def && def.module === schedule.module;
+          if (!def) return false;
+          if (schedule.module === "combined") {
+            return def.module === "llg" || def.module === "closers";
+          }
+          return def.module === schedule.module;
         });
         setSelectedMetrics(
           consistent.length > 0
@@ -178,9 +190,14 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       // Defensive clamp al guardar: solo persistimos métricas que pertenecen
       // al módulo derivado del rol elegido. Evita que el schedule quede
       // con metrics inconsistentes con su módulo.
+      // Combined acepta llg.* + closer.* (las dos familias son válidas).
       const consistentMetrics = selectedMetrics.filter((k) => {
         const def = METRICS_CATALOG.find((m) => m.key === k);
-        return def && def.module === derivedModule;
+        if (!def) return false;
+        if (derivedModule === "combined") {
+          return def.module === "llg" || def.module === "closers";
+        }
+        return def.module === derivedModule;
       });
       const metricsPayload = consistentMetrics.length > 0 ? consistentMetrics : null;
       // Payload de días según period — los campos no aplicables van NULL.
@@ -293,6 +310,13 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                       {r.name}
                     </SelectItem>
                   ))}
+                  {/* Opción especial: reporte combinado LLG + Closers.
+                      Pedido por Alvaro 2026-05-20 para recibir un solo
+                      email con ambas tablas. Mapea a module='combined'
+                      via ROLE_TO_MODULE[COMBINED_ROLE_SENTINEL]. */}
+                  <SelectItem value={COMBINED_ROLE_SENTINEL}>
+                    Combinado (LLG + Closers)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

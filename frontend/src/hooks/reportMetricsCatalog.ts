@@ -160,11 +160,22 @@ export const DEFAULT_METRICS_BY_MODULE: Record<ReportModule, string[]> = {
     "chatter.exito",
     "chatter.score_avg",
   ],
+  // Combinado: defaults de LLG + Closers. El renderer detecta prefijos
+  // y arma 2 tablas separadas en el mismo email.
+  combined: [
+    "llg.nuevos", "llg.recuperacion", "llg.total", "llg.numeros", "llg.conversion",
+    "closer.asignadas", "closer.confirmadas", "closer.completadas", "closer.no_interesadas",
+    "closer.llamadas", "closer.qa_avg", "closer.cerradas", "closer.no_cerradas",
+  ],
 };
 
 // Dada una lista de (module, submodule) accesibles para el rol, devuelve
 // qué métricas del catálogo están disponibles. Si el rol tiene acceso a
 // CUALQUIER submodule del module declarado en `requires`, basta.
+//
+// Caso especial: cuando module='combined', devolvemos tanto LLG como
+// Closers (es un reporte multi-módulo, ambas familias de métricas
+// aplican). El submodal renderiza los 2 grupos visualmente separados.
 export function filterMetricsByPermissions(
   module: ReportModule,
   permissions: Array<{ module: string; submodule: string | null }>,
@@ -173,7 +184,12 @@ export function filterMetricsByPermissions(
     permissions.filter((p) => p).map((p) => p.module),
   );
   return METRICS_CATALOG.filter((m) => {
-    if (m.module !== module) return false;
+    // Combined acepta métricas de llg + closers (las dos familias).
+    if (module === "combined") {
+      if (m.module !== "llg" && m.module !== "closers") return false;
+    } else if (m.module !== module) {
+      return false;
+    }
     // Para que la métrica aparezca, el rol debe tener acceso a TODOS los
     // requires (en este catálogo son singulares, pero estructuralmente
     // soportamos AND).

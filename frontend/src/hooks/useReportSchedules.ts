@@ -10,13 +10,19 @@ import { useAuth } from "@/hooks/useAuth";
 // El cron `dispatch-reports` corre diario 8am Miami y manda los
 // schedules cuya period matchea HOY. Ver supabase/functions/dispatch-reports.
 
-export type ReportModule = "llg" | "closers" | "chatters";
+export type ReportModule = "llg" | "closers" | "chatters" | "combined";
 export type ReportPeriod = "daily" | "weekly" | "quincenal" | "monthly" | "annual";
 
 // Mapeo rol → módulo de reporte. El UI muestra "rol" pero internamente
 // las queries se agrupan por uno de los 3 módulos disponibles. Roles
 // "estratégicos" (admin/manager/supervisor) caen al LLG por default;
 // Fase 2 va a permitir cherry-pick de métricas según permisos del rol.
+// Sentinel role: cuando el admin elige "Combinado (LLG + Closers)" en
+// el modal, guardamos este string en role_name para que se distinga
+// de un rol real. El backend ignora role_name si el módulo es 'combined'
+// (cada sub-fetch usa hardcoded "LLG" / "closer" para los role filters).
+export const COMBINED_ROLE_SENTINEL = "__combined__";
+
 export const ROLE_TO_MODULE: Record<string, ReportModule> = {
   closer: "closers",
   "Chatter Supervisor": "chatters",
@@ -26,6 +32,7 @@ export const ROLE_TO_MODULE: Record<string, ReportModule> = {
   admin: "llg",
   manager: "llg",
   supervisor: "llg",
+  [COMBINED_ROLE_SENTINEL]: "combined",
 };
 
 export const roleToModule = (roleName: string): ReportModule =>
