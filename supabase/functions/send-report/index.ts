@@ -91,6 +91,24 @@ function miamiToUtc(y: number, mo: number, d: number, h: number, mi: number, s: 
   const naive = new Date(Date.UTC(y, mo - 1, d, h, mi, s));
   return new Date(naive.getTime() - miamiOffsetMin(naive) * 60_000);
 }
+// Convierte un ISO UTC al YYYY-MM-DD del día Miami que le corresponde.
+//
+// BUG (pre-2026-05-20): se usaba `iso.slice(0,10)` para sacar la fecha,
+// pero el ISO está en UTC. Para "May 19 23:59:59 Miami (EDT=UTC-4)" el
+// ISO es "2026-05-20T03:59:59Z" — slice da "2026-05-20", no "2026-05-19".
+// Resultado: queries con .lte("entry_date", toDate) incluían el día
+// siguiente entero, inflando counts del reporte cuando se enviaba en
+// medio del día con datos ya cargados del día actual.
+//
+// Fix: usar Intl con la TZ Miami para sacar la fecha real del día Miami.
+function miamiDate(iso: string): string {
+  const d = new Date(iso);
+  // en-CA produce el formato YYYY-MM-DD nativo, sin re-armar.
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: MIAMI_TZ, year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  return fmt.format(d);
+}
 function computeRangeForPeriod(period: Period, now: Date): { from: string; to: string } {
   const m = miamiParts(now);
   if (period === "daily") {
@@ -513,9 +531,13 @@ async function fetchLlgMetrics(
   from: string,
   to: string,
 ): Promise<MetricRow[]> {
-  // entry_date es DATE — comparamos contra YYYY-MM-DD de from/to.
-  const fromDate = from.slice(0, 10);
-  const toDate = to.slice(0, 10);
+  // entry_date es DATE Miami-local — usamos miamiDate() para sacar el
+  // YMD correcto del rango (ver helper). Antes usábamos .slice(0,10)
+  // sobre el ISO UTC, lo cual incluía el día siguiente cuando el `to`
+  // cruzaba medianoche UTC (May 19 23:59 Miami = May 20 03:59 UTC →
+  // slice daba "2026-05-20" en vez de "2026-05-19").
+  const fromDate = miamiDate(from);
+  const toDate = miamiDate(to);
 
   // Query 1: LEADS creados en el rango (nuevos / recuperacion / total).
   // Atribución por lg_user_id (el LLG que creó el lead).
@@ -607,8 +629,13 @@ async function fetchCloserMetrics(
   from: string,
   to: string,
 ): Promise<MetricRow[]> {
-  const fromDate = from.slice(0, 10);
-  const toDate = to.slice(0, 10);
+  // Mismo fix que en fetchLlgMetrics: passed_date / call_date son DATE
+  // Miami-local. Antes con .slice(0,10) el toDate quedaba en el día
+  // siguiente y los reportes "diarios" enviados durante el día actual
+  // contaban actividad del día en curso. miamiDate() devuelve el YMD
+  // real del día Miami.
+  const fromDate = miamiDate(from);
+  const toDate = miamiDate(to);
 
   // SEMÁNTICA 2026-05-20 (v4): period-based — cada métrica cuenta los
   // EVENTOS (transiciones) que sucedieron DENTRO del rango del reporte.
