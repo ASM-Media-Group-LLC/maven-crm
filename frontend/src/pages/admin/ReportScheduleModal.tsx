@@ -241,6 +241,13 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           return;
         }
         dispatchWeekdaysPayload = [...dispatchWeekdays].sort((a, b) => a - b);
+      } else if (period === "daily") {
+        // Opcional: si seleccionó días, persistimos; si no, NULL =
+        // "todos los días". El dispatcher respeta el NULL.
+        dispatchWeekdaysPayload =
+          dispatchWeekdays.length > 0
+            ? [...dispatchWeekdays].sort((a, b) => a - b)
+            : null;
       } else if (period === "quincenal") {
         dispatchDaysOfMonthPayload = dispatchUseSecondDay
           ? [dispatchDayOfMonth, dispatchDayOfMonth2].sort((a, b) => a - b)
@@ -459,10 +466,22 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
             )}
           </div>
 
-          {/* Selector de días según periodicidad. daily no muestra nada. */}
-          {period === "weekly" && (
+          {/* Selector de días según periodicidad.
+              · weekly: obligatorio, mínimo 1 día.
+              · daily: opcional — si no se selecciona ninguno, manda
+                todos los días (comportamiento histórico). Útil para
+                "todos los días" o "solo lun-vie".
+              · quincenal/monthly/annual: usa día del mes (más abajo). */}
+          {(period === "weekly" || period === "daily") && (
             <div className="space-y-1.5">
-              <Label>Días de la semana *</Label>
+              <Label>
+                Días de la semana
+                {period === "weekly" ? " *" : (
+                  <span className="text-muted-foreground font-normal text-xs ml-1">
+                    (opcional — vacío = todos los días)
+                  </span>
+                )}
+              </Label>
               <div className="flex flex-wrap gap-1.5">
                 {[
                   { v: 1, l: "Lun" }, { v: 2, l: "Mar" }, { v: 3, l: "Mié" },
@@ -490,7 +509,11 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                 })}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                El reporte se manda en cada uno de los días elegidos.
+                {period === "daily"
+                  ? dispatchWeekdays.length === 0
+                    ? "Vacío: el reporte se manda todos los días."
+                    : `Solo en los días marcados (${dispatchWeekdays.length}/7).`
+                  : "El reporte se manda en cada uno de los días elegidos."}
               </p>
             </div>
           )}

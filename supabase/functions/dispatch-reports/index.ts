@@ -139,7 +139,15 @@ function shouldDispatchNow(
 ): boolean {
   const m = miamiParts(now);
   if (m.hour !== dispatchHour) return false;
-  if (period === "daily") return true;
+  if (period === "daily") {
+    // Si el admin marcó días específicos (ej. solo lun-vie), aplicar
+    // el filtro; si dispatch_weekdays es NULL/vacío significa "todos
+    // los días" — comportamiento histórico preservado.
+    const days = schedule.dispatch_weekdays;
+    if (!days || days.length === 0) return true;
+    const todayIso = WEEKDAY_TO_ISO[m.weekday] ?? 0;
+    return days.includes(todayIso);
+  }
   if (period === "weekly") {
     const todayIso = WEEKDAY_TO_ISO[m.weekday] ?? 0;
     const days = schedule.dispatch_weekdays ?? [1];
