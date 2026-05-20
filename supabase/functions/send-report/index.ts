@@ -39,8 +39,25 @@ const MODULE_LABEL: Record<Module, string> = {
   llg: "LLGs",
   closers: "Closers",
   chatters: "Chatters",
-  combined: "LLG + Closers",
+  combined: "Combinado",
 };
+
+// Mapeo rol → módulo de reporte. Mirror del catálogo del frontend
+// (useReportSchedules.ROLE_TO_MODULE). Si el admin agrega un rol que
+// no está mapeado, defaultea a "llg".
+const ROLE_TO_MODULE: Record<string, Exclude<Module, "combined">> = {
+  closer: "closers",
+  "Chatter Supervisor": "chatters",
+  LLG: "llg",
+  employee: "llg",
+  spammer: "llg",
+  agent: "llg",
+  admin: "llg",
+  manager: "llg",
+  supervisor: "llg",
+};
+const roleToModule = (role: string): Exclude<Module, "combined"> =>
+  ROLE_TO_MODULE[role] ?? "llg";
 
 const fmtMiami = (iso: string) => {
   const d = new Date(iso);
@@ -238,22 +255,32 @@ Deno.serve(async (req) => {
     let rowCount: number;
 
     if (module === "combined") {
-      // Cada submódulo aplica su propio role filter para que las filas
-      // sean coherentes con el rol del sub-reporte (LLG vs closer).
-      // Si el admin no quiso filtrar por rol específico, los pasamos
-      // hardcoded para que la sección incluya a TODOS los del rol.
-      const llgRows = await fetchModuleMetrics(admin, "llg", from, to, "LLG");
-      const closerRows = await fetchModuleMetrics(admin, "closers", from, to, "closer");
+      // Combined-flex: el admin define qué roles van adentro vía la
+      // columna `combined_roles` (text[]). Por cada rol, mapeamos a
+      // su módulo correspondiente (closer→closers, Chatter
+      // Supervisor→chatters, resto→llg) y armamos una sección.
+      //
+      // Fallback: si por algún motivo el schedule combined no tiene
+      // roles seteados (data migrada desde la versión previa, o admin
+      // dejó vacío), defaultea a [LLG, closer] para preservar el
+      // comportamiento original.
+      const combinedRoles: string[] =
+        (schedule.combined_roles as string[] | null) ?? ["LLG", "closer"];
+      const sections: Array<{ role: string; module: Module; rows: MetricRow[] }> = [];
+      for (const role of combinedRoles) {
+        const subModule = roleToModule(role);
+        const rows = await fetchModuleMetrics(admin, subModule, from, to, role);
+        sections.push({ role, module: subModule, rows });
+      }
       html = renderCombinedReportHtml({
         name: schedule.name,
         period,
         from,
         to,
-        llgRows,
-        closerRows,
+        sections,
         metrics: metricsConfig,
       });
-      rowCount = llgRows.length + closerRows.length;
+      rowCount = sections.reduce((acc, s) => acc + s.rows.length, 0);
     } else {
       const rows = await fetchModuleMetrics(admin, module, from, to, roleName);
       html = renderReportHtml({
@@ -949,33 +976,36 @@ function renderTableSection(args: {
   `;
 }
 
-// Reporte combinado: header único + 2 secciones (LLG y Closers).
-// Se usa cuando module='combined' (pedido por Alvaro 2026-05-20).
+// Reporte combinado: header único + N secciones, una por rol elegido
+// en el modal. El admin define qué roles vía `combined_roles` (text[]).
 function renderCombinedReportHtml(args: {
   name: string;
   period: Period;
   from: string;
   to: string;
-  llgRows: MetricRow[];
-  closerRows: MetricRow[];
+  sections: Array<{ role: string; module: Exclude<Module, "combined">; rows: MetricRow[] }>;
   metrics: string[] | null;
 }): string {
-  const { name, period, from, to, llgRows, closerRows, metrics } = args;
+  const { name, period, from, to, sections, metrics } = args;
   const fromLabel = fmtMiami(from);
   const toLabel = fmtMiami(to);
 
-  const llgSection = renderTableSection({
-    module: "llg",
-    rows: llgRows,
-    metrics,
-    sectionTitle: "LLGs",
-  });
-  const closerSection = renderTableSection({
-    module: "closers",
-    rows: closerRows,
-    metrics,
-    sectionTitle: "Closers",
-  });
+  const sectionsHtml = sections
+    .map((s) =>
+      renderTableSection({
+        module: s.module,
+        rows: s.rows,
+        metrics,
+        // Mostramos el rol como título de la sección — el rol es lo
+        // que el admin entiende ("LLG", "closer", "Chatter Supervisor").
+        sectionTitle: s.role,
+      }),
+    )
+    .join("");
+
+  // Línea de descripción: lista los roles incluidos (max 3 visibles + "y N más")
+  const roleList = sections.map((s) => s.role).slice(0, 3).join(" + ");
+  const extra = sections.length > 3 ? ` (+${sections.length - 3} más)` : "";
 
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:720px;margin:0;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
@@ -983,13 +1013,12 @@ function renderCombinedReportHtml(args: {
         <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;opacity:0.85;text-transform:uppercase;">Maven CRM · Reporte ${PERIOD_LABEL[period]} combinado</div>
         <h1 style="font-size:22px;font-weight:700;margin:6px 0 0;line-height:1.3;">${escapeHtml(name)}</h1>
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 0;font-size:12px;line-height:1.5;color:#ffffff;">
-          <tr><td style="padding:0;opacity:0.9;">Vista: <strong>LLG + Closers</strong></td></tr>
+          <tr><td style="padding:0;opacity:0.9;">Roles: <strong>${escapeHtml(roleList)}${extra}</strong></td></tr>
           <tr><td style="padding:0;opacity:0.9;">Rango (hora Miami): <strong>${fromLabel} → ${toLabel}</strong></td></tr>
         </table>
       </div>
       <div style="padding:16px 14px;">
-        ${llgSection}
-        ${closerSection}
+        ${sectionsHtml}
       </div>
       <div style="background:#f9fafb;padding:14px 24px;text-align:center;border-top:1px solid #e5e7eb;">
         <p style="color:#9ca3af;font-size:11px;margin:0;">Enviado por Maven CRM · No respondas a este correo.</p>

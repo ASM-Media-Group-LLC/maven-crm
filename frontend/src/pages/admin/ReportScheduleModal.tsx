@@ -30,6 +30,9 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
   const isEdit = !!schedule;
   const [name, setName] = useState("");
   const [roleName, setRoleName] = useState<string>("");
+  // Cuando roleName === COMBINED_ROLE_SENTINEL, este array guarda
+  // los roles que el admin quiere combinar en una sola entrega de email.
+  const [combinedRoles, setCombinedRoles] = useState<string[]>([]);
   const [period, setPeriod] = useState<ReportPeriod>("weekly");
   const [dispatchHour, setDispatchHour] = useState<number>(8);
   // Días en que dispara — semantics depende del period (ver ReportSchedule).
@@ -66,6 +69,15 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           "employee"
         );
         setRoleName(inferredRole);
+        // Para schedules combined, restaurar la lista de roles guardada.
+        // Default a [LLG, closer] si quedó vacío (migración del flow viejo).
+        setCombinedRoles(
+          schedule.module === "combined"
+            ? (schedule.combined_roles && schedule.combined_roles.length > 0
+                ? schedule.combined_roles
+                : ["LLG", "closer"])
+            : [],
+        );
         setPeriod(schedule.period);
         setDispatchHour(schedule.dispatch_hour ?? 8);
         // Día/s del schedule
@@ -100,6 +112,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       } else {
         setName("");
         setRoleName("employee");
+        setCombinedRoles([]);
         setPeriod("weekly");
         setDispatchHour(8);
         setDispatchWeekdays([1]);
@@ -127,6 +140,19 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       setSelectedMetrics(DEFAULT_METRICS_BY_MODULE[newModule] ?? []);
     }
     setRoleName(newRole);
+    // Si elegimos Combinado y no hay roles previos, default a [LLG, closer]
+    // (el caso de uso original de Alvaro). El admin puede tildar/destildar
+    // los checkboxes para customizar.
+    if (newRole === COMBINED_ROLE_SENTINEL && combinedRoles.length === 0) {
+      setCombinedRoles(["LLG", "closer"]);
+    }
+  };
+
+  // Toggle de un rol dentro del set de combinados.
+  const toggleCombinedRole = (role: string) => {
+    setCombinedRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
+    );
   };
 
   // Email validation: local part no termina con punto, dominio tiene
@@ -178,6 +204,10 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       toast.error("Elegí un rol");
       return;
     }
+    if (roleName === COMBINED_ROLE_SENTINEL && combinedRoles.length < 2) {
+      toast.error("Elegí al menos 2 roles para combinar");
+      return;
+    }
     if (selectedMetrics.length === 0) {
       toast.error("Seleccioná al menos una métrica");
       return;
@@ -222,13 +252,23 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
         dispatchMonthOfYearPayload = dispatchMonthOfYear;
       }
 
+      // Payload: combined_roles solo se persiste para schedules
+      // combinados; en single, va NULL para no contaminar.
+      const combinedRolesPayload =
+        derivedModule === "combined" ? combinedRoles : null;
+      // role_name: para combined, ignorado por el backend pero guardamos
+      // el sentinel para que el modal pueda re-hidratar a "Combinado"
+      // al editar.
+      const roleNamePayload =
+        derivedModule === "combined" ? COMBINED_ROLE_SENTINEL : roleName;
+
       if (isEdit && schedule) {
         await updateSchedule.mutateAsync({
           id: schedule.id,
           patch: {
             name: name.trim(),
             module: derivedModule,
-            role_name: roleName,
+            role_name: roleNamePayload,
             period,
             dispatch_hour: dispatchHour,
             dispatch_weekdays: dispatchWeekdaysPayload,
@@ -236,6 +276,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
             dispatch_month_of_year: dispatchMonthOfYearPayload,
             email_subject: subjectPayload,
             metrics: metricsPayload,
+            combined_roles: combinedRolesPayload,
           },
           recipients: recipientsPayload,
         });
@@ -243,7 +284,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
       } else {
         await createSchedule.mutateAsync({
           name: name.trim(),
-          role_name: roleName,
+          role_name: roleNamePayload,
           module: derivedModule,
           period,
           dispatch_hour: dispatchHour,
@@ -252,6 +293,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           dispatch_month_of_year: dispatchMonthOfYearPayload,
           email_subject: subjectPayload,
           metrics: metricsPayload,
+          combined_roles: combinedRolesPayload,
           recipients: recipientsPayload,
         });
         toast.success("Reporte creado");
@@ -310,15 +352,40 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                       {r.name}
                     </SelectItem>
                   ))}
-                  {/* Opción especial: reporte combinado LLG + Closers.
-                      Pedido por Alvaro 2026-05-20 para recibir un solo
-                      email con ambas tablas. Mapea a module='combined'
-                      via ROLE_TO_MODULE[COMBINED_ROLE_SENTINEL]. */}
+                  {/* Opción especial: combina múltiples roles en un solo
+                      email. Pedido por Alvaro 2026-05-20. Al elegirla
+                      aparece debajo un multi-checkbox para tildar los
+                      roles que se quieren incluir como secciones. */}
                   <SelectItem value={COMBINED_ROLE_SENTINEL}>
-                    Combinado (LLG + Closers)
+                    Combinado (varios roles)
                   </SelectItem>
                 </SelectContent>
               </Select>
+              {/* Multi-select de roles combinados — visible sólo cuando
+                  el admin eligió "Combinado". Cada rol marcado genera
+                  una sección en el email. Min 2 para guardar. */}
+              {roleName === COMBINED_ROLE_SENTINEL && (
+                <div className="mt-2 rounded-md border border-border bg-muted/30 p-2 space-y-1.5">
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Roles a combinar ({combinedRoles.length})
+                  </p>
+                  {roles.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">Cargando roles…</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {roles.map((r) => (
+                        <label key={r.id} className="flex items-center gap-2 cursor-pointer text-sm">
+                          <Checkbox
+                            checked={combinedRoles.includes(r.name)}
+                            onCheckedChange={() => toggleCombinedRole(r.name)}
+                          />
+                          <span>{r.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Periodicidad *</Label>

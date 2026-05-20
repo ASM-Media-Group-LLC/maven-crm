@@ -57,6 +57,10 @@ export interface ReportSchedule {
   dispatch_month_of_year: number | null;
   email_subject: string | null;
   metrics: string[] | null; // null = set default del módulo
+  // Cuando module='combined', lista de roles que se renderizan en
+  // secciones separadas en el email. Cada rol mapea a su módulo via
+  // ROLE_TO_MODULE.
+  combined_roles: string[] | null;
   is_active: boolean;
   last_dispatched_at: string | null;
   created_at: string;
@@ -158,7 +162,7 @@ export function useReportSchedules() {
 
 export interface CreateScheduleInput {
   name: string;
-  role_name: string;
+  role_name: string | null;
   module: ReportModule;
   period: ReportPeriod;
   dispatch_hour: number;
@@ -167,6 +171,9 @@ export interface CreateScheduleInput {
   dispatch_month_of_year: number | null;
   email_subject: string | null;
   metrics: string[] | null;
+  // Sólo cuando module='combined'. Lista de roles que renderean
+  // secciones en el email.
+  combined_roles: string[] | null;
   recipients: Array<{ email: string; user_id?: string | null }>;
 }
 
@@ -189,6 +196,7 @@ export function useCreateReportSchedule() {
           dispatch_month_of_year: input.dispatch_month_of_year,
           email_subject: input.email_subject,
           metrics: input.metrics,
+          combined_roles: input.combined_roles,
           created_by: user?.id ?? null,
         })
         .select()
