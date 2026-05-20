@@ -533,51 +533,75 @@ async function fetchCloserMetrics(
   const fromDate = from.slice(0, 10);
   const toDate = to.slice(0, 10);
 
-  // SEMÁNTICA 2026-05-16 (v3): las columnas de pipeline cuentan
-  // MILESTONES CUMULATIVOS por closer, no estados mutuamente
-  // exclusivos. Cada lead suma en TODAS las etapas que cruzó:
-  //   · Asignadas  ← passed_date NOT NULL (la lead fue asignada)
-  //   · Confirmadas ← confirmed_date NOT NULL (además fue confirmada)
-  //   · Completadas ← completed_date NOT NULL (además fue completada)
+  // SEMÁNTICA 2026-05-20 (v4): period-based — cada métrica cuenta los
+  // EVENTOS (transiciones) que sucedieron DENTRO del rango del reporte.
+  // El operador (Alvaro) pidió este cambio el 2026-05-20: el reporte
+  // diario tiene que mostrar cero si nadie movió leads ayer, y el
+  // quincenal/mensual debe sumar los eventos del rango.
   //
-  // Por qué cumulativo y no mutuamente exclusivo: un closer que pasó
-  // una lead Asignada → Confirmada hizo DOS cosas (asignar Y confirmar),
-  // entonces debería aparecer con +1 en ambas columnas. La versión
-  // "snapshot del stage actual" (v2) mostraba Ruben con 0 Asignadas y
-  // 1 Confirmada — operador dijo que se pierde el crédito del trabajo
-  // de asignación.
+  // Mapping métrica → date column → tipo:
+  //   · Asignadas    → passed_date          (DATE)
+  //   · Confirmadas  → confirmed_date       (TIMESTAMPTZ)
+  //   · Completadas  → completed_date       (TIMESTAMPTZ)
+  //   · No interesadas → no_interesada_date (TIMESTAMPTZ, agregada
+  //     en migration 20260520010000 — antes no existía).
   //
-  // Tradeoff: los totales del reporte NO suman exacto el operaciones
-  // tab (que es mutually exclusive). Pero cada fila refleja el
-  // recorrido real del closer, que es lo que importa para evaluar
-  // performance.
+  // Una lead que cruza Asignada → Confirmada en el mismo período suma
+  // en ambas columnas (es trabajo distinto en ambos slots). Si pasó la
+  // misma lead semanas atrás, no suma en este período. Es el modelo de
+  // "actividad del rango", no "estado del pipeline".
   //
   // Rows con assigned_to=null se agrupan bajo UNASSIGNED_KEY y se
-  // renderean como fila "Sin asignar" si tienen actividad.
+  // renderean como fila "Sin asignar" si tienen actividad en el rango.
   const UNASSIGNED_KEY = "__unassigned__";
-  // No interesada no tiene date column propia → la contamos por stage
-  // actual. Si una lead progresó a No interesada en algún momento, su
-  // stage va a estar ahí (es terminal — no se vuelve a mover).
+
+  // Helper para chequear si un timestamp/date está dentro del rango.
+  // - passed_date: DATE → comparar contra fromDate/toDate (string YMD)
+  // - confirmed_date / completed_date / no_interesada_date: TIMESTAMPTZ
+  //   → comparar contra el rango ISO completo from/to (timestamptz)
+  //
+  // Postgres ya filtró las filas que tienen AL MENOS UNA columna en
+  // rango (vía .or() abajo), pero la misma fila puede tener una columna
+  // en rango y otra fuera — el filter JS por columna es necesario para
+  // no inflar las cuentas.
+  const isDateInRange = (d: string | null): boolean => {
+    if (!d) return false;
+    return d >= fromDate && d <= toDate;
+  };
+  const isTsInRange = (ts: string | null): boolean => {
+    if (!ts) return false;
+    return ts >= from && ts <= to;
+  };
+
+  // Postgres pre-filtra: traer SOLO rows con al menos una columna de
+  // fecha dentro del rango. Reduce el dataset que viaja al edge.
+  // Cada `.or()` clause es un OR; los anidamos para AND interno con
+  // gte/lte por columna.
   const { data: creators, error } = await admin
     .from("closer_creators")
-    .select("assigned_to, stage, passed_date, confirmed_date, completed_date")
-    .or("passed_date.not.is.null,confirmed_date.not.is.null,completed_date.not.is.null,stage.eq.No interesada");
+    .select("assigned_to, passed_date, confirmed_date, completed_date, no_interesada_date")
+    .or([
+      `and(passed_date.gte.${fromDate},passed_date.lte.${toDate})`,
+      `and(confirmed_date.gte.${from},confirmed_date.lte.${to})`,
+      `and(completed_date.gte.${from},completed_date.lte.${to})`,
+      `and(no_interesada_date.gte.${from},no_interesada_date.lte.${to})`,
+    ].join(","));
   if (error) throw error;
 
   const byUser: Record<string, { asignadas: number; confirmadas: number; completadas: number; noInteresadas: number }> = {};
   for (const c of (creators ?? []) as Array<{
     assigned_to: string | null;
-    stage: string | null;
     passed_date: string | null;
     confirmed_date: string | null;
     completed_date: string | null;
+    no_interesada_date: string | null;
   }>) {
     const key = c.assigned_to ?? UNASSIGNED_KEY;
     if (!byUser[key]) byUser[key] = { asignadas: 0, confirmadas: 0, completadas: 0, noInteresadas: 0 };
-    if (c.passed_date) byUser[key].asignadas++;
-    if (c.confirmed_date) byUser[key].confirmadas++;
-    if (c.completed_date) byUser[key].completadas++;
-    if (c.stage === "No interesada") byUser[key].noInteresadas++;
+    if (isDateInRange(c.passed_date)) byUser[key].asignadas++;
+    if (isTsInRange(c.confirmed_date)) byUser[key].confirmadas++;
+    if (isTsInRange(c.completed_date)) byUser[key].completadas++;
+    if (isTsInRange(c.no_interesada_date)) byUser[key].noInteresadas++;
   }
 
   // qa_calls.closer_id ahora apunta directo a profiles.id (post unify

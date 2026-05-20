@@ -120,6 +120,9 @@ export const useCloserCreators = () => {
       if (stage === "Asignada") updates.passed_date = new Date().toISOString().slice(0, 10);
       if (stage === "Confirmada") updates.confirmed_date = new Date().toISOString();
       if (stage === "Completada") updates.completed_date = new Date().toISOString();
+      // No interesada también es transición — espejo del fix en
+      // useCloserLeads. Migration 20260520010000 agrega la columna.
+      if (stage === "No interesada") updates.no_interesada_date = new Date().toISOString();
       const { error } = await supabase.from("closer_creators").update(updates).eq("id", id);
       if (error) throw error;
     },

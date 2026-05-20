@@ -597,6 +597,10 @@ export const useCloserLeads = () => {
       if (stage === "Asignada") updates.passed_date = new Date().toISOString().slice(0, 10);
       if (stage === "Confirmada") updates.confirmed_date = new Date().toISOString();
       if (stage === "Completada") updates.completed_date = new Date().toISOString();
+      // No interesada también es transición — necesitamos la fecha para
+      // que el reporte de closers la cuente como evento del período.
+      // Columna `no_interesada_date` agregada en migration 20260520010000.
+      if (stage === "No interesada") updates.no_interesada_date = new Date().toISOString();
       const { error } = await supabase.from("closer_creators").update(updates).eq("id", id);
       if (error) throw error;
     },
