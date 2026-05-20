@@ -315,7 +315,11 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      {/* max-h + overflow-y-auto para que el form sea scrolleable
+          cuando es alto (e.g., combinado con muchos roles + métricas).
+          Antes el modal se "bugeaba" porque crecía fuera del viewport
+          sin scroll. */}
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar reporte" : "Nuevo reporte"}</DialogTitle>
         </DialogHeader>
@@ -370,7 +374,9 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
               </Select>
               {/* Multi-select de roles combinados — visible sólo cuando
                   el admin eligió "Combinado". Cada rol marcado genera
-                  una sección en el email. Min 2 para guardar. */}
+                  una sección en el email. Min 2 para guardar.
+                  Layout: chips compactos en flex-wrap (mucho mejor
+                  uso del espacio vertical que una lista de checkboxes). */}
               {roleName === COMBINED_ROLE_SENTINEL && (
                 <div className="mt-2 rounded-md border border-border bg-muted/30 p-2 space-y-1.5">
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -379,16 +385,24 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                   {roles.length === 0 ? (
                     <p className="text-xs text-muted-foreground italic">Cargando roles…</p>
                   ) : (
-                    <div className="space-y-1">
-                      {roles.map((r) => (
-                        <label key={r.id} className="flex items-center gap-2 cursor-pointer text-sm">
-                          <Checkbox
-                            checked={combinedRoles.includes(r.name)}
-                            onCheckedChange={() => toggleCombinedRole(r.name)}
-                          />
-                          <span>{r.name}</span>
-                        </label>
-                      ))}
+                    <div className="flex flex-wrap gap-1.5">
+                      {roles.map((r) => {
+                        const isSelected = combinedRoles.includes(r.name);
+                        return (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => toggleCombinedRole(r.name)}
+                            className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                              isSelected
+                                ? "bg-primary text-primary-foreground ring-1 ring-primary"
+                                : "bg-muted/40 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                            }`}
+                          >
+                            {r.name}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
