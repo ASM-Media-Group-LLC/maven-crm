@@ -173,23 +173,25 @@ export const DEFAULT_METRICS_BY_MODULE: Record<ReportModule, string[]> = {
 // qué métricas del catálogo están disponibles. Si el rol tiene acceso a
 // CUALQUIER submodule del module declarado en `requires`, basta.
 //
-// Caso especial: cuando module='combined', devolvemos tanto LLG como
-// Closers (es un reporte multi-módulo, ambas familias de métricas
-// aplican). El submodal renderiza los 2 grupos visualmente separados.
+// Caso especial: cuando module='combined' es admin-only (creación de
+// reportes multi-rol), bypasseamos el filtro de permisos por rol
+// (`__combined__` es sintético, no tiene permisos en role_permissions)
+// y devolvemos todas las métricas de los 3 módulos. El admin elige
+// qué tildar según los roles que combinó.
 export function filterMetricsByPermissions(
   module: ReportModule,
   permissions: Array<{ module: string; submodule: string | null }>,
 ): MetricDef[] {
+  if (module === "combined") {
+    return METRICS_CATALOG.filter(
+      (m) => m.module === "llg" || m.module === "closers" || m.module === "chatters",
+    );
+  }
   const accessibleModules = new Set(
     permissions.filter((p) => p).map((p) => p.module),
   );
   return METRICS_CATALOG.filter((m) => {
-    // Combined acepta métricas de llg + closers (las dos familias).
-    if (module === "combined") {
-      if (m.module !== "llg" && m.module !== "closers") return false;
-    } else if (m.module !== module) {
-      return false;
-    }
+    if (m.module !== module) return false;
     // Para que la métrica aparezca, el rol debe tener acceso a TODOS los
     // requires (en este catálogo son singulares, pero estructuralmente
     // soportamos AND).
