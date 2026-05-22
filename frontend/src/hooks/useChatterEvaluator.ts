@@ -1197,11 +1197,15 @@ export const useChatterMessages = (sessionId: string | null | undefined) =>
     queryKey: ["chatter-messages", sessionId],
     enabled: !!sessionId,
     queryFn: async (): Promise<ChatterMessage[]> => {
-      const { data, error } = await sb
-        .from("chatter_messages")
-        .select("*")
-        .eq("session_id", sessionId)
-        .order("created_at", { ascending: true });
+      // Usamos RPC SECURITY DEFINER en vez del SELECT directo para
+      // permitir read global a admins/managers. La policy
+      // chatter_messages_read_global se dropeó en
+      // 20260513130000_drop_chatter_messages_global_policy.sql porque
+      // rompía Realtime — el RPC resuelve el mismo problema sin tocar
+      // el hot path de broadcast. Ver migration 20260520060000.
+      const { data, error } = await sb.rpc("app_get_chatter_messages", {
+        p_session_id: sessionId,
+      });
       if (error) throw error;
       return (data ?? []) as ChatterMessage[];
     },
