@@ -25,6 +25,7 @@ import {
   Users as UsersIcon,
   X,
   XCircle,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -39,6 +40,7 @@ import {
 import { useTenantProfiles } from "@/hooks/useAgencyQa";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import AddSpammerAccountDialog from "./AddSpammerAccountDialog";
 
 // SpammerAccountsTab — vista del manager: lista de cuentas de IG que
 // los spammers/scouters registraron, agrupadas por handle (cuando
@@ -106,6 +108,9 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
   const [search, setSearch] = useState("");
   const [openHandle, setOpenHandle] = useState<string | null>(null);
   const [statPopup, setStatPopup] = useState<StatPopupKind | null>(null);
+  // Dialog para "+ Agregar cuenta" — solo se abre desde el grid cuando
+  // viewMode === "mine" (un LG/admin agregando una cuenta propia).
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   // Agrupar por handle — cuando varios spammers usan la misma cuenta,
   // se muestra UNA sola card con la lista de operators (los user_id
@@ -306,21 +311,56 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
           Cargando cuentas…
         </Card>
       ) : filtered.length === 0 ? (
-        <Card className="flex flex-col items-center gap-2 p-12 text-center">
+        // Empty state. Cuando es viewMode='mine' mostramos un CTA directo
+        // a agregar cuenta (en vez del mensaje genérico "completá el
+        // asistente"). Para Panel de Control general (viewMode='all') sin
+        // resultados, dejamos el copy original.
+        <Card className="flex flex-col items-center gap-3 p-12 text-center">
           <Instagram className="h-10 w-10 text-muted-foreground/40" />
           <p className="text-sm font-medium">
             {aggregated.length === 0
-              ? "Todavía no hay cuentas registradas"
+              ? viewMode === "mine"
+                ? "Todavía no tenés cuentas registradas"
+                : "Todavía no hay cuentas registradas"
               : "Sin resultados para esa búsqueda"}
           </p>
           <p className="max-w-md text-xs text-muted-foreground">
             {aggregated.length === 0
-              ? "Cuando un scouter agregue su primera cuenta en Scouter Assist > Cuentas, aparecerá acá con su análisis IA."
+              ? viewMode === "mine"
+                ? "Agregá tu primera cuenta de Instagram para que la IA evalúe qué tan creíble se ve."
+                : "Cuando un scouter agregue su primera cuenta en Scouter Assist > Cuentas, aparecerá acá con su análisis IA."
               : "Probá con otro handle, nombre o scouter."}
           </p>
+          {viewMode === "mine" && aggregated.length === 0 && (
+            <Button
+              size="sm"
+              className="mt-2 gap-1.5"
+              onClick={() => setAddDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Agregar mi primera cuenta
+            </Button>
+          )}
         </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/* Card "+" — solo en viewMode='mine'. Va PRIMERA para que sea
+              el primer elemento que ven los LGs cuando abren el modal. */}
+          {viewMode === "mine" && (
+            <button
+              type="button"
+              onClick={() => setAddDialogOpen(true)}
+              className="group flex min-h-[212px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-card/40 p-4 text-muted-foreground transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/50 transition-colors group-hover:bg-primary/15">
+                <Plus className="h-6 w-6" />
+              </div>
+              <span className="text-sm font-medium">Agregar cuenta</span>
+              <span className="max-w-[180px] text-center text-[11px] leading-tight">
+                Sumá una cuenta IG. La IA la escanea automático.
+              </span>
+            </button>
+          )}
           {filtered.map((a) => (
             <SpammerCard
               key={a.representative.instagram_handle}
@@ -331,6 +371,14 @@ const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) 
           ))}
         </div>
       )}
+
+      {/* Dialog de agregar cuenta — solo se abre desde la card "+" en
+          viewMode='mine'. Si lo van a necesitar también en Panel de
+          Control, hay que sumar un botón en el header. */}
+      <AddSpammerAccountDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+      />
 
       <SpammerDetailDialog
         open={!!openAcc}
