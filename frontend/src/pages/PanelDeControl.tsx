@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { startOfMonth, endOfMonth, startOfDay, format } from "date-fns";
+import {
+  startOfMonth, endOfMonth, startOfDay, endOfDay, startOfWeek, endOfWeek,
+  subDays, format,
+} from "date-fns";
 import { es } from "date-fns/locale";
 import {
   Users,
@@ -14,7 +17,7 @@ import {
   ArrowUp,
   ArrowDown,
   Crown,
-  Instagram,
+  Activity,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -812,12 +815,45 @@ const LeadDetailDialog = ({
 
 // ─── Page ──────────────────────────────────────────────────────────────
 
+// Presets de rango rápido — botones a la izquierda del DateRangePicker.
+// "Hoy" es el default al entrar a la página (antes era el mes entero,
+// pero la mayoría del uso es check del día en curso).
+type RangePreset = "yesterday" | "today" | "this_week" | "this_month";
+
+const PRESET_CONFIG: Array<{ key: RangePreset; label: string }> = [
+  { key: "yesterday", label: "Ayer" },
+  { key: "today", label: "Hoy" },
+  { key: "this_week", label: "Esta semana" },
+  { key: "this_month", label: "Este mes" },
+];
+
+function rangeForPreset(preset: RangePreset, ref: Date): DashboardRange {
+  const today = startOfDay(ref);
+  switch (preset) {
+    case "yesterday": {
+      const y = subDays(today, 1);
+      return { from: y, to: endOfDay(y) };
+    }
+    case "today":
+      return { from: today, to: endOfDay(today) };
+    case "this_week":
+      // weekStartsOn=1 (lunes) — convención local. Si Alvaro prefiere
+      // domingo después, lo cambiamos.
+      return {
+        from: startOfWeek(today, { weekStartsOn: 1 }),
+        to: endOfWeek(today, { weekStartsOn: 1 }),
+      };
+    case "this_month":
+      return { from: startOfMonth(today), to: endOfMonth(today) };
+  }
+}
+
 const PanelDeControl = () => {
   const today = startOfDay(new Date());
-  const [range, setRange] = useState<DashboardRange>({
-    from: startOfMonth(today),
-    to: endOfMonth(today),
-  });
+  // Default: Hoy (antes era el mes entero — la mayoría del uso es
+  // check del día en curso, no análisis histórico mensual).
+  const [range, setRange] = useState<DashboardRange>(() => rangeForPreset("today", today));
+  const [activePreset, setActivePreset] = useState<RangePreset | null>("today");
   // openMetric en URL — así si el user navega a otra página (ej. QA
   // history) y vuelve con back, el popup se restaura automáticamente.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -987,20 +1023,52 @@ const PanelDeControl = () => {
             Funnel operativo en tiempo real — desde el contacto LLG hasta ingresos al CRM.
           </p>
         </div>
-        <DateRangePicker
-          from={range.from}
-          to={range.to}
-          onApply={(from, to) => setRange({ from, to })}
-          placeholder="Seleccionar fechas"
-        />
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Presets rápidos — pill segmentado. Click setea range y
+              marca el preset activo. Si el user después abre el
+              DateRangePicker y elige fechas custom, `activePreset` se
+              limpia (se ve más abajo en onApply). */}
+          <div className="inline-flex items-center rounded-lg border border-border bg-card/40 p-0.5">
+            {PRESET_CONFIG.map((p) => {
+              const isActive = activePreset === p.key;
+              return (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => {
+                    setRange(rangeForPreset(p.key, new Date()));
+                    setActivePreset(p.key);
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                    isActive
+                      ? "bg-primary/15 text-primary ring-1 ring-primary/30"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                  )}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+          <DateRangePicker
+            from={range.from}
+            to={range.to}
+            onApply={(from, to) => {
+              setRange({ from, to });
+              setActivePreset(null); // selección manual → preset desactivado
+            }}
+            placeholder="Seleccionar fechas"
+          />
+        </div>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "modelos" | "chatters" | "cuentas-spammer" | "control-gasto")}>
         <TabsList>
           <TabsTrigger value="modelos">Reclutamiento modelos</TabsTrigger>
           <TabsTrigger value="cuentas-spammer" className="gap-1.5">
-            <Instagram className="h-3.5 w-3.5" />
-            Cuentas spammer
+            <Activity className="h-3.5 w-3.5" />
+            Salud de Cuentas IG
           </TabsTrigger>
           <TabsTrigger value="chatters">Reclutamiento chatters</TabsTrigger>
           <TabsTrigger value="control-gasto">Control de Gasto</TabsTrigger>

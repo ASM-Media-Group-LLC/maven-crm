@@ -37,6 +37,7 @@ import {
   useRemoveSpammerScreenshot,
 } from "@/hooks/useSpammerAccounts";
 import { useTenantProfiles } from "@/hooks/useAgencyQa";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 // SpammerAccountsTab — vista del manager: lista de cuentas de IG que
@@ -83,7 +84,22 @@ const fmtCount = (n: number | null | undefined): string => {
 
 type StatPopupKind = "all" | "pending" | "failed";
 
-const SpammerAccountsTab = () => {
+// viewMode controla qué cuentas se muestran:
+//   · "all" (default): muestra todas las cuentas accesibles vía RLS
+//     (admin/manager ven todo el equipo, LG normal ve solo las suyas
+//     porque RLS lo filtra). Cada card muestra la lista de operators.
+//   · "mine": filtro CLIENT-SIDE adicional por user_id === currentUser.id
+//     — fuerza "solo mis cuentas" incluso para admins/managers. Se usa
+//     desde MisCuentasIGModal en LeadGen donde el contexto es "estás
+//     mirando TU cuenta" sin importar tu rol.
+// Cuando es "mine", esconde la lista de operators (sería redundante:
+// solo aparece uno).
+interface SpammerAccountsTabProps {
+  viewMode?: "all" | "mine";
+}
+
+const SpammerAccountsTab = ({ viewMode = "all" }: SpammerAccountsTabProps = {}) => {
+  const { user } = useAuth();
   const accountsQ = useSpammerAccounts();
   const profilesQ = useTenantProfiles();
   const rescan = useRescanSpammerAccount();
@@ -94,8 +110,16 @@ const SpammerAccountsTab = () => {
   // Agrupar por handle — cuando varios spammers usan la misma cuenta,
   // se muestra UNA sola card con la lista de operators (los user_id
   // de la fila se resuelven contra profiles.full_name).
+  //
+  // Cuando viewMode === "mine", filtramos primero a las rows donde
+  // user_id === current user. Esto sobreescribe lo que RLS devolvió
+  // (que para managers puede ser todo el equipo) — el LG / admin que
+  // entra desde "Mis Cuentas IG" en LeadGen siempre ve solo las suyas.
   const aggregated = useMemo<AggregatedAccount[]>(() => {
-    const list = accountsQ.data ?? [];
+    const allRows = accountsQ.data ?? [];
+    const list = viewMode === "mine" && user?.id
+      ? allRows.filter((a) => a.user_id === user.id)
+      : allRows;
     const profileNameById = new Map<string, string>();
     (profilesQ.data ?? []).forEach((p) => {
       if (p.full_name) profileNameById.set(p.id, p.full_name);
@@ -217,17 +241,23 @@ const SpammerAccountsTab = () => {
           quitaba espacio cuando había cards. Ahora es una sola línea. */}
       <div className="flex flex-wrap items-center gap-2">
         <Instagram className="h-4 w-4 text-pink-400 shrink-0" />
-        <h2 className="text-sm font-semibold">Cuentas spammer</h2>
+        <h2 className="text-sm font-semibold">
+          {viewMode === "mine" ? "Mis cuentas IG" : "Salud de Cuentas IG"}
+        </h2>
         <span
           className="text-[11px] text-muted-foreground"
-          title="Cuentas de IG que los spammers/scouters usan para outreach. Cada cuenta nueva se escanea con IA (Sonnet 4.6) que evalúa qué tan creíble se ve para influencers grandes."
+          title={
+            viewMode === "mine"
+              ? "Tus cuentas de IG que usás para outreach. Cada cuenta se escanea con IA que evalúa qué tan creíble se ve para que las creadoras respondan. Click en una card para ver el análisis del scan."
+              : "Cuentas de IG que el equipo usa para outreach (LGs/scouters). Cada cuenta se escanea con IA (Sonnet 4.6) que evalúa qué tan creíble se ve para que las creadoras objetivo respondan. Click en una card para ver el detalle del análisis."
+          }
         >
-          · IA escanea cada cuenta nueva — click en una card para ver el detalle
+          · IA escanea cada cuenta nueva — click en una card para ver el análisis completo
         </span>
         <div className="relative ml-auto w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar handle, nombre, scouter…"
+            placeholder={viewMode === "mine" ? "Buscar handle o nombre…" : "Buscar handle, nombre, scouter…"}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-8 pl-8 text-xs"
@@ -295,6 +325,7 @@ const SpammerAccountsTab = () => {
             <SpammerCard
               key={a.representative.instagram_handle}
               account={a}
+              hideOperators={viewMode === "mine"}
               onClick={() => setOpenHandle(a.representative.instagram_handle)}
             />
           ))}
@@ -331,9 +362,11 @@ const SpammerAccountsTab = () => {
 const SpammerCard = ({
   account,
   onClick,
+  hideOperators = false,
 }: {
   account: AggregatedAccount;
   onClick: () => void;
+  hideOperators?: boolean;
 }) => {
   const r = account.representative;
   const cfg = scoreCfg(r.ai_score);
@@ -399,19 +432,22 @@ const SpammerCard = ({
         )}
       </div>
 
-      {/* Footer: operators */}
-      <div className="flex items-center gap-1.5 border-t border-border/60 bg-card px-4 py-2 text-[11px] text-muted-foreground">
-        <UserCog className="h-3 w-3" />
-        {account.operators.length === 0 ? (
-          <span className="italic">Sin scouter asignado</span>
-        ) : account.operators.length === 1 ? (
-          <span className="truncate">{account.operators[0].name}</span>
-        ) : (
-          <span className="truncate">
-            {account.operators.length} scouters la usan
-          </span>
-        )}
-      </div>
+      {/* Footer: operators — escondido en viewMode='mine' (sería
+          redundante: el único operator que ves sos vos). */}
+      {!hideOperators && (
+        <div className="flex items-center gap-1.5 border-t border-border/60 bg-card px-4 py-2 text-[11px] text-muted-foreground">
+          <UserCog className="h-3 w-3" />
+          {account.operators.length === 0 ? (
+            <span className="italic">Sin scouter asignado</span>
+          ) : account.operators.length === 1 ? (
+            <span className="truncate">{account.operators[0].name}</span>
+          ) : (
+            <span className="truncate">
+              {account.operators.length} scouters la usan
+            </span>
+          )}
+        </div>
+      )}
     </button>
   );
 };

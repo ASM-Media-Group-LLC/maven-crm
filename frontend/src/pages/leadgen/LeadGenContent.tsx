@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock,
   Search, List, LayoutGrid, FileText, Calendar, ChevronLeft, ChevronRight, Shield, Eye, X,
-  ArrowUpDown, ArrowUp, ArrowDown, LayoutDashboard,
+  ArrowUpDown, ArrowUp, ArrowDown, LayoutDashboard, Activity,
 } from "lucide-react";
 import { format, isSameDay, subDays, startOfWeek, addDays, isToday, isFuture, startOfDay, startOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -32,6 +32,7 @@ import LeadGenTable from "./LeadGenTable";
 import LeadGenGrid from "./LeadGenGrid";
 import AddLeadModal from "./AddLeadModal";
 import AddContactoModal from "./AddContactoModal";
+import MisCuentasIGModal from "./MisCuentasIGModal";
 import ViewLeadModal from "./ViewLeadModal";
 import DeleteLeadDialog from "./DeleteLeadDialog";
 import AgentDetailView from "./AgentDetailView";
@@ -148,6 +149,7 @@ const LeadGenContent = () => {
   const [weekOffset, setWeekOffset] = useState(0);
   const [addLeadOpen, setAddLeadOpen] = useState(false);
   const [addContactoOpen, setAddContactoOpen] = useState(false);
+  const [misCuentasOpen, setMisCuentasOpen] = useState(false);
   const [viewLeadOpen, setViewLeadOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<LeadGenEntry | null>(null);
   const [deleteLeadOpen, setDeleteLeadOpen] = useState(false);
@@ -384,6 +386,15 @@ const LeadGenContent = () => {
                 }}
               />
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMisCuentasOpen(true)}
+              title="Estado de tus cuentas IG de outreach — qué tan creíble se ven y qué les falta para que las creadoras respondan"
+            >
+              <Activity className="h-4 w-4" />
+              Mis Cuentas IG
+            </Button>
             <Button size="sm" onClick={() => setAddLeadOpen(true)}>
               <Plus className="h-4 w-4" />
               Agregar Lead
@@ -771,6 +782,7 @@ const LeadGenContent = () => {
       {/* Modals */}
       <AddLeadModal open={addLeadOpen} onOpenChange={setAddLeadOpen} />
       <AddContactoModal open={addContactoOpen} onOpenChange={setAddContactoOpen} />
+      <MisCuentasIGModal open={misCuentasOpen} onOpenChange={setMisCuentasOpen} />
       <ViewLeadModal
         open={viewLeadOpen}
         onOpenChange={setViewLeadOpen}
