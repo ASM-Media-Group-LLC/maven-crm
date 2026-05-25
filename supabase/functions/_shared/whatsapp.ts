@@ -65,10 +65,24 @@ export function parseEvolutionApiMessage(payload: unknown): IncomingMessage | nu
   if (!externalId) return null;
 
   const fromMe = key.fromMe === true;
-  // En grupos, el sender real está en `participant`. Si fromMe=true y no
-  // hay participant, usamos el JID propio (lo dejamos al adapter del
-  // sender).
-  const participant = String(data.participant ?? key.remoteJid ?? "");
+  // En grupos, el sender real está en `key.participant` (Evolution v1.8+
+  // y Baileys moderno). Versiones más viejas lo ponían en `data.participant`
+  // — soportamos ambos con fallback. Último recurso: el JID del grupo
+  // (solo cuando fromMe=true y todo lo demás falla, mejor que vacío).
+  //
+  // Importante: con WhatsApp moderno este "participant" puede venir como
+  // `<digits>@lid` en vez de `<phone>@s.whatsapp.net`. El `@lid` es un
+  // identificador anónimo que NO se puede mapear a un teléfono real sin
+  // que el bot tenga al contacto en su agenda. Es estable per-conversación
+  // (sirve como id único del wpp_member), pero el matching con phone_e164
+  // no funciona en grupos modernos por privacidad — usamos linkeo manual
+  // o matching por pushName desde el panel admin.
+  const participant = String(
+    (key.participant as string | undefined) ??
+    (data.participant as string | undefined) ??
+    key.remoteJid ??
+    ""
+  );
 
   const message = (data.message ?? {}) as Record<string, unknown>;
   let body: string | null = null;
