@@ -17,7 +17,7 @@ import { logAnthropicUsage } from "../_shared/usage.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-cron-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const MAX_TRANSCRIPT_CHARS = 200_000;
@@ -88,6 +88,22 @@ const isValidAnalysis = (a: unknown): boolean => {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Auth: aceptamos DOS modos (mismo patrón que send-report):
+  //   · X-Cron-Token (interno desde el cron de retry de QAs stuck)
+  //   · JWT válido en Authorization (frontend "Re-analizar")
+  // Cualquiera de los dos basta.
+  const cronToken = req.headers.get("X-Cron-Token");
+  const expectedToken = Deno.env.get("CRON_INTERNAL_TOKEN");
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const hasCronToken = !!expectedToken && cronToken === expectedToken;
+  const hasJwt = authHeader.toLowerCase().startsWith("bearer ") && authHeader.length > 20;
+  if (!hasCronToken && !hasJwt) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   try {
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");

@@ -155,6 +155,15 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Variables del scope outer para que el catch final pueda hacer
+  // cleanup fail-loud: si llegamos a marcar scan_status='scanning' y
+  // después el flow tira excepción, la row debería quedar 'failed'
+  // (no stuck en scanning). Sin esto, el cron de recovery tiene que
+  // limpiar 5 min después — feo para el user.
+  let cleanupAccountId: string | null = null;
+  let cleanupSb: ReturnType<typeof createClient> | null = null;
+  let markedScanning = false;
+
   try {
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     if (!ANTHROPIC_API_KEY) {
@@ -207,11 +216,16 @@ Deno.serve(async (req) => {
       return jsonError("Cuenta no encontrada.", 404);
     }
 
+    // Set vars de cleanup para que el catch final pueda recuperar la row.
+    cleanupAccountId = accountRow.id;
+    cleanupSb = sb;
+
     // Marcar como scanning para que el frontend muestre estado.
     await sb
       .from("scouter_spammer_accounts")
       .update({ scan_status: "scanning", scan_error: null })
       .eq("id", accountRow.id);
+    markedScanning = true;
 
     // Fetchear perfil público de IG.
     let snapshot: IgProfileSnapshot | null = null;
@@ -414,8 +428,33 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
+    const errorMsg = (e as Error).message ?? "Error interno.";
     console.error("scouter-spam-account-scan error:", e);
-    return jsonError((e as Error).message ?? "Error interno.", 500);
+
+    // FAIL-LOUD: si llegamos a marcar la row como 'scanning' y después
+    // hubo excepción, marcamos como 'failed' para que NO quede stuck.
+    // Sin esto, el bug que destrabamos el 2026-05-25 (constraint
+    // violation silente) podía pasar de nuevo en otros paths que tiran
+    // excepciones inesperadas.
+    if (markedScanning && cleanupAccountId && cleanupSb) {
+      try {
+        await cleanupSb
+          .from("scouter_spammer_accounts")
+          .update({
+            scan_status: "failed",
+            scan_error: `Excepción no manejada: ${errorMsg}`.slice(0, 500),
+            last_scanned_at: new Date().toISOString(),
+          })
+          .eq("id", cleanupAccountId);
+      } catch (cleanupErr) {
+        console.error(
+          "[cleanup failed] no pudimos marcar row como failed:",
+          cleanupErr,
+        );
+      }
+    }
+
+    return jsonError(errorMsg, 500);
   }
 });
 
