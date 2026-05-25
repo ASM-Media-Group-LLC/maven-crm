@@ -207,6 +207,47 @@ Deno.serve(async (req) => {
       console.error("ig fetch failed:", fetchErr);
     }
 
+    // ScrapeCreators sin sesión logueada NO detecta correctamente las
+    // cuentas restringidas — devuelve un snapshot con todos los campos
+    // vacíos en lugar de marcar is_restricted=true. Si vemos que el
+    // snapshot existe pero no tiene NINGÚN dato sustantivo (sin bio,
+    // sin followers, sin posts, sin foto), asumimos que es restringida
+    // y promovemos el snapshot a is_restricted=true. El branch de
+    // screenshot abajo se encarga del resto.
+    //
+    // Fallback adicional: si snapshot vino null (fetch tiró excepción
+    // o devolvió null), también asumimos restricted en vez de marcar
+    // failed — el user puede subir screenshots y rescatar el análisis
+    // con Claude vision.
+    const snapshotIsEmpty =
+      !!snapshot &&
+      !snapshot.biography &&
+      (snapshot.followers_count == null || snapshot.followers_count === 0) &&
+      (snapshot.posts_count == null || snapshot.posts_count === 0) &&
+      !snapshot.profile_pic_url;
+    if (snapshot && snapshotIsEmpty && !snapshot.is_restricted) {
+      console.warn(
+        `[snapshot empty] ${accountRow.instagram_handle} — asumiendo restricted (ScrapeCreators sin sesión no detecta restringidas).`,
+      );
+      snapshot = { ...snapshot, is_restricted: true };
+    }
+    if (!snapshot) {
+      console.warn(
+        `[snapshot null] ${accountRow.instagram_handle} — fetch falló, asumiendo restricted para que el user suba screenshots.`,
+      );
+      snapshot = {
+        username: accountRow.instagram_handle,
+        full_name: null,
+        biography: null,
+        followers_count: null,
+        following_count: null,
+        posts_count: null,
+        profile_pic_url: null,
+        is_verified: false,
+        is_restricted: true,
+      } as IgProfileSnapshot;
+    }
+
     // Si la cuenta vino marcada como restricted y el user ya subió un
     // screenshot manual, lo mandamos a Claude vision para extraer bio +
     // nombre + followers + link + posts + verified, y mergeamos esos
@@ -267,7 +308,7 @@ Deno.serve(async (req) => {
         // Restricted sin screenshot manual: la edge function devuelve OK
         // pero deja la row marcada para que el frontend pida el upload.
         // No corremos el AI porque sería análisis fantasma.
-        await sb
+        const { error: awaitingErr } = await sb
           .from("scouter_spammer_accounts")
           .update({
             is_restricted: true,
@@ -276,6 +317,24 @@ Deno.serve(async (req) => {
             last_scanned_at: new Date().toISOString(),
           })
           .eq("id", accountRow.id);
+        if (awaitingErr) {
+          // Antes este UPDATE era silente — si el check constraint o
+          // RLS rechazaban, la row quedaba en 'scanning' para siempre.
+          // Ahora si falla lo dejamos como 'failed' para que el cron
+          // de recovery lo limpie y el user pueda re-disparar.
+          console.error(
+            `[awaiting_screenshot update failed] ${accountRow.id}: ${awaitingErr.message}`,
+          );
+          await sb
+            .from("scouter_spammer_accounts")
+            .update({
+              scan_status: "failed",
+              scan_error: `UPDATE a awaiting_screenshot falló: ${awaitingErr.message}`,
+              last_scanned_at: new Date().toISOString(),
+            })
+            .eq("id", accountRow.id);
+          return jsonError(`No se pudo marcar como awaiting_screenshot: ${awaitingErr.message}`, 500);
+        }
         return new Response(
           JSON.stringify({
             ok: true,
