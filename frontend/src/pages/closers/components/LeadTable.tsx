@@ -749,7 +749,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                         </DropdownMenuItem>
                       </>
                     )}
-                    {isAdmin && canAssign && (
+                    {(isAdmin || canAssign) && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
@@ -967,7 +967,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                   <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {isAdmin && canAssign && (
+                  {(isAdmin || canAssign) && (
                     <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
                       <UserPlus className="h-4 w-4 mr-2" /> Asignar a Closer
                     </DropdownMenuItem>
@@ -1025,7 +1025,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                         Mover a {s}
                       </DropdownMenuItem>
                     ))}
-                    {isAdmin && canAssign && (
+                    {(isAdmin || canAssign) && (
                       <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to, c._source)}>

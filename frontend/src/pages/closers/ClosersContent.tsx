@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
@@ -46,6 +47,12 @@ const ClosersContent = () => {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  // Permiso granular: cualquier role con "Closers > Asignar Closer" puede
+  // ver el botón. Antes el botón estaba hardcoded a (isAdmin || isManager)
+  // — eso ignoraba el sistema de permisos y rompía roles custom como
+  // "Closer Supervisor" que tienen el permiso pero no el role hardcoded.
+  const { canAccess } = usePermissions();
+  const canAssignCloser = canAccess("Closers", "Asignar Closer");
   type KpiPopupState = { kind: "pipeline"; key: "total" | "asignadas" | "confirmadas" | "completadas" | "cerradas" | "no_interesadas" } | { kind: "revenue"; platform: string };
   const [kpiPopup, setKpiPopup] = useState<KpiPopupState | null>(null);
   const { data: kpiPopupResult, isLoading: kpiPopupLoading } = useClosersKpiPopup(kpiPopup, { dateFrom, dateTo, dateField, viewAsCloserId });
@@ -115,15 +122,15 @@ const ClosersContent = () => {
               placeholder="Seleccionar fechas"
             />
             {(isAdmin || isManager) && (
-              <>
-                <ViewAsCloserPicker
-                  value={viewAsCloserId}
-                  onChange={(id, name) => setViewAsCloser(id, name)}
-                />
-                <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null, source: "closer" }); setAssignDialogOpen(true); }}>
-                  <UserPlus className="h-4 w-4 mr-1" /> Asignar
-                </Button>
-              </>
+              <ViewAsCloserPicker
+                value={viewAsCloserId}
+                onChange={(id, name) => setViewAsCloser(id, name)}
+              />
+            )}
+            {(isAdmin || isManager || canAssignCloser) && (
+              <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null, source: "closer" }); setAssignDialogOpen(true); }}>
+                <UserPlus className="h-4 w-4 mr-1" /> Asignar
+              </Button>
             )}
           </div>
         </div>
