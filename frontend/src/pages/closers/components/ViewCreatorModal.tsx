@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FileText } from "lucide-react";
 import ContactHistoryPanel from "./ContactHistoryPanel";
 import ActivityTimeline from "./ActivityTimeline";
+import EvidenceViewer from "@/components/leadgen/EvidenceViewer";
 
 interface Creator {
   id: string;
@@ -44,6 +45,11 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
   if (!creator) return null;
 
   const leadgenEntryId = (creator as any).leadgen_entry_id as string | null;
+  // source_contact_id apunta al closers_contacts que generó este
+  // closer_creator. Es donde vive la evidencia que el LG adjuntó cuando
+  // pasó el número. Si la fila no tiene este campo (datos viejos),
+  // el viewer simplemente muestra estado vacío.
+  const sourceContactId = (creator as any).source_contact_id as string | null;
 
   const { data: leadOrigin } = useQuery({
     queryKey: ["leadgen-origin", leadgenEntryId],
@@ -137,6 +143,17 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
             </div>
           </>
         )}
+
+        <Separator />
+
+        {/* Evidencia del primer contacto (subida por el LG al crear el
+            closers_contacts). Si este closer_creator no tiene
+            source_contact_id linkeado, el viewer muestra estado vacío. */}
+        <EvidenceViewer
+          entityType="contact"
+          entityId={sourceContactId}
+          uploaderNameHint={agentProfile?.full_name ?? undefined}
+        />
 
         <Separator />
         <div>

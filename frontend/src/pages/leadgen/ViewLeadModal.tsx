@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ConvertLeadModal from "./ConvertLeadModal";
+import EvidenceViewer from "@/components/leadgen/EvidenceViewer";
 import type { LeadGenEntry } from "./useLeadGen";
 
 const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
@@ -221,6 +222,13 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
                 {lead.notes || "Sin notas"}
               </p>
             </div>
+
+            <Separator />
+
+            {/* Evidencia que el LG subió al crear el lead — antes se
+                guardaba en leadgen_evidence_files pero nunca se mostraba
+                en ningún componente. Ahora se ve acá. */}
+            <EvidenceViewer entityType="lead" entityId={lead.id} />
 
             <Separator />
 

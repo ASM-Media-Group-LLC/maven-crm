@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,7 +15,8 @@ import { getMiamiDateStr } from "./timezoneUtils";
 import { LEADGEN_COMPANIES } from "./leadgenConstants";
 import { useScouterCompanies, useCreateCompany } from "@/hooks/useScouterLeads";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, X, ChevronsUpDown, Check, Plus } from "lucide-react";
+import { ChevronsUpDown, Check, Plus } from "lucide-react";
+import EvidenceUploader from "@/components/leadgen/EvidenceUploader";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
@@ -45,14 +46,13 @@ interface AddLeadModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const MAX_FILES = 4;
+const MAX_FILES = 8;
 
 const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [isAddingCompany, setIsAddingCompany] = useState(false);
   const [customCompany, setCustomCompany] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   // Compañías canónicas — fuente única scouter_companies. Si el user
@@ -103,18 +103,6 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
     if (detected) {
       form.setValue("platform", detected);
     }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files;
-    if (!selected) return;
-    const newFiles = Array.from(selected);
-    setFiles((prev) => [...prev, ...newFiles].slice(0, MAX_FILES));
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const queryClient = useQueryClient();
@@ -468,27 +456,14 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                 )}
               />
 
-              <div className="space-y-2">
-                <FormLabel>Evidencia (opcional)</FormLabel>
-                <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileChange} />
-                <Button type="button" variant="outline" className="w-full" disabled={files.length >= MAX_FILES} onClick={() => fileInputRef.current?.click()}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Subir Evidencia ({files.length}/{MAX_FILES})
-                </Button>
-                <p className="text-xs text-muted-foreground">Sube hasta 4 imágenes o videos como prueba de contacto</p>
-                {files.length > 0 && (
-                  <ul className="space-y-1">
-                    {files.map((file, i) => (
-                      <li key={i} className="flex items-center justify-between text-sm text-muted-foreground bg-muted/50 rounded px-2 py-1">
-                        <span className="truncate mr-2">{file.name}</span>
-                        <button type="button" onClick={() => removeFile(i)} className="shrink-0 hover:text-destructive">
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <EvidenceUploader
+                files={files}
+                onFilesChange={setFiles}
+                minFiles={0}
+                maxFiles={MAX_FILES}
+                label="Evidencia (opcional)"
+                description="Hasta 8 capturas. Click, drag&drop, o pegá con Cmd/Ctrl+V."
+              />
             </div>
 
             <DialogFooter className="pt-4">

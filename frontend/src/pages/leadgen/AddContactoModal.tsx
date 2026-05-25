@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AlertTriangle } from "lucide-react";
+import EvidenceUploader from "@/components/leadgen/EvidenceUploader";
 import { LeadAutocomplete, type LeadAutocompleteLead } from "@/components/leadgen/LeadAutocomplete";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
@@ -31,6 +32,48 @@ const contactoSchema = z.object({
 });
 
 type ContactoFormValues = z.infer<typeof contactoSchema>;
+
+// Reglas de evidencia para AddContactoModal:
+//   MIN_EVIDENCE = 4 → impuesto por el jefe ("queremos ver pruebas reales
+//     del primer contacto antes de pasarlo a closers, mínimo 4 screenshots")
+//   MAX_EVIDENCE = 8 → tope técnico para no abusar de storage
+//
+// El bloque queda como parte del flow: si el LG no adjunta al menos 4,
+// el botón "Guardar" queda deshabilitado.
+const MIN_EVIDENCE = 4;
+const MAX_EVIDENCE = 8;
+
+// Helper: sube cada archivo al bucket creator-files y crea la fila en
+// closers_contacts_evidence_files con FK al contacto. Falla loud — si
+// un upload falla, el caller debe ver el error y decidir (ya el contacto
+// fue creado, así que un retry parcial puede dejar evidencia incompleta).
+async function uploadContactEvidence(
+  contactId: string,
+  files: File[],
+  uploadedBy: string,
+  // Importar supabase via param para no bindear el módulo afuera de la
+  // función (la signature del módulo ya lo importa).
+  supabaseClient: typeof import("@/integrations/supabase/client").supabase,
+): Promise<void> {
+  for (const file of files) {
+    const filePath = `contacts/${contactId}/${crypto.randomUUID()}-${file.name}`;
+    const { error: uploadError } = await supabaseClient.storage
+      .from("creator-files")
+      .upload(filePath, file);
+    if (uploadError) throw uploadError;
+    const { data: signed } = await supabaseClient.storage
+      .from("creator-files")
+      .createSignedUrl(filePath, 60 * 60 * 24 * 365); // 1 año
+    await supabaseClient
+      .from("closers_contacts_evidence_files" as never)
+      .insert({
+        contact_id: contactId,
+        file_url: signed?.signedUrl || filePath,
+        file_type: file.type,
+        uploaded_by: uploadedBy,
+      } as never);
+  }
+}
 
 interface AddContactoModalProps {
   open: boolean;
@@ -74,6 +117,8 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   // loguea el lead, después acá lo selecciona al conseguir el tel.
   const [selectedLead, setSelectedLead] = useState<LeadAutocompleteLead | null>(null);
   const [leadError, setLeadError] = useState<string | null>(null);
+  // Evidencia obligatoria — mínimo 4 screenshots (regla del jefe).
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
   // Compañías canónicas — lista fija, no se permite texto libre.
@@ -170,6 +215,15 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
       setLeadError("Tenés que seleccionar un lead existente. Si no aparece, agregalo primero en LeadGen.");
       return;
     }
+    // Evidencia obligatoria — mínimo 4 capturas.
+    if (evidenceFiles.length < MIN_EVIDENCE) {
+      toast({
+        title: "Evidencia insuficiente",
+        description: `Necesitás adjuntar al menos ${MIN_EVIDENCE} screenshots del contacto para guardar.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setLeadError(null);
     setIsSubmitting(true);
     try {
@@ -244,7 +298,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         }
       }
 
-      const { error } = await supabase.from("closers_contacts").insert({
+      const { data: inserted, error } = await supabase.from("closers_contacts").insert({
         name: data.nombre,
         handle: normalizedIg || data.instagram,
         platform: "Instagram",
@@ -260,9 +314,28 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         // Flujo unificado: link al lead origen. La attribution del LLG
         // original se lee via JOIN a leadgen_entries.lg_user_id.
         leadgen_entry_id: selectedLead?.id ?? null,
-      } as any);
+      } as any).select("id").single();
 
       if (error) throw error;
+
+      // Subir evidencia. Si falla, el contacto ya quedó creado — avisamos
+      // pero no rollback (el LG puede retry desde el detalle).
+      if (inserted && user?.id) {
+        try {
+          await uploadContactEvidence(
+            (inserted as { id: string }).id,
+            evidenceFiles,
+            user.id,
+            supabase,
+          );
+        } catch (e: any) {
+          toast({
+            title: "Contacto creado, pero algunas capturas no subieron",
+            description: e?.message ?? "Reintentá desde el detalle del contacto.",
+            variant: "destructive",
+          });
+        }
+      }
 
       // Marcar el lead como contactado — sync espejo del ConvertLeadModal.
       if (selectedLead?.id) {
@@ -281,7 +354,10 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
       toast({ title: "Contacto guardado exitosamente" });
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
-      form.reset(); setSelectedLead(null); setLeadError(null);
+      form.reset();
+      setSelectedLead(null);
+      setLeadError(null);
+      setEvidenceFiles([]);
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Error al guardar contacto", description: err.message, variant: "destructive" });
@@ -332,7 +408,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
     setIsSubmitting(true);
     try {
       const normalizedIg = normalizeHandle(pendingFormData.instagram);
-      const { error } = await supabase.from("closers_contacts").insert({
+      const { data: inserted, error } = await supabase.from("closers_contacts").insert({
         name: pendingFormData.nombre,
         handle: normalizedIg || pendingFormData.instagram,
         platform: "Instagram",
@@ -345,8 +421,27 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         created_by: user?.id ?? "",
         record_type: "reactivado",
         leadgen_entry_id: selectedLead?.id ?? null,
-      } as any);
+      } as any).select("id").single();
       if (error) throw error;
+
+      // Subir evidencia también en el path "crear duplicado de todos modos".
+      if (inserted && user?.id && evidenceFiles.length > 0) {
+        try {
+          await uploadContactEvidence(
+            (inserted as { id: string }).id,
+            evidenceFiles,
+            user.id,
+            supabase,
+          );
+        } catch (e: any) {
+          toast({
+            title: "Contacto creado, pero algunas capturas no subieron",
+            description: e?.message ?? "Reintentá desde el detalle del contacto.",
+            variant: "destructive",
+          });
+        }
+      }
+
       if (selectedLead?.id) {
         await supabase
           .from("leadgen_entries")
@@ -357,7 +452,10 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
       toast({ title: "Contacto guardado exitosamente" });
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
-      form.reset(); setSelectedLead(null); setLeadError(null);
+      form.reset();
+      setSelectedLead(null);
+      setLeadError(null);
+      setEvidenceFiles([]);
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Error al guardar contacto", description: err.message, variant: "destructive" });
@@ -512,14 +610,36 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                   </FormItem>
                 )}
               />
+
+              {/* Evidencia obligatoria — min 4 screenshots del primer
+                  contacto. El submit queda deshabilitado hasta cumplir. */}
+              <EvidenceUploader
+                files={evidenceFiles}
+                onFilesChange={setEvidenceFiles}
+                minFiles={MIN_EVIDENCE}
+                maxFiles={MAX_EVIDENCE}
+                label="Evidencia del contacto"
+                description={`Adjuntá al menos ${MIN_EVIDENCE} screenshots del chat con la modelo (conversación, número compartido, etc.). Podés pegar con Cmd/Ctrl+V.`}
+              />
             </div>
 
             <DialogFooter className="pt-4 flex-row gap-2 sm:justify-end">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting || !selectedLead}>
-                {isSubmitting ? "Guardando..." : "Guardar"}
+              <Button
+                type="submit"
+                disabled={
+                  isSubmitting ||
+                  !selectedLead ||
+                  evidenceFiles.length < MIN_EVIDENCE
+                }
+              >
+                {isSubmitting
+                  ? "Guardando..."
+                  : evidenceFiles.length < MIN_EVIDENCE
+                    ? `Faltan ${MIN_EVIDENCE - evidenceFiles.length} screenshots`
+                    : "Guardar"}
               </Button>
             </DialogFooter>
           </form>
