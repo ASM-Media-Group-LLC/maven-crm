@@ -91,27 +91,32 @@ async function findOrCreateGroup(
   return data;
 }
 
-// Resuelve el user_id de Maven a partir del JID de WhatsApp via el RPC
-// public.whatsapp_resolve_user_by_phone (last-10-digits matching contra
-// profiles.phone_e164). Si no hay match devuelve null y el caller deja
-// user_id NULL — un admin podrá linkearlo a mano desde el panel.
-async function resolveMavenUserByPhone(
+// Match con un user de Maven. Probamos dos estrategias:
+//   1. Por phone (si el sender JID termina en @s.whatsapp.net, los
+//      dígitos son el teléfono real). Solo funciona en DMs porque en
+//      grupos modernos el JID es @lid (anónimo).
+//   2. Por pushName del mensaje → profiles.whatsapp_push_name. Funciona
+//      en grupos cuando el user ya confirmó por DM y guardamos su pushName.
+async function resolveMavenUser(
   sb: SupabaseClient,
   jid: string,
+  pushName: string | null | undefined,
 ): Promise<string | null> {
-  try {
-    const { data, error } = await sb.rpc("whatsapp_resolve_user_by_phone", {
-      p_jid_or_phone: jid,
-    });
-    if (error) {
-      console.warn("resolveMavenUserByPhone rpc error:", error.message);
-      return null;
-    }
-    return (data as string | null) ?? null;
-  } catch (e) {
-    console.warn("resolveMavenUserByPhone threw:", (e as Error).message);
-    return null;
+  // Intento 1: phone (mejor signal — el JID tiene dígitos reales).
+  if (jid.endsWith("@s.whatsapp.net")) {
+    try {
+      const { data } = await sb.rpc("whatsapp_resolve_user_by_phone", { p_jid_or_phone: jid });
+      if (data) return data as string;
+    } catch (_e) { /* fallthrough */ }
   }
+  // Intento 2: pushName (único signal en grupos con @lid).
+  if (pushName) {
+    try {
+      const { data } = await sb.rpc("whatsapp_resolve_user_by_push_name", { p_push_name: pushName });
+      if (data) return data as string;
+    } catch (_e) { /* fallthrough */ }
+  }
+  return null;
 }
 
 async function upsertMember(
@@ -121,8 +126,6 @@ async function upsertMember(
 ): Promise<string | null> {
   if (!msg.senderExternalId) return null;
 
-  // Upsert: si existe, actualizamos display_name + last_seen_at. Si no,
-  // creamos. La PK lógica es (group_id, external_id).
   const { data: existing } = await sb
     .from("whatsapp_members")
     .select("id, display_name, user_id")
@@ -135,22 +138,15 @@ async function upsertMember(
     if (msg.senderDisplayName && msg.senderDisplayName !== existing.display_name) {
       patch.display_name = msg.senderDisplayName;
     }
-    // Si todavía no estaba linkeado a un user de Maven, intentamos
-    // resolverlo de nuevo — el user puede haber cargado su número
-    // recién en Settings y querremos que el link aparezca solo, sin
-    // intervención del admin. Idempotente: si el resolve sigue siendo
-    // NULL no hacemos nada.
     if (!existing.user_id) {
-      const resolved = await resolveMavenUserByPhone(sb, msg.senderExternalId);
+      const resolved = await resolveMavenUser(sb, msg.senderExternalId, msg.senderDisplayName);
       if (resolved) patch.user_id = resolved;
     }
     await sb.from("whatsapp_members").update(patch).eq("id", existing.id);
     return existing.id;
   }
 
-  // Member nuevo: intentamos resolver al user de Maven antes de insertar
-  // para que el row arranque ya linkeado (cuando sea posible).
-  const resolvedUserId = await resolveMavenUserByPhone(sb, msg.senderExternalId);
+  const resolvedUserId = await resolveMavenUser(sb, msg.senderExternalId, msg.senderDisplayName);
 
   const { data: inserted, error } = await sb
     .from("whatsapp_members")
@@ -170,6 +166,105 @@ async function upsertMember(
     return null;
   }
   return inserted.id;
+}
+
+// ----------------------------------------------------------------------------
+// DM handler — procesa mensajes privados al bot.
+// ----------------------------------------------------------------------------
+// Caso principal: el user respondió al DM de verificación. Si el body
+// matchea "SI" (o variantes), buscamos su profile por phone (extraído del
+// remoteJid que ES el teléfono real en DMs) y guardamos su pushName +
+// whatsapp_verified_at. Después le confirmamos por el mismo DM.
+//
+// Para cualquier otro contenido, ignoramos por ahora (no le respondemos
+// al user — no queremos que el bot empiece a conversar sin razón).
+const CONFIRM_TOKENS = [
+  "si", "sí", "yes", "ok", "okay", "dale", "confirmo", "soy yo", "es mío", "es mio",
+  "✅", "👍",
+];
+
+function isConfirmation(body: string | null): boolean {
+  if (!body) return false;
+  const normalized = body
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?¿¡,;:]/g, "")
+    .slice(0, 30);
+  // Match exacto o "contiene" para casos como "si claro" / "sí, soy yo".
+  return CONFIRM_TOKENS.some((t) => normalized === t || normalized.startsWith(t + " "));
+}
+
+async function processDirectMessage(
+  sb: SupabaseClient,
+  msg: IncomingMessage,
+): Promise<{ kind: string; user_id?: string }> {
+  // Solo procesamos DMs de texto. Audios/imágenes los ignoramos —
+  // pidieron SI por escrito.
+  if (msg.msgType !== "text" || !msg.body) {
+    return { kind: "dm_ignored_non_text" };
+  }
+  if (msg.isFromBot) {
+    return { kind: "dm_ignored_own_message" };
+  }
+
+  // Sacar el teléfono del JID. El sender es "<phone>@s.whatsapp.net" en DMs.
+  const digitsMatch = msg.senderExternalId.match(/^(\d+)@/);
+  if (!digitsMatch) return { kind: "dm_invalid_jid" };
+  const phoneDigits = digitsMatch[1];
+
+  // Buscar profile que tenga ese teléfono (matching por últimos 10 dígitos
+  // via el mismo RPC que usamos en upsertMember, así cubrimos casos de
+  // formato variado del E.164 guardado).
+  const { data: userId } = await sb.rpc("whatsapp_resolve_user_by_phone", {
+    p_jid_or_phone: phoneDigits,
+  });
+  if (!userId) return { kind: "dm_phone_not_in_profiles" };
+
+  if (!isConfirmation(msg.body)) {
+    return { kind: "dm_received_not_confirmation", user_id: userId as string };
+  }
+
+  // Es confirmación: guardar pushName + verified_at en el profile.
+  const pushName = msg.senderDisplayName ?? null;
+  await sb
+    .from("profiles")
+    .update({
+      whatsapp_push_name: pushName,
+      whatsapp_verified_at: new Date().toISOString(),
+    })
+    .eq("id", userId as string);
+
+  // Mandar respuesta al user confirmando — sin await para no bloquear.
+  fetch(`${PROJECT_URL}/functions/v1/whatsapp-send-verification-dm`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "",
+    },
+    body: JSON.stringify({
+      user_id: userId as string,
+      _confirmation_reply: true,
+    }),
+  }).catch(() => {});
+
+  // Adicionalmente, mandamos un texto de confirmación directo al user.
+  const evolutionUrl = Deno.env.get("WHATSAPP_EVOLUTION_URL") ?? "";
+  const evolutionKey = Deno.env.get("WHATSAPP_EVOLUTION_API_KEY") ?? "";
+  const evolutionInstance = Deno.env.get("WHATSAPP_EVOLUTION_INSTANCE") ?? "maven-bot";
+  if (evolutionUrl && evolutionKey) {
+    const confirmText = "¡Listo! ✅ Quedaste vinculado en Maven.\n\nCuando escribas en los grupos del equipo donde estoy, ya te voy a reconocer.";
+    fetch(`${evolutionUrl}/message/sendText/${evolutionInstance}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": evolutionKey },
+      body: JSON.stringify({
+        number: phoneDigits,
+        options: { delay: 0 },
+        textMessage: { text: confirmText },
+      }),
+    }).catch(() => {});
+  }
+
+  return { kind: "dm_verified", user_id: userId as string };
 }
 
 async function insertMessage(
@@ -366,6 +461,27 @@ serve(async (req) => {
   }
 
   const sb = adminClient();
+
+  // DM al bot (mensaje privado, no de grupo). Lo procesamos por un path
+  // distinto — esto es la verificación del phone que mandamos al user
+  // cuando carga su número en Settings. No insertamos en whatsapp_messages
+  // ni disparamos extractor/agent: los DMs son auth-only por ahora.
+  if (msg.isDirect) {
+    const result = await processDirectMessage(sb, msg);
+    await logEvent(sb, {
+      tenantId: null,
+      kind: result.kind,
+      payload: {
+        sender: msg.senderDisplayName ?? msg.senderExternalId,
+        user_id: result.user_id,
+        body_preview: (msg.body ?? "").slice(0, 100),
+      },
+    });
+    return new Response(JSON.stringify({ ok: true, kind: result.kind }), {
+      status: 200,
+      headers: { ...whatsappCors, "Content-Type": "application/json" },
+    });
+  }
 
   const group = await findOrCreateGroup(sb, msg);
   if (!group) {

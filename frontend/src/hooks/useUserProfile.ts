@@ -17,6 +17,8 @@ export interface MyProfile {
   full_name: string | null;
   avatar_url: string | null;
   phone_e164: string | null;
+  whatsapp_push_name: string | null;
+  whatsapp_verified_at: string | null;
 }
 
 export const useMyProfile = () =>
@@ -28,11 +30,28 @@ export const useMyProfile = () =>
       if (!uid) return null;
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, avatar_url, phone_e164")
+        .select("id, full_name, avatar_url, phone_e164, whatsapp_push_name, whatsapp_verified_at")
         .eq("id", uid)
         .maybeSingle();
       if (error) throw error;
       return (data as MyProfile | null) ?? null;
+    },
+  });
+
+// Reenvía manualmente el DM de verificación. Usa force=true para que la
+// edge function lo mande aunque el user ya esté verificado (útil si el
+// pushName cambió o el user perdió el mensaje).
+export const useResendWhatsappVerification = () =>
+  useMutation({
+    mutationFn: async (): Promise<void> => {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+      const uid = userData.user?.id;
+      if (!uid) throw new Error("No autenticado");
+      const { error } = await supabase.functions.invoke("whatsapp-send-verification-dm", {
+        body: { user_id: uid, force: true },
+      });
+      if (error) throw new Error(error.message ?? "No se pudo enviar el DM");
     },
   });
 

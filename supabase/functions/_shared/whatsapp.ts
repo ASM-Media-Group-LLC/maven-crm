@@ -9,24 +9,25 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 export interface IncomingMessage {
-  // ID del mensaje según el provider — usado para idempotencia
-  // (no insertamos dos veces el mismo external_id por grupo).
+  // ID del mensaje según el provider — usado para idempotencia.
   externalId: string;
+  // JID del grupo (cuando es de grupo). Para DMs queda como "" — el flag
+  // isDirect te dice cuál de los dos casos es.
   groupExternalId: string;
   groupName?: string;
+  // Para grupos: el JID/LID del participante real (key.participant).
+  // Para DMs: el JID del user (remoteJid = "<phone>@s.whatsapp.net").
   senderExternalId: string;
   senderDisplayName?: string;
   body: string | null;
   msgType: "text" | "audio" | "image" | "video" | "document" | "sticker" | "system";
   mediaUrl?: string | null;
   replyToExternalId?: string | null;
-  // ISO timestamp.
   sentAt: string;
-  // Si el provider nos confirma que el sender soy YO (el bot), marcarlo.
-  // Esto evita que el bot reaccione a sus propios mensajes.
   isFromBot?: boolean;
-  // Payload crudo del provider, lo guardamos por si necesitamos
-  // reprocesar con un parser nuevo.
+  // True si es un DM privado al bot (no de grupo). En DMs el remoteJid
+  // es el teléfono real del user → podemos resolver phone_e164 directo.
+  isDirect?: boolean;
   raw: unknown;
 }
 
@@ -58,31 +59,34 @@ export function parseEvolutionApiMessage(payload: unknown): IncomingMessage | nu
   if (!key) return null;
 
   const remoteJid = String(key.remoteJid ?? "");
-  // Solo grupos por ahora.
-  if (!remoteJid.endsWith("@g.us")) return null;
+  // Aceptamos tanto grupos (@g.us) como DMs privados (@s.whatsapp.net).
+  // Las status updates (@broadcast) y otros tipos los ignoramos.
+  const isGroup = remoteJid.endsWith("@g.us");
+  const isDirect = remoteJid.endsWith("@s.whatsapp.net");
+  if (!isGroup && !isDirect) return null;
 
   const externalId = String(key.id ?? "");
   if (!externalId) return null;
 
   const fromMe = key.fromMe === true;
-  // En grupos, el sender real está en `key.participant` (Evolution v1.8+
-  // y Baileys moderno). Versiones más viejas lo ponían en `data.participant`
-  // — soportamos ambos con fallback. Último recurso: el JID del grupo
-  // (solo cuando fromMe=true y todo lo demás falla, mejor que vacío).
-  //
-  // Importante: con WhatsApp moderno este "participant" puede venir como
-  // `<digits>@lid` en vez de `<phone>@s.whatsapp.net`. El `@lid` es un
-  // identificador anónimo que NO se puede mapear a un teléfono real sin
-  // que el bot tenga al contacto en su agenda. Es estable per-conversación
-  // (sirve como id único del wpp_member), pero el matching con phone_e164
-  // no funciona en grupos modernos por privacidad — usamos linkeo manual
-  // o matching por pushName desde el panel admin.
-  const participant = String(
-    (key.participant as string | undefined) ??
-    (data.participant as string | undefined) ??
-    key.remoteJid ??
-    ""
-  );
+  // Identificador del sender:
+  // - Para grupos: key.participant (LID anónimo en WhatsApp moderno).
+  //   Fallback a data.participant para versiones viejas de Evolution.
+  // - Para DMs: el remoteJid mismo (que es "<phone>@s.whatsapp.net" — el
+  //   teléfono real del user, sin anonimizar porque WhatsApp lo expone
+  //   cuando es 1-a-1).
+  let participant: string;
+  if (isGroup) {
+    participant = String(
+      (key.participant as string | undefined) ??
+      (data.participant as string | undefined) ??
+      remoteJid ??
+      ""
+    );
+  } else {
+    // DM: el sender es el otro lado de la conversación.
+    participant = remoteJid;
+  }
 
   const message = (data.message ?? {}) as Record<string, unknown>;
   let body: string | null = null;
@@ -129,8 +133,9 @@ export function parseEvolutionApiMessage(payload: unknown): IncomingMessage | nu
 
   return {
     externalId,
-    groupExternalId: remoteJid,
-    groupName: (data.groupSubject as string | undefined) ?? undefined,
+    // Para DMs no hay grupo — dejamos string vacío.
+    groupExternalId: isGroup ? remoteJid : "",
+    groupName: isGroup ? ((data.groupSubject as string | undefined) ?? undefined) : undefined,
     senderExternalId: participant,
     senderDisplayName: (data.pushName as string | undefined) ?? undefined,
     body,
@@ -139,6 +144,7 @@ export function parseEvolutionApiMessage(payload: unknown): IncomingMessage | nu
     replyToExternalId,
     sentAt,
     isFromBot: fromMe,
+    isDirect,
     raw: payload,
   };
 }

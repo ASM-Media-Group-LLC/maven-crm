@@ -41,7 +41,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
-import { useMyProfile, useUpdateMyPhone, useUploadUserAvatar } from "@/hooks/useUserProfile";
+import { useMyProfile, useResendWhatsappVerification, useUpdateMyPhone, useUploadUserAvatar } from "@/hooks/useUserProfile";
 import ChangePasswordModal from "@/components/dashboard/ChangePasswordModal";
 
 // Settings page — left rail with the user's role banner + tab list,
@@ -171,6 +171,8 @@ const MyAccountTab = () => {
 
       <WhatsappPhoneCard
         currentValue={profileQ.data?.phone_e164 ?? null}
+        verifiedAt={profileQ.data?.whatsapp_verified_at ?? null}
+        pushName={profileQ.data?.whatsapp_push_name ?? null}
         loading={profileQ.isLoading}
       />
 
@@ -203,9 +205,13 @@ const MyAccountTab = () => {
 // espacio entre código y número). Al guardar le sacamos el espacio.
 const WhatsappPhoneCard = ({
   currentValue,
+  verifiedAt,
+  pushName,
   loading,
 }: {
   currentValue: string | null;
+  verifiedAt: string | null;
+  pushName: string | null;
   loading: boolean;
 }) => {
   // El componente PhoneInput maneja value como "+<code> <number>". Al
@@ -215,6 +221,7 @@ const WhatsappPhoneCard = ({
   const [value, setValue] = useState("");
   const [dirty, setDirty] = useState(false);
   const updateMut = useUpdateMyPhone();
+  const resendMut = useResendWhatsappVerification();
 
   useEffect(() => {
     if (!dirty) setValue(currentValue ?? "");
@@ -266,7 +273,19 @@ const WhatsappPhoneCard = ({
   };
 
   const isLinked = Boolean(currentValue);
+  const isVerified = Boolean(verifiedAt);
   const hasChanges = dirty && toE164(value) !== (currentValue ?? "");
+
+  const handleResend = async () => {
+    try {
+      await resendMut.mutateAsync();
+      toast.success("Te mandamos un mensaje", {
+        description: "Revisá tu WhatsApp y respondé SI para confirmar.",
+      });
+    } catch (e) {
+      toast.error("No se pudo enviar", { description: (e as Error).message });
+    }
+  };
 
   return (
     <Card>
@@ -283,9 +302,14 @@ const WhatsappPhoneCard = ({
               Elegí el país en el dropdown y escribí el resto del número.
             </p>
           </div>
-          {isLinked && (
-            <Badge variant="default" className="gap-1 text-[10px]">
-              <CheckCircle2 className="h-2.5 w-2.5" /> Vinculado
+          {isLinked && isVerified && (
+            <Badge variant="default" className="gap-1 text-[10px] bg-emerald-600 hover:bg-emerald-700">
+              <CheckCircle2 className="h-2.5 w-2.5" /> Verificado
+            </Badge>
+          )}
+          {isLinked && !isVerified && (
+            <Badge variant="outline" className="gap-1 text-[10px] border-amber-500 text-amber-600 dark:text-amber-400">
+              <AlertCircle className="h-2.5 w-2.5" /> Pendiente
             </Badge>
           )}
         </div>
@@ -324,6 +348,64 @@ const WhatsappPhoneCard = ({
             </span>
           </p>
         </div>
+
+        {/* Estado de verificación cuando ya hay número guardado. */}
+        {isLinked && (
+          <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2 max-w-md">
+            {isVerified ? (
+              <>
+                <div className="flex items-center gap-2 text-xs">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <span className="font-medium">
+                    Verificado como <span className="text-emerald-600">{pushName ?? "(sin pushName)"}</span>
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  El bot ya te reconoce cuando escribís en los grupos. Si cambiás
+                  el nombre que mostrás en WhatsApp, hacé click en "Re-enviar verificación"
+                  y respondé SI de nuevo.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResend}
+                  disabled={resendMut.isPending}
+                  className="h-7 text-xs"
+                >
+                  {resendMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Re-enviar verificación
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-xs">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <span className="font-medium">Esperando confirmación por WhatsApp</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Te mandamos un DM al <code className="px-1 rounded bg-muted">{currentValue}</code>{" "}
+                  de parte de <strong>Maven Asistente</strong>. Respondé <strong>SI</strong> al
+                  mensaje para confirmar y completar la vinculación.
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  ¿No te llegó? Asegurate de tener guardado el contacto del bot
+                  (<code className="px-1 rounded bg-muted">+57 322 521 8180</code>) o pediles
+                  reenviarlo:
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResend}
+                  disabled={resendMut.isPending}
+                  className="h-7 text-xs"
+                >
+                  {resendMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Send className="h-3 w-3 mr-1" />}
+                  Re-enviar DM
+                </Button>
+              </>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
