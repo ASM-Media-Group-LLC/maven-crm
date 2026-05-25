@@ -304,46 +304,21 @@ Deno.serve(async (req) => {
         } catch (visionErr) {
           console.warn("vision extract failed:", (visionErr as Error).message);
         }
-      } else {
-        // Restricted sin screenshot manual: la edge function devuelve OK
-        // pero deja la row marcada para que el frontend pida el upload.
-        // No corremos el AI porque sería análisis fantasma.
-        const { error: awaitingErr } = await sb
-          .from("scouter_spammer_accounts")
-          .update({
-            is_restricted: true,
-            scan_status: "awaiting_screenshot",
-            scan_error: null,
-            last_scanned_at: new Date().toISOString(),
-          })
-          .eq("id", accountRow.id);
-        if (awaitingErr) {
-          // Antes este UPDATE era silente — si el check constraint o
-          // RLS rechazaban, la row quedaba en 'scanning' para siempre.
-          // Ahora si falla lo dejamos como 'failed' para que el cron
-          // de recovery lo limpie y el user pueda re-disparar.
-          console.error(
-            `[awaiting_screenshot update failed] ${accountRow.id}: ${awaitingErr.message}`,
-          );
-          await sb
-            .from("scouter_spammer_accounts")
-            .update({
-              scan_status: "failed",
-              scan_error: `UPDATE a awaiting_screenshot falló: ${awaitingErr.message}`,
-              last_scanned_at: new Date().toISOString(),
-            })
-            .eq("id", accountRow.id);
-          return jsonError(`No se pudo marcar como awaiting_screenshot: ${awaitingErr.message}`, 500);
-        }
-        return new Response(
-          JSON.stringify({
-            ok: true,
-            account_id: accountRow.id,
-            awaiting_screenshot: true,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
       }
+      // Cambio 2026-05-25: cuando la cuenta está restringida y no hay
+      // screenshots manuales, ANTES marcábamos 'awaiting_screenshot'
+      // y pedíamos al user subir capturas. Pero como dijo el user:
+      // "si IG marcó la cuenta como restringida, los DMs caen en spam
+      // de la creadora — no tiene sentido pedir screenshots para
+      // enriquecer un análisis de una cuenta que ya está perdida para
+      // outreach". Mejor: dejamos fluir al AI scan con is_restricted=true
+      // como signal principal, Claude genera el análisis explicando la
+      // situación + red_flag de "cuenta restringida = mensajes a spam =
+      // baja respuesta", y el user decide si cambiar de cuenta o
+      // arreglar la restricción (verificar email/tel, limpiar contenido).
+      //
+      // Si tiene screenshots, igual los procesamos para enriquecer la
+      // bio/followers en el análisis (mismo bloque de vision arriba).
     }
 
     // La foto de IG viene como CDN URL con tokens que caducan o que IG
