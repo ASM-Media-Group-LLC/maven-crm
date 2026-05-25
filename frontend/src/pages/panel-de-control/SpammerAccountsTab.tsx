@@ -680,6 +680,100 @@ const StatBox = ({
   );
 };
 
+// ─── Restricted recovery guide ────────────────────────────────────
+// Guía accionable que aparece cuando is_restricted=true. Reemplaza
+// el "subir screenshots" como acción principal — el user dijo que si
+// la cuenta está restringida, los DMs caen en spam de la creadora,
+// así que no sirve mucho enriquecer el análisis: lo importante es
+// recuperar la cuenta o cambiarla.
+//
+// Pasos basados en research + experiencia operativa. Si la cuenta es
+// muy nueva con muchos posts NSFW reportados, lo mejor suele ser
+// abandonar y crear una nueva con setup correcto — esto también se
+// menciona como opción.
+
+const RestrictedRecoveryGuide = () => {
+  return (
+    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-emerald-400" />
+        <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+          Cómo recuperar esta cuenta
+        </h3>
+      </div>
+
+      <div className="space-y-3 text-xs">
+        <div>
+          <p className="font-semibold text-foreground mb-1">
+            Decisión 0 — ¿Recuperar o abandonar?
+          </p>
+          <p className="text-muted-foreground leading-relaxed">
+            Si es cuenta nueva (&lt;3 meses) o con nombre genérico,
+            <strong className="text-foreground"> abandonar y crear fresh </strong>
+            suele ser más rápido que pelear la restricción (puede tomar semanas).
+            Si tiene historial decente, vale la pena recuperar.
+          </p>
+        </div>
+
+        <div>
+          <p className="font-semibold text-foreground mb-1">
+            Si decidís recuperar:
+          </p>
+          <ol className="list-decimal space-y-1.5 pl-4 text-muted-foreground marker:text-emerald-400">
+            <li>
+              <strong className="text-foreground">Verificar email Y teléfono real</strong> (no
+              virtual): Settings → Account → Personal information.
+            </li>
+            <li>
+              <strong className="text-foreground">Activar 2FA</strong>: Settings → Security →
+              Two-factor authentication.
+            </li>
+            <li>
+              <strong className="text-foreground">Revisar reports/violations</strong>: Settings →
+              Help → Account status. Eliminar posts marcados.
+            </li>
+            <li>
+              <strong className="text-foreground">Cambiar a perfil business</strong>: Settings →
+              Account type → Switch to Business. Category: "Talent Agency".
+            </li>
+            <li>
+              <strong className="text-foreground">Apelar formalmente</strong>: Settings → Help →
+              Report a Problem. Explicá que sos una agencia legítima.
+            </li>
+            <li>
+              <strong className="text-foreground text-rose-400">PARAR todo outreach</strong> por 7-14 días.
+              Browseá normal, like a posts, seguí cuentas, postea 2-3 cosas propias. Si seguís
+              spammeando DMs, IG nunca levanta el flag.
+            </li>
+            <li>
+              <strong className="text-foreground">Volver gradual</strong>: 5 DMs/día semana 3, 10
+              DMs/día semana 4, máximo 20/día después. Cada DM personalizado.
+            </li>
+          </ol>
+        </div>
+
+        <div>
+          <p className="font-semibold text-foreground mb-1">
+            Si decidís abandonar y crear nueva:
+          </p>
+          <ul className="list-disc space-y-1 pl-4 text-muted-foreground marker:text-emerald-400">
+            <li>SIM física fresca, email dedicado, dispositivo limpio.</li>
+            <li>Día 1: profile completo (foto logo, bio profesional, link al sitio, business).</li>
+            <li>Días 1-14: warm-up — browsear, likes, posts propios. <strong className="text-rose-400">CERO DMs</strong>.</li>
+            <li>Día 14+: ramp-up gradual de outreach.</li>
+          </ul>
+        </div>
+
+        <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-2 text-[11px] text-amber-200/90">
+          <strong>Reglas permanentes:</strong> nunca copy-paste el mismo DM ·
+          espaciar 2-3 min entre DMs · 1 IP/device por cuenta · profile completo
+          ANTES de cualquier outreach · mínimo 5 posts del roster en feed.
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Restricted screenshot zone ────────────────────────────────────
 // Para cuentas que IG marcó como restricted (no podemos scrapear bio /
 // pic / followers sin cookies), el user sube un screenshot logueado del
@@ -944,9 +1038,21 @@ const SpammerDetailDialog = ({
           </div>
         )}
 
-        {/* Screenshot drop-zone — para enriquecer análisis de cuentas restricted */}
+        {/* Guía de recuperación — acciones concretas para sacar el flag de IG */}
+        {r.is_restricted && <RestrictedRecoveryGuide />}
+
+        {/* Screenshot drop-zone — opcional, para enriquecer el análisis si
+            el user quiere subir capturas del perfil logueado. Movido a
+            sección secundaria porque ya no es la acción principal. */}
         {r.is_restricted && (
-          <RestrictedScreenshotZone account={r} />
+          <details className="rounded-lg border border-border bg-card/40 p-3">
+            <summary className="cursor-pointer text-xs font-semibold text-muted-foreground hover:text-foreground">
+              ¿Querés enriquecer el análisis con screenshots? (opcional)
+            </summary>
+            <div className="mt-3">
+              <RestrictedScreenshotZone account={r} />
+            </div>
+          </details>
         )}
 
         {/* Bio */}

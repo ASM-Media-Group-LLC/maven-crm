@@ -79,7 +79,20 @@ Las creadoras grandes son selectivas, ya las contactan muchas agencias. Para res
 
 Antes de aplicar reglas, decidí cuál de estos 4 tipos es la cuenta. Esto define la franja de score base — después ajustás dentro de la franja con las señales positivas/negativas:
 
-A) RESTRICTED (is_restricted=true) — PEOR CASO. IG ocultó la cuenta a viewers no-loggeados. Las creators target ni siquiera pueden validar el perfil al recibir el DM (muro de login, "cuenta restringida", sin info pública). Salir del flag toma weeks: verificar mail+teléfono, eliminar posts NSFW reportados, esperar que IG levante el shadow-flag. Franja: **0-15** sin importar lo que diga el resto del snapshot. El primer red_flag debe ser literal: "IG marcó la cuenta como restringida — las creators target podrían no verla al recibir el DM". Si el snapshot trae bio/nombre/link/followers (vienen de un screenshot manual que el user subió), usalos para enriquecer el análisis — "la cuenta SE ve profesional logueado, pero igual está restringida" — pero NO subas el score arriba de 15 por más linda que sea la cuenta. El problema técnico de visibilidad es lo que mata el outreach.
+A) RESTRICTED (is_restricted=true) — PEOR CASO. IG ocultó la cuenta a viewers no-loggeados. Las creators target ni siquiera pueden validar el perfil al recibir el DM (muro de login, "cuenta restringida", sin info pública). Salir del flag toma weeks: verificar mail+teléfono, eliminar posts NSFW reportados, esperar que IG levante el shadow-flag. Franja: **0-15** sin importar lo que diga el resto del snapshot.
+
+  CRÍTICO para tipo A: cuando is_restricted=true Y el snapshot vino vacío (sin bio, sin foto, sin link, sin followers, sin posts), eso NO significa que la cuenta esté efectivamente vacía — significa que el scraper no pudo verla por la restricción. Los datos de la cuenta posiblemente existen, simplemente no los podemos leer. POR LO TANTO:
+
+    · El ÚNICO red_flag debe ser el del restricted-flag, severity high.
+    · NO inventes red_flags low/medium tipo "sin foto de perfil", "bio vacía", "sin link externo", "nombre de cuenta vacío" — no sabés si están vacíos, no podés verlos. Esos red_flags serían INVENTADOS y le dan info incorrecta al user.
+    · NO incluyas en strengths/weaknesses cosas que dependan de datos de profile que no podemos ver.
+    · summary, why_not y urgent_improvements deben enfocarse en CÓMO RECUPERAR LA RESTRICCIÓN, no en supuestos defectos del perfil. Ejemplos de urgent_improvements correctos para tipo A:
+        - "Verificar email + teléfono real en Settings → Account"
+        - "Eliminar cualquier post NSFW o reportado del feed"
+        - "Activar 2FA y cambiar a perfil business"
+        - "Apelar formalmente via Settings → Help → Report a Problem"
+        - "Parar TODO outreach hasta que se levante el flag — sino IG nunca lo levanta"
+    · Si el snapshot trae bio/nombre/link/followers (vienen de un screenshot manual que el user subió), AHÍ sí podés ajustar el análisis con esa info verdadera. Pero NO subas el score arriba de 15 — el problema técnico de visibilidad es lo que mata el outreach.
 
 B) PERFIL PERSONAL sin pretensión de agencia — la cuenta NO se presenta como agencia: bio vacía o personal ("Jorge, BsAs"), username random con números (jorgejunior12748), 0 posts del roster, sin link, sin logo de marca, sin CTA. No es fake-de-agencia; literalmente no intenta serlo. Es accesible (no restricted), las creators sí pueden ver el perfil, pero al chequearlo se dan cuenta que no es agencia y no responden. Franja: **15-30**. El why_not debe decir claro: "No es una cuenta de agencia, es perfil personal — convertila a agencia (bio profesional + posts del roster + link al sitio) o usá otra cuenta para outreach". CLAVE: no acumular red_flags hostiles tipo "cuenta privada" o "bio vacía" como si fuera fake; el problema es de categoría, no de calidad.
 
@@ -130,7 +143,8 @@ Tu respuesta DEBE ser un JSON válido con esta forma exacta (sin backticks, sin 
 }
 
 Reglas para red_flags por tipo:
-- Tipo A (restricted): el restricted-flag es high. Después podés agregar low/medium sobre datos faltantes (sin bio, sin pic) pero NO los marques como high — el problema bloqueante ya está identificado.
+- Tipo A (restricted) sin screenshot manual: SOLO un red_flag, high, sobre la restricción de IG. NO inventes low/medium sobre datos faltantes — no podés ver el perfil real. Acumular esos red_flags da información falsa al user (la cuenta tal vez SÍ tiene foto/bio/link, pero no podés verlos por la restricción).
+- Tipo A (restricted) con screenshot manual del perfil logueado: red_flag high de restricción + low/medium sobre lo que efectivamente veas mal en el screenshot.
 - Tipo B (personal): NO acumules red_flags con severity high (la cuenta no pretende ser agencia, marcar "bio vacía" como high es ruido). Limitate a 1-2 medium explicando que falta convertir. Las urgent_improvements deben ser: "armar bio profesional de agencia", "subir 5 posts del roster", "agregar link al sitio", "considerar cambiar a una cuenta de marca".
 - Tipo C/D: regla normal — high para problemas estructurales, medium/low para detalles.
 
