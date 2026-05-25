@@ -1,0 +1,85 @@
+# Self-hosted Whisper server para Maven Bot WhatsApp.
+#
+# Usa fedirz/faster-whisper-server (https://github.com/fedirz/faster-whisper-server).
+# Expone una API OpenAI-compatible en /v1/audio/transcriptions, lo cual
+# permite que la edge function whatsapp-transcribe-audio lo use sin
+# cambios estructurales — solo cambia el WHISPER_API_URL.
+#
+# Modelo: whisper-large-v3-turbo (mismo que Groq). En CPU corre a ~1-2x
+# realtime, en GPU NVIDIA a ~30-50x realtime. Para WhatsApp con audios
+# cortos y bajo volumen, CPU alcanza tranquilo.
+#
+# DEPLOY EN DOKPLOY:
+#   1. Subir esta carpeta al repo (ya está).
+#   2. En Dokploy, crear nueva Application tipo "Docker Compose"
+#      apuntando a este path (infra/whisper).
+#   3. Setear las env vars:
+#        WHISPER_INTERNAL_TOKEN = <random 32 chars>
+#      Este token autentica los requests de la edge function.
+#   4. Exponer el puerto 8000 con un dominio (ej. whisper.tu-dominio.com).
+#      Asegurate de tener TLS — Dokploy lo gestiona via Let's Encrypt.
+#   5. En Supabase Edge Functions setear los secrets:
+#        WHISPER_API_URL = https://whisper.tu-dominio.com/v1/audio/transcriptions
+#        WHISPER_API_KEY = <el mismo WHISPER_INTERNAL_TOKEN del punto 3>
+#   6. La function va a usar self-hosted por default; si falla, hace
+#      fallback automático a Groq.
+#
+# VARIANTE GPU (opcional, si tu server tiene GPU NVIDIA):
+#   Cambiar la imagen a: fedirz/faster-whisper-server:latest-cuda
+#   Agregar la sección deploy con runtime: nvidia
+#   Esto es ~25x más rápido pero requiere drivers NVIDIA + nvidia-docker.
+
+version: "3.8"
+
+services:
+  whisper:
+    image: fedirz/faster-whisper-server:latest-cpu
+    container_name: maven-whisper
+    restart: unless-stopped
+    environment:
+      # Modelo precargado al iniciar. Si no se setea, se carga on-demand
+      # en el primer request (cold start ~30s). Precargar es preferible
+      # para producción.
+      WHISPER__MODEL: deepdml/faster-whisper-large-v3-turbo-ct2
+      # Idioma default. WA del equipo es 99% español, le forzamos para
+      # mejor precisión y para que Whisper no pierda tiempo detectando.
+      DEFAULT_LANGUAGE: es
+      # Workers: cuántos requests simultáneos podemos procesar. Cada
+      # worker carga el modelo en RAM (~1.5GB para large-v3-turbo).
+      # Para audios de WhatsApp con bajo throughput, 1-2 alcanza.
+      WHISPER__INFERENCE_DEVICE: cpu
+      WHISPER__COMPUTE_TYPE: int8
+      # Auth simple via API key. El servidor compara este valor contra
+      # el header Authorization: Bearer <key>. Lo seteamos al mismo
+      # valor que la edge function va a mandar.
+      ENABLE_UI: "false"
+      # Variable de entorno custom — el server NO la lee directo, pero
+      # la usamos vía Traefik middleware o reverse proxy en Dokploy para
+      # filtrar requests. Ver README.md.
+      WHISPER_INTERNAL_TOKEN: ${WHISPER_INTERNAL_TOKEN}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Cache de modelos. Sin esto Whisper baja el modelo (~1.5GB) en
+      # cada deploy. Es ~3-5 min de cold start y consume bandwidth.
+      - whisper-models:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Resource limits — Whisper large-v3-turbo necesita ~2GB RAM mínimo
+    # en int8. Si tu Dokploy host tiene <4GB libre considerá usar el
+    # modelo más chico (whisper-base, mucho menos preciso para español)
+    # o usar GPU.
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+        reservations:
+          memory: 2G
+
+volumes:
+  whisper-models:
+    name: maven-whisper-models

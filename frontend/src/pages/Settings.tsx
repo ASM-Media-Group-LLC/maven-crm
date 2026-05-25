@@ -18,7 +18,14 @@ import {
   LogOut,
   User as UserIcon,
   Send,
+  MessageCircle,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { PhoneInput } from "@/components/ui/phone-input";
 // Sub-páginas que antes se navegaban como rutas separadas (perdiendo el
 // rail de Settings). Ahora se renderizan embebidas en el panel derecho
 // vía ?sub=<key>.
@@ -34,7 +41,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
-import { useMyProfile, useUploadUserAvatar } from "@/hooks/useUserProfile";
+import { useMyProfile, useUpdateMyPhone, useUploadUserAvatar } from "@/hooks/useUserProfile";
 import ChangePasswordModal from "@/components/dashboard/ChangePasswordModal";
 
 // Settings page — left rail with the user's role banner + tab list,
@@ -162,6 +169,11 @@ const MyAccountTab = () => {
         </CardContent>
       </Card>
 
+      <WhatsappPhoneCard
+        currentValue={profileQ.data?.phone_e164 ?? null}
+        loading={profileQ.isLoading}
+      />
+
       <Card>
         <CardContent className="p-6">
           <div className="mb-3 text-sm font-semibold">Seguridad</div>
@@ -174,6 +186,146 @@ const MyAccountTab = () => {
 
       <ChangePasswordModal open={pwOpen} onOpenChange={setPwOpen} />
     </div>
+  );
+};
+
+// WhatsApp phone card — sección dentro de "Mi cuenta" donde el user
+// carga su número de WhatsApp con un picker de país (banderas + búsqueda
+// por nombre o código). Al guardar normalizamos a E.164 puro (sin espacios)
+// porque el CHECK constraint en DB exige `^\+[0-9]{8,16}$`.
+//
+// Por qué importa: el bot de WhatsApp usa last-10-digits matching (RPC
+// whatsapp_resolve_user_by_phone) para auto-linkear al user de Maven con
+// el wpp_member del grupo. Sin esto, un admin tendría que linkear a cada
+// miembro a mano desde Panel de Control → Bot WhatsApp.
+//
+// El componente PhoneInput maneja el value como "+57 3001234567" (con
+// espacio entre código y número). Al guardar le sacamos el espacio.
+const WhatsappPhoneCard = ({
+  currentValue,
+  loading,
+}: {
+  currentValue: string | null;
+  loading: boolean;
+}) => {
+  // El componente PhoneInput maneja value como "+<code> <number>". Al
+  // hidratar desde el backend (que guarda "+573001234567" sin espacio)
+  // el parsePhone interno se encarga de separar code de número, así que
+  // pasarle el value tal cual funciona.
+  const [value, setValue] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const updateMut = useUpdateMyPhone();
+
+  useEffect(() => {
+    if (!dirty) setValue(currentValue ?? "");
+  }, [currentValue, dirty]);
+
+  // E.164 puro: solo `+` y dígitos. Sacamos espacios/guiones/paréntesis.
+  const toE164 = (raw: string): string => raw.replace(/[^\d+]/g, "");
+
+  const handleSave = async () => {
+    const trimmed = value.trim();
+    if (trimmed === "" || trimmed === "+") {
+      try {
+        await updateMut.mutateAsync(null);
+        toast.success("Número de WhatsApp removido");
+        setDirty(false);
+      } catch (e) {
+        toast.error("No se pudo guardar", { description: (e as Error).message });
+      }
+      return;
+    }
+    const normalized = toE164(trimmed);
+    if (!/^\+[0-9]{8,16}$/.test(normalized)) {
+      toast.error("Número inválido", {
+        description: "Elegí el país y escribí el número completo (sin el código de área internacional, sin 0 inicial).",
+      });
+      return;
+    }
+    try {
+      await updateMut.mutateAsync(normalized);
+      setValue(normalized);
+      setDirty(false);
+      toast.success("Número de WhatsApp guardado", {
+        description: "El bot ya te puede reconocer cuando escribas en los grupos.",
+      });
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg.includes("duplicate") || msg.includes("unique")) {
+        toast.error("Ese número ya está en uso por otro usuario", {
+          description: "Si te lo apropiaste recientemente, pediles que se lo saquen primero.",
+        });
+      } else if (msg.includes("phone_e164_format") || msg.includes("check")) {
+        toast.error("Formato inválido", {
+          description: "Tiene que ser E.164 (ej. +573001234567 o +5491112345678).",
+        });
+      } else {
+        toast.error("No se pudo guardar", { description: msg });
+      }
+    }
+  };
+
+  const isLinked = Boolean(currentValue);
+  const hasChanges = dirty && toE164(value) !== (currentValue ?? "");
+
+  return (
+    <Card>
+      <CardContent className="p-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <MessageCircle className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold">Número de WhatsApp</div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Cargá tu número para que el bot (Maven Asistente) te reconozca
+              automáticamente cuando escribas en los grupos del equipo.
+              Elegí el país en el dropdown y escribí el resto del número.
+            </p>
+          </div>
+          {isLinked && (
+            <Badge variant="default" className="gap-1 text-[10px]">
+              <CheckCircle2 className="h-2.5 w-2.5" /> Vinculado
+            </Badge>
+          )}
+        </div>
+
+        <div className="grid gap-2 max-w-md">
+          <Label htmlFor="phone_e164" className="text-xs">
+            Tu número
+          </Label>
+          <div className="flex gap-2">
+            <PhoneInput
+              value={value}
+              onChange={(v) => {
+                setValue(v);
+                setDirty(true);
+              }}
+              disabled={loading || updateMut.isPending}
+              className="flex-1"
+            />
+            <Button
+              onClick={handleSave}
+              disabled={!hasChanges || updateMut.isPending}
+              className="shrink-0"
+            >
+              {updateMut.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Guardar"
+              )}
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+            <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+            <span>
+              Tu número solo se usa para identificarte en los grupos donde está el bot.
+              No se comparte con nadie más ni se muestra a otros usuarios.
+            </span>
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

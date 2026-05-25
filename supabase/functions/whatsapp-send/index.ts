@@ -1,0 +1,293 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_shared/whatsapp.ts";
+
+// whatsapp-send — manda mensajes a un grupo via el provider configurado.
+//
+// Acepta dos modos:
+//   1. Drain queue: POST sin body → procesa whatsapp_reminders pending
+//      con trigger_at <= now() y los manda. Esto lo llama el cron cada
+//      pocos minutos.
+//   2. Send ad-hoc: POST con { group_id, body, [commitment_id] } → manda
+//      un mensaje directo (lo usa whatsapp-agent y futuras integraciones).
+//
+// Provider: por ahora soportamos Evolution API (POST a su /sendText/...).
+// El URL base y la instance se leen del config del grupo (provider) y
+// del env (WHATSAPP_EVOLUTION_URL, WHATSAPP_EVOLUTION_API_KEY).
+//
+// Defensa: si bot_enabled=false en el grupo, marcamos el reminder como
+// cancelled con reason 'bot_disabled' y NO mandamos nada. El admin lo
+// debe habilitar explícito por grupo.
+
+const EVOLUTION_URL = Deno.env.get("WHATSAPP_EVOLUTION_URL") ?? "";
+const EVOLUTION_API_KEY = Deno.env.get("WHATSAPP_EVOLUTION_API_KEY") ?? "";
+const EVOLUTION_INSTANCE = Deno.env.get("WHATSAPP_EVOLUTION_INSTANCE") ?? "maven";
+
+interface SendRequest {
+  // Modo ad-hoc.
+  group_id?: string;
+  body?: string;
+  commitment_id?: string;
+  // Modo queue (default true si no hay group_id+body).
+  drain?: boolean;
+  drain_limit?: number;
+}
+
+interface ProviderSendResult {
+  ok: boolean;
+  externalId?: string;
+  error?: string;
+}
+
+async function sendViaEvolution(
+  groupExternalId: string,
+  body: string,
+): Promise<ProviderSendResult> {
+  if (!EVOLUTION_URL || !EVOLUTION_API_KEY) {
+    return { ok: false, error: "evolution_not_configured" };
+  }
+  const url = `${EVOLUTION_URL.replace(/\/$/, "")}/message/sendText/${EVOLUTION_INSTANCE}`;
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": EVOLUTION_API_KEY,
+      },
+      body: JSON.stringify({
+        number: groupExternalId,
+        text: body,
+      }),
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      return { ok: false, error: `evolution ${resp.status}: ${txt.slice(0, 200)}` };
+    }
+    const data = await resp.json() as { key?: { id?: string } };
+    return { ok: true, externalId: data?.key?.id };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+async function sendOne(args: {
+  groupId: string;
+  body: string;
+  tenantId: string;
+  reminderId?: string;
+}): Promise<ProviderSendResult> {
+  const sb = adminClient();
+
+  const { data: group, error: gErr } = await sb
+    .from("whatsapp_groups")
+    .select("id, tenant_id, external_id, provider, bot_enabled, active")
+    .eq("id", args.groupId)
+    .single();
+
+  if (gErr || !group) {
+    return { ok: false, error: "group_not_found" };
+  }
+  if (!group.active) return { ok: false, error: "group_inactive" };
+  if (!group.bot_enabled) return { ok: false, error: "bot_disabled" };
+
+  let result: ProviderSendResult;
+  if (group.provider === "evolution") {
+    result = await sendViaEvolution(group.external_id, args.body);
+  } else if (group.provider === "manual") {
+    // Modo manual: no mandamos al provider, solo grabamos la salida en
+    // whatsapp_messages para testing y para ver lo que el bot habría
+    // dicho.
+    result = { ok: true, externalId: `manual-${crypto.randomUUID()}` };
+  } else {
+    result = { ok: false, error: `unsupported_provider:${group.provider}` };
+  }
+
+  // Registrar el mensaje saliente en whatsapp_messages si se mandó OK.
+  if (result.ok && result.externalId) {
+    const { data: inserted } = await sb
+      .from("whatsapp_messages")
+      .insert({
+        tenant_id: group.tenant_id,
+        group_id: group.id,
+        external_id: result.externalId,
+        sender_external_id: "bot@maven",
+        sender_display_name: "Maven Asistente",
+        body: args.body,
+        msg_type: "text",
+        is_from_bot: true,
+        sent_at: new Date().toISOString(),
+        analyzed_at: new Date().toISOString(),
+        analysis: { source: "bot", reminder_id: args.reminderId ?? null },
+      })
+      .select("id")
+      .single();
+
+    await logEvent(sb, {
+      tenantId: group.tenant_id,
+      groupId: group.id,
+      kind: "message_out",
+      payload: {
+        body_preview: args.body.slice(0, 120),
+        reminder_id: args.reminderId,
+        provider_msg_id: result.externalId,
+        message_id: inserted?.id,
+      },
+    });
+
+    return { ok: true, externalId: inserted?.id };
+  }
+
+  await logEvent(sb, {
+    tenantId: group.tenant_id,
+    groupId: group.id,
+    kind: "error",
+    payload: { stage: "send", error: result.error, reminder_id: args.reminderId },
+  });
+
+  return result;
+}
+
+async function drainQueue(limit: number): Promise<{ sent: number; failed: number }> {
+  const sb = adminClient();
+
+  const { data: reminders, error } = await sb
+    .rpc("whatsapp_pending_reminders", { p_limit: limit });
+
+  if (error) {
+    console.warn("drainQueue rpc error:", error.message);
+    return { sent: 0, failed: 0 };
+  }
+  if (!reminders || reminders.length === 0) return { sent: 0, failed: 0 };
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const r of reminders as Array<{
+    id: string;
+    tenant_id: string;
+    group_id: string;
+    body: string | null;
+    attempt_count: number;
+    commitment_id: string | null;
+  }>) {
+    if (!r.body) {
+      // body NULL — tendríamos que generar contenido dinámico, pero
+      // por ahora marcamos como failed para que un admin lo revise.
+      await sb
+        .from("whatsapp_reminders")
+        .update({ status: "failed", error: "body_null_not_supported_yet" })
+        .eq("id", r.id);
+      failed += 1;
+      continue;
+    }
+
+    const result = await sendOne({
+      groupId: r.group_id,
+      body: r.body,
+      tenantId: r.tenant_id,
+      reminderId: r.id,
+    });
+
+    if (result.ok) {
+      await sb
+        .from("whatsapp_reminders")
+        .update({
+          status: "sent",
+          sent_at: new Date().toISOString(),
+          sent_message_id: result.externalId ?? null,
+        })
+        .eq("id", r.id);
+
+      // Si está atado a un commitment, bumpeamos followup_count y
+      // movemos status si corresponde (pending→overdue, overdue→stale).
+      // La RPC hace todo atómicamente, evita races con el extractor.
+      if (r.commitment_id) {
+        const { error: bumpErr } = await sb.rpc(
+          "whatsapp_bump_commitment_followup",
+          { p_id: r.commitment_id },
+        );
+        if (bumpErr) console.warn("bump followup err:", bumpErr.message);
+      }
+
+      sent += 1;
+    } else {
+      const nextAttempt = (r.attempt_count ?? 0) + 1;
+      const newStatus = nextAttempt >= 3 ? "failed" : "pending";
+      await sb
+        .from("whatsapp_reminders")
+        .update({
+          status: newStatus,
+          attempt_count: nextAttempt,
+          error: result.error?.slice(0, 500),
+        })
+        .eq("id", r.id);
+      failed += 1;
+    }
+  }
+
+  return { sent, failed };
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: whatsappCors });
+  }
+
+  if (!authorizeCronOrJwt(req)) {
+    return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
+      status: 401,
+      headers: { ...whatsappCors, "Content-Type": "application/json" },
+    });
+  }
+
+  let body: SendRequest = {};
+  try {
+    body = (await req.json()) as SendRequest;
+  } catch {
+    // OK — POST sin body = drain.
+  }
+
+  try {
+    if (body.group_id && body.body) {
+      // Resolver tenant del grupo.
+      const sb = adminClient();
+      const { data: g } = await sb
+        .from("whatsapp_groups")
+        .select("tenant_id")
+        .eq("id", body.group_id)
+        .single();
+      if (!g) {
+        return new Response(JSON.stringify({ ok: false, error: "group_not_found" }), {
+          status: 404,
+          headers: { ...whatsappCors, "Content-Type": "application/json" },
+        });
+      }
+      const result = await sendOne({
+        groupId: body.group_id,
+        body: body.body,
+        tenantId: g.tenant_id,
+      });
+      return new Response(JSON.stringify(result), {
+        status: result.ok ? 200 : 500,
+        headers: { ...whatsappCors, "Content-Type": "application/json" },
+      });
+    }
+
+    if (body.drain !== false) {
+      const result = await drainQueue(body.drain_limit ?? 20);
+      return new Response(JSON.stringify({ ok: true, ...result }), {
+        status: 200,
+        headers: { ...whatsappCors, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ ok: false, error: "no_action" }), {
+      status: 400,
+      headers: { ...whatsappCors, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    return new Response(
+      JSON.stringify({ ok: false, error: (e as Error).message }),
+      { status: 500, headers: { ...whatsappCors, "Content-Type": "application/json" } },
+    );
+  }
+});

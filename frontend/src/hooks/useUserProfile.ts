@@ -16,6 +16,7 @@ export interface MyProfile {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
+  phone_e164: string | null;
 }
 
 export const useMyProfile = () =>
@@ -27,13 +28,40 @@ export const useMyProfile = () =>
       if (!uid) return null;
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, avatar_url")
+        .select("id, full_name, avatar_url, phone_e164")
         .eq("id", uid)
         .maybeSingle();
       if (error) throw error;
       return (data as MyProfile | null) ?? null;
     },
   });
+
+// Update del propio profile.phone_e164. La policy "Users can update own
+// profile" (auth.uid() = id) ya cubre el acceso, no hace falta nada
+// custom server-side. El backend valida el formato via CHECK constraint
+// — si el user mete algo inválido la mutation tira error y el caller
+// muestra el toast con el mensaje.
+//
+// Pasamos null para BORRAR el número (el user puede querer desvincular).
+export const useUpdateMyPhone = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (phone_e164: string | null): Promise<void> => {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+      const uid = userData.user?.id;
+      if (!uid) throw new Error("No autenticado");
+      const { error } = await supabase
+        .from("profiles")
+        .update({ phone_e164 })
+        .eq("id", uid);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my-profile"] });
+    },
+  });
+};
 
 // Upload to the existing public `creator-files` bucket under a
 // `user-avatars/<uid>/` prefix. Then patch profiles.avatar_url so the

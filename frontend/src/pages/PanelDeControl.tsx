@@ -61,6 +61,7 @@ import { OUTCOME_META } from "@/hooks/useAgencyQa";
 import SpammerAccountsTab from "./panel-de-control/SpammerAccountsTab";
 import ControlGastoTab from "./panel-de-control/ControlGastoTab";
 import ChattersRecruitmentTab from "./panel-de-control/ChattersRecruitmentTab";
+import WhatsappAgentTab from "./panel-de-control/WhatsappAgentTab";
 import BestCloserMonthlyDialog from "@/components/dashboard/BestCloserMonthlyDialog";
 
 // ─── KPI card ──────────────────────────────────────────────────────────
@@ -1009,7 +1010,7 @@ const PanelDeControl = () => {
     cards.find((c) => c.key === openMetric)?.label ??
     (openMetric ? EXTRA_METRIC_LABELS[openMetric] ?? "" : "");
 
-  const [tab, setTab] = useState<"modelos" | "chatters" | "cuentas-spammer" | "control-gasto">("modelos");
+  const [tab, setTab] = useState<"modelos" | "chatters" | "cuentas-spammer" | "control-gasto" | "whatsapp-bot">("modelos");
 
   return (
     // El layout app envuelve cada page en un wrapper con overflow-hidden.
@@ -1063,7 +1064,7 @@ const PanelDeControl = () => {
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "modelos" | "chatters" | "cuentas-spammer" | "control-gasto")}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "modelos" | "chatters" | "cuentas-spammer" | "control-gasto" | "whatsapp-bot")}>
         <TabsList>
           <TabsTrigger value="modelos">Reclutamiento modelos</TabsTrigger>
           <TabsTrigger value="cuentas-spammer" className="gap-1.5">
@@ -1072,6 +1073,7 @@ const PanelDeControl = () => {
           </TabsTrigger>
           <TabsTrigger value="chatters">Reclutamiento chatters</TabsTrigger>
           <TabsTrigger value="control-gasto">Control de Gasto</TabsTrigger>
+          <TabsTrigger value="whatsapp-bot">Bot WhatsApp</TabsTrigger>
         </TabsList>
 
         <TabsContent value="cuentas-spammer" className="mt-4">
@@ -1084,6 +1086,10 @@ const PanelDeControl = () => {
 
         <TabsContent value="chatters" className="mt-4">
           <ChattersRecruitmentTab range={range} />
+        </TabsContent>
+
+        <TabsContent value="whatsapp-bot" className="mt-4">
+          <WhatsappAgentTab />
         </TabsContent>
 
         <TabsContent value="modelos" className="mt-4 space-y-5">

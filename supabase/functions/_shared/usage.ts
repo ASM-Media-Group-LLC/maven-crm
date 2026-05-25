@@ -55,6 +55,28 @@ const ELEVENLABS_PRICING_PER_HOUR: Record<string, number> = {
   "scribe_v1": 0.40,
 };
 
+// $/hora de audio para Groq Whisper. Whisper turbo es ~10x más barato
+// que Scribe y suficiente para audios cortos de WhatsApp (un speaker,
+// español, <2 min). Precio Groq oficial 2026-05.
+const GROQ_PRICING_PER_HOUR: Record<string, number> = {
+  "whisper-large-v3-turbo": 0.04,
+  "whisper-large-v3": 0.111,
+  "distil-whisper-large-v3-en": 0.02, // solo inglés, no lo usamos pero por completeness
+};
+
+// $/M tokens para Gemini. Lista actualizada 2026-05.
+// Fuente: https://ai.google.dev/gemini-api/docs/pricing
+// Para vision, Gemini cobra los tokens de la imagen como input tokens
+// (typically ~258 tokens por imagen 1024x1024).
+const GEMINI_PRICING: Record<string, { in: number; out: number }> = {
+  "gemini-2.5-flash":       { in: 0.075, out: 0.30 },
+  "gemini-2.5-pro":         { in: 1.25,  out: 5.00 },
+  "gemini-2.0-flash":       { in: 0.10,  out: 0.40 },
+  "gemini-2.0-flash-exp":   { in: 0.10,  out: 0.40 },
+  "gemini-1.5-flash":       { in: 0.075, out: 0.30 },
+  "gemini-1.5-pro":         { in: 1.25,  out: 5.00 },
+};
+
 function adminClient(): SupabaseClient {
   const url = Deno.env.get("SUPABASE_URL")!;
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -75,6 +97,18 @@ function calcElevenLabsCost(model: string, u: ElevenLabsUsage): number {
   const perHour = ELEVENLABS_PRICING_PER_HOUR[model] ?? 0;
   if (perHour === 0) return 0;
   return (u.audio_seconds / 3600) * perHour;
+}
+
+function calcGroqAudioCost(model: string, u: ElevenLabsUsage): number {
+  const perHour = GROQ_PRICING_PER_HOUR[model] ?? 0;
+  if (perHour === 0) return 0;
+  return (u.audio_seconds / 3600) * perHour;
+}
+
+function calcGeminiCost(model: string, inputTokens: number, outputTokens: number): number {
+  const p = GEMINI_PRICING[model];
+  if (!p) return 0;
+  return (inputTokens * p.in + outputTokens * p.out) / 1_000_000;
 }
 
 /** Loggea uso de Anthropic. Falla silenciosa — no rompe el flow. */
@@ -124,5 +158,53 @@ export async function logElevenLabsUsage(
     });
   } catch (e) {
     console.warn("logElevenLabsUsage failed:", (e as Error).message);
+  }
+}
+
+/** Loggea uso de Gemini (texto o vision). Falla silenciosa. */
+export async function logGeminiUsage(
+  args: ApiUsageBase & { model: string; inputTokens: number; outputTokens: number },
+): Promise<void> {
+  try {
+    const sb = adminClient();
+    const cost = calcGeminiCost(args.model, args.inputTokens, args.outputTokens);
+    await sb.from("api_usage_log").insert({
+      provider: "google",
+      operation: args.operation,
+      model: args.model,
+      units: {
+        input_tokens: args.inputTokens,
+        output_tokens: args.outputTokens,
+      },
+      cost_usd: cost,
+      context: args.context ?? {},
+      tenant_id: args.tenantId ?? null,
+    });
+  } catch (e) {
+    console.warn("logGeminiUsage failed:", (e as Error).message);
+  }
+}
+
+/** Loggea uso de Groq Whisper para transcripción de audio. Falla silenciosa. */
+export async function logGroqAudioUsage(
+  args: ApiUsageBase & { model: string; audioSeconds: number; characters?: number },
+): Promise<void> {
+  try {
+    const sb = adminClient();
+    const cost = calcGroqAudioCost(args.model, { audio_seconds: args.audioSeconds });
+    await sb.from("api_usage_log").insert({
+      provider: "groq",
+      operation: args.operation,
+      model: args.model,
+      units: {
+        audio_seconds: args.audioSeconds,
+        characters: args.characters ?? null,
+      },
+      cost_usd: cost,
+      context: args.context ?? {},
+      tenant_id: args.tenantId ?? null,
+    });
+  } catch (e) {
+    console.warn("logGroqAudioUsage failed:", (e as Error).message);
   }
 }
