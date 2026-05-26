@@ -385,6 +385,23 @@ serve(async (req) => {
 
     if (updateErr) throw updateErr;
 
+    // Redistribuir participation_pct entre los participants de la call
+    // (qa_call_participants) ahora que claude_analysis está poblado.
+    // La RPC mira audio_metrics.speakers + claude_analysis.closer_speaker_label
+    // para asignar speaker_label a cada participant y normalizar pct entre
+    // closers (sin contar el modelo). Si solo hay 1 participant, queda
+    // con pct=1.0. Falla silenciosa — no rompe la respuesta principal.
+    try {
+      const { error: recalcErr } = await supabase.rpc("recalculate_qa_call_participants", {
+        p_call_id: callId,
+      });
+      if (recalcErr) {
+        console.warn("recalculate_qa_call_participants warning:", recalcErr.message);
+      }
+    } catch (e) {
+      console.warn("recalculate_qa_call_participants threw:", (e as Error).message);
+    }
+
     // Loggea uso para el dashboard "Control de Gasto". No await crítico
     // — si falla el insert, no rompe la response al cliente.
     if (usage) {

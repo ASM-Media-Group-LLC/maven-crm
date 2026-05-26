@@ -30,6 +30,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { CANONICAL_COUNTRIES } from "@/lib/countries";
 import { toast } from "sonner";
@@ -120,6 +122,12 @@ const AgencyNewQa = () => {
   // — así el roster de qa_closers queda sincronizado con los closers
   // reales del CRM sin tener que mantener dos listas a mano.
   const [closerId, setCloserId] = useState<string>("");
+  // Closers de soporte (opcional, multi-select). Cuando el primary se
+  // hizo cargo principal pero otros closers participaron en la llamada,
+  // se agregan acá. Después de qa-analyze, los participation_pct se
+  // redistribuyen automáticamente según talk_ratio del audio.
+  // Solo admin/manager/supervisor puede agregar soportes.
+  const [supportCloserIds, setSupportCloserIds] = useState<string[]>([]);
   // Regla nueva (2026-05): el form ya no acepta nombres libres. El closer
   // tiene que seleccionar una modelo que ya exista en `models` (catálogo
   // canónico). Si no existe, primero hay que crear el lead en /scouter o
@@ -318,6 +326,8 @@ const AgencyNewQa = () => {
       // 5. Insert qa_calls con id explícito + transcript + audio_path.
       // audio_metrics ahora incluye words[] con timestamps por palabra
       // que el frontend usa para captions sincronizadas en el detail.
+      // El trigger AFTER INSERT en qa_calls auto-crea el participant
+      // primary en qa_call_participants — la UI solo agrega supports.
       setSubmitStage("Guardando QA…");
       const row = await create.mutateAsync({
         closer_id: qaCloserId,
@@ -328,6 +338,35 @@ const AgencyNewQa = () => {
         audio_path: savedAudioPath,
         audio_metrics: transcribeResult.audio_metrics,
       });
+
+      // 5.5 Insertar closers de soporte como participants.
+      // El pct queda en 1.0 inicialmente; qa-analyze redistribuye al
+      // terminar el análisis llamando a recalculate_qa_call_participants.
+      if (supportCloserIds.length > 0) {
+        try {
+          const supportRows = supportCloserIds
+            .filter((id) => id !== qaCloserId) // evitar duplicar primary
+            .map((id) => ({
+              call_id: row.id,
+              closer_id: id,
+              role: "support" as const,
+              participation_pct: 1.0,
+            }));
+          if (supportRows.length > 0) {
+            const { error: supErr } = await supabase
+              .from("qa_call_participants")
+              .insert(supportRows);
+            if (supErr) {
+              console.warn("Error agregando supports:", supErr.message);
+              toast.warning("QA guardada pero algunos soportes no se agregaron", {
+                description: supErr.message,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("Support insert threw:", (e as Error).message);
+        }
+      }
 
       setLastSavedId(row.id);
       toast.success("QA guardada", { description: "Analizando con IA…" });
@@ -340,6 +379,7 @@ const AgencyNewQa = () => {
       setModelIgUrl("");
       setCallDate(today());
       setAudioFile(null);
+      setSupportCloserIds([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
 
       // 8. Disparar análisis IA.
@@ -445,6 +485,16 @@ const AgencyNewQa = () => {
                 )}
                 {errors.closer && (
                   <p className="text-xs text-rose-400">{errors.closer}</p>
+                )}
+                {/* Closers de soporte: solo para admin/manager/supervisor.
+                    El primary lleva el 100% al inicio; qa-analyze redistribuye
+                    los pct según talk_ratio del audio cuando termina. */}
+                {canPickAnyCloser && (
+                  <SupportClosersPicker
+                    value={supportCloserIds}
+                    onChange={setSupportCloserIds}
+                    options={(closersQ.data ?? []).filter((u) => u.id !== closerId)}
+                  />
                 )}
               </div>
 
@@ -820,6 +870,77 @@ const CloserCombobox = ({
         </Command>
       </PopoverContent>
     </Popover>
+  );
+};
+
+/** Multi-select para closers de soporte que también participaron en la
+ *  llamada. Se muestra debajo del closer principal. Cuando se cierra el
+ *  popover y hay >=1 seleccionado, muestra los nombres como chips
+ *  inline. Sin selección, sigue siendo el control compacto "Agregar
+ *  closer de soporte". */
+const SupportClosersPicker = ({
+  value,
+  onChange,
+  options,
+}: {
+  value: string[];
+  onChange: (ids: string[]) => void;
+  options: Array<{ id: string; full_name: string | null }>;
+}) => {
+  const [open, setOpen] = useState(false);
+  const selectedNames = options
+    .filter((o) => value.includes(o.id))
+    .map((o) => o.full_name?.trim() || "(sin nombre)");
+
+  const toggle = (id: string) => {
+    onChange(
+      value.includes(id) ? value.filter((v) => v !== id) : [...value, id],
+    );
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1 text-xs text-muted-foreground font-normal"
+          >
+            <UserPlus className="h-3 w-3" />
+            {selectedNames.length === 0
+              ? "+ Closer de soporte"
+              : `${selectedNames.length} soporte${selectedNames.length > 1 ? "s" : ""}: ${selectedNames.join(", ")}`}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[280px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Buscar closer…" className="h-9" />
+            <CommandList>
+              <CommandEmpty>Sin resultados.</CommandEmpty>
+              <CommandGroup>
+                {options.map((opt) => {
+                  const label = opt.full_name?.trim() || "(sin nombre)";
+                  const checked = value.includes(opt.id);
+                  return (
+                    <CommandItem
+                      key={opt.id}
+                      value={label}
+                      onSelect={() => toggle(opt.id)}
+                      className="gap-2"
+                    >
+                      <Checkbox checked={checked} className="pointer-events-none" />
+                      <span>{label}</span>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 };
 
