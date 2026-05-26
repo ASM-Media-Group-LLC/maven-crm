@@ -18,12 +18,18 @@ export default function NotificationBell() {
   const { canAccess } = usePermissions();
   const { notifications, unreadCount, markAsRead, markAllAsRead, archiveNotification } = useNotifications();
 
+  // En la campana del topbar solo mostramos las NO LEÍDAS. Las leídas
+  // siguen accesibles en /notificaciones (la página completa). Sin este
+  // filtro, las leídas se quedaban en la lista y daban la sensación de
+  // que la campana no se "limpiaba" al verlas.
+  const unread = notifications.filter(
+    (n) => n.status === "new" || (!n.status && !n.is_read),
+  );
+
   const handleClick = (n: Notification) => {
-    // Mark as read
     if (n.status === "new" || (!n.status && !n.is_read)) {
       markAsRead.mutate(n.id);
     }
-    // Validate permission before navigating
     if (n.required_permission_module && !canAccess(n.required_permission_module, n.required_permission_submodule ?? undefined)) {
       toast({ title: "Sin acceso", description: "No tienes permiso para ver este recurso.", variant: "destructive" });
       return;
@@ -59,12 +65,15 @@ export default function NotificationBell() {
             </Button>
           )}
         </div>
-        <ScrollArea className="max-h-72">
-          {notifications.length === 0 ? (
+        {/* ScrollArea con altura FIJA (no max-h) — radix necesita altura
+            definida para que su viewport interno active el scrollbar.
+            Antes tenía max-h-72 y por eso no había scroll. */}
+        <ScrollArea className="h-[360px]">
+          {unread.length === 0 ? (
             <p className="text-xs text-muted-foreground p-4 text-center">{t("topbar.noNotifications")}</p>
           ) : (
             <div className="divide-y">
-              {notifications.slice(0, 20).map((n) => (
+              {unread.slice(0, 50).map((n) => (
                 <NotificationItem
                   key={n.id}
                   notification={n}
@@ -76,18 +85,16 @@ export default function NotificationBell() {
             </div>
           )}
         </ScrollArea>
-        {notifications.length > 0 && (
-          <div className="border-t p-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full text-xs"
-              onClick={() => navigate("/notificaciones")}
-            >
-              Ver todas las notificaciones
-            </Button>
-          </div>
-        )}
+        <div className="border-t p-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-xs"
+            onClick={() => navigate("/notificaciones")}
+          >
+            Ver todas las notificaciones
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   );
