@@ -46,7 +46,7 @@ export const LEADGEN_COMPANIES = [
   "Blu app",
   "Exchange",
   "KASH Agency",
-  "LeakHunter",
+  "Content Protector",
   "Ora Miami",
   "Pagomundo",
   "piclink.me",

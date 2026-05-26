@@ -45,7 +45,7 @@ const countryOptions = [
 ];
 
 // Fallback estático — la fuente real son scouter_companies (canónica).
-const AGENCY_OPTIONS_FALLBACK = ["Kash", "Atomick", "Unlok", "Ora", "Exchange", "PicLink", "LeakHunter", "Trafix", "Proyecto Medellín", "Pagomundo", "BLU"];
+const AGENCY_OPTIONS_FALLBACK = ["Kash", "Atomick", "Unlok", "Ora", "Exchange", "PicLink", "Content Protector", "Trafix", "Proyecto Medellín", "Pagomundo", "BLU"];
 const CATEGORY_OPTIONS_FALLBACK = ["Elite", "A+", "A", "B+", "B", "C+", "C"];
 const managerOptions = ["Full Management", "Hybrid", "Basic"];
 

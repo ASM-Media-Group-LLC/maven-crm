@@ -33,7 +33,7 @@ const PLATFORM_COLORS: Record<string, { bar: string; dot: string }> = {
   Trafix:     { bar: "bg-violet-500",  dot: "bg-violet-500" },
   Blu:        { bar: "bg-blue-500",    dot: "bg-blue-500" },
   Piclink:    { bar: "bg-pink-500",    dot: "bg-pink-500" },
-  LeakHunter: { bar: "bg-amber-500",   dot: "bg-amber-500" },
+  "Content Protector": { bar: "bg-amber-500", dot: "bg-amber-500" },
   ORA:        { bar: "bg-emerald-500", dot: "bg-emerald-500" },
 };
 
@@ -66,7 +66,7 @@ const ClosersKPICards = ({
   const { data: bestCloser, isLoading: bestCloserLoading } = useBestCloser(bestCloserRange);
   const [monthlyOpen, setMonthlyOpen] = useState(false);
 
-  const salePlatforms = ["Trafix", "Blu", "Piclink", "LeakHunter", "ORA"];
+  const salePlatforms = ["Trafix", "Blu", "Piclink", "Content Protector", "ORA"];
   const revPlataformas = salePlatforms.reduce((s, p) => s + (platformRevenue[p] || 0), 0);
   const revTotal = ofMonetizationTotal + revPlataformas;
 

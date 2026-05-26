@@ -27,7 +27,7 @@ import CommissionTiersEditor, { type CommissionTier } from "@/components/commiss
 
 // Fallback estático sólo si scouter_companies todavía no cargó. La
 // fuente real son las compañías canónicas de la DB.
-const AGENCIES_FALLBACK = ["Kash", "Atomick", "Unlok", "Ora", "Exchange", "PicLink", "LeakHunter", "Trafix", "Proyecto Medellín", "Pagomundo", "BLU"];
+const AGENCIES_FALLBACK = ["Kash", "Atomick", "Unlok", "Ora", "Exchange", "PicLink", "Content Protector", "Trafix", "Proyecto Medellín", "Pagomundo", "BLU"];
 const LANGUAGES = ["Español", "English", "Italiano", "Português", "Français", "Deutsch", "Русский"];
 const STATUSES = [
   { value: "onboarding", label: "En Onboarding" },
@@ -65,7 +65,7 @@ const COUNTRIES = [
   "Venezuela", "Vietnam", "Otro",
 ];
 
-const AVAILABLE_PLATFORMS = ["Leak Hunter", "Blu", "PickLink", "ORA", "Lumina"];
+const AVAILABLE_PLATFORMS = ["Content Protector", "Blu", "PickLink", "ORA", "Lumina"];
 const PLATFORM_FREQUENCIES = [
   { value: "mensual", label: "Mensual" },
   { value: "quincenal", label: "Quincenal" },

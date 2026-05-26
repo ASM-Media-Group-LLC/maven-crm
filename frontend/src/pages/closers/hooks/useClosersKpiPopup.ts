@@ -52,7 +52,7 @@ const STAGE_BY_KEY: Record<string, string[] | null> = {
 
 const STAGE_ORDER: string[] = ["Asignada", "Confirmada", "Completada", "No interesada"];
 
-const PLATFORM_KEYS = ["Trafix", "Blu", "Piclink", "LeakHunter", "ORA"];
+const PLATFORM_KEYS = ["Trafix", "Blu", "Piclink", "Content Protector", "ORA"];
 
 const fmtMoney = (n: number) => `$${Number(n || 0).toLocaleString("es")}`;
 
