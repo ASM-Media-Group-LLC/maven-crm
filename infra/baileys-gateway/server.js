@@ -837,6 +837,9 @@ app.get('/instance/connect/:instance', (req, res) => {
 });
 
 // Send text -- compatible con payload Evolution v1 o v2.
+// Soporta `mentions: ["123456@s.whatsapp.net", "456@lid"]` opcional —
+// si se manda, Baileys lo incluye en el contextInfo del mensaje y
+// WhatsApp renderiza esos números como menciones reales (ping al user).
 app.post('/message/sendText/:instance', async (req, res) => {
   if (state.connection !== 'open' || !state.sock) {
     return res.status(503).json({ error: 'not_connected', state: state.connection });
@@ -845,6 +848,11 @@ app.post('/message/sendText/:instance', async (req, res) => {
   const body = req.body || {};
   const number = body.number;
   const text = body.text ?? body.textMessage?.text;
+  // mentions opcionales: array de JIDs/LIDs completos
+  // ("123@s.whatsapp.net" o "456@lid"). El texto debe contener
+  // "@<phone_o_lid_sin_sufijo>" para que WhatsApp matchee y
+  // renderice el ping.
+  const mentions = Array.isArray(body.mentions) ? body.mentions : null;
 
   if (!number || !text) {
     return res.status(400).json({ error: 'missing_number_or_text' });
@@ -854,7 +862,11 @@ app.post('/message/sendText/:instance', async (req, res) => {
   if (!jid) return res.status(400).json({ error: 'invalid_jid' });
 
   try {
-    const result = await state.sock.sendMessage(jid, { text: String(text) });
+    const payload = { text: String(text) };
+    if (mentions && mentions.length > 0) {
+      payload.mentions = mentions;
+    }
+    const result = await state.sock.sendMessage(jid, payload);
     rolloverDayIfNeeded();
     state.msgsOut += 1;
     state.msgsOutToday += 1;
@@ -866,6 +878,7 @@ app.post('/message/sendText/:instance', async (req, res) => {
         fromMe: result.key.fromMe,
       },
       message: 'sent',
+      mentions: mentions ?? undefined,
     });
   } catch (e) {
     logger.error({ err: e.message, jid }, 'sendMessage failed');

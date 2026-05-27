@@ -69,6 +69,25 @@ NOMBRES DE PERSONAS (regla estricta):
   · "Alvaro S" → Alvaro
 - Si no estás seguro del primer nombre real de alguien (no aparece en profile), usá el display name tal cual pero SIN emojis, sufijos raros, ni símbolos. Si igual no podés, decí "el miembro que mandó X" sin nombrarlo.
 
+MENCIONES REALES (pings a usuarios — uso restringido):
+- WhatsApp permite "menciones reales" que NOTIFICAN al usuario en el móvil (no son solo texto).
+- En cada invocación recibís una tabla "MIEMBROS DEL GRUPO (con LID)" en el initial_user_message — ahí está el LID de cada miembro linkeado.
+- Para mencionar de verdad:
+  · En el body escribí "@<lid_sin_sufijo>" donde quieras la mención (ej. "@143250161664036, falta tu reporte de hoy").
+  · En reply_to_group pasá ese LID COMPLETO en el array mention_lids (ej. ["143250161664036@lid"]).
+  · WhatsApp lo renderiza al destinatario como "@Daniel" clickeable + ping.
+- CUÁNDO USAR MENCIÓN REAL:
+  ✓ Pedile algo concreto a una persona: "@Daniel falta tu reporte, podés mandarlo?"
+  ✓ Pregunta dirigida a alguien: "@Miguel, ¿vas a tomar @catalinaofficer?"
+  ✓ Decisión del owner que requiere acción inmediata: "@Yeison el owner pidió que pares con la cuenta X"
+  ✓ Override / corrección importante que NECESITA que la persona lea ya
+- CUÁNDO NO USAR MENCIÓN REAL:
+  ✗ Confirmaciones de algo registrado: "✓ Reporte de Daniel registrado" (NO mention)
+  ✗ EOD / cierre de día (todos lo ven, no hace falta despertar a nadie con notif)
+  ✗ Comentarios generales: "Miguel hoy cerró 1 confirmada" (sin mention, es info)
+  ✗ Cuando estás en MODO AUTO-LISTENING (default callado)
+- Regla de oro: usá menciones SOLO cuando el mensaje pide acción inmediata de esa persona Y vale la pena interrumpirla. Si dudás, NO uses mention — escribí el primer nombre tal cual sin @ ni mention_lids.
+
 Reglas:
 - Antes de tomar una acción que ESCRIBE (add_note_to_lead, resolve_commitment), confirmá con el usuario o asegurate de que la pidió explícito
 - Solo respondé en el grupo via reply_to_group al FINAL del razonamiento, una sola vez
@@ -724,11 +743,16 @@ const TOOLS: Array<{
   {
     name: "reply_to_group",
     description:
-      "Manda la respuesta final al grupo de WhatsApp. Llamala UNA SOLA VEZ al final del razonamiento. El cuerpo debe ser corto (idealmente <500 chars), en español argentino, conciso.",
+      "Manda la respuesta final al grupo de WhatsApp. Llamala UNA SOLA VEZ al final del razonamiento. El cuerpo debe ser corto (idealmente <500 chars), en español argentino, conciso.\n\nMENCIONES REALES (opcional):\n- Si querés que un miembro reciba un PING (notificación al móvil), incluí su LID en el texto como '@<lid_number>' (ej. '@143250161664036') Y pasalo también en el array `mention_lids`.\n- El bot tiene la tabla en el initial_user_message como 'MIEMBROS DEL GRUPO (con LID)' — usá los LIDs que aparecen ahí.\n- WhatsApp renderiza el '@<lid>' como '@NombrePersona' al destinatario.\n- USÁ MENCIONES SOLO cuando es de alto valor: '@Daniel falta tu reporte', '@Miguel decide vos sobre X'. NO en EOD normal, NO cuando solo confirmás algo ('✓ Reporte de Daniel registrado' va sin mención).",
     input_schema: {
       type: "object",
       properties: {
-        body: { type: "string", description: "el mensaje que se manda al grupo" },
+        body: { type: "string", description: "el mensaje que se manda al grupo. Para menciones reales escribí '@<lid>' donde <lid> es el número sin sufijo @lid (ej. '@143250161664036, ¿podés cargar el reporte?')." },
+        mention_lids: {
+          type: "array",
+          items: { type: "string" },
+          description: "Array de LIDs/JIDs completos a notificar (ej. ['143250161664036@lid']). Debe estar alineado con los @<lid> en el body. Solo usalo cuando realmente querés despertar a esa persona — no en cada mensaje.",
+        },
       },
       required: ["body"],
     },
@@ -1965,6 +1989,12 @@ async function executeTool(
     case "reply_to_group": {
       const body = String(input.body ?? "").trim();
       if (!body) return { error: "empty_body" };
+      // Menciones opcionales: array de LIDs/JIDs. El gateway las pasa
+      // a Baileys como `mentions` para que WhatsApp ping a esos users.
+      const rawMentions = Array.isArray(input.mention_lids) ? input.mention_lids : [];
+      const mentions = rawMentions
+        .map((m) => String(m).trim())
+        .filter((m) => m.length > 0);
       // Llamamos a whatsapp-send para que despache.
       const url = `${Deno.env.get("SUPABASE_URL")!}/functions/v1/whatsapp-send`;
       const resp = await fetch(url, {
@@ -1973,7 +2003,11 @@ async function executeTool(
           "Content-Type": "application/json",
           "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "",
         },
-        body: JSON.stringify({ group_id: ctx.groupId, body }),
+        body: JSON.stringify({
+          group_id: ctx.groupId,
+          body,
+          mentions: mentions.length > 0 ? mentions : undefined,
+        }),
       });
       const data = await resp.json();
       return data as Record<string, unknown>;
@@ -2188,6 +2222,45 @@ async function buildInitialUserMessage(args: {
     lines.push("");
     lines.push("Nota sobre nombres: los senders mostrados acá ya son el PRIMER NOMBRE del miembro según su profile en Maven (Daniel, Yeison, Miguel, Julieth, etc). Usalos así tal cual cuando te refieras a ellos en el grupo. NUNCA escribas '#21', 'Jeison.', 'Juli 💘💘' u otros display names crudos de WhatsApp — los humanos del grupo se conocen por su primer nombre real.");
     lines.push("");
+
+    // Inyectar tabla de miembros del grupo con sus LIDs — para que el
+    // bot pueda construir menciones reales (pings) cuando lo crea
+    // pertinente. Solo miembros LINKEADOS (con profile + full_name).
+    const { data: allMembers } = await sb
+      .from("whatsapp_members")
+      .select("external_id, user_id, display_name")
+      .eq("group_id", args.groupId)
+      .not("user_id", "is", null);
+    if (allMembers && allMembers.length > 0) {
+      const allUserIds = allMembers.map((m) => m.user_id).filter((u): u is string => Boolean(u));
+      const { data: allProfs } = await sb
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", allUserIds);
+      const fullNameMap = new Map((allProfs ?? []).map((p) => [p.id, p.full_name]));
+      const rows = allMembers
+        .map((m) => {
+          const fn = m.user_id ? fullNameMap.get(m.user_id) : null;
+          if (!fn) return null;
+          const first = fn.split(" ")[0] ?? fn;
+          return { first, lid: m.external_id };
+        })
+        .filter((x): x is { first: string; lid: string } => x !== null);
+      if (rows.length > 0) {
+        lines.push("MIEMBROS DEL GRUPO (con LID — usalos si vas a hacer mention real):");
+        for (const r of rows) {
+          lines.push(`  · ${r.first} → ${r.lid}`);
+        }
+        lines.push("");
+        lines.push("Cómo usar menciones reales en reply_to_group:");
+        lines.push("  - En el texto escribí '@<lid_sin_sufijo>' (ej: '@143250161664036, falta tu reporte').");
+        lines.push("  - En el array mention_lids pasá el LID COMPLETO (ej: ['143250161664036@lid']).");
+        lines.push("  - WhatsApp lo va a renderizar como '@Daniel' clickeable + ping al móvil.");
+        lines.push("  - SOLO usalo cuando querés despertar a esa persona específicamente. En EOD normal o confirmaciones tipo '✓ registrado', NO uses mention_lids — solo escribí el primer nombre tal cual.");
+        lines.push("");
+      }
+    }
+
     lines.push(
       "Razoná, usá las tools que hagan falta y respondé al grupo via reply_to_group. " +
         "No respondas en el thinking — solo via reply_to_group.",
