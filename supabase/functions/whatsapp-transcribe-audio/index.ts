@@ -71,6 +71,47 @@ type TranscribeResult =
   | { ok: true; text: string; duration_s: number; provider: "self_hosted" | "groq" }
   | { ok: false; error: string };
 
+const GATEWAY_URL = Deno.env.get("WHATSAPP_EVOLUTION_URL") ?? "";
+const GATEWAY_KEY = Deno.env.get("WHATSAPP_EVOLUTION_API_KEY") ?? "";
+
+// Baja un audio del WhatsApp media usando el gateway (que aplica
+// Baileys downloadContentFromMessage para desencriptar el .enc).
+// Espera que el `raw` del mensaje contenga el sub-mensaje
+// `audioMessage` con mediaKey + url/directPath + mimetype.
+async function downloadAudioViaGateway(rawData: unknown): Promise<Blob | { error: string }> {
+  if (!GATEWAY_URL || !GATEWAY_KEY) {
+    return { error: "gateway_not_configured" };
+  }
+  // El raw que guardamos es { data: <waMessage>, event, instance }.
+  // El audioMessage está en data.message.audioMessage.
+  const r = rawData as { data?: { message?: { audioMessage?: unknown } } } | null;
+  const audioMessage = r?.data?.message?.audioMessage;
+  if (!audioMessage) return { error: "no_audio_message_in_raw" };
+
+  try {
+    const resp = await fetch(`${GATEWAY_URL.replace(/\/$/, "")}/media/download`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": GATEWAY_KEY,
+      },
+      body: JSON.stringify({ type: "audio", message: audioMessage }),
+    });
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => "");
+      return { error: `gateway ${resp.status}: ${txt.slice(0, 200)}` };
+    }
+    const buf = await resp.arrayBuffer();
+    if (buf.byteLength === 0) return { error: "empty_audio_from_gateway" };
+    if (buf.byteLength > MAX_AUDIO_BYTES) return { error: "audio_too_large" };
+    const bytes = new Uint8Array(buf);
+    const mime = resp.headers.get("content-type") ?? "audio/ogg";
+    return new Blob([bytes], { type: mime });
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
 async function downloadAudio(url: string): Promise<Blob | { error: string }> {
   try {
     const resp = await fetch(url, { method: "GET" });
@@ -230,7 +271,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
 
   const { data: msg, error: msgErr } = await sb
     .from("whatsapp_messages")
-    .select("id, tenant_id, group_id, msg_type, media_url, transcribed_text, analyzed_at, is_from_bot")
+    .select("id, tenant_id, group_id, msg_type, media_url, transcribed_text, analyzed_at, is_from_bot, raw")
     .eq("id", messageId)
     .single();
 
@@ -267,7 +308,20 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     return { ok: false, reason: "no_provider_configured" };
   }
 
-  const blob = await downloadAudio(msg.media_url);
+  // Estrategia de descarga:
+  //   1. Si tenemos `raw` con audioMessage (típico para gateway Baileys),
+  //      usar el endpoint /media/download del gateway que aplica
+  //      downloadContentFromMessage para desencriptar el .enc.
+  //   2. Fallback: GET directo al media_url (audios viejos de Evolution
+  //      que ya venían desencriptados, o gateway no configurado).
+  let blob: Blob | { error: string };
+  const gatewayAttempt = await downloadAudioViaGateway(msg.raw);
+  if (!("error" in gatewayAttempt)) {
+    blob = gatewayAttempt;
+  } else {
+    console.warn(`gateway download failed (${gatewayAttempt.error}), trying direct media_url`);
+    blob = await downloadAudio(msg.media_url);
+  }
   if ("error" in blob) {
     await logEvent(sb, {
       tenantId: msg.tenant_id,

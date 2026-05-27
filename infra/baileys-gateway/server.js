@@ -34,7 +34,7 @@
 // Estado de la session se persiste en /data/auth (volumen Docker). Sin
 // ese volumen, cada restart pide QR de cero.
 
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers } = require('baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers, downloadContentFromMessage } = require('baileys');
 const express = require('express');
 const pino = require('pino');
 const QRCode = require('qrcode');
@@ -883,6 +883,49 @@ app.post('/message/sendText/:instance', async (req, res) => {
   } catch (e) {
     logger.error({ err: e.message, jid }, 'sendMessage failed');
     return res.status(500).json({ error: 'send_failed', detail: e.message });
+  }
+});
+
+// Descargar y desencriptar media (audio/image/video/document/sticker).
+//
+// Recibe el sub-mensaje de Baileys (ej. audioMessage con mediaKey, url,
+// directPath, mimetype, fileLength, etc) y devuelve el binary
+// desencriptado. WhatsApp expone los media files encriptados en
+// mmg.whatsapp.net/...enc — un GET plano devuelve el cipher, no el
+// archivo. Baileys tiene downloadContentFromMessage que aplica la
+// mediaKey + HKDF para desencriptar.
+//
+// Body: { type: "audio"|"image"|"video"|"document"|"sticker", message: <sub-mensaje> }
+// Response: binary (Content-Type según el mimetype del media)
+app.post('/media/download', async (req, res) => {
+  const body = req.body || {};
+  const type = String(body.type || '').toLowerCase();
+  const message = body.message;
+
+  const validTypes = ['audio', 'image', 'video', 'document', 'sticker'];
+  if (!validTypes.includes(type)) {
+    return res.status(400).json({ error: 'invalid_type', valid: validTypes });
+  }
+  if (!message || typeof message !== 'object') {
+    return res.status(400).json({ error: 'missing_message_object' });
+  }
+  if (!message.mediaKey || !(message.url || message.directPath)) {
+    return res.status(400).json({ error: 'missing_mediaKey_or_url' });
+  }
+
+  try {
+    const stream = await downloadContentFromMessage(message, type);
+    const chunks = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    const buffer = Buffer.concat(chunks);
+
+    const mime = message.mimetype || (type === 'audio' ? 'audio/ogg' : 'application/octet-stream');
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Length', String(buffer.length));
+    return res.end(buffer);
+  } catch (e) {
+    logger.error({ err: e.message, type }, 'media download failed');
+    return res.status(500).json({ error: 'download_failed', detail: e.message });
   }
 });
 
