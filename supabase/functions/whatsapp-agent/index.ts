@@ -592,6 +592,59 @@ CRITERIO DE CALIDAD KASH (lo asigna el LLG/supervisor en leadgen_entries.quality
 - B  → Regular. Más esfuerzo de conversión. Piclink.
 - C  → Básica. Difícil monetización. Solo si hay capacidad.
 
+ASESORAMIENTO DE OUTREACH IG (conocimiento operacional real sobre cómo evitar baneos):
+
+Este conocimiento aplica cuando un LLG o el owner pregunta cómo planificar el día, evitar baneos, recuperar cuentas, o el bot detecta señales de problemas operativos. PRIMERO llamá get_llg_account_status({display_name}) para tener data REAL del inventario del LLG. Después combiná con estas reglas.
+
+LÍMITES DE DMs POR DÍA (heurísticas — IG aplica rate limits dinámicos, esto es orientativo, no garantizado):
+  · Cuentas <14 días (warming_up): 0 DMs los días 1-7. Día 8-14: máx 5 DMs/día y solo si la cuenta ya hizo scroll/likes/follows orgánicos.
+  · Cuentas chicas (<500 followers, >14 días): 10-15 DMs/día max. Mezclar con likes/comentarios reales.
+  · Cuentas medias (500-10K followers): 20-30 DMs/día.
+  · Cuentas grandes (10K-100K followers): 30-50 DMs/día.
+  · Cuentas verificadas (badge azul): 50-100/día, más resilientes.
+  · Cuenta restringida (is_restricted=true): 0 DMs. Esperar apelación o descartar.
+
+SEÑALES QUE TRIGGEAN BANEOS (avisalas si detectás patrón):
+  · Mismo texto literal a 10+ usuarios en una hora → shadow ban casi seguro.
+  · Velocidad >1 DM cada 90 segundos → bot-like, flag inmediato.
+  · Link clickeable en el PRIMER mensaje (onlyfans.com, bit.ly, etc) → ban casi seguro.
+  · Keywords spam ("agencia", "modelaje", "$", "click", "link in bio", "OnlyFans") en primer DM → trigger.
+  · Comprar seguidores → IG detecta growth no-orgánico, flag/restriction.
+  · Cambiar username DESPUÉS de empezar outreach → revisión manual, suele terminar en restricted.
+  · Cambio de username + subida masiva de contenido juntos → ban inminente.
+  · Cuentas con "creators_", "agency_", "talent_", "recruitment_" en el handle → IG las flaggea automático. Las cuentas que el LLG tiene con estos prefijos suelen estar restricted o caerán pronto. RECOMENDAR migrar a handles más naturales.
+
+CALENTAMIENTO DE CUENTAS NUEVAS (los primeros 14 días son críticos):
+  · Día 1-3: solo scroll, likes a posts naturales, follows a cuentas relevantes. CERO DMs.
+  · Día 4-7: comentarios genuinos en reels, ver stories activas, save de posts. CERO DMs.
+  · Día 8-14: subir 3-5 posts orgánicos al perfil. Empezar 5 DMs/día max, soft (sin link, sin pitch).
+  · Día 15+: gradual aumento de DMs según el rendimiento.
+  · Verificar email + agregar número de teléfono = importante para credibilidad.
+
+ESTRATEGIA DE OUTREACH RECOMENDADA (lo que mejor convierte sin quemar cuenta):
+  1. Touch suave PRIMERO: story view, like a reel reciente, comentario genuino en post. NUNCA empezar con DM frío.
+  2. Esperar 24h después del soft touch antes del primer DM.
+  3. Primer DM: corto, personalizado (mencionar algo específico del perfil), SIN link, SIN pitch comercial.
+  4. Si responde → conversar 2-3 mensajes naturales antes de mencionar la propuesta.
+  5. Si NO responde después de 3-5 mensajes en 2 semanas → no insistir, pasar a otra.
+  6. NUNCA mandar exactamente el mismo texto a varias. Variar al menos saludo + 1 detalle por modelo.
+
+ROTACIÓN DE CUENTAS:
+  · No concentrar todo el outreach en 1 sola cuenta. Si el LLG tiene 5 cuentas activas, distribuir cuotas.
+  · Mezclar cuentas grandes (kash_miami__ 169K) para DMs a creators target con cuentas chicas para volumen exploratorio.
+  · Las cuentas grandes son recurso valioso — usar para leads quality A+/A (más probable de cerrar).
+
+DETECCIÓN DE PROBLEMAS:
+  · Si un LLG tiene <2 cuentas activas (excluyendo restringidas), URGENTE alertar al owner — el LLG está parado.
+  · Si todas sus cuentas tienen AI score <30 → recomendar comprar/conseguir cuentas nuevas con mejor perfil.
+  · Si reporta 0 respuestas durante 3+ días seguidos, sugerir: (a) cambiar approach del DM, (b) descansar las cuentas 48h, (c) revisar si IG les bajó alcance.
+
+FORMA DE ASESORAR EN EL GRUPO:
+  · Citá la data SIEMPRE. Ej: "Daniel, tu cuenta @kash_miami__ tiene 169K followers y AI score 74 — esa es tu más fuerte, priorizá DMs ahí para leads A+. @ex_miami__ con 131 followers usala solo para 5-8 DMs/día."
+  · NO digas reglas genéricas inventadas sin data. Si no sabés algo, decílo.
+  · Sé directo y operativo, sin paja. El LLG quiere saber qué hacer hoy, no una clase de IG.
+  · Cuando recomiendes algo, DECÍ por qué: "no más de 15 DMs porque la cuenta tiene <500 followers" — no solo "máx 15 DMs".
+
 INTELIGENCIA SOBRE LEADS (F2 — usar cuando aparezca un handle de IG en el grupo, sea en captions de imágenes, links sueltos, reportes de cierre, etc):
 - ANTES de que el closer llame a una modelo nueva, si ves su @ o link de IG en el grupo, llamá lookup_lead_history(handle). Te dice si ya pasó por la agencia, qué quality le dieron, si la rechazaron, si estuvo en pipeline, si es modelo activa.
   · Si overall_status="active_creator" → AVISÁ: ya es modelo activa, NO recontactar.
@@ -752,6 +805,18 @@ const TOOLS: Array<{
         reason: { type: "string", description: "razón corta (opcional, máx 200 chars)" },
       },
       required: ["display_name", "off_date", "off_type"],
+    },
+  },
+  {
+    name: "get_llg_account_status",
+    description:
+      "Devuelve el inventario de cuentas IG (spammer accounts) que un LLG está usando para hacer outreach a creadoras. Para cada cuenta: handle, followers, AI score (1-100, qué tan creíble se ve la cuenta), si está restringida por IG, niche, días desde creación, status del scan. Usalo cuando el LLG (o el owner) pide planificación operativa, recomendaciones de outreach, o explicación de por qué bajó el rendimiento. También cuando alguien reporte una cuenta baneada, para chequear cuántas le quedan funcionando.",
+    input_schema: {
+      type: "object",
+      properties: {
+        display_name: { type: "string", description: "nombre del LLG (Daniel, Yeison, Gislaine, etc) — usá el primer nombre o el display_name del wpp" },
+      },
+      required: ["display_name"],
     },
   },
   {
@@ -1487,6 +1552,66 @@ async function executeTool(
         ok: true,
         registered: data,
         message: `${member.display_name} marcado como ${offType} para ${offDate}.`,
+      };
+    }
+
+    case "get_llg_account_status": {
+      const displayName = String(input.display_name ?? "").trim();
+      if (!displayName) return { error: "missing_display_name" };
+      const members = await resolveMembersByName(sb, ctx.groupId, displayName);
+      const member = members.find((m) => m.user_id);
+      if (!member?.user_id) {
+        return { error: "llg_not_found_or_unlinked", display_name: displayName };
+      }
+
+      const { data: accounts } = await sb
+        .from("scouter_spammer_accounts")
+        .select("id, instagram_handle, display_name, account_niche, followers_count, ai_score, ai_analysis, is_restricted, scan_status, active, created_at, last_scanned_at")
+        .eq("user_id", member.user_id)
+        .order("ai_score", { ascending: false, nullsFirst: false });
+
+      const now = Date.now();
+      const summarized = (accounts ?? []).map((a) => {
+        const ageDays = a.created_at
+          ? Math.floor((now - new Date(a.created_at).getTime()) / (24 * 3600 * 1000))
+          : null;
+        // Riesgo derivado (no inventar — solo de columnas reales).
+        let status: "restricted" | "warming_up" | "ok_small" | "ok_medium" | "ok_strong" | "unknown";
+        if (a.is_restricted) status = "restricted";
+        else if (ageDays !== null && ageDays < 14) status = "warming_up";
+        else if (!a.followers_count || a.followers_count < 500) status = "ok_small";
+        else if (a.followers_count < 10000) status = "ok_medium";
+        else status = "ok_strong";
+        // Pull resumen del análisis AI si está
+        const aiSummary = (a.ai_analysis as { summary?: string } | null)?.summary ?? null;
+        return {
+          handle: a.instagram_handle,
+          display_name: a.display_name,
+          niche: a.account_niche,
+          followers: a.followers_count,
+          ai_score: a.ai_score,
+          ai_summary: aiSummary,
+          is_restricted: a.is_restricted,
+          age_days: ageDays,
+          status,
+          scan_status: a.scan_status,
+          active: a.active,
+        };
+      });
+
+      const totals = {
+        total: summarized.length,
+        active: summarized.filter((a) => a.active && !a.is_restricted).length,
+        restricted: summarized.filter((a) => a.is_restricted).length,
+        warming_up: summarized.filter((a) => a.status === "warming_up").length,
+        strong: summarized.filter((a) => a.status === "ok_strong").length,
+      };
+
+      return {
+        ok: true,
+        llg: member.full_name ?? member.display_name,
+        accounts: summarized,
+        totals,
       };
     }
 
