@@ -46,34 +46,78 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const MODEL = "claude-haiku-4-5";  // Haiku es suficiente para extracción
 const CLAUDE_TIMEOUT_MS = 60_000;
 
-const SYSTEM_PROMPT = `Sos un extractor de compromisos para un grupo de WhatsApp de un equipo de ventas/agencia. Tu tarea es leer mensajes en español (a veces argentino, a veces mexicano) y detectar dos cosas:
+const SYSTEM_PROMPT = `Sos un extractor de "items operativos" para un grupo de WhatsApp de un equipo de ventas/agencia. Tu tarea es leer mensajes en español (argentino/colombiano/mexicano) y detectar TODO lo que el equipo necesita rastrear, esté o no formalizado en un CRM.
 
-1. COMPROMISOS: cuando alguien dice que va a hacer algo concreto en el futuro. Ejemplos:
-   - "mañana le escribo a Camila" → compromiso de contactar
-   - "el lunes paso por ahí" → compromiso
-   - "voy a revisar el caso de Sofi" → compromiso
-   - "lo llamo en un rato" → compromiso (due_at = +2h)
-   - "te paso el contacto" → compromiso de enviar info
-   NO son compromisos:
-   - "tengo ganas de", "habría que", "deberíamos" (sin sujeto + acción concreta)
-   - "siempre les digo que..." (hábito, no compromiso puntual)
-   - Charlas off-topic, memes, audios sin transcribir
+Detectás 5 TIPOS de items (cada uno usa el campo "kind"):
 
-2. RESOLUCIONES: cuando alguien reporta haber hecho algo o el resultado:
+1. *kind="promise"* — compromiso clásico: alguien dice que va a hacer algo concreto.
+   - "mañana le escribo a Camila" → promise
+   - "el lunes paso por ahí" → promise
+   - "voy a revisar el caso de Sofi" → promise
+   - "lo llamo en un rato" → promise (due_at = +2h)
+
+2. *kind="meeting"* — REUNIÓN AGENDADA con un externo (modelo, prospecto, cliente). Patrones típicos:
+   - "*Para mañana 4PM*: https://www.instagram.com/arq.gloriatorres89/" → meeting con esa modelo
+   - "reuniones confirmadas 2: @elpadreamen.core, @mariiaroz" → 2 meetings separados
+   - "reunión con Camila martes 3pm" → meeting
+   target_subject = handle/nombre del externo. due_at = fecha-hora de la reunión.
+
+3. *kind="task"* — TAREA ASIGNADA explícitamente a alguien (interno del equipo):
+   - "Juan compra 4 cuentas para Daniel" → task assignada a Juan
+   - "Miguel se encarga de pasarnos más cuentas" → task a Miguel
+   - "Juan pachas de comprar seguidores" → task a Juan Pachas
+   - "Todos los días entregar una cuenta nueva a Juan pachas" → task recurrente (poné due_at = mañana 11am)
+   committed_by_text = la persona ASIGNADA.
+
+4. *kind="tracking"* — ITEM CON ESTADO EVOLUTIVO que el equipo necesita seguir. Cosas que NO están en el CRM pero importan:
+   - "Daniel ahora tiene 7 cuentas" → tracking del stock de cuentas IG de Daniel
+   - "12 cuentas nuevas en el sheet, 4 para cada uno" → tracking de cuentas distribuidas
+   - "1 cuenta antigua de Daniel + 1 antigua de Yeison" → tracking de qué cuentas tiene cada uno
+   - "se rechazó la cuenta @X" → tracking de estado
+   subject = qué se trackea ("cuentas IG de Daniel"). target_subject = cantidad o detalle. NO due_at necesariamente.
+
+5. *kind="followup"* — algo a verificar después, sin acción específica asignada:
+   - "después chequeamos cómo le fue" → followup
+   - "verifiquemos si respondió" → followup
+   - "esperando respuesta de Camila" → followup
+
+Y también detectás RESOLUCIONES (cuando alguien cierra un item):
    - "ya hablé con Camila, dijo que sí" → resolution outcome=done
    - "Sofi no me contestó" → outcome=no_answer
    - "dijo que mejor en otro momento" → outcome=rescheduled
    - "me rechazó" → outcome=rejected
+   - "ya cargamos las 4 cuentas" → resolution sobre tracking previo
 
-REGLAS IMPORTANTES:
-- Solo extrae compromisos con SUJETO + ACCIÓN + (opcional) TARGET y TIEMPO claros.
-- Si no hay due_at explícito pero hay urgencia ("en un rato", "ya", "ahora"), poné +2 horas. Si dice "más tarde" o "después" poné +6h. Si dice "mañana" sin hora, poné mañana a las 11am hora local. Si dice "el lunes" sin hora, poné las 11am de ese día.
-- confidence = qué tan seguro estás de que es un compromiso real (no un comentario casual). Bajalo a 0.5-0.7 si está ambiguo.
-- "committed_by_text" = el nombre/apodo de quien promete, tal como aparece en el sender_display_name del mensaje. Si el mensaje es en primera persona ("yo le escribo"), usá el sender. Si menciona a otra persona ("Miguel le escribe"), ese nombre va.
-- target_subject debe ser corto: nombre de persona, handle de IG, o entidad. NO frases largas.
-- Si el mensaje no contiene NI compromisos NI resoluciones, devolvé arrays vacíos. Esto es lo más común — no inventes.
+REGLAS:
+- Solo extraé items con SUJETO + ACCIÓN claros. NO inventes.
+- TIEMPOS por defecto (zona horaria local del grupo):
+  · "mañana a las 4PM" / "el lunes 3PM" / "el martes 10AM" → due_at exacto en zona local
+  · "mañana le escribo" / "mañana le hablo" / "mañana le mando" (con acción comunicativa específica) → due_at = mañana 11:00 local (inicio típico de turno)
+  · "mañana lo uso" / "mañana lo trabajo" / "mañana sigo con" (acción difusa sin compromiso de hora) → kind="followup" con due_at = mañana 17:00 local (final del día, sin urgencia matutina)
+  · "el lunes" sin hora → kind=followup con due_at lunes 17:00
+  · "en un rato" → +2h desde el mensaje
+  · "después" → kind=followup con due_at = +6h desde el mensaje
+  · NUNCA poner due_at antes de las 11:00 ni después de las 19:00 local (no spamear fuera de horario laboral)
+- IMPORTANTE: si el compromiso NO incluye una hora explícita y la acción no es comunicativa (escribir, llamar, mandar), preferí kind="followup" sobre "promise". Followup no dispara recordatorios urgentes — promise sí. No conviertas un "voy a usar la cuenta mañana" en promesa con hora puntual.
+- confidence = 0.5-0.7 si ambiguo, 0.8-1.0 si claro.
+- confidence = 0.5-0.7 si ambiguo, 0.8-1.0 si claro.
+- "committed_by_text" = el ASIGNADO/COMPROMETIDO (no necesariamente el sender). Si dice "Juan compra cuentas", committed_by_text="Juan" aunque el sender sea Luis.
+- target_subject corto: nombre, handle, entidad, cantidad. NO frases largas.
+- NO son items:
+  - "tengo ganas de", "habría que", "deberíamos" (sin asignación clara)
+  - charlas off-topic, memes, saludos
+  - reportes de jornada con números puros ("contactados 70") — esos los captura otro módulo
+- Si el mensaje no contiene ningún item NI resolución, devolvé arrays vacíos. Lo más común — no inventes.
 
-OUTPUT: JSON estricto. Sin markdown, sin explicaciones, solo el objeto.`;
+OUTPUT: JSON estricto con shape:
+{
+  "commitments": [
+    { "kind": "promise|meeting|task|tracking|followup", "subject": "...", "target_subject": "...", "committed_by_text": "...", "due_at_iso": "..." | null, "confidence": 0.0-1.0 }
+  ],
+  "resolutions": [...],
+  "mentions": [...]
+}
+Sin markdown, sin explicaciones.`;
 
 interface ExtractRequest {
   message_id?: string;
@@ -106,7 +150,7 @@ interface ExtractedAnalysis {
 
 async function callClaude(
   contextLines: string[],
-  targetMessage: { sender: string; body: string; sent_at: string },
+  targetMessage: { sender: string; body: string; sent_at: string; group_id?: string | null },
   tenantId: string,
 ): Promise<{ analysis: ExtractedAnalysis | null; usage: Record<string, number> }> {
   const userContent = [
@@ -170,7 +214,7 @@ async function callClaude(
       model: MODEL,
       usage: data.usage,
       tenantId,
-      context: { sender: targetMessage.sender },
+      context: { sender: targetMessage.sender, group_id: targetMessage.group_id },
     });
 
     return { analysis: parsed, usage: data.usage };
@@ -267,7 +311,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     : analyzeText!;
   const { analysis } = await callClaude(
     contextLines,
-    { sender: senderName, body: textForClaude, sent_at: msg.sent_at },
+    { sender: senderName, body: textForClaude, sent_at: msg.sent_at, group_id: msg.group_id },
     msg.tenant_id,
   );
 
@@ -287,20 +331,26 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     return { ok: false, reason: "claude_parse_failed" };
   }
 
-  // Insert commitments.
+  // Insert commitments. item_kind se setea como columna dedicada (no solo en
+  // metadata) para que el agent pueda filtrar/agrupar eficiente.
+  const VALID_KINDS = new Set(["promise", "meeting", "task", "tracking", "followup"]);
   const commitmentsToInsert = analysis.commitments
     .filter((c) => c.subject && (c.confidence ?? 1) >= 0.5)
-    .map((c) => ({
-      tenant_id: msg.tenant_id,
-      group_id: msg.group_id,
-      source_message_id: msg.id,
-      committed_by_text: c.committed_by_text ?? senderName,
-      subject: c.subject,
-      target_subject: c.target_subject ?? null,
-      due_at: c.due_at_iso ?? null,
-      confidence: c.confidence ?? 0.7,
-      metadata: { kind: c.kind ?? "other" },
-    }));
+    .map((c) => {
+      const kind = c.kind && VALID_KINDS.has(c.kind) ? c.kind : "promise";
+      return {
+        tenant_id: msg.tenant_id,
+        group_id: msg.group_id,
+        source_message_id: msg.id,
+        committed_by_text: c.committed_by_text ?? senderName,
+        subject: c.subject,
+        target_subject: c.target_subject ?? null,
+        due_at: c.due_at_iso ?? null,
+        confidence: c.confidence ?? 0.7,
+        item_kind: kind,
+        metadata: { kind },
+      };
+    });
 
   let insertedCommitments = 0;
   if (commitmentsToInsert.length > 0) {

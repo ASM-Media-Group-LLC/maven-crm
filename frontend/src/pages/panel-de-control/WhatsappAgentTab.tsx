@@ -39,11 +39,15 @@ import {
   useUpdateBotPersona,
   useWhatsappBotEvents,
   useWhatsappCommitments,
+  useWhatsappDailyReports,
+  useWhatsappGroupCosts,
   useWhatsappGroups,
   useWhatsappGroupSummary,
   useWhatsappMembers,
   useWhatsappRecentMessages,
   type WhatsappCommitment,
+  type WhatsappCostRow,
+  type WhatsappDailyReport,
   type WhatsappGroup,
   type WhatsappMember,
   type WhatsappMessage,
@@ -233,10 +237,14 @@ function GroupDetail({ group }: { group: WhatsappGroup }) {
         </div>
       </Card>
 
+      {/* Costos del bot */}
+      <CostsCard groupId={group.id} />
+
       {/* Tabs */}
       <Tabs defaultValue="commitments">
         <TabsList>
           <TabsTrigger value="commitments">Compromisos</TabsTrigger>
+          <TabsTrigger value="reports">Reportes diarios</TabsTrigger>
           <TabsTrigger value="messages">Mensajes</TabsTrigger>
           <TabsTrigger value="members">Miembros</TabsTrigger>
           <TabsTrigger value="events">Eventos</TabsTrigger>
@@ -244,6 +252,10 @@ function GroupDetail({ group }: { group: WhatsappGroup }) {
 
         <TabsContent value="commitments" className="mt-3">
           <CommitmentsList groupId={group.id} />
+        </TabsContent>
+
+        <TabsContent value="reports" className="mt-3">
+          <DailyReportsList groupId={group.id} />
         </TabsContent>
 
         <TabsContent value="messages" className="mt-3">
@@ -609,6 +621,249 @@ function MemberRow({
           </PopoverContent>
         </Popover>
       </div>
+    </div>
+  );
+}
+
+function CostsCard({ groupId }: { groupId: string }) {
+  const { data: rows } = useWhatsappGroupCosts(groupId, 3);
+
+  // Mes actual = primera row porque la query viene ordenada desc
+  const current = rows?.[0];
+  const previous = rows?.[1];
+
+  const fmt = (n: number | null | undefined) =>
+    n == null ? "—" : n < 1 ? `$${n.toFixed(3)}` : `$${n.toFixed(2)}`;
+
+  const monthLabel = current
+    ? format(new Date(`${current.month}T12:00:00Z`), "MMMM yyyy", { locale: es })
+    : "—";
+
+  // Delta vs mes anterior
+  const delta = current && previous && previous.cost_usd > 0
+    ? ((current.cost_usd - previous.cost_usd) / previous.cost_usd) * 100
+    : null;
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-amber-500" />
+          <p className="text-sm font-medium">Costos del bot — {monthLabel}</p>
+        </div>
+        {delta !== null && (
+          <Badge variant="outline" className={cn(
+            "text-[10px]",
+            delta > 20 ? "border-orange-500 text-orange-600" : delta < -20 ? "border-emerald-500 text-emerald-600" : "",
+          )}>
+            {delta > 0 ? "+" : ""}{delta.toFixed(0)}% vs mes anterior
+          </Badge>
+        )}
+      </div>
+
+      {!current ? (
+        <p className="text-xs text-muted-foreground">
+          Sin actividad pagada todavía este mes. Los costos aparecen acá apenas el bot procese mensajes.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {/* Total grande */}
+          <div className="flex items-baseline justify-between">
+            <p className="text-3xl font-bold tabular-nums">{fmt(current.cost_usd)}</p>
+            <span className="text-xs text-muted-foreground">{current.calls} calls</span>
+          </div>
+
+          {/* Breakdown por componente */}
+          <div className="grid grid-cols-4 gap-2 text-xs">
+            <CostMetric label="Agent" value={current.agent_cost} />
+            <CostMetric label="Extract" value={current.extract_cost} />
+            <CostMetric label="Audio" value={current.audio_cost} />
+            <CostMetric label="Imagen" value={current.image_cost} />
+          </div>
+
+          {/* Breakdown del agent: auto (Haiku) vs mention (Sonnet) */}
+          {(current.agent_auto_cost || current.agent_mention_cost) && (
+            <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Auto (Haiku)</span>
+                <span className="tabular-nums font-medium">{fmt(current.agent_auto_cost)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Mention (Sonnet)</span>
+                <span className="tabular-nums font-medium">{fmt(current.agent_mention_cost)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function CostMetric({ label, value }: { label: string; value: number | null | undefined }) {
+  const fmt = (n: number | null | undefined) =>
+    n == null ? "—" : n < 1 ? `$${n.toFixed(3)}` : `$${n.toFixed(2)}`;
+  return (
+    <div className="rounded-md bg-muted/30 p-2">
+      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+      <p className="text-sm font-semibold tabular-nums">{fmt(value)}</p>
+    </div>
+  );
+}
+
+function DailyReportsList({ groupId }: { groupId: string }) {
+  const { data: reports, isLoading } = useWhatsappDailyReports(groupId, 14);
+  const [selected, setSelected] = useState<WhatsappDailyReport | null>(null);
+
+  if (isLoading) {
+    return <Card className="p-4 text-center text-xs text-muted-foreground">Cargando reportes…</Card>;
+  }
+  if (!reports || reports.length === 0) {
+    return (
+      <Card className="p-4 text-center text-xs text-muted-foreground">
+        Sin reportes todavía. Cuando alguien mande un reporte de jornada en el grupo (contactados, respuestas, etc), el bot lo guarda acá.
+      </Card>
+    );
+  }
+
+  // Agrupamos por fecha para mostrar las jornadas de a una.
+  const grouped = reports.reduce<Record<string, WhatsappDailyReport[]>>((acc, r) => {
+    (acc[r.report_date] ??= []).push(r);
+    return acc;
+  }, {});
+  const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+  return (
+    <>
+      <div className="space-y-3">
+        {dates.map((date) => {
+          const dayReports = grouped[date];
+          return (
+            <Card key={date} className="p-3">
+              <div className="flex items-baseline justify-between mb-2">
+                <p className="text-sm font-medium">
+                  {format(new Date(`${date}T12:00:00Z`), "EEEE d 'de' MMMM", { locale: es })}
+                </p>
+                <span className="text-[11px] text-muted-foreground">{dayReports.length} reporte{dayReports.length === 1 ? "" : "s"}</span>
+              </div>
+              <div className="space-y-2">
+                {dayReports.map((r) => (
+                  <ReportRow key={r.id} report={r} onClick={() => setSelected(r)} />
+                ))}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Dialog open={!!selected} onOpenChange={(v) => !v && setSelected(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Reporte de {selected?.profile?.full_name ?? "—"}
+            </DialogTitle>
+            <DialogDescription>
+              {selected && format(new Date(`${selected.report_date}T12:00:00Z`), "EEEE d 'de' MMMM yyyy", { locale: es })}
+              {" · "}
+              <Badge variant="outline" className="text-[10px]">{selected?.role_kind === "llg" ? "LLG" : "Closer Sup."}</Badge>
+            </DialogDescription>
+          </DialogHeader>
+          {selected && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                {selected.role_kind === "llg" ? (
+                  <>
+                    <Metric label="Contactados" value={selected.contactados} />
+                    <Metric label="Respuestas" value={selected.respuestas} />
+                    <Metric label="Números" value={selected.numeros_obtenidos} accent="positive" />
+                  </>
+                ) : (
+                  <>
+                    <Metric label="Contactados" value={selected.contactados} />
+                    <Metric label="Respuestas" value={selected.respuestas} />
+                    <Metric label="Confirmadas" value={selected.confirmadas} accent="positive" />
+                    <Metric label="Rechazadas" value={selected.rechazadas} />
+                    <Metric label="Cerradas" value={selected.cerradas} accent="positive" />
+                    <Metric label="Seguimientos" value={selected.seguimientos} />
+                  </>
+                )}
+              </div>
+              {selected.links && selected.links.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium mb-1">Links</p>
+                  <div className="space-y-1">
+                    {selected.links.map((url, i) => (
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        {url}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {selected.raw_text && (
+                <div>
+                  <p className="text-xs font-medium mb-1">Texto original</p>
+                  <Card className="p-2 bg-muted/30">
+                    <p className="text-xs whitespace-pre-wrap text-muted-foreground">{selected.raw_text}</p>
+                  </Card>
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground">
+                Capturado {format(new Date(selected.created_at), "d MMM HH:mm", { locale: es })}
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function ReportRow({ report, onClick }: { report: WhatsappDailyReport; onClick: () => void }) {
+  const name = report.profile?.full_name ?? "—";
+  const isLLG = report.role_kind === "llg";
+
+  // Resumen 1-línea de las métricas clave según el rol.
+  const summary = isLLG
+    ? `${report.contactados ?? "—"} contactados · ${report.respuestas ?? "—"} respuestas · ${report.numeros_obtenidos ?? "—"} números`
+    : `${report.contactados ?? "—"} contactados · ${report.confirmadas ?? 0} conf. · ${report.cerradas ?? 0} cerradas · ${report.rechazadas ?? 0} rech.`;
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left p-2 rounded-md hover:bg-muted/50 transition-colors flex items-center justify-between gap-3"
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <Badge variant={isLLG ? "secondary" : "outline"} className="text-[10px] shrink-0">
+          {isLLG ? "LLG" : "Closer"}
+        </Badge>
+        <span className="text-sm font-medium truncate">{name}</span>
+      </div>
+      <span className="text-xs text-muted-foreground shrink-0">{summary}</span>
+    </button>
+  );
+}
+
+function Metric({ label, value, accent }: { label: string; value: number | null; accent?: "positive" }) {
+  return (
+    <div className={cn(
+      "rounded-md p-2 text-center",
+      accent === "positive" ? "bg-emerald-500/10" : "bg-muted/30",
+    )}>
+      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+      <p className={cn(
+        "text-lg font-semibold tabular-nums",
+        accent === "positive" ? "text-emerald-700 dark:text-emerald-400" : undefined,
+      )}>
+        {value ?? "—"}
+      </p>
     </div>
   );
 }

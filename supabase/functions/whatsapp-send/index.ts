@@ -21,6 +21,11 @@ import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_sha
 const EVOLUTION_URL = Deno.env.get("WHATSAPP_EVOLUTION_URL") ?? "";
 const EVOLUTION_API_KEY = Deno.env.get("WHATSAPP_EVOLUTION_API_KEY") ?? "";
 const EVOLUTION_INSTANCE = Deno.env.get("WHATSAPP_EVOLUTION_INSTANCE") ?? "maven";
+// EVOLUTION_API_VERSION controla el shape del payload de /message/sendText:
+//   v1 (default): { number, options:{delay,presence}, textMessage:{text} }  ← Evolution v1.8.x
+//   v2:           { number, text }                                          ← Evolution v2.4.x
+// Cambiar cuando se haga el upgrade del contenedor a v2.
+const EVOLUTION_API_VERSION = Deno.env.get("WHATSAPP_EVOLUTION_API_VERSION") ?? "v1";
 
 interface SendRequest {
   // Modo ad-hoc.
@@ -46,6 +51,14 @@ async function sendViaEvolution(
     return { ok: false, error: "evolution_not_configured" };
   }
   const url = `${EVOLUTION_URL.replace(/\/$/, "")}/message/sendText/${EVOLUTION_INSTANCE}`;
+  // Payload depende de la versión de Evolution. Ver constante EVOLUTION_API_VERSION.
+  const payload = EVOLUTION_API_VERSION === "v2"
+    ? { number: groupExternalId, text: body }
+    : {
+        number: groupExternalId,
+        options: { delay: 0, presence: "composing" },
+        textMessage: { text: body },
+      };
   try {
     const resp = await fetch(url, {
       method: "POST",
@@ -53,10 +66,7 @@ async function sendViaEvolution(
         "Content-Type": "application/json",
         "apikey": EVOLUTION_API_KEY,
       },
-      body: JSON.stringify({
-        number: groupExternalId,
-        text: body,
-      }),
+      body: JSON.stringify(payload),
     });
     if (!resp.ok) {
       const txt = await resp.text();

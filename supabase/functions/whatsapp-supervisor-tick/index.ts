@@ -249,6 +249,362 @@ async function checkCloser(
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Invoca al whatsapp-agent en modo EOD summary. El agent leyó los mensajes
+// del día, las stats de Maven, y compone el cierre via reply_to_group.
+// ─────────────────────────────────────────────────────────────────────────
+async function invokeAgentForEod(groupId: string): Promise<void> {
+  const url = `${Deno.env.get("SUPABASE_URL")!}/functions/v1/whatsapp-agent`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}`,
+      "x-cron-token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "",
+    },
+    body: JSON.stringify({
+      group_id: groupId,
+      report_kind: "eod_summary",
+      invoked_by: "supervisor_tick_eod",
+    }),
+  });
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => "");
+    console.warn("invokeAgentForEod failed:", resp.status, txt.slice(0, 300));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Commitment follow-ups (tracking determinístico, $0 tokens LLM).
+// Detecta items en whatsapp_commitments que necesitan follow-up por tiempo
+// vencido y manda mensajes con templates hardcodeados al grupo.
+//
+// Reglas:
+//   1. meeting_followup: kind=meeting con due_at 1.5-3h atrás y sin
+//      menciones del target en mensajes posteriores -> "¿Cómo fue la X?"
+//   2. promise_overdue: kind=promise con due_at venció hace 1-6h -> ping
+//   3. tracking_stale: kind=tracking sin followup en 3+ días -> ping
+//   4. closer_contact_overdue: stage=Asignada con contacto cadencia
+//      (1,3,5,8,15,29) vencido y sin closer_contact_history nuevo -> ping
+//   5. confirmada_stale: stage=Confirmada hace 7+ días sin pasar a
+//      Completada -> pregunta por la firma
+//
+// Dedup via whatsapp_supervisor_state con check_kind único por (regla, target).
+// ─────────────────────────────────────────────────────────────────────────
+
+interface CommitmentRow {
+  id: string;
+  subject: string;
+  target_subject: string | null;
+  due_at: string | null;
+  item_kind: string;
+  committed_by_text: string | null;
+  last_followup_at: string | null;
+  followup_count: number | null;
+}
+
+// Helper: ¿Alguien menciono este target en el grupo en la ultima N hora?
+// Si si, no preguntamos (el grupo ya esta hablando del tema).
+async function recentlyMentioned(
+  sb: SupabaseClient,
+  groupId: string,
+  target: string,
+  sinceHoursAgo: number,
+): Promise<boolean> {
+  if (!target || target.length < 2) return false;
+  const since = new Date(Date.now() - sinceHoursAgo * 3600_000).toISOString();
+  const safe = target.replace(/[%_]/g, (m) => `\\${m}`);
+  const { count } = await sb
+    .from("whatsapp_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("group_id", groupId)
+    .gte("sent_at", since)
+    .ilike("body", `%${safe}%`);
+  return (count ?? 0) > 0;
+}
+
+async function sendFollowup(
+  sb: SupabaseClient,
+  group: GroupInfo,
+  checkKey: string,
+  message: string,
+): Promise<void> {
+  // Solo mandamos follow-ups en horario laboral del grupo. Si el grupo
+  // tiene RPC whatsapp_group_in_business_hours, lo usamos para gate. Si
+  // falla, default permitir (mejor pasarse de ruidoso que callado).
+  try {
+    const { data: isBH } = await sb.rpc("whatsapp_group_in_business_hours", { p_group_id: group.id });
+    if (isBH === false) return;
+  } catch (_e) { /* allow on RPC failure */ }
+
+  // Claim para dedup (UNIQUE en supervisor_state).
+  const today = bogotaNow().date;
+  const ok = await tryClaim(sb, group.tenant_id, checkKey, today, {});
+  if (!ok) return;
+  await sendToGroup(sb, group.id, message);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Alerta de ausencia no anunciada — al dueño en DM, no al grupo.
+// Si un user con schedule hoy no se reportó "activo" 30 min despues de
+// su start_time y no tiene day_off registrado → ping al owner.
+// ─────────────────────────────────────────────────────────────────────────
+async function checkUnannouncedAbsence(
+  sb: SupabaseClient,
+  group: GroupInfo,
+  now: { hhmm: string; weekday: number; date: string },
+): Promise<void> {
+  // Owner del tenant (uno solo asumimos para v1).
+  const { data: owners } = await sb
+    .from("profiles")
+    .select("id, full_name, whatsapp_lid")
+    .eq("is_owner", true)
+    .limit(1);
+  const owner = (owners ?? [])[0];
+  if (!owner?.whatsapp_lid) return; // sin owner verificado no podemos DM-ear
+
+  // Schedules de hoy con role llg/closer.
+  const { data: scheds } = await sb
+    .from("whatsapp_user_schedules")
+    .select("user_id, start_time, role_kind, profile:profiles!whatsapp_user_schedules_user_id_fkey(full_name, whatsapp_push_name)")
+    .eq("weekday", now.weekday);
+  if (!scheds || scheds.length === 0) return;
+
+  const nowM = timeToMinutes(now.hhmm);
+  const missing: string[] = [];
+
+  for (const s of scheds as Array<{
+    user_id: string;
+    start_time: string;
+    role_kind: string;
+    profile: { full_name: string | null; whatsapp_push_name: string | null } | null;
+  }>) {
+    const startM = timeToMinutes(s.start_time.slice(0, 5));
+    // Solo chequear entre +30 y +60 min del inicio (ventana estrecha, dedup natural).
+    if (nowM < startM + 30 || nowM > startM + 60) continue;
+
+    // ¿Tiene día libre hoy?
+    const { count: dayOff } = await sb
+      .from("whatsapp_user_time_off")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", s.user_id)
+      .eq("off_date", now.date);
+    if ((dayOff ?? 0) > 0) continue;
+
+    // ¿Ya se reportó activo hoy?
+    const { count: active } = await sb
+      .from("whatsapp_supervisor_state")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", s.user_id)
+      .eq("check_kind", "user_active")
+      .eq("check_date", now.date);
+    if ((active ?? 0) > 0) continue;
+
+    const display = s.profile?.whatsapp_push_name ?? s.profile?.full_name?.split(" ")[0] ?? "anon";
+    missing.push(display);
+  }
+
+  if (missing.length === 0) return;
+
+  // Claim para dedup (UNIQUE por user_id=owner+check_kind+date).
+  const ok = await tryClaim(sb, owner.id, `unannounced_absence:${now.hhmm}`, now.date, { missing });
+  if (!ok) return;
+
+  // DM al owner via gateway directo. Necesitamos el JID del owner.
+  const ownerJid = owner.whatsapp_lid;
+  const msg = `🚨 Ausencia no anunciada · *${group.tenant_id ? "Marketing/Ventas" : "grupo"}*\n\n` +
+    `Estos miembros del equipo no se han reportado activos hoy (>30 min del inicio):\n` +
+    missing.map((m) => `  · ${m}`).join("\n") +
+    `\n\n¿Sabés si están OK?`;
+  // Send via gateway directo (DM al owner, no al grupo).
+  try {
+    const gwUrl = Deno.env.get("WHATSAPP_EVOLUTION_URL") ?? "";
+    const gwKey = Deno.env.get("WHATSAPP_EVOLUTION_API_KEY") ?? "";
+    const gwInst = Deno.env.get("WHATSAPP_EVOLUTION_INSTANCE") ?? "maven-bot";
+    if (gwUrl && gwKey) {
+      await fetch(`${gwUrl}/message/sendText/${gwInst}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": gwKey },
+        body: JSON.stringify({ number: ownerJid.replace(/@.*/, ""), text: msg }),
+      });
+    }
+  } catch (e) {
+    console.warn("absence DM failed:", (e as Error).message);
+  }
+}
+
+async function checkCommitmentFollowups(
+  sb: SupabaseClient,
+  group: GroupInfo,
+): Promise<void> {
+  const now = Date.now();
+
+  // ── Regla 0: PRE-meeting reminder (15-45 min antes) ─────────────────
+  // Cuando hay un meeting agendado en los próximos 15-45 min, recordamos
+  // al responsable + traemos contexto del lead (handle Maven lookup).
+  const preMeetingFrom = new Date(now + 15 * 60_000).toISOString();
+  const preMeetingTo = new Date(now + 45 * 60_000).toISOString();
+  const { data: upcomingMeetings } = await sb
+    .from("whatsapp_commitments")
+    .select("id, subject, target_subject, due_at, item_kind, committed_by_text, last_followup_at, followup_count")
+    .eq("group_id", group.id)
+    .eq("item_kind", "meeting")
+    .eq("status", "pending")
+    .gte("due_at", preMeetingFrom)
+    .lte("due_at", preMeetingTo);
+  for (const m of (upcomingMeetings ?? []) as CommitmentRow[]) {
+    const target = m.target_subject ?? m.subject;
+    const handle = target.replace(/^@/, "").trim();
+    const who = m.committed_by_text ?? "equipo";
+
+    // Lookup en Maven para traer contexto del lead.
+    let context = "";
+    try {
+      const { data: lg } = await sb
+        .from("leadgen_entries")
+        .select("model_handle, quality, status, notes")
+        .ilike("model_handle", handle)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lg) {
+        const parts: string[] = [];
+        if (lg.quality) parts.push(`quality ${lg.quality}`);
+        if (lg.status) parts.push(`status ${lg.status}`);
+        if (parts.length > 0) context = ` Contexto Maven: ${parts.join(", ")}.`;
+      }
+    } catch (_e) { /* no context, no problem */ }
+
+    const due = m.due_at ? new Date(m.due_at).toLocaleTimeString("es-ES", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit" }) : "?";
+    const msg = `⏰ @${who}, en ~30 min reunión con @${handle} (${due} Bogotá).${context}`;
+    await sendFollowup(sb, group, `pre_meeting:${m.id}`, msg);
+  }
+
+  // ── Regla 1: meeting follow-up (due_at hace 1.5-3h) ─────────────────
+  const meetingFrom = new Date(now - 3 * 3600_000).toISOString();
+  const meetingTo = new Date(now - 1.5 * 3600_000).toISOString();
+  const { data: meetings } = await sb
+    .from("whatsapp_commitments")
+    .select("id, subject, target_subject, due_at, item_kind, committed_by_text, last_followup_at, followup_count")
+    .eq("group_id", group.id)
+    .eq("item_kind", "meeting")
+    .eq("status", "pending")
+    .gte("due_at", meetingFrom)
+    .lte("due_at", meetingTo);
+  for (const m of (meetings ?? []) as CommitmentRow[]) {
+    const target = m.target_subject ?? m.subject;
+    if (await recentlyMentioned(sb, group.id, target, 1)) continue;
+    const who = m.committed_by_text ?? "equipo";
+    const msg = `@${who}, ¿cómo fue la reunión con ${target.startsWith("@") ? target : "@" + target}? 👀`;
+    await sendFollowup(sb, group, `meeting_followup:${m.id}`, msg);
+  }
+
+  // ── Regla 2: promise overdue (due_at venció hace 1-6h) ──────────────
+  const promiseFrom = new Date(now - 6 * 3600_000).toISOString();
+  const promiseTo = new Date(now - 1 * 3600_000).toISOString();
+  const { data: promises } = await sb
+    .from("whatsapp_commitments")
+    .select("id, subject, target_subject, due_at, item_kind, committed_by_text, last_followup_at, followup_count")
+    .eq("group_id", group.id)
+    .eq("item_kind", "promise")
+    .eq("status", "pending")
+    .gte("due_at", promiseFrom)
+    .lte("due_at", promiseTo);
+  for (const p of (promises ?? []) as CommitmentRow[]) {
+    const target = p.target_subject ?? p.subject;
+    if (await recentlyMentioned(sb, group.id, target, 2)) continue;
+    const who = p.committed_by_text ?? "equipo";
+    const msg = `@${who}, te recuerdo: *${p.subject.slice(0, 100)}*. ¿Cómo va?`;
+    await sendFollowup(sb, group, `promise_overdue:${p.id}`, msg);
+  }
+
+  // ── Regla 3: tracking stale (sin followup en 3+ días) ────────────────
+  const staleThreshold = new Date(now - 3 * 24 * 3600_000).toISOString();
+  const { data: stale } = await sb
+    .from("whatsapp_commitments")
+    .select("id, subject, target_subject, due_at, item_kind, committed_by_text, last_followup_at, followup_count")
+    .eq("group_id", group.id)
+    .eq("item_kind", "tracking")
+    .eq("status", "pending")
+    .or(`last_followup_at.is.null,last_followup_at.lt.${staleThreshold}`)
+    .lt("created_at", staleThreshold);
+  for (const t of (stale ?? []) as CommitmentRow[]) {
+    const target = t.target_subject ?? t.subject;
+    if (await recentlyMentioned(sb, group.id, target, 12)) continue;
+    const who = t.committed_by_text ?? "equipo";
+    const msg = `@${who}, hace +3 días que no hay updates sobre *${t.subject.slice(0, 80)}*. ¿En qué quedó?`;
+    await sendFollowup(sb, group, `tracking_stale:${t.id}`, msg);
+  }
+
+  // ── Regla 4: closer_contact_overdue ─────────────────────────────────
+  // Para cada closer_creators stage='Asignada' con cadencia vencida en el
+  // contacto siguiente. Cadencia: días 1, 3, 5, 8, 15, 29 desde passed_date.
+  const cadence = [1, 3, 5, 8, 15, 29];
+  const { data: assigned } = await sb
+    .from("closer_creators")
+    .select("id, instagram_handle, assigned_to, passed_date")
+    .eq("stage", "Asignada")
+    .not("assigned_to", "is", null)
+    .not("passed_date", "is", null);
+  for (const cc of (assigned ?? []) as Array<{
+    id: string;
+    instagram_handle: string | null;
+    assigned_to: string | null;
+    passed_date: string | null;
+  }>) {
+    if (!cc.passed_date || !cc.assigned_to) continue;
+    const passedMs = new Date(cc.passed_date + "T00:00:00-05:00").getTime();
+    const daysSince = Math.floor((now - passedMs) / 86_400_000);
+    const { count: contactsDone } = await sb
+      .from("closer_contact_history")
+      .select("id", { count: "exact", head: true })
+      .eq("creator_id", cc.id);
+    const done = contactsDone ?? 0;
+    if (done >= 6) continue;
+    const nextDay = cadence[done];
+    if (nextDay == null || daysSince <= nextDay) continue;
+    // Vencido: averiguar el closer + mandar follow-up.
+    const { data: prof } = await sb
+      .from("profiles")
+      .select("whatsapp_push_name, full_name")
+      .eq("id", cc.assigned_to)
+      .maybeSingle();
+    const closerName = prof?.whatsapp_push_name ?? prof?.full_name?.split(" ")[0] ?? "closer";
+    const handle = cc.instagram_handle ?? "(sin handle)";
+    if (await recentlyMentioned(sb, group.id, handle, 12)) continue;
+    const msg = `@${closerName}, contacto día ${nextDay} con @${handle} vencido. ¿Ya la contactaste? Llevás ${done}/6 intentos.`;
+    await sendFollowup(sb, group, `closer_contact_overdue:${cc.id}:${nextDay}`, msg);
+  }
+
+  // ── Regla 5: confirmada_stale (confirmada hace 7+ días sin Completada) ─
+  const confirmedStaleCutoff = new Date(now - 7 * 24 * 3600_000).toISOString();
+  const { data: stuckConfirmed } = await sb
+    .from("closer_creators")
+    .select("id, instagram_handle, assigned_to, confirmed_date")
+    .eq("stage", "Confirmada")
+    .not("assigned_to", "is", null)
+    .lte("confirmed_date", confirmedStaleCutoff);
+  for (const cc of (stuckConfirmed ?? []) as Array<{
+    id: string;
+    instagram_handle: string | null;
+    assigned_to: string | null;
+    confirmed_date: string | null;
+  }>) {
+    if (!cc.assigned_to) continue;
+    const handle = cc.instagram_handle ?? "(sin handle)";
+    if (await recentlyMentioned(sb, group.id, handle, 24)) continue;
+    const { data: prof } = await sb
+      .from("profiles")
+      .select("whatsapp_push_name, full_name")
+      .eq("id", cc.assigned_to)
+      .maybeSingle();
+    const closerName = prof?.whatsapp_push_name ?? prof?.full_name?.split(" ")[0] ?? "closer";
+    const daysSince = cc.confirmed_date ? Math.floor((now - new Date(cc.confirmed_date).getTime()) / 86_400_000) : "?";
+    const msg = `@${closerName}, @${handle} lleva ${daysSince} días confirmada sin pasar a *Completada*. ¿Cómo va la firma?`;
+    await sendFollowup(sb, group, `confirmada_stale:${cc.id}`, msg);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Reporte cierre del día — al fin del turno más tardío
 // ─────────────────────────────────────────────────────────────────────────
 async function maybeEndOfDayReport(
@@ -272,50 +628,12 @@ async function maybeEndOfDayReport(
   const ok = await tryClaim(sb, group.tenant_id, "end_of_day_report", now.date, {});
   if (!ok) return;
 
-  // Recolectar stats de todos los users con schedule hoy.
-  const { data: usersToday } = await sb
-    .from("whatsapp_user_schedules")
-    .select("user_id, daily_goal, role_kind, profile:profiles!whatsapp_user_schedules_user_id_fkey(full_name, whatsapp_push_name)")
-    .eq("weekday", now.weekday);
-  if (!usersToday) return;
-
-  const llgLines: string[] = [];
-  const closerLines: string[] = [];
-  let totalClosedToday = 0;
-
-  for (const u of usersToday as Array<{
-    user_id: string;
-    daily_goal: number | null;
-    role_kind: "llg" | "closer";
-    profile: { full_name: string | null; whatsapp_push_name: string | null } | null;
-  }>) {
-    const display = u.profile?.whatsapp_push_name ?? u.profile?.full_name?.split(" ")[0] ?? "anon";
-    if (u.role_kind === "llg" && u.daily_goal !== null) {
-      const contacts = await getLlgContactsToday(sb, u.user_id, now.date);
-      const emoji = contacts >= u.daily_goal ? "✅" : contacts > 0 ? "⚠️" : "❌";
-      llgLines.push(`${display} ${contacts}/${u.daily_goal} ${emoji}`);
-    } else if (u.role_kind === "closer") {
-      const stats = await getCloserStatsToday(sb, u.user_id, now.date);
-      totalClosedToday += stats.closed;
-      closerLines.push(
-        `${display}: ${stats.calls} llamadas · ${stats.closed.toFixed(1)} cerradas · ${stats.confirmed} confirmadas`,
-      );
-    }
-  }
-
-  const lines: string[] = ["📊 *Cierre del día*"];
-  if (llgLines.length > 0) {
-    lines.push("");
-    lines.push("LLGs:");
-    for (const l of llgLines) lines.push(`  ${l}`);
-  }
-  if (closerLines.length > 0) {
-    lines.push("");
-    lines.push("Closers:");
-    for (const l of closerLines) lines.push(`  ${l}`);
-    lines.push(`  Total cerradas: ${totalClosedToday.toFixed(1)}`);
-  }
-  await sendToGroup(sb, group.id, lines.join("\n"));
+  // Delegamos la composición del mensaje al agent (whatsapp-agent con
+  // report_kind="eod_summary"). El agent lee mensajes del día, cruza con
+  // Maven, identifica gaps + achievements, y envía el resumen via
+  // reply_to_group. Ver sección "REPORTE FIN DE TURNO" en el system prompt
+  // del agent para el formato exacto.
+  await invokeAgentForEod(group.id);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -377,6 +695,20 @@ async function tick(sb: SupabaseClient): Promise<{ checked: number; sent: number
       await maybeEndOfDayReport(sb, g, now);
     } catch (e) {
       console.warn("end of day report failed:", (e as Error).message);
+    }
+
+    // Follow-ups deterministicos de commitments + closer pipeline.
+    try {
+      await checkCommitmentFollowups(sb, g);
+    } catch (e) {
+      console.warn("commitment followups failed:", (e as Error).message);
+    }
+
+    // Alerta al owner si alguien no se reportó activo.
+    try {
+      await checkUnannouncedAbsence(sb, g, now);
+    } catch (e) {
+      console.warn("unannounced absence check failed:", (e as Error).message);
     }
   }
 

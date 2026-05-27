@@ -1,0 +1,67 @@
+# Maven Baileys Gateway -- compose para Dokploy.
+#
+# Reemplaza al servicio Evolution. Usa nuestro propio wrapper Node sobre
+# Baileys (ver server.js). No requiere Postgres porque guardamos la auth
+# state de Baileys en un volumen Docker.
+#
+# DEPLOY EN DOKPLOY
+# -------------------------------------------
+# Opcion A (recomendada): Provider = Git, apuntando al repo maven-crm,
+#                         branch fix/notification-bell (o main post-merge),
+#                         Compose Path = infra/baileys-gateway/docker-compose.yml.
+#                         Dokploy clona, encuentra el Dockerfile relativo (`.`),
+#                         y buildea.
+#
+# Opcion B: Provider = Raw, pero entonces hay que cambiar el `build: .` por
+#           un `build: https://github.com/jhonjlopez-sudo/maven-crm.git#fix/notification-bell:infra/baileys-gateway`
+#           Funciona si el repo es publico.
+#
+# ENV VARS REQUERIDAS EN DOKPLOY (tab Environment):
+#   EVOLUTION_API_KEY -- la misma que ya estaba, la usamos como API_KEY del gateway
+#
+# POST-DEPLOY:
+#   1. Esperar a que el container este healthy (~30s).
+#   2. Abrir https://evolution.147-93-3-97.nip.io/instance/qr.html
+#      en cualquier browser -- muestra el QR para escanear.
+#   3. Escanear con el telefono del bot. La pagina se auto-refreshea.
+#   4. Cuando dice "connected", la session esta lista.
+#   5. Test: POST a /message/sendText/maven-bot debe devolver 200.
+#   6. En Supabase secrets: `WHATSAPP_EVOLUTION_API_VERSION=v2` (nuestro
+#      gateway prefiere el payload v2 plano pero acepta los dos).
+
+version: "3.8"
+
+services:
+  # Service name `evolution-api` mantiene compatibilidad con el Domain
+  # configurado en Dokploy (`evolution.147-93-3-97.nip.io` apunta a este
+  # service name). El container interno se llama maven-baileys.
+  evolution-api:
+    build: .
+    container_name: maven-baileys
+    restart: unless-stopped
+    environment:
+      API_KEY: ${EVOLUTION_API_KEY}
+      WEBHOOK_URL: https://lsagslbkliprespbyhts.supabase.co/functions/v1/whatsapp-ingest?provider=evolution&token=bdda3e08681dfb9e11ddc5017e22fc0942f497e9ab61de6d
+      INSTANCE_NAME: maven-bot
+      LOG_LEVEL: info
+      AUTH_DIR: /data/auth
+    expose:
+      - "8080"
+    volumes:
+      - baileys-auth:/data
+    networks:
+      - dokploy-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+volumes:
+  baileys-auth:
+    name: maven-baileys-auth
+
+networks:
+  dokploy-network:
+    external: true

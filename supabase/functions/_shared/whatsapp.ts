@@ -59,10 +59,14 @@ export function parseEvolutionApiMessage(payload: unknown): IncomingMessage | nu
   if (!key) return null;
 
   const remoteJid = String(key.remoteJid ?? "");
-  // Aceptamos tanto grupos (@g.us) como DMs privados (@s.whatsapp.net).
+  // Aceptamos:
+  //   - Grupos: @g.us
+  //   - DMs con teléfono real: @s.whatsapp.net (WhatsApp viejo)
+  //   - DMs con LID anónimo: @lid (WhatsApp moderno, post-2025-ish — anonimiza
+  //     incluso DMs 1-a-1 a un bot que no está agendado como contacto)
   // Las status updates (@broadcast) y otros tipos los ignoramos.
   const isGroup = remoteJid.endsWith("@g.us");
-  const isDirect = remoteJid.endsWith("@s.whatsapp.net");
+  const isDirect = remoteJid.endsWith("@s.whatsapp.net") || remoteJid.endsWith("@lid");
   if (!isGroup && !isDirect) return null;
 
   const externalId = String(key.id ?? "");
@@ -214,6 +218,79 @@ export const whatsappCors = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-cron-token, x-evolution-token",
 };
+
+// ----------------------------------------------------------------------------
+// sniffMimeFromBytes — detecta el MIME real mirando los magic bytes del
+// archivo descargado. Evolution API devuelve `application/octet-stream` en
+// el header HTTP para audios/imágenes, lo que rompe Whisper (Groq) y Gemini
+// Vision. Esta función inspecciona los primeros bytes y devuelve un MIME
+// confiable. Si no matchea ningún formato conocido, devuelve null y el
+// caller decide qué hacer (típicamente fallback al header HTTP o un default).
+//
+// Soporta: PNG, JPEG, GIF, WebP, OGG (Opus en WhatsApp), MP3, WAV, MP4/M4A.
+// ----------------------------------------------------------------------------
+export function sniffMimeFromBytes(bytes: Uint8Array): string | null {
+  if (bytes.length < 12) return null;
+
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+    return "image/png";
+  }
+  // JPEG: FF D8 FF
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+    return "image/jpeg";
+  }
+  // GIF: 47 49 46 38 (GIF8)
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+    return "image/gif";
+  }
+  // RIFF container: bytes 0-3 = "RIFF", bytes 8-11 = format ("WEBP" o "WAVE")
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+    if (bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+      return "image/webp";
+    }
+    if (bytes[8] === 0x57 && bytes[9] === 0x41 && bytes[10] === 0x56 && bytes[11] === 0x45) {
+      return "audio/wav";
+    }
+  }
+  // OGG: 4F 67 67 53 (OggS). WhatsApp manda Opus dentro de OGG.
+  if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
+    return "audio/ogg";
+  }
+  // MP3 con ID3 tag: "ID3"
+  if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) {
+    return "audio/mpeg";
+  }
+  // MP3 frame sync: FF Fx (Fx = FB/FA/F3/F2)
+  if (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) {
+    return "audio/mpeg";
+  }
+  // MP4/M4A: bytes 4-7 = "ftyp"
+  if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+    // Distinguimos audio (M4A) vs video (MP4) por brand bytes 8-11.
+    // Brands de audio: "M4A " (4D 34 41 20), "M4B " (...). Default a m4a.
+    if (bytes[8] === 0x4D && bytes[9] === 0x34) return "audio/mp4";
+    return "video/mp4";
+  }
+  return null;
+}
+
+// Helper combinado: dado un MIME del header HTTP + los bytes, devuelve el
+// MIME más confiable. Si el header dice octet-stream o está vacío, sniffea.
+export function resolveMimeType(
+  headerMime: string | null | undefined,
+  bytes: Uint8Array,
+  defaultMime: string,
+): string {
+  const cleaned = (headerMime ?? "").split(";")[0].trim().toLowerCase();
+  // Si el header da algo confiable (image/* o audio/* específico), lo usamos.
+  if (cleaned && cleaned !== "application/octet-stream" && cleaned !== "binary/octet-stream") {
+    return cleaned;
+  }
+  // Si no, sniffeamos.
+  const sniffed = sniffMimeFromBytes(bytes);
+  return sniffed ?? defaultMime;
+}
 
 // ----------------------------------------------------------------------------
 // authorizeCronOrJwt — chequea x-cron-token contra CRON_INTERNAL_TOKEN,

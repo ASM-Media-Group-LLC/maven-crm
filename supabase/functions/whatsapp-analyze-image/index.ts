@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_shared/whatsapp.ts";
+import { adminClient, authorizeCronOrJwt, logEvent, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
 import { logGeminiUsage } from "../_shared/usage.ts";
 
 // whatsapp-analyze-image — analiza imágenes del grupo con Gemini 2.5
@@ -77,8 +77,12 @@ async function downloadImage(url: string): Promise<{ data: Uint8Array; mime: str
     const buf = await resp.arrayBuffer();
     if (buf.byteLength === 0) return { error: "empty_image" };
     if (buf.byteLength > MAX_IMAGE_BYTES) return { error: "image_too_large" };
-    const mime = resp.headers.get("content-type") || "image/jpeg";
-    return { data: new Uint8Array(buf), mime };
+    const data = new Uint8Array(buf);
+    // Evolution API devuelve application/octet-stream para todas las medias.
+    // Sniffeamos los magic bytes para obtener el MIME real — Gemini Vision
+    // rechaza octet-stream con "Unsupported MIME type".
+    const mime = resolveMimeType(resp.headers.get("content-type"), data, "image/jpeg");
+    return { data, mime };
   } catch (e) {
     return { error: (e as Error).message };
   }
@@ -323,7 +327,41 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   // Disparar el extractor con el texto extraído.
   fireExtractCommitments(msg.id);
 
+  // Trigger del agent. Depende del bot_mode del grupo:
+  //   - mention: solo si el OCR/caption tiene mención explícita al bot
+  //   - always:  siempre que el análisis haya extraído contenido útil
+  //   - off:     nunca
+  const { data: group } = await sb
+    .from("whatsapp_groups")
+    .select("bot_enabled, bot_mode")
+    .eq("id", msg.group_id)
+    .maybeSingle();
+  if (group?.bot_enabled && group?.bot_mode !== "off") {
+    const ocrLower = (result.analysis.ocr_text ?? "").toLowerCase();
+    const hasMention =
+      ocrLower.includes("@maven") ||
+      ocrLower.includes("@bot") ||
+      ocrLower.includes("maven bot");
+    if (hasMention) {
+      fireAgent(msg.id, msg.group_id, "image_mention");
+    } else if (group.bot_mode === "always" && extractedText.trim().length >= 4) {
+      const { data: inHours } = await sb.rpc("whatsapp_group_in_business_hours", { p_group_id: msg.group_id });
+      if (inHours) fireAgent(msg.id, msg.group_id, "auto");
+    }
+  }
+
   return { ok: true };
+}
+
+function fireAgent(messageId: string, groupId: string, reason: "image_mention" | "auto"): void {
+  fetch(`${PROJECT_URL}/functions/v1/whatsapp-agent`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "",
+    },
+    body: JSON.stringify({ message_id: messageId, group_id: groupId, invoked_by: reason }),
+  }).catch((e) => console.warn("fireAgent failed:", (e as Error).message));
 }
 
 async function processBatch(batchSize: number): Promise<number> {

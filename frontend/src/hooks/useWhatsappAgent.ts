@@ -181,6 +181,89 @@ export function useWhatsappCommitments(groupId: string | null, status: WhatsappC
   });
 }
 
+export interface WhatsappDailyReport {
+  id: string;
+  user_id: string;
+  report_date: string;
+  role_kind: "llg" | "closer";
+  contactados: number | null;
+  respuestas: number | null;
+  numeros_obtenidos: number | null;
+  confirmadas: number | null;
+  rechazadas: number | null;
+  canceladas: number | null;
+  cerradas: number | null;
+  seguimientos: number | null;
+  links: string[] | null;
+  raw_text: string | null;
+  source_message_id: string | null;
+  group_id: string | null;
+  created_at: string;
+  // Join opcional con profiles
+  profile?: { full_name: string | null } | null;
+}
+
+export function useWhatsappDailyReports(groupId: string | null, days = 7) {
+  return useQuery({
+    queryKey: ["whatsapp", "daily-reports", groupId, days],
+    queryFn: async (): Promise<WhatsappDailyReport[]> => {
+      if (!groupId) return [];
+      const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      const { data, error } = await sb
+        .from("whatsapp_daily_reports")
+        .select(
+          "id, user_id, report_date, role_kind, contactados, respuestas, numeros_obtenidos, confirmadas, rechazadas, canceladas, cerradas, seguimientos, links, raw_text, source_message_id, group_id, created_at, profile:profiles(full_name)",
+        )
+        .eq("group_id", groupId)
+        .gte("report_date", since)
+        .order("report_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return (data as WhatsappDailyReport[]) ?? [];
+    },
+    enabled: !!groupId,
+    refetchInterval: 60_000,
+  });
+}
+
+export interface WhatsappCostRow {
+  tenant_id: string;
+  group_id: string;
+  month: string; // YYYY-MM-01
+  calls: number;
+  cost_usd: number;
+  agent_cost: number | null;
+  extract_cost: number | null;
+  audio_cost: number | null;
+  image_cost: number | null;
+  agent_auto_cost: number | null;
+  agent_mention_cost: number | null;
+}
+
+export function useWhatsappGroupCosts(groupId: string | null, monthsBack = 3) {
+  return useQuery({
+    queryKey: ["whatsapp", "costs", groupId, monthsBack],
+    queryFn: async (): Promise<WhatsappCostRow[]> => {
+      if (!groupId) return [];
+      const since = new Date();
+      since.setMonth(since.getMonth() - monthsBack);
+      since.setDate(1);
+      const sinceStr = since.toISOString().slice(0, 10);
+      const { data, error } = await sb
+        .from("whatsapp_costs_by_group_month")
+        .select("*")
+        .eq("group_id", groupId)
+        .gte("month", sinceStr)
+        .order("month", { ascending: false });
+      if (error) throw error;
+      return (data as WhatsappCostRow[]) ?? [];
+    },
+    enabled: !!groupId,
+    refetchInterval: 5 * 60_000,
+  });
+}
+
 export function useWhatsappBotEvents(groupId: string | null, limit = 50) {
   return useQuery({
     queryKey: ["whatsapp", "bot-events", groupId, limit],

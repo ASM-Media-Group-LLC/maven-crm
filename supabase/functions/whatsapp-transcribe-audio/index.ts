@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_shared/whatsapp.ts";
+import { adminClient, authorizeCronOrJwt, logEvent, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
 import { logGroqAudioUsage } from "../_shared/usage.ts";
 
 // whatsapp-transcribe-audio — transcribe audios del grupo con Whisper.
@@ -75,10 +75,15 @@ async function downloadAudio(url: string): Promise<Blob | { error: string }> {
   try {
     const resp = await fetch(url, { method: "GET" });
     if (!resp.ok) return { error: `download status ${resp.status}` };
-    const blob = await resp.blob();
-    if (blob.size === 0) return { error: "empty_audio" };
-    if (blob.size > MAX_AUDIO_BYTES) return { error: "audio_too_large" };
-    return blob;
+    // Leemos primero como ArrayBuffer para poder sniffear el MIME real.
+    // Evolution API devuelve application/octet-stream, lo que rompe Groq
+    // Whisper ("could not process file - is it a valid media file?").
+    const buf = await resp.arrayBuffer();
+    if (buf.byteLength === 0) return { error: "empty_audio" };
+    if (buf.byteLength > MAX_AUDIO_BYTES) return { error: "audio_too_large" };
+    const bytes = new Uint8Array(buf);
+    const mime = resolveMimeType(resp.headers.get("content-type"), bytes, "audio/ogg");
+    return new Blob([bytes], { type: mime });
   } catch (e) {
     return { error: (e as Error).message };
   }
@@ -195,14 +200,14 @@ function fireExtractCommitments(messageId: string): void {
   }).catch((e) => console.warn("fireExtractCommitments failed:", (e as Error).message));
 }
 
-function fireAgent(messageId: string, groupId: string): void {
+function fireAgent(messageId: string, groupId: string, reason: "audio_mention" | "auto"): void {
   fetch(`${PROJECT_URL}/functions/v1/whatsapp-agent`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Cron-Token": CRON_TOKEN,
     },
-    body: JSON.stringify({ message_id: messageId, group_id: groupId, invoked_by: "audio_mention" }),
+    body: JSON.stringify({ message_id: messageId, group_id: groupId, invoked_by: reason }),
   }).catch((e) => console.warn("fireAgent failed:", (e as Error).message));
 }
 
@@ -337,10 +342,23 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   // transcripto (el extractor lee transcribed_text cuando msg_type='audio').
   fireExtractCommitments(msg.id);
 
-  // Si el audio menciona al bot, también invocamos al agente. El agente
-  // validará bot_enabled antes de responder al grupo.
-  if (audioMentionsBot(result.text)) {
-    fireAgent(msg.id, msg.group_id);
+  // Trigger del agent. Depende del bot_mode del grupo:
+  //   - mention: solo si la transcripción menciona "maven", "el bot", etc
+  //   - always:  siempre que el audio tenga contenido sustantivo (>4 chars)
+  //   - off:     nunca
+  const { data: group } = await sb
+    .from("whatsapp_groups")
+    .select("bot_enabled, bot_mode")
+    .eq("id", msg.group_id)
+    .maybeSingle();
+  if (group?.bot_enabled && group?.bot_mode !== "off") {
+    if (audioMentionsBot(result.text)) {
+      fireAgent(msg.id, msg.group_id, "audio_mention");
+    } else if (group.bot_mode === "always" && result.text.trim().length >= 4) {
+      // Gate por horario laboral — mismo criterio que el ingest de texto.
+      const { data: inHours } = await sb.rpc("whatsapp_group_in_business_hours", { p_group_id: msg.group_id });
+      if (inHours) fireAgent(msg.id, msg.group_id, "auto");
+    }
   }
 
   return { ok: true };

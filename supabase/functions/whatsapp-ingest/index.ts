@@ -72,14 +72,14 @@ function authorize(req: Request, provider: "evolution" | "generic"): boolean {
 async function findOrCreateGroup(
   sb: SupabaseClient,
   msg: IncomingMessage,
-): Promise<{ id: string; tenant_id: string; bot_enabled: boolean } | null> {
+): Promise<{ id: string; tenant_id: string; bot_enabled: boolean; bot_mode: string } | null> {
   // Buscar por external_id. Si no existe, NO lo creamos automáticamente
   // — esto evita que cualquier grupo random que agreguen al bot empiece
   // a quemar tokens de Claude sin que un admin lo apruebe. Sí lo
   // logueamos para que el admin lo vea en el panel y lo active.
   const { data, error } = await sb
     .from("whatsapp_groups")
-    .select("id, tenant_id, bot_enabled, active")
+    .select("id, tenant_id, bot_enabled, active, bot_mode")
     .eq("external_id", msg.groupExternalId)
     .maybeSingle();
 
@@ -91,25 +91,28 @@ async function findOrCreateGroup(
   return data;
 }
 
-// Match con un user de Maven. Probamos dos estrategias:
-//   1. Por phone (si el sender JID termina en @s.whatsapp.net, los
-//      dígitos son el teléfono real). Solo funciona en DMs porque en
-//      grupos modernos el JID es @lid (anónimo).
-//   2. Por pushName del mensaje → profiles.whatsapp_push_name. Funciona
-//      en grupos cuando el user ya confirmó por DM y guardamos su pushName.
+// Match con un user de Maven en orden de confiabilidad:
+//   1. LID — el más confiable. Se popula cuando el user verifica via DM.
+//      Es estable per-user y aparece igual en DMs y grupos.
+//   2. Phone — para legacy (@s.whatsapp.net). Casi no aplica en grupos modernos.
+//   3. PushName — último recurso si nadie matchea por LID.
 async function resolveMavenUser(
   sb: SupabaseClient,
   jid: string,
   pushName: string | null | undefined,
 ): Promise<string | null> {
-  // Intento 1: phone (mejor signal — el JID tiene dígitos reales).
+  if (jid.endsWith("@lid")) {
+    try {
+      const { data } = await sb.rpc("whatsapp_resolve_user_by_lid", { p_lid: jid });
+      if (data) return data as string;
+    } catch (_e) { /* fallthrough */ }
+  }
   if (jid.endsWith("@s.whatsapp.net")) {
     try {
       const { data } = await sb.rpc("whatsapp_resolve_user_by_phone", { p_jid_or_phone: jid });
       if (data) return data as string;
     } catch (_e) { /* fallthrough */ }
   }
-  // Intento 2: pushName (único signal en grupos con @lid).
   if (pushName) {
     try {
       const { data } = await sb.rpc("whatsapp_resolve_user_by_push_name", { p_push_name: pushName });
@@ -171,35 +174,30 @@ async function upsertMember(
 // ----------------------------------------------------------------------------
 // DM handler — procesa mensajes privados al bot.
 // ----------------------------------------------------------------------------
-// Caso principal: el user respondió al DM de verificación. Si el body
-// matchea "SI" (o variantes), buscamos su profile por phone (extraído del
-// remoteJid que ES el teléfono real en DMs) y guardamos su pushName +
-// whatsapp_verified_at. Después le confirmamos por el mismo DM.
-//
-// Para cualquier otro contenido, ignoramos por ahora (no le respondemos
-// al user — no queremos que el bot empiece a conversar sin razón).
-const CONFIRM_TOKENS = [
-  "si", "sí", "yes", "ok", "okay", "dale", "confirmo", "soy yo", "es mío", "es mio",
-  "✅", "👍",
-];
+// El user responde al DM con un código de verificación que le mandamos
+// (ej. "AB3CDE"). Buscamos el código en whatsapp_verification_codes via
+// RPC `claim_whatsapp_verification_code` que atómicamente:
+//   - Valida que el código exista, no esté usado y no haya expirado.
+//   - Marca el código como usado.
+//   - Guarda el LID + pushName + verified_at en el profile.
+// Si el match falla, ignoramos (el user puede haber respondido cualquier
+// cosa). No le respondemos automáticamente al bot privado para evitar
+// loops y para no spamear.
 
-function isConfirmation(body: string | null): boolean {
-  if (!body) return false;
-  const normalized = body
-    .trim()
-    .toLowerCase()
-    .replace(/[.!?¿¡,;:]/g, "")
-    .slice(0, 30);
-  // Match exacto o "contiene" para casos como "si claro" / "sí, soy yo".
-  return CONFIRM_TOKENS.some((t) => normalized === t || normalized.startsWith(t + " "));
+// Regex del código: 6 chars del alphabet de send-verification-dm.
+const CODE_REGEX = /\b([ACDEFGHJKLMNPQRTUVWXY3479]{6})\b/i;
+
+function extractCode(body: string | null): string | null {
+  if (!body) return null;
+  const upper = body.toUpperCase();
+  const m = upper.match(CODE_REGEX);
+  return m ? m[1] : null;
 }
 
 async function processDirectMessage(
   sb: SupabaseClient,
   msg: IncomingMessage,
 ): Promise<{ kind: string; user_id?: string }> {
-  // Solo procesamos DMs de texto. Audios/imágenes los ignoramos —
-  // pidieron SI por escrito.
   if (msg.msgType !== "text" || !msg.body) {
     return { kind: "dm_ignored_non_text" };
   }
@@ -207,60 +205,46 @@ async function processDirectMessage(
     return { kind: "dm_ignored_own_message" };
   }
 
-  // Sacar el teléfono del JID. El sender es "<phone>@s.whatsapp.net" en DMs.
-  const digitsMatch = msg.senderExternalId.match(/^(\d+)@/);
-  if (!digitsMatch) return { kind: "dm_invalid_jid" };
-  const phoneDigits = digitsMatch[1];
-
-  // Buscar profile que tenga ese teléfono (matching por últimos 10 dígitos
-  // via el mismo RPC que usamos en upsertMember, así cubrimos casos de
-  // formato variado del E.164 guardado).
-  const { data: userId } = await sb.rpc("whatsapp_resolve_user_by_phone", {
-    p_jid_or_phone: phoneDigits,
-  });
-  if (!userId) return { kind: "dm_phone_not_in_profiles" };
-
-  if (!isConfirmation(msg.body)) {
-    return { kind: "dm_received_not_confirmation", user_id: userId as string };
+  const code = extractCode(msg.body);
+  if (!code) {
+    return { kind: "dm_received_no_code" };
   }
 
-  // Es confirmación: guardar pushName + verified_at en el profile.
+  // Claim atómico del código vía RPC. Si el código es válido devuelve
+  // el user_id; sino NULL (código no encontrado, ya usado o expirado).
+  const lid = msg.senderExternalId;
   const pushName = msg.senderDisplayName ?? null;
-  await sb
-    .from("profiles")
-    .update({
-      whatsapp_push_name: pushName,
-      whatsapp_verified_at: new Date().toISOString(),
-    })
-    .eq("id", userId as string);
+  const { data: userId, error } = await sb.rpc("claim_whatsapp_verification_code", {
+    p_code: code,
+    p_lid: lid,
+    p_push_name: pushName,
+  });
+  if (error) {
+    console.warn("claim_whatsapp_verification_code error:", error.message);
+    return { kind: "dm_claim_rpc_error" };
+  }
+  if (!userId) {
+    return { kind: "dm_code_invalid_or_expired" };
+  }
 
-  // Mandar respuesta al user confirmando — sin await para no bloquear.
-  fetch(`${PROJECT_URL}/functions/v1/whatsapp-send-verification-dm`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Cron-Token": Deno.env.get("CRON_INTERNAL_TOKEN") ?? "",
-    },
-    body: JSON.stringify({
-      user_id: userId as string,
-      _confirmation_reply: true,
-    }),
-  }).catch(() => {});
-
-  // Adicionalmente, mandamos un texto de confirmación directo al user.
+  // Confirmar al user por el mismo DM.
   const evolutionUrl = Deno.env.get("WHATSAPP_EVOLUTION_URL") ?? "";
   const evolutionKey = Deno.env.get("WHATSAPP_EVOLUTION_API_KEY") ?? "";
   const evolutionInstance = Deno.env.get("WHATSAPP_EVOLUTION_INSTANCE") ?? "maven-bot";
+  // v1 (default): payload con textMessage wrapper. v2: payload plano. Ver
+  // whatsapp-send/index.ts para el porqué.
+  const evolutionApiVersion = Deno.env.get("WHATSAPP_EVOLUTION_API_VERSION") ?? "v1";
+  // Para responder en DMs con LID, el destinatario es el LID mismo.
+  const replyTarget = lid.replace(/@.*/, "");
   if (evolutionUrl && evolutionKey) {
     const confirmText = "¡Listo! ✅ Quedaste vinculado en Maven.\n\nCuando escribas en los grupos del equipo donde estoy, ya te voy a reconocer.";
+    const confirmPayload = evolutionApiVersion === "v2"
+      ? { number: replyTarget, text: confirmText }
+      : { number: replyTarget, options: { delay: 0 }, textMessage: { text: confirmText } };
     fetch(`${evolutionUrl}/message/sendText/${evolutionInstance}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "apikey": evolutionKey },
-      body: JSON.stringify({
-        number: phoneDigits,
-        options: { delay: 0 },
-        textMessage: { text: confirmText },
-      }),
+      body: JSON.stringify(confirmPayload),
     }).catch(() => {});
   }
 
@@ -316,6 +300,60 @@ async function insertMessage(
   return { id: data.id, inserted: true };
 }
 
+// Detecta si el mensaje es un "check-in" del usuario al inicio del turno.
+// Patrones: "ya activo", "activa", "dispo", "ingresando", "ya entré", etc.
+// Solo aplica al PRIMER mensaje del día del usuario que matchea, así no
+// spameamos en cada confirmación.
+function isCheckIn(body: string | null): boolean {
+  if (!body) return false;
+  const lower = body.toLowerCase().trim();
+  if (lower.length > 60) return false; // check-ins son cortos
+  const patterns = [
+    /\bya\s+activ[oa]\b/i,
+    /\bactiv[oa]\s+tambi[eé]n\b/i,
+    /^\s*activ[oa]\s*[\.\!\,\s]*$/i,
+    /^\s*dispo(nible)?\s*[✅☑\!\.\s]*$/i,
+    /\bbuen(os)?\s+d[ií]as?[\s\.,!]*(ya\s+)?(activ[oa]|dispo|entré|ingres)/i,
+    /\bingresando\b/i,
+    /\bya\s+entr[eé]\b/i,
+    /\bya\s+empez[eé]\b/i,
+    /\bbuen(os)?\s+d[ií]as?\b.{0,30}(activ|dispo|entr|listo|aqui|aquí)/i,
+  ];
+  return patterns.some((p) => p.test(body));
+}
+
+// Registra el check-in del user en whatsapp_supervisor_state con un
+// check_kind único por (user, día). No bloqueante.
+async function maybeRegisterCheckIn(
+  sb: SupabaseClient,
+  msg: IncomingMessage,
+  memberId: string | null,
+): Promise<void> {
+  if (!memberId) return;
+  if (!isCheckIn(msg.body)) return;
+  // Resolver user_id desde member.
+  const { data: member } = await sb
+    .from("whatsapp_members")
+    .select("user_id")
+    .eq("id", memberId)
+    .maybeSingle();
+  if (!member?.user_id) return;
+  const today = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
+  try {
+    await sb.from("whatsapp_supervisor_state").insert({
+      user_id: member.user_id,
+      check_kind: "user_active",
+      check_date: today,
+      payload: {
+        message_id: msg.externalId,
+        sender_display_name: msg.senderDisplayName,
+        body_preview: msg.body?.slice(0, 100) ?? null,
+        at: msg.sentAt,
+      },
+    });
+  } catch (_e) { /* duplicate = already checked in today, fine */ }
+}
+
 // Dispara whatsapp-extract-commitments sin await. La function va a
 // procesar el mensaje y guardar compromisos en background.
 function fireExtractCommitments(messageId: string): void {
@@ -368,22 +406,267 @@ function fireAnalyzeImage(messageId: string): void {
   });
 }
 
-// Triggers whatsapp-agent (fire-and-forget) cuando un mensaje menciona
-// al bot. La heurística es laxa — cubrimos @maven, @bot, "maven bot" y
-// "@maven_bot". El agent function valida bot_enabled antes de responder.
-function shouldInvokeAgent(body: string | null): boolean {
+// Quick commands — respuestas hardcodeadas para mensajes muy frecuentes y
+// predecibles. Saltea el agent (Sonnet) → 0$, instantáneo, consistente.
+//
+// La presentación usa un flow especial (multi-mensaje + stats vivas). El
+// resto son templates fijos.
+type QuickCommand = "presentate" | "help" | "audit" | "eod" | null;
+
+function detectQuickCommand(body: string | null): QuickCommand {
+  if (!body) return null;
+  const presentate = [
+    /\bpres[eé]ntate\b/i,
+    /\bqui[eé]n\s+sos\b/i,
+    /\bqu[eé]\s+sos\b/i,
+    /\bqu[eé]\s+hac[eé]s\b/i,
+    /\bqu[eé]\s+sab[eé]s\s+hacer\b/i,
+    /\bqu[eé]\s+pod[eé]s\s+hacer\b/i,
+    /\bpara\s+qu[eé]\s+serv[ií]s\b/i,
+  ];
+  if (presentate.some((p) => p.test(body))) return "presentate";
+
+  const help = [
+    /^\s*[@/]?maven\s+\/?(help|ayuda|comandos)\b/i,
+    /^\s*\/(help|ayuda|comandos)\b/i,
+    /\bqu[eé]\s+comandos\b/i,
+  ];
+  if (help.some((p) => p.test(body))) return "help";
+
+  const audit = [
+    /\baudita(?:r|ndo)?\b/i,
+    /\bauditor[ií]a\b/i,
+    /\bsync\s+(?:el\s+)?historial\b/i,
+    /\bsincroniza\b/i,
+    /\bescanea(?:r)?\s+(?:el\s+)?historial\b/i,
+    /\brevisa\s+(?:el\s+)?historial\b/i,
+  ];
+  if (audit.some((p) => p.test(body))) return "audit";
+
+  const eod = [
+    /\bcierre(?:\s+(?:del|de)\s+(?:d[ií]a|jornada|turno))?\b/i,
+    /\bresumen\s+(?:del|de)\s+(?:d[ií]a|hoy|jornada|turno)\b/i,
+    /\bc[oó]mo\s+va\s+(?:el\s+)?(?:d[ií]a|equipo|jornada|turno)\b/i,
+    /\beod\b/i,
+  ];
+  if (eod.some((p) => p.test(body))) return "eod";
+
+  return null;
+}
+
+async function sendToGroup(groupId: string, body: string): Promise<void> {
+  const url = `${PROJECT_URL}/functions/v1/whatsapp-send`;
+  const token = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Cron-Token": token },
+      body: JSON.stringify({ group_id: groupId, body }),
+    });
+  } catch (e) {
+    console.warn("sendToGroup failed:", (e as Error).message);
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// Stats vivas del grupo para el mensaje de presentación.
+async function getGroupStats(sb: SupabaseClient, groupId: string): Promise<{
+  commitments: number;
+  reports: number;
+  ig_mentions: number;
+  days_off: number;
+}> {
+  const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+  const sinceDate = since.slice(0, 10);
+
+  const head = (q: { count: number | null }) => q.count ?? 0;
+
+  const [commitments, reports, igMentions, daysOff] = await Promise.all([
+    sb.from("whatsapp_commitments").select("id", { count: "exact", head: true })
+      .eq("group_id", groupId).gte("created_at", since).then(head),
+    sb.from("whatsapp_daily_reports").select("id", { count: "exact", head: true })
+      .eq("group_id", groupId).gte("created_at", since).then(head),
+    // Mensajes que mencionan algún handle de Instagram (proxy de "modelos analizadas")
+    sb.from("whatsapp_messages").select("id", { count: "exact", head: true })
+      .eq("group_id", groupId).gte("sent_at", since)
+      .or("body.ilike.%instagram.com/%,transcribed_text.ilike.%instagram.com/%")
+      .then(head),
+    // days_off: si quitamos el filtro de group, contamos todos los del tenant
+    // (los time_off no están atados a un grupo). Para el mensaje del grupo
+    // mostramos los registrados desde miembros del grupo.
+    sb.from("whatsapp_user_time_off").select("id", { count: "exact", head: true })
+      .gte("off_date", sinceDate).then(head),
+  ]);
+
+  return { commitments, reports, ig_mentions: igMentions, days_off: daysOff };
+}
+
+// Flow de presentación: 3 mensajes con sleeps + stats vivas.
+//
+// Si las stats del grupo son bajas (suma <5), usamos modo "recién llegado"
+// — sin mostrar números que harían ver al bot como inactivo. Cuando el
+// grupo acumule historial real, automáticamente switchea al mensaje
+// completo con stats.
+const FRESH_GROUP_THRESHOLD = 5;
+const CAPABILITIES_BLOCK =
+  "*Mis capacidades:*\n\n" +
+  "✅ *Compromisos* — capto promesas, reclamo seguimiento\n" +
+  "📊 *Reportes* — guardo métricas de cada jornada\n" +
+  "🤖 *Análisis IG* — followers, AI score, monetización estimada\n" +
+  "🔍 *Leads* — historial: ¿ya rechazada? ¿quién la trabajó?\n" +
+  "🏖️ *Ausencias* — registro días libres anunciados acá\n" +
+  "🕐 *Horarios* — sé quién trabaja ahora mismo";
+
+async function firePresentationFlow(sb: SupabaseClient, groupId: string): Promise<void> {
+  // 1) Hook inicial (mientras paralelamente queryamos stats)
+  const statsPromise = getGroupStats(sb, groupId);
+  await sendToGroup(groupId, "👀 *Acá estoy.*");
+
+  // 2) Pausa dramática + stats
+  await sleep(1500);
+  const stats = await statsPromise;
+  const totalActivity = stats.commitments + stats.reports + stats.ig_mentions + stats.days_off;
+  const isFreshGroup = totalActivity < FRESH_GROUP_THRESHOLD;
+
+  const body2 = isFreshGroup
+    ? (
+      "👋 *Soy Maven Asistente.*\n" +
+      "_Memoria persistente del equipo, 24/7._\n\n" +
+      "_Recién empiezo a operar en este grupo — pero ya puedo hacer todo esto desde el minuto cero:_\n\n" +
+      CAPABILITIES_BLOCK
+    )
+    : (
+      "👋 *Soy Maven Asistente.*\n" +
+      "_Memoria persistente del equipo, 24/7._\n\n" +
+      "*Lo que ya hice en este grupo (últimos 30 días):*\n" +
+      `• 📊 *${stats.reports}* reportes de jornada capturados\n` +
+      `• ✅ *${stats.commitments}* compromisos trackeados\n` +
+      `• 🔍 *${stats.ig_mentions}* menciones de IG cruzadas\n` +
+      `• 🏖️ *${stats.days_off}* días libres registrados\n\n` +
+      CAPABILITIES_BLOCK
+    );
+
+  await sendToGroup(groupId, body2);
+
+  // 3) CTA con 4 comandos demo (cubren las 4 capacidades clave)
+  await sleep(1200);
+  await sendToGroup(groupId,
+    "👇 *Probame con cualquiera:*\n\n" +
+    "🕐 `@maven horarios de hoy`\n" +
+    "✅ `@maven qué pendientes hay`\n" +
+    "🔍 `@maven historial de @<handle>`\n" +
+    "📊 `@maven cómo va el equipo`\n\n" +
+    "_o cualquier pregunta libre sobre el equipo._"
+  );
+}
+
+const HELP_REPLY =
+  "*Comandos rápidos:*\n\n" +
+  "• `@maven preséntate` — explico qué hago\n" +
+  "• `@maven horarios` — quién trabaja hoy\n" +
+  "• `@maven horario de [nombre]`\n" +
+  "• `@maven busca [@handle o teléfono]`\n" +
+  "• `@maven historial de [@handle]` — si pasó por la agencia antes\n" +
+  "• `@maven qué pendientes tiene [nombre]`\n" +
+  "• `@maven audita el grupo` — cruzo los últimos 30 días con Maven\n" +
+  "• `@maven cierre del día` — resumen del turno en vivo\n\n" +
+  "_Para reportes y anuncios de día libre, escribilo normal — los capto solo._";
+
+function fireAudit(groupId: string, requestedBy: string | null): void {
+  const url = `${PROJECT_URL}/functions/v1/whatsapp-audit-history`;
+  const token = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Cron-Token": token },
+    body: JSON.stringify({ group_id: groupId, since_days: 30, requested_by: requestedBy }),
+  }).catch((e) => console.warn("fireAudit failed:", (e as Error).message));
+}
+
+// Quick command "@maven cierre del día" → invoca al agent en modo
+// eod_summary on-demand. El agent lee el día + Maven y postea el reporte.
+function fireEodOnDemand(groupId: string): void {
+  const url = `${PROJECT_URL}/functions/v1/whatsapp-agent`;
+  const token = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+  fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}`,
+      "X-Cron-Token": token,
+    },
+    body: JSON.stringify({
+      group_id: groupId,
+      report_kind: "eod_summary",
+      invoked_by: "quick_command_eod",
+    }),
+  }).catch((e) => console.warn("fireEodOnDemand failed:", (e as Error).message));
+}
+
+// Detecta si el body menciona al bot. Usado en modo 'mention' (default).
+//
+// IMPORTANTE: WhatsApp prefija el display name con `~` cuando el contacto
+// que se menciona NO está agendado en la lista de contactos del que escribe.
+// Por eso el body puede llegar como "@~Maven" en lugar de "@maven" — hay que
+// matchear ambos. Tambien soportamos espacios y mayúsculas mixtas.
+function hasMention(body: string | null): boolean {
   if (!body) return false;
+  // Regex: @ + opcional ~ + 0..2 spaces + maven (case insensitive)
+  if (/@\s*~?\s*maven\b/i.test(body)) return true;
+  if (/@\s*~?\s*bot\b/i.test(body)) return true;
+  // Variantes sin @ pero referencia explícita.
   const lower = body.toLowerCase();
   return (
-    lower.includes("@maven") ||
-    lower.includes("@bot") ||
     lower.includes("maven bot") ||
     lower.includes("maven asistente") ||
     lower.includes("@maven_bot")
   );
 }
 
-function fireAgent(messageId: string, groupId: string): void {
+// Decide si invocar al agent y por qué motivo. Devuelve null si no hay que
+// invocar. Si devuelve un reason, fireAgent lo manda al edge function para
+// que el system prompt decida cómo comportarse.
+//
+// Para modo 'always' chequeamos también si el grupo está en horario laboral
+// vía RPC `whatsapp_group_in_business_hours`. Fuera de horario, el modo
+// always degrada efectivamente a mention-only — ahorra tokens en bursts
+// nocturnos / fines de semana sin miembros activos.
+async function resolveAgentTrigger(
+  sb: SupabaseClient,
+  group: { id: string; bot_enabled: boolean; bot_mode: string },
+  body: string | null,
+  isFromBot: boolean,
+): Promise<"mention" | "auto" | null> {
+  if (!group.bot_enabled) return null;
+  if (isFromBot) return null; // nunca respondemos a nuestros propios mensajes
+  if (group.bot_mode === "off") return null;
+
+  if (hasMention(body)) return "mention";
+
+  // En modo always, el agent se invoca con cualquier mensaje y decide él
+  // si vale la pena responder. Filtros baratos en el ingest para no quemar
+  // tokens:
+  //   1) mensajes muy cortos (saludos, emojis, "ok", "👍") se skipean
+  //   2) fuera de horario laboral, no se invoca (solo mention)
+  if (group.bot_mode === "always") {
+    const trimmed = (body ?? "").trim();
+    if (trimmed.length < 4) return null;
+
+    const { data: inHours, error } = await sb.rpc("whatsapp_group_in_business_hours", { p_group_id: group.id });
+    if (error) {
+      console.warn("business_hours RPC failed, defaulting to active:", error.message);
+      return "auto"; // failsafe: si la RPC falla, seguimos auto (no romper el bot)
+    }
+    if (!inHours) return null; // fuera de horario → bot calla
+    return "auto";
+  }
+
+  return null;
+}
+
+function fireAgent(messageId: string, groupId: string, reason: "mention" | "auto"): void {
   const url = `${PROJECT_URL}/functions/v1/whatsapp-agent`;
   const token = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
   fetch(url, {
@@ -392,7 +675,7 @@ function fireAgent(messageId: string, groupId: string): void {
       "Content-Type": "application/json",
       "X-Cron-Token": token,
     },
-    body: JSON.stringify({ message_id: messageId, group_id: groupId, invoked_by: "mention" }),
+    body: JSON.stringify({ message_id: messageId, group_id: groupId, invoked_by: reason }),
   }).catch((e) => {
     console.warn("fireAgent failed:", (e as Error).message);
   });
@@ -509,6 +792,11 @@ serve(async (req) => {
 
   const memberId = await upsertMember(sb, group, msg);
 
+  // Si el mensaje es un check-in de inicio de turno ("ya activo", "dispo", etc),
+  // registralo en supervisor_state para que la regla de "ausencia no anunciada"
+  // sepa que la persona ya entró. Idempotente por (user_id, día).
+  maybeRegisterCheckIn(sb, msg, memberId).catch(() => {});
+
   let messageId: string;
   let inserted: boolean;
   try {
@@ -559,12 +847,57 @@ serve(async (req) => {
       // Texto (o caption de imagen/video que cumple el min): directo
       // al extractor.
       fireExtractCommitments(messageId);
-      // Menciones al bot SOLO en texto — en audios/imágenes primero
-      // hay que tener el análisis para saber si nos mencionaron.
-      // whatsapp-transcribe-audio y whatsapp-analyze-image se ocupan
-      // de invocar al agente si detectan la mención.
-      if (shouldInvokeAgent(msg.body)) {
-        fireAgent(messageId, group.id);
+
+      // Quick commands antes que nada: si el mensaje es presentate/help,
+      // respondemos hardcodeado y skip al agent. Solo aplica si está
+      // mencionado al bot (para no responder presentaciones a mensajes random).
+      if (hasMention(msg.body) && group.bot_enabled) {
+        const cmd = detectQuickCommand(msg.body);
+        if (cmd === "presentate") {
+          // Fire-and-forget el flow multi-mensaje. Awaiteamos para que el
+          // edge function no se cierre antes de mandar los 3 mensajes
+          // (~3s total). Evolution acepta respuesta hasta 5s.
+          await firePresentationFlow(sb, group.id);
+          const body: IngestResponse = { ok: true, message_id: messageId };
+          return new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { ...whatsappCors, "Content-Type": "application/json" },
+          });
+        }
+        if (cmd === "help") {
+          await sendToGroup(group.id, HELP_REPLY);
+          const body: IngestResponse = { ok: true, message_id: messageId };
+          return new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { ...whatsappCors, "Content-Type": "application/json" },
+          });
+        }
+        if (cmd === "eod") {
+          // Fire-and-forget al agent en modo eod_summary. El agent investiga
+          // mensajes del día + Maven + manda el reporte via reply_to_group.
+          fireEodOnDemand(group.id);
+          const body: IngestResponse = { ok: true, message_id: messageId };
+          return new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { ...whatsappCors, "Content-Type": "application/json" },
+          });
+        }
+        if (cmd === "audit") {
+          // Fire-and-forget el audit (puede tardar 1-2 min). El audit
+          // function ya manda mensajes al grupo (inicio + resumen final).
+          fireAudit(group.id, msg.senderDisplayName ?? null);
+          const body: IngestResponse = { ok: true, message_id: messageId };
+          return new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { ...whatsappCors, "Content-Type": "application/json" },
+          });
+        }
+      }
+
+      // Trigger del agent: mention | auto | null según bot_mode del grupo.
+      const trigger = await resolveAgentTrigger(sb, group, msg.body, msg.isFromBot ?? false);
+      if (trigger) {
+        fireAgent(messageId, group.id, trigger);
       }
     }
   }

@@ -1,0 +1,160 @@
+# Evolution API v2.4.0-rc2 -- WhatsApp gateway para Maven Bot.
+#
+# CONTEXTO DEL UPGRADE (v1.8.2 -> v2.4.0-rc2)
+# -------------------------------------------
+# v1.8.2 (Baileys viejo) tiene un bug con LID (Linked Identity) contacts:
+# cuando llamamos sendText a un jid en formato `@lid`, Baileys hace
+# `onWhatsApp` validation que falla con "SessionError: No sessions" y
+# cierra la conexion. Esto rompe el bot en grupos modernos de WhatsApp
+# (post-2025) donde todos los participantes estan anonimizados con LID.
+#
+# El fix vive en PR #2544 (Baileys) que pasa el chequeo `onWhatsApp` para
+# `@lid`. Esa PR solo esta mergeada en Evolution v2.4.0-rc2 y posteriores.
+# No hay backport a v1.x estable. Por eso forzamos el upgrade aunque sea
+# pre-release.
+#
+# BREAKING CHANGES vs v1
+# -------------------------------------------
+# 1. Database obligatoria: v2 requiere Postgres (no MongoDB). Por eso este
+#    compose levanta un postgres:16-alpine al lado.
+# 2. License activation: v2 pide activar al primer arranque via el Manager
+#    UI (campo CLIENT_NAME + email). Es free para self-hosted, solo es un
+#    paso manual. Si no se activa, el manager bloquea las acciones.
+# 3. Payload shape de /message/sendText: cambia de
+#       v1: { number, options:{delay,presence}, textMessage:{text} }
+#       v2: { number, text }
+#    Las edge functions whatsapp-send y whatsapp-send-verification-dm ya
+#    soportan ambos formatos via la env WHATSAPP_EVOLUTION_API_VERSION
+#    (default "v1"). Flip a "v2" despues de upgrade.
+# 4. Endpoints de webhook events: nombres preservados, no requiere cambio
+#    en whatsapp-ingest.
+#
+# DEPLOY EN DOKPLOY
+# -------------------------------------------
+# El servicio Evolution ya existe en Dokploy (creado para v1.8.2). Para
+# upgradear:
+#   1. En Dokploy -> maven-evolution -> tab "General" -> "Compose File"
+#      -> reemplazar el YAML actual por TODO este contenido (desde
+#      `version: "3.8"` hasta el final).
+#   2. Tab "Environment" -> verificar que estan seteadas:
+#        EVOLUTION_API_KEY = (la actual, no rotar)
+#        POSTGRES_PASSWORD = (la actual)
+#   3. "Save" -> "Redeploy".
+#   4. Esperar logs OK (`API ready on port 8080`).
+#   5. Abrir https://evolution.147-93-3-97.nip.io -> activar licencia
+#      (free self-hosted, pide email).
+#   6. Crear instancia `maven-bot` desde el manager, escanear QR con el
+#      telefono dedicado al bot (+573225218180).
+#   7. En Supabase -> Edge Function Secrets:
+#        WHATSAPP_EVOLUTION_API_VERSION = v2
+#      (esto activa el payload nuevo en las funciones).
+#   8. Test end-to-end: mandar "@maven presentate" en el grupo
+#      Marketing/Ventas. El bot deberia responder.
+#
+# ROLLBACK
+# -------------------------------------------
+# Si v2 explota: cambiar la imagen abajo de `2.4.0-rc2` a `1.8.2`,
+# borrar el bloque postgres, restaurar EVOLUTION_API_VERSION=v1 en
+# Supabase. La data de la instancia se pierde (Baileys session local),
+# va a haber que rescanear QR. Pero no hay riesgo de data loss en
+# nuestro Supabase porque whatsapp_messages no se guarda en Evolution.
+
+version: "3.8"
+
+services:
+  evolution-api:
+    image: evoapicloud/evolution-api:2.4.0-rc2
+    container_name: maven-evolution
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
+      SERVER_TYPE: http
+      SERVER_PORT: 8080
+      # Headless license auto-activation (community tier, free para self-host).
+      # v2.4.0-rc1+ gatea TODOS los /instance/* endpoints con LICENSE_REQUIRED
+      # hasta que se active. Con esta env, el container llama al licensing
+      # server de Evolution Foundation al arranque y se auto-registra como
+      # tier "community". Sin esto, la UI muestra "Error: undefined" al
+      # crear instancia y el API devuelve 503 LICENSE_REQUIRED.
+      EVOLUTION_OPERATOR_EMAIL: jhon.j.lopez@unlok.me
+      # Postgres como datastore (mandatory en v2).
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: evolution_maven
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
+      DATABASE_SAVE_DATA_CHATS: "true"
+      DATABASE_SAVE_DATA_LABELS: "false"
+      DATABASE_SAVE_DATA_HISTORIC: "false"
+      # Cache: usamos cache local in-process (no Redis, no vale la pena
+      # para un solo bot).
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      LOG_LEVEL: "ERROR,WARN,INFO,LOG"
+      LOG_COLOR: "false"
+      # Webhook global: TODOS los eventos van a nuestro ingest en Supabase.
+      # El token de la query string es el WHATSAPP_EVOLUTION_SECRET; si
+      # se rota aca, hay que rotar tambien el secret de Supabase.
+      WEBHOOK_GLOBAL_URL: https://lsagslbkliprespbyhts.supabase.co/functions/v1/whatsapp-ingest?provider=evolution&token=bdda3e08681dfb9e11ddc5017e22fc0942f497e9ab61de6d
+      WEBHOOK_GLOBAL_ENABLED: "true"
+      WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS: "false"
+      WEBHOOK_EVENTS_QRCODE_UPDATED: "true"
+      WEBHOOK_EVENTS_CONNECTION_UPDATE: "true"
+      WEBHOOK_EVENTS_MESSAGES_UPSERT: "true"
+      # Como nos identificamos en la lista de "dispositivos vinculados"
+      # del telefono cuando se escanea el QR.
+      CONFIG_SESSION_PHONE_CLIENT: Maven Asistente
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      QRCODE_LIMIT: 30
+    expose:
+      - "8080"
+    volumes:
+      - evolution-instances:/evolution/instances
+      - evolution-store:/evolution/store
+    networks:
+      - dokploy-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: maven-evolution-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution-pg-data:/var/lib/postgresql/data
+    networks:
+      - dokploy-network
+    expose:
+      - "5432"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
+volumes:
+  evolution-instances:
+    name: maven-evolution-instances
+  evolution-store:
+    name: maven-evolution-store
+  evolution-pg-data:
+    name: maven-evolution-pg-data
+
+networks:
+  dokploy-network:
+    external: true
