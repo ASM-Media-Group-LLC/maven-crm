@@ -58,6 +58,17 @@ Estilo:
 - Si necesitás datos, llamás las tools — no inventes números
 - Si una pregunta no la podés responder con tus tools, decílo y proponé una alternativa
 
+NOMBRES DE PERSONAS (regla estricta):
+- SIEMPRE referite a los miembros del equipo por su PRIMER NOMBRE del profile de Maven: Daniel, Yeison, Miguel, Julieth, Gislaine, Alvaro, Luis. Nunca el apellido completo, nunca el display name de WhatsApp.
+- PROHIBIDO escribir "#21", "Jeison.", "Juli 💘💘", "Klei Mora" o cualquier otra forma cruda que venga del wpp. Si ves uno en el contexto, traducílo al primer nombre real.
+- Tabla de equivalencias comunes (no la rompas):
+  · "#21" → Daniel
+  · "Jeison." → Yeison
+  · "Juli 💘💘" → Julieth
+  · "Gislaine 💘✨" → Gislaine
+  · "Alvaro S" → Alvaro
+- Si no estás seguro del primer nombre real de alguien (no aparece en profile), usá el display name tal cual pero SIN emojis, sufijos raros, ni símbolos. Si igual no podés, decí "el miembro que mandó X" sin nombrarlo.
+
 Reglas:
 - Antes de tomar una acción que ESCRIBE (add_note_to_lead, resolve_commitment), confirmá con el usuario o asegurate de que la pidió explícito
 - Solo respondé en el grupo via reply_to_group al FINAL del razonamiento, una sola vez
@@ -893,20 +904,11 @@ async function executeTool(
         }
         const dn = (m.sender_display_name ?? "").trim();
         const fullName = m.sender_external_id ? idToFullName.get(m.sender_external_id) : undefined;
-        let senderRendered = dn || "(desconocido)";
-        if (fullName) {
-          const ambiguous = !dn || /^#\d+$/.test(dn) || /^\+?\d{6,}$/.test(dn);
-          if (ambiguous) {
-            senderRendered = `${fullName} (${dn || "?"})`;
-          } else {
-            const normDn = dn.toLowerCase().replace(/[^a-záéíóúñ]/gi, "");
-            const normFn = fullName.toLowerCase().replace(/[^a-záéíóúñ]/gi, "");
-            const fnFirst = normFn.split(" ")[0] ?? "";
-            if (!normFn.includes(normDn) && !(fnFirst && normDn.includes(fnFirst))) {
-              senderRendered = `${dn} [${fullName}]`;
-            }
-          }
-        }
+        // Usar PRIMER NOMBRE del profile cuando esté disponible. Cero
+        // "#21" o "Juli 💘💘" en outputs del bot.
+        const senderRendered = fullName
+          ? (fullName.split(" ")[0] ?? fullName)
+          : (dn || "(desconocido)");
         return {
           id: m.id,
           sender: senderRendered,
@@ -2137,23 +2139,16 @@ async function buildInitialUserMessage(args: {
     }
 
     // Helper local: render del nombre del sender. Si tenemos full_name del
-    // profile y difiere del display name (o el display name parece ambiguo
-    // tipo "#21" o un teléfono), lo mostramos con el full_name al lado.
+    // profile, usamos el PRIMER NOMBRE (Daniel, Yeison...). El display
+    // name del wpp ("#21", "Juli 💘💘") solo se usa si NO hay full_name.
     const renderSender = (displayName: string | null, externalId: string | null) => {
       const dn = (displayName ?? "").trim();
       const fullName = externalId ? idToFullName.get(externalId) : undefined;
-      if (!fullName) return dn || "(desconocido)";
-      // Si el display name es ambiguo (vacío, "#21", número crudo, parece teléfono),
-      // priorizamos el full_name como nombre primario.
-      const ambiguous = !dn || /^#\d+$/.test(dn) || /^\+?\d{6,}$/.test(dn);
-      if (ambiguous) return `${fullName} (${dn || "?"})`;
-      // Si difiere, mostramos ambos para que el bot pueda matchear con Maven.
-      const normalizedDn = dn.toLowerCase().replace(/[^a-záéíóúñ]/gi, "");
-      const normalizedFn = fullName.toLowerCase().replace(/[^a-záéíóúñ]/gi, "");
-      if (!normalizedFn.includes(normalizedDn) && !normalizedDn.includes(normalizedFn.split(" ")[0] ?? "")) {
-        return `${dn} [${fullName}]`;
+      if (fullName) {
+        const firstName = fullName.split(" ")[0] ?? fullName;
+        return firstName;
       }
-      return dn;
+      return dn || "(desconocido)";
     };
 
     // Helper local: texto efectivo del mensaje (transcribed_text para
@@ -2191,7 +2186,7 @@ async function buildInitialUserMessage(args: {
       lines.push(`[${msg.sent_at}] ${sender}: ${effectiveText(msg)}`);
     }
     lines.push("");
-    lines.push("Nota sobre nombres: cuando un nombre aparece como 'Nombre Real (apodo)' o 'apodo [Nombre Real]' significa que el display name en WhatsApp no coincide con el nombre canónico del miembro. Usá el nombre real (el del profile) cuando te refieras a la persona; ese es el que matchea con Maven, get_team_schedule, etc.");
+    lines.push("Nota sobre nombres: los senders mostrados acá ya son el PRIMER NOMBRE del miembro según su profile en Maven (Daniel, Yeison, Miguel, Julieth, etc). Usalos así tal cual cuando te refieras a ellos en el grupo. NUNCA escribas '#21', 'Jeison.', 'Juli 💘💘' u otros display names crudos de WhatsApp — los humanos del grupo se conocen por su primer nombre real.");
     lines.push("");
     lines.push(
       "Razoná, usá las tools que hagan falta y respondé al grupo via reply_to_group. " +
