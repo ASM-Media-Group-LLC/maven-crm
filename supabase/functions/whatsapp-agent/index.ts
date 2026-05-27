@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_shared/whatsapp.ts";
 import { logAnthropicUsage } from "../_shared/usage.ts";
 
@@ -144,6 +145,8 @@ REPORTES DE JORNADA:
 - Si display_name ambiguo, el bot debería intentar inferir del context — si dice "Reporte Daniel" → Daniel; si dice "Gislaine LG" al final → Gislaine; si no está claro, usá el sender_display_name del que escribe.
 - report_date = hoy en Bogotá salvo que diga "reporte de ayer" o similar.
 - Después de registrar, confirmá breve: "✓ Reporte de [nombre] registrado: [resumen 1 línea de las métricas clave]". No te extiendas.
+- IMPORTANTE: cuando un miembro NO envió reporte hoy y querés mencionarlo, decí "X no envió reporte aún" o "falta el reporte de X". NUNCA digas "no está linkeado en Maven" / "linkear cuando tengas" — el linkeo wpp↔Maven lo maneja el admin afuera del bot, no es tarea del grupo. Esos mensajes confunden y son falsos en 99% de los casos.
+- Si register_daily_report devuelve error "wpp_member_not_found" o "member_not_linked", NO escribas en el grupo sobre "linkear". Mejor reintentá la herramienta con el sender_display_name del mensaje, o con variaciones del nombre. Si igual falla, omití el reporte en silencio — no se lo digas al grupo.
 
 REPORTE FIN DE TURNO (cuando recibís report_kind="eod_summary"):
 
@@ -745,6 +748,84 @@ function parseInstagramHandle(raw: string): string | null {
   return cleaned;
 }
 
+// Resuelve un nombre humano (ej. "Daniel", "Miguel Garcia") a miembros
+// del grupo. Busca de DOS formas y mergea:
+//   1. whatsapp_members.display_name ILIKE %name% (cómo aparece en WPP)
+//   2. profiles.full_name ILIKE %name% (cómo está en Maven)
+//
+// Bug que motivó este helper: Daniel aparece en wpp como "#21" (contacto
+// no guardado), pero los reportes dicen "Reporte Daniel". El search por
+// display_name fallaba, el bot concluía "no está linkeado en Maven" y
+// pedía linkearlo. En realidad SÍ está linkeado, solo no matcheaba la
+// búsqueda. Ahora también busca por profiles.full_name.
+async function resolveMembersByName(
+  sb: SupabaseClient,
+  groupId: string,
+  name: string,
+  limit = 5,
+): Promise<Array<{ id: string; display_name: string; user_id: string | null; role: string | null; full_name: string | null }>> {
+  const trimmed = name.trim();
+  if (!trimmed) return [];
+  const safe = trimmed.replace(/[%_]/g, (m) => `\\${m}`);
+
+  const { data: byDisplay } = await sb
+    .from("whatsapp_members")
+    .select("id, display_name, user_id, role, last_seen_at")
+    .eq("group_id", groupId)
+    .ilike("display_name", `%${safe}%`)
+    .order("last_seen_at", { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  const { data: matchingProfiles } = await sb
+    .from("profiles")
+    .select("id, full_name")
+    .ilike("full_name", `%${safe}%`)
+    .limit(limit);
+  let byFullName: typeof byDisplay = [];
+  if (matchingProfiles && matchingProfiles.length > 0) {
+    const userIds = matchingProfiles.map((p) => p.id);
+    const { data: linkedMembers } = await sb
+      .from("whatsapp_members")
+      .select("id, display_name, user_id, role, last_seen_at")
+      .eq("group_id", groupId)
+      .in("user_id", userIds)
+      .order("last_seen_at", { ascending: false, nullsFirst: false })
+      .limit(limit);
+    byFullName = linkedMembers ?? [];
+  }
+
+  // Mergear ambas, deduplicar por member.id
+  const merged = new Map<string, typeof byDisplay[number]>();
+  for (const m of byDisplay ?? []) merged.set(m.id, m);
+  for (const m of byFullName) {
+    if (!merged.has(m.id)) merged.set(m.id, m);
+  }
+
+  // Cargar full_name de cada user_id
+  const userIds = Array.from(merged.values()).map((m) => m.user_id).filter((u): u is string => Boolean(u));
+  const profilesMap = new Map<string, string | null>();
+  if (userIds.length > 0) {
+    const { data: profs } = await sb.from("profiles").select("id, full_name").in("id", userIds);
+    for (const p of profs ?? []) profilesMap.set(p.id, p.full_name);
+  }
+
+  return Array.from(merged.values())
+    .sort((a, b) => {
+      if (!!a.user_id !== !!b.user_id) return a.user_id ? -1 : 1;
+      const ta = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
+      const tb = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
+      return tb - ta;
+    })
+    .slice(0, limit)
+    .map((m) => ({
+      id: m.id,
+      display_name: m.display_name,
+      user_id: m.user_id,
+      role: m.role,
+      full_name: m.user_id ? profilesMap.get(m.user_id) ?? null : null,
+    }));
+}
+
 async function executeTool(
   name: string,
   input: ToolInput,
@@ -916,23 +997,12 @@ async function executeTool(
       if (!displayName) return { error: "missing_display_name" };
       const since = new Date(Date.now() - sinceHours * 3600 * 1000).toISOString();
 
-      // 1. Buscar el wpp_member por display_name (ilike) en el grupo
-      //    actual. Si hay varios matches preferimos el que tenga user_id
-      //    seteado (link explícito de un admin). Esto cubre el caso "Mike"
-      //    y "Mike (closer)" coexistiendo.
-      const safe = displayName.replace(/[%_]/g, (m) => `\\${m}`);
-      const { data: members } = await sb
-        .from("whatsapp_members")
-        .select("id, display_name, user_id, role")
-        .eq("group_id", ctx.groupId)
-        .ilike("display_name", `%${safe}%`)
-        .order("last_seen_at", { ascending: false, nullsFirst: false })
-        .limit(5);
-
-      if (!members || members.length === 0) {
+      // 1. Buscar via helper (wpp display_name OR profiles full_name).
+      const members = await resolveMembersByName(sb, ctx.groupId, displayName);
+      if (members.length === 0) {
         return { error: "wpp_member_not_found", display_name: displayName };
       }
-      const member = members.find((m) => m.user_id) ?? members[0];
+      const member = members[0];
       if (!member.user_id) {
         return {
           error: "member_not_linked",
@@ -1052,17 +1122,24 @@ async function executeTool(
       const displayName = input.display_name ? String(input.display_name).trim() : null;
 
       // 1. Miembros del grupo linkeados a un user. Filtramos por display si vino.
-      let memberQ = sb
-        .from("whatsapp_members")
-        .select("display_name, user_id, role")
-        .eq("group_id", ctx.groupId)
-        .not("user_id", "is", null);
+      let members: Array<{ display_name: string; user_id: string | null; role: string | null }>;
       if (displayName) {
-        const safe = displayName.replace(/[%_]/g, (m) => `\\${m}`);
-        memberQ = memberQ.ilike("display_name", `%${safe}%`);
+        // Helper busca tanto en wpp.display_name como en profiles.full_name.
+        const matches = await resolveMembersByName(sb, ctx.groupId, displayName, 10);
+        members = matches.filter((m) => m.user_id).map((m) => ({
+          display_name: m.display_name,
+          user_id: m.user_id,
+          role: m.role,
+        }));
+      } else {
+        const { data } = await sb
+          .from("whatsapp_members")
+          .select("display_name, user_id, role")
+          .eq("group_id", ctx.groupId)
+          .not("user_id", "is", null);
+        members = data ?? [];
       }
-      const { data: members } = await memberQ;
-      if (!members || members.length === 0) {
+      if (members.length === 0) {
         return { error: "no_linked_members", target_date: targetDate, weekday };
       }
 
@@ -1168,20 +1245,12 @@ async function executeTool(
         return { error: "partial_requires_time", hint: "Pasá partial_start_time y/o partial_end_time" };
       }
 
-      // Resolver display_name → user_id (mismo patrón que get_member_maven_activity).
-      const safe = displayName.replace(/[%_]/g, (m) => `\\${m}`);
-      const { data: members } = await sb
-        .from("whatsapp_members")
-        .select("id, display_name, user_id")
-        .eq("group_id", ctx.groupId)
-        .ilike("display_name", `%${safe}%`)
-        .order("last_seen_at", { ascending: false, nullsFirst: false })
-        .limit(5);
-
-      if (!members || members.length === 0) {
+      // Resolver display_name → user_id via helper (wpp + full_name).
+      const members = await resolveMembersByName(sb, ctx.groupId, displayName);
+      if (members.length === 0) {
         return { error: "wpp_member_not_found", display_name: displayName };
       }
-      const member = members.find((m) => m.user_id) ?? members[0];
+      const member = members[0];
       if (!member.user_id) {
         return {
           error: "member_not_linked",
@@ -1366,17 +1435,10 @@ async function executeTool(
       if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) return { error: "invalid_report_date" };
       if (!["llg", "closer"].includes(roleKind)) return { error: "invalid_role_kind" };
 
-      // Resolver display_name → user_id
-      const safe = displayName.replace(/[%_]/g, (m) => `\\${m}`);
-      const { data: members } = await sb
-        .from("whatsapp_members")
-        .select("id, display_name, user_id")
-        .eq("group_id", ctx.groupId)
-        .ilike("display_name", `%${safe}%`)
-        .order("last_seen_at", { ascending: false, nullsFirst: false })
-        .limit(5);
-      if (!members || members.length === 0) return { error: "wpp_member_not_found", display_name: displayName };
-      const member = members.find((m) => m.user_id) ?? members[0];
+      // Resolver display_name → user_id (helper busca en wpp + full_name).
+      const members = await resolveMembersByName(sb, ctx.groupId, displayName);
+      if (members.length === 0) return { error: "wpp_member_not_found", display_name: displayName };
+      const member = members[0];
       if (!member.user_id) return { error: "member_not_linked", member: { display_name: member.display_name } };
 
       // Construir payload
@@ -1469,18 +1531,11 @@ async function executeTool(
       let closerUserId: string | null = null;
       let closerName = "equipo";
       if (displayName) {
-        const safe = displayName.replace(/[%_]/g, (m) => `\\${m}`);
-        const { data: members } = await sb
-          .from("whatsapp_members")
-          .select("display_name, user_id")
-          .eq("group_id", ctx.groupId)
-          .ilike("display_name", `%${safe}%`)
-          .order("last_seen_at", { ascending: false, nullsFirst: false })
-          .limit(3);
-        const m = (members ?? []).find((x) => x.user_id) ?? null;
+        const members = await resolveMembersByName(sb, ctx.groupId, displayName, 3);
+        const m = members.find((x) => x.user_id) ?? null;
         if (!m?.user_id) return { error: "closer_not_found_or_unlinked", display_name: displayName };
         closerUserId = m.user_id;
-        closerName = m.display_name ?? displayName;
+        closerName = m.full_name ?? m.display_name ?? displayName;
       }
 
       // Cadencia de los 6 contactos del closer (días desde passed_date).
@@ -1555,13 +1610,9 @@ async function executeTool(
       // Fecha objetivo: report_date input o hoy en Bogotá.
       const reportDate = String(input.report_date ?? "").trim()
         || new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
-      // Resolver user_id via whatsapp_members.
-      const { data: member } = await sb
-        .from("whatsapp_members")
-        .select("id, user_id, display_name")
-        .eq("group_id", ctx.groupId)
-        .ilike("display_name", `%${displayName}%`)
-        .maybeSingle();
+      // Resolver user_id via helper (busca en wpp + full_name).
+      const members = await resolveMembersByName(sb, ctx.groupId, displayName, 3);
+      const member = members.find((m) => m.user_id);
       if (!member?.user_id) {
         return {
           error: "user_not_linked",
