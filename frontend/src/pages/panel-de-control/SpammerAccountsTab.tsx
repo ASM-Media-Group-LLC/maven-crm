@@ -36,7 +36,19 @@ import {
   useSpammerAccounts,
   useUploadSpammerScreenshots,
   useRemoveSpammerScreenshot,
+  useDeleteSpammerAccount,
 } from "@/hooks/useSpammerAccounts";
+import { Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useTenantProfiles } from "@/hooks/useAgencyQa";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -419,15 +431,39 @@ const SpammerCard = ({
   const r = account.representative;
   const cfg = scoreCfg(r.ai_score);
   const isScanning = r.scan_status === "pending" || r.scan_status === "scanning";
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const deleteAccount = useDeleteSpammerAccount();
 
   return (
-    <button
-      type="button"
+    <>
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="group relative overflow-hidden rounded-2xl border border-border bg-card text-left shadow-sm transition-all duration-200 hover:scale-[1.015] hover:border-primary/40 hover:shadow-lg"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="group relative overflow-hidden rounded-2xl border border-border bg-card text-left shadow-sm transition-all duration-200 hover:scale-[1.015] hover:border-primary/40 hover:shadow-lg cursor-pointer"
     >
+      {/* Botón eliminar — arriba a la derecha. stopPropagation para no
+          disparar el onClick de la card (que abre el detalle). */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setConfirmDelete(true);
+        }}
+        title="Eliminar esta cuenta"
+        className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 transition-all hover:bg-rose-500/15 hover:text-rose-400 group-hover:opacity-100 focus:opacity-100"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+
       {/* Header: avatar + score circle */}
-      <div className="flex items-start gap-3 p-4">
+      <div className="flex items-start gap-3 p-4 pr-10">
         <Avatar src={r.profile_pic_url} fallback={r.instagram_handle} size={48} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -496,7 +532,39 @@ const SpammerCard = ({
           )}
         </div>
       )}
-    </button>
+    </div>
+
+    <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar @{r.instagram_handle}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta cuenta dejará de aparecer en "Mis Cuentas IG" y no se usará más
+            para outreach. Si la quemaron en IG y querés agregar una nueva,
+            primero eliminala acá.
+            <br /><br />
+            Si más de un scouter la tenía registrada, se elimina solo TU
+            registro — los demás siguen viéndola.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleteAccount.isPending}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={deleteAccount.isPending}
+            onClick={(e) => {
+              e.preventDefault();
+              deleteAccount.mutate(r.id, {
+                onSuccess: () => setConfirmDelete(false),
+              });
+            }}
+            className="bg-rose-600 hover:bg-rose-700 focus:ring-rose-600"
+          >
+            {deleteAccount.isPending ? "Eliminando..." : "Sí, eliminar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 };
 
