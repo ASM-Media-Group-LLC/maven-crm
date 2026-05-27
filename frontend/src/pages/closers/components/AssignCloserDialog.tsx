@@ -123,11 +123,13 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
 
   // Mutación: cuando el seleccionado es un contacto, lo convertimos a
   // closer_creator antes de asignar. Hace 3 cosas atómicas (best-effort):
-  //   1. INSERT en closer_creators con source_contact_id apuntando al
-  //      contacto y assigned_to ya seteado.
+  //   1. Si ya existe row en closer_creators con ese source_contact_id
+  //      (caso común: la creó un trigger al insertar el contact, o un
+  //      intento previo que sí pasó pero no marcó el contact como
+  //      converted), UPDATE assigned_to. Si no existe, INSERT.
   //   2. UPDATE closers_contacts.status = 'converted' para que no
   //      aparezca como pending la próxima vez.
-  //   3. Devuelve el creatorId nuevo al caller para que el parent siga
+  //   3. Devuelve el creatorId al caller para que el parent siga
   //      con su flow normal de asignación (que ya marca assigned_to).
   const convertContactAndAssign = useMutation({
     mutationFn: async (args: { contactId: string; closerId: string }) => {
@@ -142,29 +144,56 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("not_authenticated");
 
-      const { data: inserted, error: insertErr } = await supabase
+      // 1) ¿Ya existe una row en closer_creators para este contacto?
+      //    source_contact_id tiene UNIQUE, así que un INSERT plano
+      //    falla con "duplicate key value violates unique constraint".
+      const { data: existing, error: existingErr } = await supabase
         .from("closer_creators")
-        .insert({
-          instagram_handle: contact.handle || contact.name || "sin_handle",
-          phone: contact.phone,
-          category: contact.physical_appearance,
-          source_contact_id: contact.id,
-          assigned_to: args.closerId,
-          stage: "nuevo",
-          created_by: user.id,
-        })
         .select("id")
-        .single();
-      if (insertErr || !inserted) throw insertErr ?? new Error("insert_failed");
+        .eq("source_contact_id", contact.id)
+        .maybeSingle();
+      if (existingErr) throw existingErr;
 
-      // Marcar el contacto como convertido. Si falla, no rollback —
+      let creatorId: string;
+      if (existing) {
+        // Update — solo asignar el closer. Mantenemos stage / handle /
+        // resto de campos como estaban (puede ser que el creator ya
+        // tenga progreso del pipeline).
+        const { data: updated, error: updateErr } = await supabase
+          .from("closer_creators")
+          .update({ assigned_to: args.closerId })
+          .eq("id", existing.id)
+          .select("id")
+          .single();
+        if (updateErr || !updated) throw updateErr ?? new Error("update_failed");
+        creatorId = updated.id;
+      } else {
+        // Insert nuevo.
+        const { data: inserted, error: insertErr } = await supabase
+          .from("closer_creators")
+          .insert({
+            instagram_handle: contact.handle || contact.name || "sin_handle",
+            phone: contact.phone,
+            category: contact.physical_appearance,
+            source_contact_id: contact.id,
+            assigned_to: args.closerId,
+            stage: "nuevo",
+            created_by: user.id,
+          })
+          .select("id")
+          .single();
+        if (insertErr || !inserted) throw insertErr ?? new Error("insert_failed");
+        creatorId = inserted.id;
+      }
+
+      // 2) Marcar el contacto como convertido. Si falla, no rollback —
       // el creator ya existe y queda asignado, lo importante.
       await supabase
         .from("closers_contacts")
         .update({ status: "converted" })
         .eq("id", contact.id);
 
-      return inserted.id as string;
+      return creatorId;
     },
     onError: (e: Error) => {
       toast({

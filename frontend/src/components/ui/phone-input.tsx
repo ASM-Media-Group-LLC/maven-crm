@@ -8,13 +8,19 @@ import {
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+// IMPORTANTE: USA va antes que Canadá. Ambos comparten +1 — y como el parser
+// devuelve el PRIMER match, el orden importa. La agencia trabaja casi
+// exclusivamente con creadoras en USA, así que default a US es correcto.
+// Si el usuario explícitamente elige Canadá, el componente recuerda la
+// selección en state interno (ver `pickedISO` abajo).
 const COUNTRY_CODES = [
+  { code: "+1", country: "US", flag: "🇺🇸", name: "Estados Unidos" },
+  { code: "+1", country: "CA", flag: "🇨🇦", name: "Canadá" },
   { code: "+54", country: "AR", flag: "🇦🇷", name: "Argentina" },
   { code: "+61", country: "AU", flag: "🇦🇺", name: "Australia" },
   { code: "+501", country: "BZ", flag: "🇧🇿", name: "Belice" },
   { code: "+591", country: "BO", flag: "🇧🇴", name: "Bolivia" },
   { code: "+55", country: "BR", flag: "🇧🇷", name: "Brasil" },
-  { code: "+1", country: "CA", flag: "🇨🇦", name: "Canadá" },
   { code: "+56", country: "CL", flag: "🇨🇱", name: "Chile" },
   { code: "+86", country: "CN", flag: "🇨🇳", name: "China" },
   { code: "+57", country: "CO", flag: "🇨🇴", name: "Colombia" },
@@ -26,7 +32,6 @@ const COUNTRY_CODES = [
   { code: "+971", country: "AE", flag: "🇦🇪", name: "Emiratos Árabes" },
   { code: "+593", country: "EC", flag: "🇪🇨", name: "Ecuador" },
   { code: "+34", country: "ES", flag: "🇪🇸", name: "España" },
-  { code: "+1", country: "US", flag: "🇺🇸", name: "Estados Unidos" },
   { code: "+63", country: "PH", flag: "🇵🇭", name: "Filipinas" },
   { code: "+33", country: "FR", flag: "🇫🇷", name: "Francia" },
   { code: "+502", country: "GT", flag: "🇬🇹", name: "Guatemala" },
@@ -92,9 +97,24 @@ export function PhoneInput({
   disabled = false,
 }: PhoneInputProps) {
   const [open, setOpen] = React.useState(false);
+  // Recuerda la selección EXPLÍCITA del usuario (por click en el dropdown).
+  // El parser solo mira el string del value y para códigos compartidos
+  // como +1 (USA/Canadá) no puede distinguir. Sin este state, elegir
+  // Canadá se "perdería" en el siguiente render porque el parser
+  // devuelve siempre el primer match (USA).
+  const [pickedISO, setPickedISO] = React.useState<string | null>(null);
   const { countryCode, countryISO, number } = parsePhone(value);
 
+  // Si el usuario picó explícitamente un ISO y ese país comparte el
+  // countryCode actual (típico +1 → US o CA), respetamos su elección.
+  // Si el countryCode cambió (cambió de país), el pickedISO ya no aplica.
+  const effectiveISO = pickedISO &&
+    COUNTRY_CODES.some((c) => c.country === pickedISO && c.code === countryCode)
+    ? pickedISO
+    : countryISO;
+
   const handleSelect = (country: typeof COUNTRY_CODES[0]) => {
+    setPickedISO(country.country);
     onChange(`${country.code} ${number}`.trim());
     setOpen(false);
   };
@@ -104,7 +124,7 @@ export function PhoneInput({
     onChange(`${countryCode} ${num}`.trim());
   };
 
-  const selected = COUNTRY_CODES.find((c) => c.country === countryISO) ||
+  const selected = COUNTRY_CODES.find((c) => c.country === effectiveISO) ||
     COUNTRY_CODES.find((c) => c.code === countryCode) ||
     COUNTRY_CODES.find((c) => c.country === "CO")!;
 
@@ -138,7 +158,7 @@ export function PhoneInput({
                     <Check
                       className={cn(
                         "mr-2 h-4 w-4",
-                        selected.country === c.country ? "opacity-100" : "opacity-0"
+                        effectiveISO === c.country ? "opacity-100" : "opacity-0"
                       )}
                     />
                     {c.flag} {c.name} <span className="ml-auto text-muted-foreground text-xs">{c.code}</span>

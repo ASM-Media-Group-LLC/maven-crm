@@ -289,6 +289,34 @@ DECISIONES DEL OWNER (cuando habla [OWNER_MESSAGE] o quien tiene profiles.is_own
   5. Si la modelo NO está en Maven, simplemente confirmá la decisión: "✓ Cancelado. No la veo en Maven, no hace falta tocar nada ahí."
 - Si el owner asigna tarea a alguien ("Miguel, encargate de X"), eso lo capta el extractor como item_kind=task — no hace falta que el agent haga nada extra.
 
+ENTRENAMIENTO DEL BOT POR EL OWNER (solo cuando habla [OWNER_MESSAGE]):
+
+El owner puede ENSEÑARTE reglas que vas a aplicar de aquí en adelante. Esto solo lo puede hacer el owner; nadie más.
+
+CÓMO DETECTAR un mensaje de entrenamiento (no son acciones puntuales, son reglas generales):
+- "Siempre que aparezca un perfil con menos de 30K seguidores y sin OF, sugiere descartarlo"
+- "De ahora en adelante, cuando alguien reporte una confirmada sin link de IG, pedile el link"
+- "Cada vez que un closer mencione un cierre sin el monto, recordale poner el monto"
+- "Nunca recomiendes Trafix ni Ora Miami" (ya es una regla del prompt, pero el patrón es ese)
+- "Regla: si en el reporte EOD un LLG está bajo meta sin justificar, no lo expongas en público, mandame DM"
+- "Si Yeison vuelve a faltar sin avisar, registralo como ausencia injustificada"
+
+QUÉ HACER:
+1. Cuando detectes este tipo de mensaje, llamá add_persistent_rule con el rule_text redactado como una instrucción accionable clara, en español, en una o dos oraciones.
+2. Si el owner usa lenguaje vago, parafraseálo más limpio antes de guardarlo. Ej: "no me gustan los perfiles chiquitos" → rule_text="Cuando aparezca un perfil con <30K seguidores en IG, sugerí descartarlo a menos que tenga señales fuertes de calidad (look top, OF activo, engagement alto)".
+3. Confirmá UNA línea en el grupo: "✓ Anoté la regla: [resumen corto]. La voy a aplicar de ahora en más."
+4. Si la regla es temporal (ej. "por esta semana, dejá de molestar a Daniel con el feedback"), pasá expires_at en ISO format con la fecha correcta en Bogotá (sumá 5h al ISO local).
+5. Si el owner dice "olvidate de la regla X" o "esa regla ya no aplica", primero llamá list_rules para mostrarle las opciones; cuando esté claro cuál, llamá deactivate_rule(rule_id).
+6. Si el owner pregunta "¿qué reglas tenés?", llamá list_rules y mostrá la lista con IDs para que pueda referirse a ellas.
+
+QUÉ NO HACER:
+- NO crees reglas a partir de mensajes de NADIE que no sea el owner. Si un closer dice "siempre rechazo modelos sin OF", eso NO es una regla — solo opinión.
+- NO crees reglas a partir de mensajes regulares del owner que sean instrucciones puntuales (ej. "cancela esa modelo") — esas son acciones del momento, no reglas generales.
+- NO duplíques reglas. Si ya existe una regla muy parecida, decíselo al owner: "Ya tengo una similar: [texto]. ¿La actualizamos o agregamos esta como complemento?"
+
+REGLAS PERSISTENTES YA ACTIVAS:
+- Las reglas que el owner enseñó previamente se inyectan automáticamente al final del system prompt, en la sección "REGLAS PERSISTENTES DEL OWNER". Aplicálas estrictamente. Si una regla persistente entra en conflicto con una de las reglas generales del prompt, gana la del owner.
+
 LINK DE INSTAGRAM (auto-lookup proactivo):
 - CUANDO veas un link de IG (https://www.instagram.com/<handle> o instagram.com/<handle>) en cualquier mensaje del grupo, ANTES de hacer cualquier otra cosa:
   1. Extraé el handle del URL.
@@ -644,6 +672,42 @@ const TOOLS: Array<{
     },
   },
   {
+    name: "add_persistent_rule",
+    description:
+      "SOLO PARA EL OWNER. Registra una regla permanente que el bot debe aplicar de aquí en adelante en este grupo. Las reglas activas se inyectan en el system prompt en CADA invocación. Usala cuando el owner dice algo tipo 'siempre que aparezca X, hacé Y', 'de ahora en adelante hacé Z', 'nunca W', 'regla: ...', 'cada vez que pase X'. NO la uses para mensajes regulares del owner — solo cuando claramente está enseñando una regla. El rule_text debe quedar redactado como instrucción accionable en español (ej. 'Cuando aparezca un perfil con <30K seguidores y sin OF visible, sugerí descartar').",
+    input_schema: {
+      type: "object",
+      properties: {
+        rule_text: { type: "string", description: "la regla redactada como instrucción accionable en español, en una o dos oraciones" },
+        expires_at: { type: "string", description: "opcional: ISO timestamp si la regla es temporal (ej. '2026-12-31T23:59:59Z'). Omitir si es permanente." },
+      },
+      required: ["rule_text"],
+    },
+  },
+  {
+    name: "list_rules",
+    description:
+      "Lista las reglas persistentes activas de este grupo (las que enseñó el owner). Útil cuando el owner pregunta '¿qué reglas tenés?' o '¿qué te enseñé hasta ahora?'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        include_inactive: { type: "boolean", description: "si true incluye también las desactivadas (default false)" },
+      },
+    },
+  },
+  {
+    name: "deactivate_rule",
+    description:
+      "SOLO PARA EL OWNER. Desactiva una regla persistente por su ID. Usala cuando el owner dice 'olvidate de esa regla', 'la regla X ya no aplica', 'borrala'. Si el owner no especifica el ID claramente, primero llamá list_rules para mostrarle las opciones.",
+    input_schema: {
+      type: "object",
+      properties: {
+        rule_id: { type: "string", description: "el UUID de la regla a desactivar" },
+      },
+      required: ["rule_id"],
+    },
+  },
+  {
     name: "reply_to_group",
     description:
       "Manda la respuesta final al grupo de WhatsApp. Llamala UNA SOLA VEZ al final del razonamiento. El cuerpo debe ser corto (idealmente <500 chars), en español argentino, conciso.",
@@ -684,7 +748,7 @@ function parseInstagramHandle(raw: string): string | null {
 async function executeTool(
   name: string,
   input: ToolInput,
-  ctx: { groupId: string; tenantId: string },
+  ctx: { groupId: string; tenantId: string; isOwner: boolean; senderUserId: string | null; messageId: string | null },
 ): Promise<Record<string, unknown>> {
   const sb = adminClient();
 
@@ -700,13 +764,43 @@ async function executeTool(
       const safe = query.replace(/[%_]/g, (m) => `\\${m}`);
       const { data, error } = await sb
         .from("whatsapp_messages")
-        .select("id, sender_display_name, body, transcribed_text, msg_type, sent_at")
+        .select("id, sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
         .eq("group_id", ctx.groupId)
         .gte("sent_at", since)
         .or(`body.ilike.%${safe}%,transcribed_text.ilike.%${safe}%`)
         .order("sent_at", { ascending: false })
         .limit(limit);
       if (error) return { error: error.message };
+
+      // Enriquecer sender con full_name del profile cuando el display_name de
+      // WhatsApp es ambiguo ("#21", número crudo, etc).
+      const ids = new Set<string>();
+      for (const m of (data ?? [])) {
+        if (m.sender_external_id) ids.add(m.sender_external_id);
+      }
+      const idToFullName = new Map<string, string>();
+      if (ids.size > 0) {
+        const { data: members } = await sb
+          .from("whatsapp_members")
+          .select("external_id, user_id")
+          .eq("group_id", ctx.groupId)
+          .in("external_id", Array.from(ids));
+        const userIds = (members ?? [])
+          .map((mm) => mm.user_id)
+          .filter((u): u is string => Boolean(u));
+        if (userIds.length > 0) {
+          const { data: profs } = await sb
+            .from("profiles")
+            .select("id, full_name")
+            .in("id", userIds);
+          const profMap = new Map((profs ?? []).map((p) => [p.id, p.full_name]));
+          for (const mm of (members ?? [])) {
+            const fn = mm.user_id ? profMap.get(mm.user_id) : null;
+            if (fn) idToFullName.set(mm.external_id, fn);
+          }
+        }
+      }
+
       // Devolvemos un texto unificado por mensaje (el que tenga contenido).
       const matches = (data ?? []).map((m) => {
         let text: string | null;
@@ -716,9 +810,25 @@ async function executeTool(
         } else {
           text = m.body;
         }
+        const dn = (m.sender_display_name ?? "").trim();
+        const fullName = m.sender_external_id ? idToFullName.get(m.sender_external_id) : undefined;
+        let senderRendered = dn || "(desconocido)";
+        if (fullName) {
+          const ambiguous = !dn || /^#\d+$/.test(dn) || /^\+?\d{6,}$/.test(dn);
+          if (ambiguous) {
+            senderRendered = `${fullName} (${dn || "?"})`;
+          } else {
+            const normDn = dn.toLowerCase().replace(/[^a-záéíóúñ]/gi, "");
+            const normFn = fullName.toLowerCase().replace(/[^a-záéíóúñ]/gi, "");
+            const fnFirst = normFn.split(" ")[0] ?? "";
+            if (!normFn.includes(normDn) && !(fnFirst && normDn.includes(fnFirst))) {
+              senderRendered = `${dn} [${fullName}]`;
+            }
+          }
+        }
         return {
           id: m.id,
-          sender: m.sender_display_name,
+          sender: senderRendered,
           sent_at: m.sent_at,
           text,
         };
@@ -1625,6 +1735,81 @@ async function executeTool(
       return { error: "lead_not_found", handle };
     }
 
+    case "add_persistent_rule": {
+      // Solo el owner puede crear reglas. La protección vive acá en el dispatch
+      // (no en RLS) porque las edge functions usan service role y bypassan RLS.
+      if (!ctx.isOwner) {
+        return { error: "only_owner_can_add_rules" };
+      }
+      if (!ctx.senderUserId) {
+        return { error: "owner_user_id_not_resolved" };
+      }
+      const ruleText = String(input.rule_text ?? "").trim();
+      if (!ruleText) return { error: "empty_rule_text" };
+      const expiresAt = input.expires_at ? String(input.expires_at) : null;
+
+      const { data, error } = await sb
+        .from("whatsapp_bot_rules")
+        .insert({
+          group_id: ctx.groupId,
+          rule_text: ruleText,
+          created_by_user_id: ctx.senderUserId,
+          source_message_id: ctx.messageId,
+          expires_at: expiresAt,
+        })
+        .select("id, rule_text, created_at")
+        .single();
+      if (error) return { error: error.message };
+      return { ok: true, rule: data };
+    }
+
+    case "list_rules": {
+      const includeInactive = input.include_inactive === true;
+      let q = sb
+        .from("whatsapp_bot_rules")
+        .select("id, rule_text, active, created_at, deactivated_at, expires_at")
+        .eq("group_id", ctx.groupId)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (!includeInactive) q = q.eq("active", true);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      return { rules: data ?? [] };
+    }
+
+    case "deactivate_rule": {
+      if (!ctx.isOwner) {
+        return { error: "only_owner_can_deactivate_rules" };
+      }
+      if (!ctx.senderUserId) {
+        return { error: "owner_user_id_not_resolved" };
+      }
+      const ruleId = String(input.rule_id ?? "").trim();
+      if (!ruleId) return { error: "missing_rule_id" };
+
+      const { data: existing } = await sb
+        .from("whatsapp_bot_rules")
+        .select("id, group_id, active")
+        .eq("id", ruleId)
+        .maybeSingle();
+      if (!existing) return { error: "rule_not_found" };
+      if (existing.group_id !== ctx.groupId) {
+        return { error: "rule_belongs_to_other_group" };
+      }
+      if (!existing.active) return { ok: true, already_inactive: true };
+
+      const { error } = await sb
+        .from("whatsapp_bot_rules")
+        .update({
+          active: false,
+          deactivated_at: new Date().toISOString(),
+          deactivated_by_user_id: ctx.senderUserId,
+        })
+        .eq("id", ruleId);
+      if (error) return { error: error.message };
+      return { ok: true, rule_id: ruleId };
+    }
+
     case "reply_to_group": {
       const body = String(input.body ?? "").trim();
       if (!body) return { error: "empty_body" };
@@ -1648,6 +1833,71 @@ async function executeTool(
 }
 
 // ----------------------------------------------------------------------------
+// Load active persistent rules for a group. Excluye expiradas.
+// El resultado se inyecta en el system prompt del agent en cada invocación.
+// ----------------------------------------------------------------------------
+async function loadActiveRules(groupId: string): Promise<Array<{ id: string; rule_text: string }>> {
+  const sb = adminClient();
+  const nowIso = new Date().toISOString();
+  const { data, error } = await sb
+    .from("whatsapp_bot_rules")
+    .select("id, rule_text, expires_at")
+    .eq("group_id", groupId)
+    .eq("active", true)
+    .order("created_at", { ascending: true })
+    .limit(50);
+  if (error) return [];
+  return (data ?? [])
+    .filter((r) => !r.expires_at || r.expires_at > nowIso)
+    .map((r) => ({ id: r.id, rule_text: r.rule_text }));
+}
+
+// ----------------------------------------------------------------------------
+// Resolve sender context (owner check + user mapping) from a message_id.
+// Devuelve isOwner=false / senderUserId=null si no se puede mapear.
+// ----------------------------------------------------------------------------
+async function resolveSenderContext(args: {
+  groupId: string;
+  messageId: string | null | undefined;
+}): Promise<{
+  isOwner: boolean;
+  senderUserId: string | null;
+  messageId: string | null;
+}> {
+  if (!args.messageId) {
+    return { isOwner: false, senderUserId: null, messageId: null };
+  }
+  const sb = adminClient();
+  const { data: msg } = await sb
+    .from("whatsapp_messages")
+    .select("sender_external_id")
+    .eq("id", args.messageId)
+    .maybeSingle();
+  if (!msg?.sender_external_id) {
+    return { isOwner: false, senderUserId: null, messageId: args.messageId };
+  }
+  const { data: member } = await sb
+    .from("whatsapp_members")
+    .select("user_id")
+    .eq("group_id", args.groupId)
+    .eq("external_id", msg.sender_external_id)
+    .maybeSingle();
+  if (!member?.user_id) {
+    return { isOwner: false, senderUserId: null, messageId: args.messageId };
+  }
+  const { data: profile } = await sb
+    .from("profiles")
+    .select("is_owner")
+    .eq("id", member.user_id)
+    .maybeSingle();
+  return {
+    isOwner: profile?.is_owner === true,
+    senderUserId: member.user_id,
+    messageId: args.messageId,
+  };
+}
+
+// ----------------------------------------------------------------------------
 // Build initial user message
 // ----------------------------------------------------------------------------
 async function buildInitialUserMessage(args: {
@@ -1655,6 +1905,7 @@ async function buildInitialUserMessage(args: {
   groupId: string;
   groupName: string;
   timezone: string;
+  isOwner: boolean;
 }): Promise<string> {
   const lines: string[] = [];
   lines.push(`Grupo: ${args.groupName}`);
@@ -1688,35 +1939,72 @@ async function buildInitialUserMessage(args: {
       .eq("id", args.req.message_id)
       .single();
 
-    // ¿El sender es el dueño? Mirá si whatsapp_members tiene este sender
-    // mapeado a un user con profiles.is_owner = true. Si sí, marcamos
-    // el prompt con [OWNER_MESSAGE] para que el system_prompt active el
-    // modo "ultra resumido".
-    let isOwner = false;
-    if (msg?.sender_external_id) {
-      const { data: member } = await sb
-        .from("whatsapp_members")
-        .select("user_id")
-        .eq("group_id", args.groupId)
-        .eq("external_id", msg.sender_external_id)
-        .maybeSingle();
-      if (member?.user_id) {
-        const { data: profile } = await sb
-          .from("profiles")
-          .select("is_owner")
-          .eq("id", member.user_id)
-          .maybeSingle();
-        isOwner = profile?.is_owner === true;
-      }
-    }
+    // isOwner ya viene resuelto desde runAgent (resolveSenderContext) para
+    // poder pasárselo a executeTool. Acá solo lo usamos para decidir si
+    // inyectamos el marcador [OWNER_MESSAGE] en el prompt.
+    const isOwner = args.isOwner;
 
     const { data: ctx } = await sb
       .from("whatsapp_messages")
-      .select("sender_display_name, body, transcribed_text, msg_type, sent_at")
+      .select("sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
       .eq("group_id", args.groupId)
       .lt("sent_at", msg?.sent_at ?? new Date().toISOString())
       .order("sent_at", { ascending: false })
       .limit(10);
+
+    // Enriquecer sender_display_name con el full_name del profile cuando el
+    // display name de WhatsApp es ambiguo ("#21", número crudo, apodos como
+    // "Jeison." que en realidad es Yeison). Así el bot puede identificar a
+    // la persona REAL aunque WhatsApp no tenga su contacto guardado.
+    const externalIds = new Set<string>();
+    if (msg?.sender_external_id) externalIds.add(msg.sender_external_id);
+    for (const c of (ctx ?? [])) {
+      if (c.sender_external_id) externalIds.add(c.sender_external_id);
+    }
+    const idToFullName = new Map<string, string>();
+    if (externalIds.size > 0) {
+      const { data: members } = await sb
+        .from("whatsapp_members")
+        .select("external_id, user_id, display_name")
+        .eq("group_id", args.groupId)
+        .in("external_id", Array.from(externalIds));
+      const userIds = (members ?? [])
+        .map((m) => m.user_id)
+        .filter((u): u is string => Boolean(u));
+      let profiles: Array<{ id: string; full_name: string | null }> = [];
+      if (userIds.length > 0) {
+        const { data: profs } = await sb
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", userIds);
+        profiles = profs ?? [];
+      }
+      const profileMap = new Map(profiles.map((p) => [p.id, p.full_name]));
+      for (const m of (members ?? [])) {
+        const fullName = m.user_id ? profileMap.get(m.user_id) : null;
+        if (fullName) idToFullName.set(m.external_id, fullName);
+      }
+    }
+
+    // Helper local: render del nombre del sender. Si tenemos full_name del
+    // profile y difiere del display name (o el display name parece ambiguo
+    // tipo "#21" o un teléfono), lo mostramos con el full_name al lado.
+    const renderSender = (displayName: string | null, externalId: string | null) => {
+      const dn = (displayName ?? "").trim();
+      const fullName = externalId ? idToFullName.get(externalId) : undefined;
+      if (!fullName) return dn || "(desconocido)";
+      // Si el display name es ambiguo (vacío, "#21", número crudo, parece teléfono),
+      // priorizamos el full_name como nombre primario.
+      const ambiguous = !dn || /^#\d+$/.test(dn) || /^\+?\d{6,}$/.test(dn);
+      if (ambiguous) return `${fullName} (${dn || "?"})`;
+      // Si difiere, mostramos ambos para que el bot pueda matchear con Maven.
+      const normalizedDn = dn.toLowerCase().replace(/[^a-záéíóúñ]/gi, "");
+      const normalizedFn = fullName.toLowerCase().replace(/[^a-záéíóúñ]/gi, "");
+      if (!normalizedFn.includes(normalizedDn) && !normalizedDn.includes(normalizedFn.split(" ")[0] ?? "")) {
+        return `${dn} [${fullName}]`;
+      }
+      return dn;
+    };
 
     // Helper local: texto efectivo del mensaje (transcribed_text para
     // audios/imágenes cuando ya está procesado, body en otro caso).
@@ -1735,7 +2023,10 @@ async function buildInitialUserMessage(args: {
     lines.push("Contexto reciente (orden cronológico):");
     for (const m of (ctx ?? []).reverse()) {
       const text = effectiveText(m);
-      if (text) lines.push(`[${m.sent_at}] ${m.sender_display_name}: ${text}`);
+      if (text) {
+        const sender = renderSender(m.sender_display_name, m.sender_external_id);
+        lines.push(`[${m.sent_at}] ${sender}: ${text}`);
+      }
     }
     lines.push("");
     if (isOwner) {
@@ -1746,8 +2037,11 @@ async function buildInitialUserMessage(args: {
     }
     lines.push("Mensaje al cual debés responder:");
     if (msg) {
-      lines.push(`[${msg.sent_at}] ${msg.sender_display_name}: ${effectiveText(msg)}`);
+      const sender = renderSender(msg.sender_display_name, msg.sender_external_id);
+      lines.push(`[${msg.sent_at}] ${sender}: ${effectiveText(msg)}`);
     }
+    lines.push("");
+    lines.push("Nota sobre nombres: cuando un nombre aparece como 'Nombre Real (apodo)' o 'apodo [Nombre Real]' significa que el display name en WhatsApp no coincide con el nombre canónico del miembro. Usá el nombre real (el del profile) cuando te refieras a la persona; ese es el que matchea con Maven, get_team_schedule, etc.");
     lines.push("");
     lines.push(
       "Razoná, usá las tools que hagan falta y respondé al grupo via reply_to_group. " +
@@ -1812,15 +2106,34 @@ async function runAgent(req: AgentRequest): Promise<{
     payload: { req, invoked_by: req.invoked_by },
   });
 
-  const systemPrompt = group.bot_persona
+  // Resolver sender context (isOwner, user_id) ANTES de armar prompt, porque
+  // necesitamos pasárselo a executeTool para que add_persistent_rule /
+  // deactivate_rule sepan si el caller es el owner.
+  const senderCtx = await resolveSenderContext({
+    groupId: group.id,
+    messageId: req.message_id ?? null,
+  });
+
+  // Cargar reglas persistentes activas del grupo para inyectarlas en el system
+  // prompt — así el modelo las aplica en CADA invocación sin que el caller
+  // haga nada extra.
+  const activeRules = await loadActiveRules(group.id);
+
+  const systemPromptBase = group.bot_persona
     ? `${SYSTEM_PROMPT}\n\nPersonalización del grupo:\n${group.bot_persona}`
     : SYSTEM_PROMPT;
+  const systemPrompt = activeRules.length > 0
+    ? `${systemPromptBase}\n\nREGLAS PERSISTENTES DEL OWNER (este grupo):\n${
+        activeRules.map((r, i) => `${i + 1}. [id=${r.id}] ${r.rule_text}`).join("\n")
+      }\n\nAplicálas estrictamente. Si en algún momento entran en conflicto con tus reglas generales, las del owner ganan. Si vas a violarlas, no lo hagas — preguntá al owner.`
+    : systemPromptBase;
 
   const initialUser = await buildInitialUserMessage({
     req,
     groupId: group.id,
     groupName: group.name,
     timezone: group.timezone,
+    isOwner: senderCtx.isOwner,
   });
 
   // Loop messages array per Anthropic spec.
@@ -1887,6 +2200,9 @@ async function runAgent(req: AgentRequest): Promise<{
         await executeTool("reply_to_group", { body: replyText }, {
           groupId: group.id,
           tenantId: group.tenant_id,
+          isOwner: senderCtx.isOwner,
+          senderUserId: senderCtx.senderUserId,
+          messageId: senderCtx.messageId,
         });
         finalReply = replyText;
       }
@@ -1901,7 +2217,13 @@ async function runAgent(req: AgentRequest): Promise<{
       const result = await executeTool(
         String(t.name),
         (t.input as ToolInput) ?? {},
-        { groupId: group.id, tenantId: group.tenant_id },
+        {
+          groupId: group.id,
+          tenantId: group.tenant_id,
+          isOwner: senderCtx.isOwner,
+          senderUserId: senderCtx.senderUserId,
+          messageId: senderCtx.messageId,
+        },
       );
       if (t.name === "reply_to_group") {
         finalReply = String((t.input as ToolInput).body ?? "");
