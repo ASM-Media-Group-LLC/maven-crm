@@ -25,13 +25,21 @@ export const COMBINED_ROLE_SENTINEL = "__combined__";
 
 export const ROLE_TO_MODULE: Record<string, ReportModule> = {
   closer: "closers",
+  // Closer Supervisor es un superset de closer: mismas métricas + permisos
+  // de supervisión. El equipo migró cerradores legacy a este rol custom.
+  "Closer Supervisor": "closers",
   "Chatter Supervisor": "chatters",
+  // Chatter individual (rol custom, sin supervisión)
+  Chatter: "chatters",
+  // LLG custom rol — equivalente a employee/spammer pero más descriptivo.
+  LLG: "llg",
   employee: "llg",
   spammer: "llg",
   agent: "llg",
   admin: "llg",
   manager: "llg",
   supervisor: "llg",
+  coordinator_beta: "llg",
   [COMBINED_ROLE_SENTINEL]: "combined",
 };
 

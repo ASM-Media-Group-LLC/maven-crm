@@ -47,7 +47,11 @@ const MODULE_LABEL: Record<Module, string> = {
 // no está mapeado, defaultea a "llg".
 const ROLE_TO_MODULE: Record<string, Exclude<Module, "combined">> = {
   closer: "closers",
+  // Closer Supervisor es un superset de closer — mismas métricas + lead
+  // de equipo. El admin migró los closers legacy a este rol.
+  "Closer Supervisor": "closers",
   "Chatter Supervisor": "chatters",
+  Chatter: "chatters",
   LLG: "llg",
   employee: "llg",
   spammer: "llg",
@@ -55,6 +59,7 @@ const ROLE_TO_MODULE: Record<string, Exclude<Module, "combined">> = {
   admin: "llg",
   manager: "llg",
   supervisor: "llg",
+  coordinator_beta: "llg",
 };
 const roleToModule = (role: string): Exclude<Module, "combined"> =>
   ROLE_TO_MODULE[role] ?? "llg";
@@ -465,10 +470,25 @@ async function fetchModuleMetrics(
   // gente del rol, no solo quienes aparecieron en las tablas operativas.
   // No aplica a chatters (no son users del sistema).
   if (roleName && module !== "chatters") {
+    // Role synonyms: closer y Closer Supervisor son intercambiables a
+    // efectos del reporte (ambos hacen llamadas). Idem Chatter / Chatter
+    // Supervisor. Si se pide UNO, traemos los users de AMBOS para que
+    // los schedules legacy con role='closer' no queden vacíos cuando el
+    // admin migra closers a 'Closer Supervisor'.
+    // OJO: NO mezclamos LLG con employee/spammer/agent porque esos roles
+    // pueden no ser LLGs (employee es genérico). Solo agrupamos los roles
+    // que claramente son la misma función operativa.
+    const ROLE_SYNONYMS: Record<string, string[]> = {
+      closer: ["closer", "Closer Supervisor"],
+      "Closer Supervisor": ["closer", "Closer Supervisor"],
+      Chatter: ["Chatter", "Chatter Supervisor"],
+      "Chatter Supervisor": ["Chatter", "Chatter Supervisor"],
+    };
+    const rolesToQuery = ROLE_SYNONYMS[roleName] ?? [roleName];
     const { data: usersWithRole } = await admin
       .from("user_roles")
       .select("user_id")
-      .eq("role", roleName);
+      .in("role", rolesToQuery);
     const roleUserIds = new Set(
       ((usersWithRole ?? []) as Array<{ user_id: string }>).map((r) => r.user_id),
     );
