@@ -1688,7 +1688,20 @@ async function executeTool(
         ? `\n[Bot ${new Date().toISOString().slice(0, 10)}] ${reason}`
         : "";
 
-      // Buscar primero en leadgen_entries (más común).
+      // IMPORTANTE: actualizamos las DOS tablas si la modelo existe en
+      // ambas. leadgen_entries.status es la vista del LLG (para que no
+      // la siga contactando); closer_creators.stage es el pipeline visual
+      // del Closer. Si solo tocamos una, la otra queda inconsistente y
+      // la modelo sigue apareciendo en el lado que no actualizamos.
+      const updated: Array<{
+        table: string;
+        lead_id: string;
+        prev: string | null;
+        next: string;
+      }> = [];
+      const errors: Array<{ table: string; error: string }> = [];
+
+      // 1) leadgen_entries
       const { data: lg } = await sb
         .from("leadgen_entries")
         .select("id, model_handle, status, notes")
@@ -1702,11 +1715,14 @@ async function executeTool(
           .from("leadgen_entries")
           .update({ status: newStatus, notes: newNotes })
           .eq("id", lg.id);
-        if (error) return { error: error.message, table: "leadgen_entries" };
-        return { ok: true, table: "leadgen_entries", lead_id: lg.id, prev_status: lg.status, new_status: newStatus };
+        if (error) {
+          errors.push({ table: "leadgen_entries", error: error.message });
+        } else {
+          updated.push({ table: "leadgen_entries", lead_id: lg.id, prev: lg.status, next: newStatus });
+        }
       }
 
-      // Fallback: closer_creators.
+      // 2) closer_creators
       const { data: cc } = await sb
         .from("closer_creators")
         .select("id, instagram_handle, stage, notes")
@@ -1728,11 +1744,94 @@ async function executeTool(
           .from("closer_creators")
           .update(update)
           .eq("id", cc.id);
-        if (error) return { error: error.message, table: "closer_creators" };
-        return { ok: true, table: "closer_creators", lead_id: cc.id, prev_stage: cc.stage, new_stage: newStatus };
+        if (error) {
+          errors.push({ table: "closer_creators", error: error.message });
+        } else {
+          updated.push({ table: "closer_creators", lead_id: cc.id, prev: cc.stage, next: newStatus });
+        }
       }
 
-      return { error: "lead_not_found", handle };
+      if (updated.length === 0) {
+        if (errors.length > 0) return { error: "update_failed", details: errors };
+        return { error: "lead_not_found", handle };
+      }
+
+      return { ok: true, updated, errors: errors.length > 0 ? errors : undefined };
+    }
+
+    case "add_persistent_rule": {
+      // Solo el owner puede crear reglas. La protección vive acá en el dispatch
+      // (no en RLS) porque las edge functions usan service role y bypassan RLS.
+      if (!ctx.isOwner) {
+        return { error: "only_owner_can_add_rules" };
+      }
+      if (!ctx.senderUserId) {
+        return { error: "owner_user_id_not_resolved" };
+      }
+      const ruleText = String(input.rule_text ?? "").trim();
+      if (!ruleText) return { error: "empty_rule_text" };
+      const expiresAt = input.expires_at ? String(input.expires_at) : null;
+
+      const { data, error } = await sb
+        .from("whatsapp_bot_rules")
+        .insert({
+          group_id: ctx.groupId,
+          rule_text: ruleText,
+          created_by_user_id: ctx.senderUserId,
+          source_message_id: ctx.messageId,
+          expires_at: expiresAt,
+        })
+        .select("id, rule_text, created_at")
+        .single();
+      if (error) return { error: error.message };
+      return { ok: true, rule: data };
+    }
+
+    case "list_rules": {
+      const includeInactive = input.include_inactive === true;
+      let q = sb
+        .from("whatsapp_bot_rules")
+        .select("id, rule_text, active, created_at, deactivated_at, expires_at")
+        .eq("group_id", ctx.groupId)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (!includeInactive) q = q.eq("active", true);
+      const { data, error } = await q;
+      if (error) return { error: error.message };
+      return { rules: data ?? [] };
+    }
+
+    case "deactivate_rule": {
+      if (!ctx.isOwner) {
+        return { error: "only_owner_can_deactivate_rules" };
+      }
+      if (!ctx.senderUserId) {
+        return { error: "owner_user_id_not_resolved" };
+      }
+      const ruleId = String(input.rule_id ?? "").trim();
+      if (!ruleId) return { error: "missing_rule_id" };
+
+      const { data: existing } = await sb
+        .from("whatsapp_bot_rules")
+        .select("id, group_id, active")
+        .eq("id", ruleId)
+        .maybeSingle();
+      if (!existing) return { error: "rule_not_found" };
+      if (existing.group_id !== ctx.groupId) {
+        return { error: "rule_belongs_to_other_group" };
+      }
+      if (!existing.active) return { ok: true, already_inactive: true };
+
+      const { error } = await sb
+        .from("whatsapp_bot_rules")
+        .update({
+          active: false,
+          deactivated_at: new Date().toISOString(),
+          deactivated_by_user_id: ctx.senderUserId,
+        })
+        .eq("id", ruleId);
+      if (error) return { error: error.message };
+      return { ok: true, rule_id: ruleId };
     }
 
     case "add_persistent_rule": {
