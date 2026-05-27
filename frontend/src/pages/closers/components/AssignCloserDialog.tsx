@@ -81,15 +81,19 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
           .select("id, instagram_handle")
           .order("created_at", { ascending: false })
           .limit(200),
-        // Contactos NO convertidos todavía. status='converted' los excluye
-        // porque ya tienen su creator (en teoría). Status null/new/active
-        // sí los traemos.
+        // Contactos NO convertidos todavía. Queremos TODOS menos los
+        // con status='converted' — incluyendo los con status=NULL (que
+        // son la mayoría histórica: 120 contactos con NULL hoy).
+        //
+        // CUIDADO: .neq("status", "converted") excluye también los NULL
+        // porque en SQL `NULL != 'converted'` evalúa a UNKNOWN (no TRUE).
+        // Por eso usamos un OR explícito: status IS NULL OR status != 'converted'.
         supabase
           .from("closers_contacts")
           .select("id, name, handle, status")
-          .neq("status", "converted")
+          .or("status.is.null,status.neq.converted")
           .order("created_at", { ascending: false })
-          .limit(200),
+          .limit(500),
       ]);
       if (creatorsRes.error) throw creatorsRes.error;
       if (contactsRes.error) throw contactsRes.error;
