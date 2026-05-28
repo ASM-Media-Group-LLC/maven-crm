@@ -350,7 +350,12 @@ const PromologContent = () => {
   const [selectedCreatorFilter, setSelectedCreatorFilter] = useState("");
   const [creatorsModalOpen, setCreatorsModalOpen] = useState(false);
   const [searchCreator, setSearchCreator] = useState("");
-  const [sortOrder, setSortOrder] = useState("pendientes");
+  // Collapsed state del modal "Selecciona Creadora Activa" — mismo patrón
+  // que usamos en el modal "Creadores Escaneados" del Dashboard: solo
+  // la primera categoría con resultados arranca expandida, las demás
+  // colapsadas. set vacío = default; cualquier toggle materializa el
+  // estado completo y opera con set normal.
+  const [creatorModalCollapsed, setCreatorModalCollapsed] = useState<Set<string>>(new Set());
   const [entryView, setEntryView] = useState<"list" | "grid">("list");
 
   const [searchAgent, setSearchAgent] = useState("");
@@ -601,32 +606,9 @@ const PromologContent = () => {
   const completedToday = promotedTodayIds.size;
   const pendingCreators = totalActiveCreators - completedToday;
 
-  const filteredCreators = useMemo(() => {
-    let list = [...creators];
-    if (searchCreator) {
-      const q = searchCreator.toLowerCase();
-      list = list.filter(c => c.name.toLowerCase().includes(q) || (c.artistic_name?.toLowerCase().includes(q)));
-    }
-    switch (sortOrder) {
-      case "pendientes":
-        // "Pendientes primero" ahora significa: las que NO promocionaron
-        // hoy van arriba (las que más necesitan reporte del chatter).
-        list.sort((a, b) => {
-          const aP = promotedTodayIds.has(a.id) ? 1 : 0;
-          const bP = promotedTodayIds.has(b.id) ? 1 : 0;
-          return aP - bP;
-        });
-        break;
-      case "alfabetico":
-        list.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      case "categoria":
-        const catOrder: Record<string, number> = { "A+": 0, A: 1, "B+": 2, B: 3, C: 4 };
-        list.sort((a, b) => (catOrder[a.category ?? "C"] ?? 5) - (catOrder[b.category ?? "C"] ?? 5));
-        break;
-    }
-    return list;
-  }, [creators, searchCreator, sortOrder, promotedTodayIds]);
+  // filteredCreators removido — la lógica de filtrado/agrupado vive
+  // inline en el modal "Selecciona Creadora Activa" porque necesita
+  // construir buckets por categoría con headers colapsables.
 
   const [searchEntry, setSearchEntry] = useState("");
   const [promoPage, setPromoPage] = useState(1);
@@ -1113,65 +1095,119 @@ const PromologContent = () => {
                 </CardContent>
               </Card>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar creadora..." value={searchCreator} onChange={(e) => setSearchCreator(e.target.value)} className="pl-9" />
-              </div>
-              <Select value={sortOrder} onValueChange={setSortOrder}>
-                <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pendientes">Pendientes Primero</SelectItem>
-                  <SelectItem value="alfabetico">Alfabético (A-Z)</SelectItem>
-                  <SelectItem value="categoria">Por Categoría</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Solo el campo de búsqueda — el ordenamiento ya no es
+                necesario porque agrupamos por categoría siguiendo el
+                orden canónico (Elite → A+ → A → ...). Mismo patrón que
+                el modal "Creadores Escaneados" del Dashboard. */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar creadora..." value={searchCreator} onChange={(e) => setSearchCreator(e.target.value)} className="pl-9" />
             </div>
-            <ScrollArea className="flex-1 min-h-0 max-h-[50vh]">
-              <div className="flex flex-col divide-y divide-border">
-                {filteredCreators.map((creator) => (
-                  <div
-                    key={creator.id}
-                    className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/50 rounded-md transition-colors"
-                    onClick={() => {
-                      setSelectedCreatorForEntry(creator);
-                      resetEntryModal();
-                      setEntryModalOpen(true);
-                      setCreatorsModalOpen(false);
-                    }}
-                  >
-                    <div className="relative shrink-0">
-                      <Avatar className="h-8 w-8 border border-muted-foreground/30">
-                        {creator.profile_photo_url ? <AvatarImage src={creator.profile_photo_url} alt={creator.name} /> : null}
-                        <AvatarFallback className="bg-muted text-xs font-medium">{creator.name.charAt(0).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      {/* Dot rojo = no promocionó hoy (necesita reporte).
-                          Verde implícito = ya promocionó hoy (sin dot). */}
-                      {!promotedTodayIds.has(creator.id) && (
-                        <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-destructive border-2 border-background" title="Sin promo hoy" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{creator.artistic_name || creator.name}</p>
-                      <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
-                        {creator.instagram_handle && (
-                          <span className="flex items-center gap-0.5 truncate"><InstagramIcon className="h-3 w-3 shrink-0" />@{creator.instagram_handle}</span>
-                        )}
-                        {creator.tiktok_handle && (
-                          <span className="flex items-center gap-0.5 truncate"><TikTokIcon className="h-3 w-3 shrink-0" />@{creator.tiktok_handle}</span>
-                        )}
-                        {creator.twitter_handle && (
-                          <span className="flex items-center gap-0.5 truncate"><XIcon className="h-3 w-3 shrink-0" />@{creator.twitter_handle}</span>
-                        )}
-                      </div>
-                    </div>
-                    {creator.category && (
-                      <Badge variant={getCategoryBadgeVariant(creator.category)} className="text-[10px] px-1.5 py-0 shrink-0">{creator.category}</Badge>
-                    )}
-                    <span className="text-sm shrink-0">{getCountryFlag(creator.country)}</span>
+            <ScrollArea className="flex-1 min-h-0 max-h-[55vh]">
+              {(() => {
+                // Filtrar por búsqueda (sin sortOrder — el agrupado por
+                // categoría reemplaza al sort manual).
+                const list = searchCreator
+                  ? creators.filter(c =>
+                      c.name.toLowerCase().includes(searchCreator.toLowerCase())
+                      || (c.artistic_name?.toLowerCase().includes(searchCreator.toLowerCase()))
+                    )
+                  : [...creators];
+                const sorted = [...list].sort((a, b) => (a.artistic_name || a.name).localeCompare(b.artistic_name || b.name));
+                const buckets = new Map<string, typeof sorted>();
+                for (const c of sorted) {
+                  const key = c.category ?? "Sin categoría";
+                  const arr = buckets.get(key) ?? [];
+                  arr.push(c);
+                  buckets.set(key, arr);
+                }
+                const sortedCats = Array.from(buckets.keys()).sort((a, b) => {
+                  const sa = CATEGORY_ORDER[a] ?? 999;
+                  const sb = CATEGORY_ORDER[b] ?? 999;
+                  if (sa !== sb) return sa - sb;
+                  return a.localeCompare(b);
+                });
+                // Default expand: solo la primera categoría con
+                // resultados. El user puede expandir el resto con click.
+                const effectiveCollapsed = creatorModalCollapsed.size === 0
+                  ? new Set(sortedCats.slice(1))
+                  : creatorModalCollapsed;
+                const toggleCat = (cat: string) => {
+                  const base = creatorModalCollapsed.size === 0
+                    ? new Set(sortedCats.slice(1))
+                    : new Set(creatorModalCollapsed);
+                  if (base.has(cat)) base.delete(cat);
+                  else base.add(cat);
+                  setCreatorModalCollapsed(base);
+                };
+                if (sorted.length === 0) {
+                  return <p className="text-center text-sm text-muted-foreground py-8">Sin resultados para "{searchCreator}"</p>;
+                }
+                return (
+                  <div className="space-y-3 pr-2">
+                    {sortedCats.map((cat) => {
+                      const rows = buckets.get(cat)!;
+                      const isCollapsed = effectiveCollapsed.has(cat);
+                      const pendingInCat = rows.filter(r => !promotedTodayIds.has(r.id)).length;
+                      return (
+                        <div key={cat} className="space-y-1.5">
+                          <CategorySectionHeader
+                            cat={cat}
+                            count={rows.length}
+                            isCollapsed={isCollapsed}
+                            onToggle={() => toggleCat(cat)}
+                          />
+                          {!isCollapsed && (
+                            <div className="space-y-0.5 pl-1">
+                              {/* Subheader pequeño: cuántas faltan reportar en esta cat */}
+                              {pendingInCat > 0 && (
+                                <p className="text-[10px] text-muted-foreground px-2 pb-1">
+                                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-destructive mr-1.5 align-middle" />
+                                  {pendingInCat} sin promo hoy
+                                </p>
+                              )}
+                              {rows.map((creator) => (
+                                <div
+                                  key={creator.id}
+                                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 rounded-md transition-colors"
+                                  onClick={() => {
+                                    setSelectedCreatorForEntry(creator);
+                                    resetEntryModal();
+                                    setEntryModalOpen(true);
+                                    setCreatorsModalOpen(false);
+                                  }}
+                                >
+                                  <div className="relative shrink-0">
+                                    <Avatar className="h-8 w-8 border border-muted-foreground/30">
+                                      {creator.profile_photo_url ? <AvatarImage src={creator.profile_photo_url} alt={creator.name} /> : null}
+                                      <AvatarFallback className="bg-muted text-xs font-medium">{creator.name.charAt(0).toUpperCase()}</AvatarFallback>
+                                    </Avatar>
+                                    {!promotedTodayIds.has(creator.id) && (
+                                      <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-destructive border-2 border-background" title="Sin promo hoy" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{creator.artistic_name || creator.name}</p>
+                                    <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                                      {creator.instagram_handle && (
+                                        <span className="flex items-center gap-0.5 truncate"><InstagramIcon className="h-3 w-3 shrink-0" />@{creator.instagram_handle.replace(/^@/, "").replace(/\/$/, "").split("/").pop()}</span>
+                                      )}
+                                      {creator.tiktok_handle && (
+                                        <span className="flex items-center gap-0.5 truncate"><TikTokIcon className="h-3 w-3 shrink-0" />@{creator.tiktok_handle}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className="text-sm shrink-0">{getCountryFlag(creator.country)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </ScrollArea>
           </DialogContent>
         </Dialog>
