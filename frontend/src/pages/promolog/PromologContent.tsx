@@ -138,12 +138,19 @@ const PromologContent = () => {
   const { role } = useUserRole();
   const isManagement = ["admin", "manager", "supervisor"].includes(role ?? "");
 
+  // Sólo creadoras activas — el bot promolog (Apify + Gemini) trackea
+  // únicamente estas. Las terminadas, en onboarding, paused y borradores
+  // no tienen flujo de promo diaria, así que aparecer en el modal de
+  // "Agregar Promo" era ruido (mostraba tests Testing102, ILIANA CHACÓN
+  // ya terminada, etc.). Si después necesitamos ampliar a paused/
+  // onboarding por excepción, se vuelve a relajar el filtro.
   const { data: creators = [] } = useQuery({
-    queryKey: ["creators-promolog"],
+    queryKey: ["creators-promolog-active"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("creators")
         .select("id, name, artistic_name, category, country, country_code, status, profile_photo_url, instagram_handle, twitter_handle, tiktok_handle")
+        .eq("status", "active")
         .order("name");
       if (error) throw error;
       return data;
@@ -572,6 +579,28 @@ const PromologContent = () => {
     }
   };
 
+  // Stats del modal "Agregar Promo":
+  //   · Total Activas:    creadoras con flujo de promo activo (= creators)
+  //   · Promocionaron hoy: # activas con al menos 1 entry result="Sí" hoy
+  //   · Sin actividad hoy: total - promocionaron (las que faltan reportar)
+  // El cálculo de "hoy" usa la zona del browser/user para el match.
+  // (Si en el futuro queremos que use el TZ elegido en topbar, hay que
+  // pasarlo aquí — por ahora el caso simple alcanza.)
+  const promotedTodayIds = useMemo(() => {
+    const today = new Date();
+    const todayStr = today.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+    const ids = new Set<string>();
+    for (const e of dedupedEntries) {
+      if (e.result === "Sí" && e.date === todayStr && e.creator_id) {
+        ids.add(e.creator_id);
+      }
+    }
+    return ids;
+  }, [dedupedEntries]);
+  const totalActiveCreators = creators.length;
+  const completedToday = promotedTodayIds.size;
+  const pendingCreators = totalActiveCreators - completedToday;
+
   const filteredCreators = useMemo(() => {
     let list = [...creators];
     if (searchCreator) {
@@ -580,9 +609,11 @@ const PromologContent = () => {
     }
     switch (sortOrder) {
       case "pendientes":
+        // "Pendientes primero" ahora significa: las que NO promocionaron
+        // hoy van arriba (las que más necesitan reporte del chatter).
         list.sort((a, b) => {
-          const aP = a.status !== "active" ? 0 : 1;
-          const bP = b.status !== "active" ? 0 : 1;
+          const aP = promotedTodayIds.has(a.id) ? 1 : 0;
+          const bP = promotedTodayIds.has(b.id) ? 1 : 0;
           return aP - bP;
         });
         break;
@@ -595,10 +626,7 @@ const PromologContent = () => {
         break;
     }
     return list;
-  }, [creators, searchCreator, sortOrder]);
-
-  const completedToday = filteredCreators.filter(c => c.status === "active").length;
-  const pendingCreators = filteredCreators.length - completedToday;
+  }, [creators, searchCreator, sortOrder, promotedTodayIds]);
 
   const [searchEntry, setSearchEntry] = useState("");
   const [promoPage, setPromoPage] = useState(1);
@@ -1056,28 +1084,31 @@ const PromologContent = () => {
         </div>
       )}
 
-      {/* Creators Selection Modal */}
+      {/* Creators Selection Modal — sólo creadoras ACTIVAS (las que el
+          flujo de promo realmente trackea). Los counts ahora reflejan el
+          estado real del día: total activas, cuántas ya promocionaron
+          hoy (entry result=Sí en HOY) y cuántas faltan reportar. */}
         <Dialog open={creatorsModalOpen} onOpenChange={setCreatorsModalOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader className="pr-8">
-              <DialogTitle>Todas - Selecciona una Creadora</DialogTitle>
+              <DialogTitle>Selecciona una Creadora Activa</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-3 gap-3">
-              <Card className="border-t-[3px] border-t-success">
+              <Card className="border-t-[3px] border-t-blue-500">
                 <CardContent className="p-3 text-center">
-                  <p className="text-xs text-muted-foreground">Total Creadoras</p>
-                  <p className="text-xl font-bold text-success">{creators.length}</p>
+                  <p className="text-xs text-muted-foreground">Total Activas</p>
+                  <p className="text-xl font-bold text-blue-500">{totalActiveCreators}</p>
                 </CardContent>
               </Card>
               <Card className="border-t-[3px] border-t-warning">
                 <CardContent className="p-3 text-center">
-                  <p className="text-xs text-muted-foreground">Pendientes</p>
+                  <p className="text-xs text-muted-foreground">Sin actividad hoy</p>
                   <p className="text-xl font-bold text-warning">{pendingCreators}</p>
                 </CardContent>
               </Card>
               <Card className="border-t-[3px] border-t-success">
                 <CardContent className="p-3 text-center">
-                  <p className="text-xs text-muted-foreground">Completadas Hoy</p>
+                  <p className="text-xs text-muted-foreground">Promocionaron hoy</p>
                   <p className="text-xl font-bold text-success">{completedToday}</p>
                 </CardContent>
               </Card>
@@ -1114,8 +1145,10 @@ const PromologContent = () => {
                         {creator.profile_photo_url ? <AvatarImage src={creator.profile_photo_url} alt={creator.name} /> : null}
                         <AvatarFallback className="bg-muted text-xs font-medium">{creator.name.charAt(0).toUpperCase()}</AvatarFallback>
                       </Avatar>
-                      {creator.status !== "active" && (
-                        <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-destructive border-2 border-background" />
+                      {/* Dot rojo = no promocionó hoy (necesita reporte).
+                          Verde implícito = ya promocionó hoy (sin dot). */}
+                      {!promotedTodayIds.has(creator.id) && (
+                        <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-destructive border-2 border-background" title="Sin promo hoy" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
