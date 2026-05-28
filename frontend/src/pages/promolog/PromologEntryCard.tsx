@@ -33,6 +33,10 @@ export interface PromologEntry {
   notes: string;
   creator_id?: string;
   reviewed_by?: string;
+  // Category de la creadora (Elite, A+, A, B+, B, C+, C). Lo usamos en el
+  // KPI modal "Creadores escaneados" para agrupar la lista.
+  category?: string | null;
+  profile_photo_url?: string | null;
 }
 
 interface PromologEntryCardProps {

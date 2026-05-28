@@ -13,10 +13,15 @@ import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/hooks/useAuth";
 
-const emptyFilters: CreadorFilters = {
+// Default arranca con status="active" porque el listado se usa 90% del
+// tiempo para operar sobre creadoras activas. Si el user quiere ver
+// onboarding/paused/leaving/terminated puede cambiar el dropdown a otro
+// estado o seleccionar "Todos". El botón "Limpiar filtros" vuelve a este
+// default (no a vacío) para no inundar la vista con creadoras inactivas.
+const defaultFilters: CreadorFilters = {
   search: "",
   agency: "",
-  status: "",
+  status: "active",
   category: "",
   country: "",
   city: "",
@@ -24,7 +29,7 @@ const emptyFilters: CreadorFilters = {
 };
 
 const CreadoresContent = () => {
-  const [filters, setFilters] = useState<CreadorFilters>(emptyFilters);
+  const [filters, setFilters] = useState<CreadorFilters>(defaultFilters);
   const [view, setView] = useState<"table" | "grid">("table");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -84,8 +89,20 @@ const CreadoresContent = () => {
               companies={companyOptions}
               view={view}
               onViewChange={setView}
-              hasActiveFilters={!!(filters.search || filters.status || filters.category || filters.country || filters.city || filters.manager || filters.agency)}
-              onClear={() => setFilters(emptyFilters)}
+              hasActiveFilters={
+                // status=active es el default, no cuenta como "filtro activo".
+                // Cualquier otro status sí (incluído string vacío = "Todos").
+                !!(
+                  filters.search ||
+                  (filters.status !== "active") ||
+                  filters.category ||
+                  filters.country ||
+                  filters.city ||
+                  filters.manager ||
+                  filters.agency
+                )
+              }
+              onClear={() => setFilters(defaultFilters)}
             />
           </div>
 
