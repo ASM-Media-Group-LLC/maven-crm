@@ -2,8 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, authorizeCronOrJwt, logEvent, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
 import { logGeminiUsage } from "../_shared/usage.ts";
 
-// whatsapp-analyze-image — analiza imágenes del grupo con Gemini 2.5
-// Flash (vision built-in). Reconoce:
+// whatsapp-analyze-image — analiza imágenes del grupo con un LLM con
+// vision. Reconoce:
 //   - Texto en pantalla (OCR de screenshots de WhatsApp, IG DMs, etc)
 //   - Descripción visual ("captura de bandeja de spam de IG")
 //   - Menciones a personas/cuentas dentro de la imagen
@@ -19,14 +19,21 @@ import { logGeminiUsage } from "../_shared/usage.ts";
 // Después dispara whatsapp-extract-commitments para que detecte
 // compromisos en cualquier texto OCR'd o caption + descripción.
 //
-// Costo: Gemini 2.5 Flash es ~$0.075 input / $0.30 output por 1M tokens.
-// Una imagen típica consume ~258 tokens de input + ~500 tokens de
-// output = ~$0.00017 por imagen. 100 imágenes/día ≈ $0.50/mes.
-// Despreciable.
+// LLM via OpenRouter — unificado con Promolog para tener un solo
+// proveedor (un billing, un cap de gasto, resiliencia multi-model).
+// Default model: google/gemini-2.5-flash. Costo ~$0.00017 por imagen,
+// 100 imágenes/día ≈ $0.50/mes (incluido el ~5% de overhead de OR).
+// Si querés cambiar el modelo (claude-haiku, gpt-4o-mini, etc.), basta
+// con cambiar PROMOLOG_LLM_MODEL — no toca código.
 
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
-const GEMINI_MODEL = Deno.env.get("WHATSAPP_GEMINI_MODEL") ?? "gemini-2.5-flash";
-const GEMINI_TIMEOUT_MS = 30_000;
+const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
+// Reusamos PROMOLOG_LLM_MODEL para que un solo override controle toda la
+// stack vision de Maven (WhatsApp + Promolog). Si se necesita modelo
+// distinto por módulo en el futuro, separamos en var dedicada.
+const LLM_MODEL = Deno.env.get("WHATSAPP_LLM_MODEL")
+  ?? Deno.env.get("PROMOLOG_LLM_MODEL")
+  ?? "google/gemini-2.5-flash";
+const LLM_TIMEOUT_MS = 30_000;
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20MB — WA limita imágenes a ~16MB
 const PROJECT_URL = Deno.env.get("SUPABASE_URL")!;
 const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
@@ -99,43 +106,54 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-async function callGeminiVision(
+// callLlmVision — llama OpenRouter (OpenAI-compatible API) con el modelo
+// configurado. La imagen se manda como data URI base64. OpenRouter rutea
+// al provider correspondiente (Google AI Studio para gemini, Anthropic
+// para claude, etc.) y devuelve la respuesta uniformada.
+//
+// max_tokens=2048 (era 1024) — con el prompt extendido + JSON estricto,
+// había casos donde la respuesta se cortaba a la mitad y rompía el
+// parser. El costo extra es despreciable.
+async function callLlmVision(
   imageBytes: Uint8Array,
   mime: string,
   contextHint: string | null,
 ): Promise<{ analysis: VisionAnalysis; usage: Record<string, number> } | { error: string }> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-
-  const userParts: Array<Record<string, unknown>> = [
-    {
-      inline_data: {
-        mime_type: mime,
-        data: bytesToBase64(imageBytes),
-      },
-    },
-    {
-      text: contextHint
-        ? `Contexto: el mensaje que acompaña esta imagen dice: "${contextHint}"\n\n${VISION_PROMPT}`
-        : VISION_PROMPT,
-    },
-  ];
+  const dataUri = `data:${mime};base64,${bytesToBase64(imageBytes)}`;
+  const promptText = contextHint
+    ? `Contexto: el mensaje que acompaña esta imagen dice: "${contextHint}"\n\n${VISION_PROMPT}`
+    : VISION_PROMPT;
 
   const body = {
-    contents: [{ parts: userParts }],
-    generationConfig: {
-      temperature: 0.1,
-      // Forzar JSON output. Gemini lo respeta cuando se le pide explícito.
-      responseMimeType: "application/json",
-      maxOutputTokens: 1024,
-    },
+    model: LLM_MODEL,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: promptText },
+          { type: "image_url", image_url: { url: dataUri } },
+        ],
+      },
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.1,
+    max_tokens: 2048,
   };
 
   const ac = new AbortController();
-  const timeoutId = setTimeout(() => ac.abort(), GEMINI_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => ac.abort(), LLM_TIMEOUT_MS);
   try {
-    const resp = await fetch(url, {
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        // Recomendados por OpenRouter (no obligatorios) — aparecen en
+        // su dashboard de uso para que el equipo identifique de dónde
+        // viene cada call.
+        "HTTP-Referer": "https://maven.asmtech.me",
+        "X-Title": "Maven WhatsApp Image Analyzer",
+      },
       body: JSON.stringify(body),
       signal: ac.signal,
     });
@@ -143,15 +161,15 @@ async function callGeminiVision(
 
     if (!resp.ok) {
       const errText = await resp.text().catch(() => "");
-      return { error: `gemini ${resp.status}: ${errText.slice(0, 300)}` };
+      return { error: `openrouter ${resp.status}: ${errText.slice(0, 300)}` };
     }
 
     const data = await resp.json() as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+      choices?: Array<{ message?: { content?: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const text = data.choices?.[0]?.message?.content ?? "";
     if (!text) return { error: "empty_response" };
 
     let analysis: VisionAnalysis;
@@ -171,8 +189,8 @@ async function callGeminiVision(
     }
 
     const usage = {
-      input_tokens: data.usageMetadata?.promptTokenCount ?? 0,
-      output_tokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+      input_tokens: data.usage?.prompt_tokens ?? 0,
+      output_tokens: data.usage?.completion_tokens ?? 0,
     };
 
     return { analysis, usage };
@@ -181,7 +199,7 @@ async function callGeminiVision(
     const aborted = (e as Error).name === "AbortError";
     return {
       error: aborted
-        ? `gemini_timeout_${GEMINI_TIMEOUT_MS / 1000}s`
+        ? `llm_timeout_${LLM_TIMEOUT_MS / 1000}s`
         : (e as Error).message,
     };
   }
@@ -240,14 +258,14 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
       .eq("id", msg.id);
     return { ok: false, reason: "no_media_url" };
   }
-  if (!GEMINI_API_KEY) {
+  if (!OPENROUTER_API_KEY) {
     await logEvent(sb, {
       tenantId: msg.tenant_id,
       groupId: msg.group_id,
       kind: "error",
-      payload: { stage: "analyze_image", error: "GEMINI_API_KEY missing", message_id: msg.id },
+      payload: { stage: "analyze_image", error: "OPENROUTER_API_KEY missing", message_id: msg.id },
     });
-    return { ok: false, reason: "gemini_not_configured" };
+    return { ok: false, reason: "openrouter_not_configured" };
   }
 
   const downloaded = await downloadImage(msg.media_url);
@@ -272,13 +290,13 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
   // priorice extraer info relevante a ese contexto.
   const contextHint = msg.body && msg.body !== "[imagen]" ? msg.body : null;
 
-  const result = await callGeminiVision(downloaded.data, downloaded.mime, contextHint);
+  const result = await callLlmVision(downloaded.data, downloaded.mime, contextHint);
   if ("error" in result) {
     await logEvent(sb, {
       tenantId: msg.tenant_id,
       groupId: msg.group_id,
       kind: "error",
-      payload: { stage: "gemini", error: result.error, message_id: msg.id },
+      payload: { stage: "llm", error: result.error, message_id: msg.id },
     });
     await sb
       .from("whatsapp_messages")
@@ -301,14 +319,17 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     })
     .eq("id", msg.id);
 
-  // Log cost en api_usage_log.
+  // Log cost en api_usage_log. Mantenemos logGeminiUsage como nombre
+  // del helper porque la tabla `api_usage_log` ya tiene historial bajo
+  // "gemini" — pero el model field refleja el modelo real (que ahora
+  // puede ser Gemini o cualquier otro via OpenRouter).
   void logGeminiUsage({
     operation: "whatsapp-analyze-image",
-    model: GEMINI_MODEL,
+    model: LLM_MODEL,
     inputTokens: result.usage.input_tokens,
     outputTokens: result.usage.output_tokens,
     tenantId: msg.tenant_id,
-    context: { message_id: msg.id, group_id: msg.group_id, category: result.analysis.category },
+    context: { message_id: msg.id, group_id: msg.group_id, category: result.analysis.category, provider: "openrouter" },
   });
 
   await logEvent(sb, {
