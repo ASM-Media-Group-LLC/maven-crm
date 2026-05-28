@@ -147,6 +147,19 @@ CUANDO ARMÁS RESÚMENES DE EQUIPO (a "cómo va el día", "estado actual", "qué
 - Si el closer reportó hoy múltiples veces (medio día + cierre), usá el ÚLTIMO reporte como source of truth, no el primero.
 - NO digas "sin reportes aún de X" sin haberlo verificado contra whatsapp_daily_reports del día. Si la tool no devuelve reporte de X, entonces sí decílo.
 
+RANKING / PERFORMANCE — USAR MÉTRICAS DE NEGOCIO (no del chat):
+
+Cuando alguien pregunta "¿quién es el mejor LLG/closer?", "¿quién está liderando?", "¿cómo va el equipo este mes/año?", USÁ get_team_ranking con role_kind y period adecuados:
+  · role_kind='llg' → ranking por NÚMEROS obtenidos (leadgen con teléfono).
+  · role_kind='closer' → ranking por CIERRES (Confirmadas + Completadas) y conversion rate.
+  · period: 'week' / 'month' / 'year'.
+
+PROHIBIDO usar get_member_stats para responder "quién es el mejor" — esa tool mide compromisos del CHAT (cuántas veces alguien dijo "voy a hacer X" y lo hizo). Eso NO es rendimiento de negocio. Miguel puede tener 51 compromisos cumplidos y aún así no haber cerrado ningún lead. Performance real = números (LLG) o cierres (closer).
+
+Cuando alguien pregunte "cuántos NÚMEROS trajo X este mes/año":
+  · Llamá get_member_maven_activity con since_days apropiado (mes=30, año=365 o desde inicio).
+  · La respuesta tiene leadgen_entries_with_phone (= "números obtenidos") y leadgen_entries_created (= "total leads cargados, con y sin tel"). Usá el primero para "números"; el segundo si te preguntan "leads totales".
+
 USAR EL CONTEXTO ANTES DE PREGUNTAR:
 - Si en el initial_user_message ya viene info relevante (asignaciones, stage, last_contact_date, etc), NO preguntes lo que ya sabés.
 - Ejemplo malo: "¿Vos la tenías asignada o la recién agarrás?" cuando el contexto muestra closer_creators con stage='Asignada' y passed_date=hoy → ya sabés que la acaba de tomar.
@@ -768,12 +781,13 @@ const TOOLS: Array<{
   {
     name: "get_member_maven_activity",
     description:
-      "Dado el nombre como aparece en el grupo, devuelve la ACTIVIDAD REAL del usuario en Maven en las últimas N horas: leads cargados (si es LLG), contactos creados/asignados (si es closer), creators abiertos/asignados, entradas en historial de contacto, llamadas QA. Usar para responder preguntas tipo '¿Miguel ya cargó los 2 contactos que prometió?' o '¿qué hizo Sofi hoy en Maven?'. Requiere que el wpp_member esté linkeado a un user de Maven via el panel admin — si no está linkeado, devuelve {error:'member_not_linked'} y la respuesta debe sugerir mapear al admin.",
+      "Dado el nombre como aparece en el grupo, devuelve la ACTIVIDAD REAL del usuario en Maven en las últimas N horas/días: leads cargados Y CUÁNTOS CON TELÉFONO (LLG=números obtenidos), contactos creados/asignados (closer), creators abiertos/asignados, entradas en historial de contacto, llamadas QA. Usar para preguntas tipo: '¿Miguel ya cargó los 2 contactos que prometió?', '¿qué hizo Sofi hoy en Maven?', '¿cuántos NÚMEROS trajo Yeison este mes/año?' (números = leads con teléfono cargado). Pasá `since_days` para windows largas (hasta 365 días = un año); `since_hours` solo para windows cortas (hasta 30 días). Si pasás ambos, gana since_days. Requiere que el wpp_member esté linkeado a un user de Maven — si no está linkeado, devuelve member_not_linked.",
     input_schema: {
       type: "object",
       properties: {
         display_name: { type: "string", description: "nombre del miembro tal como aparece en el grupo (ilike, podés pasar solo el nombre)" },
-        since_hours: { type: "number", description: "ventana de tiempo en horas, default 24" },
+        since_hours: { type: "number", description: "ventana en horas, máx 30 días * 24 = 720. Default 24." },
+        since_days: { type: "number", description: "ventana en DÍAS (gana sobre since_hours), máx 365. Usalo para 'este mes' (30), 'este año' (~365 o desde inicio de año)." },
       },
       required: ["display_name"],
     },
@@ -805,6 +819,19 @@ const TOOLS: Array<{
         reason: { type: "string", description: "razón corta (opcional, máx 200 chars)" },
       },
       required: ["display_name", "off_date", "off_type"],
+    },
+  },
+  {
+    name: "get_team_ranking",
+    description:
+      "Ranking REAL del equipo según métricas de NEGOCIO (no de cumplimiento del chat). Usalo cuando alguien pregunta '¿quién es el mejor LLG/closer del mes?', '¿cómo va el equipo este año?', '¿quién está liderando?'. NUNCA uses get_member_stats para esto — esa solo mide compromisos del chat, no rendimiento real. Devuelve top 10 por la métrica elegida.\n\nParámetros:\n- role_kind='llg' → ranking por números obtenidos (leads con teléfono cargado).\n- role_kind='closer' → ranking por confirmadas + completadas en el período.\n- period: 'week' (7d), 'month' (30d), 'year' (desde 1 de enero hasta hoy).",
+    input_schema: {
+      type: "object",
+      properties: {
+        role_kind: { type: "string", enum: ["llg", "closer"], description: "qué métrica de negocio rankear: LLG (números) vs Closer (confirmadas/completadas)" },
+        period: { type: "string", enum: ["week", "month", "year"], description: "ventana: week=7d, month=30d, year=desde 1/1 hasta hoy. Default month." },
+      },
+      required: ["role_kind"],
     },
   },
   {
@@ -1266,8 +1293,15 @@ async function executeTool(
 
     case "get_member_maven_activity": {
       const displayName = String(input.display_name ?? "").trim();
-      const sinceHours = Math.min(Math.max(Number(input.since_hours ?? 24), 1), 24 * 30);
       if (!displayName) return { error: "missing_display_name" };
+      // since_days gana si vino. Cap 365 días para "este año".
+      // Si solo viene since_hours, cap a 30 días * 24 = 720h.
+      const rawDays = input.since_days !== undefined ? Number(input.since_days) : null;
+      const rawHours = Number(input.since_hours ?? 24);
+      const effectiveHours = rawDays !== null && Number.isFinite(rawDays)
+        ? Math.min(Math.max(rawDays, 1), 365) * 24
+        : Math.min(Math.max(rawHours, 1), 24 * 30);
+      const sinceHours = effectiveHours;
       const since = new Date(Date.now() - sinceHours * 3600 * 1000).toISOString();
 
       // 1. Buscar via helper (wpp display_name OR profiles full_name).
@@ -1300,15 +1334,23 @@ async function executeTool(
       const head = (q: { count: number | null; error: { message: string } | null }) => q.count ?? 0;
       const [
         leadsAdded,
+        leadsWithPhone,
         contactsCreated,
         contactsAssigned,
         creatorsCreated,
         creatorsAssigned,
+        creatorsConfirmed,
+        creatorsCompleted,
         historyLogged,
         qaCalls,
       ] = await Promise.all([
+        // Total leads cargados por el LLG
         sb.from("leadgen_entries").select("id", { count: "exact", head: true })
           .eq("lg_user_id", member.user_id).gte("created_at", since).then(head),
+        // Leads CON TELÉFONO (= "números obtenidos" en jerga del dominio)
+        sb.from("leadgen_entries").select("id", { count: "exact", head: true })
+          .eq("lg_user_id", member.user_id).gte("created_at", since)
+          .not("phone_e164", "is", null).then(head),
         sb.from("closers_contacts").select("id", { count: "exact", head: true })
           .eq("created_by", member.user_id).gte("created_at", since).then(head),
         sb.from("closers_contacts").select("id", { count: "exact", head: true })
@@ -1317,6 +1359,16 @@ async function executeTool(
           .eq("created_by", member.user_id).gte("created_at", since).then(head),
         sb.from("closer_creators").select("id", { count: "exact", head: true })
           .eq("assigned_to", member.user_id).gte("created_at", since).then(head),
+        // Confirmadas: closer aceptó cierre, modelo va a firmar
+        sb.from("closer_creators").select("id", { count: "exact", head: true })
+          .eq("assigned_to", member.user_id)
+          .eq("stage", "Confirmada")
+          .gte("confirmed_date", since).then(head),
+        // Completadas: holy grail, modelo firmó
+        sb.from("closer_creators").select("id", { count: "exact", head: true })
+          .eq("assigned_to", member.user_id)
+          .eq("stage", "Completada")
+          .gte("completed_date", since).then(head),
         sb.from("closer_contact_history").select("id", { count: "exact", head: true })
           .eq("created_by", member.user_id).gte("created_at", since).then(head),
         sb.from("qa_calls").select("id", { count: "exact", head: true })
@@ -1337,13 +1389,19 @@ async function executeTool(
         window: {
           since_hours: sinceHours,
           since_iso: since,
+          window_days: Math.round(sinceHours / 24 * 10) / 10,
         },
         activity: {
+          // LLG metrics
           leadgen_entries_created: leadsAdded,
+          leadgen_entries_with_phone: leadsWithPhone, // "números obtenidos"
+          // Closer metrics
           closers_contacts_created: contactsCreated,
           closers_contacts_assigned: contactsAssigned,
           closer_creators_created: creatorsCreated,
           closer_creators_assigned: creatorsAssigned,
+          closer_creators_confirmed: creatorsConfirmed,
+          closer_creators_completed: creatorsCompleted,
           contact_history_logged: historyLogged,
           qa_calls: qaCalls,
         },
@@ -1552,6 +1610,149 @@ async function executeTool(
         ok: true,
         registered: data,
         message: `${member.display_name} marcado como ${offType} para ${offDate}.`,
+      };
+    }
+
+    case "get_team_ranking": {
+      const roleKind = String(input.role_kind ?? "").toLowerCase();
+      const period = String(input.period ?? "month").toLowerCase();
+      if (!["llg", "closer"].includes(roleKind)) return { error: "invalid_role_kind" };
+
+      // Resolver ventana de tiempo. "year" = desde 1 de enero del año actual.
+      const now = new Date();
+      let sinceIso: string;
+      let windowLabel: string;
+      if (period === "week") {
+        sinceIso = new Date(now.getTime() - 7 * 24 * 3600 * 1000).toISOString();
+        windowLabel = "últimos 7 días";
+      } else if (period === "year") {
+        sinceIso = new Date(now.getFullYear(), 0, 1).toISOString();
+        windowLabel = `${now.getFullYear()} (desde 1 de enero)`;
+      } else {
+        // month default
+        sinceIso = new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString();
+        windowLabel = "últimos 30 días";
+      }
+
+      // Roles a incluir según role_kind (uso ROLE_SYNONYMS lógicamente)
+      const rolesToInclude = roleKind === "llg"
+        ? ["LLG", "employee", "spammer"]
+        : ["closer", "Closer Supervisor"];
+
+      // Traer users con esos roles
+      const { data: userRoles } = await sb
+        .from("user_roles")
+        .select("user_id")
+        .in("role", rolesToInclude);
+      const userIds = Array.from(new Set((userRoles ?? []).map((r) => r.user_id))).filter(Boolean);
+      if (userIds.length === 0) {
+        return { ok: true, ranking: [], period: windowLabel, role_kind: roleKind, note: `no_users_in_role: ${rolesToInclude.join(",")}` };
+      }
+
+      // Profiles para los nombres
+      const { data: profiles } = await sb
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds);
+      const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name ?? null]));
+
+      // Métricas por user según role_kind
+      const results: Array<{
+        user_id: string;
+        full_name: string | null;
+        first_name: string;
+        metric_primary: number;
+        metric_secondary: number;
+        metric_tertiary: number;
+        metrics: Record<string, number>;
+      }> = [];
+
+      if (roleKind === "llg") {
+        // Para LLG: rank por números obtenidos. Secundario: total leads.
+        for (const uid of userIds) {
+          const [leadsAll, leadsWithPhone] = await Promise.all([
+            sb.from("leadgen_entries").select("id", { count: "exact", head: true })
+              .eq("lg_user_id", uid).gte("created_at", sinceIso)
+              .then((q) => q.count ?? 0),
+            sb.from("leadgen_entries").select("id", { count: "exact", head: true })
+              .eq("lg_user_id", uid).gte("created_at", sinceIso)
+              .not("phone_e164", "is", null)
+              .then((q) => q.count ?? 0),
+          ]);
+          const fullName = nameById.get(uid) ?? null;
+          const conversionRate = leadsAll > 0 ? Math.round((leadsWithPhone / leadsAll) * 100) : 0;
+          results.push({
+            user_id: uid,
+            full_name: fullName,
+            first_name: fullName?.split(" ")[0] ?? "(?)",
+            metric_primary: leadsWithPhone,
+            metric_secondary: leadsAll,
+            metric_tertiary: conversionRate,
+            metrics: {
+              numeros_obtenidos: leadsWithPhone,
+              total_leads_cargados: leadsAll,
+              conversion_rate_pct: conversionRate,
+            },
+          });
+        }
+      } else {
+        // Para closer: rank por confirmadas + completadas. Secundario: conversion.
+        for (const uid of userIds) {
+          const [asignadas, confirmadas, completadas, noInteresadas] = await Promise.all([
+            sb.from("closer_creators").select("id", { count: "exact", head: true })
+              .eq("assigned_to", uid).gte("passed_date", sinceIso.slice(0, 10))
+              .then((q) => q.count ?? 0),
+            sb.from("closer_creators").select("id", { count: "exact", head: true })
+              .eq("assigned_to", uid).eq("stage", "Confirmada")
+              .gte("confirmed_date", sinceIso)
+              .then((q) => q.count ?? 0),
+            sb.from("closer_creators").select("id", { count: "exact", head: true })
+              .eq("assigned_to", uid).eq("stage", "Completada")
+              .gte("completed_date", sinceIso)
+              .then((q) => q.count ?? 0),
+            sb.from("closer_creators").select("id", { count: "exact", head: true })
+              .eq("assigned_to", uid).eq("stage", "No interesada")
+              .gte("no_interesada_date", sinceIso)
+              .then((q) => q.count ?? 0),
+          ]);
+          const fullName = nameById.get(uid) ?? null;
+          const totalCierres = confirmadas + completadas;
+          const conversionRate = asignadas > 0 ? Math.round((totalCierres / asignadas) * 100) : 0;
+          results.push({
+            user_id: uid,
+            full_name: fullName,
+            first_name: fullName?.split(" ")[0] ?? "(?)",
+            metric_primary: totalCierres,
+            metric_secondary: confirmadas,
+            metric_tertiary: completadas,
+            metrics: {
+              asignadas,
+              confirmadas,
+              completadas,
+              no_interesadas: noInteresadas,
+              total_cierres: totalCierres,
+              conversion_rate_pct: conversionRate,
+            },
+          });
+        }
+      }
+
+      // Ordenar desc por metric_primary, luego por secondary. Filtrar usuarios sin actividad.
+      results.sort((a, b) => {
+        if (b.metric_primary !== a.metric_primary) return b.metric_primary - a.metric_primary;
+        return b.metric_secondary - a.metric_secondary;
+      });
+      const ranking = results.slice(0, 10);
+
+      return {
+        ok: true,
+        role_kind: roleKind,
+        period: windowLabel,
+        since_iso: sinceIso,
+        ranking,
+        explanation: roleKind === "llg"
+          ? "Ranking por NÚMEROS obtenidos (leads con teléfono cargado). Secundario: total leads cargados. Tercer: conversion rate."
+          : "Ranking por CIERRES (Confirmada + Completada en el período). Secundario: confirmadas. Tercer: completadas.",
       };
     }
 
