@@ -799,15 +799,12 @@ const PromologContent = () => {
                   <SelectItem value="otra">Otra</SelectItem>
                 </SelectContent>
               </Select>
-              <DateRangePicker
-                from={dateFrom}
-                to={dateTo}
-                onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
-                placeholder="Selecciona fechas"
-                className="h-9"
-              />
-              {(searchEntry || selectedStatus || selectedNetwork || selectedCardPlatform || selectedCreatorFilter || dateFrom || dateTo) && (
-                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCardPlatform(""); setSelectedCreatorFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
+              {/* DateRangePicker removido — ahora vive global en el header
+                  (DateRangePresets con chips Ayer/Hoy/Semana/Mes). El
+                  rango afecta a los 3 subtabs (Dashboard, Promos, Agentes)
+                  desde una sola fuente, eliminando la duplicidad anterior. */}
+              {(searchEntry || selectedStatus || selectedNetwork || selectedCardPlatform || selectedCreatorFilter) && (
+                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCardPlatform(""); setSelectedCreatorFilter(""); }}>
                   <X className="mr-1.5 h-4 w-4" />
                   Limpiar filtros
                 </Button>
