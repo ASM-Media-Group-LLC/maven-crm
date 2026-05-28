@@ -897,6 +897,33 @@ serve(async (req) => {
       // Trigger del agent: mention | auto | null según bot_mode del grupo.
       const trigger = await resolveAgentTrigger(sb, group, msg.body, msg.isFromBot ?? false);
       if (trigger) {
+        // ¿Es la PRIMERA invocación del día tras una pausa larga?
+        // (ej. arranca el horario laboral después de la noche, weekend, etc).
+        // Si el bot estuvo dormido >6h, primero le mandamos un "night_catchup"
+        // para que lea los mensajes nocturnos y procese acciones perdidas
+        // (reglas, reportes, decisiones del owner, anuncios de día off).
+        // Después fire el trigger normal para responder al mensaje actual.
+        try {
+          const { data: lastBotMsg } = await sb
+            .from("whatsapp_messages")
+            .select("sent_at")
+            .eq("group_id", group.id)
+            .eq("is_from_bot", true)
+            .order("sent_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const hoursSinceLastBot = lastBotMsg?.sent_at
+            ? (Date.now() - new Date(lastBotMsg.sent_at).getTime()) / 3_600_000
+            : 99;
+          if (hoursSinceLastBot > 6) {
+            // Bot estuvo dormido > 6h — fire catchup PRIMERO.
+            // Fire-and-forget; el agent va a leer todo lo nocturno
+            // antes de responder al mensaje actual.
+            fireAgent(messageId, group.id, "night_catchup" as "auto");
+          }
+        } catch (e) {
+          console.warn("night_catchup check failed:", (e as Error).message);
+        }
         fireAgent(messageId, group.id, trigger);
       }
     }

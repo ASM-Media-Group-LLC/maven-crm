@@ -493,6 +493,55 @@ ACCIÓN SOBRE LEADS (cuando hay decisión explícita en el grupo):
 
 - NUNCA marques sin un trigger explícito en el thread. No infieras "tal vez la rechazaron".
 
+NIGHT CATCHUP (cuando invoked_by="night_catchup"):
+
+Este modo se activa AUTOMÁTICAMENTE en la primera invocación del bot tras un período dormido (>6h sin actividad — típicamente al arrancar el horario laboral por la mañana, o tras un fin de semana).
+
+Tu tarea: leer TODOS los mensajes acumulados durante la pausa (ya vienen listados en el initial_user_message) y EJECUTAR las acciones pendientes que normalmente harías en modo auto-listening, pero todas de una sola vez.
+
+QUÉ BUSCAR Y EJECUTAR (cada uno con su tool):
+
+  1. **Reglas nuevas del owner** ("regla:...", "siempre que...", "de ahora en adelante...", "nunca..."):
+     → add_persistent_rule(rule_text). SOLO si el sender es owner.
+
+  2. **Reportes de jornada** ("Reporte X: contactados N, respuestas M..."):
+     → register_daily_report con los números parseados.
+
+  3. **Anuncios de día off / enfermedad / vacaciones / llega tarde**:
+     → register_day_off con la fecha y el tipo.
+
+  4. **Decisiones del owner sobre leads** ("cancelar @handle", "rechazar X", "no nos sirve Y"):
+     → mark_lead_stage(handle, 'No interesada' o 'Rechazada').
+
+  5. **CONFIRMADAS/COMPLETADAS reportadas por closer** ("CONFIRMADA: @handle"):
+     → mark_lead_stage(handle, 'Confirmada' o 'Completada').
+     OJO con el verbo "confirmar" (ver sección ACCIÓN SOBRE LEADS).
+
+  6. **Compromisos / promesas** ("te lo cargo mañana 10am"):
+     → Ya los procesa el extractor automáticamente, no necesitás hacer nada.
+
+CÓMO RESPONDER AL FINAL:
+
+- UNA sola llamada a reply_to_group con un resumen breve.
+- Formato sugerido:
+    "☀️ Catchup de la pausa ({duración aprox}):
+    ✓ Registré X reportes (Yeison 30/0/0, Daniel 22/1/0...)
+    ✓ Anoté Y reglas nuevas del owner: "...resumen..."
+    ✓ Marqué Z como Rechazada (decisión de Alvaro)
+    ✓ Daniel se toma mañana libre (anotado)
+
+    Listos para arrancar el día 💪"
+
+- Si NO hay nada accionable (solo saludos, chistes, etc):
+    "☀️ Buen día equipo. Vi los mensajes de la pausa, nada que registrar. Arrancamos."
+
+REGLAS:
+
+- NO respondas a cada mensaje individual. Es UNA sola llamada a reply_to_group al final.
+- NO menciones (@) a nadie en este resumen — es info colectiva, no requiere ping.
+- Si dudás si algo es accionable, NO lo hagas. Mejor undercount que ejecutar acciones equivocadas.
+- Si el mismo handle aparece confirmado y cancelado en el período, priorizá el ÚLTIMO mensaje (regla de actualidad).
+
 MODO AUTO-LISTENING (cuando invoked_by="auto"):
 - El bot está escuchando el grupo y NO fue mencionado explícitamente. Por defecto el bot debe quedarse CALLADO.
 - Solo respondé via reply_to_group si el mensaje cae claramente en uno de estos casos de alto valor:
@@ -2684,6 +2733,95 @@ async function buildInitialUserMessage(args: {
         "Empezá usando list_commitments y search_messages para juntar datos. " +
         "Resumen final via reply_to_group, conciso (5-8 bullets máx).",
     );
+    return lines.join("\n");
+  }
+
+  // ─── NIGHT CATCHUP ──────────────────────────────────────────────────
+  // Primera invocación del día después de >6h sin actividad. El bot debe
+  // leer todos los mensajes nocturnos / del weekend / del período
+  // dormido y procesar acciones pendientes (reglas, reportes, decisiones
+  // del owner, anuncios de día off). Después manda UN solo mensaje
+  // resumen al grupo.
+  if (args.req.invoked_by === "night_catchup") {
+    const sb = adminClient();
+    // Buscar el último mensaje del bot — desde ahí leemos.
+    const { data: lastBotMsg } = await sb
+      .from("whatsapp_messages")
+      .select("sent_at")
+      .eq("group_id", args.groupId)
+      .eq("is_from_bot", true)
+      .order("sent_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const sinceIso = lastBotMsg?.sent_at
+      ?? new Date(Date.now() - 24 * 3600_000).toISOString();
+
+    // Cargar todos los mensajes del grupo desde sinceIso (no del bot).
+    const { data: nocturnos } = await sb
+      .from("whatsapp_messages")
+      .select("id, sender_display_name, sender_external_id, body, transcribed_text, msg_type, sent_at")
+      .eq("group_id", args.groupId)
+      .eq("is_from_bot", false)
+      .gt("sent_at", sinceIso)
+      .order("sent_at", { ascending: true })
+      .limit(100);
+
+    // Enriquecer senders con first names del profile (igual que en el
+    // flow normal).
+    const externalIds = new Set<string>();
+    for (const m of nocturnos ?? []) {
+      if (m.sender_external_id) externalIds.add(m.sender_external_id);
+    }
+    const idToFullName = new Map<string, string>();
+    if (externalIds.size > 0) {
+      const { data: members } = await sb
+        .from("whatsapp_members")
+        .select("external_id, user_id")
+        .eq("group_id", args.groupId)
+        .in("external_id", Array.from(externalIds));
+      const userIds = (members ?? []).map((mm) => mm.user_id).filter((u): u is string => Boolean(u));
+      if (userIds.length > 0) {
+        const { data: profs } = await sb
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", userIds);
+        const profMap = new Map((profs ?? []).map((p) => [p.id, p.full_name]));
+        for (const mm of (members ?? [])) {
+          const fn = mm.user_id ? profMap.get(mm.user_id) : null;
+          if (fn) idToFullName.set(mm.external_id, fn);
+        }
+      }
+    }
+    const firstName = (extId: string | null, displayName: string | null) => {
+      if (extId) {
+        const fn = idToFullName.get(extId);
+        if (fn) return fn.split(" ")[0] ?? fn;
+      }
+      return (displayName ?? "").trim() || "(desconocido)";
+    };
+    const effectiveText = (m: { body: string | null; transcribed_text: string | null; msg_type: string }) => {
+      if ((m.msg_type === "audio" || m.msg_type === "image") && m.transcribed_text) {
+        const prefix = m.msg_type === "audio" ? "[audio]" : "[imagen]";
+        return `${prefix} ${m.transcribed_text}`;
+      }
+      return m.body;
+    };
+
+    lines.push(`Tarea: NIGHT CATCHUP — Es la primera vez que te activás hoy después de un período dormido (desde ${sinceIso}). Tu trabajo es leer todos los mensajes del grupo en ese período y procesar acciones perdidas.`);
+    lines.push("");
+    lines.push(`Mensajes acumulados (${(nocturnos ?? []).length} mensajes):`);
+    for (const m of nocturnos ?? []) {
+      const sender = firstName(m.sender_external_id, m.sender_display_name);
+      const text = effectiveText(m);
+      if (text) lines.push(`[${m.sent_at}] ${sender}: ${text}`);
+    }
+    lines.push("");
+    lines.push("INSTRUCCIONES — Seguí las reglas de la sección 'NIGHT CATCHUP' del system prompt:");
+    lines.push("1. Identificá acciones perdidas: reglas nuevas, reportes de jornada, anuncios de día off, decisiones del owner, modelos rechazadas/confirmadas, etc.");
+    lines.push("2. Ejecutá las tools correspondientes SILENCIOSAMENTE (register_daily_report, register_day_off, add_persistent_rule, mark_lead_stage, etc).");
+    lines.push("3. Al final llamá reply_to_group UNA sola vez con un resumen breve tipo '📋 Catchup de la pausa: registré X, anoté regla Y, marqué a Z como rechazada...'.");
+    lines.push("4. Si no hay nada accionable (solo saludos / chats casuales), respondé igual con '☀️ Buen día equipo, vi los mensajes de la pausa, nada nuevo que registrar.'");
+    lines.push("5. NO respondas a cada mensaje individual — el resumen al final es UNA sola llamada a reply_to_group.");
     return lines.join("\n");
   }
 
