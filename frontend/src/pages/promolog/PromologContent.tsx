@@ -45,6 +45,7 @@ import DateRangePresets, { type RangePreset, rangeForPreset } from "@/components
 import PromologDashboardView from "./PromologDashboardView";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { ListRow, ListRowButton } from "@/components/ui/list-row";
+import { useTimezone, formatDateInTz, formatTimeInTz } from "@/hooks/useTimezone";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -222,10 +223,15 @@ const PromologContent = () => {
     },
   });
 
+  // Timezone preferido del user — afecta cómo se renderizan TODAS las
+  // fechas/horas en Promolog. Cuando el user cambia el TZ en el topbar,
+  // este memo recalcula y todas las entries se re-renderean con la nueva
+  // zona. Default: TZ guardado en localStorage / fallback Miami.
+  const { timezone: userTz } = useTimezone();
+
   // Map DB entries to PromologEntry interface
   const entries: PromologEntry[] = useMemo(() => {
     return promologEntries.map((pe: any) => {
-      const dateObj = new Date(pe.date);
       const creator = pe.creators as any;
       return {
         id: pe.id,
@@ -235,8 +241,12 @@ const PromologContent = () => {
         network: (pe.network || "").toLowerCase(),
         platform: pe.platform || "OnlyFans",
         result: promotedToResult(pe.promoted),
-        date: dateObj.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }),
-        time: dateObj.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: true }),
+        // Formateado en el TZ del user — `pe.date` viene en UTC desde DB
+        // (timestamp). Sin esto, se renderizaba con el TZ del browser
+        // que en muchos casos era UTC (la promo de las 6:12pm Miami se
+        // veía como 10:12pm porque -4h UTC).
+        date: formatDateInTz(pe.date, userTz),
+        time: formatTimeInTz(pe.date, userTz),
         agent: (pe.created_by && profilesMap[pe.created_by]) || (pe.reviewed_by && profilesMap[pe.reviewed_by]) || "AI Agent",
         notes: pe.notes || "",
         creator_id: pe.creator_id,
@@ -254,7 +264,7 @@ const PromologContent = () => {
         ai_confidence: pe.ai_confidence != null ? Number(pe.ai_confidence) : null,
       };
     });
-  }, [promologEntries, profilesMap]);
+  }, [promologEntries, profilesMap, userTz]);
 
   // Deduplicate entries: group by creator_id + day + network + platform + result
   const dedupedEntries = useMemo(() => {
