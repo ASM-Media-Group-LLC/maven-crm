@@ -77,9 +77,23 @@ interface FormatOptions {
   options?: Intl.DateTimeFormatOptions;
 }
 
+/** Parsea un input que puede venir como Date o string. Si es string SIN
+ *  info de zona (ej "2026-05-28T23:12:45" — típico de columnas Postgres
+ *  `timestamp without time zone` como `promolog_entries.date`), asume
+ *  UTC y agrega "Z" para evitar que JS lo interprete como hora local del
+ *  browser. Si la string ya tiene "Z" o un offset "+HH:MM" / "-HH:MM",
+ *  se respeta tal como vino. */
+function parseAsUtcIfNaive(input: Date | string): Date {
+  if (input instanceof Date) return input;
+  const s = String(input);
+  // ¿Tiene info de zona explícita? Z al final, o +HH:MM / -HH:MM antes de fin.
+  const hasZone = /Z$|[+-]\d{2}:?\d{2}$/.test(s);
+  return new Date(hasZone ? s : s + "Z");
+}
+
 /** Devuelve "28 may 2026" en el TZ dado. */
 export function formatDateInTz(input: Date | string, tz: string, opts?: FormatOptions): string {
-  const date = typeof input === "string" ? new Date(input) : input;
+  const date = parseAsUtcIfNaive(input);
   if (isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat(opts?.locale ?? "es-ES", {
     timeZone: tz,
@@ -92,7 +106,7 @@ export function formatDateInTz(input: Date | string, tz: string, opts?: FormatOp
 
 /** Devuelve "06:12 PM" en el TZ dado. */
 export function formatTimeInTz(input: Date | string, tz: string, opts?: FormatOptions): string {
-  const date = typeof input === "string" ? new Date(input) : input;
+  const date = parseAsUtcIfNaive(input);
   if (isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat(opts?.locale ?? "es-ES", {
     timeZone: tz,
