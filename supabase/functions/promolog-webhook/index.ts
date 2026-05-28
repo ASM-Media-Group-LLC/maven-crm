@@ -432,12 +432,16 @@ async function callOpenRouter(
   content: unknown[],
   apiKey: string,
 ): Promise<{ analysis: StoryAnalysis } | { error: string }> {
+  // max_tokens=2048 (era 1024) — el prompt tiene una sección
+  // "INSTRUCCIONES ESPECIALES" larga y Gemini a veces cortaba el JSON
+  // a la mitad del field `reasoning`. Con 2K hay margen amplio. Cuesta
+  // ~$0.000005 extra por call (despreciable).
   const body = {
     model: LLM_MODEL,
     messages: [{ role: "user", content }],
     response_format: { type: "json_object" },
     temperature: 0.1,
-    max_tokens: 1024,
+    max_tokens: 2048,
   };
 
   const ac = new AbortController();
