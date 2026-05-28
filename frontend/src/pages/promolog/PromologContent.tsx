@@ -486,6 +486,34 @@ const PromologContent = () => {
   };
   const handleEditEntry = (entry: PromologEntry) => {
     setSelectedEntry(entry);
+    // Pre-cargar los state vars del modal con los valores actuales del
+    // entry. Antes el modal se abría con todo en blanco aunque la DB
+    // tuviera la info — confundía al chatter y obligaba a rellenar de
+    // nuevo lo que el bot AI ya había clasificado. Ahora el modal
+    // refleja lo que está en la DB y solo hay que ajustar lo necesario.
+    // entryResult acepta solo "si"/"no" — si la entry está "Pendiente"
+    // o "Parcial", default "no" para que el chatter pueda promover a "si".
+    setEntryResult(entry.result === "Sí" ? "si" : "no");
+    // Network: la DB guarda "Instagram", el form usa "instagram" (lowercase).
+    setEntryNetwork((entry.network || "").toLowerCase());
+    // Platform: la DB puede tener "OnlyFans" / "onlyfans" / "Unlok" / "Otra".
+    // Mapeamos al valor que el form espera ("onlyfans"/"unlok"/"otra"). Si
+    // viene algo no estándar lo tratamos como "otra" y guardamos el valor
+    // original como custom platform para que el user lo vea.
+    const platRaw = (entry.platform || "").toLowerCase().trim();
+    if (platRaw === "onlyfans" || platRaw === "unlok") {
+      setEntryPlatform(platRaw);
+      setEntryCustomPlatform("");
+    } else if (platRaw && platRaw !== "ninguna") {
+      setEntryPlatform("otra");
+      setEntryCustomPlatform(entry.platform ?? "");
+    } else {
+      setEntryPlatform("");
+      setEntryCustomPlatform("");
+    }
+    setEntryNotes(entry.notes ?? "");
+    setEntryStrategy(entry.action_taken ?? "");
+    setEntryEvidencePreview(entry.evidence_url ?? "");
     setEditEntryOpen(true);
   };
   const handleDeleteEntry = (entry: PromologEntry) => {
