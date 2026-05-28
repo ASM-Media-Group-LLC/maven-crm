@@ -194,11 +194,16 @@ const PromologContent = () => {
   const { data: promologEntries = [], isLoading: entriesLoading } = useQuery({
     queryKey: ["promolog-entries", user?.id, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
+      // Limit alto porque cada día el bot genera ~400 entries (20 stories
+      // por creadora * ~120 activas). Con limit 500 antes, "Esta semana"
+      // o "Este mes" solo veían las 500 más recientes (= hoy + ayer
+      // parcial). 10000 cubre ~25 días holgado. Si se acerca a este cap
+      // habría que mover los counts a queries agregadas server-side.
       let query = supabase
         .from("promolog_entries")
         .select("*, creators(name, artistic_name, instagram_handle, category, profile_photo_url)")
         .order("date", { ascending: false })
-        .limit(500);
+        .limit(10000);
 
       // Closers/agents/employees only see their own entries
       if (!isManagement && user?.id) {

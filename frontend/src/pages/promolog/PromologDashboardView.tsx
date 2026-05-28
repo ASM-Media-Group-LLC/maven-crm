@@ -142,13 +142,20 @@ const PromologDashboardView = ({
     const diff = differenceInCalendarDays(dateTo, dateFrom) + 1;
     return Math.max(1, diff);
   }, [dateFrom, dateTo]);
-  const topByConsistency = useMemo(() => {
-    // Sólo creators que tienen al menos 1 día con promo. Empate por daysWithPromo
-    // se desempata con promoCount (más volumen gana en empate).
+  // Top 3 MENOS Promoción — las creadoras escaneadas que MENOS
+  // promocionaron en el rango (volumen ascendente). El management las
+  // usa para identificar quién necesita refuerzo del chatter. Incluimos
+  // las que tienen 0 promos en el período (son las más críticas). Si
+  // hay menos de 3 con 0 promos, completamos con las de 1, 2, etc.
+  // Tie-break: menos % cumplimiento primero, luego nombre alfabético.
+  const bottomByVolume = useMemo(() => {
     return [...creatorsAgg]
-      .filter(c => c.daysWithPromo > 0)
       .map(c => ({ ...c, pct: Math.round((c.daysWithPromo / daysInRange) * 100) }))
-      .sort((a, b) => b.pct - a.pct || b.promoCount - a.promoCount)
+      .sort((a, b) =>
+        a.promoCount - b.promoCount ||
+        a.pct - b.pct ||
+        a.name.localeCompare(b.name),
+      )
       .slice(0, 3);
   }, [creatorsAgg, daysInRange]);
 
@@ -345,19 +352,23 @@ const PromologDashboardView = ({
           }))}
           onClick={goToCreator}
         />
+        {/* Top 3 MENOS Promoción — antes era "Más Constantes" (las que
+            promueven más seguido). Cambiado a su inverso porque el equipo
+            las usa para identificar a quién hacerle seguimiento prioritario.
+            Las 3 que aparecen son las que necesitan refuerzo del chatter. */}
         <PodioCard
-          title="Top 3 — Más Constantes"
-          subtitle="% días con promo en el rango"
-          icon={<Clock className="h-4 w-4 text-blue-400" />}
-          items={topByConsistency.map((c, i) => ({
+          title="Top 3 — Menos Promoción"
+          subtitle="Las que necesitan refuerzo del chatter"
+          icon={<AlertCircle className="h-4 w-4 text-rose-400" />}
+          items={bottomByVolume.map((c, i) => ({
             position: i,
             creatorId: c.creatorId,
             name: c.name,
             handle: c.handle,
             photo: c.photo,
             category: c.category,
-            primaryValue: `${c.pct}%`,
-            secondaryValue: `${c.daysWithPromo} de ${daysInRange} días`,
+            primaryValue: `${c.promoCount} promo${c.promoCount === 1 ? "" : "s"}`,
+            secondaryValue: c.pct > 0 ? `${c.pct}% cumplimiento` : "Sin actividad",
           }))}
           onClick={goToCreator}
         />
