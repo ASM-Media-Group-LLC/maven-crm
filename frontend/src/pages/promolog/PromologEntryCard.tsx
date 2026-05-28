@@ -37,6 +37,19 @@ export interface PromologEntry {
   // KPI modal "Creadores escaneados" para agrupar la lista.
   category?: string | null;
   profile_photo_url?: string | null;
+  // Acción tomada para promocionar (ej. "Story con link", "Post con CTA").
+  // Lo popula el chatter/closer al marcar la promo como Sí.
+  action_taken?: string | null;
+  // URL del pantallazo/imagen de evidencia (storage o CDN externo).
+  // El bot Promolog lo guarda con la URL del thumbnail/story de Apify.
+  evidence_url?: string | null;
+  // Plataforma de destino del link (onlyfans / piclink / linktree / fansly / other).
+  buy_link_type?: string | null;
+  // Si la promo tiene link visible (sticker, URL en caption, etc.).
+  has_buy_link?: boolean;
+  // Razonamiento de la AI cuando analyzed_by_ai = true.
+  ai_reasoning?: string | null;
+  ai_confidence?: number | null;
 }
 
 interface PromologEntryCardProps {
@@ -318,30 +331,9 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <span className="text-sm font-medium">
-                  Tipo de Contacto <span className="text-destructive">*</span>
-                </span>
-                <div className="grid grid-cols-3 gap-2">
-                  {contactTypeOptions.map((opt) => {
-                    const isSelected = editContactType === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setEditContactType(opt.value)}
-                        className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${
-                          isSelected
-                            ? "border-2 border-primary bg-accent text-accent-foreground"
-                            : "border border-input bg-background text-muted-foreground hover:bg-accent"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* "Tipo de Contacto" eliminado — el equipo de management
+                  no lo usa y agregaba fricción al chatter. Red social +
+                  plataforma + estrategia ya alcanza. */}
 
               <div className="space-y-2">
                 <span className="text-sm font-medium">Notas</span>

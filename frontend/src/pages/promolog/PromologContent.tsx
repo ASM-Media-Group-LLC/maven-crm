@@ -243,6 +243,15 @@ const PromologContent = () => {
         reviewed_by: pe.reviewed_by || undefined,
         category: creator?.category ?? null,
         profile_photo_url: creator?.profile_photo_url ?? null,
+        // action_taken sigue para entries manuales (el chatter elige una
+        // estrategia del dropdown). Para entries del bot, este campo
+        // viene null — pero el `ai_reasoning` cubre la explicación.
+        action_taken: pe.action_taken ?? null,
+        evidence_url: pe.evidence_url ?? null,
+        buy_link_type: pe.buy_link_type ?? null,
+        has_buy_link: pe.has_buy_link === true,
+        ai_reasoning: pe.ai_reasoning ?? null,
+        ai_confidence: pe.ai_confidence != null ? Number(pe.ai_confidence) : null,
       };
     });
   }, [promologEntries, profilesMap]);
@@ -1194,19 +1203,6 @@ const PromologContent = () => {
                             })}
                           </div>
                         </div>
-                        <div className="space-y-2">
-                          <span className="text-sm font-medium">Tipo de Contacto <span className="text-destructive">*</span></span>
-                          <div className="grid grid-cols-3 gap-2">
-                            {contactTypeOptions.map((opt) => {
-                              const isSelected = entryContactType === opt.value;
-                              return (
-                                <button key={opt.value} type="button" onClick={() => setEntryContactType(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                                  {opt.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
                       </>
                     )}
 
@@ -1241,8 +1237,12 @@ const PromologContent = () => {
                     <Button onClick={async () => {
                       if (!selectedCreatorForEntry) return;
                       if (entryResult === "si") {
-                        if (!entryNetwork || !entryPlatform || !entryContactType) {
-                          toast({ title: "Campos requeridos", description: "Completa Red Social, Plataforma y Tipo de Contacto.", variant: "destructive" });
+                        // Tipo de Contacto se eliminó del flow: el equipo ya
+                        // no lo usaba, agregaba fricción y la combinación
+                        // red social + plataforma + estrategia ya cuenta la
+                        // historia. Solo validamos Red Social + Plataforma.
+                        if (!entryNetwork || !entryPlatform) {
+                          toast({ title: "Campos requeridos", description: "Completa Red Social y Plataforma.", variant: "destructive" });
                           return;
                         }
                       }
@@ -1253,7 +1253,6 @@ const PromologContent = () => {
                         promoted: entryResult === "si" ? "true" : "false",
                         network: entryResult === "si" ? entryNetwork : "n/a",
                         platform: entryResult === "si" ? platformValue : null,
-                        contact_type: entryResult === "si" ? entryContactType : null,
                         notes: entryNotes || null,
                         action_taken: entryResult === "si" ? entryStrategy || null : null,
                         evidence_url: entryEvidencePreview || null,
@@ -1276,30 +1275,155 @@ const PromologContent = () => {
           </DialogContent>
         </Dialog>
 
-        {/* View Entry Modal */}
+        {/* View Entry Modal — ahora muestra todo lo que el bot Promolog
+            graba: red social, plataforma destino, link de compra, acción
+            tomada, notas, evidencia visual (pantallazo de la story/post),
+            y razonamiento de la AI cuando viene del pipeline automático.
+            "Tipo de Contacto" se eliminó del flow porque era ruido para
+            el equipo de management — la red social + plataforma ya dicen
+            por dónde vino la promo. */}
         {selectedEntry && (
           <Dialog open={viewEntryOpen} onOpenChange={setViewEntryOpen}>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader className="pr-8">
                 <DialogTitle>Detalle de Entrada</DialogTitle>
-                <DialogDescription className="sr-only">Detalle de la entrada de promolog</DialogDescription>
+                <DialogDescription className="sr-only">Detalle completo de la entrada de Promolog</DialogDescription>
               </DialogHeader>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="font-mono text-xs">{selectedEntry.ticketNumber}</Badge>
+              <div className="space-y-4">
+                {/* Header: ticket + nombre + handle */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="font-mono text-xs">{selectedEntry.ticketNumber || "—"}</Badge>
                   <span className="text-sm font-semibold">{selectedEntry.name}</span>
-                  {selectedEntry.handle && <span className="text-sm text-muted-foreground">@{selectedEntry.handle}</span>}
+                  {selectedEntry.handle && (
+                    <span className="text-sm text-muted-foreground">
+                      @{(selectedEntry.handle ?? "").replace(/^@/, "").replace(/\/$/, "").split("/").pop()}
+                    </span>
+                  )}
                 </div>
+
+                {/* Grid de metadata principal */}
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-muted-foreground">Red Social:</span> <span className="font-medium capitalize">{selectedEntry.network}</span></div>
-                  <div><span className="text-muted-foreground">Plataforma:</span> <span className="font-medium">{selectedEntry.platform}</span></div>
-                  <div><span className="text-muted-foreground">Resultado:</span> <Badge variant="outline" className="ml-1 text-xs">{selectedEntry.result}</Badge></div>
-                  <div><span className="text-muted-foreground">Agente:</span> <span className="font-medium">@{selectedEntry.agent}</span></div>
-                  <div><span className="text-muted-foreground">Fecha:</span> <span className="font-medium">{selectedEntry.date}</span></div>
-                  <div><span className="text-muted-foreground">Hora:</span> <span className="font-medium">{selectedEntry.time}</span></div>
+                  <div>
+                    <span className="text-muted-foreground">Red social:</span>{" "}
+                    <span className="font-medium capitalize">{selectedEntry.network || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Plataforma destino:</span>{" "}
+                    <span className="font-medium">{selectedEntry.platform || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Resultado:</span>{" "}
+                    <Badge variant={resultToBadgeVariant(selectedEntry.result)} className="ml-1 text-xs">
+                      {selectedEntry.result}
+                    </Badge>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Agente:</span>{" "}
+                    <span className="font-medium">{selectedEntry.agent}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Fecha:</span>{" "}
+                    <span className="font-medium">{selectedEntry.date}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Hora:</span>{" "}
+                    <span className="font-medium">{selectedEntry.time}</span>
+                  </div>
                 </div>
+
+                {/* Buy link — sólo cuando la promo tiene link visible */}
+                {selectedEntry.has_buy_link && (
+                  <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-1">
+                    <p className="text-xs uppercase tracking-wider text-emerald-400 font-semibold flex items-center gap-1.5">
+                      <Check className="h-3 w-3" />
+                      Link de compra detectado
+                    </p>
+                    <p className="text-sm">
+                      Tipo:{" "}
+                      <Badge variant="success-soft" className="text-[10px] capitalize">
+                        {selectedEntry.buy_link_type || "no especificado"}
+                      </Badge>
+                    </p>
+                  </div>
+                )}
+
+                {/* Acción tomada — qué hizo la creadora para promocionar
+                    (story con sticker, post con CTA, link en bio, etc.). */}
+                {selectedEntry.action_taken && (
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Qué hizo para promocionar</p>
+                    <p className="text-sm bg-muted/40 rounded-md p-3">{selectedEntry.action_taken}</p>
+                  </div>
+                )}
+
+                {/* Notas — viene del chatter manual o del bot ([AUTO] reasoning). */}
                 {selectedEntry.notes && (
-                  <div className="text-sm"><span className="font-semibold">Notas: </span><span className="text-muted-foreground">{selectedEntry.notes}</span></div>
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Notas</p>
+                    <p className="text-sm bg-muted/40 rounded-md p-3 whitespace-pre-wrap">{selectedEntry.notes}</p>
+                  </div>
+                )}
+
+                {/* AI reasoning + confidence — solo si fue analizada por el
+                    pipeline automático. Es info técnica útil para validar
+                    si la AI clasificó bien (sobre todo en casos ambiguos). */}
+                {selectedEntry.ai_reasoning && (
+                  <div className="rounded-md border border-blue-500/30 bg-blue-500/5 p-3 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs uppercase tracking-wider text-blue-400 font-semibold">Análisis AI</p>
+                      {selectedEntry.ai_confidence != null && (
+                        <Badge variant="secondary-soft" className="text-[10px] tabular-nums">
+                          Confianza: {(selectedEntry.ai_confidence * 100).toFixed(0)}%
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground italic">{selectedEntry.ai_reasoning}</p>
+                  </div>
+                )}
+
+                {/* Evidencia — pantallazo de la story o post. Lo guarda
+                    el bot Promolog con la URL del thumbnail de Apify, o
+                    el chatter manual al subir un screenshot. */}
+                {selectedEntry.evidence_url && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Evidencia</p>
+                      <a
+                        href={selectedEntry.evidence_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Abrir en nueva pestaña
+                      </a>
+                    </div>
+                    <a
+                      href={selectedEntry.evidence_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-md overflow-hidden border border-border bg-muted/20 hover:border-primary/40 transition-colors"
+                    >
+                      <img
+                        src={selectedEntry.evidence_url}
+                        alt="Pantallazo de la promo"
+                        className="w-full max-h-[400px] object-contain"
+                        onError={(e) => {
+                          // Si la imagen falla (URL CDN de IG expirada, signed URL caducada),
+                          // mostramos un fallback en lugar del icono roto.
+                          const img = e.currentTarget;
+                          img.style.display = "none";
+                          const parent = img.parentElement;
+                          if (parent && !parent.querySelector(".fallback")) {
+                            const fb = document.createElement("div");
+                            fb.className = "fallback p-6 text-center text-xs text-muted-foreground";
+                            fb.textContent = "La imagen ya no está disponible (URL expirada). Hacé click en 'Abrir en nueva pestaña' para verla en su origen.";
+                            parent.appendChild(fb);
+                          }
+                        }}
+                      />
+                    </a>
+                  </div>
                 )}
               </div>
               <DialogFooter>
@@ -1380,19 +1504,6 @@ const PromologContent = () => {
                         )}
                       </div>
                       <div className="space-y-2">
-                        <span className="text-sm font-medium">Tipo de Contacto <span className="text-destructive">*</span></span>
-                        <div className="grid grid-cols-3 gap-2">
-                          {contactTypeOptions.map((opt) => {
-                            const isSelected = entryContactType === opt.value;
-                            return (
-                              <button key={opt.value} type="button" onClick={() => setEntryContactType(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                                {opt.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
                         <span className="text-sm font-medium">¿Qué se hizo para que promocione?</span>
                         <div className="grid grid-cols-2 gap-2">
                           {strategyOptions.map((opt) => {
@@ -1439,8 +1550,8 @@ const PromologContent = () => {
                   <Button className="bg-cyan-500 hover:bg-cyan-600 text-white" onClick={async () => {
                     if (!selectedEntry) return;
                     if (entryResult === "si") {
-                      if (!entryNetwork || !entryPlatform || !entryContactType) {
-                        toast({ title: "Campos requeridos", description: "Completa Red Social, Plataforma y Tipo de Contacto.", variant: "destructive" });
+                      if (!entryNetwork || !entryPlatform) {
+                        toast({ title: "Campos requeridos", description: "Completa Red Social y Plataforma.", variant: "destructive" });
                         return;
                       }
                     }
@@ -1449,7 +1560,10 @@ const PromologContent = () => {
                       promoted: entryResult === "si" ? "true" : "false",
                       network: entryResult === "si" ? entryNetwork : "n/a",
                       platform: entryResult === "si" ? platformValue : null,
-                      contact_type: entryResult === "si" ? entryContactType : null,
+                      // contact_type eliminado del flow — el field sigue en DB
+                      // (no se dropea por ahora) pero la UI no lo escribe ni
+                      // lee. Si después el equipo necesita rescatarlo, basta
+                      // con re-agregar el campo + selector aquí.
                       notes: entryNotes || null,
                       action_taken: entryResult === "si" ? entryStrategy || null : null,
                       evidence_url: entryEvidencePreview || null,
