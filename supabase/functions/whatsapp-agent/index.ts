@@ -165,6 +165,28 @@ USAR EL CONTEXTO ANTES DE PREGUNTAR:
 - Ejemplo malo: "¿Vos la tenías asignada o la recién agarrás?" cuando el contexto muestra closer_creators con stage='Asignada' y passed_date=hoy → ya sabés que la acaba de tomar.
 - Antes de hacer cualquier pregunta, revisá el contexto que ya tenés. Solo preguntá si REALMENTE falta info.
 
+CONSULTAR MAVEN ANTES DE PEDIR A LA PERSONA (regla crítica):
+
+El bot tiene ACCESO COMPLETO a la DB de Maven via service_role — bypassa RLS, puede leer cualquier tabla. NUNCA le pidas a alguien que te diga info que vos podés consultar.
+
+Casos típicos donde el bot mete la pata pidiendo info que está en DB:
+
+  ✗ MAL: "Julieth, ¿cuáles son los 2 handles que confirmaste?"
+  ✓ BIEN: llamar get_closer_pipeline_status({display_name: "Julieth"}) → handles_by_stage.Confirmada te da los handles exactos. Después responder directo: "Las 2 confirmadas de Julieth son @jessicarrpacheco y @lunitapersee, ambas en stage Confirmada esperando firma."
+
+  ✗ MAL: "Miguel, ¿qué leads tenés asignadas?"
+  ✓ BIEN: get_closer_pipeline_status({display_name: "Miguel"}) → handles_by_stage.Asignada.
+
+  ✗ MAL: "Daniel, ¿cuántos contactos cargaste hoy en Maven?"
+  ✓ BIEN: get_member_maven_activity({display_name: "Daniel"}) → leadgen_entries_with_phone.
+
+  ✗ MAL: "Yeison, ¿cuáles cuentas IG estás usando?"
+  ✓ BIEN: get_llg_account_status({display_name: "Yeison"}) → lista completa de cuentas con score/restringidas.
+
+REGLA: cualquier pregunta tipo "cuántos/cuáles/qué tiene X" sobre datos operativos (leads, contactos, cuentas, pipeline, números, asignadas, confirmadas) → PRIMERO consultá la tool correspondiente. Solo preguntá al user si la tool devuelve vacío o falta contexto subjetivo (ej. "por qué rechazaste a X" — esa razón no está en DB).
+
+OJO: si vas a CONFIRMAR algo crítico que tocó la persona (ej. "marcaste a X como confirmada, ¿es así?"), está bien preguntar para evitar errores. Pero ANTES revisá la tool — si la data ya está clara, no hace falta preguntar.
+
 INTERPRETACIÓN DE INSTRUCCIONES Y AUDIENCIA (regla crítica — anti-alucinación pragmática):
 
 Cuando alguien escribe en el grupo, NO toda instrucción te aplica a vos NI a todos. Antes de actuar, identificá:
@@ -937,7 +959,7 @@ const TOOLS: Array<{
   {
     name: "get_closer_pipeline_status",
     description:
-      "Devuelve el estado del pipeline de leads asignadas a un closer (o de TODO el equipo si no se pasa closer). Útil para responder '¿cómo va Miguel?', '¿cuántas leads tiene atrasadas Julieth?', '¿qué pipeline tiene el equipo?'. Trae: counts por stage (Asignada, Confirmada, Completada, No interesada), leads con contactos overdue (cadencia 1-3-5-8-15-29 días), y leads stale (asignadas hace >30d sin tocar). NO uses esta tool si solo te preguntan por un lead específico — usá lookup_lead_history para eso.",
+      "Devuelve el estado del pipeline de leads de un closer (o del equipo entero). Útil para responder '¿cómo va Miguel?', '¿cuántas leads tiene atrasadas Julieth?', '¿qué pipeline tiene el equipo?', '¿cuáles son las confirmadas de Julieth?', '¿cuáles leads están en Completada?'. Trae:\n- by_stage: counts por stage (Asignada, Confirmada, Completada, No interesada, Rechazada).\n- handles_by_stage: LISTA DE HANDLES de IG por stage (con fecha del cambio). Esto te permite responder 'cuáles son las 2 confirmadas de X' sin tener que preguntarle a la persona. Para Confirmada/Completada devuelve TODAS, para Asignada/No interesada devuelve top 20 recientes.\n- overdue_contacts: leads con contactos vencidos según cadencia 1-3-5-8-15-29.\n- stale_asignadas: asignadas hace >30d sin tocar.\nNO uses esta tool si solo te preguntan por UN lead específico — usá lookup_lead_history para eso.",
     input_schema: {
       type: "object",
       properties: {
@@ -2075,14 +2097,40 @@ async function executeTool(
       // Cadencia de los 6 contactos del closer (días desde passed_date).
       const cadence = [1, 3, 5, 8, 15, 29];
 
-      // Counts por stage.
-      let countQ = sb.from("closer_creators").select("stage", { count: "exact", head: false });
-      if (closerUserId) countQ = countQ.eq("assigned_to", closerUserId);
-      const { data: stageRows } = await countQ;
+      // Counts + HANDLES por stage. Trae los handles para que el bot
+      // pueda responder "cuáles son las confirmadas de Julieth?" sin
+      // tener que preguntarle al user — la data ya está en Maven.
+      let detailQ = sb.from("closer_creators")
+        .select("id, instagram_handle, stage, confirmed_date, completed_date, no_interesada_date, last_contact_date, passed_date")
+        .order("updated_at", { ascending: false })
+        .limit(200);
+      if (closerUserId) detailQ = detailQ.eq("assigned_to", closerUserId);
+      const { data: stageRows } = await detailQ;
       const byStage: Record<string, number> = {};
-      for (const r of (stageRows ?? []) as Array<{ stage: string | null }>) {
+      const handlesByStage: Record<string, Array<{ handle: string; date: string | null }>> = {};
+      for (const r of (stageRows ?? []) as Array<{
+        id: string;
+        instagram_handle: string | null;
+        stage: string | null;
+        confirmed_date: string | null;
+        completed_date: string | null;
+        no_interesada_date: string | null;
+        last_contact_date: string | null;
+        passed_date: string | null;
+      }>) {
         const s = r.stage ?? "Sin stage";
         byStage[s] = (byStage[s] ?? 0) + 1;
+        if (!handlesByStage[s]) handlesByStage[s] = [];
+        // Fecha relevante según el stage
+        const dateForStage = s === "Confirmada" ? r.confirmed_date
+          : s === "Completada" ? r.completed_date
+          : s === "No interesada" || s === "Rechazada" ? r.no_interesada_date
+          : s === "Asignada" ? (r.last_contact_date ?? r.passed_date)
+          : null;
+        handlesByStage[s].push({
+          handle: r.instagram_handle ?? "(sin handle)",
+          date: dateForStage,
+        });
       }
 
       // Leads Asignadas: traer minimum data + contar contactos history → flag overdue.
@@ -2127,9 +2175,23 @@ async function executeTool(
         }
       }
 
+      // Para Confirmadas/Completadas mostramos TODOS los handles
+      // (lo más útil para el bot). Para Asignadas/Nuevo solo los
+      // 20 más recientes para no exceder context. No interesada/
+      // Rechazada → 20 más recientes.
+      const trimmedHandles: Record<string, Array<{ handle: string; date: string | null }>> = {};
+      for (const [stage, list] of Object.entries(handlesByStage)) {
+        if (stage === "Confirmada" || stage === "Completada") {
+          trimmedHandles[stage] = list; // todos
+        } else {
+          trimmedHandles[stage] = list.slice(0, 20);
+        }
+      }
+
       return {
         closer: closerName,
         by_stage: byStage,
+        handles_by_stage: trimmedHandles,
         overdue_contacts: overdue.slice(0, 15),
         overdue_count: overdue.length,
         stale_asignadas: staleAsignadas.slice(0, 10),
