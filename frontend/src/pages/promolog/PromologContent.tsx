@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -31,12 +32,19 @@ import {
   Pencil,
   Trash2,
   BarChart3,
+  ArrowRight,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import KpiCard from "@/components/dashboard/KpiCard";
-import { ListRow } from "@/components/ui/list-row";
+import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
+import DateRangePresets, { type RangePreset, rangeForPreset } from "@/components/dashboard/DateRangePresets";
+import PromologDashboardView from "./PromologDashboardView";
+import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
+import { ListRow, ListRowButton } from "@/components/ui/list-row";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -107,11 +115,13 @@ const resultToBadgeVariant = (result: string): "success-soft" | "destructive-sof
 
 // agentsData is now computed dynamically via useMemo inside the component
 
+// Subtabs visibles dentro de Promolog. Antes había Promos/Agentes/
+// Campañas/Rendimiento; el spec nuevo dejó Dashboard/Promos/Agentes
+// (Campañas se eliminó completo, Rendimiento ya estaba poco usado).
 const tabItems = [
+  { id: "dashboard" as const, label: "Dashboard", icon: BarChart3 },
   { id: "promos" as const, label: "Promos", icon: Table2 },
   { id: "agentes" as const, label: "Agentes", icon: Users },
-  { id: "campanas" as const, label: "Campañas", icon: Target },
-  { id: "rendimiento" as const, label: "Rendimiento", icon: BarChart3 },
 ];
 
 const DAY_LABELS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
@@ -169,8 +179,15 @@ const PromologContent = () => {
 
   const queryClient = useQueryClient();
 
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  // Date range global — controla el filtrado de TODOS los subtabs
+  // (Dashboard, Promos, Agentes). Default = "Hoy" igual que Panel de
+  // Control: la mayoría del uso es check del día en curso. El user
+  // puede ampliar a Ayer / Esta semana / Este mes con los chips, o
+  // elegir un rango custom desde el DateRangePicker.
+  const initialRange = rangeForPreset("today");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(initialRange.from);
+  const [dateTo, setDateTo] = useState<Date | undefined>(initialRange.to);
+  const [activeDatePreset, setActiveDatePreset] = useState<RangePreset | null>("today");
 
   // Fetch real promolog entries
   const { data: promologEntries = [], isLoading: entriesLoading } = useQuery({
@@ -178,9 +195,9 @@ const PromologContent = () => {
     queryFn: async () => {
       let query = supabase
         .from("promolog_entries")
-        .select("*, creators(name, artistic_name, instagram_handle)")
+        .select("*, creators(name, artistic_name, instagram_handle, category, profile_photo_url)")
         .order("date", { ascending: false })
-        .limit(200);
+        .limit(500);
 
       // Closers/agents/employees only see their own entries
       if (!isManagement && user?.id) {
@@ -224,6 +241,8 @@ const PromologContent = () => {
         notes: pe.notes || "",
         creator_id: pe.creator_id,
         reviewed_by: pe.reviewed_by || undefined,
+        category: creator?.category ?? null,
+        profile_photo_url: creator?.profile_photo_url ?? null,
       };
     });
   }, [promologEntries, profilesMap]);
@@ -282,7 +301,10 @@ const PromologContent = () => {
     { value: "otro", label: "Otro" },
   ];
 
-  const [activeTab, setActiveTab] = useState<"promos" | "agentes" | "campanas" | "rendimiento">("promos");
+  // Default = "dashboard": al abrir Promolog la primera vista es el
+  // dashboard con KPIs + podios + insights. El user navega a "Promos"
+  // si quiere ver el listado, "Agentes" para el detalle por agente.
+  const [activeTab, setActiveTab] = useState<"dashboard" | "promos" | "agentes">("dashboard");
   const [agentesView, setAgentesView] = useState<"list" | "grid" | "calendar">("list");
   const [agentWeekOffset, setAgentWeekOffset] = useState(0);
   const [campanasView, setCampanasView] = useState<"list" | "grid">("list");
@@ -562,15 +584,37 @@ const PromologContent = () => {
     setStatsCollapsed(e.currentTarget.scrollTop > 40);
   }, []);
 
-  // KPI modal state
-  const [kpiModalType, setKpiModalType] = useState<"ingresados" | "no_chequeadas" | "completadas" | null>(null);
-   const kpiModalEntries = useMemo(() => {
+  // KPI modal state. "creadores_escaneados" abre un modal especial con
+  // las creadoras únicas agrupadas por categoría (Elite, A+, ...). Los
+  // otros tipos siguen mostrando entries individuales.
+  type KpiModalType = "ingresados" | "no_chequeadas" | "completadas" | "creadores_escaneados" | null;
+  const [kpiModalType, setKpiModalType] = useState<KpiModalType>(null);
+  // Categorías colapsadas dentro del modal "Creadores escaneados".
+  // Default: solo la primera categoría con resultados queda expandida.
+  const [kpiCollapsed, setKpiCollapsed] = useState<Set<string>>(new Set());
+  // Reset el collapsed state al abrir/cerrar/cambiar de KPI para que
+  // siempre arranque con el default (solo top expandida).
+  const openKpiModal = (next: KpiModalType) => {
+    setKpiModalType(next);
+    setKpiCollapsed(new Set());
+  };
+  const closeKpiModal = () => {
+    setKpiModalType(null);
+    setKpiCollapsed(new Set());
+  };
+
+  const kpiModalEntries = useMemo(() => {
     if (!kpiModalType) return [];
     if (kpiModalType === "no_chequeadas") return dedupedEntries.filter(e => e.result === "Pendiente");
     if (kpiModalType === "completadas") return dedupedEntries.filter(e => e.result === "Sí");
     return dedupedEntries;
   }, [dedupedEntries, kpiModalType]);
-  const kpiModalTitle = kpiModalType === "ingresados" ? "Tickets Ingresados" : kpiModalType === "no_chequeadas" ? "Tickets NO Chequeadas" : "Tickets Completadas Hoy";
+  const kpiModalTitle = kpiModalType === "ingresados" ? "Tickets Ingresados"
+    : kpiModalType === "no_chequeadas" ? "Tickets NO Chequeadas"
+    : kpiModalType === "completadas" ? "Tickets Completadas Hoy"
+    : "Creadores Escaneados";
+
+  const navigate = useNavigate();
 
   const filteredEntries = useMemo(() => {
     return dedupedEntries.filter((entry) => {
@@ -589,6 +633,43 @@ const PromologContent = () => {
     });
   }, [dedupedEntries, selectedCreatorFilter, selectedStatus, selectedNetwork, selectedCardPlatform, searchEntry]);
 
+  // Resumen por creator para el KPI "Creadores escaneados" + su modal.
+  // Una creadora cuenta como "Promocionó" si tiene AL MENOS una entry
+  // result === "Sí" en el período filtrado; sino cuenta como "No
+  // promocionó". Entries pendientes no califican como promoción.
+  type CreatorScanRow = {
+    creatorId: string;
+    name: string;
+    handle: string | null;
+    category: string | null;
+    promoted: boolean;
+    entryCount: number;
+  };
+  const creatorsScan = useMemo<CreatorScanRow[]>(() => {
+    const byCreator = new Map<string, CreatorScanRow>();
+    for (const e of filteredEntries) {
+      const id = e.creator_id || `__no_id__${e.name}`;
+      const existing = byCreator.get(id);
+      if (existing) {
+        existing.entryCount += 1;
+        if (e.result === "Sí") existing.promoted = true;
+      } else {
+        byCreator.set(id, {
+          creatorId: id,
+          name: e.name,
+          handle: e.handle ?? null,
+          category: e.category ?? null,
+          promoted: e.result === "Sí",
+          entryCount: 1,
+        });
+      }
+    }
+    return Array.from(byCreator.values());
+  }, [filteredEntries]);
+  const creatorsScannedCount = creatorsScan.length;
+  const creatorsPromotedCount = useMemo(() => creatorsScan.filter(c => c.promoted).length, [creatorsScan]);
+  const creatorsNotPromotedCount = creatorsScannedCount - creatorsPromotedCount;
+
   const formattedDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
   const shortDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
 
@@ -604,18 +685,26 @@ const PromologContent = () => {
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-      {/* Header sticky */}
-       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
-        <div className="flex items-center justify-between">
+      {/* Header global — título a la izquierda, presets (Ayer/Hoy/...) +
+          DateRangePicker a la derecha. Mismo patrón que PanelDeControl.
+          El date range que vive acá afecta a los 3 subtabs (Dashboard,
+          Promos, Agentes) — es la única fuente de verdad temporal. */}
+      <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold">Promolog</h1>
             <p className="text-sm text-muted-foreground">Seguimiento promocional diario</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-9" onClick={() => setCampaignModalOpen(true)}>
-              <Plus className="mr-1.5 h-4 w-4" />
-              Agregar Campaña
-            </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <DateRangePresets
+              range={{ from: dateFrom ?? new Date(), to: dateTo ?? new Date() }}
+              activePreset={activeDatePreset}
+              onChange={(r, preset) => {
+                setDateFrom(r.from);
+                setDateTo(r.to);
+                setActiveDatePreset(preset);
+              }}
+            />
             <Button variant="default" size="sm" className="h-9" onClick={() => setCreatorsModalOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
               Agregar Promo
@@ -624,19 +713,9 @@ const PromologContent = () => {
         </div>
       </header>
 
-      {/* KPI Cards — todos clickeables, abren modal con detalle */}
-      <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0 pb-0" : "max-h-[240px] opacity-100 pb-2"}`}>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard label="Total Promos" value={String(filteredEntries.length)} icon={Table2} color="bg-blue-500" onClick={() => setKpiModalType("ingresados")} />
-          <KpiCard label="Tasa de éxito" value={filteredEntries.length > 0 ? `${Math.round((filteredEntries.filter(e => e.result === "Sí").length / filteredEntries.length) * 100)}%` : "0%"} icon={TrendingUp} color="bg-emerald-500" onClick={() => setKpiModalType("completadas")} />
-          <KpiCard label="Sin revisar" value={String(dedupedEntries.filter(e => e.result === "Pendiente").length)} icon={AlertTriangle} color="bg-rose-500" onClick={() => setKpiModalType("no_chequeadas")} />
-          <KpiCard label="Creadoras" value={String(new Set(filteredEntries.map(e => e.creator_id)).size)} icon={Users} color="bg-violet-500" />
-        </div>
-      </div>
-
       {/* Tabs — SubtabNav (glow azul gradient + ring) para match
           con Closers / LeadGen / Creadores / etc. */}
-      <div className="shrink-0 px-6 pb-2">
+      <div className="shrink-0 px-6 pt-3 pb-2">
         <SubtabNav>
           {tabItems.filter(tab => isManagement || tab.id !== "agentes").map((tab) => (
             <SubtabNavItem
@@ -651,6 +730,17 @@ const PromologContent = () => {
           ))}
         </SubtabNav>
       </div>
+
+      {/* Dashboard tab — KPIs, podios, insights, trend, acción */}
+      {activeTab === "dashboard" && (
+        <PromologDashboardView
+          filteredEntries={filteredEntries}
+          dedupedEntries={dedupedEntries}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onOpenKpiModal={openKpiModal}
+        />
+      )}
 
       {/* Promos tab */}
       {activeTab === "promos" && (
@@ -942,161 +1032,6 @@ const PromologContent = () => {
               </Table>
             </DataTableShell>
           ))}
-        </div>
-      )}
-
-      {/* Campañas tab */}
-      {activeTab === "campanas" && (
-        <div className="flex-1 min-h-0 overflow-auto p-6 space-y-3">
-          {/* Filters row */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar campaña..." className="pl-9 h-9" value={searchCampaign} onChange={(e) => setSearchCampaign(e.target.value)} />
-            </div>
-            <Select value={campaignStatusFilter || undefined} onValueChange={(v) => setCampaignStatusFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todos</SelectItem>
-                <SelectItem value="activa">Activa</SelectItem>
-                <SelectItem value="finalizada">Finalizada</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-              </SelectContent>
-            </Select>
-            <DateRangePicker
-              from={campDateFrom}
-              to={campDateTo}
-              onApply={(from, to) => { setCampDateFrom(from); setCampDateTo(to); }}
-              placeholder="Selecciona fechas"
-              className="h-9"
-            />
-            {(searchCampaign || campaignStatusFilter || campDateFrom || campDateTo) && (
-              <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchCampaign(""); setCampaignStatusFilter(""); setCampDateFrom(undefined); setCampDateTo(undefined); }}>
-                <X className="mr-1.5 h-4 w-4" />
-                Limpiar filtros
-              </Button>
-            )}
-            <div className="ml-auto flex gap-1">
-              <Button variant={campanasView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setCampanasView("list")}>
-                <List className="h-4 w-4" />
-              </Button>
-              <Button variant={campanasView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setCampanasView("grid")}>
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          {(() => {
-            const filtered = campaigns.filter((c: any) => {
-              const creator = c.creators as any;
-              const name = (creator?.artistic_name || creator?.name || "").toLowerCase();
-              if (searchCampaign && !name.includes(searchCampaign.toLowerCase())) return false;
-              if (campaignStatusFilter && c.status !== campaignStatusFilter) return false;
-              return true;
-            });
-            if (filtered.length === 0) {
-              return (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex flex-col items-center justify-center py-16">
-                      <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                        <Target className="h-8 w-8 text-muted-foreground/50" />
-                      </div>
-                      <p className="text-muted-foreground text-sm">No hay campañas</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            }
-            if (campanasView === "list") {
-              return (
-                <div className="rounded-md border overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Creadora</TableHead>
-                        <TableHead>Mes</TableHead>
-                        <TableHead className="text-right">Obj. Mensual</TableHead>
-                        <TableHead className="text-right">Obj. Semanal</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead>Creación</TableHead>
-                        <TableHead className="text-right w-[100px]">Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filtered.map((c: any) => {
-                        const creator = c.creators as any;
-                        const monthDate = new Date(c.month_year + "T00:00:00");
-                        return (
-                          <TableRow key={c.id}>
-                            <TableCell className="font-medium">{creator?.artistic_name || creator?.name || "—"}</TableCell>
-                            <TableCell className="capitalize">{monthDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}</TableCell>
-                            <TableCell className="text-right">{c.goal_monthly}</TableCell>
-                            <TableCell className="text-right">{c.goal_weekly}</TableCell>
-                            <TableCell>
-                              <Badge variant={c.status === "activa" ? "default" : c.status === "finalizada" ? "secondary" : "outline"} className="capitalize">{c.status}</Badge>
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString("es-ES")}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewCampaign(c)}>
-                                  <Eye className="h-3.5 w-3.5" />
-                                </Button>
-                                {isManagement && (
-                                  <>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
-                                      setEditCampaign(c);
-                                      setEditCampGoalMonthly(String(c.goal_monthly || ""));
-                                      setEditCampGoalWeekly(String(c.goal_weekly || ""));
-                                      setEditCampStatus(c.status || "activa");
-                                    }}>
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteCampaign(c)}>
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              );
-            }
-            return (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {filtered.map((c: any) => {
-                  const creator = c.creators as any;
-                  const monthDate = new Date(c.month_year + "T00:00:00");
-                  return (
-                    <Card key={c.id}>
-                      <CardContent className="p-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <p className="font-semibold text-sm">{creator?.artistic_name || creator?.name || "—"}</p>
-                          <Badge variant={c.status === "activa" ? "default" : c.status === "finalizada" ? "secondary" : "outline"} className="capitalize text-xs">{c.status}</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground capitalize">{monthDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}</p>
-                        <div className="flex gap-4 text-xs">
-                          <span><strong>{c.goal_monthly}</strong> mensual</span>
-                          <span><strong>{c.goal_weekly}</strong> semanal</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
-      {/* Rendimiento tab */}
-      {activeTab === "rendimiento" && (
-        <div className="flex-1 min-h-0 overflow-auto p-6">
-          <PromologPerformanceView profiles={profiles} />
         </div>
       )}
 
@@ -1662,15 +1597,141 @@ const PromologContent = () => {
         </Dialog>
 
       {/* KPI Detail Modal */}
-      <Dialog open={!!kpiModalType} onOpenChange={(open) => !open && setKpiModalType(null)}>
+      <Dialog open={!!kpiModalType} onOpenChange={(open) => !open && closeKpiModal()}>
         <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>{kpiModalTitle}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {kpiModalType === "creadores_escaneados" && <Users className="h-5 w-5 text-blue-500" />}
+              {kpiModalTitle}
+            </DialogTitle>
             <DialogDescription>
-              {kpiModalEntries.length} {kpiModalEntries.length === 1 ? "entrada" : "entradas"} encontradas
+              {kpiModalType === "creadores_escaneados" ? (
+                <span className="inline-flex items-center gap-2">
+                  <span>{creatorsScannedCount} {creatorsScannedCount === 1 ? "creadora escaneada" : "creadoras escaneadas"}</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-emerald-500/30">
+                    <CheckCircle2 className="h-3 w-3" /> {creatorsPromotedCount}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-400 ring-1 ring-rose-500/30">
+                    <XCircle className="h-3 w-3" /> {creatorsNotPromotedCount}
+                  </span>
+                </span>
+              ) : (
+                <>{kpiModalEntries.length} {kpiModalEntries.length === 1 ? "entrada" : "entradas"} encontradas</>
+              )}
             </DialogDescription>
           </DialogHeader>
-          {kpiModalEntries.length === 0 ? (
+
+          {kpiModalType === "creadores_escaneados" ? (
+            // ─── Branch nuevo: creadoras agrupadas por categoría ───
+            // Mismo patrón que el popup de Dashboard v2 / Panel de Control:
+            // sortear por CATEGORY_ORDER (Elite > A+ > A > B+ > B > C+ > C),
+            // header sticky por categoría, default solo la primera con
+            // resultados expandida. Click en una creadora navega a su
+            // perfil.
+            creatorsScan.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <Info className="h-10 w-10 mb-2 opacity-40" />
+                <p className="text-sm">No hay creadoras escaneadas en este período.</p>
+              </div>
+            ) : (() => {
+              const sorted = [...creatorsScan].sort((a, b) => a.name.localeCompare(b.name));
+              const buckets = new Map<string, CreatorScanRow[]>();
+              for (const c of sorted) {
+                const key = c.category ?? "Sin categoría";
+                const arr = buckets.get(key) ?? [];
+                arr.push(c);
+                buckets.set(key, arr);
+              }
+              const sortedCats = Array.from(buckets.keys()).sort((a, b) => {
+                const sa = CATEGORY_ORDER[a] ?? 999;
+                const sb = CATEGORY_ORDER[b] ?? 999;
+                if (sa !== sb) return sa - sb;
+                return a.localeCompare(b);
+              });
+              // Default: solo la primera categoría con resultados queda
+              // expandida; el resto colapsadas. El user puede expandir las
+              // demás clickeando el header.
+              const effectiveCollapsed = kpiCollapsed.size === 0
+                ? new Set(sortedCats.slice(1))
+                : kpiCollapsed;
+              const toggleCat = (cat: string) => {
+                const base = kpiCollapsed.size === 0
+                  ? new Set(sortedCats.slice(1))
+                  : new Set(kpiCollapsed);
+                if (base.has(cat)) base.delete(cat);
+                else base.add(cat);
+                setKpiCollapsed(base);
+              };
+              return (
+                <div className="max-h-[60vh] overflow-auto space-y-3 mt-2">
+                  {sortedCats.map((cat) => {
+                    const rows = buckets.get(cat)!;
+                    const isCollapsed = effectiveCollapsed.has(cat);
+                    const catPromoted = rows.filter(r => r.promoted).length;
+                    return (
+                      <div key={cat} className="space-y-2">
+                        <CategorySectionHeader
+                          cat={cat}
+                          count={rows.length}
+                          isCollapsed={isCollapsed}
+                          onToggle={() => toggleCat(cat)}
+                        />
+                        {!isCollapsed && (
+                          <div className="space-y-1.5 pl-1">
+                            {/* Mini-subheader con desglose de la categoría */}
+                            <div className="flex items-center gap-2 px-1 text-[10px] text-muted-foreground">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-emerald-400">
+                                <CheckCircle2 className="h-2.5 w-2.5" /> {catPromoted}
+                              </span>
+                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-1.5 py-0.5 text-rose-400">
+                                <XCircle className="h-2.5 w-2.5" /> {rows.length - catPromoted}
+                              </span>
+                            </div>
+                            {rows.map((c) => (
+                              <ListRowButton
+                                key={c.creatorId}
+                                onClick={() => {
+                                  if (!c.creatorId.startsWith("__no_id__")) {
+                                    navigate(`/creadores/${c.creatorId}`);
+                                    closeKpiModal();
+                                  }
+                                }}
+                                className="justify-between"
+                              >
+                                <div className="min-w-0 flex-1 flex items-center gap-2">
+                                  <span className="font-medium truncate">{c.name}</span>
+                                  {c.handle && (
+                                    <span className="text-[10px] text-muted-foreground truncate">@{c.handle.replace(/^@/, "").replace(/\/$/, "").split("/").pop()}</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {c.promoted ? (
+                                    <Badge variant="success-soft" className="text-[10px] gap-1">
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      Promocionó
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="destructive-soft" className="text-[10px] gap-1">
+                                      <XCircle className="h-3 w-3" />
+                                      No promocionó
+                                    </Badge>
+                                  )}
+                                  <span className="text-[10px] text-muted-foreground tabular-nums w-14 text-right">
+                                    {c.entryCount} {c.entryCount === 1 ? "entry" : "entries"}
+                                  </span>
+                                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                </div>
+                              </ListRowButton>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()
+          ) : kpiModalEntries.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Info className="h-10 w-10 mb-2 opacity-40" />
               <p className="text-sm">No hay entradas para mostrar</p>

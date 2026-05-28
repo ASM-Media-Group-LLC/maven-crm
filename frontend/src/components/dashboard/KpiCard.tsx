@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 interface KpiCardProps {
   label: string;
@@ -11,12 +12,16 @@ interface KpiCardProps {
   onClick?: () => void;
   // Cuando el card no es interactivo (sin onClick) renderiza como <div>.
   className?: string;
+  // Footer arbitrario debajo del subtitle — útil para mostrar chips
+  // ("Promocionaron: 5 · No promocionaron: 3") en lugar del subtitle
+  // plano. Si se pasa, reemplaza al subtitle.
+  footer?: ReactNode;
 }
 
 // Reusable KPI card — patrón estándar Panel de Control / Dashboard v2:
 // gradient corner blur + icono cuadrado coloreado + hover lift + tabular-nums.
 // Cuando se pasa onClick, el card se vuelve <button> clickeable.
-const KpiCard = ({ label, value, subtitle, icon: Icon, color = "bg-blue-500", onClick, className }: KpiCardProps) => {
+const KpiCard = ({ label, value, subtitle, icon: Icon, color = "bg-blue-500", onClick, className, footer }: KpiCardProps) => {
   const inner = (
     <>
       <div className={`absolute -right-12 -top-12 h-32 w-32 rounded-full blur-3xl opacity-25 ${color} transition-opacity group-hover:opacity-50`} />
@@ -31,7 +36,11 @@ const KpiCard = ({ label, value, subtitle, icon: Icon, color = "bg-blue-500", on
               con el value. */}
           <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{label}</p>
           <p className="text-3xl font-bold tabular-nums leading-tight">{value}</p>
-          {subtitle && <p className="text-[11px] text-muted-foreground mt-1">{subtitle}</p>}
+          {footer ? (
+            <div className="mt-1.5">{footer}</div>
+          ) : subtitle ? (
+            <p className="text-[11px] text-muted-foreground mt-1">{subtitle}</p>
+          ) : null}
         </div>
       </div>
     </>
