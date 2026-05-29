@@ -331,7 +331,36 @@ async function processStory(args: {
 
   // ── Nivel 1: thumbnail + caption ────────────────────────────────────────
   const l1 = await analyzeImageStory(mediaUrl, caption, openrouterKey);
-  if ("error" in l1) return { error: `l1: ${l1.error}` };
+  if ("error" in l1) {
+    // Si bajamos la imagen pero el modelo no devolvió un veredicto legible
+    // (JSON inválido, refusal, timeout), NO descartamos la story: persistimos
+    // su evidencia y dejamos una entry "pending / revisar manual" visible en
+    // el dashboard. Antes esto se perdía en silencio y la story desaparecía
+    // del conteo. Sólo caemos al error duro si ni siquiera tenemos los bytes.
+    if (l1.imageBytes && l1.mime) {
+      const durableUrl = await persistEvidence(args.sb, {
+        bytes: l1.imageBytes,
+        mime: l1.mime,
+        dispatchRunId: args.dispatchRunId,
+        creatorId: args.creatorId,
+        storyIndex: args.storyIndex,
+      });
+      const inserted = await insertUnreadableEntry(args.sb, {
+        creator_id: args.creatorId,
+        dispatch_run_id: args.dispatchRunId,
+        apify_run_id: args.apifyRunId,
+        story_index: args.storyIndex,
+        story_count: args.storyCount,
+        media_url: mediaUrl,
+        evidence_url: durableUrl ?? mediaUrl,
+        scraped_at: story.timestamp ?? null,
+        reason: l1.error,
+        is_video: isVideo,
+      });
+      return { inserted };
+    }
+    return { error: `l1: ${l1.error}` };
+  }
 
   let final = l1.analysis;
   let analysisLevel = "thumbnail_only";
@@ -392,7 +421,10 @@ async function analyzeImageStory(
   imageUrl: string,
   caption: string | null,
   apiKey: string,
-): Promise<{ analysis: StoryAnalysis; imageBytes: Uint8Array; mime: string } | { error: string }> {
+): Promise<
+  | { analysis: StoryAnalysis; imageBytes: Uint8Array; mime: string }
+  | { error: string; imageBytes?: Uint8Array; mime?: string }
+> {
   // Bajar imagen y mandarla como data: URI (Apify URLs expiran rápido,
   // así que mejor bajamos nosotros y pasamos bytes inline).
   let imageBytes: Uint8Array;
@@ -420,7 +452,10 @@ async function analyzeImageStory(
   ];
 
   const result = await callOpenRouter(content, apiKey);
-  if ("error" in result) return result;
+  // Imagen bajada OK pero el modelo no dio un veredicto legible (JSON roto,
+  // refusal, timeout): devolvemos el error CON los bytes, para que el caller
+  // persista la evidencia igual y no pierda la story.
+  if ("error" in result) return { error: result.error, imageBytes, mime };
   return { analysis: result.analysis, imageBytes, mime };
 }
 
@@ -441,6 +476,36 @@ async function analyzeVideoStory(
   ];
 
   return callOpenRouter(content, apiKey);
+}
+
+// parseModelJson — Gemini a veces devuelve el JSON envuelto en fences
+// markdown (```json … ```) o con prosa alrededor, lo que rompía un
+// JSON.parse directo → la story se perdía en silencio. Intentamos, en orden:
+// (1) parse directo, (2) sin fences markdown, (3) recortando del primer "{"
+// al último "}". Devuelve null si nada parsea a un objeto.
+// deno-lint-ignore no-explicit-any
+function parseModelJson(text: string): any | null {
+  // deno-lint-ignore no-explicit-any
+  const tryParse = (s: string): any | null => {
+    try {
+      const v = JSON.parse(s);
+      return v && typeof v === "object" && !Array.isArray(v) ? v : null;
+    } catch {
+      return null;
+    }
+  };
+  let v = tryParse(text);
+  if (v) return v;
+  const noFences = text.replace(/```(?:json)?/gi, "").trim();
+  v = tryParse(noFences);
+  if (v) return v;
+  const first = noFences.indexOf("{");
+  const last = noFences.lastIndexOf("}");
+  if (first !== -1 && last > first) {
+    v = tryParse(noFences.slice(first, last + 1));
+    if (v) return v;
+  }
+  return null;
 }
 
 // callOpenRouter — wrapper común para image/video content arrays.
@@ -480,9 +545,10 @@ async function callOpenRouter(
     const text = data.choices?.[0]?.message?.content ?? "";
     if (!text) return { error: "openrouter_empty" };
 
-    let parsed: any;
-    try { parsed = JSON.parse(text); }
-    catch (e) { return { error: `json_parse: ${(e as Error).message} :: ${text.slice(0, 200)}` }; }
+    const parsed = parseModelJson(text);
+    if (!parsed) {
+      return { error: `json_parse :: ${text.slice(0, 200)}` };
+    }
 
     return {
       analysis: {
@@ -564,6 +630,62 @@ async function insertAnalyzedEntry(
 
   if (error) {
     console.error("insert entry failed:", error.message);
+    return false;
+  }
+  return true;
+}
+
+// insertUnreadableEntry — la imagen se bajó OK pero el modelo no devolvió un
+// veredicto legible (JSON roto, refusal, timeout de OpenRouter). En vez de
+// tirar la story —que la hacía desaparecer del dashboard— la guardamos como
+// pending + revisar manual CON su evidencia, para que un operator la juzgue a
+// mano. promoted="pending" → la UI la manda a "Pendientes de revisar" y NO
+// contamina los conteos de promovió / no promovió / parcial.
+async function insertUnreadableEntry(
+  sb: any,
+  args: {
+    creator_id: string;
+    dispatch_run_id: string;
+    apify_run_id: string;
+    story_index: number;
+    story_count: number;
+    media_url: string;
+    evidence_url: string;
+    scraped_at: string | null;
+    reason: string;
+    is_video?: boolean;
+  },
+): Promise<boolean> {
+  const videoTag = args.is_video ? " · video" : "";
+  const reason = args.reason.slice(0, 120);
+  const notes =
+    `[REVISAR MANUAL] La IA no devolvió un veredicto legible (${reason}). ` +
+    `Evidencia guardada — revisar a mano. · unreadable${videoTag}`;
+
+  const { error } = await sb.from("promolog_entries").insert({
+    tenant_id: TENANT_ID,
+    creator_id: args.creator_id,
+    date: args.scraped_at ?? new Date().toISOString(),
+    promoted: "pending",
+    network: "Instagram",
+    platform: "Ninguna",
+    has_buy_link: false,
+    notes,
+    evidence_url: args.evidence_url,
+    dispatch_run_id: args.dispatch_run_id,
+    apify_run_id: args.apify_run_id,
+    analyzed_by_ai: true,
+    ai_model: LLM_MODEL,
+    ai_confidence: 0,
+    ai_reasoning: notes,
+    story_index: args.story_index,
+    story_count: args.story_count,
+    story_media_url: args.media_url,
+    scraped_at: args.scraped_at,
+  });
+
+  if (error) {
+    console.error("insert unreadable entry failed:", error.message);
     return false;
   }
   return true;
