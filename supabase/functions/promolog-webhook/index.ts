@@ -322,8 +322,16 @@ async function processStory(args: {
   openrouterKey: string;
 }): Promise<{ inserted: boolean } | { error: string }> {
   const { story, openrouterKey } = args;
-  const mediaUrl = story.displayUrl ?? story.imageUrl ?? story.url;
-  if (!mediaUrl) return { error: "no_media_url" };
+  // Solo aceptamos media REAL de story (thumbnail). Cuando la creadora no
+  // tiene stories/highlights, Apify devuelve el item de PERFIL (sin
+  // displayUrl/imageUrl, solo `url` = https://instagram.com/<handle>/). Antes
+  // caíamos a ese `url`, bajábamos el MURO DE LOGIN de IG y se lo mandábamos a
+  // Gemini → imagen rota + veredicto "es una página de login". Ahora lo
+  // descartamos: sin thumbnail real no hay story que analizar.
+  const mediaUrl = story.displayUrl ?? story.imageUrl ?? null;
+  if (!mediaUrl || /instagram\.com\/[^/?#]+\/?(?:[?#]|$)/i.test(mediaUrl)) {
+    return { error: "no_story_media" };
+  }
 
   const isVideo = String(story.type ?? "").toLowerCase() === "video";
   const videoUrl: string | null = story.videoUrl ?? null;
