@@ -151,7 +151,7 @@ CUANDO ARMÁS RESÚMENES DE EQUIPO (a "cómo va el día", "estado actual", "qué
 RANKING / PERFORMANCE — USAR MÉTRICAS DE NEGOCIO (no del chat):
 
 Cuando alguien pregunta "¿quién es el mejor LLG/closer?", "¿quién está liderando?", "¿cómo va el equipo este mes/año?", USÁ get_team_ranking con role_kind y period adecuados:
-  · role_kind='llg' → ranking por NÚMEROS obtenidos (leadgen con teléfono).
+  · role_kind='llg' → ranking por NÚMEROS obtenidos (closers_contacts con teléfono que cargó el LLG; NO leadgen_entries.phone_e164, que está muerta).
   · role_kind='closer' → ranking por CIERRES (Confirmadas + Completadas) y conversion rate.
   · period: 'week' / 'month' / 'year'.
 
@@ -159,7 +159,7 @@ PROHIBIDO usar get_member_stats para responder "quién es el mejor" — esa tool
 
 Cuando alguien pregunte "cuántos NÚMEROS trajo X este mes/año":
   · Llamá get_member_maven_activity con since_days apropiado (mes=30, año=365 o desde inicio).
-  · La respuesta tiene leadgen_entries_with_phone (= "números obtenidos") y leadgen_entries_created (= "total leads cargados, con y sin tel"). Usá el primero para "números"; el segundo si te preguntan "leads totales".
+  · La respuesta tiene numbers_obtained (= "números obtenidos" = closers_contacts con teléfono que cargó el LLG) y leadgen_entries_created (= "total leads cargados, con y sin tel"). Usá el primero para "números"; el segundo si te preguntan "leads totales".
 
 USAR EL CONTEXTO ANTES DE PREGUNTAR:
 - Si en el initial_user_message ya viene info relevante (asignaciones, stage, last_contact_date, etc), NO preguntes lo que ya sabés.
@@ -179,7 +179,7 @@ Casos típicos donde el bot mete la pata pidiendo info que está en DB:
   ✓ BIEN: get_closer_pipeline_status({display_name: "Miguel"}) → handles_by_stage.Asignada.
 
   ✗ MAL: "Daniel, ¿cuántos contactos cargaste hoy en Maven?"
-  ✓ BIEN: get_member_maven_activity({display_name: "Daniel"}) → leadgen_entries_with_phone.
+  ✓ BIEN: get_member_maven_activity({display_name: "Daniel"}) → numbers_obtained.
 
   ✗ MAL: "Yeison, ¿cuáles cuentas IG estás usando?"
   ✓ BIEN: get_llg_account_status({display_name: "Yeison"}) → lista completa de cuentas con score/restringidas.
@@ -633,8 +633,8 @@ PIPELINE END-TO-END DEL EQUIPO (esto es central, mantenelo siempre presente):
     a) LLG busca modelos en Instagram.
     b) Cuando contacta una nueva → la carga en *LeadGen → Agregar Lead* (crea row en tabla leadgen_entries).
     c) Puede contactar varias veces a la misma — el sistema admite leads repetidos para mismo handle si ya pasaron 24h del último entry.
-    d) Cuando obtiene el TELÉFONO de la modelo → va a *LeadGen → Agregar Contactos* (actualiza leadgen_entries.phone_e164, status pasa a "contactado" / "replied").
-    Meta diaria LLG: 3 NÚMEROS obtenidos lun-vie, 2 los sábados. NO es "3 contactos texteados". Si reporta "3 números", validá contra leadgen_entries WHERE lg_user_id=X AND phone_e164 IS NOT NULL AND entry_date=hoy.
+    d) Cuando obtiene el TELÉFONO de la modelo → va a *LeadGen → Agregar Contactos* → esto crea un row en closers_contacts con el teléfono (closers_contacts.phone, created_by=el LLG). OJO: el teléfono NO queda en leadgen_entries.phone_e164 (esa columna está muerta).
+    Meta diaria LLG: 3 NÚMEROS obtenidos lun-vie, 2 los sábados. NO es "3 contactos texteados". Si reporta "N números", validá contra closers_contacts WHERE created_by=X AND phone IS NOT NULL AND created_at=hoy (NUNCA contra leadgen_entries.phone_e164).
 
   Fase 2 — Closer (toma la posta cuando hay teléfono):
     a) El closer (o un supervisor) se asigna a sí mismo o asigna a otro la modelo desde *Closers → Asignar*. Eso crea row en closer_creators con stage='Asignada'.
@@ -1496,7 +1496,7 @@ async function executeTool(
       const head = (q: { count: number | null; error: { message: string } | null }) => q.count ?? 0;
       const [
         leadsAdded,
-        leadsWithPhone,
+        numbersObtained,
         contactsCreated,
         contactsAssigned,
         creatorsCreated,
@@ -1509,10 +1509,14 @@ async function executeTool(
         // Total leads cargados por el LLG
         sb.from("leadgen_entries").select("id", { count: "exact", head: true })
           .eq("lg_user_id", member.user_id).gte("created_at", since).then(head),
-        // Leads CON TELÉFONO (= "números obtenidos" en jerga del dominio)
-        sb.from("leadgen_entries").select("id", { count: "exact", head: true })
-          .eq("lg_user_id", member.user_id).gte("created_at", since)
-          .not("phone_e164", "is", null).then(head),
+        // "Números obtenidos" del LLG. CLAVE: el teléfono se carga en *Agregar
+        // Contactos* → crea un row en closers_contacts.phone (created_by = el
+        // LLG). NO vive en leadgen_entries.phone_e164 (columna muerta: 4 de
+        // ~21k). Antes contábamos esa columna → siempre 0 (el bot decía "no hay
+        // números cargados" aunque sí los hubiera).
+        sb.from("closers_contacts").select("id", { count: "exact", head: true })
+          .eq("created_by", member.user_id).gte("created_at", since)
+          .not("phone", "is", null).then(head),
         sb.from("closers_contacts").select("id", { count: "exact", head: true })
           .eq("created_by", member.user_id).gte("created_at", since).then(head),
         sb.from("closers_contacts").select("id", { count: "exact", head: true })
@@ -1556,7 +1560,7 @@ async function executeTool(
         activity: {
           // LLG metrics
           leadgen_entries_created: leadsAdded,
-          leadgen_entries_with_phone: leadsWithPhone, // "números obtenidos"
+          numbers_obtained: numbersObtained, // closers_contacts con phone cargados por el LLG (= "números obtenidos")
           // Closer metrics
           closers_contacts_created: contactsCreated,
           closers_contacts_assigned: contactsAssigned,
@@ -1832,26 +1836,29 @@ async function executeTool(
       if (roleKind === "llg") {
         // Para LLG: rank por números obtenidos. Secundario: total leads.
         for (const uid of userIds) {
-          const [leadsAll, leadsWithPhone] = await Promise.all([
+          const [leadsAll, numbersObtained] = await Promise.all([
+            // leads cargados (leadgen_entries)
             sb.from("leadgen_entries").select("id", { count: "exact", head: true })
               .eq("lg_user_id", uid).gte("created_at", sinceIso)
               .then((q) => q.count ?? 0),
-            sb.from("leadgen_entries").select("id", { count: "exact", head: true })
-              .eq("lg_user_id", uid).gte("created_at", sinceIso)
-              .not("phone_e164", "is", null)
+            // números obtenidos = closers_contacts con phone que cargó el LLG
+            // (NO leadgen_entries.phone_e164, que está muerta → daba 0).
+            sb.from("closers_contacts").select("id", { count: "exact", head: true })
+              .eq("created_by", uid).gte("created_at", sinceIso)
+              .not("phone", "is", null)
               .then((q) => q.count ?? 0),
           ]);
           const fullName = nameById.get(uid) ?? null;
-          const conversionRate = leadsAll > 0 ? Math.round((leadsWithPhone / leadsAll) * 100) : 0;
+          const conversionRate = leadsAll > 0 ? Math.round((numbersObtained / leadsAll) * 100) : 0;
           results.push({
             user_id: uid,
             full_name: fullName,
             first_name: fullName?.split(" ")[0] ?? "(?)",
-            metric_primary: leadsWithPhone,
+            metric_primary: numbersObtained,
             metric_secondary: leadsAll,
             metric_tertiary: conversionRate,
             metrics: {
-              numeros_obtenidos: leadsWithPhone,
+              numeros_obtenidos: numbersObtained,
               total_leads_cargados: leadsAll,
               conversion_rate_pct: conversionRate,
             },
@@ -2493,15 +2500,25 @@ async function executeTool(
       const claimed: Record<string, number | null> = {};
 
       if (roleKind === "llg") {
-        // LLG: comparar contra leadgen_entries.
+        // LLG: leads cargados y respuestas salen de leadgen_entries. PERO los
+        // "números" se cargan en closers_contacts.phone (*Agregar Contactos*),
+        // NO en leadgen_entries.phone_e164 (columna muerta → antes daba 0 y el
+        // bot le decía al LLG que su número no estaba). Contamos números aparte
+        // contra closers_contacts del LLG en la fecha del reporte.
         const { data: entries } = await sb
           .from("leadgen_entries")
-          .select("id, model_handle, phone_e164, status, entry_date")
+          .select("id, model_handle, status, entry_date")
           .eq("lg_user_id", member.user_id)
           .eq("entry_date", reportDate);
         const rows = entries ?? [];
         const actualContactados = rows.length;
-        const actualNumeros = rows.filter((r) => r.phone_e164).length;
+        const { count: numerosCount } = await sb
+          .from("closers_contacts").select("id", { count: "exact", head: true })
+          .eq("created_by", member.user_id)
+          .gte("created_at", `${reportDate}T00:00:00`)
+          .lte("created_at", `${reportDate}T23:59:59.999`)
+          .not("phone", "is", null);
+        const actualNumeros = numerosCount ?? 0;
         const actualRespuestas = rows.filter((r) =>
           ["replied", "interested", "meeting_set", "contactado"].includes(String(r.status))
         ).length;
