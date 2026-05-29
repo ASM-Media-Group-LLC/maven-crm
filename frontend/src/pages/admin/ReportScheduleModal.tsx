@@ -18,7 +18,7 @@ import {
   type ReportPeriod,
   type ReportScheduleWithRecipients,
 } from "@/hooks/useReportSchedules";
-import { filterMetricsByPermissions, DEFAULT_METRICS_BY_MODULE, METRICS_CATALOG } from "@/hooks/reportMetricsCatalog";
+import { filterMetricsByPermissions, DEFAULT_METRICS_BY_MODULE, METRICS_CATALOG, metricsAreFromFallback } from "@/hooks/reportMetricsCatalog";
 
 interface Props {
   open: boolean;
@@ -56,6 +56,12 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
   const availableMetrics = roleName
     ? filterMetricsByPermissions(roleToModule(roleName), rolePermissions)
     : [];
+  // True cuando el filtro estricto por permisos del rol dio vacío y
+  // estamos cayendo al fallback (todas las métricas del módulo). Mostramos
+  // un hint en el UI para que el admin sepa que tildar es decisión suya.
+  const usingFallbackMetrics = roleName && roleName !== COMBINED_ROLE_SENTINEL
+    ? metricsAreFromFallback(roleToModule(roleName), rolePermissions, availableMetrics)
+    : false;
 
   // Reset/hydrate state cuando abre el modal.
   useEffect(() => {
@@ -636,10 +642,17 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
                 mismo patrón (selected al top, unselected abajo). */}
           <div className="space-y-2">
             <Label>Métricas a incluir *</Label>
+            {usingFallbackMetrics && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-700 dark:text-amber-300">
+                ⚠ El rol "{roleName}" no tiene permisos explícitos configurados para los módulos del catálogo de reportes.
+                Te muestro <strong>todas</strong> las métricas del módulo <strong>{roleToModule(roleName)}</strong> para que elijas las que apliquen.
+                Si quieres restringir esto en el futuro, configurá permisos del rol en <em>Administración → Roles</em>.
+              </div>
+            )}
             {availableMetrics.length === 0 ? (
               <p className="text-[11px] text-muted-foreground italic">
                 {roleName
-                  ? `El rol "${roleName}" no tiene permisos para ninguna métrica de este módulo.`
+                  ? `El módulo "${roleToModule(roleName)}" no tiene métricas en el catálogo.`
                   : "Elegí un rol para ver las métricas disponibles."}
               </p>
             ) : (

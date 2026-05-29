@@ -43,8 +43,34 @@ export const ROLE_TO_MODULE: Record<string, ReportModule> = {
   [COMBINED_ROLE_SENTINEL]: "combined",
 };
 
-export const roleToModule = (roleName: string): ReportModule =>
-  ROLE_TO_MODULE[roleName] ?? "llg";
+// Heurística para roles custom creados desde UI (`Administración → Roles`)
+// que NO están listados en ROLE_TO_MODULE. Inferimos el módulo de
+// reporte por substring del nombre. Ejemplos:
+//   "Closer Supervisor Senior" → closers
+//   "Chatter Lead"             → chatters
+//   "Lead Gen Lead"            → llg
+//   "Sales Reviewer"           → llg (fallback)
+// Sin esta heurística, todo rol nuevo termina en "llg" silenciosamente
+// y el admin no sabe por qué no le aparecen las métricas correctas.
+function inferModuleFromRoleName(roleName: string): ReportModule {
+  const n = roleName.toLowerCase();
+  // Closers: "closer", "closing", "cerrador"
+  if (/\b(closer|closing|cerrador)\b/.test(n)) return "closers";
+  // Chatters: "chatter", "chat", "chateador"
+  if (/\b(chatter|chateador)\b/.test(n) || /\bchat\b/.test(n)) return "chatters";
+  // LLG / LeadGen
+  if (/\b(llg|leadgen|lead\s*gen|generador)\b/.test(n)) return "llg";
+  // Fallback: LLG (mismo comportamiento que antes)
+  return "llg";
+}
+
+export const roleToModule = (roleName: string): ReportModule => {
+  // 1) Mapping explícito (built-in roles + roles custom conocidos)
+  const explicit = ROLE_TO_MODULE[roleName];
+  if (explicit) return explicit;
+  // 2) Heurística por substring para roles custom no listados
+  return inferModuleFromRoleName(roleName);
+};
 
 export interface ReportSchedule {
   id: string;

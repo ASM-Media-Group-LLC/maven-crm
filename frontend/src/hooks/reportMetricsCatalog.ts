@@ -169,6 +169,14 @@ export const DEFAULT_METRICS_BY_MODULE: Record<ReportModule, string[]> = {
   ],
 };
 
+// Comparar nombres de módulos de manera tolerante:
+// "Closers" === "closers" === "  Closers " (case-insensitive + trim).
+// Esto cubre roles custom donde el admin pudo haber escrito el nombre del
+// módulo con casing distinto cuando configuró permisos.
+function moduleNameMatches(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 // Dada una lista de (module, submodule) accesibles para el rol, devuelve
 // qué métricas del catálogo están disponibles. Si el rol tiene acceso a
 // CUALQUIER submodule del module declarado en `requires`, basta.
@@ -178,6 +186,15 @@ export const DEFAULT_METRICS_BY_MODULE: Record<ReportModule, string[]> = {
 // (`__combined__` es sintético, no tiene permisos en role_permissions)
 // y devolvemos todas las métricas de los 3 módulos. El admin elige
 // qué tildar según los roles que combinó.
+//
+// Fallback robusto (Closer Supervisor case): si el rol NO tiene ningún
+// permiso registrado en role_permissions O tiene permisos con nombres
+// que no matchean los módulos canónicos del catálogo, devolvemos TODAS
+// las métricas del módulo igual. La justificación: el admin ya eligió
+// el rol manualmente en el modal — si su nombre indica claramente "es
+// closer/chatter/llg" pero los permisos están vacíos o usan nombres
+// custom, no tiene sentido bloquear la creación del reporte. El admin
+// puede tildar las que aplican; las que no, las deja sin tildar.
 export function filterMetricsByPermissions(
   module: ReportModule,
   permissions: Array<{ module: string; submodule: string | null }>,
@@ -187,14 +204,51 @@ export function filterMetricsByPermissions(
       (m) => m.module === "llg" || m.module === "closers" || m.module === "chatters",
     );
   }
-  const accessibleModules = new Set(
-    permissions.filter((p) => p).map((p) => p.module),
-  );
-  return METRICS_CATALOG.filter((m) => {
-    if (m.module !== module) return false;
+  const metricsOfModule = METRICS_CATALOG.filter((m) => m.module === module);
+
+  const accessibleModules = (permissions ?? [])
+    .filter((p) => p && p.module)
+    .map((p) => p.module);
+
+  const filtered = metricsOfModule.filter((m) => {
     // Para que la métrica aparezca, el rol debe tener acceso a TODOS los
-    // requires (en este catálogo son singulares, pero estructuralmente
-    // soportamos AND).
-    return m.requires.every((r) => accessibleModules.has(r.module));
+    // requires (case-insensitive). En este catálogo son singulares pero
+    // estructuralmente soportamos AND.
+    return m.requires.every((r) =>
+      accessibleModules.some((a) => moduleNameMatches(a, r.module)),
+    );
   });
+
+  // Fallback: si el filtro estricto deja todo vacío PERO el módulo tiene
+  // métricas disponibles, devolvemos todas las del módulo. Esto pasa con
+  // roles custom (ej. "Closer Supervisor") que se crearon desde UI sin
+  // permisos exactos en los módulos canónicos del catálogo.
+  if (filtered.length === 0 && metricsOfModule.length > 0) {
+    return metricsOfModule;
+  }
+  return filtered;
+}
+
+// Determina si una lista de métricas viene del fallback (no del filtro
+// estricto por permisos). Útil para mostrar un hint en la UI: "estas
+// métricas se muestran porque el rol no tiene permisos explícitos
+// configurados — verificá manualmente qué corresponde".
+export function metricsAreFromFallback(
+  module: ReportModule,
+  permissions: Array<{ module: string; submodule: string | null }>,
+  visibleMetrics: MetricDef[],
+): boolean {
+  if (module === "combined") return false;
+  if (visibleMetrics.length === 0) return false;
+  const accessibleModules = (permissions ?? [])
+    .filter((p) => p && p.module)
+    .map((p) => p.module);
+  // Si NO hay ninguna métrica que pase el filtro estricto pero hay
+  // métricas visibles, es fallback.
+  const strictMatch = visibleMetrics.some((m) =>
+    m.requires.every((r) =>
+      accessibleModules.some((a) => moduleNameMatches(a, r.module)),
+    ),
+  );
+  return !strictMatch;
 }
