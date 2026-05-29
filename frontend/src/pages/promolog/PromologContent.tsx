@@ -35,6 +35,7 @@ import {
   ArrowRight,
   CheckCircle2,
   XCircle,
+  Bot,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ import KpiCard from "@/components/dashboard/KpiCard";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import DateRangePresets, { type RangePreset, rangeForPreset } from "@/components/dashboard/DateRangePresets";
 import PromologDashboardView from "./PromologDashboardView";
+import PromobotPanel from "./PromobotPanel";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { ListRow, ListRowButton } from "@/components/ui/list-row";
 import { useTimezone, formatDateInTz, formatTimeInTz } from "@/hooks/useTimezone";
@@ -77,6 +79,7 @@ import AnalyticsSectionBanner from "@/components/analytics/AnalyticsSectionBanne
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const networkOptions = [
   { value: "instagram", label: "Instagram", icon: InstagramIcon },
@@ -125,6 +128,7 @@ const tabItems = [
   { id: "dashboard" as const, label: "Dashboard", icon: BarChart3 },
   { id: "promos" as const, label: "Promos", icon: Table2 },
   { id: "agentes" as const, label: "Agentes", icon: Users },
+  { id: "promobot" as const, label: "Promobot", icon: Bot },
 ];
 
 const DAY_LABELS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
@@ -138,7 +142,11 @@ const getAgentWeekDays = (offset: number): Date[] => {
 const PromologContent = () => {
   const { user } = useAuth();
   const { role } = useUserRole();
+  const { canAccess } = usePermissions();
   const isManagement = ["admin", "manager", "supervisor"].includes(role ?? "");
+  // Promobot: gateado por el sistema de permisos (default solo admin, marcable
+  // por rol en Settings/admin/roles). Admin siempre true vía usePermissions.
+  const canPromobot = canAccess("Promolog", "Promobot");
 
   // Sólo creadoras activas — el bot promolog (Apify + Gemini) trackea
   // únicamente estas. Las terminadas, en onboarding, paused y borradores
@@ -340,7 +348,7 @@ const PromologContent = () => {
   // Default = "dashboard": al abrir Promolog la primera vista es el
   // dashboard con KPIs + podios + insights. El user navega a "Promos"
   // si quiere ver el listado, "Agentes" para el detalle por agente.
-  const [activeTab, setActiveTab] = useState<"dashboard" | "promos" | "agentes">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "promos" | "agentes" | "promobot">("dashboard");
   const [agentesView, setAgentesView] = useState<"list" | "grid" | "calendar">("list");
   const [agentWeekOffset, setAgentWeekOffset] = useState(0);
   const [campanasView, setCampanasView] = useState<"list" | "grid">("list");
@@ -793,7 +801,11 @@ const PromologContent = () => {
           con Closers / LeadGen / Creadores / etc. */}
       <div className="shrink-0 px-6 pt-3 pb-2">
         <SubtabNav>
-          {tabItems.filter(tab => isManagement || tab.id !== "agentes").map((tab) => (
+          {tabItems.filter(tab => {
+            if (tab.id === "agentes") return isManagement;
+            if (tab.id === "promobot") return canPromobot;
+            return true;
+          }).map((tab) => (
             <SubtabNavItem
               key={tab.id}
               active={activeTab === tab.id}
@@ -806,6 +818,9 @@ const PromologContent = () => {
           ))}
         </SubtabNav>
       </div>
+
+      {/* Promobot tab — control manual del pipeline (lanzar + monitor de corridas) */}
+      {activeTab === "promobot" && canPromobot && <PromobotPanel />}
 
       {/* Dashboard tab — KPIs, podios, insights, trend, acción */}
       {activeTab === "dashboard" && (
