@@ -31,9 +31,16 @@ const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech
 // Doc: https://apify.com/apify/instagram-scraper/input-schema
 const APIFY_ACTOR_ID = "apify~instagram-scraper";
 
-// Máximo creadores por run para no sobrepasar timeout del actor (cada
-// stories ~ 1-3s scraping). Si superamos esto, partimos en multiples runs.
-const MAX_CREATORS_PER_RUN = 100;
+// Tope total de creadoras por invocación del dispatch (la flota completa hoy
+// son ~97). El batch se reparte en lotes de CREATORS_PER_APIFY_RUN.
+const MAX_CREATORS_PER_DISPATCH = 100;
+
+// Creadoras por Apify run (= por invocación del webhook). CRÍTICO: el webhook
+// procesa TODAS las stories de un run en una sola invocación (baja imágenes +
+// Gemini Vision por story); con la flota entera (~97) excede el límite de
+// recursos de la Edge Function → HTTP 546 y 0 entries. Lotes chicos mantienen
+// cada webhook bien por debajo del límite. Tuneable si hiciera falta.
+const CREATORS_PER_APIFY_RUN = 8;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -116,18 +123,73 @@ Deno.serve(async (req: Request) => {
     return json({ skipped: true, reason: "No eligible creators" });
   }
 
-  const limit = body.max_creators && body.max_creators > 0 && body.max_creators <= MAX_CREATORS_PER_RUN
+  const limit = body.max_creators && body.max_creators > 0 && body.max_creators <= MAX_CREATORS_PER_DISPATCH
     ? body.max_creators
-    : MAX_CREATORS_PER_RUN;
+    : MAX_CREATORS_PER_DISPATCH;
   const batch = (creators as any[]).slice(0, limit);
 
-  // ── Crear dispatch_run row ──────────────────────────────────────────────
-  const directUrls = batch.map((c) => `https://www.instagram.com/${normalizeHandle(c.instagram_handle)}/`);
+  // ── Partir en lotes y lanzar un Apify run por lote ──────────────────────
+  // Un Apify run = una invocación del webhook. Lotes chicos para que el
+  // webhook nunca procese demasiadas stories de una (ver CREATORS_PER_APIFY_RUN).
+  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "";
 
+  const chunks: any[][] = [];
+  for (let i = 0; i < batch.length; i += CREATORS_PER_APIFY_RUN) {
+    chunks.push(batch.slice(i, i + CREATORS_PER_APIFY_RUN));
+  }
+
+  const results: ChunkResult[] = [];
+  for (const chunk of chunks) {
+    results.push(await launchChunk(sb, chunk, { SUPABASE_URL, ANON_KEY, APIFY_TOKEN, dispatchedBy }));
+  }
+
+  const launched = results.filter((r) => r.apify_run_id);
+  const failedRuns = results.filter((r) => r.error);
+
+  return json(
+    {
+      ok: launched.length > 0,
+      runs: results.length,
+      runs_launched: launched.length,
+      runs_failed: failedRuns.length,
+      creators_dispatched: launched.reduce((n, r) => n + r.creators, 0),
+      chunk_size: CREATORS_PER_APIFY_RUN,
+      actor: APIFY_ACTOR_ID,
+      dispatch_run_ids: results.map((r) => r.dispatch_run_id).filter(Boolean),
+      ...(failedRuns.length ? { errors: failedRuns.map((r) => r.error) } : {}),
+    },
+    launched.length === 0 ? 502 : 200,
+  );
+});
+
+// ─── helpers ──────────────────────────────────────────────────────────────
+
+interface ChunkResult {
+  dispatch_run_id: string | null;
+  apify_run_id: string | null;
+  creators: number;
+  error: string | null;
+}
+
+// launchChunk — crea un dispatch_run y lanza UN Apify run para un lote de
+// creadoras, con su propio webhook (correlacionado por dispatch_run_id). Cada
+// lote = una invocación del webhook, así ninguna supera el límite de recursos
+// de la Edge Function (HTTP 546). Best-effort: si Apify falla, marca el row
+// failed y devuelve el error sin abortar los demás lotes.
+//
+// SECURITY (igual que antes): pasamos el ANON key público a Apify en el
+// header; la auth real del webhook es la doble validación dispatch_run_id +
+// apify_run_id. Apify espera el webhook en base64url en el query string.
+async function launchChunk(
+  sb: any,
+  chunk: any[],
+  env: { SUPABASE_URL: string; ANON_KEY: string; APIFY_TOKEN: string; dispatchedBy: string | null },
+): Promise<ChunkResult> {
+  const directUrls = chunk.map((c) => `https://www.instagram.com/${normalizeHandle(c.instagram_handle)}/`);
   const apifyInput = {
     directUrls,
     resultsType: "stories",
-    resultsLimit: 200,                  // hasta 200 stories total
+    resultsLimit: 200,
     addParentData: false,
     searchType: "user",
     searchLimit: 1,
@@ -140,41 +202,25 @@ Deno.serve(async (req: Request) => {
       tenant_id: TENANT_ID,
       apify_actor_id: APIFY_ACTOR_ID,
       status: "pending",
-      creators_count: batch.length,
-      dispatched_by: dispatchedBy,
-      payload: { input: apifyInput, creator_ids: batch.map((c) => c.id) },
+      creators_count: chunk.length,
+      dispatched_by: env.dispatchedBy,
+      payload: { input: apifyInput, creator_ids: chunk.map((c) => c.id) },
     })
     .select("id")
     .single();
 
-  if (rErr || !run) return json({ error: `Insert dispatch_run failed: ${rErr?.message}` }, 500);
-
+  if (rErr || !run) {
+    return { dispatch_run_id: null, apify_run_id: null, creators: chunk.length, error: `insert_run: ${rErr?.message}` };
+  }
   const runId = run.id as string;
 
-  // ── Lanzar Apify ────────────────────────────────────────────────────────
-  // Webhook: cuando el actor termine, Apify hace POST a promolog-webhook
-  // con el runId nuestro en eventData para correlacionar.
-  const webhookUrl = `${SUPABASE_URL}/functions/v1/promolog-webhook?dispatch_run_id=${runId}`;
-
-  // Webhook config: dispara para SUCCEEDED + FAILED + TIMED_OUT.
-  //
-  // SECURITY: Supabase Edge Functions con verify_jwt=true requieren
-  // un Bearer token válido. Apify no es un cliente Supabase, así que le
-  // pasamos el ANON key en headersTemplate. El anon key es público
-  // (vive en el frontend bundle) y por sí solo no autoriza nada al
-  // service role. La auth real del webhook es la doble validación:
-  //   1) dispatch_run_id en query string debe existir en DB
-  //   2) apify_run_id en body debe coincidir con lo que guardamos
-  // Cualquiera con el anon key Y un dispatch_run_id válido Y el
-  // apify_run_id correcto puede hitearlo — el set de quien sabe los 3
-  // es esencialmente Apify mismo.
-  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "";
+  const webhookUrl = `${env.SUPABASE_URL}/functions/v1/promolog-webhook?dispatch_run_id=${runId}`;
   const webhooks = [
     {
       eventTypes: ["ACTOR.RUN.SUCCEEDED", "ACTOR.RUN.FAILED", "ACTOR.RUN.TIMED_OUT", "ACTOR.RUN.ABORTED"],
       requestUrl: webhookUrl,
       headersTemplate: JSON.stringify({
-        Authorization: `Bearer ${ANON_KEY}`,
+        Authorization: `Bearer ${env.ANON_KEY}`,
         "Content-Type": "application/json",
       }),
       payloadTemplate: JSON.stringify({
@@ -188,18 +234,11 @@ Deno.serve(async (req: Request) => {
       }),
     },
   ];
-
-  // Webhooks ad-hoc en Apify se pasan en query string como `webhooks=<base64url>`.
-  // Si los mandás dentro del body junto con el input, Apify los pone en el
-  // input del actor (que los ignora). Y atención: Apify espera **base64url**
-  // (URL-safe), no base64 estándar. Hay que reemplazar `+→-`, `/→_` y
-  // remover el padding `=`. Sin esto, Apify silenciosamente no engancha
-  // los webhooks (count=0 en el run resultante).
   const webhooksB64 = btoa(JSON.stringify(webhooks))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
-  const apifyUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR_ID}/runs?token=${APIFY_TOKEN}&webhooks=${webhooksB64}`;
+  const apifyUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR_ID}/runs?token=${env.APIFY_TOKEN}&webhooks=${webhooksB64}`;
 
   let apifyRunId: string | null = null;
   let apifyErr: string | null = null;
@@ -207,12 +246,11 @@ Deno.serve(async (req: Request) => {
     const resp = await fetch(apifyUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // Sólo apifyInput — los webhooks van en query string (ver arriba).
       body: JSON.stringify(apifyInput),
     });
     const data = await resp.json();
     if (!resp.ok) {
-      apifyErr = `Apify ${resp.status}: ${JSON.stringify(data)}`;
+      apifyErr = `Apify ${resp.status}: ${JSON.stringify(data).slice(0, 200)}`;
     } else {
       apifyRunId = data?.data?.id ?? null;
       if (!apifyRunId) apifyErr = "Apify run created but missing id";
@@ -221,34 +259,21 @@ Deno.serve(async (req: Request) => {
     apifyErr = (e as Error).message;
   }
 
-  // ── Update row ──────────────────────────────────────────────────────────
   if (apifyErr) {
     await (sb as any)
       .from("promolog_dispatch_runs")
-      .update({
-        status: "failed",
-        error: apifyErr,
-        finished_at: new Date().toISOString(),
-      })
+      .update({ status: "failed", error: apifyErr, finished_at: new Date().toISOString() })
       .eq("id", runId);
-    return json({ error: apifyErr, dispatch_run_id: runId }, 502);
+    return { dispatch_run_id: runId, apify_run_id: null, creators: chunk.length, error: apifyErr };
   }
 
   await (sb as any)
     .from("promolog_dispatch_runs")
     .update({ status: "running", apify_run_id: apifyRunId })
     .eq("id", runId);
+  return { dispatch_run_id: runId, apify_run_id: apifyRunId, creators: chunk.length, error: null };
+}
 
-  return json({
-    ok: true,
-    dispatch_run_id: runId,
-    apify_run_id: apifyRunId,
-    creators_dispatched: batch.length,
-    actor: APIFY_ACTOR_ID,
-  });
-});
-
-// ─── helpers ──────────────────────────────────────────────────────────────
 function normalizeHandle(h: string): string {
   // Acepta tres formatos en `creators.instagram_handle`:
   //   1) "handle"                       → "handle"
