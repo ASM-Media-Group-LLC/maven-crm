@@ -356,6 +356,17 @@ async function processStory(args: {
   // ── Flag para review manual si confidence sigue baja ────────────────────
   const needsReview = final.confidence < NEEDS_REVIEW_THRESHOLD;
 
+  // ── Evidencia durable: subimos el thumbnail (bytes del nivel 1, ya en
+  //    memoria) a Storage. La URL de IG/Apify (mediaUrl) expira en horas;
+  //    la de Storage no. Best-effort: si falla, caemos al mediaUrl efímero.
+  const durableUrl = await persistEvidence(args.sb, {
+    bytes: l1.imageBytes,
+    mime: l1.mime,
+    dispatchRunId: args.dispatchRunId,
+    creatorId: args.creatorId,
+    storyIndex: args.storyIndex,
+  });
+
   const inserted = await insertAnalyzedEntry(args.sb, {
     creator_id: args.creatorId,
     dispatch_run_id: args.dispatchRunId,
@@ -363,6 +374,7 @@ async function processStory(args: {
     story_index: args.storyIndex,
     story_count: args.storyCount,
     media_url: mediaUrl,
+    evidence_url: durableUrl ?? mediaUrl,
     scraped_at: story.timestamp ?? null,
     analysis: final,
     analysis_level: analysisLevel,
@@ -374,11 +386,13 @@ async function processStory(args: {
 }
 
 // analyzeImageStory — nivel 1: thumbnail + caption.
+// Devuelve también los bytes/mime ya descargados para que el caller los
+// persista como evidencia durable sin re-descargar.
 async function analyzeImageStory(
   imageUrl: string,
   caption: string | null,
   apiKey: string,
-): Promise<{ analysis: StoryAnalysis } | { error: string }> {
+): Promise<{ analysis: StoryAnalysis; imageBytes: Uint8Array; mime: string } | { error: string }> {
   // Bajar imagen y mandarla como data: URI (Apify URLs expiran rápido,
   // así que mejor bajamos nosotros y pasamos bytes inline).
   let imageBytes: Uint8Array;
@@ -405,7 +419,9 @@ async function analyzeImageStory(
     { type: "image_url", image_url: { url: dataUri } },
   ];
 
-  return callOpenRouter(content, apiKey);
+  const result = await callOpenRouter(content, apiKey);
+  if ("error" in result) return result;
+  return { analysis: result.analysis, imageBytes, mime };
 }
 
 // analyzeVideoStory — nivel 2: video completo + caption. Gemini 2.5 Flash
@@ -495,7 +511,8 @@ async function insertAnalyzedEntry(
     apify_run_id: string;
     story_index: number;
     story_count: number;
-    media_url: string;
+    media_url: string;          // URL original de IG/Apify (efímera) → story_media_url
+    evidence_url: string;       // URL durable (Storage) o fallback al media_url
     scraped_at: string | null;
     analysis: StoryAnalysis;
     // Metadata nueva — para auditar el flow de 2 niveles
@@ -532,7 +549,7 @@ async function insertAnalyzedEntry(
     has_buy_link: args.analysis.has_buy_link,
     buy_link_type: args.analysis.buy_link_type,
     notes,
-    evidence_url: args.media_url,
+    evidence_url: args.evidence_url,
     dispatch_run_id: args.dispatch_run_id,
     apify_run_id: args.apify_run_id,
     analyzed_by_ai: true,
@@ -550,6 +567,54 @@ async function insertAnalyzedEntry(
     return false;
   }
   return true;
+}
+
+const EVIDENCE_BUCKET = "promolog-evidence";
+
+// persistEvidence — sube el thumbnail (bytes ya descargados en nivel 1) al
+// bucket privado `promolog-evidence` y devuelve un signed URL durable. El
+// bucket es privado (convención del proyecto para evidencia, igual que las
+// subidas manuales del chatter que ya viven ahí) → firmamos la URL en vez de
+// usar getPublicUrl. Best-effort: si el upload/firma falla devolvemos null y
+// el caller cae al media_url efímero — nunca bloqueamos la entry por Storage.
+// Path estable por run/idx (+ upsert) para que un re-run sobreescriba.
+async function persistEvidence(
+  sb: any,
+  args: {
+    bytes: Uint8Array;
+    mime: string;
+    dispatchRunId: string;
+    creatorId: string;
+    storyIndex: number;
+  },
+): Promise<string | null> {
+  try {
+    const ext = args.mime.includes("png")
+      ? "png"
+      : args.mime.includes("webp")
+      ? "webp"
+      : "jpg";
+    const path = `${TENANT_ID}/${args.dispatchRunId}/${args.creatorId}-${args.storyIndex}.${ext}`;
+    const { error } = await sb.storage.from(EVIDENCE_BUCKET).upload(path, args.bytes, {
+      contentType: args.mime,
+      upsert: true,
+    });
+    if (error) {
+      console.error("persistEvidence upload failed:", error.message);
+      return null;
+    }
+    const { data, error: signErr } = await sb.storage
+      .from(EVIDENCE_BUCKET)
+      .createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (signErr) {
+      console.error("persistEvidence sign failed:", signErr.message);
+      return null;
+    }
+    return data?.signedUrl ?? null;
+  } catch (e) {
+    console.error("persistEvidence error:", (e as Error).message);
+    return null;
+  }
 }
 
 async function insertEmptyEntry(
