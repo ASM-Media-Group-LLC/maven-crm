@@ -25,22 +25,28 @@ const corsHeaders = {
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech
 
-// Actor de Apify para Instagram stories. apify/instagram-scraper es el
-// oficial: acepta directUrls con `https://instagram.com/<handle>/` y un
-// resultsType. Para stories del día, resultsType="stories".
-// Doc: https://apify.com/apify/instagram-scraper/input-schema
-const APIFY_ACTOR_ID = "apify~instagram-scraper";
+// Actor de Apify para Instagram STORIES EN VIVO (24h). Requiere sesión
+// autenticada: sessionCookie = el `sessionid` de una cuenta de IG que siga a
+// las creadoras (o que sean públicas). El actor sin login solo veía highlights
+// viejos (fechas de años atrás) — por eso migramos a este. includeHighlights:
+// false → solo las stories del día. Doc:
+// https://apify.com/automation-lab/instagram-stories-scraper
+const APIFY_ACTOR_ID = "automation-lab~instagram-stories-scraper";
 
 // Tope total de creadoras por invocación del dispatch (la flota completa hoy
 // son ~97). El batch se reparte en lotes de CREATORS_PER_APIFY_RUN.
 const MAX_CREATORS_PER_DISPATCH = 100;
 
-// Creadoras por Apify run (= por invocación del webhook). CRÍTICO: el webhook
-// procesa TODAS las stories de un run en una sola invocación (baja imágenes +
-// Gemini Vision por story); con la flota entera (~97) excede el límite de
-// recursos de la Edge Function → HTTP 546 y 0 entries. Lotes chicos mantienen
-// cada webhook bien por debajo del límite. Tuneable si hiciera falta.
-const CREATORS_PER_APIFY_RUN = 8;
+// Creadoras por Apify run (= por invocación del webhook). El webhook procesa
+// todas las stories del run en una invocación; el tope que importa es
+// MAX_STORIES_PER_CREATOR (20) en el webhook: peor caso = lote × 20 stories.
+// Con el actor logueado cada creadora trae pocas stories en vivo (~3-5), pero
+// dimensionamos por el peor caso para no volver a tirar HTTP 546:
+//   12 × 20 = 240 stories ≈ ~2.4 min de webhook (vs 8×20=160 ya probado OK).
+// 12 mantiene margen y reduce run-starts (cada uno cuesta $0.005 en Apify):
+// 97 creadoras → ~9 runs en vez de 13. El ahorro es chico; el grande lo dio el
+// cambio al actor logueado (stories en vivo, no posts). Tuneable.
+const CREATORS_PER_APIFY_RUN = 12;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -51,9 +57,15 @@ Deno.serve(async (req: Request) => {
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const APIFY_TOKEN = Deno.env.get("APIFY_TOKEN");
   const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN");
+  // sessionid de IG para el actor de stories autenticado (lo carga el admin
+  // como secret; nunca se loguea/extrae desde el código).
+  const IG_SESSION = Deno.env.get("IG_SESSION_COOKIE");
 
   if (!APIFY_TOKEN) {
     return json({ error: "APIFY_TOKEN not configured" }, 500);
+  }
+  if (!IG_SESSION) {
+    return json({ error: "IG_SESSION_COOKIE not configured (sessionid de IG para stories en vivo)" }, 500);
   }
 
   // ── Auth: cron token o JWT admin ────────────────────────────────────────
@@ -140,7 +152,7 @@ Deno.serve(async (req: Request) => {
 
   const results: ChunkResult[] = [];
   for (const chunk of chunks) {
-    results.push(await launchChunk(sb, chunk, { SUPABASE_URL, ANON_KEY, APIFY_TOKEN, dispatchedBy }));
+    results.push(await launchChunk(sb, chunk, { SUPABASE_URL, ANON_KEY, APIFY_TOKEN, IG_SESSION, dispatchedBy }));
   }
 
   const launched = results.filter((r) => r.apify_run_id);
@@ -183,17 +195,17 @@ interface ChunkResult {
 async function launchChunk(
   sb: any,
   chunk: any[],
-  env: { SUPABASE_URL: string; ANON_KEY: string; APIFY_TOKEN: string; dispatchedBy: string | null },
+  env: { SUPABASE_URL: string; ANON_KEY: string; APIFY_TOKEN: string; IG_SESSION: string; dispatchedBy: string | null },
 ): Promise<ChunkResult> {
-  const directUrls = chunk.map((c) => `https://www.instagram.com/${normalizeHandle(c.instagram_handle)}/`);
+  // Input del actor automation-lab/instagram-stories-scraper:
+  //   usernames: handles sin @  ·  sessionCookie: el sessionid de IG
+  //   includeHighlights:false → solo stories en vivo (no highlights viejos)
+  // Proxy residencial para reducir bloqueos de IG.
   const apifyInput = {
-    directUrls,
-    resultsType: "stories",
-    resultsLimit: 200,
-    addParentData: false,
-    searchType: "user",
-    searchLimit: 1,
-    enhanceUserSearchWithFacebookPage: false,
+    usernames: chunk.map((c) => normalizeHandle(c.instagram_handle)),
+    sessionCookie: env.IG_SESSION,
+    includeHighlights: false,
+    proxyConfiguration: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
   };
 
   const { data: run, error: rErr } = await (sb as any)

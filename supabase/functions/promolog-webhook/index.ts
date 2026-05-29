@@ -29,9 +29,10 @@ const corsHeaders = {
 // updatea el env PROMOLOG_LLM_MODEL.
 const LLM_MODEL = Deno.env.get("PROMOLOG_LLM_MODEL") ?? "google/gemini-2.5-flash";
 const LLM_TIMEOUT_MS = 30_000;
-// Cap conservador: con paralelización a 5 concurrentes y posible re-análisis
-// de video por story, 20 stories caben holgadas en el timeout de 150s.
-const MAX_STORIES_PER_CREATOR = 20;
+// Máx historias por creadora que analizamos (regla de negocio: 10/creadora).
+// Acota el costo de Gemini por creadora y mantiene el webhook bien bajo el
+// timeout (con concurrencia 5 + posible re-análisis de video, 10 entran de sobra).
+const MAX_STORIES_PER_CREATOR = 10;
 // Análisis de stories en paralelo. 5 concurrentes balancea throughput con
 // rate-limit de OpenRouter (que es generoso pero igual).
 const CONCURRENCY = 5;
@@ -322,19 +323,23 @@ async function processStory(args: {
   openrouterKey: string;
 }): Promise<{ inserted: boolean } | { error: string }> {
   const { story, openrouterKey } = args;
-  // Solo aceptamos media REAL de story (thumbnail). Cuando la creadora no
-  // tiene stories/highlights, Apify devuelve el item de PERFIL (sin
-  // displayUrl/imageUrl, solo `url` = https://instagram.com/<handle>/). Antes
-  // caíamos a ese `url`, bajábamos el MURO DE LOGIN de IG y se lo mandábamos a
-  // Gemini → imagen rota + veredicto "es una página de login". Ahora lo
-  // descartamos: sin thumbnail real no hay story que analizar.
-  const mediaUrl = story.displayUrl ?? story.imageUrl ?? null;
+  // mediaType: viejo actor usa `type` ("video"); nuevo (automation-lab) usa
+  // `mediaType` ("Image"/"Video").
+  const isVideo = ["video"].includes(String(story.type ?? story.mediaType ?? "").toLowerCase());
+
+  // Thumbnail (imagen para analizar con Vision). Campos según actor:
+  //   viejo: displayUrl / imageUrl   ·   nuevo: thumbnailUrl (o mediaUrl si es Image)
+  // Solo aceptamos media REAL. Si no hay thumbnail (o es una URL de PERFIL de
+  // IG, que el actor viejo devolvía cuando no había stories → muro de login),
+  // descartamos: sin imagen real no hay story que analizar.
+  const mediaUrl = story.displayUrl ?? story.imageUrl ?? story.thumbnailUrl ??
+    (!isVideo ? story.mediaUrl : null) ?? null;
   if (!mediaUrl || /instagram\.com\/[^/?#]+\/?(?:[?#]|$)/i.test(mediaUrl)) {
     return { error: "no_story_media" };
   }
 
-  const isVideo = String(story.type ?? "").toLowerCase() === "video";
-  const videoUrl: string | null = story.videoUrl ?? null;
+  // Video URL para re-análisis nivel 2: viejo usa `videoUrl`; nuevo, `mediaUrl`.
+  const videoUrl: string | null = story.videoUrl ?? (isVideo ? (story.mediaUrl ?? null) : null);
   const caption: string | null = story.caption ?? null;
 
   // ── Nivel 1: thumbnail + caption ────────────────────────────────────────
