@@ -29,9 +29,10 @@ const corsHeaders = {
 // updatea el env PROMOLOG_LLM_MODEL.
 const LLM_MODEL = Deno.env.get("PROMOLOG_LLM_MODEL") ?? "google/gemini-2.5-flash";
 const LLM_TIMEOUT_MS = 30_000;
-// Cap conservador: con paralelización a 5 concurrentes y posible re-análisis
-// de video por story, 20 stories caben holgadas en el timeout de 150s.
-const MAX_STORIES_PER_CREATOR = 20;
+// Máx historias por creadora que analizamos (regla de negocio: 10/creadora).
+// Acota el costo de Gemini por creadora y mantiene el webhook bien bajo el
+// timeout (con concurrencia 5 + posible re-análisis de video, 10 entran de sobra).
+const MAX_STORIES_PER_CREATOR = 10;
 // Análisis de stories en paralelo. 5 concurrentes balancea throughput con
 // rate-limit de OpenRouter (que es generoso pero igual).
 const CONCURRENCY = 5;
