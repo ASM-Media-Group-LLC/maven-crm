@@ -25,11 +25,13 @@ const corsHeaders = {
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech
 
-// Actor de Apify para Instagram stories. apify/instagram-scraper es el
-// oficial: acepta directUrls con `https://instagram.com/<handle>/` y un
-// resultsType. Para stories del día, resultsType="stories".
-// Doc: https://apify.com/apify/instagram-scraper/input-schema
-const APIFY_ACTOR_ID = "apify~instagram-scraper";
+// Actor de Apify para Instagram STORIES EN VIVO (24h). Requiere sesión
+// autenticada: sessionCookie = el `sessionid` de una cuenta de IG que siga a
+// las creadoras (o que sean públicas). El actor sin login solo veía highlights
+// viejos (fechas de años atrás) — por eso migramos a este. includeHighlights:
+// false → solo las stories del día. Doc:
+// https://apify.com/automation-lab/instagram-stories-scraper
+const APIFY_ACTOR_ID = "automation-lab~instagram-stories-scraper";
 
 // Tope total de creadoras por invocación del dispatch (la flota completa hoy
 // son ~97). El batch se reparte en lotes de CREATORS_PER_APIFY_RUN.
@@ -51,9 +53,15 @@ Deno.serve(async (req: Request) => {
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const APIFY_TOKEN = Deno.env.get("APIFY_TOKEN");
   const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN");
+  // sessionid de IG para el actor de stories autenticado (lo carga el admin
+  // como secret; nunca se loguea/extrae desde el código).
+  const IG_SESSION = Deno.env.get("IG_SESSION_COOKIE");
 
   if (!APIFY_TOKEN) {
     return json({ error: "APIFY_TOKEN not configured" }, 500);
+  }
+  if (!IG_SESSION) {
+    return json({ error: "IG_SESSION_COOKIE not configured (sessionid de IG para stories en vivo)" }, 500);
   }
 
   // ── Auth: cron token o JWT admin ────────────────────────────────────────
@@ -140,7 +148,7 @@ Deno.serve(async (req: Request) => {
 
   const results: ChunkResult[] = [];
   for (const chunk of chunks) {
-    results.push(await launchChunk(sb, chunk, { SUPABASE_URL, ANON_KEY, APIFY_TOKEN, dispatchedBy }));
+    results.push(await launchChunk(sb, chunk, { SUPABASE_URL, ANON_KEY, APIFY_TOKEN, IG_SESSION, dispatchedBy }));
   }
 
   const launched = results.filter((r) => r.apify_run_id);
@@ -183,17 +191,17 @@ interface ChunkResult {
 async function launchChunk(
   sb: any,
   chunk: any[],
-  env: { SUPABASE_URL: string; ANON_KEY: string; APIFY_TOKEN: string; dispatchedBy: string | null },
+  env: { SUPABASE_URL: string; ANON_KEY: string; APIFY_TOKEN: string; IG_SESSION: string; dispatchedBy: string | null },
 ): Promise<ChunkResult> {
-  const directUrls = chunk.map((c) => `https://www.instagram.com/${normalizeHandle(c.instagram_handle)}/`);
+  // Input del actor automation-lab/instagram-stories-scraper:
+  //   usernames: handles sin @  ·  sessionCookie: el sessionid de IG
+  //   includeHighlights:false → solo stories en vivo (no highlights viejos)
+  // Proxy residencial para reducir bloqueos de IG.
   const apifyInput = {
-    directUrls,
-    resultsType: "stories",
-    resultsLimit: 200,
-    addParentData: false,
-    searchType: "user",
-    searchLimit: 1,
-    enhanceUserSearchWithFacebookPage: false,
+    usernames: chunk.map((c) => normalizeHandle(c.instagram_handle)),
+    sessionCookie: env.IG_SESSION,
+    includeHighlights: false,
+    proxyConfiguration: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
   };
 
   const { data: run, error: rErr } = await (sb as any)

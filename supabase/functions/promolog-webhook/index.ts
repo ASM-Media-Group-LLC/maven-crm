@@ -322,19 +322,23 @@ async function processStory(args: {
   openrouterKey: string;
 }): Promise<{ inserted: boolean } | { error: string }> {
   const { story, openrouterKey } = args;
-  // Solo aceptamos media REAL de story (thumbnail). Cuando la creadora no
-  // tiene stories/highlights, Apify devuelve el item de PERFIL (sin
-  // displayUrl/imageUrl, solo `url` = https://instagram.com/<handle>/). Antes
-  // caíamos a ese `url`, bajábamos el MURO DE LOGIN de IG y se lo mandábamos a
-  // Gemini → imagen rota + veredicto "es una página de login". Ahora lo
-  // descartamos: sin thumbnail real no hay story que analizar.
-  const mediaUrl = story.displayUrl ?? story.imageUrl ?? null;
+  // mediaType: viejo actor usa `type` ("video"); nuevo (automation-lab) usa
+  // `mediaType` ("Image"/"Video").
+  const isVideo = ["video"].includes(String(story.type ?? story.mediaType ?? "").toLowerCase());
+
+  // Thumbnail (imagen para analizar con Vision). Campos según actor:
+  //   viejo: displayUrl / imageUrl   ·   nuevo: thumbnailUrl (o mediaUrl si es Image)
+  // Solo aceptamos media REAL. Si no hay thumbnail (o es una URL de PERFIL de
+  // IG, que el actor viejo devolvía cuando no había stories → muro de login),
+  // descartamos: sin imagen real no hay story que analizar.
+  const mediaUrl = story.displayUrl ?? story.imageUrl ?? story.thumbnailUrl ??
+    (!isVideo ? story.mediaUrl : null) ?? null;
   if (!mediaUrl || /instagram\.com\/[^/?#]+\/?(?:[?#]|$)/i.test(mediaUrl)) {
     return { error: "no_story_media" };
   }
 
-  const isVideo = String(story.type ?? "").toLowerCase() === "video";
-  const videoUrl: string | null = story.videoUrl ?? null;
+  // Video URL para re-análisis nivel 2: viejo usa `videoUrl`; nuevo, `mediaUrl`.
+  const videoUrl: string | null = story.videoUrl ?? (isVideo ? (story.mediaUrl ?? null) : null);
   const caption: string | null = story.caption ?? null;
 
   // ── Nivel 1: thumbnail + caption ────────────────────────────────────────
