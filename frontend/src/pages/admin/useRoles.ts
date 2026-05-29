@@ -67,7 +67,11 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   { group: "Menú",          module: "Creator Sales", submodules: ["Dashboard", "Reportes", "IA Ventas", "Auditoría"] },
 
   // === Operaciones ===
-  { group: "Operaciones",   module: "Promolog",      submodules: ["Promos", "Rendimiento"] },
+  // Promobot = subtab de control del pipeline (lanzar análisis manual,
+  // monitor de corridas, programación del cron). Default solo admin (se
+  // siembran filas can_access=false para roles no-admin en migración);
+  // marcable por rol desde acá.
+  { group: "Operaciones",   module: "Promolog",      submodules: ["Promos", "Rendimiento", "Promobot"] },
   // LeadGen subtabs: rail interno + acciones críticas.
   { group: "Operaciones",   module: "LeadGen",       submodules: ["Dashboard", "Lista", "Crear Entrada", "Eliminar Entradas", "Exportar", "Agentes", "Supervisores", "Rendimiento"] },
   // Closers tabs top-level (Dashboard / Operaciones) + sub-tabs internos

@@ -79,6 +79,7 @@ import AnalyticsSectionBanner from "@/components/analytics/AnalyticsSectionBanne
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const networkOptions = [
   { value: "instagram", label: "Instagram", icon: InstagramIcon },
@@ -141,7 +142,11 @@ const getAgentWeekDays = (offset: number): Date[] => {
 const PromologContent = () => {
   const { user } = useAuth();
   const { role } = useUserRole();
+  const { canAccess } = usePermissions();
   const isManagement = ["admin", "manager", "supervisor"].includes(role ?? "");
+  // Promobot: gateado por el sistema de permisos (default solo admin, marcable
+  // por rol en Settings/admin/roles). Admin siempre true vía usePermissions.
+  const canPromobot = canAccess("Promolog", "Promobot");
 
   // Sólo creadoras activas — el bot promolog (Apify + Gemini) trackea
   // únicamente estas. Las terminadas, en onboarding, paused y borradores
@@ -796,7 +801,11 @@ const PromologContent = () => {
           con Closers / LeadGen / Creadores / etc. */}
       <div className="shrink-0 px-6 pt-3 pb-2">
         <SubtabNav>
-          {tabItems.filter(tab => isManagement || !["agentes", "promobot"].includes(tab.id)).map((tab) => (
+          {tabItems.filter(tab => {
+            if (tab.id === "agentes") return isManagement;
+            if (tab.id === "promobot") return canPromobot;
+            return true;
+          }).map((tab) => (
             <SubtabNavItem
               key={tab.id}
               active={activeTab === tab.id}
@@ -811,7 +820,7 @@ const PromologContent = () => {
       </div>
 
       {/* Promobot tab — control manual del pipeline (lanzar + monitor de corridas) */}
-      {activeTab === "promobot" && <PromobotPanel />}
+      {activeTab === "promobot" && canPromobot && <PromobotPanel />}
 
       {/* Dashboard tab — KPIs, podios, insights, trend, acción */}
       {activeTab === "dashboard" && (
