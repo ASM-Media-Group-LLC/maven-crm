@@ -388,6 +388,7 @@ const PromologContent = () => {
   const [entryContactType, setEntryContactType] = useState<string>("");
   const [entryNotes, setEntryNotes] = useState<string>("");
   const [entryEvidencePreview, setEntryEvidencePreview] = useState<string>("");
+  const [uploadingEvidence, setUploadingEvidence] = useState(false);
   const entryFileInputRef = useRef<HTMLInputElement>(null);
 
   // Entry action state (table/grid actions)
@@ -591,11 +592,32 @@ const PromologContent = () => {
     setCampaignGoalWeekly("");
   };
 
-  const handleEntryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEntryFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setEntryEvidencePreview(url);
+    if (!file) return;
+    // Preview instantáneo (blob local) mientras sube. OJO: el blob NO se
+    // persiste — antes guardábamos esa URL `blob:` como evidence_url y se veía
+    // rota apenas recargabas / para cualquier otro user. Ahora subimos el
+    // archivo a Storage y guardamos un signed URL durable.
+    setEntryEvidencePreview(URL.createObjectURL(file));
+    setUploadingEvidence(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `promolog-manual/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("creator-files")
+        .upload(path, file, { contentType: file.type, upsert: true });
+      if (upErr) throw upErr;
+      const { data: signed, error: signErr } = await supabase.storage
+        .from("creator-files")
+        .createSignedUrl(path, 60 * 60 * 24 * 365); // 1 año
+      if (signErr || !signed?.signedUrl) throw signErr ?? new Error("No se pudo firmar la URL");
+      setEntryEvidencePreview(signed.signedUrl); // URL durable → se guarda como evidence_url
+    } catch (err) {
+      toast({ title: "Error subiendo evidencia", description: (err as Error).message, variant: "destructive" });
+      setEntryEvidencePreview(""); // limpiar para no guardar un blob roto
+    } finally {
+      setUploadingEvidence(false);
     }
   };
 
@@ -1372,7 +1394,7 @@ const PromologContent = () => {
                 <div className="shrink-0 p-6 pt-4 border-t">
                   <DialogFooter>
                     <Button variant="outline" onClick={() => { setEntryModalOpen(false); toast({ title: "Registro cancelado" }); }}>Cancelar</Button>
-                    <Button onClick={async () => {
+                    <Button disabled={uploadingEvidence} onClick={async () => {
                       if (!selectedCreatorForEntry) return;
                       if (entryResult === "si") {
                         // Tipo de Contacto se eliminó del flow: el equipo ya
@@ -1687,7 +1709,7 @@ const PromologContent = () => {
               <div className="shrink-0 p-6 pt-4 border-t">
                 <DialogFooter>
                   <Button variant="outline" onClick={() => { setEditEntryOpen(false); toast({ title: "Edición cancelada" }); }}>Cancelar</Button>
-                  <Button className="bg-cyan-500 hover:bg-cyan-600 text-white" onClick={async () => {
+                  <Button disabled={uploadingEvidence} className="bg-cyan-500 hover:bg-cyan-600 text-white" onClick={async () => {
                     if (!selectedEntry) return;
                     if (entryResult === "si") {
                       if (!entryNetwork || !entryPlatform) {
