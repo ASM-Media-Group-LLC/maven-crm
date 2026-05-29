@@ -35,6 +35,7 @@ import {
   ArrowRight,
   CheckCircle2,
   XCircle,
+  Bot,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ import KpiCard from "@/components/dashboard/KpiCard";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import DateRangePresets, { type RangePreset, rangeForPreset } from "@/components/dashboard/DateRangePresets";
 import PromologDashboardView from "./PromologDashboardView";
+import PromobotPanel from "./PromobotPanel";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { ListRow, ListRowButton } from "@/components/ui/list-row";
 import { useTimezone, formatDateInTz, formatTimeInTz } from "@/hooks/useTimezone";
@@ -125,6 +127,7 @@ const tabItems = [
   { id: "dashboard" as const, label: "Dashboard", icon: BarChart3 },
   { id: "promos" as const, label: "Promos", icon: Table2 },
   { id: "agentes" as const, label: "Agentes", icon: Users },
+  { id: "promobot" as const, label: "Promobot", icon: Bot },
 ];
 
 const DAY_LABELS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
@@ -340,7 +343,7 @@ const PromologContent = () => {
   // Default = "dashboard": al abrir Promolog la primera vista es el
   // dashboard con KPIs + podios + insights. El user navega a "Promos"
   // si quiere ver el listado, "Agentes" para el detalle por agente.
-  const [activeTab, setActiveTab] = useState<"dashboard" | "promos" | "agentes">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "promos" | "agentes" | "promobot">("dashboard");
   const [agentesView, setAgentesView] = useState<"list" | "grid" | "calendar">("list");
   const [agentWeekOffset, setAgentWeekOffset] = useState(0);
   const [campanasView, setCampanasView] = useState<"list" | "grid">("list");
@@ -793,7 +796,7 @@ const PromologContent = () => {
           con Closers / LeadGen / Creadores / etc. */}
       <div className="shrink-0 px-6 pt-3 pb-2">
         <SubtabNav>
-          {tabItems.filter(tab => isManagement || tab.id !== "agentes").map((tab) => (
+          {tabItems.filter(tab => isManagement || !["agentes", "promobot"].includes(tab.id)).map((tab) => (
             <SubtabNavItem
               key={tab.id}
               active={activeTab === tab.id}
@@ -806,6 +809,9 @@ const PromologContent = () => {
           ))}
         </SubtabNav>
       </div>
+
+      {/* Promobot tab — control manual del pipeline (lanzar + monitor de corridas) */}
+      {activeTab === "promobot" && <PromobotPanel />}
 
       {/* Dashboard tab — KPIs, podios, insights, trend, acción */}
       {activeTab === "dashboard" && (
