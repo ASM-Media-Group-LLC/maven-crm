@@ -625,7 +625,7 @@ LINK DE INSTAGRAM (auto-lookup proactivo):
   4. Si está en "ya_contactada" o "no_interesada" → AVISO claro al grupo ANTES de que el closer la trabaje al pedo.
   5. Si está en "nueva" → silencio (solo recordá llamarla cuando alguien pregunte por ella). NO spamees.
 
-Contexto: el equipo trabaja con cuentas de IG, captan modelos (llamadas "creators") y luego las venden a fans en OF. Los "leads" son contactos de IG que se filtran como potenciales modelos. Los "spammer accounts" son cuentas que mandan DMs masivos para captar. Las "QAs" son revisiones de llamadas de los closers. Los LLGs cargan leads (meta diaria 3 lun-vie, 2 sáb); los Closer Supervisors hacen llamadas QA (sin meta numérica).
+Contexto: el equipo trabaja con cuentas de IG, captan modelos (llamadas "creators") y luego las venden a fans en OF. Los "leads" son contactos de IG que se filtran como potenciales modelos. Los "spammer accounts" son cuentas que mandan DMs masivos para captar. Las "QAs" (*Agency QA → Closers QA*) son las llamadas de venta que los closers SUBEN para que la IA las evalúe (valoración de cómo estuvo la llamada). Esas llamadas subidas son las qa_calls. Los LLGs cargan leads (meta diaria 3 lun-vie, 2 sáb); los closers suben sus llamadas a Closers QA para que la IA las valore (sin meta numérica fija); los Closer Supervisors revisan esas QA.
 
 PIPELINE END-TO-END DEL EQUIPO (esto es central, mantenelo siempre presente):
 
@@ -636,19 +636,16 @@ PIPELINE END-TO-END DEL EQUIPO (esto es central, mantenelo siempre presente):
     d) Cuando obtiene el TELÉFONO de la modelo → va a *LeadGen → Agregar Contactos* → esto crea un row en closers_contacts con el teléfono (closers_contacts.phone, created_by=el LLG). OJO: el teléfono NO queda en leadgen_entries.phone_e164 (esa columna está muerta).
     Meta diaria LLG: 3 NÚMEROS obtenidos lun-vie, 2 los sábados. NO es "3 contactos texteados". Si reporta "N números", validá contra closers_contacts WHERE created_by=X AND phone IS NOT NULL AND created_at=hoy (NUNCA contra leadgen_entries.phone_e164).
 
-  Fase 2 — Closer (toma la posta cuando hay teléfono):
-    a) El closer (o un supervisor) se asigna a sí mismo o asigna a otro la modelo desde *Closers → Asignar*. Eso crea row en closer_creators con stage='Asignada'.
-    b) Tiene 6 OPORTUNIDADES de contacto, con cadencia fija desde el día de asignación (passed_date):
-       · Contacto 1 → día 1
-       · Contacto 2 → día 3
-       · Contacto 3 → día 5
-       · Contacto 4 → día 8
-       · Contacto 5 → día 15
-       · Contacto 6 → día 29
-       Cada intento se registra en closer_contact_history. El sistema le notifica overdue automáticamente.
-    c) Si la modelo ACEPTA una llamada oficial → closer marca stage='Confirmada' (confirmed_date queda timestamp).
-    d) Si la modelo FIRMA el contrato/acuerdo → stage='Completada'. Eso convierte automáticamente la row en un creator (tabla creators).
-    e) Si la modelo dice que no o no responde después de los 6 → stage='No interesada' (no_interesada_date queda timestamp). Después de 3 meses, su lead puede re-aparecer en leadgen para reintentar.
+  Fase 2 — Closer (toma la posta cuando el lead tiene número):
+    a) NUEVO (entrada del pipeline): apenas el LLG carga el número, la modelo entra al pipeline de closers como closer_creators stage='Nuevo'. Son las "Nuevas" de *Closers → Operaciones*: el pool de leads CON número esperando que un closer las tome. Es el stage MÁS numeroso del pipeline; todavía NO están asignadas.
+    b) ASIGNADA: un closer (o supervisor) toma una Nueva (o se la asignan) desde *Closers → Asignar* → el stage pasa de 'Nuevo' a 'Asignada' (passed_date queda timestamp). Recién acá empieza a trabajarla.
+    c) Ya asignada, tiene 6 OPORTUNIDADES de contacto, cadencia fija desde la asignación (passed_date):
+       · Contacto 1 → día 1 · 2 → día 3 · 3 → día 5 · 4 → día 8 · 5 → día 15 · 6 → día 29
+       Cada intento se registra en closer_contact_history. OJO: contactar NO cambia el stage — la lead sigue en 'Asignada' (NO existe stage 'Contactado'). El sistema notifica overdue automáticamente.
+    d) CONFIRMADA: cuando se cuadra/confirma una reunión (o llamada oficial) con la modelo → stage='Confirmada' (confirmed_date queda timestamp).
+    e) Después de la reunión hay dos salidas:
+       · COMPLETADA: la modelo firma/cierra → stage='Completada'. Convierte automáticamente la row en un creator (tabla creators). Es el holy grail.
+       · NO INTERESADA: dice que no, o no responde tras las 6 oportunidades → stage='No interesada' (no_interesada_date queda timestamp). Después de 3 meses, su lead puede re-aparecer en leadgen para reintentar.
 
   Fase 3 — Creator activo:
     Una vez stage='Completada' y se crea el creator, la modelo entra al funnel de monetización (Blu, Piclink, Content Protector). De ahí en adelante NO la trabajan más closers; pasa a operaciones.
@@ -1129,7 +1126,7 @@ const TOOLS: Array<{
   {
     name: "mark_lead_stage",
     description:
-      "Cambia el status de un lead en Maven (leadgen_entries o closer_creators). Útil cuando el OWNER decide cancelar/rechazar una modelo, o cuando un closer confirma cierre. Busca por handle de IG (lo encuentra en cualquiera de las dos tablas). status válidos en leadgen_entries: 'no_response', 'contactado', 'replied', 'meeting_set', 'interested', 'rechazado'. stage válidos en closer_creators (texto libre, comunes): 'Nuevo', 'Contactado', 'Confirmada', 'Rechazada', 'No interesada'. SOLO usá cuando hay decisión explícita en el grupo — nunca infieras por tu cuenta.",
+      "Cambia el status de un lead en Maven (leadgen_entries o closer_creators). Útil cuando el OWNER decide cancelar/rechazar una modelo, o cuando un closer confirma cierre. Busca por handle de IG (lo encuentra en cualquiera de las dos tablas). status válidos en leadgen_entries: 'no_response', 'contactado', 'replied', 'meeting_set', 'interested', 'rechazado'. stage válidos en closer_creators: 'Nuevo' (lead con número, sin asignar), 'Asignada', 'Confirmada' (reunión cuadrada), 'Completada' (firmó → se vuelve creator), 'No interesada', 'Rechazada'. NO existe 'Contactado' (los contactos son historial en closer_contact_history, no un stage). SOLO usá cuando hay decisión explícita en el grupo — nunca infieras por tu cuenta.",
     input_schema: {
       type: "object",
       properties: {
