@@ -572,10 +572,12 @@ async function insertAnalyzedEntry(
 const EVIDENCE_BUCKET = "promolog-evidence";
 
 // persistEvidence — sube el thumbnail (bytes ya descargados en nivel 1) al
-// bucket `promolog-evidence` y devuelve su URL pública durable. Best-effort:
-// si el upload falla devolvemos null y el caller cae al media_url efímero —
-// nunca bloqueamos la entry por un fallo de Storage. Path estable por run/idx
-// (+ upsert) para que un re-run del webhook sobreescriba en vez de duplicar.
+// bucket privado `promolog-evidence` y devuelve un signed URL durable. El
+// bucket es privado (convención del proyecto para evidencia, igual que las
+// subidas manuales del chatter que ya viven ahí) → firmamos la URL en vez de
+// usar getPublicUrl. Best-effort: si el upload/firma falla devolvemos null y
+// el caller cae al media_url efímero — nunca bloqueamos la entry por Storage.
+// Path estable por run/idx (+ upsert) para que un re-run sobreescriba.
 async function persistEvidence(
   sb: any,
   args: {
@@ -601,8 +603,14 @@ async function persistEvidence(
       console.error("persistEvidence upload failed:", error.message);
       return null;
     }
-    const { data } = sb.storage.from(EVIDENCE_BUCKET).getPublicUrl(path);
-    return data?.publicUrl ?? null;
+    const { data, error: signErr } = await sb.storage
+      .from(EVIDENCE_BUCKET)
+      .createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (signErr) {
+      console.error("persistEvidence sign failed:", signErr.message);
+      return null;
+    }
+    return data?.signedUrl ?? null;
   } catch (e) {
     console.error("persistEvidence error:", (e as Error).message);
     return null;
