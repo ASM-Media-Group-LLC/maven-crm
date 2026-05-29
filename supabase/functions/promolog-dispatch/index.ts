@@ -37,12 +37,16 @@ const APIFY_ACTOR_ID = "automation-lab~instagram-stories-scraper";
 // son ~97). El batch se reparte en lotes de CREATORS_PER_APIFY_RUN.
 const MAX_CREATORS_PER_DISPATCH = 100;
 
-// Creadoras por Apify run (= por invocación del webhook). CRÍTICO: el webhook
-// procesa TODAS las stories de un run en una sola invocación (baja imágenes +
-// Gemini Vision por story); con la flota entera (~97) excede el límite de
-// recursos de la Edge Function → HTTP 546 y 0 entries. Lotes chicos mantienen
-// cada webhook bien por debajo del límite. Tuneable si hiciera falta.
-const CREATORS_PER_APIFY_RUN = 8;
+// Creadoras por Apify run (= por invocación del webhook). El webhook procesa
+// todas las stories del run en una invocación; el tope que importa es
+// MAX_STORIES_PER_CREATOR (20) en el webhook: peor caso = lote × 20 stories.
+// Con el actor logueado cada creadora trae pocas stories en vivo (~3-5), pero
+// dimensionamos por el peor caso para no volver a tirar HTTP 546:
+//   12 × 20 = 240 stories ≈ ~2.4 min de webhook (vs 8×20=160 ya probado OK).
+// 12 mantiene margen y reduce run-starts (cada uno cuesta $0.005 en Apify):
+// 97 creadoras → ~9 runs en vez de 13. El ahorro es chico; el grande lo dio el
+// cambio al actor logueado (stories en vivo, no posts). Tuneable.
+const CREATORS_PER_APIFY_RUN = 12;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
