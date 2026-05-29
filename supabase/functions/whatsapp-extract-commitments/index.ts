@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_shared/whatsapp.ts";
-import { logAnthropicUsage } from "../_shared/usage.ts";
+import { logGeminiUsage } from "../_shared/usage.ts";
 
 // whatsapp-extract-commitments — corre Claude sobre un mensaje (o batch)
 // para detectar compromisos del estilo "el lunes contacto a Camila" y
@@ -42,8 +42,15 @@ import { logAnthropicUsage } from "../_shared/usage.ts";
 //     target_subject y lo marca como done con el resolution_note.
 //   - Mentions se guardan en messages.analysis para futuras búsquedas.
 
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
-const MODEL = "claude-haiku-4-5";  // Haiku es suficiente para extracción
+// Provider via OpenRouter (mismo billing que Promolog / whatsapp-analyze-image).
+// Default model Gemini 2.5 Flash — 10× más barato que Haiku ($0.075 vs $0.80
+// por M input tokens) y suficiente para extracción JSON estructurada de
+// mensajes cortos en español. Si querés cambiar el modelo (claude-haiku via
+// OpenRouter, gpt-4o-mini, llama-3.3-70b, etc), basta con override de la env.
+const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
+const MODEL = Deno.env.get("WHATSAPP_EXTRACT_MODEL")
+  ?? Deno.env.get("PROMOLOG_LLM_MODEL")
+  ?? "google/gemini-2.5-flash";
 const CLAUDE_TIMEOUT_MS = 60_000;
 
 const SYSTEM_PROMPT = `Sos un extractor de "items operativos" para un grupo de WhatsApp de un equipo de ventas/agencia. Tu tarea es leer mensajes en español (argentino/colombiano/mexicano) y detectar TODO lo que el equipo necesita rastrear, esté o no formalizado en un CRM.
@@ -165,36 +172,43 @@ async function callClaude(
   const timeoutId = setTimeout(() => controller.abort(), CLAUDE_TIMEOUT_MS);
 
   try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    // OpenRouter es OpenAI-compatible: usa "messages" con role+content,
+    // y la system prompt va como mensaje role=system (no como field separado
+    // como Anthropic). Pedimos response_format json_object para forzar JSON.
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "HTTP-Referer": "https://maven.asmtech.me",
+        "X-Title": "Maven Extract Commitments",
       },
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 1500,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userContent }],
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userContent },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.1,
       }),
       signal: controller.signal,
     });
 
     if (!resp.ok) {
       const errText = await resp.text();
-      throw new Error(`anthropic ${resp.status}: ${errText.slice(0, 200)}`);
+      throw new Error(`openrouter ${resp.status}: ${errText.slice(0, 200)}`);
     }
 
     const data = await resp.json() as {
-      content: Array<{ type: string; text?: string }>;
-      usage: Record<string, number>;
+      choices?: Array<{ message?: { content?: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
-    const text = data.content?.find((c) => c.type === "text")?.text ?? "";
+    const text = data.choices?.[0]?.message?.content ?? "";
 
-    // Intentar parsear el JSON. Si Claude devolvió markdown, sacamos los
-    // backticks. Si parseo falla, devolvemos null y el caller decide qué
-    // hacer.
+    // Parsear JSON. Gemini con response_format=json_object debería devolver
+    // siempre JSON limpio, pero por las dudas removemos backticks markdown.
     let parsed: ExtractedAnalysis | null = null;
     try {
       const cleaned = text.trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim();
@@ -205,16 +219,18 @@ async function callClaude(
         mentions: Array.isArray(obj.mentions) ? obj.mentions : [],
       };
     } catch (e) {
-      console.warn("claude json parse failed:", (e as Error).message);
+      console.warn("json parse failed:", (e as Error).message);
     }
 
-    // Log usage best-effort.
-    await logAnthropicUsage({
+    // Log usage best-effort. Usamos logGeminiUsage porque OpenRouter
+    // mantiene la nomenclatura de prompt_tokens/completion_tokens.
+    await logGeminiUsage({
       operation: "whatsapp_extract_commitments",
       model: MODEL,
-      usage: data.usage,
+      inputTokens: data.usage?.prompt_tokens ?? 0,
+      outputTokens: data.usage?.completion_tokens ?? 0,
       tenantId,
-      context: { sender: targetMessage.sender, group_id: targetMessage.group_id },
+      context: { sender: targetMessage.sender, group_id: targetMessage.group_id, provider: "openrouter" },
     });
 
     return { analysis: parsed, usage: data.usage };

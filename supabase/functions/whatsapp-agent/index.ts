@@ -50,6 +50,7 @@ const SYSTEM_PROMPT = `Sos Maven Asistente, un asistente IA que vive en grupos d
 2. RECORDARLES compromisos pendientes ("¿se hizo X?")
 3. AYUDAR a tomar acciones concretas en Maven CRM (agregar notas, marcar leads, etc)
 4. GENERAR reportes cuando se lo pidan
+5. PROGRAMAR RECORDATORIOS futuros cuando alguien lo pida explícitamente ("recordame mañana 9am llamar a X", "avisame el viernes que revise Y", "en 2 horas decime Z"). Usá la tool create_reminder — el bot va a postear el mensaje al grupo SOLO cuando llegue la hora, sin que nadie tenga que activarlo. Convertí siempre la hora local del grupo a UTC antes de pasarla a la tool. Default zona: Bogotá (UTC-5) si no se especifica.
 
 Estilo:
 - Hablás en español argentino, casual pero profesional
@@ -661,13 +662,62 @@ LO QUE EL BOT DEBE TRACKEAR (siempre):
 
 EMPRESA + PORTFOLIO:
 - KASH es la compañía madre y dueña del CRM. Los LLGs humanos están dedicados a KASH (la principal). El "scouter assist" es la herramienta de scrapeo automático que puede operar para múltiples compañías del portfolio.
-- Productos del portfolio que SÍ podemos ofrecer a una modelo:
-  · **Blu app** → principal, alta monetización, modelos A+/A con buen potencial OF
-  · **piclink.me** → modelos más soft o con perfil de contenido más light (B+/B)
-  · **Content Protector** → anti-leaks. No es alternativa: se ofrece COMPLEMENTARIO si la modelo tiene riesgo de filtraciones (ya leakeada, contenido caro, paywall fuerte)
-  · **UNLOK, Pagomundo, Exchange, KASH Agency** → otros productos del grupo, ofrecer según contexto
-- Productos que NO ofrecer NUNCA: **Trafix**, **Ora Miami** (instrucción explícita del dueño)
-- Productos legacy ignorables: "alvaroletshoot" (cuenta vieja, no es producto activo)
+
+PORTFOLIO DETALLADO (vendé sabiendo qué vendés — usá esta info cuando un closer/owner te pida estrategia o pitch):
+
+**KASH AGENCY** → core business, oferta primaria
+- Agencia full-service de OnlyFans: chatters, contenido, monetización end-to-end.
+- Si la modelo NO quiere agencia (porque ya tiene equipo propio, contrato con otra agencia, o quiere mantener autonomía), NO insistir → pivot inmediato a Blu/Piclink/CP como SaaS complementarios.
+- Regla: "agencia y SaaS no compiten. La modelo que ya tiene equipo puede usar nuestras herramientas igual."
+
+**BLU app** → CRM premium para OnlyFans (target A+/A)
+- Gestor de cuentas de OF construido por gente que lleva años en la industria.
+- IA conversacional: preguntás cualquier cosa de cualquier fan (historial, qué compra, qué le gusta, riesgo) y la IA lo sabe.
+- Ayuda a chatear, sugiere respuestas, detecta señales del fan, optimiza venta.
+- Multi-cuenta + alertas de risk de OF en tiempo real.
+- ÁNGULO DE PITCH (dolor + claim social): "las creadoras que usan Blu ven sus ganancias multiplicadas 3x-5x vs. cuando estaban solas. Vos hoy estás dejando plata sobre la mesa cada día que respondés DMs sin saber quién es ese fan ni qué venderle."
+- ⚠️ NO mencionar en pitch que "nuestro objetivo es 3x" como compromiso — eso es interno de la metodología que se cuenta en reunión, no en el primer mensaje. SÍ usar "creadoras que usan Blu ven 3x-5x" como prueba social.
+- Pitch corto sugerido: "vi que estás monetizando sola. Las que usan Blu suelen 3x-ear sus ingresos con la misma audiencia, solo cambiando cómo manejan los chats. ¿Te paso un demo de 15 min?"
+
+**piclink.me** → linktree-safe para promo (target B+/B, también A+/A si necesitan link en bio)
+- Linktree-style page diseñada para que IG/TikTok NO te baneen al ponerla en bio (linktr.ee, onlyfans.com directo = ban casi seguro).
+- Trae fans automáticamente (no es agregador estático) + tracking de quiénes cliquean.
+- ÁNGULO DE PITCH (dolor + tracking): "el bio.link genérico que usás está dejando plata afuera — no sabés cuántos cliquearon, quiénes son, ni convertís el tráfico. Piclink mismo link pero te trae más fans Y los rastreás. Las creadoras pasan de 5-10 nuevos fans/día a 20-30."
+- Pitch corto sugerido: "vi tu bio. Tu linktree actual está haciendo trabajo de medio link. Piclink mismo lugar, pero te trae más fans y los rastreás. Es un cambio de 2 minutos. ¿Te muestro?"
+
+**Content Protector** → anti-leaks con IA + facial detection (complementario a CUALQUIER quality)
+- IA + detección facial escanea continuamente Telegram, foros, sitios pirata, redes — buscando contenido filtrado de la modelo.
+- Baja automáticamente lo que detecta (DMCA automation). Equipo legal escala si el caso lo amerita.
+- ÁNGULO DE PITCH (dolor económico real): "si tu contenido está leakeado (y casi siempre lo está cuando tenés paywall fuerte o base grande), estás perdiendo hasta el DOBLE de tus ingresos — fans que pagarían se lo bajan gratis de Telegram. CP te recupera esa plata, protege tu privacidad, y para creadoras serias es lo que separa los $X de los $XX al mes."
+- NO es alternativa a Blu/Piclink — es COMPLEMENTARIO. Se ofrece a:
+  · Modelos con leaks previos confirmados.
+  · Modelos con contenido caro / paywall fuerte (más target de piratería).
+  · Modelos con base de fans grande (más exposición).
+- Pitch corto sugerido: "encontramos contenido tuyo circulando en [grupo / sitio]. Mientras eso esté gratis afuera, perdés casi el doble de los fans que te pagarían. CP la IA que lo baja todos los meses y te recupera esa plata. ¿Querés que escaneemos tu perfil completo?"
+
+REGLAS DE TONO PARA TODOS LOS PITCHES:
+- Empezá con un OBSERVABLE de su perfil (no con "Hola, te ofrezco X"). Ej: "vi que estás en OF y tu bio tiene linktree".
+- Inmediato: nombra la PÉRDIDA que tiene HOY por NO usar el producto. Específica, no genérica.
+- Después el CLAIM con número (3x-5x para Blu, 5→30 fans/día Piclink, doble de ingresos CP).
+- Cierre con CTA de bajo compromiso: "demo de 15 min", "te muestro", "te paso info", "lo escaneamos". NUNCA "comprá ahora" ni "te vendo".
+- No prometas resultados garantizados a esa creadora específica — usá fraseo "las que usan / suelen / pasan a" para que sea claim general y no compromiso unilateral.
+- Si la modelo tiene agencia, NO usar el ángulo de "estás perdiendo plata" porque ya tiene un equipo manejándolo. Pivot a "Blu como complemento, no reemplazo".
+
+**UNLOK, Pagomundo, Exchange** → productos secundarios del grupo. Ofrecer según contexto (pagos, exchange, etc). Si no estás seguro de cómo encaja con la modelo, NO inventar — pedir info.
+
+NUNCA ofrecer: **Trafix**, **Ora Miami** (instrucción explícita del dueño).
+Legacy ignorable: "alvaroletshoot" (cuenta vieja, no es producto activo).
+
+CÓMO ARMAR ESTRATEGIA DE VENTA (cuando un closer te pide pitch para una modelo específica):
+1. Identificá QUALITY de la modelo (A+/A/B+/B/C) — usá lookup_lead_history o analyze_instagram_lead si no la tenés.
+2. Detectá si ya tiene agencia (caption de IG, propio reporte del closer, mention en historial). Si tiene → NO ofrecer Kash, ir directo a SaaS.
+3. Recomendá producto primario según quality:
+   - A+/A → Blu (principal). Si tiene fans grandes / paywall fuerte → agregar CP.
+   - B+ → Piclink + posibilidad de Blu si tiene volumen.
+   - B  → Piclink.
+4. Sumá CP cross-sell si hay señales de riesgo de leak (paywall alto, modelos exposed previamente, base grande).
+5. Citá data REAL (followers, AI score, post recent, lo que sea que tengas) en el pitch. Sin data inventada.
+6. Adaptá el mensaje al lenguaje del closer: corto, operativo, sin academia.
 
 CRITERIO DE CALIDAD KASH (lo asigna el LLG/supervisor en leadgen_entries.quality basado en monetización potencial en OF):
 - A+ → Excelente. Look + perfil top. Monetización alta esperada. Producto sugerido: Blu.
@@ -768,6 +818,10 @@ interface AgentRequest {
   group_id?: string;
   // Quien pidió (para auditoría).
   invoked_by?: string;
+  // Cuando invoked_by="profile_analysis_complete": id del row profile_analyses
+  // a postear. El callback de scrape-profile-deep dispara esto.
+  profile_analysis_id?: string;
+  outcome?: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -943,6 +997,20 @@ const TOOLS: Array<{
     },
   },
   {
+    name: "analyze_profile_deep",
+    description:
+      "Análisis DEEP de un perfil de Instagram (Apify + Gemini Vision) que devuelve estrategia de venta personalizada. Tarda 30-90 segundos en completar. Usar SOLO cuando el closer/owner pide explícitamente estrategia o análisis profundo (frases tipo 'analizame a @X', 'qué le ofrezco a @X', 'estrategia para @X', 'cómo abordo a @X'). NO usar para lookups simples — para eso usá analyze_instagram_lead (cache, instantáneo). Scrapea stories en vivo + bio + posts y produce: profile (followers/bio/link), análisis story-by-story con Gemini Vision (promo directa/indirecta/none, trackers, paywall strength, audience vibe, signs de agencia), signals agregados, y estrategia textual con recomendación de producto (Blu/Piclink/CP/Kash) + pitch específico. Costo ~$0.06 por análisis. El bot debe responder al closer 'dame ~1 min, scrapeando' inmediatamente, y la estrategia llega después en un segundo mensaje cuando el callback completa.",
+    input_schema: {
+      type: "object",
+      properties: {
+        instagram_handle: { type: "string", description: "handle de IG sin @ o URL completa" },
+        requested_by_display_name: { type: "string", description: "nombre del miembro que pidió (ej Miguel Garcia)" },
+        context: { type: "string", description: "contexto del pedido en 1 frase: ej 'ya rechazó kash, considera SaaS', 'lead nueva, evaluar quality', 'tiene equipo propio'" },
+      },
+      required: ["instagram_handle", "requested_by_display_name"],
+    },
+  },
+  {
     name: "register_daily_report",
     description:
       "Registra el reporte de jornada de un miembro del equipo cuando manda métricas en el grupo. Llamala cuando detectes patrones tipo 'Reporte Daniel: contactados 70, respuestas 1, números 0' (LLG) o 'rechazadas 1, confirmadas 1, contactados 12, cerrados 0' (Closer Supervisor). Idempotente: si ya hay un reporte para ese user y fecha, lo actualiza (típicamente el último wins). Después de registrar, confirmá breve en el grupo con un ✓ y un mini-summary.",
@@ -1003,6 +1071,29 @@ const TOOLS: Array<{
         hours: { type: "number", description: "default 24" },
       },
       required: ["commitment_id"],
+    },
+  },
+  {
+    name: "create_reminder",
+    description:
+      "Programa un recordatorio futuro en el grupo. Usar cuando alguien pide 'recordame X mañana a las 9', 'avisame el viernes que hable con Y', 'en 2 horas recordame Z', etc. El bot postea el mensaje al grupo automáticamente cuando llegue la hora — sin que nadie tenga que activarlo manualmente. NO usar para compromisos detectados automáticamente (esos los maneja el extractor + follow-up tick). Solo para pedidos EXPLÍCITOS de recordatorio. El reminder dispara en el mismo grupo donde se pidió. Default precision: 5 min (el cron corre cada 5 min).",
+    input_schema: {
+      type: "object",
+      properties: {
+        trigger_at: {
+          type: "string",
+          description: "Cuándo disparar el reminder, en ISO 8601 UTC (ej '2026-05-29T14:00:00Z' para mañana 9am Bogotá). Convertí la hora local de quien pidió a UTC vos mismo (Bogotá=UTC-5, Miami=UTC-4 EDT). Si la fecha es ambigua ('mañana' sin hora), default 9am hora local del grupo. Si la persona dice 'en X horas/minutos', calculá desde la hora actual.",
+        },
+        body: {
+          type: "string",
+          description: "Texto del recordatorio que el bot va a postear al grupo. Estilo natural, en primera persona del bot. Si va dirigido a alguien específico, empezá con @nombre. Máx 500 chars. Ej: '@Miguel te recuerdo que tenías que llamar a María Hernández hoy a esta hora.'",
+        },
+        target_display_name: {
+          type: "string",
+          description: "Opcional. Nombre de la persona que pidió el reminder (para auditoría y para que el bot sepa a quién está respondiendo).",
+        },
+      },
+      required: ["trigger_at", "body"],
     },
   },
   {
@@ -2032,6 +2123,69 @@ async function executeTool(
       };
     }
 
+    case "analyze_profile_deep": {
+      // Análisis on-demand con Apify + Gemini Vision via OpenRouter.
+      // Llama a la edge function scrape-profile-deep que devuelve queued|cached|in_flight.
+      // Si queued: la respuesta final llega después via webhook callback que
+      // dispara whatsapp-agent con invoked_by="profile_analysis_complete".
+      const raw = String(input.instagram_handle ?? "").trim();
+      if (!raw) return { error: "missing_handle" };
+      const handle = parseInstagramHandle(raw);
+      if (!handle) return { error: "invalid_handle", input: raw };
+
+      const requestedBy = String(input.requested_by_display_name ?? "").trim() || null;
+      const context = input.context ? String(input.context).slice(0, 280) : null;
+
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+
+      try {
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/scrape-profile-deep`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Cron-Token": CRON_TOKEN,
+          },
+          body: JSON.stringify({
+            instagram_handle: handle,
+            requested_by_display_name: requestedBy,
+            source_message_id: ctx.messageId ?? null,
+            source_group_id: ctx.groupId ?? null,
+            context,
+          }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) return { error: `dispatch_failed: ${data?.error ?? resp.status}` };
+
+        // Si vino cached, devolver el análisis al modelo para que el bot
+        // pueda responder con la estrategia al instante.
+        if (data.status === "cached" && data.analysis) {
+          return {
+            handle,
+            status: "cached",
+            job_id: data.job_id,
+            stories_count: data.analysis.stories_count,
+            profile: data.analysis.profile,
+            signals: data.analysis.signals,
+            strategy: data.analysis.strategy,
+            note: "Cache hit (análisis reciente). Si querés forzar refresh, mencionálo.",
+          };
+        }
+
+        // queued / in_flight → el bot debe responder corto al closer.
+        // La estrategia llega después via callback automático.
+        return {
+          handle,
+          status: data.status, // "queued" | "in_flight"
+          job_id: data.job_id,
+          eta_seconds: data.eta_seconds ?? 75,
+          note: "Análisis en curso. Avisá al closer que tarda ~1 min y que vas a postear la estrategia automáticamente cuando esté.",
+        };
+      } catch (e) {
+        return { error: `dispatch_call_failed: ${(e as Error).message}` };
+      }
+    }
+
     case "register_daily_report": {
       const displayName = String(input.display_name ?? "").trim();
       const reportDate = String(input.report_date ?? "").trim();
@@ -2128,6 +2282,68 @@ async function executeTool(
         .eq("group_id", ctx.groupId);
       if (error) return { error: error.message };
       return { ok: true, new_due_at: newDue };
+    }
+
+    case "create_reminder": {
+      // Crear un reminder manual con trigger_at futuro.
+      // El cron whatsapp-followup-tick (cada 5 min) lo drenará cuando
+      // trigger_at <= now() via la función SQL whatsapp_pending_reminders.
+      const triggerAtRaw = String(input.trigger_at ?? "").trim();
+      const body = String(input.body ?? "").trim();
+      const targetName = input.target_display_name ? String(input.target_display_name).slice(0, 100) : null;
+
+      if (!triggerAtRaw) return { error: "missing_trigger_at" };
+      if (!body) return { error: "missing_body" };
+      if (body.length > 500) return { error: "body_too_long", max_chars: 500 };
+
+      // Validar fecha
+      const triggerDate = new Date(triggerAtRaw);
+      if (isNaN(triggerDate.getTime())) {
+        return { error: "invalid_trigger_at", hint: "use ISO 8601 UTC e.g. 2026-05-29T14:00:00Z" };
+      }
+
+      // No reminders en el pasado (más de 1 min atrás)
+      const minutesFromNow = (triggerDate.getTime() - Date.now()) / 60_000;
+      if (minutesFromNow < -1) {
+        return { error: "trigger_at_in_past", hint: "el reminder debe ser en el futuro" };
+      }
+
+      // No reminders muy lejanos (más de 90 días) — protege de typos tipo año equivocado.
+      if (minutesFromNow > 90 * 24 * 60) {
+        return { error: "trigger_at_too_far", hint: "máximo 90 días en el futuro" };
+      }
+
+      // Resolver el tenant_id del grupo
+      const { data: grp } = await sb
+        .from("whatsapp_groups")
+        .select("tenant_id")
+        .eq("id", ctx.groupId)
+        .maybeSingle();
+      if (!grp?.tenant_id) return { error: "group_not_found" };
+
+      const { data: row, error: insErr } = await sb.from("whatsapp_reminders").insert({
+        tenant_id: grp.tenant_id,
+        group_id: ctx.groupId,
+        kind: "manual",
+        trigger_at: triggerDate.toISOString(),
+        body,
+        status: "pending",
+        created_by: ctx.senderUserId ?? null,
+        metadata: {
+          requested_by: targetName,
+          requested_at: new Date().toISOString(),
+        },
+      }).select("id, trigger_at").single();
+
+      if (insErr) return { error: insErr.message };
+
+      return {
+        ok: true,
+        reminder_id: row.id,
+        trigger_at: row.trigger_at,
+        minutes_from_now: Math.round(minutesFromNow),
+        note: "Reminder programado. El cron lo drena cada 5 min, así que la precisión es ±5 min.",
+      };
     }
 
     case "get_closer_pipeline_status": {
@@ -2736,6 +2952,146 @@ async function buildInitialUserMessage(args: {
     return lines.join("\n");
   }
 
+  // ─── PROFILE ANALYSIS COMPLETE ──────────────────────────────────────
+  // El callback de scrape-profile-deep llamó al agent porque terminó el
+  // análisis deep de un perfil pedido por un closer/owner. Cargamos el
+  // análisis de la DB y se lo damos al modelo para que postee la strategy
+  // al grupo con tono natural (no copy-paste del markdown crudo).
+  if (args.req.invoked_by === "profile_analysis_complete" && args.req.profile_analysis_id) {
+    const sb = adminClient();
+    const { data: pa } = await sb
+      .from("profile_analyses")
+      .select("id, instagram_handle, status, error, profile, stories_analysis, signals, strategy, stories_count, requested_by_display_name, context, duration_seconds")
+      .eq("id", args.req.profile_analysis_id)
+      .maybeSingle();
+
+    if (!pa) {
+      lines.push("Tarea: postear al grupo un mensaje de ERROR porque el análisis de perfil no se encontró.");
+      lines.push("Tu output final va por reply_to_group — UN solo mensaje, corto.");
+      return lines.join("\n");
+    }
+
+    if (pa.status === "failed" || pa.status === "timeout" || args.req.outcome === "failed") {
+      lines.push(`Tarea: avisar al grupo que el análisis deep de @${pa.instagram_handle} FALLÓ.`);
+      lines.push(`Razón: ${pa.error ?? "timeout o error de Apify/Gemini"}.`);
+      if (pa.requested_by_display_name) {
+        lines.push(`Mencioná a ${pa.requested_by_display_name} (quien lo pidió).`);
+      }
+      lines.push("Sugerí: 'puede ser cuenta privada, sin stories del día, o un blip de Apify. Probá analyze_instagram_lead para el cache normal.'");
+      lines.push("Tu output va por reply_to_group — corto, profesional, no técnico.");
+      return lines.join("\n");
+    }
+
+    // status='complete' — postear estrategia CREATIVA, no formulaica.
+    //
+    // CRÍTICO: no le pasamos al modelo el `strategy` pre-armado (es muy
+    // formulaico, parece "leído del prompt"). Le pasamos DATOS CRUDOS y le
+    // pedimos que detecte INSIGHTS específicos del perfil y arme un opener
+    // genuino que conecte con la persona, no con el producto.
+    lines.push(`Tarea: postear estrategia creativa para abordar a @${pa.instagram_handle}.`);
+    if (pa.requested_by_display_name) {
+      lines.push(`Lo pidió: ${pa.requested_by_display_name}.`);
+    }
+    if (pa.context) {
+      lines.push(`Contexto del pedido: "${pa.context}"`);
+    }
+    lines.push("");
+
+    // Datos crudos del perfil
+    const p = pa.profile ?? {};
+    lines.push("═══════════════════════════════════════════════════════════");
+    lines.push("DATOS DEL PERFIL (de Apify):");
+    lines.push("═══════════════════════════════════════════════════════════");
+    lines.push(`Handle: @${p.handle ?? pa.instagram_handle}`);
+    if (p.full_name) lines.push(`Nombre real: ${p.full_name}`);
+    if (typeof p.followers_count === "number") lines.push(`Followers: ${p.followers_count.toLocaleString("en-US")}`);
+    if (typeof p.posts_count === "number") lines.push(`Posts: ${p.posts_count.toLocaleString("en-US")}`);
+    if (typeof p.is_verified === "boolean") lines.push(`Verificada: ${p.is_verified ? "sí ✓" : "no"}`);
+    if (typeof p.is_private === "boolean" && p.is_private) lines.push("Cuenta privada: SÍ (pocas stories accesibles)");
+    if (p.external_url) lines.push(`Link en bio: ${p.external_url}`);
+    if (p.biography) lines.push(`Bio textual: "${String(p.biography).replace(/\n/g, " / ")}"`);
+    lines.push("");
+
+    // Captions/contenido literal de las stories (lo que CLAUDE necesita
+    // para detectar tono, intereses, vibe personal). Si el caption es null
+    // mostramos "[sin caption]" para que el modelo no asuma vacío = vacío.
+    const stories: any[] = Array.isArray(pa.stories_analysis) ? pa.stories_analysis : [];
+    const validStories = stories.filter((s) => !s.error);
+    lines.push("═══════════════════════════════════════════════════════════");
+    lines.push(`STORIES INDIVIDUALES (${validStories.length} de ${stories.length} analizadas con Gemini Vision):`);
+    lines.push("═══════════════════════════════════════════════════════════");
+    for (const s of validStories) {
+      const idx = s.story_index ?? "?";
+      const promo = s.promoted ? (s.promotion_type === "direct" ? "PROMO directa" : "PROMO indirecta") : "sin promo";
+      const cap = s.caption ? `caption: "${String(s.caption).slice(0, 180).replace(/\n/g, " / ")}"` : "caption: [sin texto]";
+      const reasoning = s.reasoning ? ` · ${s.reasoning}` : "";
+      const audience = s.signals?.audience_vibe ? ` · vibe: ${s.signals.audience_vibe}` : "";
+      const paywall = s.signals?.paywall_strength && s.signals.paywall_strength !== "unknown" ? ` · paywall: ${s.signals.paywall_strength}` : "";
+      const tracker = s.signals?.tracker_kind && s.signals.tracker_kind !== "none" ? ` · tracker: ${s.signals.tracker_kind}` : "";
+      const agency = s.signals?.has_agency_branding ? ` · 🚩 BRANDING AGENCIA (${s.signals.agency_name_visible ?? "?"})` : "";
+      lines.push(`Story ${idx} [${promo}]: ${cap}${reasoning}${audience}${paywall}${tracker}${agency}`);
+    }
+    if (validStories.length === 0) {
+      lines.push("(ninguna story analizable — perfil probablemente sin stories del día o cuenta privada)");
+    }
+    lines.push("");
+
+    // Signals agregados (sumario, para que no tengas que recomputar)
+    const sig: any = pa.signals ?? {};
+    lines.push("═══════════════════════════════════════════════════════════");
+    lines.push("SEÑALES AGREGADAS:");
+    lines.push("═══════════════════════════════════════════════════════════");
+    if (sig.bio_tracker) lines.push(`Tracker en bio: ${sig.bio_tracker} (${sig.bio_url ?? ""})`);
+    if (sig.has_agency_branding) lines.push(`🚩 Tiene agencia visible: SÍ (${(sig.agency_names_visible ?? []).join(", ") || "branding pero sin nombre claro"}) → NO ofrecer Kash`);
+    else lines.push("Branding agencia: no visible (probablemente trabaja sola)");
+    if (sig.paywall_strength && sig.paywall_strength !== "unknown") lines.push(`Paywall observado: ${sig.paywall_strength}`);
+    if (sig.audience_vibes_distribution) {
+      const av = sig.audience_vibes_distribution;
+      const parts = Object.entries(av).map(([k, v]) => `${k}:${v}`).join(" ");
+      if (parts) lines.push(`Audience vibes: ${parts}`);
+    }
+    if (sig.quality_estimate && sig.quality_estimate !== "unknown") lines.push(`Quality estimate heurístico: ${sig.quality_estimate}`);
+    lines.push("");
+
+    // INSTRUCCIONES DE CREATIVIDAD — el corazón del cambio
+    lines.push("═══════════════════════════════════════════════════════════");
+    lines.push("CÓMO RESPONDER (leé esto con atención):");
+    lines.push("═══════════════════════════════════════════════════════════");
+    lines.push("");
+    lines.push("NO devuelvas un texto formulaico tipo 'Profile: X / Stories: Y / Señales: Z / Recomendación: pitch Blu'. Eso es robótico y le sirve a nadie.");
+    lines.push("");
+    lines.push("Tu trabajo: leer los datos de arriba como un humano que va a abordar a esta persona, y responder DOS cosas:");
+    lines.push("");
+    lines.push("1) UN INSIGHT GENUINO sobre la creadora. Algo que vos viste en la data y otro chatter NO habría visto sin esta info. Ejemplos:");
+    lines.push("   - 'Sube siempre stories de gym antes de las 8am — es disciplinada, conectá por ese lado.'");
+    lines.push("   - 'Usa jerga colombiana fuerte (parce, qué chimba) — escribile en su mismo registro, no en neutro.'");
+    lines.push("   - 'Su bio dice modelo profesional pero el linktree es genérico, no se sienta diferenciada. Pitch ahí.'");
+    lines.push("   - 'En 3 stories mencionó a su novio — no la pitchees como soltera; respetá el contexto.'");
+    lines.push("   - 'Caption de la story 5 dice \"another sponsored shoot\" — ya monetiza con marcas, sabe lo que es un brand deal.'");
+    lines.push("");
+    lines.push("2) UN OPENER DE DM concreto, redactado en estilo natural (NO copy de catálogo), que use ese insight. Reglas del opener:");
+    lines.push("   - NO empezás con el producto. Primero conectás humanamente.");
+    lines.push("   - Si vas a mencionar nuestro producto, va al final, como complemento de la conversación.");
+    lines.push("   - Tono: como mensaje real de alguien que vio su perfil, no como cold sales.");
+    lines.push("   - Máx 4-5 líneas. Acortable.");
+    lines.push("   - No prometas resultados específicos (10x, 5k/mes, etc) — no podemos garantizarlo.");
+    lines.push("");
+    lines.push("3) RECOMENDACIÓN DE PRODUCTO específica, justificada con LO QUE VISTE (no por 'tiene X followers entonces Blu' — eso es flojo). Justificá usando captions/bio/signals reales.");
+    lines.push("");
+    lines.push("FORMATO DE RESPUESTA (al grupo):");
+    lines.push("- Empezá mencionando al closer (@nombre).");
+    lines.push("- Insight breve (1-2 oraciones).");
+    lines.push("- El opener DM entre comillas / en bloque visualmente claro.");
+    lines.push("- Cierre: producto recomendado + por qué justificado en data observada.");
+    lines.push("- Sin headers tipo 'INSIGHT:' o 'OPENER:'. Texto corrido natural.");
+    lines.push("- Sin emojis decorativos. Solo si suman.");
+    lines.push("");
+    lines.push("Output vía reply_to_group — UN solo mensaje. Si algún dato falta (perfil privado, sin stories) decílo y explicá qué se puede pitch sin info visual: 'pidamos screenshots manuales' o 'arranquen con cold soft touch'.");
+    lines.push("");
+    lines.push(`(Duración scrape: ${pa.duration_seconds ?? "?"}s · ${pa.stories_count ?? 0} stories scrapeadas)`);
+    return lines.join("\n");
+  }
+
   // ─── NIGHT CATCHUP ──────────────────────────────────────────────────
   // Primera invocación del día después de >6h sin actividad. El bot debe
   // leer todos los mensajes nocturnos / del weekend / del período
@@ -3077,6 +3433,30 @@ async function runAgent(req: AgentRequest): Promise<{
   for (; iter < MAX_ITERATIONS; iter += 1) {
     if (Date.now() - startedAt > MAX_WALL_MS) break;
 
+    // PROMPT CACHING (Anthropic): el system prompt (~5K tokens con
+    // catálogo + reglas) y el array TOOLS (~3K tokens) son estables
+    // entre invocaciones. Cacheándolos, ahorramos ~90% en input tokens
+    // si la próxima call llega dentro de 5 min (TTL del cache ephemeral).
+    //
+    // Cómo funciona:
+    //   - cache_control: { type: "ephemeral" } marca el punto del prefix
+    //     a cachear. Anthropic cachea TODO lo que viene antes (system +
+    //     hasta el item marcado de tools).
+    //   - Primera call: paga creation cost (10% más que input normal).
+    //   - Calls subsecuentes dentro de 5 min: 90% descuento en esos tokens.
+    //
+    // Como el bot recibe varios mensajes por minuto en horas activas, el
+    // hit ratio es alto. Esperamos ahorro ~70-80% del input total.
+    const systemWithCache = [
+      { type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } },
+    ];
+    const toolsWithCache = TOOLS.length > 0
+      ? [
+          ...TOOLS.slice(0, -1),
+          { ...TOOLS[TOOLS.length - 1], cache_control: { type: "ephemeral" } },
+        ]
+      : TOOLS;
+
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -3087,8 +3467,8 @@ async function runAgent(req: AgentRequest): Promise<{
       body: JSON.stringify({
         model: modelToUse,
         max_tokens: 4000,
-        system: systemPrompt,
-        tools: TOOLS,
+        system: systemWithCache,
+        tools: toolsWithCache,
         messages,
       }),
     });

@@ -165,11 +165,18 @@ Deno.serve(async (req) => {
   let markedScanning = false;
 
   try {
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) {
-      return jsonError("ANTHROPIC_API_KEY no configurada en los secrets de Supabase.", 500);
+    // Provider via OpenRouter — unificado con Promolog y whatsapp-extract.
+    // Default Gemini 2.5 Flash: ~95% más barato que Claude Sonnet y suficiente
+    // para esta tarea (vision sobre screenshot + análisis de perfil IG con
+    // JSON estructurado). Override via SCAN_MODEL si en el futuro hay que
+    // cambiar a otro modelo más capable.
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    if (!OPENROUTER_API_KEY) {
+      return jsonError("OPENROUTER_API_KEY no configurada en los secrets de Supabase.", 500);
     }
-    const SCAN_MODEL = Deno.env.get("CLAUDE_MODEL_STANDARD") || "claude-sonnet-4-6";
+    const SCAN_MODEL = Deno.env.get("SCOUTER_SCAN_MODEL")
+      ?? Deno.env.get("PROMOLOG_LLM_MODEL")
+      ?? "google/gemini-2.5-flash";
 
     let body: ScanRequest;
     try {
@@ -311,7 +318,7 @@ Deno.serve(async (req) => {
           for (const path of paths) {
             const enriched = await extractFromScreenshot(
               sb,
-              ANTHROPIC_API_KEY,
+              OPENROUTER_API_KEY,
               SCAN_MODEL,
               path,
               accountRow.instagram_handle,
@@ -378,7 +385,7 @@ Deno.serve(async (req) => {
     // Llamar a Sonnet 4.6 con el snapshot.
     let analysis: AiAnalysis;
     try {
-      analysis = await runAiScan(ANTHROPIC_API_KEY, SCAN_MODEL, snapshot);
+      analysis = await runAiScan(OPENROUTER_API_KEY, SCAN_MODEL, snapshot);
     } catch (aiErr) {
       const msg = (aiErr as Error).message ?? "Error de IA.";
       await sb
@@ -693,14 +700,18 @@ async function extractFromScreenshot(
 
 Los counts pueden venir abreviados (1.2K, 16.5K, 1M); convertilos a número entero. Si algún dato no es visible en el screenshot, usá null. No inventes nada.`;
 
+  // OpenRouter (OpenAI-compatible): formato image_url con data URI base64.
+  // Gemini 2.5 Flash hace vision sobre screenshots de IG igual de bien que
+  // Claude Sonnet a 1/20 del costo.
   const res = await fetchWithTimeout(
-    "https://api.anthropic.com/v1/messages",
+    "https://openrouter.ai/api/v1/chat/completions",
     {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://maven.asmtech.me",
+        "X-Title": "Maven Spam Screenshot Extract",
       },
       body: JSON.stringify({
         model,
@@ -709,18 +720,13 @@ Los counts pueden venir abreviados (1.2K, 16.5K, 1M); convertilos a número ente
           {
             role: "user",
             content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: mime,
-                  data: dataUrl.split(",")[1],
-                },
-              },
               { type: "text", text: extractPrompt },
+              { type: "image_url", image_url: { url: dataUrl } },
             ],
           },
         ],
+        response_format: { type: "json_object" },
+        temperature: 0.1,
       }),
     },
     60_000,
@@ -733,23 +739,19 @@ Los counts pueden venir abreviados (1.2K, 16.5K, 1M); convertilos a número ente
   }
 
   const data = (await res.json()) as {
-    content?: Array<{ type: string; text?: string }>;
-    usage?: {
-      input_tokens?: number;
-      output_tokens?: number;
-      cache_creation_input_tokens?: number;
-      cache_read_input_tokens?: number;
-    };
+    choices?: Array<{ message?: { content?: string } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
   if (data.usage) {
     void (async () => {
       try {
-        const { logAnthropicUsage } = await import("../_shared/usage.ts");
-        await logAnthropicUsage({
+        const { logGeminiUsage } = await import("../_shared/usage.ts");
+        await logGeminiUsage({
           operation: "scouter-spam-screenshot-extract",
           model,
-          usage: data.usage as any,
-          context: { handle: expectedHandle },
+          inputTokens: data.usage?.prompt_tokens ?? 0,
+          outputTokens: data.usage?.completion_tokens ?? 0,
+          context: { handle: expectedHandle, provider: "openrouter" },
         });
       } catch {
         // silent
@@ -757,10 +759,7 @@ Los counts pueden venir abreviados (1.2K, 16.5K, 1M); convertilos a número ente
     })();
   }
 
-  const raw = (data.content ?? [])
-    .filter((c) => c.type === "text" && c.text)
-    .map((c) => c.text!)
-    .join("")
+  const raw = (data.choices?.[0]?.message?.content ?? "")
     .trim();
   let cleaned = raw;
   if (cleaned.startsWith("```json")) cleaned = cleaned.slice(7);
@@ -899,26 +898,29 @@ NOTA: la cuenta está marcada como restringida por IG. ${
 
 Devolvé el JSON de evaluación.`;
 
+  // OpenRouter (OpenAI-compatible): el system prompt va como mensaje
+  // role=system. Sin cache_control de Anthropic — Gemini tiene caching
+  // automático del lado del provider. response_format json_object para
+  // que Gemini devuelva JSON limpio sin backticks.
   const res = await fetchWithTimeout(
-    "https://api.anthropic.com/v1/messages",
+    "https://openrouter.ai/api/v1/chat/completions",
     {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://maven.asmtech.me",
+        "X-Title": "Maven Spam Account Scan",
       },
       body: JSON.stringify({
         model,
         max_tokens: 2000,
-        system: [
-          {
-            type: "text",
-            text: SYSTEM_PROMPT,
-            cache_control: { type: "ephemeral" },
-          },
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userMessage },
         ],
-        messages: [{ role: "user", content: userMessage }],
+        response_format: { type: "json_object" },
+        temperature: 0.1,
       }),
     },
     60_000,
@@ -926,39 +928,31 @@ Devolvé el JSON de evaluación.`;
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Claude API error ${res.status}: ${text.slice(0, 300)}`);
+    throw new Error(`OpenRouter API error ${res.status}: ${text.slice(0, 300)}`);
   }
 
   const data = (await res.json()) as {
-    content?: Array<{ type: string; text?: string }>;
-    usage?: {
-      input_tokens?: number;
-      output_tokens?: number;
-      cache_creation_input_tokens?: number;
-      cache_read_input_tokens?: number;
-    };
+    choices?: Array<{ message?: { content?: string } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
   // Loggea para Control de Gasto (fire-and-forget, no awaitea).
   if (data.usage) {
     void (async () => {
       try {
-        const { logAnthropicUsage } = await import("../_shared/usage.ts");
-        await logAnthropicUsage({
+        const { logGeminiUsage } = await import("../_shared/usage.ts");
+        await logGeminiUsage({
           operation: "scouter-spam-account-scan",
           model,
-          usage: data.usage as any,
-          context: { username: snapshot.username },
+          inputTokens: data.usage?.prompt_tokens ?? 0,
+          outputTokens: data.usage?.completion_tokens ?? 0,
+          context: { username: snapshot.username, provider: "openrouter" },
         });
       } catch (e) {
-        console.warn("logAnthropicUsage failed:", (e as Error).message);
+        console.warn("logGeminiUsage failed:", (e as Error).message);
       }
     })();
   }
-  const raw = (data.content ?? [])
-    .filter((c) => c.type === "text" && c.text)
-    .map((c) => c.text!)
-    .join("")
-    .trim();
+  const raw = (data.choices?.[0]?.message?.content ?? "").trim();
 
   let cleaned = raw;
   if (cleaned.startsWith("```json")) cleaned = cleaned.slice(7);

@@ -149,6 +149,25 @@ function isProviderPausedError(msg: string): boolean {
   );
 }
 
+// Errores PERMANENTES: cuentas privadas, inexistentes, handles inválidos.
+// El retry NO va a cambiar el resultado porque la cuenta no existe o IG
+// la marcó privada. Cada retry sigue consumiendo créditos de ScrapeCreators
+// porque la API SÍ recibe la request (solo devuelve "no datos").
+//
+// Antes del fix: 337 jobs fallidos × 3 retries = ~1000 calls desperdiciadas
+// = $2.30/sem en cuentas que nunca van a responder.
+//
+// Ahora: detectamos el patrón "no devolvió datos" en el mensaje de error
+// y marcamos failed inmediatamente sin retry.
+function isPermanentNotFoundError(msg: string): boolean {
+  return (
+    /no devolvi[oó] datos.*cuenta privada.*inexistente/i.test(msg) ||
+    /handle.*no encontrado/i.test(msg) ||
+    /perfil.*no existe/i.test(msg) ||
+    /account.*not found/i.test(msg)
+  );
+}
+
 // Rollback del attempt + devuelve el job a queued con backoff.
 // CRÍTICO: sin next_retry_at el worker re-pickeaba este job cada 15s
 // (ciclo de polling) generando 2 UPDATEs por ciclo. Eso explicaba el
@@ -230,6 +249,14 @@ export async function processOne(job: ScouterJob): Promise<void> {
         console.warn(`[${job.id}] provider-paused — keeping queued (no attempt consumed)`);
         return;
       }
+      // Error PERMANENTE: la cuenta no existe / es privada / handle inválido.
+      // Retry no va a cambiar el resultado pero SÍ consume créditos de
+      // ScrapeCreators. Marcamos failed inmediatamente saltando los retries.
+      if (isPermanentNotFoundError(failMsg)) {
+        await markFailed(job, failMsg, /*exhausted*/ true);
+        console.warn(`[${job.id}] failed (permanent — not_found, no retry) — ${failMsg}`);
+        return;
+      }
       const exhausted = job.attempts + 1 >= job.max_attempts;
       await markFailed(job, failMsg, exhausted);
       console.warn(
@@ -241,6 +268,11 @@ export async function processOne(job: ScouterJob): Promise<void> {
     if (isProviderPausedError(msg)) {
       await rescheduleNoAttempt(job, msg);
       console.warn(`[${job.id}] provider-paused — keeping queued (no attempt consumed)`);
+      return;
+    }
+    if (isPermanentNotFoundError(msg)) {
+      await markFailed(job, msg, /*exhausted*/ true);
+      console.warn(`[${job.id}] failed (permanent — not_found, no retry) — ${msg}`);
       return;
     }
     const exhausted = job.attempts + 1 >= job.max_attempts;

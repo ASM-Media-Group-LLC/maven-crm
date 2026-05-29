@@ -18,29 +18,48 @@ import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_sha
 const PROJECT_URL = Deno.env.get("SUPABASE_URL")!;
 const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
 
-// Build el texto del recordatorio. Mantenido simple y en español
-// argentino. Después podemos hacer que el agente lo genere con tools.
-function buildReminderText(args: {
+// Build el texto del recordatorio AGRUPADO por persona+grupo.
+// En vez de mandar 1 mensaje por commitment (que satura el grupo con
+// 10+ mensajes seguidos cuando hay backlog), juntamos todos los
+// pendientes de la persona en UN mensaje consolidado.
+//
+// Ejemplo de output con 1 pendiente: típico "¿pudiste X?"
+// Con 3 pendientes: "@Miguel tenés 3 cosas pendientes: · X · Y · Z"
+function buildGroupedReminderText(args: {
   committedBy: string | null;
-  subject: string;
-  targetSubject: string | null;
-  hoursOverdue: number;
-  followupCount: number;
+  commitments: Array<{ subject: string; target_subject: string | null; hoursOverdue: number; followupCount: number }>;
 }): string {
   const who = args.committedBy ? `@${args.committedBy}` : "Hola equipo";
-  const target = args.targetSubject ? ` con ${args.targetSubject}` : "";
-  const action = args.subject;
+  const n = args.commitments.length;
 
-  if (args.followupCount === 0) {
-    if (args.hoursOverdue < 24) {
-      return `${who} 👋 te pregunto rápido — ¿pudiste ${action}${target ? "" : ""}? Lo tenías para hoy.`;
+  if (n === 1) {
+    const c = args.commitments[0];
+    if (c.followupCount === 0) {
+      if (c.hoursOverdue < 24) {
+        return `${who} 👋 ¿pudiste ${c.subject}? Lo tenías para hoy.`;
+      }
+      const days = Math.floor(c.hoursOverdue / 24);
+      return `${who} 👋 ¿qué pasó con "${c.subject}"? Lo habías agendado hace ${days} día${days > 1 ? "s" : ""}.`;
     }
-    const days = Math.floor(args.hoursOverdue / 24);
-    return `${who} 👋 ¿qué pasó con "${action}"? Lo habías agendado hace ${days} día${days > 1 ? "s" : ""}.`;
+    // Segundo intento
+    return `${who} insisto: ¿se hizo "${c.subject}"? Si ya no aplica, decímelo y lo cierro.`;
   }
 
-  // Segundo intento: más directo.
-  return `${who} insisto: ¿se hizo "${action}"${target}? Si ya no aplica, decímelo y lo cierro.`;
+  // Multi-pendiente: un solo mensaje resumido.
+  const lines = [`${who} 👋 tenés ${n} pendientes:`];
+  for (const c of args.commitments) {
+    let when = "";
+    if (c.hoursOverdue < 24) {
+      when = " (hoy)";
+    } else {
+      const days = Math.floor(c.hoursOverdue / 24);
+      when = ` (hace ${days} día${days > 1 ? "s" : ""})`;
+    }
+    lines.push(`· ${c.subject}${when}`);
+  }
+  lines.push("");
+  lines.push("¿Cómo va eso? Si alguno ya no aplica, decímelo y lo cierro.");
+  return lines.join("\n");
 }
 
 async function markOverdue(): Promise<number> {
@@ -99,42 +118,113 @@ async function enqueueFollowups(): Promise<number> {
     return g?.bot_enabled === true && g?.active === true;
   });
 
-  let enqueued = 0;
+  if (eligible.length === 0) return 0;
+
+  // ── Agrupar por (group_id, committed_by_member_id) ──────────────────────
+  // Para evitar spam: en vez de N reminders separados (uno por commitment),
+  // generamos UN reminder por persona-grupo con todos sus pendientes
+  // listados. Máximo 5 items por reminder para no hacer texto enorme.
+  const MAX_ITEMS_PER_REMINDER = 5;
+  type CommitmentSlim = {
+    id: string;
+    tenant_id: string;
+    group_id: string;
+    subject: string;
+    target_subject: string | null;
+    hoursOverdue: number;
+    followupCount: number;
+    committedBy: string | null;
+    committedByMemberId: string | null;
+  };
+
+  // Key: `${group_id}::${committed_by_member_id ?? committed_by_text}`
+  const groups = new Map<string, CommitmentSlim[]>();
+
   for (const c of eligible) {
     const member = c.member as unknown as { display_name: string } | null;
     const committedBy = member?.display_name ?? c.committed_by_text ?? null;
+    const personKey = c.committed_by_member_id ?? `text:${c.committed_by_text ?? "unknown"}`;
+    const key = `${c.group_id}::${personKey}`;
 
     const hoursOverdue = c.due_at
       ? (Date.now() - new Date(c.due_at).getTime()) / 3600 / 1000
       : 0;
 
-    const body = buildReminderText({
-      committedBy,
+    const arr = groups.get(key) ?? [];
+    arr.push({
+      id: c.id,
+      tenant_id: c.tenant_id,
+      group_id: c.group_id,
       subject: c.subject,
-      targetSubject: c.target_subject ?? null,
+      target_subject: c.target_subject ?? null,
       hoursOverdue,
       followupCount: c.followup_count,
+      committedBy,
+      committedByMemberId: c.committed_by_member_id,
     });
+    groups.set(key, arr);
+  }
 
-    // Chequear que no haya ya un reminder pending para este commitment.
+  let enqueued = 0;
+  for (const [_key, commitments] of groups) {
+    const first = commitments[0];
+    // Truncar a max items para que el mensaje no sea kilométrico
+    const items = commitments.slice(0, MAX_ITEMS_PER_REMINDER);
+    const more = commitments.length - items.length;
+
+    // Chequear que no haya YA un reminder pending para esta persona+grupo
+    // (en kind=commitment_followup_grouped). Esto evita re-enviar antes de
+    // que se drene el anterior.
     const { data: existing } = await sb
       .from("whatsapp_reminders")
       .select("id")
-      .eq("commitment_id", c.id)
+      .eq("group_id", first.group_id)
+      .eq("kind", "commitment_followup")
       .eq("status", "pending")
+      .contains("metadata", { grouped_by_member: first.committedByMemberId ?? "text" })
       .limit(1);
 
     if (existing && existing.length > 0) continue;
 
+    let body = buildGroupedReminderText({
+      committedBy: first.committedBy,
+      commitments: items.map((c) => ({
+        subject: c.subject,
+        target_subject: c.target_subject,
+        hoursOverdue: c.hoursOverdue,
+        followupCount: c.followupCount,
+      })),
+    });
+
+    if (more > 0) {
+      body += `\n\n(+ ${more} más pendientes, te paso esos en otro tick)`;
+    }
+
     const { error: insErr } = await sb.from("whatsapp_reminders").insert({
-      tenant_id: c.tenant_id,
-      group_id: c.group_id,
+      tenant_id: first.tenant_id,
+      group_id: first.group_id,
       kind: "commitment_followup",
-      commitment_id: c.id,
+      // commitment_id queda null porque cubre varios. Auditamos via metadata.
       trigger_at: new Date().toISOString(),
       body,
+      metadata: {
+        grouped_by_member: first.committedByMemberId ?? "text",
+        commitment_ids: items.map((c) => c.id),
+        total_pending: commitments.length,
+      },
     });
-    if (!insErr) enqueued += 1;
+    if (!insErr) {
+      enqueued += 1;
+      // Marcar followup_count++ en los commitments incluidos
+      const ids = items.map((c) => c.id);
+      await sb.rpc("increment_followup_count", { p_ids: ids }).catch(() => {
+        // Fallback si la RPC no existe: update simple
+        return sb
+          .from("whatsapp_commitments")
+          .update({ last_followup_at: new Date().toISOString() })
+          .in("id", ids);
+      });
+    }
   }
 
   return enqueued;

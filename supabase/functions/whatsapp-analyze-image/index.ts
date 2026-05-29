@@ -37,6 +37,10 @@ const LLM_TIMEOUT_MS = 30_000;
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20MB — WA limita imágenes a ~16MB
 const PROJECT_URL = Deno.env.get("SUPABASE_URL")!;
 const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN") ?? "";
+// Gateway custom que aplica Baileys downloadContentFromMessage para
+// desencriptar los .enc de WhatsApp. Mismo patrón que whatsapp-transcribe-audio.
+const GATEWAY_URL = Deno.env.get("WHATSAPP_EVOLUTION_URL") ?? "";
+const GATEWAY_KEY = Deno.env.get("WHATSAPP_EVOLUTION_API_KEY") ?? "";
 
 const VISION_PROMPT = `Sos un analista de imágenes para un equipo de ventas de agencias de OnlyFans. Te van a pasar una imagen que alguien compartió en un grupo de WhatsApp del equipo. Tu tarea: extraer toda la info útil de la imagen para que el bot que vive en el grupo pueda detectar compromisos, responder preguntas y trackear casos.
 
@@ -77,6 +81,60 @@ interface VisionAnalysis {
   red_flags: string[];
 }
 
+// Baja una imagen del WhatsApp media usando el gateway (que aplica
+// Baileys downloadContentFromMessage para desencriptar el .enc).
+// Espera que el `raw` del mensaje contenga el sub-mensaje `imageMessage`
+// con mediaKey + url/directPath + mimetype.
+//
+// IMPORTANTE: este es el path principal. El fetch directo a mmg.whatsapp.net
+// devuelve bytes ENCRIPTADOS (content-disposition: attachment;filename=file.enc)
+// que ni Gemini ni ningún LLM pueden procesar. Sin el gateway, el análisis
+// siempre falla con "Unable to process input image / INVALID_ARGUMENT".
+async function downloadImageViaGateway(
+  rawData: unknown,
+): Promise<{ data: Uint8Array; mime: string } | { error: string }> {
+  if (!GATEWAY_URL || !GATEWAY_KEY) {
+    return { error: "gateway_not_configured" };
+  }
+  // El raw que guardamos es { data: <waMessage>, event, instance }.
+  // El imageMessage está en data.message.imageMessage. Algunas variantes
+  // de Evolution lo ponen directamente en message.imageMessage.
+  const r = rawData as
+    | { data?: { message?: { imageMessage?: unknown } }; message?: { imageMessage?: unknown } }
+    | null;
+  const imageMessage = r?.data?.message?.imageMessage ?? r?.message?.imageMessage;
+  if (!imageMessage) return { error: "no_image_message_in_raw" };
+
+  try {
+    const resp = await fetch(`${GATEWAY_URL.replace(/\/$/, "")}/media/download`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": GATEWAY_KEY,
+      },
+      body: JSON.stringify({ type: "image", message: imageMessage }),
+    });
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => "");
+      return { error: `gateway ${resp.status}: ${txt.slice(0, 200)}` };
+    }
+    const buf = await resp.arrayBuffer();
+    if (buf.byteLength === 0) return { error: "empty_image_from_gateway" };
+    if (buf.byteLength > MAX_IMAGE_BYTES) return { error: "image_too_large" };
+    const data = new Uint8Array(buf);
+    // El gateway devuelve el MIME real (image/jpeg, image/png, etc) en
+    // content-type. Si no lo manda, sniffeamos por magic bytes.
+    const mime = resolveMimeType(resp.headers.get("content-type"), data, "image/jpeg");
+    return { data, mime };
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
+// Fallback: descarga directa desde la URL pública. SOLO funciona para
+// imágenes ya desencriptadas (ej. media compartido por otros bots o
+// pruebas con URLs limpias). Para mensajes reales de WhatsApp, siempre
+// va a fallar porque devuelve .enc. Lo dejamos como red de seguridad.
 async function downloadImage(url: string): Promise<{ data: Uint8Array; mime: string } | { error: string }> {
   try {
     const resp = await fetch(url, { method: "GET" });
@@ -237,7 +295,7 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
 
   const { data: msg, error: msgErr } = await sb
     .from("whatsapp_messages")
-    .select("id, tenant_id, group_id, msg_type, body, media_url, transcribed_text, analyzed_at, is_from_bot")
+    .select("id, tenant_id, group_id, msg_type, body, media_url, transcribed_text, analyzed_at, is_from_bot, raw")
     .eq("id", messageId)
     .single();
 
@@ -268,7 +326,17 @@ async function processMessage(messageId: string): Promise<{ ok: boolean; reason?
     return { ok: false, reason: "openrouter_not_configured" };
   }
 
-  const downloaded = await downloadImage(msg.media_url);
+  // Estrategia (igual que whatsapp-transcribe-audio):
+  //   1. Si tenemos `raw` con imageMessage, usar el endpoint /media/download
+  //      del gateway que aplica Baileys decrypt → bytes plain de la imagen.
+  //   2. Fallback: fetch directo a la URL (sirve si la URL ya es de un
+  //      media desencriptado, o si el gateway no está configurado).
+  //      Para WhatsApp real esto SIEMPRE falla porque devuelve .enc.
+  let downloaded = await downloadImageViaGateway(msg.raw);
+  if ("error" in downloaded) {
+    console.warn(`gateway download failed (${downloaded.error}), trying direct media_url`);
+    downloaded = await downloadImage(msg.media_url);
+  }
   if ("error" in downloaded) {
     await logEvent(sb, {
       tenantId: msg.tenant_id,

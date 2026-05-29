@@ -605,17 +605,37 @@ function fireEodOnDemand(groupId: string): void {
   }).catch((e) => console.warn("fireEodOnDemand failed:", (e as Error).message));
 }
 
+// LID(s) interno(s) del bot en WhatsApp. Cuando alguien menciona al bot
+// usando el "@" picker, WhatsApp inserta el LID numérico en el body
+// (formato "@140716701401153") en lugar del display name. Sin detectar
+// esto, el bot no veía la mention y respondía con modo 'auto' (que a
+// veces decide quedarse callado).
+//
+// Configurable via env BOT_LIDS (CSV) por si en el futuro el bot cambia
+// de número o agregamos más instancias.
+const BOT_LIDS: string[] = (Deno.env.get("BOT_LIDS") ?? "140716701401153")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 // Detecta si el body menciona al bot. Usado en modo 'mention' (default).
 //
 // IMPORTANTE: WhatsApp prefija el display name con `~` cuando el contacto
 // que se menciona NO está agendado en la lista de contactos del que escribe.
 // Por eso el body puede llegar como "@~Maven" en lugar de "@maven" — hay que
 // matchear ambos. Tambien soportamos espacios y mayúsculas mixtas.
+//
+// Además matcheamos el LID del bot directamente (WhatsApp lo inserta así
+// cuando el contacto no está agendado por nombre).
 function hasMention(body: string | null): boolean {
   if (!body) return false;
   // Regex: @ + opcional ~ + 0..2 spaces + maven (case insensitive)
   if (/@\s*~?\s*maven\b/i.test(body)) return true;
   if (/@\s*~?\s*bot\b/i.test(body)) return true;
+  // Match directo del LID del bot: "@140716701401153" o "@140716701401153@lid"
+  for (const lid of BOT_LIDS) {
+    if (body.includes(`@${lid}`)) return true;
+  }
   // Variantes sin @ pero referencia explícita.
   const lower = body.toLowerCase();
   return (

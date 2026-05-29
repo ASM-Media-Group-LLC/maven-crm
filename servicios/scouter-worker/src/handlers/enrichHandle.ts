@@ -16,6 +16,10 @@ import type { EnrichHandlePayload, JobResult, ScouterJob } from "../types.ts";
 
 // Limpia un input que puede venir como URL completa o con @ — devuelve
 // el handle válido (alfanuméricos + . + _) o null si no se pudo extraer.
+//
+// MIN 3 chars: handles tipo "p", "a", "x" son spam o errores del LLG
+// cargando datos. Antes pasaban a ScrapeCreators que los devolvía como
+// "no encontrado" y consumían crédito. Filtramos antes.
 function normalizeHandle(raw: string | undefined | null): string | null {
   if (!raw) return null;
   const cleaned = raw
@@ -24,7 +28,7 @@ function normalizeHandle(raw: string | undefined | null): string | null {
     .replace(/^https?:\/\/(www\.)?(instagram|ig)\.com\//i, "")
     .replace(/^@/, "")
     .replace(/[^a-z0-9._].*$/, "");
-  if (!/^[a-z0-9._]{1,30}$/.test(cleaned)) return null;
+  if (!/^[a-z0-9._]{3,30}$/.test(cleaned)) return null;
   return cleaned;
 }
 
