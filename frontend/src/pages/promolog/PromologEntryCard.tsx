@@ -50,6 +50,14 @@ export interface PromologEntry {
   // Razonamiento de la AI cuando analyzed_by_ai = true.
   ai_reasoning?: string | null;
   ai_confidence?: number | null;
+  // true si la entry la creó el pipeline automático (Apify + Gemini Vision).
+  // Las entries del bot son 1-por-story; las manuales (chatter) son 1-por-promo.
+  analyzed_by_ai?: boolean;
+  // Posición de la story dentro del día (0,1,2…) y total de stories ese día.
+  // Lo popula el bot Promolog. Usado para reconstruir la galería de evidencia
+  // con TODAS las historias del día en el modal de detalle.
+  story_index?: number | null;
+  story_count?: number | null;
 }
 
 interface PromologEntryCardProps {

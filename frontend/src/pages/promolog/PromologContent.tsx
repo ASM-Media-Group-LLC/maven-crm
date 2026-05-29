@@ -70,6 +70,8 @@ import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
 import PromologTable from "./PromologTable";
 import PromologGrid from "./PromologGrid";
 import PromologAgentDetailView from "./PromologAgentDetailView";
+import PromologStoryGallery from "./PromologStoryGallery";
+import { collectDayStories, shouldShowGallery } from "./storyEvidence";
 import PromologPerformanceView from "./PromologPerformanceView";
 import AnalyticsSectionBanner from "@/components/analytics/AnalyticsSectionBanner";
 import DataTableShell from "@/components/ui/data-table-shell";
@@ -274,6 +276,9 @@ const PromologContent = () => {
         has_buy_link: pe.has_buy_link === true,
         ai_reasoning: pe.ai_reasoning ?? null,
         ai_confidence: pe.ai_confidence != null ? Number(pe.ai_confidence) : null,
+        analyzed_by_ai: pe.analyzed_by_ai === true,
+        story_index: pe.story_index != null ? Number(pe.story_index) : null,
+        story_count: pe.story_count != null ? Number(pe.story_count) : null,
       };
     });
   }, [promologEntries, profilesMap, userTz]);
@@ -380,6 +385,15 @@ const PromologContent = () => {
   // Entry action state (table/grid actions)
   const [selectedEntry, setSelectedEntry] = useState<PromologEntry | null>(null);
   const [viewEntryOpen, setViewEntryOpen] = useState(false);
+
+  // Todas las stories del día de la creadora seleccionada (para la galería de
+  // evidencia del modal). Usa las entries SIN deduplicar — la tabla muestra 1
+  // fila por resultado, pero acá queremos ver cada historia analizada.
+  const selectedDayStories = useMemo(
+    () => collectDayStories(entries, selectedEntry),
+    [entries, selectedEntry],
+  );
+  const showStoryGallery = shouldShowGallery(selectedDayStories);
   const [editEntryOpen, setEditEntryOpen] = useState(false);
   const [deleteEntryOpen, setDeleteEntryOpen] = useState(false);
   const [assignAgentOpen, setAssignAgentOpen] = useState(false);
@@ -1476,7 +1490,7 @@ const PromologContent = () => {
                 {/* AI reasoning + confidence — solo si fue analizada por el
                     pipeline automático. Es info técnica útil para validar
                     si la AI clasificó bien (sobre todo en casos ambiguos). */}
-                {selectedEntry.ai_reasoning && (
+                {!showStoryGallery && selectedEntry.ai_reasoning && (
                   <div className="rounded-md border border-blue-500/30 bg-blue-500/5 p-3 space-y-1">
                     <div className="flex items-center justify-between">
                       <p className="text-xs uppercase tracking-wider text-blue-400 font-semibold">Análisis AI</p>
@@ -1490,10 +1504,12 @@ const PromologContent = () => {
                   </div>
                 )}
 
-                {/* Evidencia — pantallazo de la story o post. Lo guarda
-                    el bot Promolog con la URL del thumbnail de Apify, o
-                    el chatter manual al subir un screenshot. */}
-                {selectedEntry.evidence_url && (
+                {/* Evidencia — galería de TODAS las stories del día (cuando el
+                    bot analizó varias) o el pantallazo único (entry manual del
+                    chatter / 1 sola story). */}
+                {showStoryGallery ? (
+                  <PromologStoryGallery stories={selectedDayStories} selectedId={selectedEntry.id} />
+                ) : selectedEntry.evidence_url ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Evidencia</p>
@@ -1533,7 +1549,7 @@ const PromologContent = () => {
                       />
                     </a>
                   </div>
-                )}
+                ) : null}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setViewEntryOpen(false)}>Cerrar</Button>
