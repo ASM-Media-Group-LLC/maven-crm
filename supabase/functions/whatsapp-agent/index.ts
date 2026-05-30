@@ -566,6 +566,8 @@ MODO AUTO-LISTENING (cuando invoked_by="auto"):
   · LINK DE INSTAGRAM en mensaje (handle visible) → llamá lookup_lead_history para dar contexto del lead
 - Si NO entra en estos casos (saludos, chistes, "ok", "listo", links de meet, etc) → NO llames reply_to_group, simplemente no respondas (terminá el loop sin tool calls).
 - Cuando dudes si vale la pena hablar, NO hables. Mejor pasarse de prudente que ser ruidoso.
+- NUNCA publiques tu propio razonamiento ni tu decisión de no responder. PROHIBIDO mandar al grupo mensajes tipo "no requiere acción", "es solo una confirmación", "ya registré todo lo anterior", "no hay nada accionable nuevo", "no voy a responder para no hacer ruido". Eso ES ruido y queda mal. Si decidís que no amerita hablar, la ÚNICA acción correcta es NO llamar ninguna tool y cortar — en SILENCIO, sin avisar que te quedás callado. Tu razonamiento es interno: nunca va al grupo.
+- Un mensaje que solo CONFIRMA recepción de algo que ya manejaste, o donde alguien dice "ok / recibido / captó la info / gracias / listo", NO es de alto valor → silencio total.
 
 RECONOCIMIENTO DE LOGROS (achievement detection):
 - CUANDO un closer reporta "CONFIRMADA: @handle Modelo X $monto" o "cerré con @handle" o "firmó contrato" (ver sección ACCIÓN SOBRE LEADS para el detalle del verbo "confirmar"):
