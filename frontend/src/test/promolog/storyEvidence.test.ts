@@ -21,6 +21,7 @@ function makeEntry(over: Partial<PromologEntry> = {}): PromologEntry {
     notes: "",
     creator_id: "creator-1",
     analyzed_by_ai: true,
+    apify_run_id: "run-1",
     ...over,
   };
 }
@@ -51,13 +52,14 @@ describe("storyEvidence — galería de stories de Promolog", () => {
       expect(result.map((e) => e.id)).toEqual(["s0", "s1", "s2"]);
     });
 
-    it("excluye otros creadores y otros días", () => {
-      const sel = makeEntry({ id: "a0", story_index: 0, creator_id: "creator-1", date: "28 may 2026" });
-      const otherCreator = makeEntry({ id: "b0", story_index: 0, creator_id: "creator-2", date: "28 may 2026" });
-      const otherDay = makeEntry({ id: "a-prev", story_index: 0, creator_id: "creator-1", date: "27 may 2026" });
-      const sameDayStory = makeEntry({ id: "a1", story_index: 1, creator_id: "creator-1", date: "28 may 2026" });
+    it("agrupa por SCAN: incluye otra fecha del mismo run, excluye otro creador y otro scan", () => {
+      const sel = makeEntry({ id: "a0", story_index: 0, creator_id: "creator-1", apify_run_id: "run-1", date: "28 may 2026" });
+      const otherCreator = makeEntry({ id: "b0", story_index: 0, creator_id: "creator-2", apify_run_id: "run-1" });
+      const otherScan = makeEntry({ id: "a-old", story_index: 5, creator_id: "creator-1", apify_run_id: "run-0" });
+      // Mismo run de Apify pero la story es un highlight viejo (otra fecha de posteo) → IGUAL entra.
+      const sameScanOtherDay = makeEntry({ id: "a1", story_index: 1, creator_id: "creator-1", apify_run_id: "run-1", date: "13 jun 2023" });
 
-      const result = collectDayStories([sel, otherCreator, otherDay, sameDayStory], sel);
+      const result = collectDayStories([sel, otherCreator, otherScan, sameScanOtherDay], sel);
       expect(result.map((e) => e.id)).toEqual(["a0", "a1"]);
     });
 
