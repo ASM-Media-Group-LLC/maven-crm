@@ -55,40 +55,32 @@ const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 // de IG).
 const VISION_PROMPT = `Analizá esta story de Instagram de una creadora de contenido para una agencia de OnlyFans.
 
-Tu job es clasificar SI promueve su contenido de OnlyFans o no. Considerá tres niveles:
+Tu job: decidir si en ESTA story la creadora está PROMOCIONANDO su contenido pago (OnlyFans / Piclink / Fansly / etc), o no.
 
-1) PROMOCIÓN DIRECTA: muestra link a OnlyFans, página azul, "blue page", LinkTree, link en bio,
-   piclink, o cualquier URL/CTA que lleve a contenido pago.
-2) PROMOCIÓN INDIRECTA: insinúa contenido +18 sin link explícito (poses sugestivas + caption sutil,
-   "DM me", "check my bio", "más en mi página", emojis 🍑🔥💦, mención de "premium content", etc).
-3) NO PROMUEVE: contenido lifestyle, viajes, comida, mascotas, sin connotación sexual ni mención
-   a sus plataformas pagas.
+REGLA CENTRAL: "promocionar" = hay un PUNTERO o LLAMADO A LA ACCIÓN concreto hacia contenido PAGO. Que la foto sea sexy o sugestiva NO es promoción por sí sola — una creadora puede postear lencería/bikini sin promocionar nada. Lo que define la promoción es que DIRIJA al fan a comprar/ver contenido pago (un link, un sticker, una mención de su plataforma, o una invitación clara). NO infieras promoción solo de la apariencia (ropa, pose, cuerpo).
+
+Tres categorías:
+1) DIRECTA (promotion_type="direct", promoted=true, has_buy_link=true): hay un LINK o puntero VISIBLE a contenido pago — sticker/URL de OnlyFans/Piclink/Fansly/Linktree, "link in bio", swipe-up, o un watermark/overlay con un handle o URL de plataforma de pago.
+2) INDIRECTA (promotion_type="indirect", promoted=true): NO hay link visible, pero el TEXTO tiene un llamado a la acción claro hacia contenido pago: "escríbeme por mi contenido", "más en mi página / mi OF", "contenido exclusivo / VIP / premium", "suscribite", "DM para el link", o redirección a una cuenta "premium/+18". Tiene que haber una INVITACIÓN a ir a otro lado o comprar — NO alcanza con una foto linda + un emoji.
+3) NO PROMUEVE (promotion_type="none", promoted=false): TODO lo demás. Incluye EXPLÍCITAMENTE las fotos sugestivas (lencería, bikini, cuerpo destacado, poses insinuantes) que NO tienen ningún link, mención de plataforma ni llamado a la acción a contenido pago. También lifestyle, selfies, gym, comida, viajes, etc. Estar sexy NO es promocionar.
 
 Devolvé SOLO JSON con esta forma:
 {
-  "promoted": true | false,                       // true si DIRECTA o INDIRECTA
+  "promoted": true | false,                       // true SOLO si direct o indirect
   "promotion_type": "direct" | "indirect" | "none",
-  "has_buy_link": true | false,                   // hay link/CTA visible a contenido pago
+  "has_buy_link": true | false,                   // true SOLO si hay link/sticker/URL VISIBLE a contenido pago
   "buy_link_type": "onlyfans" | "piclink" | "linktree" | "fansly" | "other" | null,
-  "platform_mentioned": "onlyfans" | "piclink" | "fansly" | "linktree" | "ninguna",
-  "confidence": 0.0 a 1.0,                        // qué tan seguro estás
-  "reasoning": "una oración corta en español explicando por qué"
+  "platform_mentioned": "onlyfans" | "piclink" | "fansly" | "linktree" | "ninguna",  // solo si se nombra o se ve; si no, "ninguna"
+  "confidence": 0.0 a 1.0,
+  "reasoning": "una oración corta en español: QUÉ señal de promoción viste (link/sticker/frase CTA) o, si no promociona, por qué no"
 }
 
-INSTRUCCIONES ESPECIALES (contexto OnlyFans):
-- Las creadoras profesionales de OF NUNCA ponen links explícitos en captions IG (riesgo de ban).
-  Por eso la promoción más común es INDIRECTA: ropa sugestiva + caption ambiguo + emoji estratégico.
-- Si ves pose insinuante (lencería, bikini, cuerpo destacado) + cualquier caption no-banal,
-  inclínate a marcar promoted=indirect con confidence 0.65-0.80.
-- Si el caption usa frases como "DM", "in bio", "página", "premium", "VIP", "exclusivo",
-  "contenido sin censura", "+18", o emojis sexuales (🍑🔥💦😈🥵), marcá promoted=true.
-- Si ves un sticker, watermark, overlay con texto tipo URL/handle (ej "linktr.ee/", "OF",
-  "@_creadora_premium"), marcá promoted=true y has_buy_link=true.
-- Sé estricto en NO promoción solo cuando el contenido es claramente lifestyle inocuo:
-  comida, mascotas, viajes, gym SIN exhibir cuerpo, eventos de trabajo, etc.
-
-Si no ves evidencia clara y la story no parece lifestyle puro, marcá confidence baja (<0.6)
-para que se revise manualmente — preferimos falsos positivos que perder promos reales.`;
+GUÍA:
+- Necesitás una señal CONCRETA para marcar promoted=true: un link/sticker/URL, una mención de su plataforma de pago, o una frase de llamado a la acción. Sin eso → "none".
+- Si platform_mentioned="ninguna" Y has_buy_link=false Y el texto no tiene ningún CTA → promoted=false (none). NO la marques "indirect" solo por verse sugerente.
+- Los emojis (🍑🔥💦😈🥵) por sí solos NO son promoción; solo cuentan si acompañan un CTA real.
+- En "reasoning" citá la señal concreta ("sticker 'OF' arriba a la derecha", "caption: 'link en bio'") o, si no promociona, decilo ("solo una selfie en lencería, sin link ni CTA").
+- Si la imagen está borrosa o el texto ilegible y NO podés saber si hay un link/CTA, poné confidence < 0.6 para revisión manual — pero NO marques promoted=true por las dudas: marcá lo que efectivamente ves.`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
