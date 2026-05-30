@@ -124,7 +124,7 @@ Deno.serve(async (req: Request) => {
   // ── Validar que el run existe y coincide ────────────────────────────────
   const { data: run, error: rErr } = await (sb as any)
     .from("promolog_dispatch_runs")
-    .select("id, apify_run_id, payload, status, tenant_id")
+    .select("id, apify_run_id, payload, status, tenant_id, created_at")
     .eq("id", dispatchRunId)
     .maybeSingle();
 
@@ -137,6 +137,18 @@ Deno.serve(async (req: Request) => {
     return json({ ok: true, idempotent: true, status: run.status });
   }
 
+  // Fecha de la ENTRY = fecha del SCAN (cuándo se corrió el análisis), NO la
+  // hora de posteo de la story. Las stories activas suelen haberse posteado
+  // "ayer" (ventana de 24h), así que fechar por posteo las archivaba bajo ayer
+  // y se deduplicaban → nunca aparecían bajo "Hoy". La hora de posteo real se
+  // preserva aparte en `scraped_at`. Usamos created_at del dispatch_run (inicio
+  // del scan) para que un scan que cruza medianoche quede bajo su propio día.
+  const scanDate = run.created_at ?? new Date().toISOString();
+
+  // Costo del run (best-effort) → columna "Costo" del panel de Promobot.
+  // Se captura igual para runs fallidos: un run que falló igual consumió cómputo.
+  const costUsd = await fetchRunCost(apifyRunId, APIFY_TOKEN);
+
   // ── Handle non-SUCCEEDED outcomes ───────────────────────────────────────
   if (status !== "SUCCEEDED") {
     await (sb as any)
@@ -144,6 +156,7 @@ Deno.serve(async (req: Request) => {
       .update({
         status: status === "TIMED-OUT" ? "timeout" : "failed",
         error: `Apify run ended with status=${status}`,
+        cost_usd: costUsd,
         finished_at: new Date().toISOString(),
       })
       .eq("id", dispatchRunId);
@@ -204,6 +217,7 @@ Deno.serve(async (req: Request) => {
           creator_id: creatorId,
           dispatch_run_id: dispatchRunId,
           apify_run_id: apifyRunId,
+          scan_date: scanDate,
         });
         entriesCreated++;
         creatorsSucceeded++;
@@ -224,6 +238,7 @@ Deno.serve(async (req: Request) => {
               creatorId,
               dispatchRunId,
               apifyRunId,
+              scanDate,
               openrouterKey: OPENROUTER_API_KEY,
             }).catch((e) => ({ error: (e as Error).message })),
           ),
@@ -253,6 +268,7 @@ Deno.serve(async (req: Request) => {
       creators_succeeded: creatorsSucceeded,
       creators_failed: creatorsFailed,
       entries_created: entriesCreated,
+      cost_usd: costUsd,
       error: errors.length > 0 ? JSON.stringify(errors.slice(0, 20)) : null,
       finished_at: new Date().toISOString(),
     })
@@ -286,6 +302,23 @@ async function fetchDataset(
   }
 }
 
+// fetchRunCost — costo en USD del run de Apify (usageTotalUsd), para la columna
+// "Costo" del panel de Promobot. El run object lo trae ya finalizado cuando el
+// run llega a estado terminal (que es justo cuando el webhook se dispara).
+// Best-effort: si el GET falla devolvemos null y la columna queda en "—" — el
+// costo no es crítico para procesar las entries, solo informativo.
+async function fetchRunCost(apifyRunId: string, token: string): Promise<number | null> {
+  try {
+    const resp = await fetch(`https://api.apify.com/v2/actor-runs/${apifyRunId}?token=${token}`);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const usd = data?.data?.usageTotalUsd;
+    return typeof usd === "number" ? usd : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 interface StoryAnalysis {
   promoted: boolean;
   promotion_type: "direct" | "indirect" | "none";
@@ -312,6 +345,7 @@ async function processStory(args: {
   creatorId: string;
   dispatchRunId: string;
   apifyRunId: string;
+  scanDate: string;
   openrouterKey: string;
 }): Promise<{ inserted: boolean } | { error: string }> {
   const { story, openrouterKey } = args;
@@ -359,6 +393,7 @@ async function processStory(args: {
         media_url: mediaUrl,
         evidence_url: durableUrl ?? mediaUrl,
         scraped_at: story.timestamp ?? null,
+        scan_date: args.scanDate,
         reason: l1.error,
         is_video: isVideo,
       });
@@ -410,6 +445,7 @@ async function processStory(args: {
     media_url: mediaUrl,
     evidence_url: durableUrl ?? mediaUrl,
     scraped_at: story.timestamp ?? null,
+    scan_date: args.scanDate,
     analysis: final,
     analysis_level: analysisLevel,
     needs_review: needsReview,
@@ -584,7 +620,8 @@ async function insertAnalyzedEntry(
     story_count: number;
     media_url: string;          // URL original de IG/Apify (efímera) → story_media_url
     evidence_url: string;       // URL durable (Storage) o fallback al media_url
-    scraped_at: string | null;
+    scraped_at: string | null;  // hora real de posteo de la story (preservada)
+    scan_date: string;          // fecha del scan → va a `date` (filtra el dashboard)
     analysis: StoryAnalysis;
     // Metadata nueva — para auditar el flow de 2 niveles
     analysis_level?: string;       // "thumbnail_only" | "video_full" | "video_tried_lower_conf" | "video_failed:..."
@@ -613,7 +650,7 @@ async function insertAnalyzedEntry(
   const { error } = await sb.from("promolog_entries").insert({
     tenant_id: TENANT_ID,
     creator_id: args.creator_id,
-    date: args.scraped_at ?? new Date().toISOString(),
+    date: args.scan_date,
     promoted: args.analysis.promoted ? "true" : "false",
     network: "Instagram",
     platform,
@@ -656,7 +693,8 @@ async function insertUnreadableEntry(
     story_count: number;
     media_url: string;
     evidence_url: string;
-    scraped_at: string | null;
+    scraped_at: string | null;  // hora real de posteo (preservada)
+    scan_date: string;          // fecha del scan → va a `date`
     reason: string;
     is_video?: boolean;
   },
@@ -670,7 +708,7 @@ async function insertUnreadableEntry(
   const { error } = await sb.from("promolog_entries").insert({
     tenant_id: TENANT_ID,
     creator_id: args.creator_id,
-    date: args.scraped_at ?? new Date().toISOString(),
+    date: args.scan_date,
     promoted: "pending",
     network: "Instagram",
     platform: "Ninguna",
@@ -746,12 +784,12 @@ async function persistEvidence(
 
 async function insertEmptyEntry(
   sb: any,
-  args: { creator_id: string; dispatch_run_id: string; apify_run_id: string },
+  args: { creator_id: string; dispatch_run_id: string; apify_run_id: string; scan_date: string },
 ): Promise<void> {
   await sb.from("promolog_entries").insert({
     tenant_id: TENANT_ID,
     creator_id: args.creator_id,
-    date: new Date().toISOString(),
+    date: args.scan_date,
     promoted: "false",
     network: "Instagram",
     platform: "Ninguna",

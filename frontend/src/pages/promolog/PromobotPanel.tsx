@@ -45,6 +45,9 @@ interface DispatchRun {
   cost_usd: number | null;
   dispatched_by: string | null;
   error: string | null;
+  // payload guardado por el dispatch: creator_ids[i] ↔ input.usernames[i]
+  // (mismo chunk, mismo orden) → permite el drill-down "qué modelos entraron".
+  payload: { input?: { usernames?: string[] }; creator_ids?: string[] } | null;
 }
 
 const RUNS_LIMIT = 15;
@@ -88,6 +91,8 @@ const PromobotPanel = () => {
   const [launching, setLaunching] = useState(false);
   // scope del diálogo de confirmación: "all" | "selected" | null
   const [confirmScope, setConfirmScope] = useState<"all" | "selected" | null>(null);
+  // corrida cuyo detalle de modelos se está viendo (drill-down de "Modelos").
+  const [runModels, setRunModels] = useState<DispatchRun | null>(null);
 
   // ── Fetchers ──────────────────────────────────────────────────────────────
   const fetchCreators = useCallback(async () => {
@@ -107,7 +112,7 @@ const PromobotPanel = () => {
   const fetchRuns = useCallback(async () => {
     const { data, error } = await (supabase as any)
       .from("promolog_dispatch_runs")
-      .select("id, started_at, finished_at, status, apify_run_id, creators_count, creators_succeeded, creators_failed, entries_created, cost_usd, dispatched_by, error")
+      .select("id, started_at, finished_at, status, apify_run_id, creators_count, creators_succeeded, creators_failed, entries_created, cost_usd, dispatched_by, error, payload")
       .order("started_at", { ascending: false })
       .limit(RUNS_LIMIT);
     if (error) {
@@ -146,6 +151,37 @@ const PromobotPanel = () => {
       creatorLabel(c).toLowerCase().includes(q) || c.instagram_handle.toLowerCase().includes(q),
     );
   }, [creators, search]);
+
+  // id → creador, para resolver nombres en el drill-down de una corrida.
+  const creatorsById = useMemo(() => {
+    const m = new Map<string, EligibleCreator>();
+    for (const c of creators) m.set(c.id, c);
+    return m;
+  }, [creators]);
+
+  // Lista de modelos de la corrida abierta: zip creator_ids ↔ usernames del
+  // payload. Resolvemos el nombre artístico si el creador sigue cargado; sino
+  // caemos al @handle que quedó guardado en el payload (creadora ya no elegible).
+  const runModelsList = useMemo(() => {
+    const p = runModels?.payload;
+    if (!p) return [] as Array<{ key: string; label: string; handle: string; resolved: boolean }>;
+    const ids = p.creator_ids ?? [];
+    const handles = p.input?.usernames ?? [];
+    const n = Math.max(ids.length, handles.length);
+    const out: Array<{ key: string; label: string; handle: string; resolved: boolean }> = [];
+    for (let i = 0; i < n; i++) {
+      const id = ids[i];
+      const c = id ? creatorsById.get(id) : undefined;
+      const handle = (handles[i] ?? c?.instagram_handle ?? "").replace(/^@/, "");
+      out.push({
+        key: id || handle || String(i),
+        label: c ? creatorLabel(c) : handle ? `@${handle}` : (id ?? "—"),
+        handle,
+        resolved: !!c,
+      });
+    }
+    return out;
+  }, [runModels, creatorsById]);
 
   const toggle = (handle: string) => {
     setSelected((prev) => {
@@ -320,7 +356,20 @@ const PromobotPanel = () => {
                         <td className="px-2 py-1.5 text-xs text-muted-foreground">
                           {r.dispatched_by ? "Manual" : "Cron"}
                         </td>
-                        <td className="px-2 py-1.5 text-right tabular-nums">{r.creators_count}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">
+                          {r.creators_count > 0 && (r.payload?.creator_ids?.length || r.payload?.input?.usernames?.length) ? (
+                            <button
+                              type="button"
+                              onClick={() => setRunModels(r)}
+                              className="font-medium text-primary underline-offset-2 hover:underline"
+                              title="Ver qué modelos entraron en esta corrida"
+                            >
+                              {r.creators_count}
+                            </button>
+                          ) : (
+                            r.creators_count
+                          )}
+                        </td>
                         <td className="px-2 py-1.5 text-right tabular-nums">{r.entries_created}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums text-xs">
                           {r.cost_usd != null ? `$${r.cost_usd.toFixed(4)}` : "—"}
@@ -353,6 +402,48 @@ const PromobotPanel = () => {
               {launching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               Lanzar
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Drill-down: modelos de una corrida ───────────────────────────── */}
+      <Dialog open={runModels !== null} onOpenChange={(o) => !o && setRunModels(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modelos de la corrida</DialogTitle>
+            <DialogDescription>
+              {runModels
+                ? `${fmtTime(runModels.started_at)} · ${runModelsList.length} modelo(s)`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {runModelsList.length === 0 ? (
+            <p className="py-4 text-sm text-muted-foreground">
+              Sin detalle de modelos para esta corrida.
+            </p>
+          ) : (
+            <ScrollArea className="max-h-80 rounded-md border">
+              <div className="divide-y">
+                {runModelsList.map((m) => (
+                  <div key={m.key} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <span className="truncate text-sm font-medium">{m.label}</span>
+                    {m.handle && (
+                      <a
+                        href={`https://instagram.com/${m.handle}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 text-xs text-muted-foreground hover:text-primary hover:underline"
+                      >
+                        @{m.handle}
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRunModels(null)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
