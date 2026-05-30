@@ -145,6 +145,10 @@ Deno.serve(async (req: Request) => {
   // del scan) para que un scan que cruza medianoche quede bajo su propio día.
   const scanDate = run.created_at ?? new Date().toISOString();
 
+  // Costo del run (best-effort) → columna "Costo" del panel de Promobot.
+  // Se captura igual para runs fallidos: un run que falló igual consumió cómputo.
+  const costUsd = await fetchRunCost(apifyRunId, APIFY_TOKEN);
+
   // ── Handle non-SUCCEEDED outcomes ───────────────────────────────────────
   if (status !== "SUCCEEDED") {
     await (sb as any)
@@ -152,6 +156,7 @@ Deno.serve(async (req: Request) => {
       .update({
         status: status === "TIMED-OUT" ? "timeout" : "failed",
         error: `Apify run ended with status=${status}`,
+        cost_usd: costUsd,
         finished_at: new Date().toISOString(),
       })
       .eq("id", dispatchRunId);
@@ -263,6 +268,7 @@ Deno.serve(async (req: Request) => {
       creators_succeeded: creatorsSucceeded,
       creators_failed: creatorsFailed,
       entries_created: entriesCreated,
+      cost_usd: costUsd,
       error: errors.length > 0 ? JSON.stringify(errors.slice(0, 20)) : null,
       finished_at: new Date().toISOString(),
     })
@@ -293,6 +299,23 @@ async function fetchDataset(
     return { data: Array.isArray(data) ? data : [] };
   } catch (e) {
     return { error: (e as Error).message };
+  }
+}
+
+// fetchRunCost — costo en USD del run de Apify (usageTotalUsd), para la columna
+// "Costo" del panel de Promobot. El run object lo trae ya finalizado cuando el
+// run llega a estado terminal (que es justo cuando el webhook se dispara).
+// Best-effort: si el GET falla devolvemos null y la columna queda en "—" — el
+// costo no es crítico para procesar las entries, solo informativo.
+async function fetchRunCost(apifyRunId: string, token: string): Promise<number | null> {
+  try {
+    const resp = await fetch(`https://api.apify.com/v2/actor-runs/${apifyRunId}?token=${token}`);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const usd = data?.data?.usageTotalUsd;
+    return typeof usd === "number" ? usd : null;
+  } catch (_) {
+    return null;
   }
 }
 
