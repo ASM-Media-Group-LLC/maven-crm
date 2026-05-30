@@ -30,15 +30,22 @@ export function collectDayStories(
 ): PromologEntry[] {
   if (!entry || !entry.analyzed_by_ai || entry.creator_id == null) return [];
 
-  const sameDay = allEntries.filter(
+  // Agrupamos por SCAN (apify_run_id), NO por la fecha de la story. Cada story
+  // trae su propia fecha de posteo (un highlight puede ser de hace meses), así
+  // que agrupar por `date` partía la galería en grupos de 1 → solo se veía 1
+  // foto. Todas las stories de un mismo run de Apify = una galería. Fallback a
+  // `date` para entries legacy/manuales sin apify_run_id.
+  const sameScan = allEntries.filter(
     (e) =>
       e.analyzed_by_ai === true &&
       e.creator_id != null &&
       e.creator_id === entry.creator_id &&
-      e.date === entry.date,
+      (entry.apify_run_id
+        ? e.apify_run_id === entry.apify_run_id
+        : e.date === entry.date),
   );
 
-  const sorted = sameDay.slice().sort((a, b) => {
+  const sorted = sameScan.slice().sort((a, b) => {
     const ai = a.story_index ?? Number.MAX_SAFE_INTEGER;
     const bi = b.story_index ?? Number.MAX_SAFE_INTEGER;
     if (ai !== bi) return ai - bi;

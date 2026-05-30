@@ -287,6 +287,7 @@ const PromologContent = () => {
         analyzed_by_ai: pe.analyzed_by_ai === true,
         story_index: pe.story_index != null ? Number(pe.story_index) : null,
         story_count: pe.story_count != null ? Number(pe.story_count) : null,
+        apify_run_id: pe.apify_run_id ?? null,
       };
     });
   }, [promologEntries, profilesMap, userTz]);

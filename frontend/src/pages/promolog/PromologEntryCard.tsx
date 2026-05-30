@@ -58,6 +58,9 @@ export interface PromologEntry {
   // con TODAS las historias del día en el modal de detalle.
   story_index?: number | null;
   story_count?: number | null;
+  // ID del run de Apify que generó esta entry (bot). Agrupa la galería de
+  // evidencia: todas las stories de un mismo scan, sin importar su fecha de posteo.
+  apify_run_id?: string | null;
 }
 
 interface PromologEntryCardProps {
