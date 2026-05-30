@@ -7,6 +7,7 @@ import { enqueueAvatarFetch } from "@/lib/avatarFetch";
 import { checkCreatorExists, checkExistingContact, checkDuplicateOnlyFans } from "@/lib/lead-validation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { MaskedPhone } from "@/components/MaskedPhone";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -522,7 +523,7 @@ const NuevoContactoForm = () => {
                   <p><span className="text-muted-foreground">Fecha:</span> {new Date(existingContactData.createdAt).toLocaleDateString("es-CO")}</p>
                 )}
                 {existingContactData.phone && (
-                  <p><span className="text-muted-foreground">Teléfono actual:</span> {existingContactData.phone}</p>
+                  <p><span className="text-muted-foreground">Teléfono actual:</span> <MaskedPhone phone={existingContactData.phone} /></p>
                 )}
                 {existingContactData.email && (
                   <p><span className="text-muted-foreground">Email actual:</span> {existingContactData.email}</p>

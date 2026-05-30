@@ -11,6 +11,8 @@ import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import { displayHandle, buildSocialUrl } from "@/lib/utils";
+import { maskPhone } from "@/lib/country-utils";
+import { useUserRole } from "@/hooks/useUserRole";
 import type { CreatorFull } from "./useCreadores";
 
 interface RedesTabContentProps {
@@ -130,6 +132,7 @@ const platforms: PlatformConfig[] = [
 
 const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
   const queryClient = useQueryClient();
+  const { isAdmin } = useUserRole();
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState<EditData>({
@@ -239,8 +242,12 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
       ) : (
         <div className="space-y-2">
           {platforms.filter((p) => !p.editOnly).map((platform) => {
-            const url = platform.buildUrl(creator);
+            const maskThis = platform.key === "whatsapp_number" && !isAdmin;
+            const url = maskThis ? "" : platform.buildUrl(creator);
             const hasLink = !!url;
+            const displayVal = maskThis
+              ? (creator.whatsapp_number ? maskPhone(creator.whatsapp_number) : "—")
+              : platform.displayValue(creator);
 
             return (
               <Card
@@ -253,7 +260,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium">{platform.label}</p>
                   <p className="text-sm text-muted-foreground truncate">
-                    {platform.displayValue(creator)}
+                    {displayVal}
                   </p>
                 </div>
                 {hasLink && (
