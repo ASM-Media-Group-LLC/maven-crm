@@ -3,6 +3,7 @@ import { ExternalLink, MessageCircle, Plus, Save, UserCheck, Trash2 } from "luci
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { MaskedPhone } from "@/components/MaskedPhone";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -206,7 +207,7 @@ const ViewLeadModal = ({ open, onOpenChange, lead, onDelete }: Props) => {
               </InfoCard>
               {lead.phone_raw && (
                 <InfoCard label="Teléfono">
-                  <span>{lead.phone_e164 || lead.phone_raw}</span>
+                  <MaskedPhone phone={lead.phone_e164 || lead.phone_raw} />
                 </InfoCard>
               )}
             </div>

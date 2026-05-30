@@ -4,6 +4,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useUserRole } from "@/hooks/useUserRole";
+import { displayPhone } from "@/lib/country-utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { enqueueAvatarFetch } from "@/lib/avatarFetch";
@@ -96,12 +98,13 @@ const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Prop
     },
   });
 
+  const { isAdmin } = useUserRole();
   const items = [
     { label: "Handle", value: `@${lead.instagram_handle}` },
     { label: "Nombre", value: lead.name || "—" },
     { label: "Plataforma", value: lead.platform || "instagram" },
     { label: "País / Ciudad", value: [lead.country, lead.city].filter(Boolean).join(" · ") || "—" },
-    { label: "Teléfono", value: lead.phone || "—" },
+    { label: "Teléfono", value: displayPhone(lead.phone, isAdmin) || "—" },
     { label: "OnlyFans", value: lead.onlyfans_url ? "✓ Incluido" : "—" },
   ];
 

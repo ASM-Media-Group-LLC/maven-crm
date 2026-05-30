@@ -1,6 +1,7 @@
 import { Eye, MoreHorizontal, Pencil, Sparkles, Trash2 } from "lucide-react";
 import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
+import { WhatsAppLink } from "@/components/MaskedPhone";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -122,15 +123,14 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert, onDelete }: Props
                       <span className="truncate">@{c.instagram.replace(/^@/, "")}</span>
                     </a>
                     {(c as any).whatsapp && (
-                      <a
-                        href={`https://wa.me/${(c as any).whatsapp.replace(/\D/g, "")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <WhatsAppLink
+                        phone={(c as any).whatsapp}
                         className="text-green-500 hover:text-green-400 transition-colors"
                         onClick={(e) => e.stopPropagation()}
+                        hideForNonAdmin
                       >
                         <WhatsAppIcon className="h-4 w-4" />
-                      </a>
+                      </WhatsAppLink>
                     )}
                   </div>
                 </div>

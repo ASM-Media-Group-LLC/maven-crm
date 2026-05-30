@@ -5,6 +5,7 @@ import { es } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { WhatsAppPhone } from "@/components/MaskedPhone";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -343,19 +344,7 @@ const LeadRow = React.memo(({ lead, onView, onDelete, profiles, qaMap, canReview
       </TableCell>
       <TableCell className="text-center text-lg">{countryToFlag(lead.country_code)}</TableCell>
       <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}>
-        {lead.phone_raw ? (
-          <a
-            href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone_e164 || lead.phone_raw)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-primary hover:underline"
-          >
-            <Phone className="h-3 w-3" />
-            <span className="truncate max-w-[100px]">{lead.phone_raw}</span>
-          </a>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        )}
+        <WhatsAppPhone phone={lead.phone_raw} waNumber={lead.phone_e164 || lead.phone_raw} />
       </TableCell>
       <TableCell className="text-center text-sm" onClick={(e) => e.stopPropagation()}>
         <QACell lead={lead} qaMap={qaMap} canReview={canReview} />

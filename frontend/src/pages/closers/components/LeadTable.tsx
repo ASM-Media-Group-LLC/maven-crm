@@ -1,5 +1,7 @@
 import { useState, memo, useMemo, useCallback } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useUserRole } from "@/hooks/useUserRole";
+import { maskPhone } from "@/lib/country-utils";
 import PlatformSalesModal from "./PlatformSalesModal";
 import { LEADGEN_COMPANIES } from "@/pages/leadgen/leadgenConstants";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
@@ -359,16 +361,18 @@ const ContactCountCell = ({ creatorId, count }: { creatorId: string; count: numb
 };
 
 const PhoneWhatsApp = ({ phone, resolvedPhone }: { phone: string | null; resolvedPhone: string | null }) => {
+  const { isAdmin } = useUserRole();
   if (!phone) return <span className="text-muted-foreground">—</span>;
-  if (!resolvedPhone) {
-    // Show phone as non-clickable text (no valid international format)
-    return <span className="text-muted-foreground text-sm">{phone}</span>;
+  const shown = isAdmin ? phone : maskPhone(phone);
+  // No-admin: enmascarado y NO clickable (el número no debe ir ni en el href de wa.me).
+  if (!resolvedPhone || !isAdmin) {
+    return <span className="text-muted-foreground text-sm">{shown}</span>;
   }
   return (
     <a href={`https://wa.me/${cleanPhoneForWhatsApp(resolvedPhone)}`} target="_blank" rel="noopener noreferrer"
       className="flex items-center gap-1 text-primary hover:underline">
       <Phone className="h-3 w-3" />
-      <span className="truncate max-w-[100px]">{phone}</span>
+      <span className="truncate max-w-[100px]">{shown}</span>
     </a>
   );
 };
@@ -511,18 +515,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                         <AlertTriangle className="h-3 w-3" /> Decidir
                       </Badge>
                     )}
-                    {c.phone && c.resolved_whatsapp_phone && (
-                      <a href={`https://wa.me/${cleanPhoneForWhatsApp(c.resolved_whatsapp_phone)}`} target="_blank" rel="noopener noreferrer">
-                        <Badge variant="outline" className="text-[10px] h-5 gap-0.5 cursor-pointer">
-                          <Phone className="h-3 w-3" /> WhatsApp
-                        </Badge>
-                      </a>
-                    )}
-                    {c.phone && !c.resolved_whatsapp_phone && (
-                      <Badge variant="outline" className="text-[10px] h-5 gap-0.5">
-                        <Phone className="h-3 w-3" /> {c.phone}
-                      </Badge>
-                    )}
+                    {c.phone && <PhoneWhatsApp phone={c.phone} resolvedPhone={c.resolved_whatsapp_phone} />}
                   </div>
                 </div>
               );

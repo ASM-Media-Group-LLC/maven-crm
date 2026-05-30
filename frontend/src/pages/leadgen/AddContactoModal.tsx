@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AlertTriangle } from "lucide-react";
 import EvidenceUploader from "@/components/leadgen/EvidenceUploader";
+import { MaskedPhone } from "@/components/MaskedPhone";
 import { LeadAutocomplete, type LeadAutocompleteLead } from "@/components/leadgen/LeadAutocomplete";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
@@ -670,7 +671,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                 <p><span className="text-muted-foreground">Fecha:</span> {new Date(existingContactData.createdAt).toLocaleDateString("es-CO")}</p>
               )}
               {existingContactData.phone && (
-                <p><span className="text-muted-foreground">Teléfono actual:</span> {existingContactData.phone}</p>
+                <p><span className="text-muted-foreground">Teléfono actual:</span> <MaskedPhone phone={existingContactData.phone} /></p>
               )}
               {existingContactData.email && (
                 <p><span className="text-muted-foreground">Email actual:</span> {existingContactData.email}</p>

@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import DataTableShell from "@/components/ui/data-table-shell";
+import { MaskedPhone } from "@/components/MaskedPhone";
 import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp, Star, ArrowUpRight, ArrowRight, ArrowDownRight, Eye, ClipboardCheck } from "lucide-react";
 import { format, isSameDay, differenceInMinutes, differenceInSeconds, startOfDay, endOfDay, subDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -645,7 +646,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Teléfono</p>
-                  <p className="text-sm font-medium">{selectedLead.phone_e164 || selectedLead.phone_raw || "—"}</p>
+                  <p className="text-sm font-medium"><MaskedPhone phone={selectedLead.phone_e164 || selectedLead.phone_raw} /></p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Fecha</p>

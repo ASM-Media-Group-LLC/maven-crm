@@ -7,6 +7,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { getCountryFlag, getCountryShortDisplay, maskPhone } from "@/lib/country-utils";
+import { WhatsAppLink } from "@/components/MaskedPhone";
 import type { Contacto } from "./ContactosContent";
 
 const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
@@ -90,15 +91,13 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
     {
       label: "Contacto",
       value: whatsappNumber ? (
-        <a
-          href={`https://wa.me/${whatsappNumber}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <WhatsAppLink
+          phone={whatsappNumber}
           className="inline-flex items-center gap-1 text-primary hover:underline"
         >
           <Phone className="h-3 w-3" />
           {phoneDisplay}
-        </a>
+        </WhatsAppLink>
       ) : phoneDisplay,
     },
   ];
