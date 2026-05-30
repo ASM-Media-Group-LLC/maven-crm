@@ -2,6 +2,7 @@ import { useState } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ArrowUpDown, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Phone, Trash2 } from "lucide-react";
 import { getCountryFlag, getCountryShortDisplay, maskPhone } from "@/lib/country-utils";
+import { WhatsAppLink } from "@/components/MaskedPhone";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import {
   Table,
@@ -182,11 +183,10 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onDelete }: Prop
                 <TableCell className="text-sm text-muted-foreground">{c.city || "No aplicable"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {c.whatsapp ? (
-                    <a href={`https://wa.me/${c.whatsapp.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-primary hover:underline">
+                    <WhatsAppLink phone={c.whatsapp} className="inline-flex items-center gap-1.5 text-primary hover:underline">
                       <Phone className="h-3.5 w-3.5" />
                       {maskPhone(c.whatsapp)}
-                    </a>
+                    </WhatsAppLink>
                   ) : c.phone ? maskPhone(`${c.country_code || ""}${c.phone}`) : "No aplicable"}
                 </TableCell>
 

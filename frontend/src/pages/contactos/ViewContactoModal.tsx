@@ -3,6 +3,7 @@ import { ExternalLink, MessageCircle, Pencil, Plus, Sparkles, Trash2, Upload, X,
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import InstagramIcon from "@/components/icons/InstagramIcon";
+import { WhatsAppLink } from "@/components/MaskedPhone";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -231,15 +232,14 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                 <MessageCircle className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">WhatsApp</p>
-                  <a
-                    href={`https://wa.me/${contacto.whatsapp}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <WhatsAppLink
+                    phone={contacto.whatsapp}
                     className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+                    hideForNonAdmin
                   >
                     Abrir chat
                     <ExternalLink className="h-3 w-3" />
-                  </a>
+                  </WhatsAppLink>
                 </div>
               </div>
             )}

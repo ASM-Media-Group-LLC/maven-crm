@@ -1,3 +1,4 @@
+import type { ReactNode, MouseEvent, CSSProperties } from "react";
 import { Phone } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
 import { maskPhone } from "@/lib/country-utils";
@@ -49,6 +50,38 @@ export function WhatsAppPhone({
     >
       <Phone className="h-3 w-3" />
       <span className="truncate max-w-[100px]">{shown}</span>
+    </a>
+  );
+}
+
+/**
+ * Envuelve contenido en un link a WhatsApp SOLO para admin. Para no-admin
+ * renderiza el contenido sin <a> → el número (que va en el href) no llega al DOM.
+ * Úsalo cuando el texto visible ya está enmascarado y solo hay que tapar el href.
+ */
+export function WhatsAppLink({
+  phone,
+  className,
+  children,
+  hideForNonAdmin,
+  onClick,
+  style,
+  title,
+}: {
+  phone: string | null | undefined;
+  className?: string;
+  children: ReactNode;
+  hideForNonAdmin?: boolean;
+  onClick?: (e: MouseEvent<HTMLAnchorElement>) => void;
+  style?: CSSProperties;
+  title?: string;
+}) {
+  const { isAdmin } = useUserRole();
+  const digits = phone?.replace(/[^0-9]/g, "") ?? "";
+  if (!isAdmin || !digits) return hideForNonAdmin ? null : <>{children}</>;
+  return (
+    <a href={`https://wa.me/${digits}`} target="_blank" rel="noopener noreferrer" className={className} onClick={onClick} style={style} title={title}>
+      {children}
     </a>
   );
 }
