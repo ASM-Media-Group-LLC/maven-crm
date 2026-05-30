@@ -4,6 +4,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useUserRole } from "@/hooks/useUserRole";
+import { displayPhone } from "@/lib/country-utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { LeadGenEntry } from "./useLeadGen";
@@ -82,12 +84,13 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
   // Si el lead está sin handle, bloqueamos la conversión.
   const missingHandle = !lead.model_handle || !lead.model_handle.trim();
 
+  const { isAdmin } = useUserRole();
   const items = [
     { label: "Handle", value: lead.model_handle ? `@${lead.model_handle}` : "—" },
     { label: "Plataforma", value: lead.platform },
     { label: "Categoría", value: lead.quality || "—" },
     { label: "Cuenta origen", value: lead.company || "—" },
-    { label: "Teléfono", value: lead.phone_raw || "—" },
+    { label: "Teléfono", value: displayPhone(lead.phone_raw, isAdmin) || "—" },
     { label: "Enlace", value: lead.source_link ? "✓ Incluido" : "—" },
   ];
 

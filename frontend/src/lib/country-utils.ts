@@ -99,6 +99,25 @@ export function maskPhone(phone: string | null | undefined): string {
   return "•".repeat(digits.length - 4) + digits.slice(-4);
 }
 
+/**
+ * Muestra un teléfono respetando la visibilidad por rol: completo si el usuario
+ * está autorizado (admin), enmascarado (últimos 4) si no. Usar con
+ * `const canSee = useUserRole().isAdmin` en el componente.
+ */
+export function displayPhone(phone: string | null | undefined, canSeeFull: boolean): string {
+  if (!phone) return "";
+  return canSeeFull ? phone : maskPhone(phone);
+}
+
+/**
+ * Dígitos crudos para un link wa.me SOLO si está autorizado. Si no, devuelve null
+ * para que el componente NO renderice el link (el número no debe ir ni en el href).
+ */
+export function waMeDigits(phone: string | null | undefined, canSeeFull: boolean): string | null {
+  if (!phone || !canSeeFull) return null;
+  return phone.replace(/[^0-9]/g, "");
+}
+
 /** Get all available countries as an array for Select components */
 export function getCountryOptions(): Array<{ code: string; name: string; flag: string }> {
   return Object.entries(COUNTRY_DATA)

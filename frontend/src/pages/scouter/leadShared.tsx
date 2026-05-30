@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { WhatsAppPhone } from "@/components/MaskedPhone";
 import {
   Dialog,
   DialogContent,
@@ -648,17 +649,8 @@ export const LeadDrawer = ({
                       onChange={(e) => setField("phone", e.target.value || null)}
                       className="h-8"
                     />
-                  ) : lead.phone ? (
-                    <a
-                      href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, "")}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline tabular-nums"
-                    >
-                      {lead.phone}
-                    </a>
                   ) : (
-                    <span className="text-muted-foreground">—</span>
+                    <WhatsAppPhone phone={lead.phone} />
                   )}
                 </Field>
 
