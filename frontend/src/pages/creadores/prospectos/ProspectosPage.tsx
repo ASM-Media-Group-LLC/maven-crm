@@ -4,6 +4,7 @@ import {
   ListIcon, LayoutGrid, Rocket,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MaskedPhone } from "@/components/MaskedPhone";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -316,7 +317,7 @@ export default function ProspectosPage() {
                   <div><p className="text-xs text-muted-foreground">Agencia</p><p>{viewItem.agency ?? "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">País</p><p>{viewItem.country ?? "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">Email</p><p>{viewItem.email ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Teléfono</p><p>{viewItem.phone ?? "—"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Teléfono</p><p><MaskedPhone phone={viewItem.phone} /></p></div>
                   <div><p className="text-xs text-muted-foreground">Fuente</p><p>{PROSPECT_SOURCES.find((s) => s.value === viewItem.source)?.label ?? "—"}</p></div>
                   <div><p className="text-xs text-muted-foreground">Fecha</p><p>{format(new Date(viewItem.created_at), "dd/MM/yyyy")}</p></div>
                   <div>

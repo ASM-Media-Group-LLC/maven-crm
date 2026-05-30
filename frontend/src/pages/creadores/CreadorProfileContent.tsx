@@ -199,7 +199,7 @@ const CreadorProfileContent = () => {
             )}
 
             <div className="flex flex-wrap items-center gap-2 mt-3">
-              {c.whatsapp_number && (
+              {isAdmin && c.whatsapp_number && (
                 <a href={`https://wa.me/${c.whatsapp_number.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer">
                   <Badge variant="secondary-soft" className="gap-1.5 cursor-pointer hover:bg-muted">
                     <Phone className="h-3 w-3" /> WhatsApp
