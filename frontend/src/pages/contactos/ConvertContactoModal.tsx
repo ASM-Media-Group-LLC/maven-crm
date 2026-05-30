@@ -4,6 +4,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useUserRole } from "@/hooks/useUserRole";
+import { displayPhone } from "@/lib/country-utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
@@ -69,12 +71,13 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
   // de models como fuente canónica de identidad.
   const missingHandle = !contacto.handle || !contacto.handle.trim();
 
+  const { isAdmin } = useUserRole();
   const items = [
     { label: "Nombre", value: contacto.name },
     { label: "Handle", value: contacto.handle || "—" },
     { label: "País", value: contacto.country_code || "—" },
     { label: "Categoría", value: contacto.physical_appearance || "—" },
-    { label: "Teléfono", value: contacto.phone ? `${contacto.country_code || ""}${contacto.phone}` : "—" },
+    { label: "Teléfono", value: contacto.phone ? displayPhone(`${contacto.country_code || ""}${contacto.phone}`, isAdmin) : "—" },
     { label: "Email", value: contacto.email || "—" },
   ];
 
