@@ -97,11 +97,14 @@ serve(async (req) => {
   if (!conv) return json({ ok: false, error: "conversation_not_found" }, 404);
   const waJid = conv.wa_contacts?.wa_jid as string | undefined;
   if (!waJid) return json({ ok: false, error: "contact_jid_missing" }, 422);
-  const toNumber = waJid.replace(/@.*/, "");
+  // Destino: el wa_jid COMPLETO. Evolution/Baileys rutea por JID (igual que a los
+  // grupos @g.us). Para un @lid hay que mandar al "<id>@lid" entero — mandar solo
+  // los dígitos NO llega (el lid no es el teléfono real del usuario).
+  const toNumber = waJid;
 
   // ── Enviar por Evolution ────────────────────────────────────────────────────
   const sent = await sendViaEvolution(toNumber, text);
-  if (!sent.ok) return json({ ok: false, error: sent.error }, 502);
+  if (!sent.ok) return json({ ok: false, error: sent.error, target: toNumber }, 502);
 
   // ── Persistir el saliente + actualizar metadata ─────────────────────────────
   const nowIso = new Date().toISOString();
