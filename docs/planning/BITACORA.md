@@ -8,7 +8,7 @@
 ## Hoja de ruta (slices — cada uno deployable)
 - [✅] **Slice 0** — Scaffolding (rama, BITÁCORA, feature flag documentado)
 - [✅] **Slice 1** — Modelo de datos (3 tablas + RLS + masking + realtime + tipos TS) · aplicado y verificado en prod 2026-06-01
-- [ ] Slice 2 — Ingesta 1:1 (DMs entrantes → conversación/mensaje, reusa parser Evolution)
+- [⏳] Slice 2 — Ingesta 1:1 (DMs entrantes → conversación/mensaje, reusa parser Evolution) · implementado, falta deploy+verify
 - [ ] Slice 3 — Envío saliente (Maven → Evolution, persistido + idempotente)
 - [ ] Slice 4 — Bandeja lectura (lista + hilo, número oculto, realtime)
 - [ ] Slice 5 — Componer + asignar (escribir desde UI, asignar chat, marcar leído)
@@ -25,10 +25,10 @@
 ## Estado
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📍 FASE: Implementación incremental
-🏃 SLICE ACTUAL: Slice 1 cerrado → próximo Slice 2 (ingesta 1:1)
-✅ HECHO: Slice 0 (scaffolding) + Slice 1 (migración wa_inbox_core APLICADA y VERIFICADA en prod: 3 tablas, RLS=3, 4 policies, v_wa_contacts, realtime=2, authenticated NO ve phone_e164 ✓)
-⏳ EN PROGRESO: —
-📋 PRÓXIMO: Slice 2 — ingesta de DMs 1:1 (whatsapp-ingest → persistir contacto/conversación/mensaje, reusa parseEvolutionApiMessage)
+🏃 SLICE ACTUAL: Slice 2 — ingesta de DMs 1:1 (implementado, falta deploy+verify)
+✅ HECHO: Slice 0 (scaffolding) + Slice 1 (wa_inbox_core APLICADA/VERIFICADA en prod)
+⏳ EN PROGRESO: Slice 2 — persistInboxMessage() en whatsapp-ingest: DM 1:1 entrante → wa_contacts/wa_conversations/wa_conversation_messages (additive, best-effort, idempotente). Falta: deploy whatsapp-ingest + verificar con un DM real.
+📋 PRÓXIMO: Slice 3 — envío saliente (Maven → Evolution, persistido)
 🚧 BLOCKERS: ninguno
-📊 PROGRESO: 1 de 8 slices cerrados (Slice 0 = setup)
+📊 PROGRESO: 1 de 8 slices cerrados
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
