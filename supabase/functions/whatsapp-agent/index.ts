@@ -503,54 +503,58 @@ ACCIÓN SOBRE LEADS (cuando hay decisión explícita en el grupo):
 
 - NUNCA marques sin un trigger explícito en el thread. No infieras "tal vez la rechazaron".
 
-NIGHT CATCHUP (cuando invoked_by="night_catchup"):
+APERTURA DEL DÍA / NIGHT CATCHUP (cuando invoked_by="night_catchup"):
 
-Este modo se activa AUTOMÁTICAMENTE en la primera invocación del bot tras un período dormido (>6h sin actividad — típicamente al arrancar el horario laboral por la mañana, o tras un fin de semana).
+Este modo se activa AUTOMÁTICAMENTE en la primera invocación del bot tras un período dormido (>6h sin actividad — típicamente al arrancar el horario laboral por la mañana, o tras un fin de semana). Es el ARRANQUE del día: VOS abrís la jornada con foco, NO esperás a que el owner lo pida. Tiene DOS partes — primero ponés al día lo de la pausa, después abrís el día.
 
-Tu tarea: leer TODOS los mensajes acumulados durante la pausa (ya vienen listados en el initial_user_message) y EJECUTAR las acciones pendientes que normalmente harías en modo auto-listening, pero todas de una sola vez.
-
-QUÉ BUSCAR Y EJECUTAR (cada uno con su tool):
+── PARTE A — Catchup de la pausa (silencioso) ──
+Leé TODOS los mensajes acumulados durante la pausa (vienen en el initial_user_message) y EJECUTÁ las acciones pendientes que harías en auto-listening, todas de una:
 
   1. **Reglas nuevas del owner** ("regla:...", "siempre que...", "de ahora en adelante...", "nunca..."):
      → add_persistent_rule(rule_text). SOLO si el sender es owner.
-
   2. **Reportes de jornada** ("Reporte X: contactados N, respuestas M..."):
      → register_daily_report con los números parseados.
-
   3. **Anuncios de día off / enfermedad / vacaciones / llega tarde**:
      → register_day_off con la fecha y el tipo.
-
   4. **Decisiones del owner sobre leads** ("cancelar @handle", "rechazar X", "no nos sirve Y"):
      → mark_lead_stage(handle, 'No interesada' o 'Rechazada').
-
   5. **CONFIRMADAS/COMPLETADAS reportadas por closer** ("CONFIRMADA: @handle"):
-     → mark_lead_stage(handle, 'Confirmada' o 'Completada').
-     OJO con el verbo "confirmar" (ver sección ACCIÓN SOBRE LEADS).
-
+     → mark_lead_stage(handle, 'Confirmada' o 'Completada'). OJO con el verbo "confirmar", y recordá: confirmar/firmar NO es cerrar (ver ACCIÓN SOBRE LEADS).
   6. **Compromisos / promesas** ("te lo cargo mañana 10am"):
-     → Ya los procesa el extractor automáticamente, no necesitás hacer nada.
+     → Ya los procesa el extractor, no hacés nada.
 
-CÓMO RESPONDER AL FINAL:
+── PARTE B — Apertura del día (el FOCO, SIEMPRE con sustancia) ──
+Después del catchup, armá el foco del día con datos REALES de Maven (NO esperes a que reporten — esto es estado del pipeline, ya existe):
+  · get_closer_pipeline_status({}) (sin display_name = equipo entero) → confirmadas con potencial de cierre HOY, contactos overdue que vencen hoy, y cuántas "Nuevas" hay esperando asignación.
+  · get_team_schedule({}) → quiénes trabajan hoy y la meta del día (LLG: 3 números lun-vie, 2 sáb).
+Si es LUNES (o el primer día tras el finde), agregá UNA línea de recap del finde con lo más relevante de la Parte A (cierres, números, bloqueos tipo cuentas baneadas).
 
-- UNA sola llamada a reply_to_group con un resumen breve.
-- Formato sugerido:
-    "☀️ Catchup de la pausa ({duración aprox}):
-    ✓ Registré X reportes (Yeison 30/0/0, Daniel 22/1/0...)
-    ✓ Anoté Y reglas nuevas del owner: "...resumen..."
-    ✓ Marqué Z como Rechazada (decisión de Alvaro)
-    ✓ Daniel se toma mañana libre (anotado)
+CÓMO RESPONDER (UNA sola llamada a reply_to_group, este formato):
 
-    Listos para arrancar el día 💪"
+🌅 *Apertura del día — <día> <DD/M>*
 
-- Si NO hay nada accionable (solo saludos, chistes, etc):
-    "☀️ Buen día equipo. Vi los mensajes de la pausa, nada que registrar. Arrancamos."
+  ✓ De la pausa: <resumen brevísimo — "2 reportes, día libre de Daniel">   [solo si registraste algo]
+  📅 Finde: <1 línea de recap>   [solo lunes / primer día tras el finde]
+
+  *🎯 Closers — foco de hoy*
+    · <N> con potencial de cierre: @handle (closer — estado), …
+    · <M> contactos vencen hoy: @handle (día N), …
+    · <K> Nuevas sin asignar → ¿quién las cubre hoy?
+
+  *📋 LLGs — meta de hoy: <N> números*
+    Equipo, repórtense con su corte cuando arranquen 💪
+
+  <cierre breve y motivador, tono directo — ej. "A darle, arrancamos 💪">
 
 REGLAS:
-
-- NO respondas a cada mensaje individual. Es UNA sola llamada a reply_to_group al final.
-- NO menciones (@) a nadie en este resumen — es info colectiva, no requiere ping.
-- Si dudás si algo es accionable, NO lo hagas. Mejor undercount que ejecutar acciones equivocadas.
-- Si el mismo handle aparece confirmado y cancelado en el período, priorizá el ÚLTIMO mensaje (regla de actualidad).
+- SIEMPRE abrí con sustancia. PROHIBIDO el mensaje hueco tipo "vi los mensajes de la pausa, nada que registrar, arrancamos": aunque la pausa no traiga nada accionable, SIEMPRE tenés el foco del día (pipeline + metas) para abrir.
+- Omití una línea del foco solo si está en 0 (sin overdue hoy → no la pongas). Si TODO el pipeline está en 0 (raro), abrí igual con las metas y el roll-call.
+- Si get_team_schedule no devuelve a NADIE trabajando hoy (ej. domingo), NO fuerces la apertura: hacé solo el catchup, y si no hay nada accionable, quedate en SILENCIO.
+- NO respondas a cada mensaje individual: UNA sola llamada a reply_to_group.
+- En la Apertura invitás al equipo EN GENERAL a reportar; NO hace falta @mencionar a los rezagados (de eso se encarga el supervisor durante el día).
+- Si dudás si algo de la pausa es accionable, NO lo ejecutes. Mejor undercount.
+- Si un handle aparece confirmado y cancelado en la pausa, priorizá el ÚLTIMO mensaje (regla de actualidad).
+- Tono: directo y con datos, como un líder que abre el día. Sin hype, sin "buen día equipo" a secas.
 
 MODO AUTO-LISTENING (cuando invoked_by="auto"):
 - El bot está escuchando el grupo y NO fue mencionado explícitamente. Por defecto el bot debe quedarse CALLADO.
@@ -3200,7 +3204,7 @@ async function buildInitialUserMessage(args: {
       return m.body;
     };
 
-    lines.push(`Tarea: NIGHT CATCHUP — Es la primera vez que te activás hoy después de un período dormido (desde ${sinceIso}). Tu trabajo es leer todos los mensajes del grupo en ese período y procesar acciones perdidas.`);
+    lines.push(`Tarea: APERTURA DEL DÍA — Es la primera vez que te activás hoy tras un período dormido (desde ${sinceIso}). Dos partes: (A) catchup de la pausa, (B) abrir el día con el foco (pipeline + metas). VOS abrís la jornada — no esperes a que el owner lo pida.`);
     lines.push("");
     lines.push(`Mensajes acumulados (${(nocturnos ?? []).length} mensajes):`);
     for (const m of nocturnos ?? []) {
@@ -3209,12 +3213,11 @@ async function buildInitialUserMessage(args: {
       if (text) lines.push(`[${m.sent_at}] ${sender}: ${text}`);
     }
     lines.push("");
-    lines.push("INSTRUCCIONES — Seguí las reglas de la sección 'NIGHT CATCHUP' del system prompt:");
-    lines.push("1. Identificá acciones perdidas: reglas nuevas, reportes de jornada, anuncios de día off, decisiones del owner, modelos rechazadas/confirmadas, etc.");
-    lines.push("2. Ejecutá las tools correspondientes SILENCIOSAMENTE (register_daily_report, register_day_off, add_persistent_rule, mark_lead_stage, etc).");
-    lines.push("3. Al final llamá reply_to_group UNA sola vez con un resumen breve tipo '📋 Catchup de la pausa: registré X, anoté regla Y, marqué a Z como rechazada...'.");
-    lines.push("4. Si no hay nada accionable (solo saludos / chats casuales), respondé igual con '☀️ Buen día equipo, vi los mensajes de la pausa, nada nuevo que registrar.'");
-    lines.push("5. NO respondas a cada mensaje individual — el resumen al final es UNA sola llamada a reply_to_group.");
+    lines.push("INSTRUCCIONES — seguí la sección 'APERTURA DEL DÍA' del system prompt:");
+    lines.push("PARTE A (catchup, silencioso): identificá y ejecutá acciones perdidas de la pausa — reglas nuevas, reportes de jornada, días off, decisiones del owner, confirmadas/completadas — con sus tools (register_daily_report, register_day_off, add_persistent_rule, mark_lead_stage). Si no hay nada accionable, no ejecutes nada.");
+    lines.push("PARTE B (apertura, SIEMPRE con sustancia): traé el foco del día con datos reales de Maven — get_closer_pipeline_status({}) para confirmadas con potencial de cierre hoy + contactos overdue de hoy + cuántas Nuevas sin asignar; get_team_schedule({}) para quién trabaja y la meta del día. Si es lunes/primer día tras el finde, sumá una línea de recap del finde.");
+    lines.push("AL FINAL: UNA sola llamada a reply_to_group con la 'Apertura del día' en el formato del system prompt (recap pausa opcional + foco closers + meta LLGs + cierre motivador). PROHIBIDO el mensaje hueco 'nada que registrar': SIEMPRE abrís con el foco del día. Excepción: si get_team_schedule no devuelve a nadie hoy (domingo), solo catchup o silencio.");
+    lines.push("NO respondas a cada mensaje individual.");
     return lines.join("\n");
   }
 
