@@ -147,13 +147,27 @@ const InboxPage = () => {
   const sendMessage = async () => {
     const text = draft.trim();
     if (!text || !selectedId || sending) return;
+    const convId = selectedId;
+    setDraft(""); // limpiar el input al instante (snappy)
+
+    // Optimista: mostrar la burbuja saliente YA; se confirma por detrás.
+    const optimisticId = "optimistic-" + Date.now();
+    qc.setQueryData<MsgRow[]>(["wa-inbox-messages", convId], (old = []) => [
+      ...old,
+      { id: optimisticId, direction: "out", body: text, msg_type: "text", media_url: null, sent_at: new Date().toISOString() },
+    ]);
+
     setSending(true);
     const { data, error } = await supabase.functions.invoke("wa-inbox-send", {
-      body: { conversation_id: selectedId, body: text },
+      body: { conversation_id: convId, body: text },
     });
     setSending(false);
     const res = data as { ok?: boolean; error?: string } | null;
     if (error || !res?.ok) {
+      // Rollback de la burbuja optimista + restaurar el texto para reintentar.
+      qc.setQueryData<MsgRow[]>(["wa-inbox-messages", convId], (old = []) =>
+        old.filter((m) => m.id !== optimisticId));
+      setDraft(text);
       toast({
         title: "No se pudo enviar",
         description: error?.message ?? res?.error ?? "Error desconocido",
@@ -161,8 +175,7 @@ const InboxPage = () => {
       });
       return;
     }
-    setDraft("");
-    qc.invalidateQueries({ queryKey: ["wa-inbox-messages", selectedId] });
+    qc.invalidateQueries({ queryKey: ["wa-inbox-messages", convId] });
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
   };
 
@@ -301,7 +314,6 @@ const InboxPage = () => {
                   }
                 }}
                 placeholder="Escribí un mensaje…"
-                disabled={sending}
                 className="h-10"
               />
               <Button
