@@ -8,9 +8,9 @@
 ## Hoja de ruta (slices — cada uno deployable)
 - [✅] **Slice 0** — Scaffolding (rama, BITÁCORA, feature flag documentado)
 - [✅] **Slice 1** — Modelo de datos (3 tablas + RLS + masking + realtime + tipos TS) · aplicado y verificado en prod 2026-06-01
-- [⏳] Slice 2 — Ingesta 1:1 (DMs entrantes → conversación/mensaje, reusa parser Evolution) · implementado, falta deploy+verify
-- [ ] Slice 3 — Envío saliente (Maven → Evolution, persistido + idempotente)
-- [ ] Slice 4 — Bandeja lectura (lista + hilo, número oculto, realtime)
+- [✅] Slice 2 — Ingesta 1:1 (DMs entrantes → conversación/mensaje) · deployado + VERIFICADO en prod 2026-06-01 (DM "Hola" capturado: contacto + conversación + mensaje direction=in; @lid → phone null, correcto)
+- [⏳] Slice 4 — Bandeja lectura (lista + hilo, número oculto, realtime) · REORDENADO: va ANTES del envío (no tiene sentido mandar sin pantalla). Implementado, falta merge + verla andando.
+- [ ] Slice 3 — Envío saliente (Maven → Evolution, persistido) · va DESPUÉS de la bandeja (cuadro de escribir + enviar)
 - [ ] Slice 5 — Componer + asignar (escribir desde UI, asignar chat, marcar leído)
 - [ ] Slice 6 — Copiloto IA (Claude directo; visión de imágenes vía Gemini/OpenRouter existente)
 - [ ] Slice 7 — Números por closer + cutover desde Whaticket
@@ -25,10 +25,12 @@
 ## Estado
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📍 FASE: Implementación incremental
-🏃 SLICE ACTUAL: Slice 2 — ingesta de DMs 1:1 (implementado, falta deploy+verify)
-✅ HECHO: Slice 0 (scaffolding) + Slice 1 (wa_inbox_core APLICADA/VERIFICADA en prod)
-⏳ EN PROGRESO: Slice 2 — persistInboxMessage() en whatsapp-ingest: DM 1:1 entrante → wa_contacts/wa_conversations/wa_conversation_messages (additive, best-effort, idempotente). Falta: deploy whatsapp-ingest + verificar con un DM real.
-📋 PRÓXIMO: Slice 3 — envío saliente (Maven → Evolution, persistido)
+🏃 SLICE ACTUAL: Slice 4 — bandeja visual (lectura). Implementado, falta merge + verla andando.
+✅ HECHO: Slice 0 (scaffolding) + Slice 1 (wa_inbox_core en prod) + Slice 2 (ingesta de DMs VERIFICADA en prod con un DM real)
+⏳ EN PROGRESO: Slice 4 — InboxPage (frontend/src/pages/inbox/InboxPage.tsx): lista de conversaciones + hilo estilo WhatsApp, número oculto, realtime. Ruta /inbox gateada por AdminRoute (lanzamiento oscuro). Falta: merge (Dokploy) + verla con la conversación "Hola".
+📋 PRÓXIMO: Slice 3 — envío saliente (cuadro de escribir + enviar por Evolution, persistido)
 🚧 BLOCKERS: ninguno
-📊 PROGRESO: 1 de 8 slices cerrados
+📊 PROGRESO: 2 de 8 slices cerrados
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Nota de reorden: la bandeja (4) va ANTES del envío (3) — primero ver, después escribir.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
