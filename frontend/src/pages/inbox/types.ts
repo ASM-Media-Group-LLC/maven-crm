@@ -40,8 +40,10 @@ export interface WaConversation {
   id: string;
   tenant_id: string;
   contact_id: string;
-  /** Línea de empresa que "posee" el hilo (uno-por-closer). */
+  /** Instancia/línea de empresa que "posee" el hilo (string crudo del webhook). */
   channel_jid: string | null;
+  /** FK al canal (wa_channels) — resuelve la visibilidad por membresía. */
+  channel_id: string | null;
   department: WaDepartment;
   /** user_id del closer que la atiende; null = sin asignar. */
   assigned_to: string | null;
@@ -74,4 +76,31 @@ export interface WaConversationMessage {
 // Fila de la bandeja: conversación + datos mínimos del contacto para la lista.
 export interface WaInboxRow extends WaConversation {
   contact: Pick<WaContact, "display_name" | "instagram_handle" | "phone"> | null;
+}
+
+// ── Canales (números) — Slice 5 ──────────────────────────────────────────────
+export type WaChannelDepartment = "closer" | "manager" | "recruitment" | "chatter" | "other";
+export type WaChannelType = "dedicated" | "shared";
+
+// Un canal = un número/línea de WhatsApp (una instancia de Evolution). Un
+// departamento puede tener muchos. dedicated=1 persona, shared=varios miembros.
+export interface WaChannel {
+  id: string;
+  tenant_id: string;
+  evolution_instance: string;
+  label: string | null;
+  /** Número de la línea (de empresa). */
+  phone_e164: string | null;
+  department: WaChannelDepartment;
+  type: WaChannelType;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Quién atiende cada canal (muchos-a-muchos canal ↔ usuario).
+export interface WaChannelMember {
+  channel_id: string;
+  user_id: string;
+  created_at: string;
 }
