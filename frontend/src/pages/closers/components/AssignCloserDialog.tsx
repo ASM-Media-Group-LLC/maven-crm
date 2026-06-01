@@ -125,83 +125,29 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
   // Si vinimos sin creatorId, dependemos de selectedCandidate.
   const targetIsContact = needsCreatorSelection && selectedCandidate?.kind === "contact";
 
-  // Mutación: cuando el seleccionado es un contacto, lo convertimos a
-  // closer_creator antes de asignar. Hace 3 cosas atómicas (best-effort):
-  //   1. Si ya existe row en closer_creators con ese source_contact_id
-  //      (caso común: la creó un trigger al insertar el contact, o un
-  //      intento previo que sí pasó pero no marcó el contact como
-  //      converted), UPDATE assigned_to. Si no existe, INSERT.
-  //   2. UPDATE closers_contacts.status = 'converted' para que no
-  //      aparezca como pending la próxima vez.
-  //   3. Devuelve el creatorId al caller para que el parent siga
-  //      con su flow normal de asignación (que ya marca assigned_to).
+  // Mutación: convertir un contacto a creator + asignarlo. TODA la lógica
+  // (chequear-si-existe + convertir-o-reasignar + marcar convertido) vive ahora
+  // en el RPC SECURITY DEFINER `assign_closer_to_contact`, que corre server-side:
+  //   · Inmune a RLS → el chequeo de existencia ve TODAS las filas, así que
+  //     nunca intenta duplicar una fila que el caller no veía (el viejo bug
+  //     "duplicate key closer_creators_source_contact_id_key").
+  //   · Gateado por el MISMO permiso de la UI (Closers / Asignar Closer) via
+  //     has_permission() → si el rol no lo tiene marcado, el RPC devuelve 403.
+  //   · Atómico: deja la fila en stage 'Asignada' + passed_date.
+  // Devuelve el closer_creators.id.
   const convertContactAndAssign = useMutation({
     mutationFn: async (args: { contactId: string; closerId: string }) => {
-      // Traer el contact completo para copiar campos al creator.
-      const { data: contact, error: fetchErr } = await supabase
-        .from("closers_contacts")
-        .select("id, name, handle, phone, country_code, physical_appearance")
-        .eq("id", args.contactId)
-        .single();
-      if (fetchErr || !contact) throw fetchErr ?? new Error("contact_not_found");
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("not_authenticated");
-
-      // 1) ¿Ya existe una row en closer_creators para este contacto?
-      //    source_contact_id tiene UNIQUE, así que un INSERT plano
-      //    falla con "duplicate key value violates unique constraint".
-      const { data: existing, error: existingErr } = await supabase
-        .from("closer_creators")
-        .select("id")
-        .eq("source_contact_id", contact.id)
-        .maybeSingle();
-      if (existingErr) throw existingErr;
-
-      let creatorId: string;
-      if (existing) {
-        // Update — solo asignar el closer. Mantenemos stage / handle /
-        // resto de campos como estaban (puede ser que el creator ya
-        // tenga progreso del pipeline).
-        const { data: updated, error: updateErr } = await supabase
-          .from("closer_creators")
-          .update({ assigned_to: args.closerId })
-          .eq("id", existing.id)
-          .select("id")
-          .single();
-        if (updateErr || !updated) throw updateErr ?? new Error("update_failed");
-        creatorId = updated.id;
-      } else {
-        // Insert nuevo.
-        const { data: inserted, error: insertErr } = await supabase
-          .from("closer_creators")
-          .insert({
-            instagram_handle: contact.handle || contact.name || "sin_handle",
-            phone: contact.phone,
-            category: contact.physical_appearance,
-            source_contact_id: contact.id,
-            assigned_to: args.closerId,
-            stage: "nuevo",
-            created_by: user.id,
-          })
-          .select("id")
-          .single();
-        if (insertErr || !inserted) throw insertErr ?? new Error("insert_failed");
-        creatorId = inserted.id;
-      }
-
-      // 2) Marcar el contacto como convertido. Si falla, no rollback —
-      // el creator ya existe y queda asignado, lo importante.
-      await supabase
-        .from("closers_contacts")
-        .update({ status: "converted" })
-        .eq("id", contact.id);
-
-      return creatorId;
+      // (supabase as any): el RPC es nuevo y todavía no está en los tipos generados.
+      const { data, error } = await (supabase as any).rpc("assign_closer_to_contact", {
+        p_contact_id: args.contactId,
+        p_closer_id: args.closerId,
+      });
+      if (error) throw error;
+      return data as string; // closer_creators.id
     },
     onError: (e: Error) => {
       toast({
-        title: "Error al convertir contacto",
+        title: "Error al asignar",
         description: e.message,
         variant: "destructive",
       });
@@ -218,20 +164,22 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
     if (!selectedCandidate) return;
 
     if (selectedCandidate.kind === "contact") {
-      // Convertir + asignar en un solo flow.
+      // El RPC convierte + asigna TODO server-side. NO llamamos onAssign (que
+      // dispararía un segundo UPDATE del lado del cliente, gated por RLS, que
+      // volvería a fallar para roles no-supervisores): solo refrescamos y cerramos.
       try {
-        const newCreatorId = await convertContactAndAssign.mutateAsync({
+        await convertContactAndAssign.mutateAsync({
           contactId: selectedCandidate.id,
           closerId: selected,
         });
         toast({
-          title: "Contacto convertido",
-          description: `${selectedCandidate.label} ahora es un creator asignado.`,
+          title: "Contacto asignado",
+          description: `${selectedCandidate.label} quedó asignada a ${selectedCloser?.full_name ?? "el closer"} (stage Asignada).`,
         });
         queryClient.invalidateQueries({ queryKey: ["closers_contacts"] });
         queryClient.invalidateQueries({ queryKey: ["assignable-candidates"] });
         queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
-        onAssign(newCreatorId, selected);
+        onOpenChange(false);
       } catch {
         // toast ya manejado en onError de la mutation.
       }
@@ -321,7 +269,7 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
               </Popover>
               {targetIsContact && (
                 <p className="text-[11px] text-muted-foreground">
-                  ⚡ Al asignar, el contacto se convierte automáticamente a creator del pipeline (queda con stage "nuevo" + closer asignado).
+                  ⚡ Al asignar, el contacto se convierte automáticamente a creator del pipeline (queda con stage "Asignada" + closer asignado).
                 </p>
               )}
             </div>
