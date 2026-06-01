@@ -16,9 +16,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Lock, Loader2, Instagram } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram } from "lucide-react";
 import type { WaConversationStatus, WaMessageDirection } from "./types";
 
 interface ConvRow {
@@ -65,8 +67,11 @@ const statusMeta: Record<string, { label: string; variant: "secondary-soft" | "s
 
 const InboxPage = () => {
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
 
   const { data: conversations = [], isLoading: convLoading } = useQuery({
     queryKey: ["wa-inbox-conversations"],
@@ -138,6 +143,28 @@ const InboxPage = () => {
   }, [conversations, search]);
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
+
+  const sendMessage = async () => {
+    const text = draft.trim();
+    if (!text || !selectedId || sending) return;
+    setSending(true);
+    const { data, error } = await supabase.functions.invoke("wa-inbox-send", {
+      body: { conversation_id: selectedId, body: text },
+    });
+    setSending(false);
+    const res = data as { ok?: boolean; error?: string } | null;
+    if (error || !res?.ok) {
+      toast({
+        title: "No se pudo enviar",
+        description: error?.message ?? res?.error ?? "Error desconocido",
+        variant: "destructive",
+      });
+      return;
+    }
+    setDraft("");
+    qc.invalidateQueries({ queryKey: ["wa-inbox-messages", selectedId] });
+    qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+  };
 
   return (
     <div className="flex h-full min-h-0">
@@ -262,10 +289,30 @@ const InboxPage = () => {
               )}
             </ScrollArea>
 
-            {/* Cuadro de envío — llega en el próximo paso (Slice 5). */}
-            <div className="flex items-center gap-2 border-t border-border px-5 py-3 text-sm text-muted-foreground">
-              <Lock className="h-4 w-4" />
-              <span>Responder desde acá llega en el próximo paso.</span>
+            {/* Cuadro de envío (Slice 3) */}
+            <div className="flex items-center gap-2 border-t border-border px-4 py-3">
+              <Input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+                placeholder="Escribí un mensaje…"
+                disabled={sending}
+                className="h-10"
+              />
+              <Button
+                onClick={sendMessage}
+                disabled={sending || !draft.trim()}
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                title="Enviar"
+              >
+                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
             </div>
           </>
         )}
