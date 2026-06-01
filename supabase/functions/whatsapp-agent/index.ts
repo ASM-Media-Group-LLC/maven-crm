@@ -526,6 +526,7 @@ Leé TODOS los mensajes acumulados durante la pausa (vienen en el initial_user_m
 ── PARTE B — Apertura del día (el FOCO, SIEMPRE con sustancia) ──
 Después del catchup, armá el foco del día con datos REALES de Maven (NO esperes a que reporten — esto es estado del pipeline, ya existe):
   · get_closer_pipeline_status({}) (sin display_name = equipo entero) → confirmadas con potencial de cierre HOY, contactos overdue que vencen hoy, y cuántas "Nuevas" hay esperando asignación.
+  · get_unassigned_leads({limit: 10}) → de esas Nuevas sin asignar, las 10 de MAYOR calidad (Elite/A+/A/B+/B…) para sugerir por dónde empezar a contactar HOY. Mostralas como lista corta con su calidad.
   · get_team_schedule({}) → quiénes trabajan hoy y la meta del día (LLG: 3 números lun-vie, 2 sáb).
 Si es LUNES (o el primer día tras el finde), agregá UNA línea de recap del finde con lo más relevante de la Parte A (cierres, números, bloqueos tipo cuentas baneadas).
 
@@ -539,7 +540,7 @@ CÓMO RESPONDER (UNA sola llamada a reply_to_group, este formato):
   *🎯 Closers — foco de hoy*
     · <N> con potencial de cierre: @handle (closer — estado), …
     · <M> contactos vencen hoy: @handle (día N), …
-    · <K> Nuevas sin asignar → ¿quién las cubre hoy?
+    · <K> Nuevas sin asignar. Sugiero arrancar por (prioridad calidad): @handle (A+), @handle (A+), @handle (A)… [top 10 de get_unassigned_leads] → ¿quién las toma hoy?
 
   *📋 LLGs — meta de hoy: <N> números*
     Equipo, repórtense con su corte cuando arranquen 💪
@@ -1130,6 +1131,17 @@ const TOOLS: Array<{
       type: "object",
       properties: {
         display_name: { type: "string", description: "nombre del closer (opcional, si omitís devuelve total del equipo)" },
+      },
+    },
+  },
+  {
+    name: "get_unassigned_leads",
+    description:
+      "Devuelve las leads NUEVAS del pipeline de closers que están SIN ASIGNAR (stage='Nuevo' — con número, esperando que un closer las tome), priorizadas por CALIDAD (Elite/A++ > A+ > A > B+ > B > C+ > C; a igualdad, mayor monetización estimada y más recientes). Úsala para SUGERIR por dónde empezar a contactar de las Nuevas — en la Apertura del día, o cuando preguntan '¿cuáles nuevas asigno?', '¿por cuáles arranco?', 'dame potenciales para hoy'. Devuelve total_unassigned (cuántas hay en total) y suggested (lista top-N con handle, calidad y monetización estimada). NO asigna nada ni expone teléfonos — solo sugiere a quién priorizar.",
+    input_schema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "cuántas sugerir (default 10, máx 25)" },
       },
     },
   },
@@ -2379,6 +2391,46 @@ async function executeTool(
       };
     }
 
+    case "get_unassigned_leads": {
+      const limit = Math.min(Math.max(Math.floor(Number(input.limit ?? 10)) || 10, 1), 25);
+      // Pool de "Nuevas" = closer_creators stage='Nuevo' (con número, esperando
+      // que un closer las tome). Traemos hasta 500 y rankeamos por calidad en JS:
+      // el orden por calidad NO es alfabético (A+ > B+ > C), necesita mapa de
+      // prioridad. NO devolvemos teléfono — solo handle/calidad/monetización.
+      const { data: rows, count } = await sb
+        .from("closer_creators")
+        .select("instagram_handle, category, estimated_monetization, city, created_at", { count: "exact" })
+        .eq("stage", "Nuevo")
+        .limit(500);
+      const QUALITY_RANK: Record<string, number> = {
+        elite: 0, "a++": 0, "a+": 1, a: 2, "b+": 3, b: 4, "c+": 5, c: 6,
+      };
+      const rankOf = (cat: string | null | undefined): number => {
+        const k = String(cat ?? "").trim().toLowerCase();
+        return k in QUALITY_RANK ? QUALITY_RANK[k] : 8; // calidad desconocida al fondo
+      };
+      const sorted = ((rows ?? []) as Array<{
+        instagram_handle: string | null;
+        category: string | null;
+        estimated_monetization: number | null;
+        city: string | null;
+        created_at: string;
+      }>).slice().sort((a, b) => {
+        const ra = rankOf(a.category), rb = rankOf(b.category);
+        if (ra !== rb) return ra - rb;
+        const ma = Number(a.estimated_monetization ?? 0), mb = Number(b.estimated_monetization ?? 0);
+        if (ma !== mb) return mb - ma; // a igual calidad, más monetización estimada primero
+        return String(b.created_at).localeCompare(String(a.created_at)); // luego, más reciente
+      });
+      const suggested = sorted.slice(0, limit).map((r) => ({
+        handle: r.instagram_handle ?? "(sin handle)",
+        quality: r.category ?? "?",
+        est_monetization: r.estimated_monetization != null ? Number(r.estimated_monetization) : null,
+        city: r.city ?? null,
+      }));
+      return { total_unassigned: count ?? (rows ?? []).length, suggested };
+    }
+
     case "get_closer_pipeline_status": {
       const displayName = String(input.display_name ?? "").trim();
       // Resolver closer (opcional).
@@ -3215,7 +3267,7 @@ async function buildInitialUserMessage(args: {
     lines.push("");
     lines.push("INSTRUCCIONES — seguí la sección 'APERTURA DEL DÍA' del system prompt:");
     lines.push("PARTE A (catchup, silencioso): identificá y ejecutá acciones perdidas de la pausa — reglas nuevas, reportes de jornada, días off, decisiones del owner, confirmadas/completadas — con sus tools (register_daily_report, register_day_off, add_persistent_rule, mark_lead_stage). Si no hay nada accionable, no ejecutes nada.");
-    lines.push("PARTE B (apertura, SIEMPRE con sustancia): traé el foco del día con datos reales de Maven — get_closer_pipeline_status({}) para confirmadas con potencial de cierre hoy + contactos overdue de hoy + cuántas Nuevas sin asignar; get_team_schedule({}) para quién trabaja y la meta del día. Si es lunes/primer día tras el finde, sumá una línea de recap del finde.");
+    lines.push("PARTE B (apertura, SIEMPRE con sustancia): traé el foco del día con datos reales de Maven — get_closer_pipeline_status({}) para confirmadas con potencial de cierre hoy + contactos overdue de hoy + cuántas Nuevas sin asignar; get_unassigned_leads({limit:10}) para sugerir las 10 Nuevas de mayor calidad por dónde empezar a contactar; get_team_schedule({}) para quién trabaja y la meta del día. Si es lunes/primer día tras el finde, sumá una línea de recap del finde.");
     lines.push("AL FINAL: UNA sola llamada a reply_to_group con la 'Apertura del día' en el formato del system prompt (recap pausa opcional + foco closers + meta LLGs + cierre motivador). PROHIBIDO el mensaje hueco 'nada que registrar': SIEMPRE abrís con el foco del día. Excepción: si get_team_schedule no devuelve a nadie hoy (domingo), solo catchup o silencio.");
     lines.push("NO respondas a cada mensaje individual.");
     return lines.join("\n");
