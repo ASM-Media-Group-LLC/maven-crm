@@ -12,6 +12,7 @@
 // tipos generados de Supabase.
 
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -20,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio } from "lucide-react";
 import type { WaConversationStatus, WaMessageDirection } from "./types";
 
 interface ConvRow {
@@ -186,7 +187,10 @@ const InboxPage = () => {
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
           <MessageSquare className="h-5 w-5 text-primary" />
           <h1 className="text-base font-semibold">Bandeja</h1>
-          <Badge variant="secondary-soft" className="ml-auto text-[10px]">
+          <Button asChild variant="ghost" size="icon" className="ml-auto h-7 w-7" title="Gestionar canales">
+            <Link to="/inbox/canales"><Radio className="h-4 w-4" /></Link>
+          </Button>
+          <Badge variant="secondary-soft" className="text-[10px]">
             {convLoading ? "…" : conversations.length}
           </Badge>
         </div>

@@ -28,8 +28,8 @@
 📍 FASE: Implementación incremental
 🏃 SLICE ACTUAL: Slice 5 — modelo de CANALES (números). Base DB lista en este PR; falta deploy+merge + sub-slices.
 ✅ HECHO: Slices 0,1,2,4,3 — NÚCLEO (ver + responder) VERIFICADO EN VIVO por el owner. El inbox ya es un Whaticket usable básico.
-⏳ EN PROGRESO: Slice 5 — modelo de canales: wa_channels + wa_channel_members + channel_id en conversaciones + visibilidad por canal (admin ve todo; resto ve sus canales + asignadas; supervisor = miembro de los canales de su depto). Sub-slices que faltan: (a) ingest resuelve channel_id por instancia; (b) pantalla admin de canales (mapear número↔personas/depto + conectar por QR); (c) asignación de conversaciones; (d) abrir inbox a roles + link en el menú.
-📋 PRÓXIMO (dentro de Slice 5): ingest→channel_id + pantalla de canales.
+⏳ EN PROGRESO: Slice 5 — 5a (modelo de canales) APLICADO en prod · 5b (ingest resuelve channel_id por instancia + pantalla /inbox/canales: crear canal + mapear miembros, con link desde la bandeja) implementado. Falta: (c) asignación de conversaciones a una persona; (d) abrir el inbox a roles (sacar admin-only) + link en el menú lateral; conectar números por QR (operativo, depende del setup Evolution/Whaticket).
+📋 PRÓXIMO (dentro de Slice 5): (c) asignación + (d) abrir a roles. Antes, el owner define su setup de números para empezar a mapear.
 🚧 BLOCKERS: ninguno — pero la pantalla de "conectar número (QR)" depende de la API de instancias de Evolution / setup actual (Whaticket vs nuevos).
 📊 PROGRESO: 4 de 8 cerrados (0,1,2,3,4) + Slice 5 en curso
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

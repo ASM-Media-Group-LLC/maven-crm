@@ -346,18 +346,33 @@ async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Pr
     }
   }
 
+  // Resolver el canal por la instancia (si está registrado en wa_channels).
+  // De ahí deriva la visibilidad por membresía; si la instancia no está
+  // registrada todavía, queda null (solo admin lo ve, hasta que se mapee).
+  let channelId: string | null = null;
+  if (channelJid) {
+    const { data: ch } = await sb
+      .from("wa_channels").select("id")
+      .eq("tenant_id", TENANT_ID).eq("evolution_instance", channelJid).maybeSingle();
+    channelId = ch?.id ?? null;
+  }
+
   // 2) Conversación: la más reciente del contacto en depto 'closer'; sino crear.
   let conversationId: string;
   const { data: convs } = await sb
-    .from("wa_conversations").select("id")
+    .from("wa_conversations").select("id, channel_id")
     .eq("contact_id", contactId).eq("department", "closer")
     .order("created_at", { ascending: false }).limit(1);
   if (convs && convs.length > 0) {
     conversationId = convs[0].id;
+    // Si la conversación no tenía canal y ahora lo resolvimos, lo enganchamos.
+    if (channelId && !convs[0].channel_id) {
+      await sb.from("wa_conversations").update({ channel_id: channelId }).eq("id", conversationId);
+    }
   } else {
     const { data: created, error } = await sb
       .from("wa_conversations")
-      .insert({ tenant_id: TENANT_ID, contact_id: contactId, channel_jid: channelJid, department: "closer", status: "open" })
+      .insert({ tenant_id: TENANT_ID, contact_id: contactId, channel_jid: channelJid, channel_id: channelId, department: "closer", status: "open" })
       .select("id").single();
     if (!created) { console.warn("inbox conversation insert:", error?.message); return; }
     conversationId = created.id;
