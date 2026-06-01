@@ -41,6 +41,7 @@ const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
 const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
 const InboxPage = lazy(() => import("./pages/inbox/InboxPage"));
 const InboxChannelsPage = lazy(() => import("./pages/inbox/ChannelsPage"));
+const OpportunitiesPage = lazy(() => import("./pages/opportunities/OpportunitiesPage"));
 
 // Proyecto MP — its own sub-app, kept lazy.
 const ProyectoMPLayout = lazy(() => import("./pages/proyectomp/ProyectoMPLayout"));
@@ -272,6 +273,8 @@ const App = () => (
                 {/* Inbox WhatsApp (bandeja propia) — lanzamiento oscuro: admin-only hasta validar. */}
                 <Route path="/inbox" element={<AdminRoute><InboxPage /></AdminRoute>} />
                 <Route path="/inbox/canales" element={<AdminRoute><InboxChannelsPage /></AdminRoute>} />
+                {/* Oportunidades de monetización — lanzamiento oscuro: admin-only hasta abrir a managers/supervisores. */}
+                <Route path="/oportunidades" element={<AdminRoute><OpportunitiesPage /></AdminRoute>} />
                 <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />
                 <Route path="/promolog" element={<PermissionRoute module="Promolog"><Promolog /></PermissionRoute>} />
                 {/* Migrated areas from kash-call-qa — placeholders for now */}
