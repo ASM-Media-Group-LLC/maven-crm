@@ -23,6 +23,9 @@ export interface IncomingMessage {
   msgType: "text" | "audio" | "image" | "video" | "document" | "sticker" | "system";
   mediaUrl?: string | null;
   replyToExternalId?: string | null;
+  // JIDs/LIDs mencionados (menciones REALES vía "@" picker), normalizados al
+  // id numérico (sin sufijo @s.whatsapp.net / @lid). Vacío si no hay menciones.
+  mentions?: string[];
   sentAt: string;
   isFromBot?: boolean;
   // True si es un DM privado al bot (no de grupo). En DMs el remoteJid
@@ -130,10 +133,19 @@ export function parseEvolutionApiMessage(payload: unknown): IncomingMessage | nu
     : (typeof data.messageTimestamp === "string" ? parseInt(data.messageTimestamp, 10) : null);
   const sentAt = ts ? new Date(ts * 1000).toISOString() : new Date().toISOString();
 
-  // Quoted message (reply).
-  const ctx = (message.extendedTextMessage as Record<string, unknown> | undefined)?.contextInfo as
-    Record<string, unknown> | undefined;
+  // contextInfo lleva el quote (reply) Y las menciones reales (mentionedJid).
+  // Puede venir en extendedTextMessage (texto) o en captions (image/video).
+  const ctxOf = (m: unknown) =>
+    (m as Record<string, unknown> | undefined)?.contextInfo as Record<string, unknown> | undefined;
+  const ctx = ctxOf(message.extendedTextMessage) ?? ctxOf(message.imageMessage) ?? ctxOf(message.videoMessage);
   const replyToExternalId = ctx?.stanzaId as string | undefined ?? null;
+  // Menciones REALES: cuando alguien etiqueta con el "@" picker, WhatsApp mete
+  // el JID/LID del mencionado (no el texto del nombre) en mentionedJid.
+  // Normalizamos al id numérico para comparar fácil (ver isBotAddressed).
+  const mentionedJid = ctx?.mentionedJid;
+  const mentions = Array.isArray(mentionedJid)
+    ? (mentionedJid as unknown[]).map((j) => String(j).split("@")[0].trim()).filter(Boolean)
+    : [];
 
   return {
     externalId,
@@ -146,6 +158,7 @@ export function parseEvolutionApiMessage(payload: unknown): IncomingMessage | nu
     msgType,
     mediaUrl,
     replyToExternalId,
+    mentions,
     sentAt,
     isFromBot: fromMe,
     isDirect,

@@ -752,6 +752,28 @@ function hasMention(body: string | null): boolean {
   );
 }
 
+// IDs del bot para detectar MENCIONES REALES (cuando alguien lo etiqueta con
+// el "@" picker en vez de tipear "@maven"). WhatsApp mete el JID/LID del bot
+// en mentionedJid (NO el texto "maven"), así que el regex de hasMention no lo
+// veía y el bot quedaba en visto. Incluimos su LID y su número porque WhatsApp
+// puede usar cualquiera de los dos. Configurable via env BOT_MENTION_IDS (CSV).
+const BOT_MENTION_IDS: string[] = (Deno.env.get("BOT_MENTION_IDS") ?? "140716701401153,573225218180")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function mentionsBotReal(mentions: string[] | undefined): boolean {
+  if (!mentions || mentions.length === 0) return false;
+  return mentions.some((m) => BOT_MENTION_IDS.includes(m));
+}
+
+// ¿El bot está siendo aludido? Por TEXTO ("@maven" tipeado) O por MENCIÓN REAL
+// (etiquetado con el "@" picker → mentionedJid). Cubrir ambos es lo que evita
+// que un @mention legítimo quede sin respuesta.
+function isBotAddressed(body: string | null, mentions: string[] | undefined): boolean {
+  return hasMention(body) || mentionsBotReal(mentions);
+}
+
 // Decide si invocar al agent y por qué motivo. Devuelve null si no hay que
 // invocar. Si devuelve un reason, fireAgent lo manda al edge function para
 // que el system prompt decida cómo comportarse.
@@ -765,12 +787,13 @@ async function resolveAgentTrigger(
   group: { id: string; bot_enabled: boolean; bot_mode: string },
   body: string | null,
   isFromBot: boolean,
+  mentions?: string[],
 ): Promise<"mention" | "auto" | null> {
   if (!group.bot_enabled) return null;
   if (isFromBot) return null; // nunca respondemos a nuestros propios mensajes
   if (group.bot_mode === "off") return null;
 
-  if (hasMention(body)) return "mention";
+  if (isBotAddressed(body, mentions)) return "mention";
 
   // En modo always, el agent se invoca con cualquier mensaje y decide él
   // si vale la pena responder. Filtros baratos en el ingest para no quemar
@@ -981,7 +1004,7 @@ serve(async (req) => {
       // Quick commands antes que nada: si el mensaje es presentate/help,
       // respondemos hardcodeado y skip al agent. Solo aplica si está
       // mencionado al bot (para no responder presentaciones a mensajes random).
-      if (hasMention(msg.body) && group.bot_enabled) {
+      if (isBotAddressed(msg.body, msg.mentions) && group.bot_enabled) {
         const cmd = detectQuickCommand(msg.body);
         if (cmd === "presentate") {
           // Fire-and-forget el flow multi-mensaje. Awaiteamos para que el
@@ -1025,7 +1048,7 @@ serve(async (req) => {
       }
 
       // Trigger del agent: mention | auto | null según bot_mode del grupo.
-      const trigger = await resolveAgentTrigger(sb, group, msg.body, msg.isFromBot ?? false);
+      const trigger = await resolveAgentTrigger(sb, group, msg.body, msg.isFromBot ?? false, msg.mentions);
       if (trigger) {
         // ¿Es la PRIMERA invocación del día tras una pausa larga?
         // (ej. arranca el horario laboral después de la noche, weekend, etc).

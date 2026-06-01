@@ -36,3 +36,6 @@ verify_jwt = false  # auth via X-Cron-Token (propagado por dispatch-reports)
 
 [functions.dispatch-reports]
 verify_jwt = false  # invocada por pg_cron; check interno de X-Cron-Token
+
+[functions.whatsapp-ingest]
+verify_jwt = false  # webhook de Evolution (sin JWT) — NO cambiar o el bot deja de recibir mensajes
