@@ -300,6 +300,98 @@ async function insertMessage(
   return { id: data.id, inserted: true };
 }
 
+// ── Inbox propio (Slice 2): persistir DMs 1:1 en las tablas wa_* ──────────────
+const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech (inbox v1, mono-tenant)
+
+// persistInboxMessage — guarda un DM 1:1 ENTRANTE en el núcleo de conversación
+// del inbox propio (wa_contacts -> wa_conversations -> wa_conversation_messages).
+// Corre ALONGSIDE del flujo de verificación, es best-effort (no rompe la ingesta
+// si falla) e idempotente (por conversation_id+external_id). Como todavía no hay
+// UI que lea estas tablas (Slice 4), no tiene efecto visible: solo puebla datos.
+// Escribe con service_role (bypassa RLS). El número crudo (phone_e164) solo se
+// deriva si el JID trae teléfono (<phone>@s.whatsapp.net); con @lid queda null.
+async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Promise<void> {
+  if (!msg.isDirect || msg.isFromBot) return;
+  const jid = msg.senderExternalId;
+  if (!jid) return;
+
+  const digits = jid.replace(/@.*/, "").replace(/[^0-9]/g, "");
+  const phone = jid.endsWith("@s.whatsapp.net") && digits ? "+" + digits : null;
+  const displayName = msg.senderDisplayName ?? (phone ? null : (jid.replace(/@.*/, "") || null));
+  const rawObj = (msg.raw && typeof msg.raw === "object") ? (msg.raw as Record<string, unknown>) : {};
+  const channelJid = typeof rawObj.instance === "string" ? rawObj.instance : null;
+
+  // 1) Contacto: find-or-insert por (tenant, wa_jid). NO upsert, para no pisar
+  //    phone/display_name con null en mensajes posteriores.
+  let contactId: string | null = null;
+  const { data: existing } = await sb
+    .from("wa_contacts").select("id")
+    .eq("tenant_id", TENANT_ID).eq("wa_jid", jid).maybeSingle();
+  if (existing) {
+    contactId = existing.id;
+  } else {
+    const { data: created, error } = await sb
+      .from("wa_contacts")
+      .insert({ tenant_id: TENANT_ID, wa_jid: jid, phone_e164: phone, display_name: displayName })
+      .select("id").single();
+    if (created) {
+      contactId = created.id;
+    } else {
+      // Carrera: otro DM creó el contacto en paralelo (unique violation) -> re-buscar.
+      const { data: re } = await sb
+        .from("wa_contacts").select("id")
+        .eq("tenant_id", TENANT_ID).eq("wa_jid", jid).maybeSingle();
+      if (re) contactId = re.id;
+      else { console.warn("inbox contact insert:", error?.message); return; }
+    }
+  }
+
+  // 2) Conversación: la más reciente del contacto en depto 'closer'; sino crear.
+  let conversationId: string;
+  const { data: convs } = await sb
+    .from("wa_conversations").select("id")
+    .eq("contact_id", contactId).eq("department", "closer")
+    .order("created_at", { ascending: false }).limit(1);
+  if (convs && convs.length > 0) {
+    conversationId = convs[0].id;
+  } else {
+    const { data: created, error } = await sb
+      .from("wa_conversations")
+      .insert({ tenant_id: TENANT_ID, contact_id: contactId, channel_jid: channelJid, department: "closer", status: "open" })
+      .select("id").single();
+    if (!created) { console.warn("inbox conversation insert:", error?.message); return; }
+    conversationId = created.id;
+  }
+
+  // 3) Mensaje: insert idempotente por (conversation_id, external_id).
+  const preview = (msg.body ?? `[${msg.msgType}]`).slice(0, 120);
+  const { error: mErr } = await sb
+    .from("wa_conversation_messages")
+    .insert({
+      tenant_id: TENANT_ID,
+      conversation_id: conversationId,
+      direction: "in",
+      external_id: msg.externalId,
+      body: msg.body,
+      msg_type: msg.msgType,
+      media_url: msg.mediaUrl ?? null,
+      sent_at: msg.sentAt,
+    });
+  if (mErr) {
+    // 23505 = unique_violation -> el mensaje ya estaba guardado (idempotente).
+    if (mErr.code !== "23505" && !mErr.message.includes("duplicate")) {
+      console.warn("inbox message insert:", mErr.message);
+    }
+    return;
+  }
+
+  // 4) Metadata de la conversación (para la lista del inbox en Slice 4).
+  await sb
+    .from("wa_conversations")
+    .update({ last_message_at: msg.sentAt, last_message_preview: preview })
+    .eq("id", conversationId);
+}
+
 // Detecta si el mensaje es un "check-in" del usuario al inicio del turno.
 // Patrones: "ya activo", "activa", "dispo", "ingresando", "ya entré", etc.
 // Solo aplica al PRIMER mensaje del día del usuario que matchea, así no
@@ -770,6 +862,9 @@ serve(async (req) => {
   // cuando carga su número en Settings. No insertamos en whatsapp_messages
   // ni disparamos extractor/agent: los DMs son auth-only por ahora.
   if (msg.isDirect) {
+    // Inbox (Slice 2): persistir el DM 1:1 entrante en las tablas wa_* (additive,
+    // best-effort — no afecta la verificación ni rompe la ingesta si falla).
+    await persistInboxMessage(sb, msg).catch((e) => console.warn("persistInboxMessage:", (e as Error).message));
     const result = await processDirectMessage(sb, msg);
     await logEvent(sb, {
       tenantId: null,
