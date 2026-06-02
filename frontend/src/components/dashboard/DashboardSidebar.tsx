@@ -103,7 +103,7 @@ const DashboardSidebar = () => {
     { title: t("nav.leadgen"), url: "/leadgen", icon: Activity, badge: leadgenCount || undefined, module: "LeadGen", submodule: undefined },
     { title: t("nav.closers"), url: "/closers", icon: Phone, badge: closersCount || undefined, module: "Closers", submodule: undefined },
     { title: "Oportunidades", url: "/oportunidades", icon: TrendingUp, module: "Oportunidades", submodule: undefined as string | undefined },
-    { title: "Inbox", url: "/inbox", icon: Inbox, module: "Inbox", submodule: undefined as string | undefined },
+    { title: "WhatsApp", url: "/inbox", icon: Inbox, module: "WhatsApp", submodule: undefined as string | undefined },
     { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets", submodule: undefined },
     { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: MessageSquare, module: "Chatters", submodule: "Evaluator" as string | undefined },
     { title: "Scouter Assist", url: "/scouter-assist", icon: Search, module: "Scouter Assist", submodule: undefined },

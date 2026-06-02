@@ -2,22 +2,23 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { whatsappCors } from "../_shared/whatsapp.ts";
 
-// wa-inbox-suggest — Copiloto del inbox (Slice 6a): "Sugerir respuesta".
+// wa-inbox-suggest — Copiloto del inbox (Slice 6a).
 //
-// Dado un conversation_id, lee el contexto (historial reciente del hilo + datos
-// del contacto + lead del pipeline si está vinculado) y le pide a Claude que
-// redacte EL PRÓXIMO MENSAJE del closer, en el tono de ventas de la agencia.
-// NO envía nada — devuelve el texto sugerido para que el closer lo edite y mande.
+// El botón ✨ abre un MENÚ; cada acción llama a esta función con `action`. Solo
+// se gasta cuando el closer elige una acción (no auto-dispara). Acciones:
+//   - suggest   → redacta el próximo mensaje del closer (va al compose, editable)
+//   - summarize → TL;DR del hilo (info, no se envía)
+//   - signals   → señal principal + próximo paso (info, no se envía)
 //
-// Autorización (v1, lanzamiento oscuro): SOLO admin (igual que wa-inbox-send).
-// Se invoca vía supabase.functions.invoke con el JWT del usuario (verify_jwt ON).
-// Lee con service_role (bypassa RLS) para armar el contexto.
+// Costo: usa Haiku (~5× más barato que Sonnet — alcanza para textos cortos),
+// cap de tokens bajo y contexto recortado (últimos 12 mensajes). El humano
+// siempre revisa/edita antes de enviar. Prompt anti-inventar cifras.
 //
-// Anti-alucinación: el prompt prohíbe inventar datos/cifras de la creadora. Si no
-// hay un dato, no se afirma. El humano siempre edita antes de enviar.
+// Autorización (v1, lanzamiento oscuro): SOLO admin. (6a.2 lo cambia por
+// has_permission(uid,'WhatsApp','IA') + cuota por usuario.) verify_jwt ON.
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-haiku-4-5"; // barato — suficiente para redactar/resumir un WhatsApp
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -26,24 +27,43 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-const SYSTEM_PROMPT = `Sos el copiloto de ventas de una agencia de creadoras de OnlyFans, trabajando DENTRO del inbox de un closer que chatea con una creadora (lead) por WhatsApp. Tu única tarea: redactar EL PRÓXIMO MENSAJE que el closer le enviaría a ELLA, listo para mandar.
+const BASE = `Sos el copiloto de ventas de una agencia de creadoras de OnlyFans, trabajando DENTRO del inbox de un closer que chatea con una creadora (lead) por WhatsApp. Español natural e informal (registro neutro/latam). NUNCA inventes datos de la creadora (nombre, país, nicho, cifras) ni resultados que no estén en el contexto que te paso; si te falta un dato, no lo afirmes.`;
 
-REGLAS DE ORO (no negociables):
-- Hablá de ELLA, no de "nosotros". Prohibido "nos encantaría", "queremos", "nos gustaría".
-- Confiado, NUNCA pidas permiso ("si te gustaría escuchar" ❌). Asumí el valor: tenemos el método y los resultados.
-- Cuando aplique, liderá con un resultado/beneficio concreto. Bajale el riesgo.
-- Cerrá con un micro-compromiso fácil (una pregunta concreta, "¿hoy o mañana?", "¿te paso 2 horarios?"). Nunca "quedamos atentos a tu disponibilidad".
-- HUMANO y cálido, nada robótico ni corporativo. Español natural e informal (registro neutro/latam). Como un WhatsApp real.
-- Leé en qué punto está la charla (primer contacto, objeción, seguimiento, casi cierre) y respondé a ESO.
-- Si la lead puso una objeción, manejala con seguridad y empatía, sin rogar.
+const ACTIONS: Record<string, { system: string; instruction: (who: string) => string; maxTokens: number }> = {
+  suggest: {
+    system: `${BASE}
 
-ANTI-INVENTO (crítico):
-- NO inventes datos de la creadora (nombre, país, nicho, cifras) ni resultados que no estén en el contexto que te paso. Si no tenés un dato, no lo afirmes.
-- Si te falta info para responder bien, hacé una pregunta breve y concreta en vez de inventar.
+Tu tarea: redactar EL PRÓXIMO MENSAJE que el closer le enviaría a ELLA, listo para mandar.
+REGLAS DE ORO:
+- Hablá de ELLA, no de "nosotros". Prohibido "nos encantaría", "queremos".
+- Confiado, NUNCA pidas permiso ("si te gustaría escuchar" ❌). Asumí el valor.
+- Cuando aplique, liderá con un resultado/beneficio concreto y bajale el riesgo.
+- Cerrá con un micro-compromiso fácil ("¿hoy o mañana?"). Nunca "quedamos atentos a tu disponibilidad".
+- Humano y cálido, nada robótico. Si hay objeción, manejala con seguridad y empatía.
+SALIDA: solo el texto del mensaje, listo para pegar. Sin comillas ni explicaciones. 2-5 líneas máx.`,
+    instruction: (who) => `Redactá el próximo mensaje que el Closer le envía a ${who}. Solo el texto del mensaje.`,
+    maxTokens: 500,
+  },
+  summarize: {
+    system: `${BASE}
 
-FORMATO DE SALIDA:
-- Devolvé SOLO el texto del mensaje, listo para pegar. Sin comillas, sin encabezados, sin explicaciones, sin firmar.
-- Corto: 2 a 5 líneas máximo. Un emoji ocasional está bien; no abuses.`;
+Tu tarea: resumir el hilo para que el closer/supervisor lo retome de un vistazo.
+SALIDA: 3 a 5 bullets cortos cubriendo — estado/interés del lead, qué se le ofreció, objeción principal, último contacto, y qué quedó PENDIENTE. Conciso. Sin preámbulo.`,
+    instruction: (_who) => `Resumí esta conversación en bullets cortos.`,
+    maxTokens: 400,
+  },
+  signals: {
+    system: `${BASE}
+
+Tu tarea: leer la conversación y devolver señal + próximo paso.
+SALIDA exactamente en este formato:
+• Señal: <una señal principal — ej. "lista para cerrar", "enfriándose", "objeción: precio", "sin respuesta hace X días">
+• Próximo paso: <1-2 líneas, accionable>
+Si conviene cambiar el stage del lead, decilo como SUGERENCIA (el humano decide, nunca automático).`,
+    instruction: (_who) => `Analizá la conversación y devolvé la señal y el próximo paso.`,
+    maxTokens: 350,
+  },
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCors });
@@ -63,7 +83,7 @@ serve(async (req) => {
   if (uErr || !userData?.user) return json({ ok: false, error: "invalid_token" }, 401);
   const userId = userData.user.id;
 
-  // ── Permiso (v1 = admin) ───────────────────────────────────────────────────
+  // ── Permiso (v1 = admin; 6a.2 → has_permission + cuota) ─────────────────────
   const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", userId);
   const isAdmin = (roles ?? []).some((r: { role: string }) => r.role === "admin");
   if (!isAdmin) return json({ ok: false, error: "forbidden" }, 403);
@@ -71,15 +91,18 @@ serve(async (req) => {
   if (!ANTHROPIC_API_KEY) return json({ ok: false, error: "ai_not_configured" }, 503);
 
   // ── Input ──────────────────────────────────────────────────────────────────
-  let payload: { conversation_id?: string } = {};
+  let payload: { conversation_id?: string; action?: string } = {};
   try { payload = await req.json(); } catch { /* */ }
   const conversationId = payload.conversation_id;
+  const action = (payload.action ?? "suggest").toLowerCase();
   if (!conversationId) return json({ ok: false, error: "missing_conversation" }, 400);
+  const cfg = ACTIONS[action];
+  if (!cfg) return json({ ok: false, error: "unknown_action" }, 400);
 
   // ── Contexto: conversación + contacto + lead del pipeline (best-effort) ─────
   const { data: conv } = await (sb as any)
     .from("wa_conversations")
-    .select("id, contact_id, department, status, wa_contacts(display_name, instagram_handle, closer_creator_id)")
+    .select("id, contact_id, status, wa_contacts(display_name, instagram_handle, closer_creator_id)")
     .eq("id", conversationId)
     .maybeSingle();
   if (!conv) return json({ ok: false, error: "conversation_not_found" }, 404);
@@ -88,39 +111,32 @@ serve(async (req) => {
   const name = contact.display_name as string | null;
   const handle = contact.instagram_handle as string | null;
 
-  // Historial reciente (últimos 20 mensajes, en orden).
+  // Historial reciente (últimos 12 — recortado para abaratar).
   const { data: msgs } = await (sb as any)
     .from("wa_conversation_messages")
     .select("direction, body, msg_type, sent_at")
     .eq("conversation_id", conversationId)
     .order("sent_at", { ascending: false })
-    .limit(20);
+    .limit(12);
   const history = ((msgs ?? []) as Array<{ direction: string; body: string | null; msg_type: string }>)
     .reverse()
-    .map((m) => {
-      const who = m.direction === "out" ? "Closer" : "Lead";
-      const text = m.body || `[${m.msg_type}]`;
-      return `${who}: ${text}`;
-    })
+    .map((m) => `${m.direction === "out" ? "Closer" : "Lead"}: ${m.body || `[${m.msg_type}]`}`)
     .join("\n");
 
-  // Lead del pipeline (si el contacto está vinculado) — best-effort, sin romper.
+  // Lead del pipeline (si el contacto está vinculado) — best-effort.
   let leadCtx = "";
   const ccId = contact.closer_creator_id as string | null;
   if (ccId) {
     try {
       const { data: lead } = await (sb as any)
-        .from("closer_creators")
-        .select("*")
-        .eq("id", ccId)
-        .maybeSingle();
+        .from("closer_creators").select("*").eq("id", ccId).maybeSingle();
       if (lead) {
         const bits: string[] = [];
         if (lead.stage) bits.push(`stage: ${lead.stage}`);
         if (lead.country) bits.push(`país: ${lead.country}`);
         if (lead.quality) bits.push(`quality: ${lead.quality}`);
         if (lead.notes) bits.push(`nota: ${String(lead.notes).slice(0, 200)}`);
-        if (bits.length) leadCtx = `\nDatos del lead en Maven (NO inventes más allá de esto): ${bits.join(" · ")}`;
+        if (bits.length) leadCtx = `\nDatos del lead en Maven (no inventes más allá de esto): ${bits.join(" · ")}`;
       }
     } catch (_e) { /* sin contexto de pipeline, seguimos */ }
   }
@@ -129,10 +145,10 @@ serve(async (req) => {
   const userMessage =
     `Creadora: ${who}${handle ? ` (IG @${String(handle).replace(/^@/, "")})` : ""}.` +
     leadCtx +
-    `\n\nHistorial reciente del chat (lo más nuevo abajo):\n${history || "(sin mensajes previos — es el primer contacto)"}` +
-    `\n\nRedactá el próximo mensaje que el Closer le envía a ${who}. Solo el texto del mensaje.`;
+    `\n\nHistorial reciente del chat (lo más nuevo abajo):\n${history || "(sin mensajes previos — primer contacto)"}` +
+    `\n\n${cfg.instruction(who)}`;
 
-  // ── Anthropic ───────────────────────────────────────────────────────────────
+  // ── Anthropic (Haiku) ───────────────────────────────────────────────────────
   try {
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -143,8 +159,8 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 600,
-        system: SYSTEM_PROMPT,
+        max_tokens: cfg.maxTokens,
+        system: cfg.system,
         messages: [{ role: "user", content: userMessage }],
       }),
     });
@@ -153,13 +169,10 @@ serve(async (req) => {
       return json({ ok: false, error: `anthropic ${resp.status}: ${txt.slice(0, 200)}` }, 502);
     }
     const data = await resp.json() as { content?: Array<{ type: string; text?: string }> };
-    const suggestion = (data.content ?? [])
-      .filter((c) => c.type === "text")
-      .map((c) => c.text ?? "")
-      .join("")
-      .trim();
-    if (!suggestion) return json({ ok: false, error: "empty_suggestion" }, 502);
-    return json({ ok: true, suggestion });
+    const result = (data.content ?? [])
+      .filter((c) => c.type === "text").map((c) => c.text ?? "").join("").trim();
+    if (!result) return json({ ok: false, error: "empty_result" }, 502);
+    return json({ ok: true, action, result });
   } catch (e) {
     return json({ ok: false, error: (e as Error).message }, 500);
   }

@@ -21,7 +21,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import type { WaConversationStatus, WaMessageDirection } from "./types";
 
 interface ConvRow {
@@ -73,7 +76,8 @@ const InboxPage = () => {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
+  const [copilotBusy, setCopilotBusy] = useState<string | null>(null); // acción del copiloto en curso
+  const [copilotInfo, setCopilotInfo] = useState<{ action: string; text: string } | null>(null); // output read-only de resumir/señales
 
   const { data: conversations = [], isLoading: convLoading } = useQuery({
     queryKey: ["wa-inbox-conversations"],
@@ -181,25 +185,27 @@ const InboxPage = () => {
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
   };
 
-  // Copiloto (6a): pide a la IA el próximo mensaje y lo carga en el compose box
-  // (editable). El closer revisa/edita y manda — siempre con humano en control.
-  const suggestReply = async () => {
-    if (!selectedId || suggesting) return;
-    setSuggesting(true);
+  // Copiloto (6a): el menú dispara una acción puntual (solo gasta cuando elegís).
+  // 'suggest' carga el mensaje en el compose box (editable, humano en control);
+  // 'summarize'/'signals' muestran info read-only (no se envía).
+  const runCopilot = async (action: "suggest" | "summarize" | "signals") => {
+    if (!selectedId || copilotBusy) return;
+    setCopilotBusy(action);
     const { data, error } = await supabase.functions.invoke("wa-inbox-suggest", {
-      body: { conversation_id: selectedId },
+      body: { conversation_id: selectedId, action },
     });
-    setSuggesting(false);
-    const res = data as { ok?: boolean; suggestion?: string; error?: string } | null;
-    if (error || !res?.ok || !res.suggestion) {
+    setCopilotBusy(null);
+    const res = data as { ok?: boolean; result?: string; error?: string } | null;
+    if (error || !res?.ok || !res.result) {
       toast({
-        title: "No se pudo sugerir",
+        title: "El copiloto no pudo responder",
         description: error?.message ?? res?.error ?? "Error desconocido",
         variant: "destructive",
       });
       return;
     }
-    setDraft(res.suggestion);
+    if (action === "suggest") setDraft(res.result);
+    else setCopilotInfo({ action, text: res.result });
   };
 
   return (
@@ -240,7 +246,7 @@ const InboxPage = () => {
                 <li key={c.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedId(c.id)}
+                    onClick={() => { setSelectedId(c.id); setCopilotInfo(null); }}
                     className={cn(
                       "flex w-full flex-col gap-0.5 px-4 py-3 text-left hover:bg-muted/40",
                       selectedId === c.id && "bg-muted/60",
@@ -328,18 +334,52 @@ const InboxPage = () => {
               )}
             </ScrollArea>
 
-            {/* Cuadro de envío (Slice 3) + Copiloto (6a) */}
+            {/* Panel del copiloto (resumir / señales) — info read-only */}
+            {copilotInfo && (
+              <div className="mx-4 mb-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+                <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-primary">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {copilotInfo.action === "summarize" ? "Resumen del hilo" : "Señales / próximo paso"}
+                  <button
+                    type="button"
+                    onClick={() => setCopilotInfo(null)}
+                    className="ml-auto text-muted-foreground hover:text-foreground"
+                    title="Cerrar"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <p className="whitespace-pre-wrap break-words text-xs text-foreground/90">{copilotInfo.text}</p>
+              </div>
+            )}
+
+            {/* Cuadro de envío (Slice 3) + Copiloto menú (6a) */}
             <div className="flex items-center gap-2 border-t border-border px-4 py-3">
-              <Button
-                onClick={suggestReply}
-                disabled={suggesting || sending}
-                variant="outline"
-                size="icon"
-                className="h-10 w-10 shrink-0"
-                title="Sugerir respuesta (IA)"
-              >
-                {suggesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    disabled={!!copilotBusy || sending}
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10 shrink-0"
+                    title="Copiloto IA"
+                  >
+                    {copilotBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="top" className="w-52">
+                  <DropdownMenuLabel className="text-xs">Copiloto IA</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => runCopilot("suggest")}>
+                    <PenLine className="mr-2 h-4 w-4" /> Sugerir respuesta
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => runCopilot("summarize")}>
+                    <FileText className="mr-2 h-4 w-4" /> Resumir el hilo
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => runCopilot("signals")}>
+                    <Gauge className="mr-2 h-4 w-4" /> Detectar señales
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
