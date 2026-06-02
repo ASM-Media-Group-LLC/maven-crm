@@ -270,9 +270,9 @@ const App = () => (
                 <Route path="/leadgen" element={<PermissionRoute module="LeadGen"><LeadGen /></PermissionRoute>} />
                 <Route path="/leadgen/base-datos" element={<PermissionRoute module="LeadGen"><LeadGenBaseDatos /></PermissionRoute>} />
                 <Route path="/closers" element={<PermissionRoute module="Closers"><Closers /></PermissionRoute>} />
-                {/* Inbox WhatsApp (bandeja propia) — lanzamiento oscuro: admin-only hasta validar. */}
-                <Route path="/inbox" element={<AdminRoute><InboxPage /></AdminRoute>} />
-                <Route path="/inbox/canales" element={<AdminRoute><InboxChannelsPage /></AdminRoute>} />
+                {/* Inbox WhatsApp (bandeja propia) — gateado por permisos (módulo "WhatsApp"). Admin siempre; otros roles según role_permissions. */}
+                <Route path="/inbox" element={<PermissionRoute module="WhatsApp" submodule="Bandeja"><InboxPage /></PermissionRoute>} />
+                <Route path="/inbox/canales" element={<PermissionRoute module="WhatsApp" submodule="Canales"><InboxChannelsPage /></PermissionRoute>} />
                 {/* Oportunidades de monetización — lanzamiento oscuro: admin-only hasta abrir a managers/supervisores. */}
                 <Route path="/oportunidades" element={<AdminRoute><OpportunitiesPage /></AdminRoute>} />
                 <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />

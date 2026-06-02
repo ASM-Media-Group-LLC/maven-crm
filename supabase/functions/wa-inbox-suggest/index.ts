@@ -83,10 +83,13 @@ serve(async (req) => {
   if (uErr || !userData?.user) return json({ ok: false, error: "invalid_token" }, 401);
   const userId = userData.user.id;
 
-  // ── Permiso (v1 = admin; 6a.2 → has_permission + cuota) ─────────────────────
-  const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", userId);
-  const isAdmin = (roles ?? []).some((r: { role: string }) => r.role === "admin");
-  if (!isAdmin) return json({ ok: false, error: "forbidden" }, 403);
+  // ── Permiso server-side: módulo WhatsApp / submódulo IA (espejo de canAccess;
+  // has_permission ya devuelve true para admin). ESTE gate controla el costo:
+  // aunque oculten o burlen el botón, sin permiso IA no se llama a Claude.
+  const { data: allowed, error: pErr } = await sb.rpc("has_permission", {
+    _user_id: userId, _module: "WhatsApp", _submodule: "IA",
+  });
+  if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
 
   if (!ANTHROPIC_API_KEY) return json({ ok: false, error: "ai_not_configured" }, 503);
 

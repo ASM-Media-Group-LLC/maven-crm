@@ -76,10 +76,12 @@ serve(async (req) => {
   if (uErr || !userData?.user) return json({ ok: false, error: "invalid_token" }, 401);
   const userId = userData.user.id;
 
-  // ── Permiso (v1 = admin) ───────────────────────────────────────────────────
-  const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", userId);
-  const isAdmin = (roles ?? []).some((r: { role: string }) => r.role === "admin");
-  if (!isAdmin) return json({ ok: false, error: "forbidden" }, 403);
+  // ── Permiso server-side: módulo WhatsApp / submódulo Bandeja (has_permission
+  // ya devuelve true para admin). Abre el envío a los roles habilitados.
+  const { data: allowed, error: pErr } = await sb.rpc("has_permission", {
+    _user_id: userId, _module: "WhatsApp", _submodule: "Bandeja",
+  });
+  if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
 
   // ── Input ──────────────────────────────────────────────────────────────────
   let payload: { conversation_id?: string; body?: string } = {};

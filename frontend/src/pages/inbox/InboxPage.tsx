@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
 import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X } from "lucide-react";
 import {
@@ -72,6 +73,7 @@ const statusMeta: Record<string, { label: string; variant: "secondary-soft" | "s
 const InboxPage = () => {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { canAccess } = usePermissions();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
@@ -355,6 +357,7 @@ const InboxPage = () => {
 
             {/* Cuadro de envío (Slice 3) + Copiloto menú (6a) */}
             <div className="flex items-center gap-2 border-t border-border px-4 py-3">
+              {canAccess("WhatsApp", "IA") && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -380,6 +383,7 @@ const InboxPage = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
               <Input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
