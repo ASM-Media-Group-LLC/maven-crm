@@ -10,18 +10,20 @@ interface EditRoleModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   role: RoleConfig | null;
-  onConfirm: (id: string, name: string, description?: string) => void;
+  onConfirm: (id: string, name: string, description?: string, aiDailyQuota?: number | null) => void;
   isLoading: boolean;
 }
 
 const EditRoleModal = ({ open, onOpenChange, role, onConfirm, isLoading }: EditRoleModalProps) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [aiQuota, setAiQuota] = useState("");
 
   useEffect(() => {
     if (role && open) {
       setName(role.name);
       setDescription(role.description || "");
+      setAiQuota(role.ai_daily_quota != null ? String(role.ai_daily_quota) : "");
     }
   }, [role, open]);
 
@@ -40,10 +42,15 @@ const EditRoleModal = ({ open, onOpenChange, role, onConfirm, isLoading }: EditR
             <Label>Descripción</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value.slice(0, 300))} rows={3} />
           </div>
+          <div className="space-y-1.5">
+            <Label>Cuota IA / día (copiloto del inbox)</Label>
+            <Input type="number" min={0} value={aiQuota} onChange={(e) => setAiQuota(e.target.value)} placeholder="20 (default)" />
+            <p className="text-xs text-muted-foreground">Usos del copiloto ✨ por persona/día para este rol. Vacío = 20. Admin/managers: sin tope.</p>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => role && onConfirm(role.id, name.trim(), description.trim() || undefined)} disabled={isLoading || !name.trim()}>
+          <Button onClick={() => role && onConfirm(role.id, name.trim(), description.trim() || undefined, aiQuota.trim() === "" ? null : Number(aiQuota))} disabled={isLoading || !name.trim()}>
             {isLoading ? "Guardando..." : "Guardar"}
           </Button>
         </DialogFooter>

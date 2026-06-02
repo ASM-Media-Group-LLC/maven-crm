@@ -15,6 +15,7 @@ export interface RoleConfig {
   description: string | null;
   is_active: boolean;
   is_system: boolean;
+  ai_daily_quota: number | null; // cuota diaria del copiloto IA del inbox para el rol (null = default 20)
   created_at: string;
   updated_at: string;
   user_count: number;
@@ -176,8 +177,10 @@ export const useRoles = () => {
   });
 
   const updateRole = useMutation({
-    mutationFn: async ({ id, name, description }: { id: string; name: string; description?: string }) => {
-      const { error } = await supabase.from("roles_config").update({ name, description }).eq("id", id);
+    mutationFn: async ({ id, name, description, ai_daily_quota }: { id: string; name: string; description?: string; ai_daily_quota?: number | null }) => {
+      const patch: Record<string, unknown> = { name, description };
+      if (ai_daily_quota !== undefined) patch.ai_daily_quota = ai_daily_quota;
+      const { error } = await supabase.from("roles_config").update(patch).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
