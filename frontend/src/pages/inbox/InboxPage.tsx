@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
@@ -36,6 +36,7 @@ interface ConvRow {
   last_message_at: string | null;
   last_message_preview: string | null;
   unread_count: number;
+  assigned_to: string | null;
   contact: { display_name: string | null; instagram_handle: string | null } | null;
 }
 
@@ -87,7 +88,7 @@ const InboxPage = () => {
       const { data, error } = await (supabase as any)
         .from("wa_conversations")
         .select(
-          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, contact:wa_contacts(display_name, instagram_handle)",
+          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, contact:wa_contacts(display_name, instagram_handle)",
         )
         .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(200);
@@ -113,6 +114,17 @@ const InboxPage = () => {
     enabled: !!selectedId,
     refetchOnWindowFocus: false,
   });
+
+  // Usuarios para asignar conversaciones (5c).
+  const { data: users = [] } = useQuery({
+    queryKey: ["wa-inbox-users"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name").order("full_name", { ascending: true });
+      return (data ?? []) as { id: string; full_name: string | null }[];
+    },
+    refetchOnWindowFocus: false,
+  });
+  const userName = (id: string | null) => (!id ? null : users.find((u) => u.id === id)?.full_name || id.slice(0, 8));
 
   // Realtime: nuevos mensajes / cambios de conversación → refrescar en vivo.
   useEffect(() => {
@@ -217,6 +229,20 @@ const InboxPage = () => {
     else setCopilotInfo({ action, text: res.result });
   };
 
+  // Asignar la conversación a una persona (5c) — actualiza assigned_to directo
+  // (RLS lo permite a admin/miembro del canal). No toca Evolution (es metadata).
+  const assignConversation = async (userId: string | null) => {
+    if (!selectedId) return;
+    const { error } = await (supabase as any)
+      .from("wa_conversations").update({ assigned_to: userId }).eq("id", selectedId);
+    if (error) {
+      toast({ title: "No se pudo asignar", description: error.message, variant: "destructive" });
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+    toast({ title: userId ? `Asignada a ${userName(userId)}` : "Asignación quitada" });
+  };
+
   return (
     <div className="flex h-full min-h-0">
       {/* ── Lista de conversaciones ─────────────────────────────────────── */}
@@ -299,9 +325,26 @@ const InboxPage = () => {
                   )}
                 </p>
               </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="ml-auto h-7 gap-1 text-xs" title="Asignar conversación">
+                    <UserCheck className="h-3.5 w-3.5" />
+                    {userName(selected.assigned_to) ?? "Asignar"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="max-h-72 w-52 overflow-y-auto">
+                  <DropdownMenuLabel className="text-xs">Asignar conversación</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => assignConversation(null)}>Sin asignar</DropdownMenuItem>
+                  {users.map((u) => (
+                    <DropdownMenuItem key={u.id} onClick={() => assignConversation(u.id)}>
+                      {u.full_name || u.id.slice(0, 8)}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Badge
                 variant={(statusMeta[selected.status] ?? statusMeta.open).variant}
-                className="ml-auto text-[10px]"
+                className="text-[10px]"
               >
                 {(statusMeta[selected.status] ?? statusMeta.open).label}
               </Badge>
