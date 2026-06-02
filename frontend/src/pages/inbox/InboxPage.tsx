@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles } from "lucide-react";
 import type { WaConversationStatus, WaMessageDirection } from "./types";
 
 interface ConvRow {
@@ -73,6 +73,7 @@ const InboxPage = () => {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
 
   const { data: conversations = [], isLoading: convLoading } = useQuery({
     queryKey: ["wa-inbox-conversations"],
@@ -178,6 +179,27 @@ const InboxPage = () => {
     }
     qc.invalidateQueries({ queryKey: ["wa-inbox-messages", convId] });
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+  };
+
+  // Copiloto (6a): pide a la IA el próximo mensaje y lo carga en el compose box
+  // (editable). El closer revisa/edita y manda — siempre con humano en control.
+  const suggestReply = async () => {
+    if (!selectedId || suggesting) return;
+    setSuggesting(true);
+    const { data, error } = await supabase.functions.invoke("wa-inbox-suggest", {
+      body: { conversation_id: selectedId },
+    });
+    setSuggesting(false);
+    const res = data as { ok?: boolean; suggestion?: string; error?: string } | null;
+    if (error || !res?.ok || !res.suggestion) {
+      toast({
+        title: "No se pudo sugerir",
+        description: error?.message ?? res?.error ?? "Error desconocido",
+        variant: "destructive",
+      });
+      return;
+    }
+    setDraft(res.suggestion);
   };
 
   return (
@@ -306,8 +328,18 @@ const InboxPage = () => {
               )}
             </ScrollArea>
 
-            {/* Cuadro de envío (Slice 3) */}
+            {/* Cuadro de envío (Slice 3) + Copiloto (6a) */}
             <div className="flex items-center gap-2 border-t border-border px-4 py-3">
+              <Button
+                onClick={suggestReply}
+                disabled={suggesting || sending}
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                title="Sugerir respuesta (IA)"
+              >
+                {suggesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              </Button>
               <Input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
