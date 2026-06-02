@@ -13,7 +13,7 @@ interface EditUserModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   user: AdminUser | null;
-  onConfirm: (data: { first_name: string; last_name: string; role: string }) => void;
+  onConfirm: (data: { first_name: string; last_name: string; role: string; ai_daily_quota_override: number | null }) => void;
   isLoading: boolean;
 }
 
@@ -21,6 +21,7 @@ const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading }: EditU
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState("employee");
+  const [aiOverride, setAiOverride] = useState("");
 
   const { data: roles = [] } = useQuery({
     queryKey: ["roles-config-select"],
@@ -41,13 +42,14 @@ const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading }: EditU
       setFirstName(parts[0] || "");
       setLastName(parts.slice(1).join(" ") || "");
       setRole(user.role || "employee");
+      setAiOverride(user.ai_daily_quota_override != null ? String(user.ai_daily_quota_override) : "");
     }
   }, [open, user]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!firstName.trim() || !lastName.trim()) return;
-    onConfirm({ first_name: firstName.trim(), last_name: lastName.trim(), role });
+    onConfirm({ first_name: firstName.trim(), last_name: lastName.trim(), role, ai_daily_quota_override: aiOverride.trim() === "" ? null : Number(aiOverride) });
   };
 
   return (
@@ -104,6 +106,19 @@ const EditUserModal = ({ open, onOpenChange, user, onConfirm, isLoading }: EditU
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-aiquota">Override cuota IA/día (opcional)</Label>
+            <Input
+              id="edit-aiquota"
+              type="number"
+              min={0}
+              placeholder="Usar la del rol"
+              value={aiOverride}
+              onChange={(e) => setAiOverride(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">Pisa la cuota del rol para esta persona. Vacío = usar la del rol.</p>
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">

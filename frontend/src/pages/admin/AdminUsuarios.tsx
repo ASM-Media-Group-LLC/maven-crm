@@ -51,7 +51,7 @@ const AdminUsuarios = () => {
   };
 
   const adminAction = useMutation({
-    mutationFn: async (body: Record<string, string>) => {
+    mutationFn: async (body: Record<string, unknown>) => {
       return adminInvoke("admin-user-actions", body);
     },
     onSuccess: () => {
@@ -217,7 +217,7 @@ const AdminUsuarios = () => {
                     onConfirm={(data) => {
                       if (selectedUser) {
                         adminAction.mutate(
-                          { action: "update_profile", user_id: selectedUser.id, first_name: data.first_name, last_name: data.last_name, role: data.role },
+                          { action: "update_profile", user_id: selectedUser.id, first_name: data.first_name, last_name: data.last_name, role: data.role, ai_daily_quota_override: data.ai_daily_quota_override },
                           { onSuccess: () => { setEditOpen(false); toast({ title: "Usuario actualizado" }); } }
                         );
                       }

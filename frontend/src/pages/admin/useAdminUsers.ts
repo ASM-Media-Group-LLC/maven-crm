@@ -12,6 +12,7 @@ export interface AdminUser {
   created_at: string;
   role: AppRole | null;
   linked_employee: { id: string; first_name: string; last_name: string } | null;
+  ai_daily_quota_override: number | null; // override de cuota IA del inbox (null = usar la del rol)
 }
 
 export const useAdminUsers = () => {
@@ -22,9 +23,9 @@ export const useAdminUsers = () => {
     queryKey: ["admin-users"],
     queryFn: async () => {
       // Fetch profiles
-      const { data: profiles, error: profilesError } = await supabase
+      const { data: profiles, error: profilesError } = await (supabase as any)
         .from("profiles")
-        .select("id, full_name, avatar_url, created_at");
+        .select("id, full_name, avatar_url, created_at, ai_daily_quota_override");
 
       if (profilesError) throw profilesError;
 
@@ -72,6 +73,7 @@ export const useAdminUsers = () => {
         created_at: p.created_at || "",
         role: rolesMap.get(p.id) ?? null,
         linked_employee: employeeByProfileId.get(p.id) ?? null,
+        ai_daily_quota_override: (p as { ai_daily_quota_override?: number | null }).ai_daily_quota_override ?? null,
       })) as AdminUser[];
     },
   });

@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, user_id, full_name, email, first_name, last_name, role } = body;
+    const { action, user_id, full_name, email, first_name, last_name, role, ai_daily_quota_override } = body;
 
     if (!action) {
       return new Response(JSON.stringify({ error: "action is required" }), {
@@ -537,9 +537,11 @@ Deno.serve(async (req) => {
         });
       }
 
+      const profilePatch: Record<string, unknown> = { full_name: newFullName };
+      if (ai_daily_quota_override !== undefined) profilePatch.ai_daily_quota_override = ai_daily_quota_override;
       const { error: updateError } = await adminClient
         .from("profiles")
-        .update({ full_name: newFullName })
+        .update(profilePatch)
         .eq("id", user_id);
 
       if (updateError) {
