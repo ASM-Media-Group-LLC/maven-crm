@@ -151,6 +151,15 @@ serve(async (req) => {
     `\n\nHistorial reciente del chat (lo más nuevo abajo):\n${history || "(sin mensajes previos — primer contacto)"}` +
     `\n\n${cfg.instruction(who)}`;
 
+  // ── Cuota (6a.3): chequea y consume 1 uso ANTES de gastar en Claude ─────────
+  // admin/manager = ilimitado; el resto, override del usuario > cuota del rol > 20.
+  const { data: quotaRows, error: qErr } = await sb.rpc("wa_copilot_try_consume", { _user_id: userId });
+  const quota = Array.isArray(quotaRows) ? quotaRows[0] : quotaRows;
+  if (!qErr && quota && quota.allowed === false) {
+    return json({ ok: false, error: "quota_exceeded", used: quota.used, limit: quota.lim }, 429);
+  }
+  // Si la RPC falla, fail-open: no bloqueamos por un error transitorio del contador.
+
   // ── Anthropic (Haiku) ───────────────────────────────────────────────────────
   try {
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -175,7 +184,7 @@ serve(async (req) => {
     const result = (data.content ?? [])
       .filter((c) => c.type === "text").map((c) => c.text ?? "").join("").trim();
     if (!result) return json({ ok: false, error: "empty_result" }, 502);
-    return json({ ok: true, action, result });
+    return json({ ok: true, action, result, used: quota?.used, limit: quota?.lim });
   } catch (e) {
     return json({ ok: false, error: (e as Error).message }, 500);
   }

@@ -197,7 +197,14 @@ const InboxPage = () => {
       body: { conversation_id: selectedId, action },
     });
     setCopilotBusy(null);
-    const res = data as { ok?: boolean; result?: string; error?: string } | null;
+    const res = data as { ok?: boolean; result?: string; error?: string; used?: number; limit?: number } | null;
+    if (res?.error === "quota_exceeded") {
+      toast({
+        title: "Llegaste a tu límite de IA por hoy",
+        description: `Usaste ${res.used ?? "?"}/${res.limit ?? "?"} hoy. Se reinicia mañana.`,
+      });
+      return;
+    }
     if (error || !res?.ok || !res.result) {
       toast({
         title: "El copiloto no pudo responder",
