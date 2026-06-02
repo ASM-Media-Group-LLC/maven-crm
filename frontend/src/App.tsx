@@ -29,7 +29,10 @@ import NotFound from "./pages/NotFound";
 
 // Rare / public — kept lazy.
 const Concept = lazy(() => import("./pages/Concept"));
-const Credentials = lazy(() => import("./pages/Credentials"));
+// SEGURIDAD: página de login de demo (roles de prueba + contraseña hardcodeada).
+// Solo en desarrollo: en prod no se rutea NI se bundlea (la rama queda muerta y
+// el chunk —con la contraseña— se elimina por tree-shaking en el build de prod).
+const Credentials = import.meta.env.DEV ? lazy(() => import("./pages/Credentials")) : null;
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const ChatterPublicView = lazy(() => import("./pages/ChatterPublicView"));
@@ -230,7 +233,7 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/concept" element={<Concept />} />
-              <Route path="/credentials" element={<Credentials />} />
+              {import.meta.env.DEV && Credentials && <Route path="/credentials" element={<Credentials />} />}
               
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />

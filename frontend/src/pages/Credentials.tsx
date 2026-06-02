@@ -9,7 +9,10 @@ import Logo from "@/components/Logo";
 import AnimatedGradientBackground from "@/components/auth/AnimatedGradientBackground";
 import AnimatedWaves from "@/components/auth/AnimatedWaves";
 
-const TEST_PASSWORD = "MavenTest2025!";
+// SEGURIDAD: nunca hardcodear la contraseña (terminaba shippeada en el bundle).
+// Viene de una env var SOLO de desarrollo; en prod queda vacía (y la página ni
+// se rutea — ver App.tsx). Para usar esta página en dev: setear VITE_TEST_PASSWORD.
+const TEST_PASSWORD = import.meta.env.VITE_TEST_PASSWORD ?? "";
 
 const roles = [
   {
