@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Maven · Gateway — Líneas de WhatsApp</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}</style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+  <div class="max-w-5xl mx-auto p-6">
+
+    <header class="flex items-center justify-between mb-5">
+      <div>
+        <h1 class="text-xl font-bold">Líneas de WhatsApp</h1>
+        <p class="text-sm text-slate-500">Cada línea es un número conectado al gateway. Agregá, conectá por QR y mirá el estado en vivo.</p>
+      </div>
+      <button id="btn-add" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm">+ Agregar número</button>
+    </header>
+
+    <!-- API key -->
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-sm font-semibold text-amber-900">API key del gateway</span>
+        <span class="text-xs text-amber-700">(Dokploy → evolution-api → Environment → <code class="bg-amber-100 px-1 rounded">EVOLUTION_API_KEY</code>. Se guarda en este navegador.)</span>
+      </div>
+      <div class="flex gap-2 mt-2">
+        <input id="apikey" type="password" placeholder="pegá la API key…" class="flex-1 border border-amber-300 rounded px-2 py-1.5 text-sm bg-white">
+        <button id="btn-savekey" class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded text-sm font-semibold">Guardar</button>
+        <span id="key-ok" class="text-xs text-emerald-700 self-center"></span>
+      </div>
+    </div>
+
+    <div id="lines" class="space-y-3">
+      <p class="text-slate-400 text-sm text-center py-10">cargando líneas…</p>
+    </div>
+
+    <p class="text-center text-xs text-slate-400 mt-8">Maven Baileys Gateway · las líneas se gestionan acá; los bots y su asignación a grupos, en Maven.</p>
+  </div>
+
+  <!-- Modal: agregar -->
+  <div id="modal-add" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-5">
+      <h2 class="font-bold text-lg mb-1">Agregar número</h2>
+      <p class="text-sm text-slate-500 mb-3">Un nombre corto para identificar la línea (sin espacios). Ej: <code class="bg-slate-100 px-1 rounded">managers</code>, <code class="bg-slate-100 px-1 rounded">closers-2</code>.</p>
+      <label class="text-sm font-semibold">Nombre de la línea</label>
+      <input id="new-name" placeholder="managers" class="w-full border border-slate-300 rounded px-2 py-1.5 mt-1 mb-4 font-mono text-sm">
+      <div class="flex justify-end gap-2">
+        <button id="add-cancel" class="px-3 py-1.5 rounded border border-slate-300 text-sm hover:bg-slate-50">Cancelar</button>
+        <button id="add-create" class="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">Crear y conectar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: QR -->
+  <div id="modal-qr" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-5 text-center">
+      <h2 class="font-bold text-lg mb-1">Conectar <span id="qr-line" class="font-mono text-emerald-700"></span></h2>
+      <div id="qr-body" class="my-4 flex flex-col items-center justify-center gap-3 min-h-[300px]">
+        <p class="text-slate-400 text-sm">generando QR…</p>
+      </div>
+      <button id="qr-close" class="px-3 py-1.5 rounded border border-slate-300 text-sm hover:bg-slate-50">Cerrar</button>
+    </div>
+  </div>
+
+  <script>
+    const KEY = "apikey";
+    const $ = (id) => document.getElementById(id);
+    const getKey = () => localStorage.getItem(KEY) || "";
+    const authH = () => { const k = getKey(); return k ? { apikey: k } : {}; };
+    const show = (id) => { $(id).classList.remove("hidden"); $(id).classList.add("flex"); };
+    const hide = (id) => { $(id).classList.add("hidden"); $(id).classList.remove("flex"); };
+
+    $("apikey").value = getKey();
+    $("btn-savekey").onclick = () => {
+      localStorage.setItem(KEY, $("apikey").value.trim());
+      $("key-ok").textContent = "✓ guardada";
+      loadLines();
+    };
+
+    const badge = (c) => {
+      if (c === "open") return '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">● Conectado</span>';
+      if (c === "connecting") return '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">● Conectando…</span>';
+      if (c === "close") return '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">● Caído</span>';
+      return '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">● Sin conectar</span>';
+    };
+
+    async function loadLines() {
+      const box = $("lines");
+      if (!getKey()) { box.innerHTML = '<p class="text-amber-700 text-sm text-center py-10">Pegá la API key arriba para ver las líneas.</p>'; return; }
+      try {
+        const r = await fetch("/instance/list", { headers: authH() });
+        if (r.status === 401) { box.innerHTML = '<p class="text-red-600 text-sm text-center py-10">API key inválida.</p>'; return; }
+        const j = await r.json();
+        const list = j.instances || [];
+        if (!list.length) { box.innerHTML = '<p class="text-slate-400 text-sm text-center py-10">No hay líneas todavía. Agregá un número con el botón de arriba.</p>'; return; }
+        box.innerHTML = list.map((i) => {
+          const name = (i.profile && i.profile.name) || "";
+          const num = (i.profile && i.profile.number) ? "+" + i.profile.number : "sin vincular";
+          const action = i.connection === "open"
+            ? `<button onclick="logoutLine('${i.instance}')" class="text-xs px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Desvincular</button>`
+            : `<button onclick="connectLine('${i.instance}')" class="text-xs px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Conectar (QR)</button>`;
+          return `<div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4 shadow-sm">
+            <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold flex-shrink-0">${name ? name[0].toUpperCase() : "#"}</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2"><span class="font-semibold font-mono truncate">${i.instance}</span>${badge(i.connection)}</div>
+              <p class="text-xs text-slate-500 truncate">${name ? name + " · " : ""}${num} · in ${i.msgsInToday || 0} / out ${i.msgsOutToday || 0} hoy</p>
+            </div>
+            <div class="flex gap-2 flex-shrink-0">${action}</div>
+          </div>`;
+        }).join("");
+      } catch (e) { box.innerHTML = '<p class="text-red-600 text-sm text-center py-10">Error: ' + e.message + "</p>"; }
+    }
+
+    // Agregar
+    $("btn-add").onclick = () => { $("new-name").value = ""; show("modal-add"); $("new-name").focus(); };
+    $("add-cancel").onclick = () => hide("modal-add");
+    $("add-create").onclick = () => {
+      const name = $("new-name").value.trim();
+      if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) { alert("Nombre inválido: solo letras, números, - y _ (sin espacios)."); return; }
+      hide("modal-add");
+      connectLine(name);
+    };
+
+    // Conectar (QR) — arranca la instancia (idempotente) y pollea hasta conectar
+    let qrTimer = null;
+    async function connectLine(name) {
+      $("qr-line").textContent = name;
+      $("qr-body").innerHTML = '<p class="text-slate-400 text-sm">generando QR…</p>';
+      show("modal-qr");
+      try { await fetch("/instance/create/" + name, { method: "POST", headers: authH() }); } catch (e) {}
+      const poll = async () => {
+        try {
+          const r = await fetch("/instance/connect/" + name, { headers: authH() });
+          const j = await r.json();
+          if (j.status === "connected" || j.connection === "open") {
+            $("qr-body").innerHTML = '<div class="text-emerald-600 text-center"><div class="text-5xl">✓</div><p class="font-semibold mt-2">¡Línea conectada!</p></div>';
+            loadLines();
+            return;
+          }
+          if (j.qrcode && j.qrcode.base64) {
+            $("qr-body").innerHTML = `<img src="${j.qrcode.base64}" alt="QR" class="w-64 h-64 border rounded bg-white" style="image-rendering:pixelated">
+              <p class="text-xs text-slate-500 leading-relaxed">En el teléfono de esta línea:<br>WhatsApp → Dispositivos vinculados → <b>Vincular un dispositivo</b> → escaneá</p>`;
+          }
+          qrTimer = setTimeout(poll, 3000);
+        } catch (e) {
+          $("qr-body").innerHTML = '<p class="text-red-600 text-sm">Error: ' + e.message + "</p>";
+        }
+      };
+      poll();
+    }
+    $("qr-close").onclick = () => { if (qrTimer) clearTimeout(qrTimer); hide("modal-qr"); loadLines(); };
+
+    async function logoutLine(name) {
+      if (!confirm("¿Desvincular la línea " + name + "? Vas a tener que re-escanear el QR para reconectarla.")) return;
+      try { await fetch("/instance/logout/" + name, { method: "DELETE", headers: authH() }); } catch (e) {}
+      loadLines();
+    }
+    window.connectLine = connectLine; window.logoutLine = logoutLine;
+
+    loadLines();
+    setInterval(loadLines, 12000);
+  </script>
+</body>
+</html>

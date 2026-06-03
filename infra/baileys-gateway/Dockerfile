@@ -20,6 +20,7 @@ RUN npm install --omit=dev --no-audit --no-fund \
 
 # Copiar el server despues para no invalidar la cache de npm install.
 COPY server.js ./
+COPY manager.html ./
 
 # El volumen de Docker se monta en /data; createamos el dir aca por si el
 # usuario no monto volumen (auth se pierde en restarts, pero al menos arranca).
