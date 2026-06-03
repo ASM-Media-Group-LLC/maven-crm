@@ -575,6 +575,7 @@ MODO AUTO-LISTENING (cuando invoked_by="auto"):
   · BAJO RENDIMIENTO sin explicación previa (LLG con 0 escritos sin razón en thread) → pedir contexto (ver abajo)
   · DECISIÓN DEL OWNER que requiere acción ("cancelar X", "rechazar Y", "asignar a Z") → ejecutar (ver abajo)
   · LINK DE INSTAGRAM en mensaje (handle visible) → llamá lookup_lead_history para dar contexto del lead
+  · INTERÉS / OFERTA DE UN PRODUCTO a una creadora (Piclink/Content Protector/Blu/Exchange) con señal concreta → log_monetization_opportunity (ver "OPORTUNIDADES DE MONETIZACIÓN" abajo). Es registro silencioso: si el mensaje no amerita responder, logueá y quedate callado.
 - Si NO entra en estos casos (saludos, chistes, "ok", "listo", links de meet, etc) → NO llames reply_to_group, simplemente no respondas (terminá el loop sin tool calls).
 - Cuando dudes si vale la pena hablar, NO hables. Mejor pasarse de prudente que ser ruidoso.
 - NUNCA publiques tu propio razonamiento ni tu decisión de no responder. PROHIBIDO mandar al grupo mensajes tipo "no requiere acción", "es solo una confirmación", "ya registré todo lo anterior", "no hay nada accionable nuevo", "no voy a responder para no hacer ruido". Eso ES ruido y queda mal. Si decidís que no amerita hablar, la ÚNICA acción correcta es NO llamar ninguna tool y cortar — en SILENCIO, sin avisar que te quedás callado. Tu razonamiento es interno: nunca va al grupo.
@@ -603,6 +604,19 @@ MONETIZACIÓN — CREADORA COMPLETADA (ganancias compartidas → promedio + hand
   donde Y = X × 1.3 redondeado a entero (ej. promedio $4.049 → objetivo ~$5.264).
 - Si hay varios meses, aclará el período ("promedio de los últimos [N] meses"). NUNCA mezcles ingresos de creadoras distintas en un mismo promedio.
 - Tono: concreto y con datos, sin hype — el equipo celebra con números reales, no con humo. UNA sola llamada a reply_to_group.
+
+OPORTUNIDADES DE MONETIZACIÓN — REGISTRAR INTERÉS EN PRODUCTOS (pedido de Alvaro):
+Maven tiene una "memoria de oportunidades" de venta de PRODUCTOS/plataformas a creadoras (Piclink, Content Protector, Blu, Exchange). VOS la llenás con log_monetization_opportunity cuando hay señal CONCRETA en el grupo; los humanos la ven/manejan en la pantalla de Oportunidades; el supervisor persigue el seguimiento (no la perseguís vos en el momento).
+- DISPARÁ log_monetization_opportunity SOLO con señal explícita de un humano (nunca por suposición):
+  · Un closer dice que OFRECIÓ un producto: "le ofrecí Piclink a @x", "le pasé el de CP a @y" → stage="offered".
+  · La creadora MOSTRÓ INTERÉS: "@x quedó interesada en Blu", "@y preguntó por Piclink" → stage="interested".
+  · NEGOCIANDO precio/condiciones: "viendo el Exchange con @z" → stage="negotiating".
+  · CERRÓ el producto: "@x se quedó con Piclink", "activamos CP en @y" → stage="won".
+  · NO quiso: "@x no le interesó el Exchange" → stage="lost" (+ lost_reason si lo dicen).
+- Si mencionan CUÁNDO volver a tocarla ("le escribo el viernes", "la sigo en 2 días"), calculá next_followup_at desde la "Hora actual" del initial_user_message. Si no lo dicen, omitilo (el humano lo pone en la pantalla).
+- Acción de registro SILENCIOSA: después de loguear NO anuncies "registré la oportunidad". Si ya vas a hablar por otra razón, sumá a lo sumo un ✓ corto ("✓ anoté la oportunidad de Piclink con @x"). En modo auto, si el mensaje no amerita respuesta: logueá y callate.
+- NO INVENTAR: nada de "le vendría bien Blu" ni "deberíamos ofrecerle X". Solo registrás lo que EFECTIVAMENTE pasó, dicho por un humano. Vale CONFIANZA CALIBRADA.
+- NO confundir con la firma de AGENCIA (eso es closer_creators / mark_lead_stage). Esto es venta de PRODUCTOS, que puede pasarle a una creadora ya nuestra o a una que aún no firmó.
 
 BAJO RENDIMIENTO — PEDIR CONTEXTO (no juzgar, indagar):
 - CUANDO un LLG reporta 0 escritos / 0 números, O lejos de meta sin haberlo justificado YA en el thread del día:
@@ -1186,6 +1200,23 @@ const TOOLS: Array<{
         reason: { type: "string", description: "razón de la actualización (queda en notes con timestamp + autor)" },
       },
       required: ["handle", "new_status"],
+    },
+  },
+  {
+    name: "log_monetization_opportunity",
+    description:
+      "Registrá o actualizá una OPORTUNIDAD DE MONETIZACIÓN (venta de un producto/plataforma a una creadora) en Maven. Usala SOLO con señal CONCRETA en el grupo: un closer dice explícito que OFRECIÓ un producto, o que la creadora MOSTRÓ INTERÉS ('@x quedó interesada en Piclink', 'le ofrecí Blu a @y', 'negociando CP con @z'). NO la uses por suposición ni porque 'le vendría bien' — eso es inventar (vale CONFIANZA CALIBRADA). Si ya existe una oportunidad ABIERTA para ese mismo handle+producto, se ACTUALIZA (stage/notas/próximo seguimiento); si no, se crea. El bot la registra; los humanos la ven en la pantalla de Oportunidades; el supervisor persigue el seguimiento. assigned_to queda en quien REPORTA.",
+    input_schema: {
+      type: "object",
+      properties: {
+        creator_handle: { type: "string", description: "handle de IG de la creadora, sin @ (ej. 'catalinaofficer')" },
+        product: { type: "string", enum: ["piclink", "content_protector", "blu", "exchange", "agency", "other"], description: "producto/plataforma ofrecido" },
+        stage: { type: "string", enum: ["interested", "offered", "negotiating", "won", "lost"], description: "etapa: interested (mostró interés), offered (le ofrecimos), negotiating (precio/condiciones), won (cerró el producto), lost (no quiso). Default 'interested'." },
+        notes: { type: "string", description: "contexto breve y REAL de lo que pasó (ej. 'le ofrecí Piclink gratis + CP con descuento'). No inventes." },
+        next_followup_at: { type: "string", description: "opcional: ISO timestamp de cuándo volver a tocarla. Si el closer dice 'le escribo el viernes', calculalo desde la hora actual. Omitir si no lo dicen." },
+        lost_reason: { type: "string", description: "si stage='lost', por qué se perdió (si lo dicen)" },
+      },
+      required: ["creator_handle", "product"],
     },
   },
   {
@@ -2772,6 +2803,72 @@ async function executeTool(
       }
 
       return { ok: true, updated, errors: errors.length > 0 ? errors : undefined };
+    }
+
+    case "log_monetization_opportunity": {
+      const handle = String(input.creator_handle ?? "").trim().replace(/^@/, "");
+      const product = String(input.product ?? "").trim().toLowerCase();
+      const rawStage = String(input.stage ?? "interested").trim().toLowerCase();
+      const notes = String(input.notes ?? "").trim();
+      const nextFollowup = input.next_followup_at ? String(input.next_followup_at).trim() : null;
+      const lostReason = String(input.lost_reason ?? "").trim();
+      const VALID_PRODUCTS = ["piclink", "content_protector", "blu", "exchange", "agency", "other"];
+      const VALID_STAGES = ["interested", "offered", "negotiating", "won", "lost"];
+      if (!handle || !product) return { error: "missing_handle_or_product" };
+      if (!VALID_PRODUCTS.includes(product)) return { error: "invalid_product", product, valid: VALID_PRODUCTS };
+      const stage = VALID_STAGES.includes(rawStage) ? rawStage : "interested";
+      const noteLine = notes ? `[Bot ${new Date().toISOString().slice(0, 10)}] ${notes}` : null;
+
+      // Link opcional al lead del pipeline (para que la pantalla lo cruce).
+      const { data: ccLink } = await sb
+        .from("closer_creators")
+        .select("id")
+        .ilike("instagram_handle", handle)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Upsert manual: si hay una oportunidad ABIERTA (no won/lost) para este
+      // handle+producto, la actualizamos; si no, creamos una nueva.
+      const { data: existing } = await sb
+        .from("monetization_opportunities")
+        .select("id, notes")
+        .eq("tenant_id", ctx.tenantId)
+        .ilike("creator_handle", handle)
+        .eq("product", product)
+        .not("stage", "in", "(won,lost)")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        const update: Record<string, unknown> = { stage, last_touch_at: new Date().toISOString() };
+        if (noteLine) update.notes = existing.notes ? existing.notes + "\n" + noteLine : noteLine;
+        if (nextFollowup) update.next_followup_at = nextFollowup;
+        if (stage === "lost" && lostReason) update.lost_reason = lostReason;
+        const { error } = await sb.from("monetization_opportunities").update(update).eq("id", existing.id);
+        if (error) return { error: "update_failed", detail: error.message };
+        return { ok: true, action: "updated", id: existing.id, handle, product, stage };
+      }
+
+      const { data: created, error } = await sb
+        .from("monetization_opportunities")
+        .insert({
+          tenant_id: ctx.tenantId,
+          creator_handle: handle,
+          closer_creator_id: ccLink?.id ?? null,
+          product,
+          stage,
+          assigned_to: ctx.senderUserId ?? null,
+          notes: noteLine,
+          next_followup_at: nextFollowup,
+          lost_reason: stage === "lost" ? (lostReason || null) : null,
+          source: "bot",
+        })
+        .select("id")
+        .single();
+      if (error) return { error: "insert_failed", detail: error.message };
+      return { ok: true, action: "created", id: created?.id, handle, product, stage };
     }
 
     case "add_persistent_rule": {
