@@ -26,7 +26,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Radio, Users, Plus, Loader2, QrCode, RefreshCw, Wifi, Bot } from "lucide-react";
+import { Radio, Users, Plus, Loader2, Bot } from "lucide-react";
 import type { WaChannel, WaChannelDepartment, WaChannelType } from "./types";
 
 const DEPTS: { value: WaChannelDepartment; label: string }[] = [
@@ -60,7 +60,6 @@ const ChannelsPage = () => {
   const [newOpen, setNewOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [membersFor, setMembersFor] = useState<ChannelRow | null>(null);
-  const [connectFor, setConnectFor] = useState<ChannelRow | null>(null);
 
   const { data: channels = [], isLoading } = useQuery({
     queryKey: ["wa-channels"],
@@ -110,29 +109,6 @@ const ChannelsPage = () => {
     onError: (e: Error) => toast({ title: "No se pudo crear", description: e.message, variant: "destructive" }),
   });
 
-  // Estado de conexión en vivo de cada línea (instancia) desde el gateway, vía el
-  // proxy admin. Refresca solo cada 15s.
-  const { data: instStatuses = {}, refetch: refetchInst, isFetching: instFetching } = useQuery({
-    queryKey: ["wa-instances-status"],
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("wa-instance-manage", { body: { action: "list" } });
-      if (error) throw error;
-      const map: Record<string, string> = {};
-      for (const i of ((data?.instances ?? []) as Array<{ instance: string; connection: string }>)) {
-        map[i.instance] = i.connection;
-      }
-      return map;
-    },
-    refetchInterval: 15000,
-  });
-
-  const statusBadge = (conn: string | undefined) => {
-    if (conn === "open") return <Badge className="border-transparent bg-emerald-500/15 text-emerald-600">Conectado</Badge>;
-    if (conn === "connecting") return <Badge className="border-transparent bg-amber-500/15 text-amber-600">Conectando…</Badge>;
-    if (conn === "close") return <Badge className="border-transparent bg-red-500/15 text-red-600">Caído</Badge>;
-    return <Badge variant="secondary-soft" className="text-muted-foreground">Sin conectar</Badge>;
-  };
-
   const userName = (id: string) => users.find((u) => u.id === id)?.full_name || id.slice(0, 8);
 
   return (
@@ -142,14 +118,12 @@ const ChannelsPage = () => {
         <div className="flex-1">
           <h1 className="text-base font-semibold leading-tight">Canales del inbox</h1>
           <p className="text-xs text-muted-foreground">
-            Cada número de WhatsApp es un canal. Mapeá quién lo atiende — un depto puede tener varios; admin ve todo.
+            Quién atiende cada número en la bandeja. Para <b>conectar/agregar un número</b> (QR), usá el{" "}
+            <a href="https://evolution.147-93-3-97.nip.io/manager" target="_blank" rel="noreferrer" className="underline hover:text-foreground">panel del gateway</a>.
           </p>
         </div>
         <Button variant="outline" size="sm" asChild>
           <Link to="/inbox/bots"><Bot className="h-4 w-4" /> Bots</Link>
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => refetchInst()} disabled={instFetching}>
-          <RefreshCw className={`h-4 w-4 ${instFetching ? "animate-spin" : ""}`} /> Estado
         </Button>
         <Button size="sm" onClick={() => setNewOpen(true)}>
           <Plus className="h-4 w-4" /> Nuevo canal
@@ -171,11 +145,9 @@ const ChannelsPage = () => {
               <tr className="border-b text-left text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Canal</th>
                 <th className="px-3 py-2 font-medium">Instancia</th>
-                <th className="px-3 py-2 font-medium">Estado</th>
                 <th className="px-3 py-2 font-medium">Depto</th>
                 <th className="px-3 py-2 font-medium">Tipo</th>
                 <th className="px-3 py-2 text-right font-medium">Atienden</th>
-                <th className="px-3 py-2 text-right font-medium">Conexión</th>
               </tr>
             </thead>
             <tbody>
@@ -183,17 +155,11 @@ const ChannelsPage = () => {
                 <tr key={c.id} className="border-b last:border-0">
                   <td className="px-3 py-2 font-medium">{c.label || "(sin etiqueta)"}</td>
                   <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{c.evolution_instance}</td>
-                  <td className="px-3 py-2">{statusBadge(instStatuses[c.evolution_instance])}</td>
                   <td className="px-3 py-2"><Badge variant="secondary-soft" className="text-[10px]">{deptLabel(c.department)}</Badge></td>
                   <td className="px-3 py-2 text-xs">{c.type === "dedicated" ? "Dedicado" : "Compartido"}</td>
                   <td className="px-3 py-2 text-right">
                     <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => setMembersFor(c)}>
                       <Users className="h-3.5 w-3.5" /> {c.member_ids.length}
-                    </Button>
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setConnectFor(c)}>
-                      <QrCode className="h-3.5 w-3.5" /> Conectar
                     </Button>
                   </td>
                 </tr>
@@ -209,7 +175,7 @@ const ChannelsPage = () => {
           <DialogHeader>
             <DialogTitle>Nuevo canal</DialogTitle>
             <DialogDescription>
-              Registrá un número/línea. El nombre de la instancia es el de Evolution (donde está conectado el WhatsApp).
+              Registrá quién atiende un canal. El "nombre de instancia" debe coincidir con una línea ya conectada en el panel del gateway.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -263,12 +229,6 @@ const ChannelsPage = () => {
         userName={userName}
         onOpenChange={(o) => !o && setMembersFor(null)}
         onChanged={() => qc.invalidateQueries({ queryKey: ["wa-channels"] })}
-      />
-
-      <ConnectDialog
-        channel={connectFor}
-        onClose={() => setConnectFor(null)}
-        onConnected={() => refetchInst()}
       />
     </div>
   );
@@ -345,89 +305,6 @@ const MembersDialog = ({
         </ScrollArea>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-// Diálogo de conexión: arranca la instancia (idempotente) y pollea el QR cada 3s
-// hasta que la línea queda conectada. El QR rota, por eso re-fetcheamos.
-const ConnectDialog = ({
-  channel, onClose, onConnected,
-}: {
-  channel: ChannelRow | null;
-  onClose: () => void;
-  onConnected: () => void;
-}) => {
-  const [status, setStatus] = useState<string>("starting");
-  const [qr, setQr] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!channel) return;
-    let active = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const inst = channel.evolution_instance;
-    setErr(null); setQr(null); setStatus("starting");
-
-    const poll = async () => {
-      const { data, error } = await supabase.functions.invoke("wa-instance-manage", {
-        body: { action: "connect", instance: inst },
-      });
-      if (!active) return;
-      if (error) { setErr(error.message); return; }
-      const st = (data?.status ?? data?.connection ?? "?") as string;
-      setStatus(st);
-      setQr((data?.qrcode?.base64 ?? null) as string | null);
-      if (st === "connected" || st === "open") { onConnected(); return; }
-      timer = setTimeout(poll, 3000);
-    };
-
-    (async () => {
-      await supabase.functions.invoke("wa-instance-manage", { body: { action: "create", instance: inst } });
-      if (active) poll();
-    })();
-
-    return () => { active = false; if (timer) clearTimeout(timer); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channel]);
-
-  const connected = status === "connected" || status === "open";
-  return (
-    <Dialog open={channel !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Conectar línea</DialogTitle>
-          <DialogDescription>
-            {channel ? `${channel.label || channel.evolution_instance} · ${channel.evolution_instance}` : ""}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex min-h-[18rem] flex-col items-center justify-center gap-3 py-2">
-          {err ? (
-            <p className="text-sm text-destructive">{err}</p>
-          ) : connected ? (
-            <div className="text-center">
-              <Wifi className="mx-auto h-12 w-12 text-emerald-500" />
-              <p className="mt-2 text-sm font-medium text-emerald-600">¡Línea conectada!</p>
-            </div>
-          ) : qr ? (
-            <>
-              <img src={qr} alt="QR" className="h-64 w-64 rounded bg-white p-2" style={{ imageRendering: "pixelated" }} />
-              <p className="text-center text-xs text-muted-foreground">
-                Escaneá con el teléfono de la línea:<br />
-                WhatsApp → Dispositivos vinculados → Vincular un dispositivo
-              </p>
-            </>
-          ) : (
-            <div className="flex flex-col items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <p className="text-xs">Generando QR…</p>
-            </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>{connected ? "Listo" : "Cerrar"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
