@@ -410,6 +410,33 @@ app.get('/manager/recent', (_req, res) => {
   res.json({ events: state.recentEvents });
 });
 
+// Lista PÚBLICA de líneas (instancias) para el dashboard — solo metadatos no
+// sensibles (estado, perfil, contadores, uptime). SIN apikey: el dashboard se ve
+// sin pedir nada; la apikey solo hace falta para acciones (crear/conectar/logout).
+app.get('/manager/lines', (_req, res) => {
+  const now = Date.now();
+  const lines = [...sessions.values()].map((s) => ({
+    instance: s.instanceName,
+    connection: s.connection,
+    profile: { name: s.profileName, number: s.profileNumber, pic: s.profilePicUrl },
+    msgsInToday: s.msgsInToday,
+    msgsOutToday: s.msgsOutToday,
+    msgsIn: s.msgsIn,
+    msgsOut: s.msgsOut,
+    connectedAt: s.connectedAt,
+    uptimeSec: s.connectedAt ? Math.floor((now - s.connectedAt) / 1000) : null,
+    lastError: s.lastError,
+  }));
+  res.json({ lines });
+});
+
+// Actividad reciente de UNA línea (pública, mismo criterio que /manager/recent
+// del default). Si la instancia no existe, lista vacía.
+app.get('/manager/recent/:instance', (req, res) => {
+  const s = sessions.get(req.params.instance);
+  res.json({ events: s ? s.recentEvents : [] });
+});
+
 // Lista de grupos donde esta el bot. Cacheado 30s para no llamar a
 // groupFetchAllParticipating en cada request.
 let groupsCache = { at: 0, data: [] };

@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Maven · Gateway — Líneas de WhatsApp</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}</style>
+  <style>
+    body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+    .dot{animation:pulse 2s cubic-bezier(.4,0,.6,1) infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+  </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-900">
   <div class="max-w-5xl mx-auto p-6">
@@ -13,29 +16,29 @@
     <header class="flex items-center justify-between mb-5">
       <div>
         <h1 class="text-xl font-bold">Líneas de WhatsApp</h1>
-        <p class="text-sm text-slate-500">Cada línea es un número conectado al gateway. Agregá, conectá por QR y mirá el estado en vivo.</p>
+        <p class="text-sm text-slate-500">Cada línea es un número conectado al gateway. Estado, actividad y conexión por QR — en vivo.</p>
       </div>
       <button id="btn-add" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm">+ Agregar número</button>
     </header>
-
-    <!-- API key -->
-    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5">
-      <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-sm font-semibold text-amber-900">API key del gateway</span>
-        <span class="text-xs text-amber-700">(Dokploy → evolution-api → Environment → <code class="bg-amber-100 px-1 rounded">EVOLUTION_API_KEY</code>. Se guarda en este navegador.)</span>
-      </div>
-      <div class="flex gap-2 mt-2">
-        <input id="apikey" type="password" placeholder="pegá la API key…" class="flex-1 border border-amber-300 rounded px-2 py-1.5 text-sm bg-white">
-        <button id="btn-savekey" class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded text-sm font-semibold">Guardar</button>
-        <span id="key-ok" class="text-xs text-emerald-700 self-center"></span>
-      </div>
-    </div>
 
     <div id="lines" class="space-y-3">
       <p class="text-slate-400 text-sm text-center py-10">cargando líneas…</p>
     </div>
 
-    <p class="text-center text-xs text-slate-400 mt-8">Maven Baileys Gateway · las líneas se gestionan acá; los bots y su asignación a grupos, en Maven.</p>
+    <!-- API key (solo para acciones) -->
+    <details id="keybox" class="mt-6 bg-white border border-slate-200 rounded-lg text-sm">
+      <summary class="cursor-pointer px-4 py-2.5 text-slate-600 select-none">🔑 API key del gateway <span class="text-xs text-slate-400">— solo para acciones (agregar / conectar / desvincular)</span></summary>
+      <div class="px-4 pb-3 pt-1">
+        <p class="text-xs text-slate-400 mb-2">Dokploy → evolution-api → Environment → <code class="bg-slate-100 px-1 rounded">EVOLUTION_API_KEY</code>. Se guarda en este navegador.</p>
+        <div class="flex gap-2">
+          <input id="apikey" type="password" placeholder="pegá la API key…" class="flex-1 border border-slate-300 rounded px-2 py-1.5 text-sm">
+          <button id="btn-savekey" class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded text-sm font-semibold">Guardar</button>
+          <span id="key-ok" class="text-xs text-emerald-700 self-center"></span>
+        </div>
+      </div>
+    </details>
+
+    <p class="text-center text-xs text-slate-400 mt-6">Maven Baileys Gateway · las líneas se gestionan acá; los bots y su asignación a grupos, en Maven.</p>
   </div>
 
   <!-- Modal: agregar -->
@@ -43,8 +46,7 @@
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-5">
       <h2 class="font-bold text-lg mb-1">Agregar número</h2>
       <p class="text-sm text-slate-500 mb-3">Un nombre corto para identificar la línea (sin espacios). Ej: <code class="bg-slate-100 px-1 rounded">managers</code>, <code class="bg-slate-100 px-1 rounded">closers-2</code>.</p>
-      <label class="text-sm font-semibold">Nombre de la línea</label>
-      <input id="new-name" placeholder="managers" class="w-full border border-slate-300 rounded px-2 py-1.5 mt-1 mb-4 font-mono text-sm">
+      <input id="new-name" placeholder="managers" class="w-full border border-slate-300 rounded px-2 py-1.5 mb-4 font-mono text-sm">
       <div class="flex justify-end gap-2">
         <button id="add-cancel" class="px-3 py-1.5 rounded border border-slate-300 text-sm hover:bg-slate-50">Cancelar</button>
         <button id="add-create" class="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">Crear y conectar</button>
@@ -56,9 +58,7 @@
   <div id="modal-qr" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-5 text-center">
       <h2 class="font-bold text-lg mb-1">Conectar <span id="qr-line" class="font-mono text-emerald-700"></span></h2>
-      <div id="qr-body" class="my-4 flex flex-col items-center justify-center gap-3 min-h-[300px]">
-        <p class="text-slate-400 text-sm">generando QR…</p>
-      </div>
+      <div id="qr-body" class="my-4 flex flex-col items-center justify-center gap-3 min-h-[300px]"><p class="text-slate-400 text-sm">generando QR…</p></div>
       <button id="qr-close" class="px-3 py-1.5 rounded border border-slate-300 text-sm hover:bg-slate-50">Cerrar</button>
     </div>
   </div>
@@ -70,93 +70,129 @@
     const authH = () => { const k = getKey(); return k ? { apikey: k } : {}; };
     const show = (id) => { $(id).classList.remove("hidden"); $(id).classList.add("flex"); };
     const hide = (id) => { $(id).classList.add("hidden"); $(id).classList.remove("flex"); };
+    const esc = (s) => (s || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+    let expanded = null; // instancia con la actividad abierta
 
     $("apikey").value = getKey();
-    $("btn-savekey").onclick = () => {
-      localStorage.setItem(KEY, $("apikey").value.trim());
-      $("key-ok").textContent = "✓ guardada";
-      loadLines();
-    };
+    $("btn-savekey").onclick = () => { localStorage.setItem(KEY, $("apikey").value.trim()); $("key-ok").textContent = "✓ guardada"; };
+    function needKey() {
+      if (getKey()) return true;
+      $("keybox").open = true;
+      $("apikey").focus();
+      alert("Pegá la API key del gateway abajo — solo hace falta para acciones (agregar / conectar / desvincular).");
+      return false;
+    }
 
     const badge = (c) => {
-      if (c === "open") return '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">● Conectado</span>';
-      if (c === "connecting") return '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">● Conectando…</span>';
+      if (c === "open") return '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700"><span class="dot">●</span> Conectado</span>';
+      if (c === "connecting") return '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700"><span class="dot">●</span> Conectando…</span>';
       if (c === "close") return '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">● Caído</span>';
       return '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">● Sin conectar</span>';
     };
+    const fmtUptime = (s) => { if (!s && s !== 0) return "—"; const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m`; };
+    const fmtTime = (iso) => { try { return new Date(iso).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); } catch (e) { return ""; } };
 
     async function loadLines() {
       const box = $("lines");
-      if (!getKey()) { box.innerHTML = '<p class="text-amber-700 text-sm text-center py-10">Pegá la API key arriba para ver las líneas.</p>'; return; }
       try {
-        const r = await fetch("/instance/list", { headers: authH() });
-        if (r.status === 401) { box.innerHTML = '<p class="text-red-600 text-sm text-center py-10">API key inválida.</p>'; return; }
+        const r = await fetch("/manager/lines");           // PÚBLICO — sin apikey
         const j = await r.json();
-        const list = j.instances || [];
+        const list = j.lines || [];
         if (!list.length) { box.innerHTML = '<p class="text-slate-400 text-sm text-center py-10">No hay líneas todavía. Agregá un número con el botón de arriba.</p>'; return; }
         box.innerHTML = list.map((i) => {
           const name = (i.profile && i.profile.name) || "";
           const num = (i.profile && i.profile.number) ? "+" + i.profile.number : "sin vincular";
+          const pic = (i.profile && i.profile.pic) || "";
+          const avatar = pic
+            ? `<img src="${pic}" class="w-11 h-11 rounded-full object-cover flex-shrink-0">`
+            : `<div class="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold flex-shrink-0">${name ? esc(name[0].toUpperCase()) : "#"}</div>`;
           const action = i.connection === "open"
             ? `<button onclick="logoutLine('${i.instance}')" class="text-xs px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Desvincular</button>`
             : `<button onclick="connectLine('${i.instance}')" class="text-xs px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Conectar (QR)</button>`;
-          return `<div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-4 shadow-sm">
-            <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold flex-shrink-0">${name ? name[0].toUpperCase() : "#"}</div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2"><span class="font-semibold font-mono truncate">${i.instance}</span>${badge(i.connection)}</div>
-              <p class="text-xs text-slate-500 truncate">${name ? name + " · " : ""}${num} · in ${i.msgsInToday || 0} / out ${i.msgsOutToday || 0} hoy</p>
+          return `<div class="bg-white rounded-xl border border-slate-200 shadow-sm">
+            <div class="p-4 flex items-center gap-4">
+              ${avatar}
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2"><span class="font-semibold font-mono truncate">${esc(i.instance)}</span>${badge(i.connection)}</div>
+                <p class="text-xs text-slate-500 truncate">${name ? esc(name) + " · " : ""}${num}</p>
+                <p class="text-xs text-slate-400 mt-0.5">📥 ${i.msgsInToday || 0} · 📤 ${i.msgsOutToday || 0} hoy · ⏱ ${fmtUptime(i.uptimeSec)}${i.lastError ? ' · <span class="text-red-500">' + esc(i.lastError) + "</span>" : ""}</p>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <button onclick="toggleAct('${i.instance}')" class="text-xs px-2.5 py-1.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-50">Actividad ${expanded === i.instance ? "▴" : "▾"}</button>
+                ${action}
+              </div>
             </div>
-            <div class="flex gap-2 flex-shrink-0">${action}</div>
+            <div id="act-${i.instance}" class="${expanded === i.instance ? "" : "hidden"} border-t border-slate-100 px-4 py-2 max-h-64 overflow-y-auto"><p class="text-xs text-slate-400 py-2">cargando…</p></div>
           </div>`;
         }).join("");
-      } catch (e) { box.innerHTML = '<p class="text-red-600 text-sm text-center py-10">Error: ' + e.message + "</p>"; }
+        if (expanded) renderAct(expanded);
+      } catch (e) { box.innerHTML = '<p class="text-red-600 text-sm text-center py-10">Error cargando líneas: ' + esc(e.message) + "</p>"; }
     }
 
-    // Agregar
-    $("btn-add").onclick = () => { $("new-name").value = ""; show("modal-add"); $("new-name").focus(); };
+    async function renderAct(inst) {
+      const div = $("act-" + inst);
+      if (!div) return;
+      try {
+        const r = await fetch("/manager/recent/" + inst);  // PÚBLICO
+        const evs = (await r.json()).events || [];
+        if (!evs.length) { div.innerHTML = '<p class="text-xs text-slate-400 py-2">sin actividad reciente</p>'; return; }
+        div.innerHTML = evs.map((e) => {
+          const color = e.kind === "in" ? "text-blue-600" : e.kind === "out" ? "text-emerald-600" : "text-slate-400";
+          const who = e.kind === "out" ? "bot →" : (e.from || e.jid || "");
+          const body = e.body || (e.state ? "conexión: " + e.state : "");
+          return `<div class="py-1.5 border-b border-slate-50 last:border-0 text-xs">
+            <span class="text-slate-400 font-mono">${fmtTime(e.at)}</span>
+            <span class="${color} font-semibold ml-1">${esc(String(who).slice(0, 28))}</span>
+            <div class="text-slate-600 truncate">${esc(String(body).slice(0, 140))}</div>
+          </div>`;
+        }).join("");
+      } catch (e) { div.innerHTML = '<p class="text-xs text-red-500 py-2">error: ' + esc(e.message) + "</p>"; }
+    }
+
+    function toggleAct(inst) { expanded = (expanded === inst) ? null : inst; loadLines(); }
+
+    // Acciones (requieren apikey)
+    $("btn-add").onclick = () => { if (!needKey()) return; $("new-name").value = ""; show("modal-add"); $("new-name").focus(); };
     $("add-cancel").onclick = () => hide("modal-add");
     $("add-create").onclick = () => {
       const name = $("new-name").value.trim();
       if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) { alert("Nombre inválido: solo letras, números, - y _ (sin espacios)."); return; }
-      hide("modal-add");
-      connectLine(name);
+      hide("modal-add"); connectLine(name);
     };
 
-    // Conectar (QR) — arranca la instancia (idempotente) y pollea hasta conectar
     let qrTimer = null;
     async function connectLine(name) {
+      if (!needKey()) return;
       $("qr-line").textContent = name;
       $("qr-body").innerHTML = '<p class="text-slate-400 text-sm">generando QR…</p>';
       show("modal-qr");
       try { await fetch("/instance/create/" + name, { method: "POST", headers: authH() }); } catch (e) {}
       const poll = async () => {
         try {
-          const r = await fetch("/instance/connect/" + name, { headers: authH() });
-          const j = await r.json();
+          const j = await (await fetch("/instance/connect/" + name, { headers: authH() })).json();
           if (j.status === "connected" || j.connection === "open") {
             $("qr-body").innerHTML = '<div class="text-emerald-600 text-center"><div class="text-5xl">✓</div><p class="font-semibold mt-2">¡Línea conectada!</p></div>';
-            loadLines();
-            return;
+            loadLines(); return;
           }
           if (j.qrcode && j.qrcode.base64) {
             $("qr-body").innerHTML = `<img src="${j.qrcode.base64}" alt="QR" class="w-64 h-64 border rounded bg-white" style="image-rendering:pixelated">
               <p class="text-xs text-slate-500 leading-relaxed">En el teléfono de esta línea:<br>WhatsApp → Dispositivos vinculados → <b>Vincular un dispositivo</b> → escaneá</p>`;
           }
           qrTimer = setTimeout(poll, 3000);
-        } catch (e) {
-          $("qr-body").innerHTML = '<p class="text-red-600 text-sm">Error: ' + e.message + "</p>";
-        }
+        } catch (e) { $("qr-body").innerHTML = '<p class="text-red-600 text-sm">Error: ' + esc(e.message) + "</p>"; }
       };
       poll();
     }
     $("qr-close").onclick = () => { if (qrTimer) clearTimeout(qrTimer); hide("modal-qr"); loadLines(); };
 
     async function logoutLine(name) {
+      if (!needKey()) return;
       if (!confirm("¿Desvincular la línea " + name + "? Vas a tener que re-escanear el QR para reconectarla.")) return;
       try { await fetch("/instance/logout/" + name, { method: "DELETE", headers: authH() }); } catch (e) {}
       loadLines();
     }
-    window.connectLine = connectLine; window.logoutLine = logoutLine;
+    window.connectLine = connectLine; window.logoutLine = logoutLine; window.toggleAct = toggleAct;
 
     loadLines();
     setInterval(loadLines, 12000);
