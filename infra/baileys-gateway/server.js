@@ -38,6 +38,7 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLat
 const express = require('express');
 const pino = require('pino');
 const QRCode = require('qrcode');
+const fs = require('fs');
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const API_KEY = process.env.API_KEY || '';
@@ -454,42 +455,70 @@ setInterval(refreshAll, 3000);
 </body>
 </html>`;
 
-// Runtime state. Singleton porque solo manejamos UNA instancia (maven-bot).
-const state = {
-  sock: null,
-  connection: 'disconnected', // 'disconnected' | 'connecting' | 'open' | 'close'
-  qrRaw: null,                // raw QR string del evento connection.update
-  qrDataUrl: null,            // PNG data URL precomputado
-  lastError: null,
-  // Metrics
-  bootedAt: Date.now(),
-  connectedAt: null,          // timestamp del ultimo 'open'
-  msgsIn: 0,
-  msgsOut: 0,
-  msgsInToday: 0,
-  msgsOutToday: 0,
-  todayDate: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
-  // Profile info (lo cargamos al conectar)
-  profileName: null,
-  profileNumber: null,
-  profilePicUrl: null,
-  // Buffer circular de actividad reciente (last 30).
-  recentEvents: [],
-};
+// Sesiones multi-número (Fase 2). Cada número/instancia tiene su propia sesión
+// (sock, conexión, QR, métricas). `sessions` mapea instanceName -> sessionState.
+// RETROCOMPAT: `state` apunta a la sesión default (INSTANCE_NAME) para que las
+// ~71 referencias existentes sigan funcionando mientras migramos los handlers
+// a multi-sesión, sin romper el bot que ya corre.
+const sessions = new Map();
+
+function createSession(instanceName) {
+  return {
+    instanceName,
+    sock: null,
+    connection: 'disconnected', // 'disconnected' | 'connecting' | 'open' | 'close'
+    qrRaw: null,                // raw QR string del evento connection.update
+    qrDataUrl: null,            // PNG data URL precomputado
+    lastError: null,
+    // Metrics
+    bootedAt: Date.now(),
+    connectedAt: null,          // timestamp del ultimo 'open'
+    msgsIn: 0,
+    msgsOut: 0,
+    msgsInToday: 0,
+    msgsOutToday: 0,
+    todayDate: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
+    // Profile info (lo cargamos al conectar)
+    profileName: null,
+    profileNumber: null,
+    profilePicUrl: null,
+    // Buffer circular de actividad reciente (last 30).
+    recentEvents: [],
+  };
+}
+
+function getSession(instanceName) {
+  let s = sessions.get(instanceName);
+  if (!s) { s = createSession(instanceName); sessions.set(instanceName, s); }
+  return s;
+}
+
+// Sesión default (el número histórico, INSTANCE_NAME). Las referencias `state.`
+// del código actual operan sobre ésta hasta migrar cada handler a multi-sesión.
+const state = getSession(INSTANCE_NAME);
+
+// Resuelve la sesión de una request por :instance. RETROCOMPAT: si la instancia
+// pedida aún no existe (modo single-bot, o el nombre que Maven manda hoy), cae en
+// la sesión default → comportamiento idéntico al actual hasta que arranque un 2º
+// número. El ruteo solo diverge cuando una segunda sesión existe de verdad.
+function sessionFromReq(req) {
+  const name = req.params && req.params.instance;
+  return name && sessions.has(name) ? sessions.get(name) : state;
+}
 
 const RECENT_MAX = 30;
 
-function pushRecent(event) {
-  state.recentEvents.unshift({ ...event, at: new Date().toISOString() });
-  if (state.recentEvents.length > RECENT_MAX) state.recentEvents.length = RECENT_MAX;
+function pushRecent(event, s = state) {
+  s.recentEvents.unshift({ ...event, at: new Date().toISOString() });
+  if (s.recentEvents.length > RECENT_MAX) s.recentEvents.length = RECENT_MAX;
 }
 
-function rolloverDayIfNeeded() {
+function rolloverDayIfNeeded(s = state) {
   const today = new Date().toISOString().slice(0, 10);
-  if (today !== state.todayDate) {
-    state.todayDate = today;
-    state.msgsInToday = 0;
-    state.msgsOutToday = 0;
+  if (today !== s.todayDate) {
+    s.todayDate = today;
+    s.msgsInToday = 0;
+    s.msgsOutToday = 0;
   }
 }
 
@@ -497,12 +526,16 @@ function rolloverDayIfNeeded() {
 // Baileys boot + reconnect loop
 // ---------------------------------------------------------------------------
 
-async function startSocket() {
-  state.connection = 'connecting';
-  state.qrRaw = null;
-  state.qrDataUrl = null;
+async function startSocket(instanceName = INSTANCE_NAME) {
+  const s = getSession(instanceName);
+  s.connection = 'connecting';
+  s.qrRaw = null;
+  s.qrDataUrl = null;
 
-  const { state: authState, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+  // El número default conserva su AUTH_DIR histórico (no romper credenciales en
+  // prod); los números nuevos usan un subdirectorio propio por instancia.
+  const authPath = instanceName === INSTANCE_NAME ? AUTH_DIR : `${AUTH_DIR}/${instanceName}`;
+  const { state: authState, saveCreds } = await useMultiFileAuthState(authPath);
   let version;
   try {
     const fetched = await fetchLatestBaileysVersion();
@@ -512,7 +545,7 @@ async function startSocket() {
     logger.warn({ err: e.message }, 'fetchLatestBaileysVersion failed, using default');
   }
 
-  state.sock = makeWASocket({
+  s.sock = makeWASocket({
     version,
     auth: authState,
     logger: pino({ level: 'warn' }),
@@ -524,70 +557,70 @@ async function startSocket() {
     markOnlineOnConnect: true,
   });
 
-  state.sock.ev.on('creds.update', saveCreds);
+  s.sock.ev.on('creds.update', saveCreds);
 
-  state.sock.ev.on('connection.update', async (update) => {
+  s.sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      state.qrRaw = qr;
+      s.qrRaw = qr;
       try {
-        state.qrDataUrl = await QRCode.toDataURL(qr, { width: 320, margin: 1 });
-        logger.info('QR refreshed (data URL ready)');
+        s.qrDataUrl = await QRCode.toDataURL(qr, { width: 320, margin: 1 });
+        logger.info({ instance: instanceName }, 'QR refreshed (data URL ready)');
       } catch (e) {
         logger.error({ err: e.message }, 'QR encode failed');
       }
     }
 
     if (connection === 'open') {
-      state.connection = 'open';
-      state.qrRaw = null;
-      state.qrDataUrl = null;
-      state.lastError = null;
-      state.connectedAt = Date.now();
+      s.connection = 'open';
+      s.qrRaw = null;
+      s.qrDataUrl = null;
+      s.lastError = null;
+      s.connectedAt = Date.now();
       // Carga profile info en background -- no bloqueante.
-      loadProfileInfo().catch((e) => logger.warn({ err: e.message }, 'profile load failed'));
-      pushRecent({ kind: 'connection', state: 'open' });
-      logger.info('Connected to WhatsApp');
+      loadProfileInfo(s).catch((e) => logger.warn({ err: e.message }, 'profile load failed'));
+      pushRecent({ kind: 'connection', state: 'open' }, s);
+      logger.info({ instance: instanceName }, 'Connected to WhatsApp');
     } else if (connection === 'close') {
-      state.connection = 'close';
+      s.connection = 'close';
       const statusCode = lastDisconnect?.error?.output?.statusCode;
-      state.lastError = lastDisconnect?.error?.message || 'unknown';
-      logger.warn({ statusCode, err: state.lastError }, 'Connection closed');
+      s.lastError = lastDisconnect?.error?.message || 'unknown';
+      logger.warn({ instance: instanceName, statusCode, err: s.lastError }, 'Connection closed');
 
       const loggedOut = statusCode === DisconnectReason.loggedOut;
       if (loggedOut) {
-        logger.error('Logged out by WhatsApp -- clear AUTH_DIR and re-scan QR');
+        logger.error({ instance: instanceName }, 'Logged out by WhatsApp -- clear AUTH_DIR and re-scan QR');
         // No auto-reconnect on logout: necesita rescanear.
       } else {
         // Reconnect con backoff.
         const delay = 3000;
-        logger.info({ delay }, 'Reconnecting');
-        setTimeout(() => startSocket().catch((e) => logger.error({ err: e.message }, 'reconnect failed')), delay);
+        logger.info({ instance: instanceName, delay }, 'Reconnecting');
+        setTimeout(() => startSocket(instanceName).catch((e) => logger.error({ err: e.message }, 'reconnect failed')), delay);
       }
     } else if (connection === 'connecting') {
-      state.connection = 'connecting';
+      s.connection = 'connecting';
     }
   });
 
-  state.sock.ev.on('messages.upsert', async ({ messages, type }) => {
+  s.sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
     for (const m of messages) {
       // Tracking: contamos solo mensajes externos (no echo de nuestros sends).
       if (!m.key?.fromMe) {
-        rolloverDayIfNeeded();
-        state.msgsIn += 1;
-        state.msgsInToday += 1;
+        rolloverDayIfNeeded(s);
+        s.msgsIn += 1;
+        s.msgsInToday += 1;
         pushRecent({
           kind: 'in',
           jid: m.key?.remoteJid,
           from: m.pushName || m.key?.participant || m.key?.remoteJid,
           body: extractMsgPreview(m.message),
-        });
+        }, s);
       }
       if (WEBHOOK_URL) {
         try {
-          await forwardMessage(m);
+          await forwardMessage(m, s);
         } catch (e) {
           logger.error({ err: e.message }, 'forwardMessage failed');
         }
@@ -598,19 +631,19 @@ async function startSocket() {
 
 // Carga el perfil del bot tras conectar. Le pedimos a Baileys el numero
 // + profile pic URL para mostrar en el dashboard.
-async function loadProfileInfo() {
-  if (!state.sock) return;
+async function loadProfileInfo(s = state) {
+  if (!s.sock) return;
   try {
-    const me = state.sock.user;
+    const me = s.sock.user;
     if (me) {
-      state.profileName = me.name || null;
-      state.profileNumber = me.id ? me.id.split('@')[0].split(':')[0] : null;
+      s.profileName = me.name || null;
+      s.profileNumber = me.id ? me.id.split('@')[0].split(':')[0] : null;
     }
     if (me?.id) {
       try {
-        state.profilePicUrl = await state.sock.profilePictureUrl(me.id, 'image');
+        s.profilePicUrl = await s.sock.profilePictureUrl(me.id, 'image');
       } catch {
-        state.profilePicUrl = null;
+        s.profilePicUrl = null;
       }
     }
   } catch (e) {
@@ -632,12 +665,13 @@ function extractMsgPreview(message) {
   return '[' + Object.keys(message).slice(0, 2).join(',') + ']';
 }
 
-async function forwardMessage(m) {
+async function forwardMessage(m, s = state) {
   // Shape compatible con parseEvolutionApiMessage en _shared/whatsapp.ts:
   //   { event, instance, data: { key, pushName, message, messageTimestamp, participant } }
+  // `instance` reporta QUÉ número recibió el msg → el ingest enruta al bot correcto.
   const payload = {
     event: 'messages.upsert',
-    instance: INSTANCE_NAME,
+    instance: s.instanceName,
     data: {
       key: m.key,
       pushName: m.pushName,
@@ -818,22 +852,55 @@ app.use((req, res, next) => {
 });
 
 app.get('/instance/connectionState/:instance', (req, res) => {
-  res.json({ instance: req.params.instance, state: state.connection, lastError: state.lastError });
+  const s = sessionFromReq(req);
+  res.json({ instance: req.params.instance, state: s.connection, lastError: s.lastError });
 });
 
 // QR endpoint -- devuelve el QR actual como data URL si esta esperando scan.
 app.get('/instance/connect/:instance', (req, res) => {
-  if (state.connection === 'open') {
+  const s = sessionFromReq(req);
+  if (s.connection === 'open') {
     return res.json({ instance: req.params.instance, status: 'connected' });
   }
-  if (state.qrDataUrl) {
+  if (s.qrDataUrl) {
     return res.json({
       instance: req.params.instance,
       status: 'awaiting_qr_scan',
-      qrcode: { base64: state.qrDataUrl, code: state.qrRaw },
+      qrcode: { base64: s.qrDataUrl, code: s.qrRaw },
     });
   }
-  res.json({ instance: req.params.instance, status: state.connection, qrcode: null });
+  res.json({ instance: req.params.instance, status: s.connection, qrcode: null });
+});
+
+// Crear/arrancar una sesión nueva (número adicional). Bajo apikey. Idempotente:
+// si ya está conectada/conectando no reinicia; si no, arranca el socket → su QR
+// queda disponible en GET /instance/connect/:instance. La persistencia entre
+// reboots la da el escaneo de AUTH_DIR en el boot (ver más abajo).
+app.post('/instance/create/:instance', async (req, res) => {
+  const name = req.params.instance;
+  if (!name || !/^[a-zA-Z0-9_-]{1,64}$/.test(name)) {
+    return res.status(400).json({ error: 'invalid_instance_name', hint: 'use [a-zA-Z0-9_-], 1-64 chars' });
+  }
+  const existing = sessions.get(name);
+  if (existing && (existing.connection === 'open' || existing.connection === 'connecting')) {
+    return res.json({ instance: name, status: existing.connection, message: 'already_running' });
+  }
+  startSocket(name).catch((e) => logger.error({ err: e.message, instance: name }, 'startSocket(create) failed'));
+  return res.json({ instance: name, status: 'starting', connectUrl: `/instance/connect/${name}` });
+});
+
+// Lista todas las sesiones (números) que el gateway maneja — para que Maven
+// pinte el panel de líneas. Solo metadatos no sensibles.
+app.get('/instance/list', (_req, res) => {
+  const instances = [...sessions.values()].map((s) => ({
+    instance: s.instanceName,
+    connection: s.connection,
+    profile: { name: s.profileName, number: s.profileNumber, pic: s.profilePicUrl },
+    msgsInToday: s.msgsInToday,
+    msgsOutToday: s.msgsOutToday,
+    connectedAt: s.connectedAt,
+  }));
+  res.json({ instances });
 });
 
 // Send text -- compatible con payload Evolution v1 o v2.
@@ -841,8 +908,9 @@ app.get('/instance/connect/:instance', (req, res) => {
 // si se manda, Baileys lo incluye en el contextInfo del mensaje y
 // WhatsApp renderiza esos números como menciones reales (ping al user).
 app.post('/message/sendText/:instance', async (req, res) => {
-  if (state.connection !== 'open' || !state.sock) {
-    return res.status(503).json({ error: 'not_connected', state: state.connection });
+  const s = sessionFromReq(req);
+  if (s.connection !== 'open' || !s.sock) {
+    return res.status(503).json({ error: 'not_connected', state: s.connection });
   }
 
   const body = req.body || {};
@@ -866,11 +934,11 @@ app.post('/message/sendText/:instance', async (req, res) => {
     if (mentions && mentions.length > 0) {
       payload.mentions = mentions;
     }
-    const result = await state.sock.sendMessage(jid, payload);
-    rolloverDayIfNeeded();
-    state.msgsOut += 1;
-    state.msgsOutToday += 1;
-    pushRecent({ kind: 'out', jid, body: String(text).slice(0, 120) });
+    const result = await s.sock.sendMessage(jid, payload);
+    rolloverDayIfNeeded(s);
+    s.msgsOut += 1;
+    s.msgsOutToday += 1;
+    pushRecent({ kind: 'out', jid, body: String(text).slice(0, 120) }, s);
     return res.json({
       key: {
         id: result.key.id,
@@ -930,9 +998,10 @@ app.post('/media/download', async (req, res) => {
 });
 
 // Logout endpoint -- destruye la session local (para rotar QR sin tocar volume).
-app.delete('/instance/logout/:instance', async (_req, res) => {
+app.delete('/instance/logout/:instance', async (req, res) => {
+  const s = sessionFromReq(req);
   try {
-    if (state.sock) await state.sock.logout();
+    if (s.sock) await s.sock.logout();
     res.json({ status: 'logged_out' });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -945,6 +1014,7 @@ app.delete('/instance/logout/:instance', async (_req, res) => {
 
 app.listen(PORT, () => {
   logger.info({ port: PORT, instance: INSTANCE_NAME }, 'HTTP listening');
+  // Sesión default (número histórico; sus credenciales viven en la raíz de AUTH_DIR).
   startSocket().catch((e) => {
     logger.error({ err: e.message }, 'startSocket failed at boot');
     state.connection = 'close';
@@ -952,6 +1022,21 @@ app.listen(PORT, () => {
     // Reintenta en 5s.
     setTimeout(() => startSocket().catch((err) => logger.error({ err: err.message }, 'retry failed')), 5000);
   });
+  // Persistencia multi-número: re-arranca cada instancia adicional con credenciales
+  // guardadas (subdirectorio propio dentro de AUTH_DIR). El default vive en la raíz,
+  // así que no se re-arranca acá. Bridge hasta que la fuente de verdad sea la DB (Fase 3).
+  try {
+    if (fs.existsSync(AUTH_DIR)) {
+      for (const entry of fs.readdirSync(AUTH_DIR, { withFileTypes: true })) {
+        if (entry.isDirectory() && entry.name !== INSTANCE_NAME) {
+          logger.info({ instance: entry.name }, 'Restoring saved instance');
+          startSocket(entry.name).catch((e) => logger.error({ err: e.message, instance: entry.name }, 'restore failed'));
+        }
+      }
+    }
+  } catch (e) {
+    logger.warn({ err: e.message }, 'instance restore scan failed');
+  }
 });
 
 // Graceful shutdown
