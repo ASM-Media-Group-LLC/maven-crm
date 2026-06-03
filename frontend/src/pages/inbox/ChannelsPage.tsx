@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Radio, Users, Plus, Loader2, QrCode, RefreshCw, Wifi } from "lucide-react";
+import { Radio, Users, Plus, Loader2, QrCode, RefreshCw, Wifi, Bot } from "lucide-react";
 import type { WaChannel, WaChannelDepartment, WaChannelType } from "./types";
 
 const DEPTS: { value: WaChannelDepartment; label: string }[] = [
@@ -144,6 +145,9 @@ const ChannelsPage = () => {
             Cada número de WhatsApp es un canal. Mapeá quién lo atiende — un depto puede tener varios; admin ve todo.
           </p>
         </div>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/inbox/bots"><Bot className="h-4 w-4" /> Bots</Link>
+        </Button>
         <Button variant="outline" size="sm" onClick={() => refetchInst()} disabled={instFetching}>
           <RefreshCw className={`h-4 w-4 ${instFetching ? "animate-spin" : ""}`} /> Estado
         </Button>

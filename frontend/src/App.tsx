@@ -44,6 +44,7 @@ const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
 const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
 const InboxPage = lazy(() => import("./pages/inbox/InboxPage"));
 const InboxChannelsPage = lazy(() => import("./pages/inbox/ChannelsPage"));
+const InboxBotsPage = lazy(() => import("./pages/inbox/BotsPage"));
 const OpportunitiesPage = lazy(() => import("./pages/opportunities/OpportunitiesPage"));
 
 // Proyecto MP — its own sub-app, kept lazy.
@@ -276,6 +277,7 @@ const App = () => (
                 {/* Inbox WhatsApp (bandeja propia) — gateado por permisos (módulo "WhatsApp"). Admin siempre; otros roles según role_permissions. */}
                 <Route path="/inbox" element={<PermissionRoute module="WhatsApp" submodule="Bandeja"><InboxPage /></PermissionRoute>} />
                 <Route path="/inbox/canales" element={<PermissionRoute module="WhatsApp" submodule="Canales"><InboxChannelsPage /></PermissionRoute>} />
+                <Route path="/inbox/bots" element={<PermissionRoute module="WhatsApp" submodule="Canales"><InboxBotsPage /></PermissionRoute>} />
                 {/* Oportunidades de monetización — lanzamiento oscuro: admin-only hasta abrir a managers/supervisores. */}
                 <Route path="/oportunidades" element={<AdminRoute><OpportunitiesPage /></AdminRoute>} />
                 <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />
