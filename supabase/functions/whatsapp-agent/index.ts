@@ -3528,24 +3528,29 @@ async function runAgent(req: AgentRequest): Promise<{
     // PROMPT CACHING (Anthropic): el system prompt (~5K tokens con
     // catálogo + reglas) y el array TOOLS (~3K tokens) son estables
     // entre invocaciones. Cacheándolos, ahorramos ~90% en input tokens
-    // si la próxima call llega dentro de 5 min (TTL del cache ephemeral).
+    // si la próxima call llega dentro del TTL del cache. Usamos ttl="1h"
+    // (no el default de 5 min): en modo `auto` (escucha pasiva) los mensajes
+    // del grupo llegan ESPACIADOS, y con 5 min el cache se enfriaba y se
+    // RE-PAGABA el prefix (~16K tokens de prompt+tools) en cada mensaje
+    // escuchado — ese era el grueso del costo de `auto` (~24K input fresco/
+    // call vs ~5K en `mention`). Con 1h el prefix sobrevive toda la jornada.
     //
     // Cómo funciona:
     //   - cache_control: { type: "ephemeral" } marca el punto del prefix
     //     a cachear. Anthropic cachea TODO lo que viene antes (system +
     //     hasta el item marcado de tools).
-    //   - Primera call: paga creation cost (10% más que input normal).
-    //   - Calls subsecuentes dentro de 5 min: 90% descuento en esos tokens.
+    //   - Primera call: paga creation cost (cache 1h = 2× el input normal).
+    //   - Calls subsecuentes dentro de 1h: ~90% descuento (cache read = 0.1×).
     //
     // Como el bot recibe varios mensajes por minuto en horas activas, el
     // hit ratio es alto. Esperamos ahorro ~70-80% del input total.
     const systemWithCache = [
-      { type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } },
+      { type: "text", text: systemPrompt, cache_control: { type: "ephemeral", ttl: "1h" } },
     ];
     const toolsWithCache = TOOLS.length > 0
       ? [
           ...TOOLS.slice(0, -1),
-          { ...TOOLS[TOOLS.length - 1], cache_control: { type: "ephemeral" } },
+          { ...TOOLS[TOOLS.length - 1], cache_control: { type: "ephemeral", ttl: "1h" } },
         ]
       : TOOLS;
 
