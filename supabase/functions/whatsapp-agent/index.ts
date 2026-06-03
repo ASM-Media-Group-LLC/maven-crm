@@ -533,6 +533,7 @@ Después del catchup, armá el foco del día con datos REALES de Maven (NO esper
   · get_closer_pipeline_status({}) (sin display_name = equipo entero) → confirmadas con potencial de cierre HOY, contactos overdue que vencen hoy, y cuántas "Nuevas" hay esperando asignación.
   · get_unassigned_leads({limit: 10}) → de esas Nuevas sin asignar, las 10 de MAYOR calidad (Elite/A+/A/B+/B…) para sugerir por dónde empezar a contactar HOY. Mostralas como lista corta con su calidad.
   · get_team_schedule({}) → quiénes trabajan hoy y la meta del día (LLG: 3 números lun-vie, 2 sáb).
+  · get_monetization_opportunities({}) → ventas de productos abiertas (Piclink/CP/Blu/Exchange), con las CERCA DE CERRAR (negotiating) primero. Es lo que Alvaro quiere ver de arranque: qué hay cerca de completar.
 Si es LUNES (o el primer día tras el finde), agregá UNA línea de recap del finde con lo más relevante de la Parte A (cierres, números, bloqueos tipo cuentas baneadas).
 
 CÓMO RESPONDER (UNA sola llamada a reply_to_group, este formato):
@@ -546,6 +547,9 @@ CÓMO RESPONDER (UNA sola llamada a reply_to_group, este formato):
     · Con potencial de cierre HOY: @handle (closer) → dirigí el next step al dueño, no al aire: "Miguel, @x está para cerrar — dale el empujón hoy."
     · Contactos que vencen hoy: @handle (closer, día N) → recordáselo puntual a quien la tiene.
     · Nuevas sin asignar (top calidad de get_unassigned_leads): REPARTILAS con criterio, no preguntes "¿quién las toma?" al aire. Si podés inferir quién está más liviano (cruzá get_closer_pipeline_status por closer + get_team_schedule de quién trabaja hoy), recomendá asignaciones concretas: "Miguel, agarrá @x (A+) y @y (A); Julieth, sumá @z (A+) que viene de tu estilo." Que ellos se las AUTO-asignen — vos recomendás quién toma qué, no lo imponés. Si no podés inferir carga, listalas por calidad y pedí reparto.
+
+  *💰 Ventas de productos — cerca de cerrar*  [solo si hay oportunidades abiertas; omití toda la sección si 0]
+    · @handle — <producto> (<etapa>, <dueño>)   ← priorizá las negotiating; máx 3-4
 
   *📋 LLGs — meta de hoy: <N> números*
     Equipo, repórtense con su corte cuando arranquen 💪
@@ -1200,6 +1204,18 @@ const TOOLS: Array<{
         reason: { type: "string", description: "razón de la actualización (queda en notes con timestamp + autor)" },
       },
       required: ["handle", "new_status"],
+    },
+  },
+  {
+    name: "get_monetization_opportunities",
+    description:
+      "Lee las OPORTUNIDADES DE MONETIZACIÓN abiertas (venta de productos a creadoras: interested/offered/negotiating) de Maven, ordenadas con las MÁS CERCA DE CERRAR primero (negotiating > offered > interested) y luego por seguimiento más urgente. Usala en la Apertura del día para el panorama, y cuando el owner/un manager pregunta '¿qué oportunidades de monetización hay?' / '¿qué ventas hay cerca de completar?' / '¿cómo venimos con los productos?'. Devuelve handle, producto, etapa, dueño y si el seguimiento ya vence. NO incluye won ni lost.",
+    input_schema: {
+      type: "object",
+      properties: {
+        only_due: { type: "boolean", description: "si true, solo las con seguimiento vencido (next_followup_at <= ahora). Default false (todas las abiertas)." },
+        limit: { type: "number", description: "máx a devolver (default 15)" },
+      },
     },
   },
   {
@@ -2472,6 +2488,50 @@ async function executeTool(
       return { total_unassigned: count ?? (rows ?? []).length, suggested };
     }
 
+    case "get_monetization_opportunities": {
+      const onlyDue = input.only_due === true;
+      const limit = Math.min(Math.max(Math.floor(Number(input.limit ?? 15)) || 15, 1), 50);
+      const nowIso = new Date().toISOString();
+      let q = sb
+        .from("monetization_opportunities")
+        .select("creator_handle, product, stage, assigned_to, next_followup_at")
+        .eq("tenant_id", ctx.tenantId)
+        .in("stage", ["interested", "offered", "negotiating"]);
+      if (onlyDue) q = q.not("next_followup_at", "is", null).lte("next_followup_at", nowIso);
+      const { data: rows, error } = await q.limit(200);
+      if (error) return { error: "read_failed", detail: error.message };
+      const ownerIds = [...new Set(((rows ?? []) as Array<{ assigned_to: string | null }>).map((r) => r.assigned_to).filter((x): x is string => Boolean(x)))];
+      const ownerName = new Map<string, string>();
+      if (ownerIds.length > 0) {
+        const { data: profs } = await sb.from("profiles").select("id, whatsapp_push_name, full_name").in("id", ownerIds);
+        for (const p of (profs ?? []) as Array<{ id: string; whatsapp_push_name: string | null; full_name: string | null }>) {
+          ownerName.set(p.id, p.whatsapp_push_name ?? p.full_name?.split(" ")[0] ?? "?");
+        }
+      }
+      const STAGE_RANK: Record<string, number> = { negotiating: 0, offered: 1, interested: 2 };
+      const sorted = ((rows ?? []) as Array<{
+        creator_handle: string | null;
+        product: string;
+        stage: string;
+        assigned_to: string | null;
+        next_followup_at: string | null;
+      }>).slice().sort((a, b) => {
+        const ra = STAGE_RANK[a.stage] ?? 3, rb = STAGE_RANK[b.stage] ?? 3;
+        if (ra !== rb) return ra - rb;
+        const fa = a.next_followup_at ? Date.parse(a.next_followup_at) : Infinity;
+        const fb = b.next_followup_at ? Date.parse(b.next_followup_at) : Infinity;
+        return fa - fb;
+      });
+      const out = sorted.slice(0, limit).map((r) => ({
+        handle: r.creator_handle ?? "(sin handle)",
+        product: r.product,
+        stage: r.stage,
+        owner: r.assigned_to ? (ownerName.get(r.assigned_to) ?? "?") : null,
+        followup_due: r.next_followup_at ? (Date.parse(r.next_followup_at) <= Date.now()) : false,
+      }));
+      return { total_open: (rows ?? []).length, near_close: out.filter((o) => o.stage === "negotiating").length, opportunities: out };
+    }
+
     case "get_closer_pipeline_status": {
       const displayName = String(input.display_name ?? "").trim();
       // Resolver closer (opcional).
@@ -3374,7 +3434,7 @@ async function buildInitialUserMessage(args: {
     lines.push("");
     lines.push("INSTRUCCIONES — seguí la sección 'APERTURA DEL DÍA' del system prompt:");
     lines.push("PARTE A (catchup, silencioso): identificá y ejecutá acciones perdidas de la pausa — reglas nuevas, reportes de jornada, días off, decisiones del owner, confirmadas/completadas — con sus tools (register_daily_report, register_day_off, add_persistent_rule, mark_lead_stage). Si no hay nada accionable, no ejecutes nada.");
-    lines.push("PARTE B (apertura, SIEMPRE con sustancia): traé el foco del día con datos reales de Maven — get_closer_pipeline_status({}) para confirmadas con potencial de cierre hoy + contactos overdue de hoy + cuántas Nuevas sin asignar; get_unassigned_leads({limit:10}) para sugerir las 10 Nuevas de mayor calidad por dónde empezar a contactar; get_team_schedule({}) para quién trabaja y la meta del día. Si es lunes/primer día tras el finde, sumá una línea de recap del finde.");
+    lines.push("PARTE B (apertura, SIEMPRE con sustancia): traé el foco del día con datos reales de Maven — get_closer_pipeline_status({}) para confirmadas con potencial de cierre hoy + contactos overdue de hoy + cuántas Nuevas sin asignar; get_unassigned_leads({limit:10}) para sugerir las 10 Nuevas de mayor calidad por dónde empezar a contactar; get_monetization_opportunities({}) para las ventas de productos cerca de cerrar; get_team_schedule({}) para quién trabaja y la meta del día. Si es lunes/primer día tras el finde, sumá una línea de recap del finde.");
     lines.push("AL FINAL: UNA sola llamada a reply_to_group con la 'Apertura del día' en el formato del system prompt (recap pausa opcional + foco closers + meta LLGs + cierre motivador). PROHIBIDO el mensaje hueco 'nada que registrar': SIEMPRE abrís con el foco del día. Excepción: si get_team_schedule no devuelve a nadie hoy (domingo), solo catchup o silencio.");
     lines.push("NO respondas a cada mensaje individual.");
     return lines.join("\n");
