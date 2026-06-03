@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
   useAskWhatsappAgent,
@@ -37,6 +38,8 @@ import {
   useResolveCommitment,
   useToggleWhatsappBot,
   useUpdateBotPersona,
+  useWaBots,
+  useAssignBotToGroup,
   useWhatsappBotEvents,
   useWhatsappCommitments,
   useWhatsappDailyReports,
@@ -191,6 +194,8 @@ function GroupsList({
 function GroupDetail({ group }: { group: WhatsappGroup }) {
   const { data: summary } = useWhatsappGroupSummary(group.id);
   const toggleMut = useToggleWhatsappBot();
+  const bots = useWaBots();
+  const assignMut = useAssignBotToGroup();
   const [askOpen, setAskOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -228,6 +233,23 @@ function GroupDetail({ group }: { group: WhatsappGroup }) {
               <Settings className="h-4 w-4" />
             </Button>
           </div>
+        </div>
+
+        {/* Bot asignado (Fase 6): qué bot (wa_bots) atiende este grupo. */}
+        <div className="mt-3 flex items-center gap-2 border-t pt-3">
+          <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-xs text-muted-foreground shrink-0">Bot asignado:</span>
+          <Select
+            value={group.wa_bot_id ?? "none"}
+            onValueChange={(v) => assignMut.mutate({ groupId: group.id, botId: v === "none" ? null : v })}
+            disabled={assignMut.isPending}
+          >
+            <SelectTrigger className="h-8 w-72 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sin bot (motor + manual de Ventas por defecto)</SelectItem>
+              {(bots.data ?? []).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t">

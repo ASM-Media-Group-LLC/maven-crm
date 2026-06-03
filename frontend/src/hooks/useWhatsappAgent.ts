@@ -23,6 +23,7 @@ export interface WhatsappGroup {
   provider: "evolution" | "baileys" | "manual";
   bot_enabled: boolean;
   bot_persona: string | null;
+  wa_bot_id: string | null;
   timezone: string;
   active: boolean;
   last_message_at: string | null;
@@ -299,6 +300,48 @@ export function useToggleWhatsappBot() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["whatsapp", "groups"] });
       toast.success("Configuración del bot actualizada");
+    },
+    onError: (e: Error) => toast.error(`Error: ${e.message}`),
+  });
+}
+
+// Fase 6: bots disponibles (wa_bots activos) para asignar a un grupo.
+export interface WaBotOption {
+  id: string;
+  name: string;
+  department: string;
+}
+
+export function useWaBots() {
+  return useQuery({
+    queryKey: ["wa-bots", "options"],
+    queryFn: async (): Promise<WaBotOption[]> => {
+      const { data, error } = await sb
+        .from("wa_bots")
+        .select("id, name, department")
+        .eq("active", true)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data as WaBotOption[]) ?? [];
+    },
+  });
+}
+
+// Fase 6: asignar (o desasignar, botId=null) un bot a un grupo. null = el grupo
+// vuelve al comportamiento legacy del agent (SYSTEM_PROMPT + bot_persona).
+export function useAssignBotToGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ groupId, botId }: { groupId: string; botId: string | null }) => {
+      const { error } = await sb
+        .from("whatsapp_groups")
+        .update({ wa_bot_id: botId })
+        .eq("id", groupId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["whatsapp", "groups"] });
+      toast.success("Bot del grupo actualizado");
     },
     onError: (e: Error) => toast.error(`Error: ${e.message}`),
   });
