@@ -3192,7 +3192,14 @@ async function buildInitialUserMessage(args: {
   const lines: string[] = [];
   lines.push(`Grupo: ${args.groupName}`);
   lines.push(`Timezone: ${args.timezone}`);
-  lines.push(`Hora actual: ${new Date().toISOString()}`);
+  // Hora actual en zona del grupo (Bogotá = UTC-5 fijo, sin DST), LEGIBLE. Antes
+  // se pasaba en UTC (toISOString) y el bot titulaba p.ej. "Corte 16:30" cuando
+  // en Colombia eran las 11:30. Le damos la hora YA local para que no convierta.
+  const _bog = new Date(Date.now() - 5 * 3600 * 1000);
+  const _dias = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const _hhmm = `${String(_bog.getUTCHours()).padStart(2, "0")}:${String(_bog.getUTCMinutes()).padStart(2, "0")}`;
+  const _fechaBog = `${_dias[_bog.getUTCDay()]} ${String(_bog.getUTCDate()).padStart(2, "0")}/${String(_bog.getUTCMonth() + 1).padStart(2, "0")}/${_bog.getUTCFullYear()}`;
+  lines.push(`Hora actual: ${_hhmm} hora Colombia (Bogotá, UTC-5) · ${_fechaBog}. USÁ SIEMPRE esta hora y fecha LOCAL para títulos/cortes/marcadores y horarios — NUNCA muestres UTC. Solo para horas dichas en OTRAS zonas usá la tabla de conversión del system prompt.`);
   lines.push("");
 
   if (args.req.report_kind === "eod_summary") {
