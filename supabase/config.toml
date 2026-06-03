@@ -39,3 +39,6 @@ verify_jwt = false  # invocada por pg_cron; check interno de X-Cron-Token
 
 [functions.whatsapp-ingest]
 verify_jwt = false  # webhook de Evolution (sin JWT) — NO cambiar o el bot deja de recibir mensajes
+
+[functions.wa-instance-manage]
+verify_jwt = false  # proxy admin del gateway (auth propia: getUser + has_permission)
