@@ -602,6 +602,54 @@ async function checkCommitmentFollowups(
     const msg = `@${closerName}, @${handle} lleva ${daysSince} días confirmada sin pasar a *Completada*. ¿Cómo va la firma?`;
     await sendFollowup(sb, group, `confirmada_stale:${cc.id}`, msg);
   }
+
+  // ── Regla 6: monetization_followup ──────────────────────────────────
+  // Oportunidades de venta de productos (monetization_opportunities) que el
+  // equipo cargó en la pantalla de Maven y dejó con un next_followup_at ya
+  // vencido. Pedido de Alvaro: que el bot "persiga" esos seguimientos sin que
+  // se lo recuerden. Solo las ABIERTAS (no won/lost) y CON dueño (assigned_to)
+  // → ping dirigido a quien la trabaja. Dedup: recentlyMentioned por handle +
+  // sendFollowup (1 ping/oportunidad/día mientras siga vencida).
+  // DEFENSIVO: si la migración de la tabla aún no está aplicada en prod,
+  // `oppsErr` viene set y la regla queda inerte (no rompe el tick); se activa
+  // sola cuando la tabla exista.
+  const PRODUCT_ES: Record<string, string> = {
+    piclink: "Piclink", content_protector: "Content Protector", blu: "Blu",
+    exchange: "Exchange", agency: "Agencia", other: "el producto",
+  };
+  const STAGE_ES: Record<string, string> = {
+    interested: "interesada", offered: "con oferta hecha", negotiating: "en negociación",
+  };
+  const { data: opps, error: oppsErr } = await sb
+    .from("monetization_opportunities")
+    .select("id, creator_handle, product, stage, assigned_to, next_followup_at")
+    .eq("tenant_id", group.tenant_id)
+    .in("stage", ["interested", "offered", "negotiating"])
+    .not("assigned_to", "is", null)
+    .not("next_followup_at", "is", null)
+    .lte("next_followup_at", new Date(now).toISOString());
+  for (const o of (oppsErr ? [] : (opps ?? [])) as Array<{
+    id: string;
+    creator_handle: string | null;
+    product: string;
+    stage: string;
+    assigned_to: string | null;
+    next_followup_at: string | null;
+  }>) {
+    if (!o.assigned_to) continue;
+    const handle = (o.creator_handle ?? "").replace(/^@/, "") || "(sin handle)";
+    if (await recentlyMentioned(sb, group.id, handle, 24)) continue;
+    const { data: prof } = await sb
+      .from("profiles")
+      .select("whatsapp_push_name, full_name")
+      .eq("id", o.assigned_to)
+      .maybeSingle();
+    const who = prof?.whatsapp_push_name ?? prof?.full_name?.split(" ")[0] ?? "equipo";
+    const prod = PRODUCT_ES[o.product] ?? o.product;
+    const stageEs = STAGE_ES[o.stage] ?? o.stage;
+    const msg = `@${who}, seguimiento de monetización: @${handle} quedó *${stageEs}* con ${prod} y ya toca volver a tocarla. ¿La avanzás hoy?`;
+    await sendFollowup(sb, group, `monetization_followup:${o.id}`, msg);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
