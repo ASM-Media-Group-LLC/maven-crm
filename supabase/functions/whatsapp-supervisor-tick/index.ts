@@ -210,6 +210,34 @@ async function checkLlg(
 // ─────────────────────────────────────────────────────────────────────────
 // Closer checker — preguntas abiertas (sin meta numérica fija)
 // ─────────────────────────────────────────────────────────────────────────
+// Top leads sin asignar (closer_creators stage='Nuevo') rankeados por calidad —
+// para que el supervisor RECOMIENDE cuáles agarrar a un closer sin leads, en vez
+// de solo preguntar. Mismo criterio que get_unassigned_leads del agent.
+async function topUnassignedLeads(
+  sb: SupabaseClient,
+  limit: number,
+): Promise<Array<{ handle: string; quality: string }>> {
+  const { data: rows } = await sb
+    .from("closer_creators")
+    .select("instagram_handle, category, estimated_monetization")
+    .eq("stage", "Nuevo")
+    .limit(500);
+  const RANK: Record<string, number> = { elite: 0, "a++": 0, "a+": 1, a: 2, "b+": 3, b: 4, "c+": 5, c: 6 };
+  const rankOf = (c: string | null) => {
+    const k = String(c ?? "").trim().toLowerCase();
+    return k in RANK ? RANK[k] : 8;
+  };
+  return ((rows ?? []) as Array<{ instagram_handle: string | null; category: string | null; estimated_monetization: number | null }>)
+    .slice()
+    .sort((a, b) => {
+      const ra = rankOf(a.category), rb = rankOf(b.category);
+      if (ra !== rb) return ra - rb;
+      return Number(b.estimated_monetization ?? 0) - Number(a.estimated_monetization ?? 0);
+    })
+    .slice(0, limit)
+    .map((r) => ({ handle: r.instagram_handle ?? "(sin handle)", quality: r.category ?? "?" }));
+}
+
 async function checkCloser(
   sb: SupabaseClient,
   user: UserSchedule,
@@ -243,7 +271,18 @@ async function checkCloser(
     const stats = await getCloserStatsToday(sb, user.user_id, now.date);
     if (stats.leads_assigned === 0) {
       const ok = await tryClaim(sb, user.user_id, "closer_no_leads_2h", now.date, stats);
-      if (ok) await sendToGroup(sb, group.id, `@${mention} 0 leads nuevos asignados hoy. ¿Algo pendiente del pipeline?`);
+      if (ok) {
+        // Estratega, no notetaker: en vez de solo preguntar "¿algo pendiente?",
+        // recomendá leads de alta calidad sin asignar para que los agarre y les
+        // dé seguimiento hoy.
+        const top = await topUnassignedLeads(sb, 4);
+        const msg = top.length > 0
+          ? `@${mention} venís sin leads asignados hoy. Sin tomar, de mayor calidad: ${
+            top.map((l) => `@${l.handle} (${l.quality})`).join(", ")
+          } — agarrá 2-3 y arrancales el seguimiento hoy. ¿Cuáles te asignás?`
+          : `@${mention} venís sin leads asignados hoy y el pool de Nuevas está vacío. ¿Reactivamos algún seguimiento pendiente o conseguimos más leads?`;
+        await sendToGroup(sb, group.id, msg);
+      }
     }
   }
 }

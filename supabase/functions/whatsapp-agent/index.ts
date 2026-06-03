@@ -58,6 +58,7 @@ Estilo:
 - Usás bullets cuando la info lo amerita
 - Si necesitás datos, llamás las tools — no inventes números
 - Si una pregunta no la podés responder con tus tools, decílo y proponé una alternativa
+- CÓMO HABLÁS AL GRUPO: lo ÚNICO que llega al grupo es lo que mandás con la tool reply_to_group. Tu razonamiento/análisis —incluido decidir si vale la pena responder— es INTERNO y NUNCA se publica. Para responder → llamá reply_to_group con el mensaje YA pulido. Si concluís que no hay nada que aportar → NO llames ninguna tool y terminá (silencio real). PROHIBIDO escribir tu deliberación como si fuera un mensaje (ej. "esto no requiere respuesta, silencio total" JAMÁS va al grupo).
 
 CONFIANZA CALIBRADA — NO ALUCINAR (regla crítica):
 - Cuando armás respuestas, distinguí TRES tipos de información:
@@ -3754,28 +3755,14 @@ async function runAgent(req: AgentRequest): Promise<{
     }
 
     const toolUses = data.content.filter((b) => b.type === "tool_use");
-    const replyText = data.content
-      .filter((b) => b.type === "text")
-      .map((b) => String(b.text ?? ""))
-      .join("\n")
-      .trim();
 
     if (toolUses.length === 0) {
-      // No tools llamadas. En modo mention/manual: si el modelo escribió texto
-      // y olvidó llamar reply_to_group, lo mandamos nosotros (fallback).
-      // En modo auto: NO hay fallback — si el agent decidió quedarse callado
-      // (no llamó reply_to_group), lo respetamos. Esto evita que el bot
-      // hable en el grupo cuando solo razonó internamente "esto no amerita".
-      if (replyText && req.invoked_by !== "auto") {
-        await executeTool("reply_to_group", { body: replyText }, {
-          groupId: group.id,
-          tenantId: group.tenant_id,
-          isOwner: senderCtx.isOwner,
-          senderUserId: senderCtx.senderUserId,
-          messageId: senderCtx.messageId,
-        });
-        finalReply = replyText;
-      }
+      // El modelo no llamó ninguna tool. Su texto/razonamiento suelto NUNCA se
+      // publica (ni en mention ni en auto): para hablarle al grupo TIENE que
+      // llamar reply_to_group explícitamente. Antes un "fallback" publicaba ese
+      // texto en mention — pero terminaba publicando el META-RAZONAMIENTO del
+      // bot (ej. "esto no requiere respuesta, silencio total"). Si el modelo no
+      // llamó reply_to_group, respetamos su silencio.
       messages.push({ role: "assistant", content: data.content });
       break;
     }
