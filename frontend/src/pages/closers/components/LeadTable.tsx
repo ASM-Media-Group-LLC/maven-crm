@@ -1,7 +1,9 @@
 import { useState, memo, useMemo, useCallback } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
-import { useUserRole } from "@/hooks/useUserRole";
-import { maskPhone } from "@/lib/country-utils";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useMyWaChannels } from "@/hooks/useMyWaChannels";
 import PlatformSalesModal from "./PlatformSalesModal";
 import { LEADGEN_COMPANIES } from "@/pages/leadgen/leadgenConstants";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
@@ -16,7 +18,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ExternalLink, Phone, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown } from "lucide-react";
+import { MoreHorizontal, ExternalLink, MessageCircle, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown } from "lucide-react";
 import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, isContactOverdue, needsContactDecision, getNextContactDate } from "../hooks/useCloserLeads";
 import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
@@ -57,7 +59,7 @@ const stageVariant = (s: string): "primary-soft" | "secondary-soft" | "success-s
   }
 };
 
-const cleanPhoneForWhatsApp = (phone: string) => phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
+// (cleanPhoneForWhatsApp removido: el número ya no va al cliente; se mensajea vía Maven.)
 
 // ─── Inline editable number cell ───
 const InlineNumber = memo(({ value, onSave, prefix = "", suffix = "", disabled }: { value: number | null; onSave: (v: number) => void; prefix?: string; suffix?: string; disabled?: boolean }) => {
@@ -360,20 +362,56 @@ const ContactCountCell = ({ creatorId, count }: { creatorId: string; count: numb
   );
 };
 
-const PhoneWhatsApp = ({ phone, resolvedPhone }: { phone: string | null; resolvedPhone: string | null }) => {
-  const { isAdmin } = useUserRole();
-  if (!phone) return <span className="text-muted-foreground">—</span>;
-  const shown = isAdmin ? phone : maskPhone(phone);
-  // No-admin: enmascarado y NO clickable (el número no debe ir ni en el href de wa.me).
-  if (!resolvedPhone || !isAdmin) {
-    return <span className="text-muted-foreground text-sm">{shown}</span>;
+// Botón "WhatsApp" — mensajea al lead DESDE Maven (no abre el WhatsApp personal).
+// Si el closer atiende 1 canal, abre el inbox directo en la conversación con el lead;
+// si atiende varios, despliega para elegir desde cuál. El número queda oculto (privacidad).
+const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string; source: "closer" | "leadgen"; resolvedPhone: string | null }) => {
+  const { data: channels = [] } = useMyWaChannels();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const open = async (channelId: string) => {
+    setBusy(true);
+    const { data, error } = await supabase.functions.invoke("wa-inbox-open", {
+      body: { channel_id: channelId, closer_creator_id: source === "closer" ? leadId : null, phone: resolvedPhone },
+    });
+    setBusy(false);
+    if (error || !data?.ok) {
+      toast({ title: "No se pudo abrir el chat", description: data?.error || error?.message || "Error", variant: "destructive" });
+      return;
+    }
+    navigate(`/inbox?c=${data.conversation_id}`);
+  };
+
+  if (!resolvedPhone) return <span className="text-muted-foreground text-xs">—</span>;
+  if (channels.length === 0) {
+    return <span className="text-muted-foreground text-xs" title="No tenés canales de WhatsApp asignados">WhatsApp</span>;
+  }
+  if (channels.length === 1) {
+    return (
+      <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-emerald-600 hover:text-emerald-700" disabled={busy} onClick={() => open(channels[0].id)}>
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />} WhatsApp
+      </Button>
+    );
   }
   return (
-    <a href={`https://wa.me/${cleanPhoneForWhatsApp(resolvedPhone)}`} target="_blank" rel="noopener noreferrer"
-      className="flex items-center gap-1 text-primary hover:underline">
-      <Phone className="h-3 w-3" />
-      <span className="truncate max-w-[100px]">{shown}</span>
-    </a>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-emerald-600 hover:text-emerald-700" disabled={busy}>
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />} WhatsApp <ChevronDown className="h-3 w-3" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <div className="px-2 py-1.5 text-xs text-muted-foreground">¿Desde qué canal?</div>
+        {channels.map((ch) => (
+          <DropdownMenuItem key={ch.id} onClick={() => open(ch.id)}>
+            {ch.label || ch.evolution_instance}
+            <span className="ml-1.5 text-[10px] text-muted-foreground">{ch.department}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
@@ -515,7 +553,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                         <AlertTriangle className="h-3 w-3" /> Decidir
                       </Badge>
                     )}
-                    {c.phone && <PhoneWhatsApp phone={c.phone} resolvedPhone={c.resolved_whatsapp_phone} />}
+                    {c.phone && <LeadWhatsappButton leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} />}
                   </div>
                 </div>
               );
@@ -694,7 +732,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 </p>
               )}
             </TableCell>
-            <TableCell><PhoneWhatsApp phone={c.phone} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
+            <TableCell><LeadWhatsappButton leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
             <TableCell className="text-sm">
               {c.onlyfans_url ? (
                 <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
@@ -765,7 +803,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
               <TableCell>{igLink}</TableCell>
               <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
-              <TableCell><PhoneWhatsApp phone={c.phone} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
+              <TableCell><LeadWhatsappButton leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
               <TableCell>
                 <InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} />
               </TableCell>
@@ -942,7 +980,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>
               <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v)} disabled={!canEditStatus} />
             </TableCell>
-            <TableCell><PhoneWhatsApp phone={c.phone} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
+            <TableCell><LeadWhatsappButton leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
             <TableCell className="text-sm">
               {c.onlyfans_url ? (
                 <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
@@ -994,7 +1032,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>
               <ContactCountCell creatorId={c.id} count={c.contact_count} />
             </TableCell>
-            <TableCell><PhoneWhatsApp phone={c.phone} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
+            <TableCell><LeadWhatsappButton leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
             <TableCell className="text-sm">
               {c.onlyfans_url ? (
                 <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"

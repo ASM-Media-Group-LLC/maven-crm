@@ -12,7 +12,7 @@
 // tipos generados de Supabase.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -76,6 +76,12 @@ const InboxPage = () => {
   const { toast } = useToast();
   const { canAccess } = usePermissions();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  // Deep-link: /inbox?c=<conversationId> (ej. desde el botón WhatsApp de Closers) abre directo esa conversación.
+  useEffect(() => {
+    const c = searchParams.get("c");
+    if (c) setSelectedId(c);
+  }, [searchParams]);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
