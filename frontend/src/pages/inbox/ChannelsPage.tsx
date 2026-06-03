@@ -26,7 +26,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Radio, Users, Plus, Loader2, Bot } from "lucide-react";
+import { Radio, Users, Plus, Loader2, Bot, ArrowLeft } from "lucide-react";
 import type { WaChannel, WaChannelDepartment, WaChannelType } from "./types";
 
 const DEPTS: { value: WaChannelDepartment; label: string }[] = [
@@ -114,6 +114,9 @@ const ChannelsPage = () => {
   return (
     <div className="space-y-4 px-6 py-5">
       <div className="flex items-center gap-2">
+        <Button asChild variant="ghost" size="icon" className="h-7 w-7 -ml-1" title="Volver a la bandeja">
+          <Link to="/inbox"><ArrowLeft className="h-4 w-4" /></Link>
+        </Button>
         <Radio className="h-5 w-5 text-primary" />
         <div className="flex-1">
           <h1 className="text-base font-semibold leading-tight">Canales del inbox</h1>

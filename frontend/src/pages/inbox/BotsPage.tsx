@@ -23,7 +23,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Bot, Plus, Loader2, Radio } from "lucide-react";
+import { Bot, Plus, Loader2, Radio, ArrowLeft } from "lucide-react";
 
 const DEPTS = [
   { value: "sales", label: "Ventas / Marketing" },
@@ -107,6 +107,9 @@ const BotsPage = () => {
   return (
     <div className="space-y-4 px-6 py-5">
       <div className="flex items-center gap-2">
+        <Button asChild variant="ghost" size="icon" className="h-7 w-7 -ml-1" title="Volver a la bandeja">
+          <Link to="/inbox"><ArrowLeft className="h-4 w-4" /></Link>
+        </Button>
         <Bot className="h-5 w-5 text-primary" />
         <div className="flex-1">
           <h1 className="text-base font-semibold leading-tight">Bots de WhatsApp</h1>

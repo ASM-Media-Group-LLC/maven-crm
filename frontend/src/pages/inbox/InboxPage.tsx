@@ -250,12 +250,16 @@ const InboxPage = () => {
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
           <MessageSquare className="h-5 w-5 text-primary" />
           <h1 className="text-base font-semibold">Bandeja</h1>
-          <Button asChild variant="ghost" size="icon" className="ml-auto h-7 w-7" title="Gestionar canales">
-            <Link to="/inbox/canales"><Radio className="h-4 w-4" /></Link>
-          </Button>
-          <Badge variant="secondary-soft" className="text-[10px]">
-            {convLoading ? "…" : conversations.length}
-          </Badge>
+          <div className="ml-auto flex items-center gap-2">
+            {canAccess("WhatsApp", "Canales") && (
+              <Button asChild variant="ghost" size="icon" className="h-7 w-7" title="Gestionar canales">
+                <Link to="/inbox/canales"><Radio className="h-4 w-4" /></Link>
+              </Button>
+            )}
+            <Badge variant="secondary-soft" className="text-[10px]">
+              {convLoading ? "…" : conversations.length}
+            </Badge>
+          </div>
         </div>
         <div className="relative px-3 py-2">
           <Search className="absolute left-5 top-4 h-4 w-4 text-muted-foreground" />
