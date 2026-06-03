@@ -65,7 +65,12 @@ serve(async (req) => {
     .from("wa_channel_members")
     .select("channel_id")
     .eq("channel_id", channelId).eq("user_id", userId).maybeSingle();
-  if (!membership) return json({ ok: false, error: "not_channel_member" }, 403);
+  if (!membership) {
+    // Los admins ven/usan TODOS los canales (igual que la RLS de wa_channels) y no
+    // figuran como members → si no es member, recién ahí chequeamos admin.
+    const { data: isAdmin } = await sb.rpc("is_in_role_group", { _user_id: userId, _group: "admin" });
+    if (!isAdmin) return json({ ok: false, error: "not_channel_member" }, 403);
+  }
 
   // ── Resolver teléfono del destino ──────────────────────────────────────────
   let e164: string | null = null;
