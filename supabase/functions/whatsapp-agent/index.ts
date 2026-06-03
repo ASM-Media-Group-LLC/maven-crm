@@ -44,7 +44,14 @@ function pickModel(invokedBy: string | undefined, hasReportKind: boolean): strin
 const MAX_ITERATIONS = 8;
 const MAX_WALL_MS = 30_000;
 
-const SYSTEM_PROMPT = `Sos Maven Asistente, un asistente IA que vive en grupos de WhatsApp de equipos de agencias de OnlyFans (closers, LLGs, owners). Tu trabajo es:
+// ── MOTOR (reutilizable por TODO bot) ──────────────────────────────────────
+// Cómo piensa el asistente: rol, estilo, no-alucinar, cómo habla, zonas
+// horarias, reagendamientos. Heredado por cualquier bot (Ventas, Managers…).
+// Fase 1 del plan de plataforma multi-bot — slice 1 (núcleo del motor).
+// PENDIENTE (slice 2): mover acá las secciones-motor que aún quedan en el
+// Manual (audiencia/quién-escribe, regla de oro de consultar tools, dueño,
+// memoria/reglas persistentes, mecánica de auto-listening).
+const MOTOR_PROMPT = `Sos Maven Asistente, un asistente IA que vive en grupos de WhatsApp de equipos de agencias de OnlyFans (closers, LLGs, owners). Tu trabajo es:
 
 1. RESPONDER preguntas del equipo sobre leads, casos, performance, conversaciones pasadas
 2. RECORDARLES compromisos pendientes ("¿se hizo X?")
@@ -129,9 +136,12 @@ Si NO ESTÁS SEGURO de la zona (ej. alguien dice "9PM Centroamérica" — Centro
 REAGENDAMIENTOS — DETECTAR CONFLICTOS DE HORA/FECHA:
 - Si en el contexto reciente (o en la historia del grupo) hay un mensaje previo agendando algo a hora X para un handle, y AHORA el mismo handle aparece con hora Y, eso es un reagendamiento.
 - Aclaralo: "@handle estaba para hoy 7PM (Julieth lo había agendado ayer); Miguel acaba de reagendarla a 9PM Miami (8PM Bogotá). Confirmar el nuevo horario."
-- Cuando hay un reagendamiento entre 2 closers distintos (Julieth → Miguel), aclaralo también: "Pasó de Julieth a Miguel — ¿se coordinaron, o hay duplicación?".
+- Cuando hay un reagendamiento entre 2 closers distintos (Julieth → Miguel), aclaralo también: "Pasó de Julieth a Miguel — ¿se coordinaron, o hay duplicación?".`;
 
-VOCABULARIO DEL DOMINIO (entender bien antes de actuar):
+// ── MANUAL DE VENTAS (específico del depto) ─────────────────────────────────
+// Vocabulario, pipeline, reportes, EOD, apertura, pitches, lead intelligence.
+// En Fase 3 esto saldrá de la DB (configurable por bot); por ahora, en código.
+const MANUAL_VENTAS = `VOCABULARIO DEL DOMINIO (entender bien antes de actuar):
 - "**Contactados**" / "**escritos**" / "**números contactados**" → modelos a las que el LLG escribió DMs hoy. Cuenta = N modelos.
 - "**Respuestas**" → modelos que respondieron al DM. Subconjunto de contactados.
 - "**Números obtenidos**" → modelos que le pasaron el teléfono al LLG. La meta diaria del LLG (3 lun-vie, 2 sáb).
@@ -862,6 +872,11 @@ REGLAS DE ESTILO PARA LEAD INTELLIGENCE:
 - Sé conciso: "Daniel, larola_a ya estuvo: la rechazó Miguel el 25/5 porque quería ser cantante. Saltala." es mejor que un párrafo.
 - Si todas las tools devolvieron datos → presentá hechos, no inferencias.
 - Si las tools devolvieron poco/nada → reconocelo y proponé pasos concretos (cargar en Maven, esperar scrape, preguntar al equipo).`;
+
+// El system prompt final = MOTOR (reutilizable) + MANUAL del depto. Mismo texto
+// que el monolito anterior → comportamiento idéntico. En Fase 3, el Manual se
+// reemplazará por el del bot que corresponda (Ventas, Managers, …) desde la DB.
+const SYSTEM_PROMPT = `${MOTOR_PROMPT}\n\n${MANUAL_VENTAS}`;
 
 interface AgentRequest {
   // Modo conversación: el bot responde a un mensaje específico del grupo
@@ -3641,12 +3656,36 @@ async function runAgent(req: AgentRequest): Promise<{
 
   const { data: group } = await sb
     .from("whatsapp_groups")
-    .select("id, tenant_id, name, timezone, active, bot_enabled, bot_persona")
+    .select("id, tenant_id, name, timezone, active, bot_enabled, bot_persona, wa_bot_id")
     .eq("id", groupId)
     .single();
 
   if (!group) return { ok: false, error: "group_not_found" };
   if (!group.active) return { ok: false, error: "group_inactive" };
+
+  // Bot config (Fase 3): si el grupo tiene un bot asignado (wa_bot_id), cargamos
+  // su MANUAL (manual_prompt), LLAVERO (tool_allowlist/denylist) y modelo desde
+  // wa_bots (vía service_role). Sin bot asignado — o si el bot está inactivo —
+  // botCfg = null y todo cae al comportamiento legacy (SYSTEM_PROMPT completo +
+  // bot_persona, todas las tools, pickModel).
+  let botCfg:
+    | { manualPrompt: string | null; model: string | null; allow: string[] | null; deny: string[] | null }
+    | null = null;
+  if (group.wa_bot_id) {
+    const { data: bot } = await sb
+      .from("wa_bots")
+      .select("manual_prompt, model, tool_allowlist, tool_denylist, active")
+      .eq("id", group.wa_bot_id)
+      .single();
+    if (bot && bot.active) {
+      botCfg = {
+        manualPrompt: bot.manual_prompt ?? null,
+        model: bot.model ?? null,
+        allow: Array.isArray(bot.tool_allowlist) ? bot.tool_allowlist as string[] : null,
+        deny: Array.isArray(bot.tool_denylist) ? bot.tool_denylist as string[] : null,
+      };
+    }
+  }
 
   await logEvent(sb, {
     tenantId: group.tenant_id,
@@ -3668,9 +3707,15 @@ async function runAgent(req: AgentRequest): Promise<{
   // haga nada extra.
   const activeRules = await loadActiveRules(group.id);
 
-  const systemPromptBase = group.bot_persona
-    ? `${SYSTEM_PROMPT}\n\nPersonalización del grupo:\n${group.bot_persona}`
+  // Prompt = MOTOR (código) + MANUAL. Con bot asignado, el MANUAL sale de la DB
+  // (botCfg.manualPrompt); si está vacío, cae al MANUAL_VENTAS de código. Sin bot
+  // asignado, SYSTEM_PROMPT (= MOTOR + MANUAL_VENTAS) como siempre.
+  const enginePrompt = botCfg
+    ? `${MOTOR_PROMPT}\n\n${botCfg.manualPrompt ?? MANUAL_VENTAS}`
     : SYSTEM_PROMPT;
+  const systemPromptBase = group.bot_persona
+    ? `${enginePrompt}\n\nPersonalización del grupo:\n${group.bot_persona}`
+    : enginePrompt;
   const systemPrompt = activeRules.length > 0
     ? `${systemPromptBase}\n\nREGLAS PERSISTENTES DEL OWNER (este grupo):\n${
         activeRules.map((r, i) => `${i + 1}. [id=${r.id}] ${r.rule_text}`).join("\n")
@@ -3695,7 +3740,20 @@ async function runAgent(req: AgentRequest): Promise<{
   let iter = 0;
   const totalUsage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
 
-  const modelToUse = pickModel(req.invoked_by, !!req.report_kind);
+  // Modelo: el del bot si lo define; si no, el router por defecto.
+  const modelToUse = botCfg?.model ?? pickModel(req.invoked_by, !!req.report_kind);
+
+  // LLAVERO: el modelo solo "ve" las tools que le mandamos → filtrar acá es la
+  // garantía estructural de acceso. Sin bot o sin allowlist, van todas; la
+  // denylist (si hay) se resta al final.
+  const activeTools = (() => {
+    if (!botCfg) return TOOLS;
+    const { allow, deny } = botCfg;
+    let t = TOOLS;
+    if (allow) t = t.filter((tool) => allow.includes((tool as { name: string }).name));
+    if (deny) t = t.filter((tool) => !deny.includes((tool as { name: string }).name));
+    return t;
+  })();
 
   for (; iter < MAX_ITERATIONS; iter += 1) {
     if (Date.now() - startedAt > MAX_WALL_MS) break;
@@ -3722,12 +3780,12 @@ async function runAgent(req: AgentRequest): Promise<{
     const systemWithCache = [
       { type: "text", text: systemPrompt, cache_control: { type: "ephemeral", ttl: "1h" } },
     ];
-    const toolsWithCache = TOOLS.length > 0
+    const toolsWithCache = activeTools.length > 0
       ? [
-          ...TOOLS.slice(0, -1),
-          { ...TOOLS[TOOLS.length - 1], cache_control: { type: "ephemeral", ttl: "1h" } },
+          ...activeTools.slice(0, -1),
+          { ...activeTools[activeTools.length - 1], cache_control: { type: "ephemeral", ttl: "1h" } },
         ]
-      : TOOLS;
+      : activeTools;
 
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
