@@ -64,9 +64,14 @@ export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
     if (!file) return;
     setBusy(true);
     try {
-      const webp = await toStickerWebp(file);
-      const path = `wa-stickers/${crypto.randomUUID()}.webp`;
-      const up = await supabase.storage.from(BUCKET).upload(path, webp, { contentType: "image/webp", upsert: false });
+      // webp (sticker) y gif ya pueden ser ANIMADOS → subir tal cual (canvas los
+      // aplanaría). PNG/JPG → normalizar a webp 512×512. El gif lo convierte a webp
+      // animado el gateway al enviar.
+      const keepAsIs = file.type === "image/webp" || file.type === "image/gif";
+      const blob: Blob = keepAsIs ? file : await toStickerWebp(file);
+      const ext = file.type === "image/gif" ? "gif" : "webp";
+      const path = `wa-stickers/${crypto.randomUUID()}.${ext}`;
+      const up = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: keepAsIs ? file.type : "image/webp", upsert: false });
       if (up.error) throw up.error;
       const ins = await (supabase as any).from("wa_stickers").insert({ storage_path: path });
       if (ins.error) throw ins.error;

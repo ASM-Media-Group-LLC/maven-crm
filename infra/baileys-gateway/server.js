@@ -847,6 +847,28 @@ function transcodeToOggOpus(inputBuffer) {
   });
 }
 
+// Convierte un GIF a webp ANIMADO (formato de sticker animado de WhatsApp) con
+// ffmpeg — escala a 512px máx y loop infinito. Rechaza si ffmpeg falla → fallback.
+function gifToAnimatedWebp(inputBuffer) {
+  return new Promise((resolve, reject) => {
+    const args = ['-hide_banner', '-loglevel', 'error', '-f', 'gif', '-i', 'pipe:0',
+      '-vcodec', 'libwebp', '-lossless', '0', '-q:v', '70', '-loop', '0', '-an', '-vsync', '0',
+      '-filter:v', 'scale=512:512:force_original_aspect_ratio=decrease', '-f', 'webp', 'pipe:1'];
+    let ff;
+    try { ff = spawn('ffmpeg', args); } catch (e) { return reject(e); }
+    const out = []; const err = [];
+    ff.stdout.on('data', (d) => out.push(d));
+    ff.stderr.on('data', (d) => err.push(d));
+    ff.on('error', reject);
+    ff.on('close', (code) => {
+      if (code === 0 && out.length) resolve(Buffer.concat(out));
+      else reject(new Error('ffmpeg webp exit ' + code + ': ' + Buffer.concat(err).toString().slice(0, 200)));
+    });
+    ff.stdin.on('error', () => {});
+    ff.stdin.end(inputBuffer);
+  });
+}
+
 // Enviar media (imagen/audio/video/documento) por URL. El caller (edge function
 // wa-inbox-send-media) sube el archivo a Storage y nos pasa una URL firmada;
 // Baileys la descarga y la manda. Para notas de voz: mediatype=audio + ptt=true.
@@ -895,7 +917,20 @@ app.post('/message/sendMedia/:instance', async (req, res) => {
       }
     }
     else if (mediatype === 'gif') content = { video: { url }, gifPlayback: true, caption };
-    else if (mediatype === 'sticker') content = { sticker: { url } };
+    else if (mediatype === 'sticker') {
+      // WhatsApp solo acepta WEBP como sticker. Si llega un GIF, lo convertimos a
+      // webp ANIMADO con ffmpeg; si ya es webp/imagen, lo mandamos por URL.
+      if (/\.gif(\?|$)/i.test(url) || (mimetype && mimetype.includes('gif'))) {
+        try {
+          const resp = await fetch(url);
+          if (!resp.ok) throw new Error('fetch ' + resp.status);
+          const webp = await gifToAnimatedWebp(Buffer.from(await resp.arrayBuffer()));
+          content = { sticker: webp };
+        } catch (e) { logger.error({ err: e.message }, 'gif->webp sticker failed'); content = { sticker: { url } }; }
+      } else {
+        content = { sticker: { url } };
+      }
+    }
     else content = { document: { url }, fileName: fileName || 'archivo', mimetype: mimetype || 'application/octet-stream', caption };
 
     const result = await s.sock.sendMessage(jid, content);
