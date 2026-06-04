@@ -18,6 +18,8 @@
 #
 # ENV VARS REQUERIDAS EN DOKPLOY (tab Environment):
 #   EVOLUTION_API_KEY -- la misma que ya estaba, la usamos como API_KEY del gateway
+#   MANAGER_PASSWORD  -- contraseña del login del dashboard /manager (opcional; si
+#                        falta, el dashboard queda público sin pedir login)
 #
 # POST-DEPLOY:
 #   1. Esperar a que el container este healthy (~30s).
@@ -45,6 +47,9 @@ services:
       INSTANCE_NAME: maven-bot
       LOG_LEVEL: info
       AUTH_DIR: /data/auth
+      # Password del login del dashboard /manager. Toma la env var del mismo nombre
+      # del tab Environment de Dokploy. Si queda vacía, el login se desactiva.
+      MANAGER_PASSWORD: ${MANAGER_PASSWORD}
     expose:
       - "8080"
     volumes:
