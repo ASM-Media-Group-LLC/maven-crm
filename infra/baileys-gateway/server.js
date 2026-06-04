@@ -112,10 +112,6 @@ function sessionFromReq(req) {
 
 const RECENT_MAX = 30;
 
-// DEBUG temporal (@lid → número): guarda el último mensaje entrante COMPLETO
-// para diagnosticar si Baileys provee el teléfono real detrás de un @lid.
-let lastInboundFull = null;
-
 function pushRecent(event, s = state) {
   s.recentEvents.unshift({ ...event, at: new Date().toISOString() });
   if (s.recentEvents.length > RECENT_MAX) s.recentEvents.length = RECENT_MAX;
@@ -216,7 +212,6 @@ async function startSocket(instanceName = INSTANCE_NAME) {
     for (const m of messages) {
       // Tracking: contamos solo mensajes externos (no echo de nuestros sends).
       if (!m.key?.fromMe) {
-        lastInboundFull = { instance: s.instanceName, key: m.key, pushName: m.pushName, verifiedBizName: m.verifiedBizName ?? null };
         rolloverDayIfNeeded(s);
         s.msgsIn += 1;
         s.msgsInToday += 1;
@@ -413,11 +408,6 @@ app.get('/manager/stats', (_req, res) => {
 // preview limitado.
 app.get('/manager/recent', (_req, res) => {
   res.json({ events: state.recentEvents });
-});
-
-// DEBUG temporal (@lid): expone el key completo del último entrante.
-app.get('/manager/debug/lastinbound', (_req, res) => {
-  res.json(lastInboundFull || { empty: true });
 });
 
 // Lista PÚBLICA de líneas (instancias) para el dashboard — solo metadatos no
