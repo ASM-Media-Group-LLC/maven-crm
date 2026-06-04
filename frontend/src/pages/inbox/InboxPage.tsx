@@ -561,7 +561,7 @@ const InboxPage = () => {
                     <WaContactAvatar conversationId={c.id} name={contactLabel(c.contact)} className="h-11 w-11 text-sm" />
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <div className="flex items-center gap-2">
-                        <span className={cn("truncate text-sm", (c.unread_count ?? 0) > 0 ? "font-bold" : "font-medium")}>
+                        <span className={cn("min-w-0 flex-1 truncate text-sm", (c.unread_count ?? 0) > 0 ? "font-bold" : "font-medium")}>
                           {contactLabel(c.contact)}
                         </span>
                         <span className={cn(
@@ -572,7 +572,7 @@ const InboxPage = () => {
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={cn("truncate text-xs", (c.unread_count ?? 0) > 0 ? "font-medium text-foreground" : "text-muted-foreground")}>
+                        <span className={cn("min-w-0 flex-1 truncate text-xs", (c.unread_count ?? 0) > 0 ? "font-medium text-foreground" : "text-muted-foreground")}>
                           {c.last_message_preview ?? "—"}
                         </span>
                         {(c.unread_count ?? 0) > 0 && (
