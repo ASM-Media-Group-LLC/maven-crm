@@ -552,6 +552,9 @@ app.post('/message/sendText/:instance', async (req, res) => {
   // "@<phone_o_lid_sin_sufijo>" para que WhatsApp matchee y
   // renderice el ping.
   const mentions = Array.isArray(body.mentions) ? body.mentions : null;
+  // Responder/citar: { id, fromMe, text } del mensaje original. Armamos un quoted
+  // mínimo (key + conversation) — suficiente para que WhatsApp lo pinte como cita.
+  const quoted = body.quoted && body.quoted.id ? body.quoted : null;
 
   if (!number || !text) {
     return res.status(400).json({ error: 'missing_number_or_text' });
@@ -565,7 +568,16 @@ app.post('/message/sendText/:instance', async (req, res) => {
     if (mentions && mentions.length > 0) {
       payload.mentions = mentions;
     }
-    const result = await s.sock.sendMessage(jid, payload);
+    const options = {};
+    if (quoted) {
+      // Baileys: el mensaje citado va en el 3er arg (options.quoted), con un
+      // WAMessage mínimo (key + message.conversation).
+      options.quoted = {
+        key: { remoteJid: jid, fromMe: quoted.fromMe === true, id: String(quoted.id) },
+        message: { conversation: String(quoted.text || '') },
+      };
+    }
+    const result = await s.sock.sendMessage(jid, payload, options);
     rolloverDayIfNeeded(s);
     s.msgsOut += 1;
     s.msgsOutToday += 1;

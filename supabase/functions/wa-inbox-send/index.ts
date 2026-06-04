@@ -36,12 +36,15 @@ async function sendViaEvolution(
   toNumber: string,
   text: string,
   instance: string,
+  quoted?: { id: string; fromMe: boolean; text: string } | null,
 ): Promise<{ ok: boolean; externalId?: string; error?: string }> {
   if (!EVOLUTION_URL || !EVOLUTION_API_KEY) return { ok: false, error: "evolution_not_configured" };
   const url = `${EVOLUTION_URL.replace(/\/$/, "")}/message/sendText/${instance}`;
-  const payload = EVOLUTION_API_VERSION === "v2"
+  const base = EVOLUTION_API_VERSION === "v2"
     ? { number: toNumber, text }
     : { number: toNumber, options: { delay: 0, presence: "composing" }, textMessage: { text } };
+  // El gateway lee body.quoted aparte del wrapper de texto (v1/v2).
+  const payload = quoted ? { ...base, quoted } : base;
   try {
     const resp = await fetch(url, {
       method: "POST",
@@ -85,10 +88,11 @@ serve(async (req) => {
   if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
 
   // ── Input ──────────────────────────────────────────────────────────────────
-  let payload: { conversation_id?: string; body?: string } = {};
+  let payload: { conversation_id?: string; body?: string; reply_to_message_id?: string } = {};
   try { payload = await req.json(); } catch { /* */ }
   const conversationId = payload.conversation_id;
   const text = (payload.body ?? "").trim();
+  const replyToId = payload.reply_to_message_id;
   if (!conversationId || !text) return json({ ok: false, error: "missing_conversation_or_body" }, 400);
 
   // ── Resolver conversación → wa_jid del contacto + instancia del canal ───────
@@ -118,8 +122,26 @@ serve(async (req) => {
     if (ch?.evolution_instance) instance = ch.evolution_instance as string;
   }
 
+  // ── Responder/citar: resolver el mensaje original (external_id + autor + texto) ─
+  let quoted: { id: string; fromMe: boolean; text: string } | null = null;
+  if (replyToId) {
+    const { data: orig } = await (sb as any)
+      .from("wa_conversation_messages")
+      .select("external_id, direction, body, msg_type")
+      .eq("id", replyToId)
+      .eq("conversation_id", conversationId)
+      .maybeSingle();
+    if (orig?.external_id) {
+      quoted = {
+        id: orig.external_id as string,
+        fromMe: orig.direction === "out",
+        text: (orig.body as string | null) || `[${orig.msg_type}]`,
+      };
+    }
+  }
+
   // ── Enviar por Evolution (por la instancia del canal de la conversación) ────
-  const sent = await sendViaEvolution(toNumber, text, instance);
+  const sent = await sendViaEvolution(toNumber, text, instance, quoted);
   if (!sent.ok) return json({ ok: false, error: sent.error, target: toNumber }, 502);
 
   // ── Persistir el saliente + actualizar metadata ─────────────────────────────
@@ -136,6 +158,7 @@ serve(async (req) => {
       msg_type: "text",
       status: "sent",
       sent_at: nowIso,
+      reply_to_message_id: replyToId ?? null,
     })
     .select("id")
     .single();
