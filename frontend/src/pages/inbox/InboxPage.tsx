@@ -573,9 +573,11 @@ const InboxPage = () => {
                   {messages.map((m) => {
                     const isOut = m.direction === "out";
                     const isDeleted = m.msg_type === "deleted";
-                    const showBody =
-                      m.body || isDeleted ||
-                      !(m.media_url && isOut && (m.msg_type === "image" || m.msg_type === "audio"));
+                    const mediaShown = !!m.media_url && ["image", "sticker", "video", "audio", "document"].includes(m.msg_type);
+                    const bodyIsPlaceholder = !!m.body && /^\[[^\]]+\]$/.test(m.body.trim());
+                    const showBody = isDeleted
+                      ? true
+                      : (!mediaShown ? true : (!!m.body && !bodyIsPlaceholder && m.msg_type !== "document"));
                     const quoted = m.reply_to_message_id
                       ? messages.find((x) => x.id === m.reply_to_message_id) ?? null
                       : null;
@@ -602,11 +604,32 @@ const InboxPage = () => {
                                 </p>
                               </div>
                             )}
-                            {!isDeleted && m.media_url && isOut && m.msg_type === "image" && (
-                              <img src={m.media_url} alt="" className="mb-1 max-h-64 rounded-lg" />
+                            {!isDeleted && m.media_url && (m.msg_type === "image" || m.msg_type === "sticker") && (
+                              <img
+                                src={m.media_url}
+                                alt=""
+                                className={cn("mb-1 rounded-lg object-cover", m.msg_type === "sticker" ? "max-h-32" : "max-h-64")}
+                              />
                             )}
-                            {!isDeleted && m.media_url && isOut && m.msg_type === "audio" && (
+                            {!isDeleted && m.media_url && m.msg_type === "video" && (
+                              <video controls src={m.media_url} className="mb-1 max-h-64 rounded-lg" />
+                            )}
+                            {!isDeleted && m.media_url && m.msg_type === "audio" && (
                               <audio controls src={m.media_url} className="mb-1 w-56" />
+                            )}
+                            {!isDeleted && m.media_url && m.msg_type === "document" && (
+                              <a
+                                href={m.media_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={cn(
+                                  "mb-1 flex items-center gap-2 rounded-lg border px-2 py-1.5",
+                                  isOut ? "border-primary-foreground/30 hover:bg-black/10" : "hover:bg-muted",
+                                )}
+                              >
+                                <FileText className="h-4 w-4 shrink-0" />
+                                <span className="truncate text-xs">{m.body && !bodyIsPlaceholder ? m.body : "Documento"}</span>
+                              </a>
                             )}
                             {showBody && (
                               <p className={cn("whitespace-pre-wrap break-words", isDeleted && "italic opacity-80")}>

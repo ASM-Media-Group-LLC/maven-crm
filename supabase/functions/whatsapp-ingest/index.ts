@@ -310,6 +310,61 @@ const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech (inbox v1,
 // UI que lea estas tablas (Slice 4), no tiene efecto visible: solo puebla datos.
 // Escribe con service_role (bypassa RLS). El número crudo (phone_e164) solo se
 // deriva si el JID trae teléfono (<phone>@s.whatsapp.net); con @lid queda null.
+// Tipos de media → key del sub-mensaje Baileys + extensión por defecto.
+const MEDIA_SUBKEY: Record<string, string> = {
+  audio: "audioMessage", image: "imageMessage", video: "videoMessage",
+  document: "documentMessage", sticker: "stickerMessage",
+};
+const EXT_FALLBACK: Record<string, string> = {
+  audio: "ogg", image: "jpg", video: "mp4", document: "bin", sticker: "webp",
+};
+
+// downloadAndStoreInboundMedia — baja la media ENTRANTE desencriptada del gateway
+// (/media/download usa la mediaKey del propio mensaje, no la sesión), la sube a
+// Storage (creator-files/wa-inbound/...) y devuelve una URL firmada (1 año). La
+// "url" que trae WhatsApp está CIFRADA y caduca, por eso no sirve directo; el
+// sticker ni siquiera la trae. Best-effort: devuelve null ante cualquier fallo
+// (el mensaje queda con el placeholder "[tipo]", la ingesta no se rompe).
+async function downloadAndStoreInboundMedia(
+  sb: SupabaseClient,
+  conversationId: string,
+  msg: IncomingMessage,
+): Promise<string | null> {
+  const type = msg.msgType;
+  const subKey = MEDIA_SUBKEY[type];
+  if (!subKey) return null;
+  const rawObj = (msg.raw && typeof msg.raw === "object") ? (msg.raw as Record<string, unknown>) : {};
+  const data = rawObj.data as Record<string, unknown> | undefined;
+  const message = data?.message as Record<string, unknown> | undefined;
+  const sub = message?.[subKey] as Record<string, unknown> | undefined;
+  if (!sub || !sub.mediaKey || !(sub.url || sub.directPath)) return null;
+
+  const GW = Deno.env.get("WHATSAPP_EVOLUTION_URL");
+  const KEY = Deno.env.get("WHATSAPP_EVOLUTION_API_KEY");
+  if (!GW || !KEY) return null;
+  try {
+    const resp = await fetch(`${GW.replace(/\/$/, "")}/media/download`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": KEY },
+      body: JSON.stringify({ type, message: sub }),
+    });
+    if (!resp.ok) { console.warn("inbound media download:", resp.status); return null; }
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    if (!bytes.length) return null;
+    const mime = resp.headers.get("content-type") ?? undefined;
+    const ext = (mime?.split("/")[1]?.split(";")[0]?.replace(/[^a-z0-9]/gi, "")) || EXT_FALLBACK[type] || "bin";
+    const safeId = (msg.externalId ?? "m").replace(/[^a-zA-Z0-9]/g, "").slice(0, 40) || "m";
+    const path = `wa-inbound/${conversationId}/${safeId}.${ext}`;
+    const up = await sb.storage.from("creator-files").upload(path, bytes, { contentType: mime, upsert: true });
+    if (up.error) { console.warn("inbound media upload:", up.error.message); return null; }
+    const signed = await sb.storage.from("creator-files").createSignedUrl(path, 60 * 60 * 24 * 365);
+    return signed.data?.signedUrl ?? null;
+  } catch (e) {
+    console.warn("inbound media store:", (e as Error).message);
+    return null;
+  }
+}
+
 async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Promise<void> {
   if (!msg.isDirect || msg.isFromBot) return;
   const jid = msg.senderExternalId;
@@ -381,8 +436,9 @@ async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Pr
   }
 
   // 3) Mensaje: insert idempotente por (conversation_id, external_id).
+  const isMedia = ["audio", "image", "video", "document", "sticker"].includes(msg.msgType);
   const preview = (msg.body ?? `[${msg.msgType}]`).slice(0, 120);
-  const { error: mErr } = await sb
+  const { data: inserted, error: mErr } = await sb
     .from("wa_conversation_messages")
     .insert({
       tenant_id: TENANT_ID,
@@ -391,15 +447,26 @@ async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Pr
       external_id: msg.externalId,
       body: msg.body,
       msg_type: msg.msgType,
-      media_url: msg.mediaUrl ?? null,
+      media_url: null, // la media entrante se baja + sube a Storage en 3b
       sent_at: msg.sentAt,
-    });
+    })
+    .select("id")
+    .maybeSingle();
   if (mErr) {
     // 23505 = unique_violation -> el mensaje ya estaba guardado (idempotente).
     if (mErr.code !== "23505" && !mErr.message.includes("duplicate")) {
       console.warn("inbox message insert:", mErr.message);
     }
     return;
+  }
+
+  // 3b) Media entrante: bajar (desencriptar vía gateway) + subir a Storage +
+  //     setear media_url. Best-effort: si falla, queda el placeholder "[tipo]".
+  if (inserted?.id && isMedia) {
+    const storedUrl = await downloadAndStoreInboundMedia(sb, conversationId, msg);
+    if (storedUrl) {
+      await sb.from("wa_conversation_messages").update({ media_url: storedUrl }).eq("id", inserted.id);
+    }
   }
 
   // 4) Metadata + no-leídos (+1). Antes solo seteaba last_message_* y el contador
