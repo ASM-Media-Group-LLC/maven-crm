@@ -37,6 +37,7 @@ import { AudioRecorderBar } from "./AudioRecorder";
 import { GifPicker } from "./GifPicker";
 import { StickerPicker } from "./StickerPicker";
 import { MediaLightbox, type LightboxItem } from "./MediaLightbox";
+import { WaContactAvatar } from "./WaContactAvatar";
 
 interface ConvRow {
   id: string;
@@ -540,27 +541,30 @@ const InboxPage = () => {
                     type="button"
                     onClick={() => { setSelectedId(c.id); setCopilotInfo(null); }}
                     className={cn(
-                      "flex w-full flex-col gap-0.5 px-4 py-3 text-left hover:bg-muted/40",
+                      "flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40",
                       selectedId === c.id && "bg-muted/60",
                     )}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className={cn("truncate text-sm", (c.unread_count ?? 0) > 0 ? "font-bold" : "font-medium")}>
-                        {contactLabel(c.contact)}
-                      </span>
-                      <span className="ml-auto shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                        {fmtTime(c.last_message_at)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={cn("truncate text-xs", (c.unread_count ?? 0) > 0 ? "font-medium text-foreground" : "text-muted-foreground")}>
-                        {c.last_message_preview ?? "—"}
-                      </span>
-                      {(c.unread_count ?? 0) > 0 && (
-                        <span className="ml-auto grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
-                          {c.unread_count > 99 ? "99+" : c.unread_count}
+                    <WaContactAvatar conversationId={c.id} name={contactLabel(c.contact)} className="h-11 w-11 text-sm" />
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className={cn("truncate text-sm", (c.unread_count ?? 0) > 0 ? "font-bold" : "font-medium")}>
+                          {contactLabel(c.contact)}
                         </span>
-                      )}
+                        <span className="ml-auto shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                          {fmtTime(c.last_message_at)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={cn("truncate text-xs", (c.unread_count ?? 0) > 0 ? "font-medium text-foreground" : "text-muted-foreground")}>
+                          {c.last_message_preview ?? "—"}
+                        </span>
+                        {(c.unread_count ?? 0) > 0 && (
+                          <span className="ml-auto grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                            {c.unread_count > 99 ? "99+" : c.unread_count}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </button>
                 </li>
@@ -580,6 +584,7 @@ const InboxPage = () => {
         ) : (
           <>
             <header className="flex items-center gap-2 border-b border-border px-5 py-3">
+              <WaContactAvatar conversationId={selected.id} name={contactLabel(selected.contact)} className="h-9 w-9 text-xs" />
               <div className="min-w-0">
                 {isAdmin ? (
                   <button
