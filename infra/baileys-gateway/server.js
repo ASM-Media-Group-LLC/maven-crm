@@ -139,6 +139,8 @@ function createSession(instanceName) {
     recentEvents: [],
     // Config por línea (settings + webhook). Persistida en AUTH_DIR/<inst>/manager-config.json.
     config: { webhookUrl: null, rejectCalls: false, markRead: false, alwaysOnline: true, syncFullHistory: false },
+    // Tráfico por bucket de tiempo: hourly["YYYY-MM-DDTHH"]={in,out}, daily["YYYY-MM-DD"]={in,out}.
+    traffic: { hourly: {}, daily: {} },
   };
 }
 
@@ -166,6 +168,33 @@ function saveConfig(s) {
   } catch (e) { logger.warn({ err: e.message }, 'saveConfig failed'); }
 }
 
+// Métricas de tráfico (por hora y por día) — persistidas en el volumen.
+function bumpTraffic(s, dir) {
+  const now = new Date();
+  const hKey = now.toISOString().slice(0, 13); // YYYY-MM-DDTHH
+  const dKey = now.toISOString().slice(0, 10); // YYYY-MM-DD
+  const t = s.traffic || (s.traffic = { hourly: {}, daily: {} });
+  (t.hourly[hKey] || (t.hourly[hKey] = { in: 0, out: 0 }))[dir] += 1;
+  (t.daily[dKey] || (t.daily[dKey] = { in: 0, out: 0 }))[dir] += 1;
+  const cutH = new Date(now.getTime() - 48 * 3600 * 1000).toISOString().slice(0, 13);
+  for (const k of Object.keys(t.hourly)) if (k < cutH) delete t.hourly[k];
+  const cutD = new Date(now.getTime() - 60 * 86400 * 1000).toISOString().slice(0, 10);
+  for (const k of Object.keys(t.daily)) if (k < cutD) delete t.daily[k];
+}
+function loadMetrics(s) {
+  try {
+    const m = JSON.parse(fs.readFileSync(`${instanceDir(s.instanceName)}/metrics.json`, 'utf8'));
+    if (m && m.hourly && m.daily) s.traffic = m;
+  } catch (e) { /* sin métricas previas */ }
+}
+function saveMetrics(s) {
+  try {
+    const dir = instanceDir(s.instanceName);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(`${dir}/metrics.json`, JSON.stringify(s.traffic));
+  } catch (e) { /* best-effort */ }
+}
+
 // Sesión default (el número histórico, INSTANCE_NAME). Las referencias `state.`
 // del código actual operan sobre ésta hasta migrar cada handler a multi-sesión.
 const state = getSession(INSTANCE_NAME);
@@ -184,6 +213,7 @@ const RECENT_MAX = 30;
 function pushRecent(event, s = state) {
   s.recentEvents.unshift({ ...event, at: new Date().toISOString() });
   if (s.recentEvents.length > RECENT_MAX) s.recentEvents.length = RECENT_MAX;
+  if (event.kind === 'in' || event.kind === 'out') bumpTraffic(s, event.kind);
 }
 
 function rolloverDayIfNeeded(s = state) {
@@ -202,6 +232,7 @@ function rolloverDayIfNeeded(s = state) {
 async function startSocket(instanceName = INSTANCE_NAME) {
   const s = getSession(instanceName);
   loadConfig(s);
+  loadMetrics(s);
   s.connection = 'connecting';
   s.qrRaw = null;
   s.qrDataUrl = null;
@@ -604,6 +635,26 @@ app.post('/manager/settings/:instance', (req, res) => {
   saveConfig(s);
   // rejectCalls / markRead / webhook aplican en caliente; alwaysOnline y syncFullHistory, al reconectar.
   res.json({ ok: true, config: s.config, needsReconnect: ['alwaysOnline', 'syncFullHistory'] });
+});
+
+// Métricas de tráfico para los gráficos: últimas 24h (por hora) y 30d (por día).
+app.get('/manager/metrics/:instance', (req, res) => {
+  const s = sessionFromReq(req);
+  const t = s.traffic || { hourly: {}, daily: {} };
+  const now = Date.now();
+  const hourly = [];
+  for (let i = 23; i >= 0; i--) {
+    const k = new Date(now - i * 3600 * 1000).toISOString().slice(0, 13);
+    const b = t.hourly[k] || {};
+    hourly.push({ label: k.slice(11) + 'h', in: b.in || 0, out: b.out || 0 });
+  }
+  const daily = [];
+  for (let i = 29; i >= 0; i--) {
+    const k = new Date(now - i * 86400 * 1000).toISOString().slice(0, 10);
+    const b = t.daily[k] || {};
+    daily.push({ label: k.slice(5), in: b.in || 0, out: b.out || 0 });
+  }
+  res.json({ hourly, daily });
 });
 
 // Login del dashboard: valida la password contra MANAGER_PASSWORD (env) server-side
@@ -1028,6 +1079,8 @@ app.listen(PORT, () => {
   } catch (e) {
     logger.warn({ err: e.message }, 'instance restore scan failed');
   }
+  // Snapshot periódico de las métricas de tráfico al volumen (sobrevive reinicios).
+  setInterval(() => { for (const s of sessions.values()) saveMetrics(s); }, 60_000);
 });
 
 // Graceful shutdown

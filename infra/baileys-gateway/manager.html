@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Maven · Gateway — Líneas de WhatsApp</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
     .dot{animation:pulse 2s cubic-bezier(.4,0,.6,1) infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
@@ -96,12 +97,17 @@
       </div>
       <div class="flex gap-1 px-4 pt-2 border-b border-slate-100">
         <button data-tab="salud" class="ln-tab px-3 py-2 text-sm border-b-2 border-emerald-600 font-semibold text-emerald-700">Salud</button>
+        <button data-tab="trafico" class="ln-tab px-3 py-2 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700">Tráfico</button>
         <button data-tab="acciones" class="ln-tab px-3 py-2 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700">Acciones</button>
         <button data-tab="config" class="ln-tab px-3 py-2 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700">Config</button>
         <button data-tab="actividad" class="ln-tab px-3 py-2 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700">Actividad</button>
       </div>
       <div class="p-4 overflow-y-auto">
         <div id="ln-salud" class="ln-pane"></div>
+        <div id="ln-trafico" class="ln-pane hidden">
+          <div class="mb-4"><div class="text-xs font-medium text-slate-500 mb-1">Últimas 24 horas (por hora)</div><canvas id="ln-chart-h" height="110"></canvas></div>
+          <div><div class="text-xs font-medium text-slate-500 mb-1">Últimos 30 días</div><canvas id="ln-chart-d" height="110"></canvas></div>
+        </div>
         <div id="ln-acciones" class="ln-pane hidden space-y-5">
           <div>
             <h3 class="text-sm font-semibold mb-2">Enviar mensaje de prueba</h3>
@@ -324,6 +330,7 @@
       });
       if (tab === "actividad") loadLineActivity();
       if (tab === "config") loadLineConfig();
+      if (tab === "trafico") loadLineTraffic();
     }
     function openLine(inst) {
       lnLine = inst;
@@ -415,6 +422,34 @@
         else { $("cfg-msg").className = "text-xs text-red-600"; $("cfg-msg").textContent = "Error " + r.status; }
       } catch (e) { $("cfg-msg").className = "text-xs text-red-600"; $("cfg-msg").textContent = "Error: " + esc(e.message); }
     };
+    // Tráfico (gráficos Chart.js de 24h y 30d).
+    let chartH = null, chartD = null;
+    function drawChart(canvasId, prev, data) {
+      if (prev) prev.destroy();
+      if (typeof Chart === "undefined") return null;
+      return new Chart($(canvasId).getContext("2d"), {
+        type: "bar",
+        data: {
+          labels: data.map((d) => d.label),
+          datasets: [
+            { label: "Recibidos", data: data.map((d) => d.in), backgroundColor: "rgba(59,130,246,0.75)" },
+            { label: "Enviados", data: data.map((d) => d.out), backgroundColor: "rgba(16,185,129,0.75)" },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          plugins: { legend: { labels: { boxWidth: 12, font: { size: 10 } } } },
+          scales: { x: { stacked: false, ticks: { font: { size: 8 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } }, y: { beginAtZero: true, ticks: { precision: 0, font: { size: 9 } } } },
+        },
+      });
+    }
+    async function loadLineTraffic() {
+      try {
+        const m = await (await fetch("/manager/metrics/" + lnLine, { headers: authH() })).json();
+        chartH = drawChart("ln-chart-h", chartH, m.hourly || []);
+        chartD = drawChart("ln-chart-d", chartD, m.daily || []);
+      } catch (e) { /* sin datos */ }
+    }
     window.openLine = openLine;
 
     window.connectLine = connectLine; window.logoutLine = logoutLine; window.toggleAct = toggleAct; window.openProfile = openProfile;
