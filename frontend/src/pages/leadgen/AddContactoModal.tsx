@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -140,6 +140,12 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
 
   const queryClient = useQueryClient();
 
+  // El último IG que escribió el AUTOFILL (no el usuario). El reverse-lookup
+  // por IG lo usa para NO re-seleccionar el lead a partir del IG que él mismo
+  // dejó: sin esto, al borrar el nombre, el IG residual re-seleccionaba el
+  // lead y el nombre "se volvía a poner solo".
+  const autofilledIgRef = useRef("");
+
   // Auto-fill al seleccionar un lead (desde el autocomplete por nombre O
   // desde el reverse lookup por IG link — ambos terminan en setSelectedLead).
   //
@@ -158,7 +164,9 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
     // ── Paso 1: llenado inmediato (sin red) ──────────────────────────────
     if (lead.model_handle) {
       form.setValue("nombre", lead.model_handle);
-      form.setValue("instagram", `https://instagram.com/${String(lead.model_handle).replace(/^@/, "")}`);
+      const igFromHandle = `https://instagram.com/${String(lead.model_handle).replace(/^@/, "")}`;
+      form.setValue("instagram", igFromHandle);
+      autofilledIgRef.current = igFromHandle;
     }
     if (lead.company) {
       const canon = scouterCompanies.find(
@@ -189,7 +197,10 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         // Categoría: leadgen guarda "A+/A/B+/B/C" (mayúsc) → el select usa minúsc.
         if (q) form.setValue("categoriaFisica", String(q).toLowerCase());
         // Mejorar el IG reconstruido por el link real que cargó el LLG.
-        if (src && /instagram\.com/i.test(src)) form.setValue("instagram", src);
+        if (src && /instagram\.com/i.test(src)) {
+          form.setValue("instagram", src);
+          autofilledIgRef.current = src;
+        }
       } catch {
         /* red caída — los campos del paso 1 ya están; no rompemos el autofill */
       }
@@ -214,6 +225,10 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   useEffect(() => {
     if (selectedLead) return; // ya hay lead — no pisar
     if (!igFieldValue) return;
+    // Si el IG es el que dejó el AUTOFILL (no algo que tipeó el usuario), NO
+    // re-seleccionamos: sin esto, borrar el nombre re-disparaba la selección
+    // desde el IG residual y el nombre "se volvía a poner solo".
+    if (igFieldValue === autofilledIgRef.current) return;
     const handle = extractIgHandle(igFieldValue);
     if (!handle) return;
 
