@@ -176,6 +176,14 @@ const InboxPage = () => {
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
 
+  // Al abrir una conversación con no-leídos, marcarla leída (resetea el bubble).
+  // Via RPC porque la policy UPDATE de wa_conversations está gateada por permiso.
+  useEffect(() => {
+    if (!selectedId || !selected || (selected.unread_count ?? 0) === 0) return;
+    (supabase as any).rpc("wa_mark_read", { p_conversation_id: selectedId })
+      .then(() => qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] }));
+  }, [selectedId, selected, qc]);
+
   const sendMessage = async () => {
     const text = draft.trim();
     if (!text || !selectedId || sending) return;
@@ -309,14 +317,23 @@ const InboxPage = () => {
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium">{contactLabel(c.contact)}</span>
+                      <span className={cn("truncate text-sm", (c.unread_count ?? 0) > 0 ? "font-bold" : "font-medium")}>
+                        {contactLabel(c.contact)}
+                      </span>
                       <span className="ml-auto shrink-0 text-[10px] tabular-nums text-muted-foreground">
                         {fmtTime(c.last_message_at)}
                       </span>
                     </div>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {c.last_message_preview ?? "—"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={cn("truncate text-xs", (c.unread_count ?? 0) > 0 ? "font-medium text-foreground" : "text-muted-foreground")}>
+                        {c.last_message_preview ?? "—"}
+                      </span>
+                      {(c.unread_count ?? 0) > 0 && (
+                        <span className="ml-auto grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                          {c.unread_count > 99 ? "99+" : c.unread_count}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 </li>
               ))}

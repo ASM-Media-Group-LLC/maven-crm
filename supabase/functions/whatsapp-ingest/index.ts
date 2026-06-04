@@ -357,18 +357,20 @@ async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Pr
     channelId = ch?.id ?? null;
   }
 
-  // 2) Conversación: la más reciente del contacto en depto 'closer'; sino crear.
+  // 2) Conversación: la del contacto EN ESTA LÍNEA (canal). Antes buscaba por
+  //    (contacto + department) SIN canal → un contacto que escribía a 2 líneas
+  //    distintas acumulaba todo en la 1ra conversación (un DM entrante por
+  //    Closers1 caía en la conversación vieja de maven-bot). Ahora cada línea
+  //    tiene su propia conversación.
   let conversationId: string;
-  const { data: convs } = await sb
-    .from("wa_conversations").select("id, channel_id")
-    .eq("contact_id", contactId).eq("department", "closer")
-    .order("created_at", { ascending: false }).limit(1);
+  let convQ = sb
+    .from("wa_conversations").select("id")
+    .eq("contact_id", contactId).eq("department", "closer");
+  if (channelId) convQ = convQ.eq("channel_id", channelId);
+  else if (channelJid) convQ = convQ.eq("channel_jid", channelJid);
+  const { data: convs } = await convQ.order("created_at", { ascending: false }).limit(1);
   if (convs && convs.length > 0) {
     conversationId = convs[0].id;
-    // Si la conversación no tenía canal y ahora lo resolvimos, lo enganchamos.
-    if (channelId && !convs[0].channel_id) {
-      await sb.from("wa_conversations").update({ channel_id: channelId }).eq("id", conversationId);
-    }
   } else {
     const { data: created, error } = await sb
       .from("wa_conversations")
@@ -400,11 +402,14 @@ async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Pr
     return;
   }
 
-  // 4) Metadata de la conversación (para la lista del inbox en Slice 4).
-  await sb
-    .from("wa_conversations")
-    .update({ last_message_at: msg.sentAt, last_message_preview: preview })
-    .eq("id", conversationId);
+  // 4) Metadata + no-leídos (+1). Antes solo seteaba last_message_* y el contador
+  //    de no-leídos quedaba en 0 (sin bubbles en el inbox). wa_bump_unread lo
+  //    incrementa de forma atómica (RPC SECURITY DEFINER).
+  await sb.rpc("wa_bump_unread", {
+    p_conversation_id: conversationId,
+    p_preview: preview,
+    p_sent_at: msg.sentAt,
+  });
 }
 
 // Detecta si el mensaje es un "check-in" del usuario al inicio del turno.
