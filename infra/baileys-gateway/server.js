@@ -632,6 +632,55 @@ app.post('/message/sendMedia/:instance', async (req, res) => {
   }
 });
 
+// Reaccionar a un mensaje (emoji) — Baileys sendMessage({ react: {text, key} }).
+// emoji "" quita la reacción. key identifica el mensaje target.
+app.post('/message/react/:instance', async (req, res) => {
+  const s = sessionFromReq(req);
+  if (s.connection !== 'open' || !s.sock) {
+    return res.status(503).json({ error: 'not_connected', state: s.connection });
+  }
+  const body = req.body || {};
+  const number = body.number;
+  const messageId = body.messageId;
+  const fromMe = body.fromMe === true;
+  const emoji = typeof body.emoji === 'string' ? body.emoji : '';
+  if (!number || !messageId) return res.status(400).json({ error: 'missing_number_or_messageId' });
+  const jid = resolveJid(number);
+  if (!jid) return res.status(400).json({ error: 'invalid_jid' });
+  try {
+    const result = await s.sock.sendMessage(jid, {
+      react: { text: emoji, key: { remoteJid: jid, fromMe, id: messageId } },
+    });
+    return res.json({ key: { id: result?.key?.id }, message: 'reacted' });
+  } catch (e) {
+    logger.error({ err: e.message, jid }, 'react failed');
+    return res.status(500).json({ error: 'react_failed', detail: e.message });
+  }
+});
+
+// Eliminar un mensaje PARA TODOS — Baileys sendMessage({ delete: key }). Solo
+// sobre mensajes propios (fromMe) y dentro de la ventana que permite WhatsApp.
+app.post('/message/delete/:instance', async (req, res) => {
+  const s = sessionFromReq(req);
+  if (s.connection !== 'open' || !s.sock) {
+    return res.status(503).json({ error: 'not_connected', state: s.connection });
+  }
+  const body = req.body || {};
+  const number = body.number;
+  const messageId = body.messageId;
+  const fromMe = body.fromMe !== false; // default true (borrar propios)
+  if (!number || !messageId) return res.status(400).json({ error: 'missing_number_or_messageId' });
+  const jid = resolveJid(number);
+  if (!jid) return res.status(400).json({ error: 'invalid_jid' });
+  try {
+    await s.sock.sendMessage(jid, { delete: { remoteJid: jid, fromMe, id: messageId } });
+    return res.json({ message: 'deleted' });
+  } catch (e) {
+    logger.error({ err: e.message, jid }, 'delete failed');
+    return res.status(500).json({ error: 'delete_failed', detail: e.message });
+  }
+});
+
 // Descargar y desencriptar media (audio/image/video/document/sticker).
 //
 // Recibe el sub-mensaje de Baileys (ej. audioMessage con mediaKey, url,

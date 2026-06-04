@@ -48,3 +48,6 @@ verify_jwt = false  # envía saliente desde la bandeja (auth propia: getUser + p
 
 [functions.wa-inbox-send-media]
 verify_jwt = false  # envía saliente con media (imagen/audio/video/doc) desde la bandeja (auth propia). Rutea por la instancia del canal.
+
+[functions.wa-inbox-action]
+verify_jwt = false  # reaccionar/eliminar un mensaje del inbox (auth propia). Rutea por la instancia del canal.
