@@ -140,63 +140,59 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
 
   const queryClient = useQueryClient();
 
-  // Auto-fill centralizado cuando se selecciona un lead (desde el
-  // autocomplete por nombre O desde el reverse lookup por IG link).
-  // El RPC del autocomplete (leadgen_search_fuzzy) NO devuelve `quality`
-  // (categoría) ni `source_link` (link IG real), así que traemos el lead
-  // COMPLETO por id y llenamos TODO desde ahí — así el closer no recarga
-  // a mano lo que el LLG ya dejó cargado. Ambos orígenes terminan en
-  // setSelectedLead, por eso este único effect los cubre a los dos.
+  // Auto-fill al seleccionar un lead (desde el autocomplete por nombre O
+  // desde el reverse lookup por IG link — ambos terminan en setSelectedLead).
+  //
+  // 2 pasos para que sea INSTANTÁNEO y ROBUSTO:
+  //  1) SÍNCRONO: lleno YA todo lo que el autocomplete (RPC) ya trae en
+  //     `selectedLead` — nombre, IG (reconstruido del handle), compañía,
+  //     notas, país, teléfono. Sin esperar red → feedback inmediato.
+  //  2) ASYNC (best-effort): el RPC NO trae `quality` (categoría) ni
+  //     `source_link` (link IG real), así que los busco por id y, si llegan,
+  //     completo la categoría y mejoro el IG. Va en try/catch: si la red
+  //     falla o tarda, los campos del paso 1 ya quedaron cargados igual.
   useEffect(() => {
     if (!selectedLead) return;
-    const id = selectedLead.id;
+    const lead = selectedLead;
+
+    // ── Paso 1: llenado inmediato (sin red) ──────────────────────────────
+    if (lead.model_handle) {
+      form.setValue("nombre", lead.model_handle);
+      form.setValue("instagram", `https://instagram.com/${String(lead.model_handle).replace(/^@/, "")}`);
+    }
+    if (lead.company) {
+      const canon = scouterCompanies.find(
+        (sc) => sc.name.toLowerCase() === String(lead.company).toLowerCase(),
+      );
+      form.setValue("compania", canon?.name ?? lead.company);
+    }
+    if (lead.country_code) {
+      const cc = String(lead.country_code).startsWith("+") ? lead.country_code : `+${lead.country_code}`;
+      form.setValue("paisCodigo", cc);
+    }
+    if (lead.phone_raw) form.setValue("telefono", lead.phone_raw);
+    if (lead.notes) form.setValue("notas", lead.notes);
+
+    // ── Paso 2: enriquecer categoría (quality) + IG real (source_link) ───
+    const id = lead.id;
     let cancelled = false;
     (async () => {
-      const { data: full } = await supabase
-        .from("leadgen_entries")
-        .select("model_handle, source_link, onlyfans_url, quality, company, country_code, phone_raw, notes")
-        .eq("id", id)
-        .maybeSingle();
-      if (cancelled) return;
-      const lead = { ...selectedLead, ...((full as Record<string, unknown>) ?? {}) } as LeadAutocompleteLead & {
-        source_link?: string | null;
-        quality?: string | null;
-      };
-
-      if (lead.model_handle) form.setValue("nombre", lead.model_handle);
-
-      // Link IG: preferimos el source_link real que cargó el LLG; si no es
-      // de Instagram (o no hay), lo reconstruimos desde el handle.
-      const ig =
-        lead.source_link && /instagram\.com/i.test(lead.source_link)
-          ? lead.source_link
-          : lead.model_handle
-            ? `https://instagram.com/${String(lead.model_handle).replace(/^@/, "")}`
-            : "";
-      if (ig) form.setValue("instagram", ig);
-
-      // Categoría física: leadgen guarda "A+/A/B+/B/C" (mayúsculas); el
-      // select de este modal usa minúsculas (a+/a/b+/b/c) → normalizamos.
-      if (lead.quality) form.setValue("categoriaFisica", String(lead.quality).toLowerCase());
-
-      // Compañía: match canónico case-insensitive contra scouter_companies
-      // (leads viejos pueden tener el name con otro casing). Si no matchea
-      // ninguna, seteamos el raw igual.
-      if (lead.company) {
-        const canon = scouterCompanies.find(
-          (sc) => sc.name.toLowerCase() === String(lead.company).toLowerCase(),
-        );
-        form.setValue("compania", canon?.name ?? lead.company);
+      try {
+        const { data: full } = await supabase
+          .from("leadgen_entries")
+          .select("quality, source_link")
+          .eq("id", id)
+          .maybeSingle();
+        if (cancelled || !full) return;
+        const q = (full as { quality?: string | null }).quality;
+        const src = (full as { source_link?: string | null }).source_link;
+        // Categoría: leadgen guarda "A+/A/B+/B/C" (mayúsc) → el select usa minúsc.
+        if (q) form.setValue("categoriaFisica", String(q).toLowerCase());
+        // Mejorar el IG reconstruido por el link real que cargó el LLG.
+        if (src && /instagram\.com/i.test(src)) form.setValue("instagram", src);
+      } catch {
+        /* red caída — los campos del paso 1 ya están; no rompemos el autofill */
       }
-
-      if (lead.country_code) {
-        const cc = String(lead.country_code).startsWith("+")
-          ? lead.country_code
-          : `+${lead.country_code}`;
-        form.setValue("paisCodigo", cc);
-      }
-      if (lead.phone_raw) form.setValue("telefono", lead.phone_raw);
-      if (lead.notes) form.setValue("notas", lead.notes);
     })();
     return () => {
       cancelled = true;

@@ -120,7 +120,9 @@ export function PhoneInput({
   };
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const num = e.target.value;
+    // Un teléfono solo lleva dígitos (y espacios para legibilidad). Filtramos
+    // letras y símbolos para que no se puedan tipear/pegar en el número.
+    const num = e.target.value.replace(/[^\d\s]/g, "");
     onChange(`${countryCode} ${num}`.trim());
   };
 
