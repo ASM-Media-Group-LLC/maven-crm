@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, type Dispatch, type SetStateAction } from "react";
 import { Plus, Pencil, Check } from "lucide-react";
 import {
   Dialog,
@@ -9,6 +9,31 @@ import {
 
 // DEFAULT_EMOJIS from the original Roleplaychatters index.html line 2145.
 export const DEFAULT_EMOJIS = ["😏","🔥","💦","😈","❤️","🥵","😍","🙈","🍆","💋"];
+
+// Estado de la barra de emojis PERSISTIDO por usuario (localStorage). Si el usuario
+// agrega/quita emojis, se conserva al refrescar. `scope` separa contextos (inbox vs
+// chatter) y `userId` lo aísla por usuario (en un navegador compartido cada uno tiene
+// su barra). Sin nada guardado, arranca con DEFAULT_EMOJIS.
+export function usePersistedEmojis(
+  scope: string,
+  userId?: string | null,
+): [string[], Dispatch<SetStateAction<string[]>>] {
+  const key = `maven_emojibar_${scope}_${userId || "anon"}`;
+  const [emojis, setEmojis] = useState<string[]>(() => {
+    try {
+      const raw = typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.every((x) => typeof x === "string")) return arr as string[];
+      }
+    } catch { /* localStorage no disponible o JSON inválido → defaults */ }
+    return [...DEFAULT_EMOJIS];
+  });
+  useEffect(() => {
+    try { localStorage.setItem(key, JSON.stringify(emojis)); } catch { /* */ }
+  }, [key, emojis]);
+  return [emojis, setEmojis];
+}
 
 // EMOJI_CATALOG verbatim from index.html line 3501 — the same six categories
 // with the same emojis in the same order, so admins who knew the old picker

@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, Sticker } from "lucide-react";
 import {
@@ -29,7 +30,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { WaConversationStatus, WaMessageDirection } from "./types";
-import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
+import { EmojiBar, usePersistedEmojis } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import { AudioRecorderBar } from "./AudioRecorder";
@@ -94,8 +95,10 @@ const InboxPage = () => {
   const [mediaBusy, setMediaBusy] = useState(false);
   const [recording, setRecording] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Emojis del compose — misma barra/catálogo que Chatter Evaluator (en memoria).
-  const [inboxEmojis, setInboxEmojis] = useState<string[]>([...DEFAULT_EMOJIS]);
+  // Emojis del compose — barra/catálogo de Chatter Evaluator, PERSISTIDA por usuario
+  // (localStorage): lo que el usuario agrega/quita sobrevive al refrescar.
+  const { user } = useAuth();
+  const [inboxEmojis, setInboxEmojis] = usePersistedEmojis("inbox", user?.id);
   const [searchParams] = useSearchParams();
   // Deep-link: /inbox?c=<conversationId> (ej. desde el botón WhatsApp de Closers) abre directo esa conversación.
   useEffect(() => {
