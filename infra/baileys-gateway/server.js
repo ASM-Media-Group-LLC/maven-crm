@@ -638,7 +638,7 @@ app.post('/message/sendMedia/:instance', async (req, res) => {
   const mimetype = body.mimetype ? String(body.mimetype) : undefined;
   const ptt = body.ptt === true; // nota de voz (push-to-talk)
 
-  const validTypes = ['image', 'audio', 'video', 'document'];
+  const validTypes = ['image', 'audio', 'video', 'document', 'gif', 'sticker'];
   if (!number || !url || !validTypes.includes(mediatype)) {
     return res.status(400).json({ error: 'missing_or_invalid', valid: validTypes });
   }
@@ -667,6 +667,8 @@ app.post('/message/sendMedia/:instance', async (req, res) => {
         content = { audio: { url }, ptt: false, mimetype: mimetype || 'audio/mp4' };
       }
     }
+    else if (mediatype === 'gif') content = { video: { url }, gifPlayback: true, caption };
+    else if (mediatype === 'sticker') content = { sticker: { url } };
     else content = { document: { url }, fileName: fileName || 'archivo', mimetype: mimetype || 'application/octet-stream', caption };
 
     const result = await s.sock.sendMessage(jid, content);

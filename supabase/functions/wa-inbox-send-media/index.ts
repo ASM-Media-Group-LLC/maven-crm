@@ -14,7 +14,7 @@ const EVOLUTION_API_KEY = Deno.env.get("WHATSAPP_EVOLUTION_API_KEY") ?? "";
 const EVOLUTION_INSTANCE = Deno.env.get("WHATSAPP_EVOLUTION_INSTANCE") ?? "maven-bot";
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech (inbox v1 mono-tenant)
 
-const VALID_TYPES = ["image", "audio", "video", "document"];
+const VALID_TYPES = ["image", "audio", "video", "document", "gif", "sticker"];
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -132,7 +132,7 @@ serve(async (req) => {
       sender_user_id: userId,
       external_id: sent.externalId ?? null,
       body: payload.caption?.trim() || null,
-      msg_type: mediaType,
+      msg_type: mediaType === "gif" ? "video" : mediaType, // gif se renderiza como video
       media_url: mediaUrl,
       status: "sent",
       sent_at: nowIso,
