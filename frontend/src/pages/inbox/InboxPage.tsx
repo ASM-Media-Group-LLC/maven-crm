@@ -34,6 +34,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useUserRole } from "@/hooks/useUserRole";
 import { AudioRecorderBar } from "./AudioRecorder";
 import { GifPicker } from "./GifPicker";
+import { StickerPicker } from "./StickerPicker";
 
 interface ConvRow {
   id: string;
@@ -293,19 +294,19 @@ const InboxPage = () => {
     sendMedia(blob, "audio", `nota-${Date.now()}.webm`, true);
   };
 
-  // Enviar un GIF de Giphy: mandamos la URL .mp4 directo (pública, el gateway la
-  // descarga) como media_type "gif" → video con gifPlayback en WhatsApp.
-  const sendGifUrl = async (gifUrl: string) => {
+  // Enviar media por URL pública (GIF de Giphy / sticker de la galería): mandamos
+  // la URL directo (el gateway la descarga) con el media_type correspondiente.
+  const sendUrlMedia = async (url: string, mediaType: "gif" | "sticker", label: string) => {
     if (!selectedId || mediaBusy) return;
     const convId = selectedId;
     setMediaBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("wa-inbox-send-media", {
-        body: { conversation_id: convId, media_url: gifUrl, media_type: "gif" },
+        body: { conversation_id: convId, media_url: url, media_type: mediaType },
       });
       const res = data as { ok?: boolean; error?: string } | null;
       if (error || !res?.ok) {
-        toast({ title: "No se pudo enviar el GIF", description: error?.message ?? res?.error ?? "error", variant: "destructive" });
+        toast({ title: `No se pudo enviar el ${label}`, description: error?.message ?? res?.error ?? "error", variant: "destructive" });
         return;
       }
       qc.invalidateQueries({ queryKey: ["wa-inbox-messages", convId] });
@@ -314,6 +315,8 @@ const InboxPage = () => {
       setMediaBusy(false);
     }
   };
+  const sendGifUrl = (gifUrl: string) => sendUrlMedia(gifUrl, "gif", "GIF");
+  const sendStickerUrl = (url: string) => sendUrlMedia(url, "sticker", "sticker");
 
   // Acciones por mensaje (Slice B): reaccionar / eliminar via wa-inbox-action.
   const messageAction = async (messageId: string, action: "react" | "delete", emoji?: string) => {
@@ -950,6 +953,7 @@ const InboxPage = () => {
                 <Mic className="h-4 w-4" />
               </Button>
               <GifPicker onPick={sendGifUrl} disabled={mediaBusy || sending} />
+              <StickerPicker onPick={sendStickerUrl} disabled={mediaBusy || sending} />
               <Input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
