@@ -91,8 +91,17 @@ export function parseEvolutionApiMessage(payload: unknown): IncomingMessage | nu
       ""
     );
   } else {
-    // DM: el sender es el otro lado de la conversación.
-    participant = remoteJid;
+    // DM: el sender es el otro lado. WhatsApp moderno (Baileys 7.x) direcciona
+    // por @lid (anónimo) aunque sea 1-a-1, PERO trae el teléfono REAL en
+    // key.remoteJidAlt. Preferimos el número real para que el MISMO usuario no
+    // se duplique como dos contactos: el @lid de su mensaje ENTRANTE vs el
+    // número con el que el closer le abrió el chat (SALIENTE). Sin esto, un
+    // lead que responde aparece como un contacto nuevo (su @lid) en vez de su
+    // conversación real. Fallback al remoteJid si no hay alt numérico.
+    const altJid = String((key.remoteJidAlt as string | undefined) ?? "");
+    participant = remoteJid.endsWith("@lid") && altJid.endsWith("@s.whatsapp.net")
+      ? altJid
+      : remoteJid;
   }
 
   const message = (data.message ?? {}) as Record<string, unknown>;
