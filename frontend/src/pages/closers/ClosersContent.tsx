@@ -41,7 +41,7 @@ const ClosersContent = () => {
     dateFrom, setDateFrom,
     dateTo, setDateTo,
     dateField, setDateField,
-    updateField, updateStage, assignCreator,
+    updateField, updateStage, assignCreator, claimLead,
     isAdmin, isManager,
     viewAsCloserId, viewAsCloserName, setViewAsCloser,
   } = useCloserLeads();
@@ -362,6 +362,7 @@ const ClosersContent = () => {
                   setAssignTarget({ id, assignee, source: source || "closer" });
                   setAssignDialogOpen(true);
                 }}
+                onClaim={(id) => claimLead.mutate({ id })}
                 isAdmin={isAdmin}
                 platformSalesByCreator={platformSalesByCreator}
               />

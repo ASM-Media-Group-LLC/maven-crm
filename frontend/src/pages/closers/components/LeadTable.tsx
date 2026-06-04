@@ -36,6 +36,7 @@ interface Props {
   onStageChange: (id: string, stage: string, source?: "closer" | "leadgen") => void;
   onFieldChange: (id: string, field: string, value: any) => void;
   onAssign: (id: string, currentAssignee: string | null, source?: "closer" | "leadgen") => void;
+  onClaim?: (id: string) => void;
   onConvertToCreator?: (creator: CloserCreatorRow) => void;
   isAdmin: boolean;
   sourceAccounts: string[];
@@ -429,7 +430,7 @@ const SortHeader = ({ label, sortKey: key, currentKey, asc, onSort, className = 
   </TableHead>
 );
 
-const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, onConvertToCreator, isAdmin, sourceAccounts, platformSalesByCreator }: Props) => {
+const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, onClaim, onConvertToCreator, isAdmin, sourceAccounts, platformSalesByCreator }: Props) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [platformModalId, setPlatformModalId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -1000,14 +1001,22 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                   <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {(isAdmin || canAssign) && (
-                    <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
-                      <UserPlus className="h-4 w-4 mr-2" /> Asignar a Closer
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada")}>
-                    Mover a Asignada
+                  {/* Tomar = auto-asignarse el lead del pool (cualquier closer).
+                      RLS "Closers can claim unassigned pool" lo permite solo
+                      para sí y solo sobre filas sin dueño. */}
+                  <DropdownMenuItem onClick={() => onClaim?.(c.id)}>
+                    <UserPlus className="h-4 w-4 mr-2" /> Tomar (asignármela)
                   </DropdownMenuItem>
+                  {(isAdmin || canAssign) && (
+                    <>
+                      <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
+                        <UserPlus className="h-4 w-4 mr-2" /> Asignar a otro closer
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada")}>
+                        Mover a Asignada
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </TableCell>

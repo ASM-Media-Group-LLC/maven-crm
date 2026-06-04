@@ -677,6 +677,40 @@ export const useCloserLeads = () => {
     },
   });
 
+  // Tomar (auto-asignarse) un lead del pool sin asignar. Claim atómico: el
+  // filtro .is("assigned_to", null) + la policy RLS "Closers can claim
+  // unassigned pool" garantizan que solo se tome lo que sigue sin dueño; si
+  // otro la tomó primero, el UPDATE matchea 0 filas → avisamos.
+  const claimLead = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      if (!user?.id) throw new Error("No hay usuario autenticado");
+      const { data, error } = await supabase
+        .from("closer_creators")
+        .update({
+          assigned_to: user.id,
+          stage: "Asignada",
+          passed_date: new Date().toISOString().slice(0, 10),
+        })
+        .eq("id", id)
+        .is("assigned_to", null)
+        .select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("Esta lead ya fue tomada por otra persona.");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
+      toast({ title: "Lead tomada", description: "Quedó asignada a vos, en Asignaciones." });
+    },
+    onError: (e: Error) => {
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
+      toast({ title: "No se pudo tomar", description: e.message, variant: "destructive" });
+    },
+  });
+
   return {
     creators,
     isLoading,
@@ -699,6 +733,7 @@ export const useCloserLeads = () => {
     updateField,
     updateStage,
     assignCreator,
+    claimLead,
     isAdmin,
     isManager,
     viewAsCloserId,
