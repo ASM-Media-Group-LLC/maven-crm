@@ -314,14 +314,16 @@ const DimensionsBlock = ({
   ctx?: SectionFeedbackContext;
 }) => {
   if (dimensions.length === 0) return null;
-  // recharts wants 0-100 normalized; kash dimensions are 0-10.
+  // Las dimensiones vienen en escala 0-100 desde la IA → tal cual al chart
+  // (domain 0-100). Antes venían en 0-10 y se multiplicaban ×10; el backend
+  // cambió a 0-100 y esto quedó desfasado (mostraba ×10).
   const radarData = dimensions.map((d) => ({
     name: d.name,
-    score: d.score * 10,
+    score: d.score,
     fullMark: 100,
   }));
   return (
-    <Section title="Dimensiones (0–10)">
+    <Section title="Dimensiones (0–100)">
       <div className="h-[260px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart data={radarData} outerRadius="78%">
@@ -345,9 +347,9 @@ const DimensionsBlock = ({
               <div className="flex items-center gap-2">
                 <span
                   className="font-bold tabular-nums"
-                  style={{ color: scoreColor(d.score * 10) }}
+                  style={{ color: scoreColor(d.score) }}
                 >
-                  {d.score}/10
+                  {Math.round(d.score)}/100
                 </span>
                 {ctx && (
                   <SectionThumbs ctx={ctx} type="dimension" index={i} label={d.name} />

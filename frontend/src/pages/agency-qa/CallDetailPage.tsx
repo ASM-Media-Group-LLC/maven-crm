@@ -489,13 +489,13 @@ const DimensionsRadar = ({
   dimensions: NonNullable<CallAnalysis["dimensions"]>;
 }) => {
   const fullByShort = new Map<string, string>();
-  // Mostramos las dimensiones en escala 0-100 para que sea consistente
-  // con el resto de la UI. El JSON de la IA viene en 0-10, lo
-  // multiplicamos antes de pasárselo al chart.
+  // Las dimensiones ya vienen en escala 0-100 desde la IA → las pasamos tal
+  // cual al chart (que está en 0-100). (Antes el JSON venía en 0-10 y se
+  // multiplicaba ×10; el backend cambió a 0-100 y esto quedó desfasado.)
   const data = dimensions.map((d) => {
     const short = d.name.length > 22 ? d.name.slice(0, 20) + "…" : d.name;
     fullByShort.set(short, d.name);
-    return { dim: short, score: Math.round(d.score * 10) };
+    return { dim: short, score: Math.round(d.score) };
   });
 
   return (
@@ -863,9 +863,9 @@ type DimensionGroup = {
 const groupDimensions = (
   dimensions: NonNullable<CallAnalysis["dimensions"]>
 ): DimensionGroup[] => {
-  const fuertes = dimensions.filter((d) => d.score >= 8);
-  const mejorar = dimensions.filter((d) => d.score >= 6 && d.score < 8);
-  const debiles = dimensions.filter((d) => d.score < 6);
+  const fuertes = dimensions.filter((d) => d.score >= 80);
+  const mejorar = dimensions.filter((d) => d.score >= 60 && d.score < 80);
+  const debiles = dimensions.filter((d) => d.score < 60);
   return [
     {
       title: "Puntos fuertes",
@@ -978,9 +978,9 @@ const AnalysisSections = ({
                             <div className="flex items-start gap-3 self-start">
                               <div
                                 className="inline-flex h-8 shrink-0 items-center rounded-full px-3.5 text-sm font-bold tabular-nums text-white"
-                                style={{ background: scoreColor10(d.score) }}
+                                style={{ background: scoreColorPct(d.score) }}
                               >
-                                {Math.round(d.score * 10)}/100
+                                {Math.round(d.score)}/100
                               </div>
                               {ctx && (
                                 <SectionThumbs

@@ -366,12 +366,18 @@ serve(async (req) => {
       return jsonError("El análisis no tiene la estructura esperada. Reintentá.", 502);
     }
 
-    // El score lo decide 100% Claude — el prompt ya le instruye que
-    // penalice fuerte (15-40) cuando outcome ≠ "cerro" y que sea
-    // generoso (75-100) cuando cerró. Antes había un cap/floor en
-    // código aplicado encima, pero la lógica de negocio vive mejor en
-    // el prompt y deja al modelo más espacio para matizar.
-    const score = (analysis as { overall_score: number }).overall_score;
+    // El score TOTAL = CALIDAD DEL PROCESO: el promedio de los criterios
+    // (qué tan bien manejó la llamada el closer). El resultado (cerró/no)
+    // queda guardado en el análisis y se muestra APARTE, pero NO aplasta la
+    // nota. Antes el total era el `overall_score` que Claude castigaba fuerte
+    // por outcome (≠ promedio de criterios → confundía). Decisión del owner
+    // 2026-06-04: la nota del closer mide su manejo, no el cierre.
+    const dimScores = ((analysis as { dimensions?: Array<{ score?: number }> }).dimensions ?? [])
+      .map((d) => Number(d?.score))
+      .filter((n) => Number.isFinite(n));
+    const score = dimScores.length
+      ? Math.round(dimScores.reduce((a, b) => a + b, 0) / dimScores.length)
+      : (analysis as { overall_score: number }).overall_score;
 
     const { data: updated, error: updateErr } = await supabase
       .from("qa_calls")
