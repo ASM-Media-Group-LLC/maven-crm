@@ -585,6 +585,53 @@ app.post('/message/sendText/:instance', async (req, res) => {
   }
 });
 
+// Enviar media (imagen/audio/video/documento) por URL. El caller (edge function
+// wa-inbox-send-media) sube el archivo a Storage y nos pasa una URL firmada;
+// Baileys la descarga y la manda. Para notas de voz: mediatype=audio + ptt=true.
+app.post('/message/sendMedia/:instance', async (req, res) => {
+  const s = sessionFromReq(req);
+  if (s.connection !== 'open' || !s.sock) {
+    return res.status(503).json({ error: 'not_connected', state: s.connection });
+  }
+
+  const body = req.body || {};
+  const number = body.number;
+  const mediatype = String(body.mediatype || '').toLowerCase();
+  const url = body.url;
+  const caption = body.caption ? String(body.caption) : undefined;
+  const fileName = body.filename ? String(body.filename) : undefined;
+  const mimetype = body.mimetype ? String(body.mimetype) : undefined;
+  const ptt = body.ptt === true; // nota de voz (push-to-talk)
+
+  const validTypes = ['image', 'audio', 'video', 'document'];
+  if (!number || !url || !validTypes.includes(mediatype)) {
+    return res.status(400).json({ error: 'missing_or_invalid', valid: validTypes });
+  }
+  const jid = resolveJid(number);
+  if (!jid) return res.status(400).json({ error: 'invalid_jid' });
+
+  try {
+    let content;
+    if (mediatype === 'image') content = { image: { url }, caption };
+    else if (mediatype === 'video') content = { video: { url }, caption };
+    else if (mediatype === 'audio') content = { audio: { url }, ptt, mimetype: mimetype || (ptt ? 'audio/ogg; codecs=opus' : 'audio/mp4') };
+    else content = { document: { url }, fileName: fileName || 'archivo', mimetype: mimetype || 'application/octet-stream', caption };
+
+    const result = await s.sock.sendMessage(jid, content);
+    rolloverDayIfNeeded(s);
+    s.msgsOut += 1;
+    s.msgsOutToday += 1;
+    pushRecent({ kind: 'out', jid, body: '[' + mediatype + ']' + (caption ? ' ' + caption.slice(0, 80) : '') }, s);
+    return res.json({
+      key: { id: result.key.id, remoteJid: result.key.remoteJid, fromMe: result.key.fromMe },
+      message: 'sent',
+    });
+  } catch (e) {
+    logger.error({ err: e.message, jid, mediatype }, 'sendMedia failed');
+    return res.status(500).json({ error: 'send_failed', detail: e.message });
+  }
+});
+
 // Descargar y desencriptar media (audio/image/video/document/sticker).
 //
 // Recibe el sub-mensaje de Baileys (ej. audioMessage con mediaKey, url,

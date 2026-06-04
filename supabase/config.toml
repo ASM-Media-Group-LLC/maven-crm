@@ -45,3 +45,6 @@ verify_jwt = false  # abre/crea conversación del inbox para un lead (auth propi
 
 [functions.wa-inbox-send]
 verify_jwt = false  # envía saliente desde la bandeja (auth propia: getUser + permiso). Rutea por la instancia del canal de la conversación.
+
+[functions.wa-inbox-send-media]
+verify_jwt = false  # envía saliente con media (imagen/audio/video/doc) desde la bandeja (auth propia). Rutea por la instancia del canal.
