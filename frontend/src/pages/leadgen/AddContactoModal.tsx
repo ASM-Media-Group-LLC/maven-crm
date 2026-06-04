@@ -209,6 +209,12 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   // Eso dispara el useEffect de arriba que auto-llena nombre + resto.
   // Mirror simétrico del autocomplete por nombre que llena el IG link.
   const igFieldValue = form.watch("instagram");
+  // Reactivos para el PhoneInput: el componente es 100% controlado (deriva el
+  // número del prop `value` en cada render). Si le pasáramos `form.getValues`,
+  // que NO dispara re-render, el input de teléfono queda "congelado" al tipear.
+  // Con watch se recalcula el value en cada cambio y el input acepta input.
+  const paisCodigoVal = form.watch("paisCodigo");
+  const telefonoVal = form.watch("telefono");
   useEffect(() => {
     if (selectedLead) return; // ya hay lead — no pisar
     if (!igFieldValue) return;
@@ -625,7 +631,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
               <div className="space-y-2">
                 <FormLabel>Teléfono</FormLabel>
                 <PhoneInput
-                  value={`${form.getValues("paisCodigo")} ${form.getValues("telefono") || ""}`.trim()}
+                  value={`${paisCodigoVal || "+57"} ${telefonoVal || ""}`.trim()}
                   onChange={(val) => {
                     const parts = val.match(/^(\+\d+)\s*(.*)/);
                     if (parts) {
