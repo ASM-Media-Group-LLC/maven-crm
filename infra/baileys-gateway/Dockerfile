@@ -7,6 +7,10 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# ffmpeg nativo de Alpine (musl) para transcodear notas de voz: el navegador graba
+# webm/opus y WhatsApp solo reproduce ogg/opus como nota de voz (PTT).
+RUN apk add --no-cache ffmpeg
+
 # Tools: git no es estrictamente necesario pero baileys a veces pide build tools
 # para qrcode (canvas). Si baileys ya viene precompilado, sobra.
 RUN apk add --no-cache --virtual .build-deps python3 make g++ git \

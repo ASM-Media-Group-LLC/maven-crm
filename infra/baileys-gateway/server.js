@@ -38,6 +38,7 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLat
 const express = require('express');
 const pino = require('pino');
 const QRCode = require('qrcode');
+const { spawn } = require('child_process');
 const fs = require('fs');
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
@@ -597,6 +598,28 @@ app.post('/message/sendText/:instance', async (req, res) => {
   }
 });
 
+// Transcodea audio (cualquier contenedor) a OGG/Opus para nota de voz de WhatsApp.
+// El navegador graba webm/opus; WhatsApp solo reproduce ogg/opus como PTT. Usa el
+// ffmpeg nativo del contenedor (apk). Rechaza si ffmpeg no está o falla → fallback.
+function transcodeToOggOpus(inputBuffer) {
+  return new Promise((resolve, reject) => {
+    const args = ['-hide_banner', '-loglevel', 'error', '-i', 'pipe:0',
+      '-c:a', 'libopus', '-b:a', '32k', '-ar', '48000', '-ac', '1', '-f', 'ogg', 'pipe:1'];
+    let ff;
+    try { ff = spawn('ffmpeg', args); } catch (e) { return reject(e); }
+    const out = []; const err = [];
+    ff.stdout.on('data', (d) => out.push(d));
+    ff.stderr.on('data', (d) => err.push(d));
+    ff.on('error', reject);
+    ff.on('close', (code) => {
+      if (code === 0 && out.length) resolve(Buffer.concat(out));
+      else reject(new Error('ffmpeg exit ' + code + ': ' + Buffer.concat(err).toString().slice(0, 200)));
+    });
+    ff.stdin.on('error', () => {}); // ignora EPIPE si ffmpeg corta antes
+    ff.stdin.end(inputBuffer);
+  });
+}
+
 // Enviar media (imagen/audio/video/documento) por URL. El caller (edge function
 // wa-inbox-send-media) sube el archivo a Storage y nos pasa una URL firmada;
 // Baileys la descarga y la manda. Para notas de voz: mediatype=audio + ptt=true.
@@ -626,7 +649,24 @@ app.post('/message/sendMedia/:instance', async (req, res) => {
     let content;
     if (mediatype === 'image') content = { image: { url }, caption };
     else if (mediatype === 'video') content = { video: { url }, caption };
-    else if (mediatype === 'audio') content = { audio: { url }, ptt, mimetype: mimetype || (ptt ? 'audio/ogg; codecs=opus' : 'audio/mp4') };
+    else if (mediatype === 'audio') {
+      if (ptt) {
+        // Nota de voz: WhatsApp solo reproduce OGG/Opus. Bajamos la URL (webm/opus
+        // del navegador) y la transcodeamos con ffmpeg; si algo falla, fallback a la URL.
+        try {
+          const resp = await fetch(url);
+          if (!resp.ok) throw new Error('fetch ' + resp.status);
+          const inBuf = Buffer.from(await resp.arrayBuffer());
+          const ogg = await transcodeToOggOpus(inBuf);
+          content = { audio: ogg, ptt: true, mimetype: 'audio/ogg; codecs=opus' };
+        } catch (e) {
+          logger.error({ err: e.message }, 'ptt transcode failed, fallback a url directa');
+          content = { audio: { url }, ptt: true, mimetype: 'audio/ogg; codecs=opus' };
+        }
+      } else {
+        content = { audio: { url }, ptt: false, mimetype: mimetype || 'audio/mp4' };
+      }
+    }
     else content = { document: { url }, fileName: fileName || 'archivo', mimetype: mimetype || 'application/octet-stream', caption };
 
     const result = await s.sock.sendMessage(jid, content);
