@@ -33,6 +33,7 @@ import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/Em
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import { AudioRecorderBar } from "./AudioRecorder";
+import { GifPicker } from "./GifPicker";
 
 interface ConvRow {
   id: string;
@@ -290,6 +291,28 @@ const InboxPage = () => {
   const handleRecorderSend = (blob: Blob) => {
     setRecording(false);
     sendMedia(blob, "audio", `nota-${Date.now()}.webm`, true);
+  };
+
+  // Enviar un GIF de Giphy: mandamos la URL .mp4 directo (pública, el gateway la
+  // descarga) como media_type "gif" → video con gifPlayback en WhatsApp.
+  const sendGifUrl = async (gifUrl: string) => {
+    if (!selectedId || mediaBusy) return;
+    const convId = selectedId;
+    setMediaBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("wa-inbox-send-media", {
+        body: { conversation_id: convId, media_url: gifUrl, media_type: "gif" },
+      });
+      const res = data as { ok?: boolean; error?: string } | null;
+      if (error || !res?.ok) {
+        toast({ title: "No se pudo enviar el GIF", description: error?.message ?? res?.error ?? "error", variant: "destructive" });
+        return;
+      }
+      qc.invalidateQueries({ queryKey: ["wa-inbox-messages", convId] });
+      qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+    } finally {
+      setMediaBusy(false);
+    }
   };
 
   // Acciones por mensaje (Slice B): reaccionar / eliminar via wa-inbox-action.
@@ -926,6 +949,7 @@ const InboxPage = () => {
               >
                 <Mic className="h-4 w-4" />
               </Button>
+              <GifPicker onPick={sendGifUrl} disabled={mediaBusy || sending} />
               <Input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
