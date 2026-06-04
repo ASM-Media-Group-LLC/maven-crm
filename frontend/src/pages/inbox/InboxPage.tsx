@@ -416,8 +416,22 @@ const InboxPage = () => {
       body: { conversation_id: convId, body: text, reply_to_message_id: replyTo?.id },
     });
     setSending(false);
-    const res = data as { ok?: boolean; error?: string } | null;
+    const res = data as { ok?: boolean; error?: string; reason?: string } | null;
     if (error || !res?.ok) {
+      if (res?.reason === "not_on_whatsapp") {
+        // El edge ya dejó el intento como FALLIDO (rojo) en el chat. Quitamos
+        // la burbuja optimista y refrescamos para mostrar el fallido real.
+        qc.setQueryData<MsgRow[]>(["wa-inbox-messages", convId], (old = []) =>
+          old.filter((m) => m.id !== optimisticId));
+        qc.invalidateQueries({ queryKey: ["wa-inbox-messages", convId] });
+        qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+        toast({
+          title: "⚠ Número no registrado en WhatsApp",
+          description: "El mensaje no se entregó: este número no tiene WhatsApp.",
+          variant: "destructive",
+        });
+        return;
+      }
       // Rollback de la burbuja optimista + restaurar el texto para reintentar.
       qc.setQueryData<MsgRow[]>(["wa-inbox-messages", convId], (old = []) =>
         old.filter((m) => m.id !== optimisticId));
@@ -766,6 +780,11 @@ const InboxPage = () => {
                               {fmtTime(m.sent_at)}
                               {isOut && !isDeleted && <StatusTick status={m.status} />}
                             </p>
+                            {isOut && !isDeleted && m.status === "failed" && (
+                              <p className="mt-0.5 flex items-center justify-end gap-1 text-[10px] font-medium text-red-400">
+                                <AlertCircle className="h-3 w-3" /> No entregado
+                              </p>
+                            )}
                             {m.agent_reaction && (
                               <span
                                 className={cn(

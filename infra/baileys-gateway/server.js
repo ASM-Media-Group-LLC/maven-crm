@@ -809,6 +809,30 @@ app.get('/instance/list', (_req, res) => {
   res.json({ instances });
 });
 
+// ¿El número está registrado en WhatsApp? Solo aplica a teléfonos
+// (@s.whatsapp.net); @lid y grupos (@g.us) no se pueden chequear. Cachea 1h
+// por sesión para no repegarle a onWhatsApp en cada envío. Devuelve true/false,
+// o null si no se pudo determinar (en ese caso NO bloqueamos el envío).
+async function checkOnWhatsApp(s, jid) {
+  if (!jid || !jid.endsWith('@s.whatsapp.net') || !s.sock) return null;
+  const phone = jid.split('@')[0];
+  if (!phone) return null;
+  if (!s.onWaCache) s.onWaCache = new Map();
+  const hit = s.onWaCache.get(phone);
+  if (hit && (Date.now() - hit.ts) < 3600000) return hit.exists;
+  try {
+    const r = await s.sock.onWhatsApp(phone);
+    if (!Array.isArray(r)) return null;
+    const item = r.find((x) => x && String(x.jid || '').split('@')[0] === phone) || r[0];
+    const exists = item ? item.exists === true : false;
+    s.onWaCache.set(phone, { exists, ts: Date.now() });
+    return exists;
+  } catch (e) {
+    logger.warn({ err: e.message }, 'onWhatsApp check failed');
+    return null;
+  }
+}
+
 // Send text -- compatible con payload Evolution v1 o v2.
 // Soporta `mentions: ["123456@s.whatsapp.net", "456@lid"]` opcional —
 // si se manda, Baileys lo incluye en el contextInfo del mensaje y
@@ -837,6 +861,11 @@ app.post('/message/sendText/:instance', async (req, res) => {
 
   const jid = resolveJid(number);
   if (!jid) return res.status(400).json({ error: 'invalid_jid' });
+
+  // ¿El número está en WhatsApp? Si NO, no enviamos y avisamos (el edge lo
+  // registra como fallido → queda en rojo en el chat).
+  const onWa = await checkOnWhatsApp(s, jid);
+  if (onWa === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
 
   try {
     const payload = { text: String(text) };
@@ -941,6 +970,11 @@ app.post('/message/sendMedia/:instance', async (req, res) => {
   const jid = resolveJid(number);
   if (!jid) return res.status(400).json({ error: 'invalid_jid' });
 
+  // ¿El número está en WhatsApp? Si NO, no enviamos y avisamos (el edge lo
+  // registra como fallido → queda en rojo en el chat).
+  const onWa = await checkOnWhatsApp(s, jid);
+  if (onWa === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
+
   try {
     let content;
     if (mediatype === 'image') content = { image: { url }, caption };
@@ -1010,6 +1044,11 @@ app.post('/message/react/:instance', async (req, res) => {
   if (!number || !messageId) return res.status(400).json({ error: 'missing_number_or_messageId' });
   const jid = resolveJid(number);
   if (!jid) return res.status(400).json({ error: 'invalid_jid' });
+
+  // ¿El número está en WhatsApp? Si NO, no enviamos y avisamos (el edge lo
+  // registra como fallido → queda en rojo en el chat).
+  const onWa = await checkOnWhatsApp(s, jid);
+  if (onWa === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
   try {
     const result = await s.sock.sendMessage(jid, {
       react: { text: emoji, key: { remoteJid: jid, fromMe, id: messageId } },
@@ -1035,6 +1074,11 @@ app.post('/message/delete/:instance', async (req, res) => {
   if (!number || !messageId) return res.status(400).json({ error: 'missing_number_or_messageId' });
   const jid = resolveJid(number);
   if (!jid) return res.status(400).json({ error: 'invalid_jid' });
+
+  // ¿El número está en WhatsApp? Si NO, no enviamos y avisamos (el edge lo
+  // registra como fallido → queda en rojo en el chat).
+  const onWa = await checkOnWhatsApp(s, jid);
+  if (onWa === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
   try {
     await s.sock.sendMessage(jid, { delete: { remoteJid: jid, fromMe, id: messageId } });
     return res.json({ message: 'deleted' });

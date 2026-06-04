@@ -118,7 +118,25 @@ serve(async (req) => {
     mimetype: payload.mimetype,
     ptt: payload.ptt,
   });
-  if (!sent.ok) return json({ ok: false, error: sent.error, target: waJid }, 502);
+  if (!sent.ok) {
+    // Número no registrado en WhatsApp: registramos el intento como FALLIDO
+    // (queda en rojo en el chat) y avisamos al front con reason.
+    if ((sent.error ?? "").includes("not_on_whatsapp")) {
+      const nowIso = new Date().toISOString();
+      const preview = payload.caption?.trim() || `[${mediaType}]`;
+      await sb.from("wa_conversation_messages").insert({
+        tenant_id: TENANT_ID, conversation_id: conversationId, direction: "out",
+        sender_user_id: userId, external_id: null, body: payload.caption?.trim() || null,
+        msg_type: mediaType === "gif" ? "video" : mediaType, media_url: mediaUrl,
+        status: "failed", sent_at: nowIso,
+      });
+      await sb.from("wa_conversations")
+        .update({ last_message_at: nowIso, last_message_preview: preview.slice(0, 120) })
+        .eq("id", conversationId);
+      return json({ ok: false, reason: "not_on_whatsapp", target: waJid }, 200);
+    }
+    return json({ ok: false, error: sent.error, target: waJid }, 502);
+  }
 
   // ── Persistir el saliente + metadata ────────────────────────────────────────
   const nowIso = new Date().toISOString();

@@ -142,7 +142,23 @@ serve(async (req) => {
 
   // ── Enviar por Evolution (por la instancia del canal de la conversación) ────
   const sent = await sendViaEvolution(toNumber, text, instance, quoted);
-  if (!sent.ok) return json({ ok: false, error: sent.error, target: toNumber }, 502);
+  if (!sent.ok) {
+    // Número no registrado en WhatsApp: registramos el intento como FALLIDO
+    // (queda en rojo en el chat) y avisamos al front con reason.
+    if ((sent.error ?? "").includes("not_on_whatsapp")) {
+      const nowIso = new Date().toISOString();
+      await sb.from("wa_conversation_messages").insert({
+        tenant_id: TENANT_ID, conversation_id: conversationId, direction: "out",
+        sender_user_id: userId, external_id: null, body: text, msg_type: "text",
+        status: "failed", sent_at: nowIso, reply_to_message_id: replyToId ?? null,
+      });
+      await sb.from("wa_conversations")
+        .update({ last_message_at: nowIso, last_message_preview: text.slice(0, 120) })
+        .eq("id", conversationId);
+      return json({ ok: false, reason: "not_on_whatsapp", target: toNumber }, 200);
+    }
+    return json({ ok: false, error: sent.error, target: toNumber }, 502);
+  }
 
   // ── Persistir el saliente + actualizar metadata ─────────────────────────────
   const nowIso = new Date().toISOString();
