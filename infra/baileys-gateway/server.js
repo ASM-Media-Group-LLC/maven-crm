@@ -927,13 +927,57 @@ function probeAudioSeconds(oggBuffer) {
   });
 }
 
+// Genera la forma de onda (64 barras, 0-100) que WhatsApp muestra en la nota de
+// voz. Extrae PCM mono con ffmpeg y calcula el RMS por segmento. Algunas
+// versiones de WhatsApp Android NO reproducen la nota si falta el waveform.
+// Devuelve un Uint8Array(64) o null si no se pudo generar (ahí lo omitimos).
+function generateWaveform(oggBuffer) {
+  return new Promise((resolve) => {
+    const tmp = `/tmp/wa-wf-${crypto.randomUUID()}.ogg`;
+    try { fs.writeFileSync(tmp, oggBuffer); } catch (_) { return resolve(null); }
+    let ff;
+    try {
+      ff = spawn('ffmpeg', ['-v', 'error', '-i', tmp, '-ac', '1', '-ar', '8000', '-f', 's16le', 'pipe:1']);
+    } catch (_) { try { fs.unlinkSync(tmp); } catch (_) { /* */ } return resolve(null); }
+    const chunks = [];
+    ff.stdout.on('data', (d) => chunks.push(d));
+    ff.on('error', () => { try { fs.unlinkSync(tmp); } catch (_) { /* */ } resolve(null); });
+    ff.on('close', () => {
+      try { fs.unlinkSync(tmp); } catch (_) { /* */ }
+      const pcm = Buffer.concat(chunks);
+      if (pcm.length < 128) return resolve(null);
+      const bars = 64;
+      const total = Math.floor(pcm.length / 2);
+      const per = Math.max(1, Math.floor(total / bars));
+      const raw = new Array(bars).fill(0);
+      let max = 1;
+      for (let i = 0; i < bars; i++) {
+        let sum = 0, n = 0;
+        for (let j = 0; j < per; j++) {
+          const idx = (i * per + j) * 2;
+          if (idx + 1 >= pcm.length) break;
+          const v = pcm.readInt16LE(idx);
+          sum += v * v; n++;
+        }
+        const rms = n ? Math.sqrt(sum / n) : 0;
+        raw[i] = rms; if (rms > max) max = rms;
+      }
+      const wf = new Uint8Array(bars);
+      for (let i = 0; i < bars; i++) wf[i] = Math.min(100, Math.round((raw[i] / max) * 100));
+      resolve(wf);
+    });
+  });
+}
+
 // Transcodea audio (cualquier contenedor) a OGG/Opus para nota de voz de WhatsApp.
 // El navegador graba webm/opus; WhatsApp solo reproduce ogg/opus como PTT. Usa el
 // ffmpeg nativo del contenedor (apk). Rechaza si ffmpeg no está o falla → fallback.
 function transcodeToOggOpus(inputBuffer) {
   return new Promise((resolve, reject) => {
     const args = ['-hide_banner', '-loglevel', 'error', '-i', 'pipe:0',
-      '-c:a', 'libopus', '-b:a', '32k', '-ar', '48000', '-ac', '1', '-f', 'ogg', 'pipe:1'];
+      // Perfil de voz de WhatsApp: Opus mono 16kHz en modo `voip`. Android es
+      // estricto y NO reproduce notas de voz fuera de este perfil (Web/iPhone sí).
+      '-c:a', 'libopus', '-b:a', '32k', '-ar', '16000', '-ac', '1', '-application', 'voip', '-f', 'ogg', 'pipe:1'];
     let ff;
     try { ff = spawn('ffmpeg', args); } catch (e) { return reject(e); }
     const out = []; const err = [];
@@ -1014,11 +1058,14 @@ app.post('/message/sendMedia/:instance', async (req, res) => {
           if (!resp.ok) throw new Error('fetch ' + resp.status);
           const inBuf = Buffer.from(await resp.arrayBuffer());
           const ogg = await transcodeToOggOpus(inBuf);
-          // Duración: sin `seconds` el celu marca la nota de voz como "no
-          // disponible" (Web la reproduce igual). La medimos del OGG final.
+          // Metadata para que la nota de voz se reproduzca en ANDROID (no solo
+          // en Web/iPhone): duración (seconds) + forma de onda (waveform). Sin
+          // esto Android la marca "no disponible".
           const seconds = await probeAudioSeconds(ogg);
+          const waveform = await generateWaveform(ogg);
           content = { audio: ogg, ptt: true, mimetype: 'audio/ogg; codecs=opus' };
           if (seconds) content.seconds = seconds;
+          if (waveform) content.waveform = waveform;
         } catch (e) {
           logger.error({ err: e.message }, 'ptt transcode failed, fallback a url directa');
           content = { audio: { url }, ptt: true, mimetype: 'audio/ogg; codecs=opus' };
