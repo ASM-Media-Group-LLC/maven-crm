@@ -527,7 +527,7 @@ app.get('/manager/groups', async (_req, res) => {
 // y setea la cookie de sesión (HMAC). Devuelve la apikey para que el dashboard haga
 // acciones sin pedirla aparte (la password ya autenticó al humano).
 app.post('/manager/login', (req, res) => {
-  if (!MANAGER_PASSWORD) return res.json({ ok: true, apikey: API_KEY });
+  if (!MANAGER_PASSWORD) return res.status(503).json({ ok: false, error: 'login no configurado: falta la env var MANAGER_PASSWORD' });
   const pw = (req.body && req.body.password) || '';
   if (!safeEq(pw, MANAGER_PASSWORD)) return res.status(401).json({ ok: false });
   const remember = !!(req.body && req.body.remember);
