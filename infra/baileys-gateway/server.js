@@ -137,6 +137,8 @@ function createSession(instanceName) {
     profilePicUrl: null,
     // Buffer circular de actividad reciente (last 30).
     recentEvents: [],
+    // Config por línea (settings + webhook). Persistida en AUTH_DIR/<inst>/manager-config.json.
+    config: { webhookUrl: null, rejectCalls: false, markRead: false, alwaysOnline: true, syncFullHistory: false },
   };
 }
 
@@ -144,6 +146,24 @@ function getSession(instanceName) {
   let s = sessions.get(instanceName);
   if (!s) { s = createSession(instanceName); sessions.set(instanceName, s); }
   return s;
+}
+
+// Config por línea — persistida en el volumen para sobrevivir reinicios.
+function instanceDir(instanceName) {
+  return instanceName === INSTANCE_NAME ? AUTH_DIR : `${AUTH_DIR}/${instanceName}`;
+}
+function loadConfig(s) {
+  try {
+    const raw = fs.readFileSync(`${instanceDir(s.instanceName)}/manager-config.json`, 'utf8');
+    s.config = { ...s.config, ...JSON.parse(raw) };
+  } catch (e) { /* sin config previa → defaults */ }
+}
+function saveConfig(s) {
+  try {
+    const dir = instanceDir(s.instanceName);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(`${dir}/manager-config.json`, JSON.stringify(s.config));
+  } catch (e) { logger.warn({ err: e.message }, 'saveConfig failed'); }
 }
 
 // Sesión default (el número histórico, INSTANCE_NAME). Las referencias `state.`
@@ -181,6 +201,7 @@ function rolloverDayIfNeeded(s = state) {
 
 async function startSocket(instanceName = INSTANCE_NAME) {
   const s = getSession(instanceName);
+  loadConfig(s);
   s.connection = 'connecting';
   s.qrRaw = null;
   s.qrDataUrl = null;
@@ -207,11 +228,21 @@ async function startSocket(instanceName = INSTANCE_NAME) {
     // No imprime QR en stdout -- lo servimos por HTTP.
     printQRInTerminal: false,
     // generateHighQualityLinkPreview: false,
-    syncFullHistory: false,
-    markOnlineOnConnect: true,
+    syncFullHistory: s.config.syncFullHistory === true,
+    markOnlineOnConnect: s.config.alwaysOnline !== false,
   });
 
   s.sock.ev.on('creds.update', saveCreds);
+
+  // Rechazar llamadas entrantes si la línea lo tiene activado (settings).
+  s.sock.ev.on('call', async (calls) => {
+    if (!s.config.rejectCalls) return;
+    for (const c of (Array.isArray(calls) ? calls : [])) {
+      if (c && c.status === 'offer') {
+        try { await s.sock.rejectCall(c.id, c.from); } catch (e) { logger.warn({ err: e.message }, 'rejectCall failed'); }
+      }
+    }
+  });
 
   s.sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
@@ -273,10 +304,15 @@ async function startSocket(instanceName = INSTANCE_NAME) {
           from: m.pushName || m.key?.participant || m.key?.remoteJid,
           body: extractMsgPreview(m.message),
         }, s);
+        // Marcar como leído si la línea lo tiene activado (settings).
+        if (s.config.markRead && m.key) {
+          try { await s.sock.readMessages([m.key]); } catch (e) { /* best-effort */ }
+        }
       }
-      if (WEBHOOK_URL) {
+      const webhook = s.config.webhookUrl || WEBHOOK_URL;
+      if (webhook) {
         try {
-          await forwardMessage(m, s);
+          await forwardMessage(m, s, webhook);
         } catch (e) {
           logger.error({ err: e.message }, 'forwardMessage failed');
         }
@@ -321,7 +357,7 @@ function extractMsgPreview(message) {
   return '[' + Object.keys(message).slice(0, 2).join(',') + ']';
 }
 
-async function forwardMessage(m, s = state) {
+async function forwardMessage(m, s = state, webhookUrl = WEBHOOK_URL) {
   // Shape compatible con parseEvolutionApiMessage en _shared/whatsapp.ts:
   //   { event, instance, data: { key, pushName, message, messageTimestamp, participant } }
   // `instance` reporta QUÉ número recibió el msg → el ingest enruta al bot correcto.
@@ -337,7 +373,7 @@ async function forwardMessage(m, s = state) {
     },
   };
 
-  const resp = await fetch(WEBHOOK_URL, {
+  const resp = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -548,6 +584,26 @@ app.get('/manager/groups/:instance', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// Settings por línea (rechazar llamadas / leído / online / sync) + webhook propio.
+app.get('/manager/settings/:instance', (req, res) => {
+  const s = sessionFromReq(req);
+  res.json({ config: s.config });
+});
+app.post('/manager/settings/:instance', (req, res) => {
+  const s = sessionFromReq(req);
+  const b = req.body || {};
+  const next = { ...s.config };
+  if (typeof b.webhookUrl === 'string') next.webhookUrl = b.webhookUrl.trim() || null;
+  if (typeof b.rejectCalls === 'boolean') next.rejectCalls = b.rejectCalls;
+  if (typeof b.markRead === 'boolean') next.markRead = b.markRead;
+  if (typeof b.alwaysOnline === 'boolean') next.alwaysOnline = b.alwaysOnline;
+  if (typeof b.syncFullHistory === 'boolean') next.syncFullHistory = b.syncFullHistory;
+  s.config = next;
+  saveConfig(s);
+  // rejectCalls / markRead / webhook aplican en caliente; alwaysOnline y syncFullHistory, al reconectar.
+  res.json({ ok: true, config: s.config, needsReconnect: ['alwaysOnline', 'syncFullHistory'] });
 });
 
 // Login del dashboard: valida la password contra MANAGER_PASSWORD (env) server-side

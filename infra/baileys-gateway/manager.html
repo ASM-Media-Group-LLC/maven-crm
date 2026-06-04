@@ -97,6 +97,7 @@
       <div class="flex gap-1 px-4 pt-2 border-b border-slate-100">
         <button data-tab="salud" class="ln-tab px-3 py-2 text-sm border-b-2 border-emerald-600 font-semibold text-emerald-700">Salud</button>
         <button data-tab="acciones" class="ln-tab px-3 py-2 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700">Acciones</button>
+        <button data-tab="config" class="ln-tab px-3 py-2 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700">Config</button>
         <button data-tab="actividad" class="ln-tab px-3 py-2 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700">Actividad</button>
       </div>
       <div class="p-4 overflow-y-auto">
@@ -121,6 +122,21 @@
             <button id="ln-groups-btn" class="px-3 py-1.5 rounded border border-slate-300 text-sm hover:bg-slate-50">Cargar grupos</button>
             <div id="ln-groups" class="text-xs mt-2 space-y-0.5 max-h-48 overflow-y-auto"></div>
           </div>
+        </div>
+        <div id="ln-config" class="ln-pane hidden space-y-3">
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input id="cfg-reject" type="checkbox" class="rounded"> Rechazar llamadas entrantes automáticamente</label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input id="cfg-read" type="checkbox" class="rounded"> Marcar mensajes como leídos</label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input id="cfg-online" type="checkbox" class="rounded"> Siempre en línea</label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input id="cfg-synchist" type="checkbox" class="rounded"> Sincronizar historial completo</label>
+          <div>
+            <label class="text-xs text-slate-500">Webhook por línea (vacío = usa el global)</label>
+            <input id="cfg-webhook" type="text" placeholder="https://…" class="w-full mt-1 px-2 py-1.5 rounded border border-slate-300 text-sm">
+          </div>
+          <div class="flex items-center gap-2 pt-1">
+            <button id="cfg-save" class="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">Guardar</button>
+            <span id="cfg-msg" class="text-xs"></span>
+          </div>
+          <p class="text-[11px] text-slate-400">"Siempre en línea" y "Sincronizar historial" se aplican al reconectar la línea.</p>
         </div>
         <div id="ln-actividad" class="ln-pane hidden max-h-[55vh] overflow-y-auto"></div>
       </div>
@@ -307,6 +323,7 @@
         b.classList.toggle("border-transparent", !on); b.classList.toggle("text-slate-500", !on);
       });
       if (tab === "actividad") loadLineActivity();
+      if (tab === "config") loadLineConfig();
     }
     function openLine(inst) {
       lnLine = inst;
@@ -372,6 +389,31 @@
         if (!gs.length) { div.innerHTML = '<span class="text-slate-400">' + (j.error === "not_connected" ? "línea no conectada" : "sin grupos") + '</span>'; return; }
         div.innerHTML = gs.map((g) => `<div class="flex justify-between border-b border-slate-50 py-1"><span class="truncate">${esc(g.name)}</span><span class="text-slate-400 ml-2 shrink-0">${g.memberCount}👥</span></div>`).join("");
       } catch (e) { div.innerHTML = '<span class="text-red-500">error: ' + esc(e.message) + '</span>'; }
+    };
+    async function loadLineConfig() {
+      try {
+        const c = (await (await fetch("/manager/settings/" + lnLine, { headers: authH() })).json()).config || {};
+        $("cfg-reject").checked = !!c.rejectCalls;
+        $("cfg-read").checked = !!c.markRead;
+        $("cfg-online").checked = c.alwaysOnline !== false;
+        $("cfg-synchist").checked = !!c.syncFullHistory;
+        $("cfg-webhook").value = c.webhookUrl || "";
+        $("cfg-msg").textContent = "";
+      } catch (e) { $("cfg-msg").className = "text-xs text-red-600"; $("cfg-msg").textContent = "Error: " + esc(e.message); }
+    }
+    $("cfg-save").onclick = async () => {
+      if (!needKey()) return;
+      $("cfg-msg").className = "text-xs text-slate-500"; $("cfg-msg").textContent = "Guardando…";
+      const body = {
+        rejectCalls: $("cfg-reject").checked, markRead: $("cfg-read").checked,
+        alwaysOnline: $("cfg-online").checked, syncFullHistory: $("cfg-synchist").checked,
+        webhookUrl: $("cfg-webhook").value.trim(),
+      };
+      try {
+        const r = await fetch("/manager/settings/" + lnLine, { method: "POST", headers: Object.assign({ "Content-Type": "application/json" }, authH()), body: JSON.stringify(body) });
+        if (r.ok) { $("cfg-msg").className = "text-xs text-emerald-600"; $("cfg-msg").textContent = "✓ Guardado (online/historial aplican al reconectar)"; }
+        else { $("cfg-msg").className = "text-xs text-red-600"; $("cfg-msg").textContent = "Error " + r.status; }
+      } catch (e) { $("cfg-msg").className = "text-xs text-red-600"; $("cfg-msg").textContent = "Error: " + esc(e.message); }
     };
     window.openLine = openLine;
 
