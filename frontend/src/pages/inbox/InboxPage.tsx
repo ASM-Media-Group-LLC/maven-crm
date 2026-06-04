@@ -537,7 +537,7 @@ const InboxPage = () => {
             className="h-9 pl-8"
           />
         </div>
-        <ScrollArea className="flex-1">
+        <div className="flex-1 overflow-y-auto">
           {convLoading ? (
             <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando…
@@ -587,7 +587,7 @@ const InboxPage = () => {
               ))}
             </ul>
           )}
-        </ScrollArea>
+        </div>
       </aside>
 
       {/* ── Hilo ────────────────────────────────────────────────────────── */}
