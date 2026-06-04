@@ -26,6 +26,8 @@ import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLi
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { WaConversationStatus, WaMessageDirection } from "./types";
 
 interface ConvRow {
@@ -75,7 +77,11 @@ const InboxPage = () => {
   const qc = useQueryClient();
   const { toast } = useToast();
   const { canAccess } = usePermissions();
+  // Permiso configurable (Administración → Roles). Default: solo admin. Quien no
+  // lo tiene ve la asignación pero NO puede cambiarla (el RPC + la RLS lo refuerzan).
+  const canAssign = canAccess("WhatsApp", "Asignar conversaciones");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [assignOpen, setAssignOpen] = useState(false);
   const [searchParams] = useSearchParams();
   // Deep-link: /inbox?c=<conversationId> (ej. desde el botón WhatsApp de Closers) abre directo esa conversación.
   useEffect(() => {
@@ -235,12 +241,17 @@ const InboxPage = () => {
     else setCopilotInfo({ action, text: res.result });
   };
 
-  // Asignar la conversación a una persona (5c) — actualiza assigned_to directo
-  // (RLS lo permite a admin/miembro del canal). No toca Evolution (es metadata).
+  // Asignar la conversación a una persona — via RPC gateado por el permiso
+  // "WhatsApp / Asignar conversaciones" (admin siempre; el resto solo si el admin
+  // se lo prendió por rol). La RLS ya NO deja cambiar assigned_to por la API
+  // directa, así que el candado vale aunque alguien evite la UI. No toca Evolution.
   const assignConversation = async (userId: string | null) => {
     if (!selectedId) return;
-    const { error } = await (supabase as any)
-      .from("wa_conversations").update({ assigned_to: userId }).eq("id", selectedId);
+    setAssignOpen(false);
+    const { error } = await (supabase as any).rpc("wa_assign_conversation", {
+      p_conversation_id: selectedId,
+      p_assignee: userId,
+    });
     if (error) {
       toast({ title: "No se pudo asignar", description: error.message, variant: "destructive" });
       return;
@@ -335,23 +346,43 @@ const InboxPage = () => {
                   )}
                 </p>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="ml-auto h-7 gap-1 text-xs" title="Asignar conversación">
-                    <UserCheck className="h-3.5 w-3.5" />
-                    {userName(selected.assigned_to) ?? "Asignar"}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="max-h-72 w-52 overflow-y-auto">
-                  <DropdownMenuLabel className="text-xs">Asignar conversación</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => assignConversation(null)}>Sin asignar</DropdownMenuItem>
-                  {users.map((u) => (
-                    <DropdownMenuItem key={u.id} onClick={() => assignConversation(u.id)}>
-                      {u.full_name || u.id.slice(0, 8)}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {canAssign ? (
+                <Popover open={assignOpen} onOpenChange={setAssignOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="ml-auto h-7 gap-1 text-xs" title="Asignar conversación">
+                      <UserCheck className="h-3.5 w-3.5" />
+                      {userName(selected.assigned_to) ?? "Asignar"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-56 p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar persona…" className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>Sin resultados.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem value="sin asignar" onSelect={() => assignConversation(null)}>
+                            Sin asignar
+                          </CommandItem>
+                          {users.map((u) => (
+                            <CommandItem
+                              key={u.id}
+                              value={u.full_name || u.id}
+                              onSelect={() => assignConversation(u.id)}
+                            >
+                              {u.full_name || u.id.slice(0, 8)}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground" title="Asignación (solo lectura)">
+                  <UserCheck className="h-3.5 w-3.5" />
+                  {userName(selected.assigned_to) ?? "Sin asignar"}
+                </span>
+              )}
               <Badge
                 variant={(statusMeta[selected.status] ?? statusMeta.open).variant}
                 className="text-[10px]"

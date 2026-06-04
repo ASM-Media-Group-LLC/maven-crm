@@ -82,8 +82,8 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     "Ver Todas", "Ver Nuevo", "Ver Asignadas", "Ver Confirmadas", "Ver Completadas", "Ver No Interesadas",
     "Editar Status", "Asignar Closer", "Editar Comisiones", "Convertir a Creadora", "Exportar",
   ] },
-  // Inbox WhatsApp propio: Bandeja (ver/responder) · IA (copiloto ✨, controla el costo) · Canales (admin de números).
-  { group: "Operaciones",   module: "WhatsApp",      submodules: ["Bandeja", "IA", "Canales"] },
+  // Inbox WhatsApp propio: Bandeja (ver/responder) · IA (copiloto ✨, controla el costo) · Canales (admin de números) · Asignar conversaciones (reasignar a otros; default solo admin).
+  { group: "Operaciones",   module: "WhatsApp",      submodules: ["Bandeja", "IA", "Canales", "Asignar conversaciones"] },
   { group: "Operaciones",   module: "Tickets",       submodules: ["Crear Ticket", "Editar Ticket", "Eliminar Ticket", "Asignar Ticket"] },
   { group: "Operaciones",   module: "Chatters",      submodules: ["Evaluator", "Workspace", "Admin", "Borrar Historial"] },
   // Scouter Assist submodules. Los que comienzan con "Settings →" son
