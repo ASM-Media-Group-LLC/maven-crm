@@ -789,6 +789,48 @@ app.delete('/instance/logout/:instance', async (req, res) => {
   }
 });
 
+// ── Perfil de la LÍNEA (editar desde el dashboard /manager): foto, nombre y
+//    estado/about del número conectado. ──────────────────────────────────────
+app.post('/profile/picture/:instance', async (req, res) => {
+  const s = sessionFromReq(req);
+  if (s.connection !== 'open' || !s.sock) return res.status(503).json({ error: 'not_connected', state: s.connection });
+  const jid = s.sock.user && s.sock.user.id ? s.sock.user.id : null;
+  if (!jid) return res.status(503).json({ error: 'no_user' });
+  const body = req.body || {};
+  try {
+    let content;
+    if (body.imageUrl) content = { url: String(body.imageUrl) };
+    else if (body.imageBase64) content = Buffer.from(String(body.imageBase64).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    else return res.status(400).json({ error: 'missing_imageUrl_or_imageBase64' });
+    await s.sock.updateProfilePicture(jid, content);
+    return res.json({ message: 'updated' });
+  } catch (e) { logger.error({ err: e.message }, 'updateProfilePicture failed'); return res.status(500).json({ error: 'failed', detail: e.message }); }
+});
+app.post('/profile/name/:instance', async (req, res) => {
+  const s = sessionFromReq(req);
+  if (s.connection !== 'open' || !s.sock) return res.status(503).json({ error: 'not_connected', state: s.connection });
+  const name = String((req.body || {}).name || '').trim();
+  if (!name) return res.status(400).json({ error: 'missing_name' });
+  try { await s.sock.updateProfileName(name); return res.json({ message: 'updated' }); }
+  catch (e) { logger.error({ err: e.message }, 'updateProfileName failed'); return res.status(500).json({ error: 'failed', detail: e.message }); }
+});
+app.post('/profile/status/:instance', async (req, res) => {
+  const s = sessionFromReq(req);
+  if (s.connection !== 'open' || !s.sock) return res.status(503).json({ error: 'not_connected', state: s.connection });
+  const status = String((req.body || {}).status || '');
+  try { await s.sock.updateProfileStatus(status); return res.json({ message: 'updated' }); }
+  catch (e) { logger.error({ err: e.message }, 'updateProfileStatus failed'); return res.status(500).json({ error: 'failed', detail: e.message }); }
+});
+// Foto de perfil de un CONTACTO (la usa el panel de contacto de Maven).
+app.get('/profile/picture/:instance', async (req, res) => {
+  const s = sessionFromReq(req);
+  if (s.connection !== 'open' || !s.sock) return res.status(503).json({ error: 'not_connected', state: s.connection });
+  const jid = resolveJid(String(req.query.jid || ''));
+  if (!jid) return res.status(400).json({ error: 'invalid_jid' });
+  try { const url = await s.sock.profilePictureUrl(jid, 'image').catch(() => null); return res.json({ url: url || null }); }
+  catch (e) { return res.json({ url: null }); }
+});
+
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
