@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, Sticker } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -317,6 +317,25 @@ const InboxPage = () => {
   };
   const sendGifUrl = (gifUrl: string) => sendUrlMedia(gifUrl, "gif", "GIF");
   const sendStickerUrl = (url: string) => sendUrlMedia(url, "sticker", "sticker");
+
+  // Guardar a la galería un sticker RECIBIDO (como "agregar a favoritos" de WhatsApp):
+  // baja el webp del mensaje y lo sube a wa-stickers + lo registra en wa_stickers.
+  const saveStickerToGallery = async (mediaUrl: string) => {
+    try {
+      const resp = await fetch(mediaUrl);
+      if (!resp.ok) throw new Error("no se pudo bajar el sticker");
+      const blob = await resp.blob();
+      const path = `wa-stickers/${crypto.randomUUID()}.webp`;
+      const up = await supabase.storage.from("creator-files").upload(path, blob, { contentType: "image/webp", upsert: false });
+      if (up.error) throw up.error;
+      const ins = await (supabase as any).from("wa_stickers").insert({ storage_path: path });
+      if (ins.error) throw ins.error;
+      qc.invalidateQueries({ queryKey: ["wa-stickers"] });
+      toast({ title: "Sticker guardado en tu galería" });
+    } catch (e) {
+      toast({ title: "No se pudo guardar el sticker", description: (e as Error).message, variant: "destructive" });
+    }
+  };
 
   // Acciones por mensaje (Slice B): reaccionar / eliminar via wa-inbox-action.
   const messageAction = async (messageId: string, action: "react" | "delete", emoji?: string) => {
@@ -707,6 +726,11 @@ const InboxPage = () => {
                                 <DropdownMenuItem onClick={() => setReplyingTo(m)}>
                                   <Reply className="mr-2 h-4 w-4" /> Responder
                                 </DropdownMenuItem>
+                                {m.msg_type === "sticker" && m.media_url && (
+                                  <DropdownMenuItem onClick={() => saveStickerToGallery(m.media_url!)}>
+                                    <Sticker className="mr-2 h-4 w-4" /> Guardar sticker
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuSeparator />
                                 <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
                                   Reaccionar
