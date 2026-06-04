@@ -22,9 +22,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2 } from "lucide-react";
 import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -49,6 +49,7 @@ interface MsgRow {
   body: string | null;
   msg_type: string;
   media_url: string | null;
+  agent_reaction: string | null;
   sent_at: string;
 }
 
@@ -124,7 +125,7 @@ const InboxPage = () => {
       if (!selectedId) return [] as MsgRow[];
       const { data, error } = await (supabase as any)
         .from("wa_conversation_messages")
-        .select("id, direction, body, msg_type, media_url, sent_at")
+        .select("id, direction, body, msg_type, media_url, agent_reaction, sent_at")
         .eq("conversation_id", selectedId)
         .order("sent_at", { ascending: true })
         .limit(500);
@@ -256,6 +257,21 @@ const InboxPage = () => {
     } catch (e) {
       toast({ title: "No se pudo grabar", description: (e as Error).message, variant: "destructive" });
     }
+  };
+
+  // Acciones por mensaje (Slice B): reaccionar / eliminar via wa-inbox-action.
+  const messageAction = async (messageId: string, action: "react" | "delete", emoji?: string) => {
+    if (!selectedId) return;
+    const convId = selectedId;
+    const { data, error } = await supabase.functions.invoke("wa-inbox-action", {
+      body: { message_id: messageId, action, emoji },
+    });
+    const res = data as { ok?: boolean; error?: string } | null;
+    if (error || !res?.ok) {
+      toast({ title: "No se pudo completar la acción", description: error?.message ?? res?.error ?? "error", variant: "destructive" });
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["wa-inbox-messages", convId] });
   };
 
   const sendMessage = async () => {
@@ -491,37 +507,111 @@ const InboxPage = () => {
                 <div className="py-10 text-center text-sm text-muted-foreground">Sin mensajes.</div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {messages.map((m) => (
-                    <div
-                      key={m.id}
-                      className={cn(
-                        "max-w-[75%] rounded-2xl px-3 py-2 text-sm",
-                        m.direction === "out"
-                          ? "self-end bg-primary text-primary-foreground"
-                          : "self-start bg-muted",
-                      )}
-                    >
-                      {m.media_url && m.direction === "out" && m.msg_type === "image" && (
-                        <img src={m.media_url} alt="" className="mb-1 max-h-64 rounded-lg" />
-                      )}
-                      {m.media_url && m.direction === "out" && m.msg_type === "audio" && (
-                        <audio controls src={m.media_url} className="mb-1 w-56" />
-                      )}
-                      {(m.body || !(m.media_url && m.direction === "out" && (m.msg_type === "image" || m.msg_type === "audio"))) && (
-                        <p className="whitespace-pre-wrap break-words">
-                          {m.body || (m.msg_type !== "text" ? `[${m.msg_type}]` : "")}
-                        </p>
-                      )}
-                      <p
-                        className={cn(
-                          "mt-0.5 text-right text-[10px] tabular-nums",
-                          m.direction === "out" ? "text-primary-foreground/70" : "text-muted-foreground",
-                        )}
-                      >
-                        {fmtTime(m.sent_at)}
-                      </p>
-                    </div>
-                  ))}
+                  {messages.map((m) => {
+                    const isOut = m.direction === "out";
+                    const isDeleted = m.msg_type === "deleted";
+                    const showBody =
+                      m.body || isDeleted ||
+                      !(m.media_url && isOut && (m.msg_type === "image" || m.msg_type === "audio"));
+                    return (
+                      <div key={m.id} className={cn("group flex flex-col", isOut ? "items-end" : "items-start")}>
+                        <div className={cn("flex max-w-[80%] items-end gap-1", isOut ? "flex-row-reverse" : "flex-row")}>
+                          <div
+                            className={cn(
+                              "relative min-w-0 rounded-2xl px-3 py-2 text-sm",
+                              isOut ? "bg-primary text-primary-foreground" : "bg-muted",
+                              isDeleted && "opacity-70",
+                              m.agent_reaction && "mb-2",
+                            )}
+                          >
+                            {!isDeleted && m.media_url && isOut && m.msg_type === "image" && (
+                              <img src={m.media_url} alt="" className="mb-1 max-h-64 rounded-lg" />
+                            )}
+                            {!isDeleted && m.media_url && isOut && m.msg_type === "audio" && (
+                              <audio controls src={m.media_url} className="mb-1 w-56" />
+                            )}
+                            {showBody && (
+                              <p className={cn("whitespace-pre-wrap break-words", isDeleted && "italic opacity-80")}>
+                                {isDeleted ? "🚫 Mensaje eliminado" : (m.body || (m.msg_type !== "text" ? `[${m.msg_type}]` : ""))}
+                              </p>
+                            )}
+                            <p
+                              className={cn(
+                                "mt-0.5 text-right text-[10px] tabular-nums",
+                                isOut ? "text-primary-foreground/70" : "text-muted-foreground",
+                              )}
+                            >
+                              {fmtTime(m.sent_at)}
+                            </p>
+                            {m.agent_reaction && (
+                              <span
+                                className={cn(
+                                  "absolute -bottom-2.5 rounded-full border bg-background px-1 text-xs shadow-sm",
+                                  isOut ? "left-2" : "right-2",
+                                )}
+                              >
+                                {m.agent_reaction}
+                              </span>
+                            )}
+                          </div>
+                          {!isDeleted && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  aria-label="Acciones del mensaje"
+                                  className="mb-1 shrink-0 rounded p-1 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align={isOut ? "end" : "start"} side="top" className="w-auto">
+                                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                                  Reaccionar
+                                </DropdownMenuLabel>
+                                <div className="flex items-center gap-0.5 px-1.5 pb-1">
+                                  {["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥"].map((e) => (
+                                    <button
+                                      key={e}
+                                      type="button"
+                                      onClick={() => messageAction(m.id, "react", e)}
+                                      className={cn(
+                                        "rounded px-1 py-0.5 text-lg leading-none hover:bg-muted",
+                                        m.agent_reaction === e && "bg-muted ring-1 ring-primary",
+                                      )}
+                                    >
+                                      {e}
+                                    </button>
+                                  ))}
+                                  {m.agent_reaction && (
+                                    <button
+                                      type="button"
+                                      onClick={() => messageAction(m.id, "react", "")}
+                                      aria-label="Quitar reacción"
+                                      className="rounded p-1 text-muted-foreground hover:bg-muted"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                                {isOut && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive"
+                                      onClick={() => messageAction(m.id, "delete")}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar para todos
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>
