@@ -901,6 +901,32 @@ app.post('/message/sendText/:instance', async (req, res) => {
   }
 });
 
+// Mide la duración (segundos) de un OGG/Opus con ffprobe. WhatsApp necesita
+// `seconds` en la nota de voz; sin eso el teléfono la marca "audio ya no está
+// disponible" (WhatsApp Web la tolera, pero la app del celu no). Las
+// grabaciones webm del navegador no traen duración → hay que medirla del OGG
+// ya transcodeado (escrito a /tmp para que ffprobe pueda hacer seek). Devuelve
+// null si no se pudo medir (ahí omitimos seconds, sin romper el envío).
+function probeAudioSeconds(oggBuffer) {
+  return new Promise((resolve) => {
+    const tmp = `/tmp/wa-ptt-${crypto.randomUUID()}.ogg`;
+    try { fs.writeFileSync(tmp, oggBuffer); } catch (_) { return resolve(null); }
+    let ff;
+    try {
+      ff = spawn('ffprobe', ['-v', 'error', '-show_entries', 'format=duration',
+        '-of', 'default=noprint_wrappers=1:nokey=1', tmp]);
+    } catch (_) { try { fs.unlinkSync(tmp); } catch (_) { /* */ } return resolve(null); }
+    const out = [];
+    ff.stdout.on('data', (d) => out.push(d));
+    ff.on('error', () => { try { fs.unlinkSync(tmp); } catch (_) { /* */ } resolve(null); });
+    ff.on('close', () => {
+      try { fs.unlinkSync(tmp); } catch (_) { /* */ }
+      const s = parseFloat(Buffer.concat(out).toString().trim());
+      resolve(Number.isFinite(s) && s > 0 ? Math.round(s) : null);
+    });
+  });
+}
+
 // Transcodea audio (cualquier contenedor) a OGG/Opus para nota de voz de WhatsApp.
 // El navegador graba webm/opus; WhatsApp solo reproduce ogg/opus como PTT. Usa el
 // ffmpeg nativo del contenedor (apk). Rechaza si ffmpeg no está o falla → fallback.
@@ -988,7 +1014,11 @@ app.post('/message/sendMedia/:instance', async (req, res) => {
           if (!resp.ok) throw new Error('fetch ' + resp.status);
           const inBuf = Buffer.from(await resp.arrayBuffer());
           const ogg = await transcodeToOggOpus(inBuf);
+          // Duración: sin `seconds` el celu marca la nota de voz como "no
+          // disponible" (Web la reproduce igual). La medimos del OGG final.
+          const seconds = await probeAudioSeconds(ogg);
           content = { audio: ogg, ptt: true, mimetype: 'audio/ogg; codecs=opus' };
+          if (seconds) content.seconds = seconds;
         } catch (e) {
           logger.error({ err: e.message }, 'ptt transcode failed, fallback a url directa');
           content = { audio: { url }, ptt: true, mimetype: 'audio/ogg; codecs=opus' };
