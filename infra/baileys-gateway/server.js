@@ -357,6 +357,24 @@ async function startSocket(instanceName = INSTANCE_NAME) {
       }
     }
   });
+
+  // ACK / recibos de entrega → palomitas de WhatsApp. Baileys emite
+  // 'messages.update' con update.status (2 server, 3 entregado, 4 leído).
+  // Solo nos interesan NUESTROS salientes (key.fromMe); los reenviamos al
+  // webhook para que Maven avance wa_conversation_messages.status.
+  s.sock.ev.on('messages.update', async (updates) => {
+    const webhook = s.config.webhookUrl || WEBHOOK_URL;
+    if (!webhook || !Array.isArray(updates)) return;
+    const items = [];
+    for (const u of updates) {
+      if (!u?.key?.fromMe || !u.key?.id) continue;
+      const mapped = mapBaileysStatus(u.update?.status);
+      if (mapped) items.push({ id: u.key.id, status: mapped });
+    }
+    if (!items.length) return;
+    try { await forwardStatus(items, s, webhook); }
+    catch (e) { logger.error({ err: e.message }, 'forwardStatus failed'); }
+  });
 }
 
 // Carga el perfil del bot tras conectar. Le pedimos a Baileys el numero
@@ -420,6 +438,35 @@ async function forwardMessage(m, s = state, webhookUrl = WEBHOOK_URL) {
   if (!resp.ok) {
     const txt = await resp.text().catch(() => '');
     logger.warn({ status: resp.status, body: txt.slice(0, 200) }, 'webhook returned non-2xx');
+  }
+}
+
+// Mapea el status numérico de Baileys (proto.WebMessageInfo.Status) al estado
+// de la bandeja: 0 ERROR, 1 PENDING, 2 SERVER_ACK, 3 DELIVERY_ACK, 4 READ, 5 PLAYED.
+function mapBaileysStatus(st) {
+  if (st == null) return null;
+  const n = typeof st === 'number'
+    ? st
+    : ({ ERROR: 0, PENDING: 1, SERVER_ACK: 2, DELIVERY_ACK: 3, READ: 4, PLAYED: 5 })[String(st).toUpperCase()];
+  if (n === 0) return 'failed';
+  if (n === 1 || n === 2) return 'sent';
+  if (n === 3) return 'delivered';
+  if (n === 4 || n === 5) return 'read';
+  return null;
+}
+
+// Reenvía los ACK (palomitas) al MISMO webhook que los mensajes. El ingest
+// detecta `statusUpdates` y hace UPDATE del saliente por external_id (key.id).
+async function forwardStatus(items, s = state, webhookUrl = WEBHOOK_URL) {
+  const payload = { event: 'messages.update', instance: s.instanceName, statusUpdates: items };
+  const resp = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => '');
+    logger.warn({ status: resp.status, body: txt.slice(0, 200) }, 'status webhook non-2xx');
   }
 }
 

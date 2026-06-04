@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, Sticker, Maximize2 } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, CheckCheck, AlertCircle, Sticker, Maximize2 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -61,6 +61,19 @@ interface MsgRow {
   agent_reaction: string | null;
   reply_to_message_id: string | null;
   sent_at: string;
+  status: string | null;
+}
+
+// Palomitas de WhatsApp para los mensajes SALIENTES según el estado de entrega:
+// 1 palomita = enviado (server ack), 2 = entregado, 2 azules = leído, ⚠ = no entregado.
+function StatusTick({ status }: { status: string | null }) {
+  if (status === "failed")
+    return <AlertCircle className="h-3 w-3 text-red-300" aria-label="No entregado" />;
+  if (status === "read")
+    return <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb]" aria-label="Leído" />;
+  if (status === "delivered")
+    return <CheckCheck className="h-3.5 w-3.5" aria-label="Entregado" />;
+  return <Check className="h-3.5 w-3.5" aria-label="Enviado" />; // 'sent' o null
 }
 
 const fmtTime = (iso: string | null): string => {
@@ -155,7 +168,7 @@ const InboxPage = () => {
       if (!selectedId) return [] as MsgRow[];
       const { data, error } = await (supabase as any)
         .from("wa_conversation_messages")
-        .select("id, direction, body, msg_type, media_url, agent_reaction, reply_to_message_id, sent_at")
+        .select("id, direction, body, msg_type, media_url, agent_reaction, reply_to_message_id, sent_at, status")
         .eq("conversation_id", selectedId)
         .order("sent_at", { ascending: true })
         .limit(500);
@@ -395,7 +408,7 @@ const InboxPage = () => {
     const optimisticId = "optimistic-" + Date.now();
     qc.setQueryData<MsgRow[]>(["wa-inbox-messages", convId], (old = []) => [
       ...old,
-      { id: optimisticId, direction: "out", body: text, msg_type: "text", media_url: null, agent_reaction: null, reply_to_message_id: replyTo?.id ?? null, sent_at: new Date().toISOString() },
+      { id: optimisticId, direction: "out", body: text, msg_type: "text", media_url: null, agent_reaction: null, reply_to_message_id: replyTo?.id ?? null, sent_at: new Date().toISOString(), status: "sent" },
     ]);
 
     setSending(true);
@@ -743,11 +756,12 @@ const InboxPage = () => {
                             )}
                             <p
                               className={cn(
-                                "mt-0.5 text-right text-[10px] tabular-nums",
+                                "mt-0.5 flex items-center justify-end gap-1 text-[10px] tabular-nums",
                                 isOut ? "text-primary-foreground/70" : "text-muted-foreground",
                               )}
                             >
                               {fmtTime(m.sent_at)}
+                              {isOut && !isDeleted && <StatusTick status={m.status} />}
                             </p>
                             {m.agent_reaction && (
                               <span

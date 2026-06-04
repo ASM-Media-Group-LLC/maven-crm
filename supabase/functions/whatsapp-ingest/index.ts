@@ -940,6 +940,41 @@ serve(async (req) => {
     });
   }
 
+  // ── ACK / palomitas (estado de entrega) ──────────────────────────────
+  // El gateway manda { event:'messages.update', instance, statusUpdates:[{id,status}] }
+  // con los recibos de Baileys (server/delivered/read) de NUESTROS salientes.
+  // Avanzamos wa_conversation_messages.status (match por external_id = key.id),
+  // sin retroceder (sent→delivered→read); 'failed' solo si seguía en 'sent'.
+  if (payload && typeof payload === "object" && Array.isArray((payload as { statusUpdates?: unknown }).statusUpdates)) {
+    const sb = adminClient();
+    const updates = (payload as { statusUpdates: Array<{ id?: string; status?: string }> }).statusUpdates;
+    const RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3 };
+    let applied = 0;
+    for (const u of updates) {
+      if (!u?.id || !u?.status) continue;
+      const { data: rows } = await (sb as any)
+        .from("wa_conversation_messages")
+        .select("id, status")
+        .eq("external_id", u.id)
+        .eq("direction", "out")
+        .limit(1);
+      const row = rows?.[0] as { id: string; status: string } | undefined;
+      if (!row) continue;
+      if (u.status === "failed") {
+        if (row.status !== "sent") continue; // no pisar delivered/read
+      } else {
+        const cur = RANK[row.status] ?? 1;
+        const next = RANK[u.status];
+        if (!next || next <= cur) continue; // solo avanzar el estado
+      }
+      await (sb as any).from("wa_conversation_messages").update({ status: u.status }).eq("id", row.id);
+      applied++;
+    }
+    return new Response(JSON.stringify({ ok: true, status_applied: applied }), {
+      status: 200, headers: { ...whatsappCors, "Content-Type": "application/json" },
+    });
+  }
+
   const msg = provider === "evolution"
     ? parseEvolutionApiMessage(payload)
     : parseGenericMessage(payload);
