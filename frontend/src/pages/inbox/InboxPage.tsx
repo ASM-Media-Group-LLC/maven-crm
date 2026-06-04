@@ -22,13 +22,14 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Smile, Paperclip, Mic } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { WaConversationStatus, WaMessageDirection } from "./types";
+import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 
 interface ConvRow {
   id: string;
@@ -73,9 +74,6 @@ const statusMeta: Record<string, { label: string; variant: "secondary-soft" | "s
   closed: { label: "Cerrada", variant: "success-soft" },
 };
 
-// Emojis frecuentes para el compose (ventas/closers). Picker simple sin lib.
-const QUICK_EMOJIS = ["😀","😅","😂","🥰","😍","😘","😎","🤝","👍","👏","🙌","🙏","🔥","💪","✅","❤️","💯","🎉","👀","😉","👋","💰","📸","🤔"];
-
 const InboxPage = () => {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -90,6 +88,8 @@ const InboxPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  // Emojis del compose — misma barra/catálogo que Chatter Evaluator (en memoria).
+  const [inboxEmojis, setInboxEmojis] = useState<string[]>([...DEFAULT_EMOJIS]);
   const [searchParams] = useSearchParams();
   // Deep-link: /inbox?c=<conversationId> (ej. desde el botón WhatsApp de Closers) abre directo esa conversación.
   useEffect(() => {
@@ -545,6 +545,14 @@ const InboxPage = () => {
               </div>
             )}
 
+            {/* Barra de emojis — misma config/catálogo que Chatter Evaluator */}
+            <EmojiBar
+              emojis={inboxEmojis}
+              onPick={(e) => setDraft((v) => v + e)}
+              onAdd={(e) => setInboxEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
+              onRemove={(e) => setInboxEmojis((curr) => curr.filter((x) => x !== e))}
+            />
+
             {/* Cuadro de envío (Slice 3) + Copiloto menú (6a) */}
             <div className="flex items-center gap-2 border-t border-border px-4 py-3">
               {canAccess("WhatsApp", "IA") && (
@@ -574,27 +582,6 @@ const InboxPage = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
               )}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" title="Emojis">
-                    <Smile className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="start" side="top" className="w-64 p-2">
-                  <div className="grid grid-cols-8 gap-1">
-                    {QUICK_EMOJIS.map((e) => (
-                      <button
-                        key={e}
-                        type="button"
-                        onClick={() => setDraft((d) => d + e)}
-                        className="rounded p-1 text-lg leading-none hover:bg-muted"
-                      >
-                        {e}
-                      </button>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
               <input
                 ref={fileInputRef}
                 type="file"
