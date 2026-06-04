@@ -40,6 +40,7 @@ const pino = require('pino');
 const QRCode = require('qrcode');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const API_KEY = process.env.API_KEY || '';
@@ -59,6 +60,49 @@ if (!API_KEY) {
 // codigo nuestro. Vanilla JS + Tailwind CDN. La apikey se guarda en
 // sessionStorage del browser para acciones que la requieren.
 const MANAGER_HTML = fs.readFileSync(__dirname + '/manager.html', 'utf8');
+
+// ── Login del dashboard (NO hardcodeado, server-side) ────────────────────────
+// La password vive en la env var MANAGER_PASSWORD (se setea en Dokploy, nunca en
+// el código). Si no está seteada, el login queda DESHABILITADO (dashboard público
+// como antes) para no bloquear hasta configurarla. El token de sesión es un HMAC
+// de la password con la API_KEY como secret: determinístico (sobrevive reinicios)
+// y NO revela la password. Se valida server-side; el cliente solo guarda el token
+// en una cookie HttpOnly (no legible por JS).
+const MANAGER_PASSWORD = process.env.MANAGER_PASSWORD || '';
+const managerToken = () => crypto.createHmac('sha256', API_KEY).update('mgr:' + MANAGER_PASSWORD).digest('hex');
+function safeEq(a, b) {
+  const ba = Buffer.from(String(a)); const bb = Buffer.from(String(b));
+  if (ba.length !== bb.length) return false;
+  try { return crypto.timingSafeEqual(ba, bb); } catch (e) { return false; }
+}
+function hasManagerSession(req) {
+  if (!MANAGER_PASSWORD) return true; // login deshabilitado hasta configurar la env var
+  const cookie = String((req.headers && req.headers.cookie) || '');
+  const hit = cookie.split(';').map((c) => c.trim()).find((c) => c.startsWith('mgr_session='));
+  if (!hit) return false;
+  return safeEq(hit.slice('mgr_session='.length), managerToken());
+}
+const LOGIN_HTML = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Maven · Gateway — Acceso</title><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-slate-900 min-h-screen flex items-center justify-center p-4">
+  <form id="f" class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+    <h1 class="text-xl font-bold mb-1">Maven · Gateway</h1>
+    <p class="text-sm text-slate-500 mb-4">Ingresá la contraseña para administrar las líneas de WhatsApp.</p>
+    <input id="pw" type="password" autofocus placeholder="Contraseña" class="w-full px-3 py-2 rounded border border-slate-300 mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+    <div id="err" class="text-sm text-red-600 mb-2 hidden">Contraseña incorrecta.</div>
+    <button class="w-full py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Entrar</button>
+  </form>
+  <script>
+    document.getElementById('f').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('err'); err.classList.add('hidden');
+      try {
+        const r = await fetch('/manager/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: document.getElementById('pw').value }) });
+        if (r.ok) { const j = await r.json(); if (j.apikey) localStorage.setItem('apikey', j.apikey); location.replace('/manager'); }
+        else { err.classList.remove('hidden'); }
+      } catch (_e) { err.classList.remove('hidden'); }
+    });
+  </script>
+</body></html>`;
 
 // Sesiones multi-número (Fase 2). Cada número/instancia tiene su propia sesión
 // (sock, conexión, QR, métricas). `sessions` mapea instanceName -> sessionState.
@@ -324,6 +368,17 @@ function resolveJid(numberOrJid) {
 const app = express();
 app.use(express.json({ limit: '5mb' }));
 
+// Gate del dashboard: las APIs de lectura /manager/* requieren sesión (login con
+// MANAGER_PASSWORD). Se eximen GET /manager (sirve login o dashboard) y POST
+// /manager/login. NO afecta las acciones (/instance, /profile, /message), que
+// siguen con su apikey (middleware de más abajo, intacto para las edge functions).
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/manager')) return next();
+  if (req.path === '/manager' || req.path === '/manager/login') return next();
+  if (hasManagerSession(req)) return next();
+  return res.status(401).json({ error: 'login_required' });
+});
+
 // Healthcheck publico. Para browsers (Accept: text/html) redirige al
 // dashboard; para clientes API (curl, fetch, etc) devuelve JSON.
 app.get('/', (req, res) => {
@@ -467,10 +522,24 @@ app.get('/manager/groups', async (_req, res) => {
   }
 });
 
-// Manager UI -- dashboard HTML inspired on Evolution Manager pero light.
-// Sirve sin auth (publica). Las acciones que mutan estado piden apikey
-// guardada en sessionStorage del browser.
-app.get('/manager', (_req, res) => {
+// Login del dashboard: valida la password contra MANAGER_PASSWORD (env) server-side
+// y setea la cookie de sesión (HMAC). Devuelve la apikey para que el dashboard haga
+// acciones sin pedirla aparte (la password ya autenticó al humano).
+app.post('/manager/login', (req, res) => {
+  if (!MANAGER_PASSWORD) return res.json({ ok: true, apikey: API_KEY });
+  const pw = (req.body && req.body.password) || '';
+  if (!safeEq(pw, MANAGER_PASSWORD)) return res.status(401).json({ ok: false });
+  const secure = req.headers['x-forwarded-proto'] === 'https' || !!req.secure;
+  res.cookie('mgr_session', managerToken(), { httpOnly: true, sameSite: 'lax', secure, maxAge: 30 * 24 * 3600 * 1000, path: '/' });
+  res.json({ ok: true, apikey: API_KEY });
+});
+
+// Manager UI -- dashboard. Con MANAGER_PASSWORD configurada y sin sesión válida,
+// sirve la pantalla de login; con sesión (o sin password configurada), el dashboard.
+app.get('/manager', (req, res) => {
+  if (!hasManagerSession(req)) {
+    return res.set('Content-Type', 'text/html').send(LOGIN_HTML);
+  }
   res.set('Content-Type', 'text/html').send(MANAGER_HTML);
 });
 
