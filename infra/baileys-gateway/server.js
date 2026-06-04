@@ -88,6 +88,7 @@ const LOGIN_HTML = `<!doctype html><html lang="es"><head><meta charset="utf-8"><
     <h1 class="text-xl font-bold mb-1">Maven · Gateway</h1>
     <p class="text-sm text-slate-500 mb-4">Ingresá la contraseña para administrar las líneas de WhatsApp.</p>
     <input id="pw" type="password" autofocus placeholder="Contraseña" class="w-full px-3 py-2 rounded border border-slate-300 mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+    <label class="flex items-center gap-2 text-sm text-slate-600 mb-3 select-none cursor-pointer"><input id="rm" type="checkbox" checked class="rounded border-slate-300"> Recordarme en este dispositivo</label>
     <div id="err" class="text-sm text-red-600 mb-2 hidden">Contraseña incorrecta.</div>
     <button class="w-full py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Entrar</button>
   </form>
@@ -96,7 +97,7 @@ const LOGIN_HTML = `<!doctype html><html lang="es"><head><meta charset="utf-8"><
       e.preventDefault();
       const err = document.getElementById('err'); err.classList.add('hidden');
       try {
-        const r = await fetch('/manager/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: document.getElementById('pw').value }) });
+        const r = await fetch('/manager/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: document.getElementById('pw').value, remember: document.getElementById('rm').checked }) });
         if (r.ok) { const j = await r.json(); if (j.apikey) localStorage.setItem('apikey', j.apikey); location.replace('/manager'); }
         else { err.classList.remove('hidden'); }
       } catch (_e) { err.classList.remove('hidden'); }
@@ -529,8 +530,11 @@ app.post('/manager/login', (req, res) => {
   if (!MANAGER_PASSWORD) return res.json({ ok: true, apikey: API_KEY });
   const pw = (req.body && req.body.password) || '';
   if (!safeEq(pw, MANAGER_PASSWORD)) return res.status(401).json({ ok: false });
+  const remember = !!(req.body && req.body.remember);
   const secure = req.headers['x-forwarded-proto'] === 'https' || !!req.secure;
-  res.cookie('mgr_session', managerToken(), { httpOnly: true, sameSite: 'lax', secure, maxAge: 30 * 24 * 3600 * 1000, path: '/' });
+  const opts = { httpOnly: true, sameSite: 'lax', secure, path: '/' };
+  if (remember) opts.maxAge = 30 * 24 * 3600 * 1000; // persistente; sin esto = cookie de sesión (hasta cerrar el navegador)
+  res.cookie('mgr_session', managerToken(), opts);
   res.json({ ok: true, apikey: API_KEY });
 });
 
