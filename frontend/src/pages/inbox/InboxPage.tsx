@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Smile } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
@@ -72,6 +72,9 @@ const statusMeta: Record<string, { label: string; variant: "secondary-soft" | "s
   pending: { label: "Pendiente", variant: "warning-soft" },
   closed: { label: "Cerrada", variant: "success-soft" },
 };
+
+// Emojis frecuentes para el compose (ventas/closers). Picker simple sin lib.
+const QUICK_EMOJIS = ["😀","😅","😂","🥰","😍","😘","😎","🤝","👍","👏","🙌","🙏","🔥","💪","✅","❤️","💯","🎉","👀","😉","👋","💰","📸","🤔"];
 
 const InboxPage = () => {
   const qc = useQueryClient();
@@ -492,6 +495,27 @@ const InboxPage = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
               )}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" title="Emojis">
+                    <Smile className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" side="top" className="w-64 p-2">
+                  <div className="grid grid-cols-8 gap-1">
+                    {QUICK_EMOJIS.map((e) => (
+                      <button
+                        key={e}
+                        type="button"
+                        onClick={() => setDraft((d) => d + e)}
+                        className="rounded p-1 text-lg leading-none hover:bg-muted"
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
               <Input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
