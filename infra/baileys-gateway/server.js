@@ -974,10 +974,16 @@ function generateWaveform(oggBuffer) {
 // ffmpeg nativo del contenedor (apk). Rechaza si ffmpeg no está o falla → fallback.
 function transcodeToOggOpus(inputBuffer) {
   return new Promise((resolve, reject) => {
-    const args = ['-hide_banner', '-loglevel', 'error', '-i', 'pipe:0',
-      // Perfil de voz de WhatsApp: Opus mono 16kHz en modo `voip`. Android es
-      // estricto y NO reproduce notas de voz fuera de este perfil (Web/iPhone sí).
-      '-c:a', 'libopus', '-b:a', '32k', '-ar', '16000', '-ac', '1', '-application', 'voip', '-f', 'ogg', 'pipe:1'];
+    const args = ['-hide_banner', '-loglevel', 'error',
+      // +genpts: regenera timestamps del webm del navegador (vienen rotos).
+      '-fflags', '+genpts', '-i', 'pipe:0',
+      // Perfil de voz de WhatsApp: Opus mono 16kHz en modo `voip`.
+      '-c:a', 'libopus', '-b:a', '32k', '-ar', '16000', '-ac', '1', '-application', 'voip',
+      // avoid_negative_ts make_zero: fuerza que el audio arranque en t=0. El webm
+      // del navegador trae timestamps negativos/no-cero que el reproductor estricto
+      // del iPhone rechaza como corrupto ("audio no disponible") aunque Web los
+      // tolere. Recomendado por la doc de Baileys para audio.
+      '-avoid_negative_ts', 'make_zero', '-f', 'ogg', 'pipe:1'];
     let ff;
     try { ff = spawn('ffmpeg', args); } catch (e) { return reject(e); }
     const out = []; const err = [];
