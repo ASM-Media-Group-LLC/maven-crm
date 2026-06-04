@@ -51,3 +51,6 @@ verify_jwt = false  # envía saliente con media (imagen/audio/video/doc) desde l
 
 [functions.wa-inbox-action]
 verify_jwt = false  # reaccionar/eliminar un mensaje del inbox (auth propia). Rutea por la instancia del canal.
+
+[functions.wa-contact-avatar]
+verify_jwt = false  # foto de perfil del contacto (proxy al gateway /profile/picture, auth propia).

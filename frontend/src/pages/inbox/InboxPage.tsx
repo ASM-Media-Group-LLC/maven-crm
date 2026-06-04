@@ -117,6 +117,7 @@ const InboxPage = () => {
   const [assignPanelOpen, setAssignPanelOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [contactAvatar, setContactAvatar] = useState<string | null>(null);
 
   const { data: conversations = [], isLoading: convLoading } = useQuery({
     queryKey: ["wa-inbox-conversations"],
@@ -244,6 +245,19 @@ const InboxPage = () => {
     (supabase as any).rpc("wa_mark_read", { p_conversation_id: selectedId })
       .then(() => qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] }));
   }, [selectedId, selected, qc]);
+
+  // Foto real del contacto: al abrir el panel, se la pedimos al gateway (vía edge).
+  useEffect(() => {
+    setContactAvatar(null);
+    if (!contactPanelOpen || !selectedId) return;
+    const conv = selectedId;
+    supabase.functions.invoke("wa-contact-avatar", { body: { conversation_id: conv } })
+      .then(({ data }) => {
+        const u = (data as { url?: string | null } | null)?.url ?? null;
+        if (u) setContactAvatar(u);
+      })
+      .catch(() => { /* sin foto: queda la inicial */ });
+  }, [contactPanelOpen, selectedId]);
 
   // ── Media saliente (Slice A): sube el archivo a Storage y lo manda por
   //    wa-inbox-send-media (que rutea por la instancia del canal). ──
@@ -812,9 +826,13 @@ const InboxPage = () => {
                   <DialogTitle className="sr-only">Info del contacto</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col items-center gap-3 pt-1">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/10 text-2xl font-semibold text-primary">
-                    {(selected?.contact?.display_name || selected?.contact?.instagram_handle || "?").slice(0, 1).toUpperCase()}
-                  </div>
+                  {contactAvatar ? (
+                    <img src={contactAvatar} alt="" className="h-20 w-20 rounded-full object-cover" />
+                  ) : (
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/10 text-2xl font-semibold text-primary">
+                      {(selected?.contact?.display_name || selected?.contact?.instagram_handle || "?").slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
                   <div className="flex w-full items-center gap-1">
                     <Input
                       value={nameDraft}
