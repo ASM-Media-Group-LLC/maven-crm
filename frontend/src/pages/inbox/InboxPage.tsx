@@ -32,6 +32,7 @@ import type { WaConversationStatus, WaMessageDirection } from "./types";
 import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUserRole } from "@/hooks/useUserRole";
+import { AudioRecorderBar } from "./AudioRecorder";
 
 interface ConvRow {
   id: string;
@@ -91,8 +92,6 @@ const InboxPage = () => {
   const [mediaBusy, setMediaBusy] = useState(false);
   const [recording, setRecording] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   // Emojis del compose — misma barra/catálogo que Chatter Evaluator (en memoria).
   const [inboxEmojis, setInboxEmojis] = useState<string[]>([...DEFAULT_EMOJIS]);
   const [searchParams] = useSearchParams();
@@ -258,27 +257,13 @@ const InboxPage = () => {
     sendMedia(file, file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : "document", file.name);
   };
 
-  // Grabar nota de voz (toggle). En Chrome sale webm/opus; WhatsApp suele
-  // reproducirlo, si no lo hace habría que transcodear a ogg en el gateway.
-  const toggleRecording = async () => {
-    if (recording) { mediaRecorderRef.current?.stop(); return; }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const rec = new MediaRecorder(stream);
-      audioChunksRef.current = [];
-      rec.ondataavailable = (ev) => { if (ev.data.size > 0) audioChunksRef.current.push(ev.data); };
-      rec.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        setRecording(false);
-        const blob = new Blob(audioChunksRef.current, { type: rec.mimeType || "audio/webm" });
-        if (blob.size > 0) sendMedia(blob, "audio", `nota-${Date.now()}.webm`, true);
-      };
-      mediaRecorderRef.current = rec;
-      rec.start();
-      setRecording(true);
-    } catch (e) {
-      toast({ title: "No se pudo grabar", description: (e as Error).message, variant: "destructive" });
-    }
+  // La grabación de nota de voz (micrófono + ondas en vivo + pausar/cancelar/enviar)
+  // la maneja <AudioRecorderBar/>; acá solo montamos/desmontamos la barra y, al
+  // enviar, mandamos el blob como nota de voz (ptt) — el gateway lo transcodea a ogg.
+  const startRecording = () => setRecording(true);
+  const handleRecorderSend = (blob: Blob) => {
+    setRecording(false);
+    sendMedia(blob, "audio", `nota-${Date.now()}.webm`, true);
   };
 
   // Acciones por mensaje (Slice B): reaccionar / eliminar via wa-inbox-action.
@@ -847,14 +832,22 @@ const InboxPage = () => {
             )}
 
             {/* Barra de emojis — misma config/catálogo que Chatter Evaluator */}
-            <EmojiBar
-              emojis={inboxEmojis}
-              onPick={(e) => setDraft((v) => v + e)}
-              onAdd={(e) => setInboxEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
-              onRemove={(e) => setInboxEmojis((curr) => curr.filter((x) => x !== e))}
-            />
+            {!recording && (
+              <EmojiBar
+                emojis={inboxEmojis}
+                onPick={(e) => setDraft((v) => v + e)}
+                onAdd={(e) => setInboxEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
+                onRemove={(e) => setInboxEmojis((curr) => curr.filter((x) => x !== e))}
+              />
+            )}
+
+            {/* Grabador de nota de voz (estilo WhatsApp): ondas + pausar/cancelar/enviar */}
+            {recording && (
+              <AudioRecorderBar onSend={handleRecorderSend} onCancel={() => setRecording(false)} />
+            )}
 
             {/* Cuadro de envío (Slice 3) + Copiloto menú (6a) */}
+            {!recording && (
             <div className="flex items-center gap-2 border-t border-border px-4 py-3">
               {canAccess("WhatsApp", "IA") && (
               <DropdownMenu>
@@ -899,10 +892,10 @@ const InboxPage = () => {
                 {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
               </Button>
               <Button
-                variant={recording ? "destructive" : "outline"} size="icon" className="h-10 w-10 shrink-0"
-                title={recording ? "Detener y enviar nota de voz" : "Grabar nota de voz"}
+                variant="outline" size="icon" className="h-10 w-10 shrink-0"
+                title="Grabar nota de voz"
                 disabled={mediaBusy || sending}
-                onClick={toggleRecording}
+                onClick={startRecording}
               >
                 <Mic className="h-4 w-4" />
               </Button>
@@ -928,6 +921,7 @@ const InboxPage = () => {
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
+            )}
           </>
         )}
       </section>
