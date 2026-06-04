@@ -168,6 +168,32 @@ const InboxPage = () => {
   });
   const channelLabel = (id: string | null) => (!id ? null : channels.find((c) => c.id === id)?.label ?? null);
 
+  // Autoscroll del hilo: al abrir/recargar una conversación lleva al último mensaje;
+  // al llegar mensajes nuevos baja solo si ya estabas cerca del fondo (no te corta
+  // la lectura si subiste a leer historial). Alcanza el viewport del Radix
+  // ScrollArea desde el ancla con closest([data-radix-scroll-area-viewport]).
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollThreadToBottom = (force: boolean) => {
+    const anchor = messagesEndRef.current;
+    if (!anchor) return;
+    const vp = anchor.closest("[data-radix-scroll-area-viewport]") as HTMLElement | null;
+    if (!vp) { anchor.scrollIntoView({ block: "end" }); return; }
+    const nearBottom = vp.scrollHeight - vp.scrollTop - vp.clientHeight < 160;
+    if (force || nearBottom) vp.scrollTop = vp.scrollHeight;
+  };
+  // Abrir/recargar/terminar de cargar → SIEMPRE al fondo (+ respaldo a los 220ms por
+  // la media que ajusta su altura al cargar y correría el scroll).
+  useEffect(() => {
+    if (msgLoading) return;
+    requestAnimationFrame(() => scrollThreadToBottom(true));
+    const t = setTimeout(() => scrollThreadToBottom(true), 220);
+    return () => clearTimeout(t);
+  }, [selectedId, msgLoading]);
+  // Mensajes nuevos (realtime / envío) → al fondo solo si ya estabas cerca.
+  useEffect(() => {
+    requestAnimationFrame(() => scrollThreadToBottom(false));
+  }, [messages]);
+
   // Realtime: nuevos mensajes / cambios de conversación → refrescar en vivo.
   useEffect(() => {
     const channel = supabase
@@ -702,6 +728,7 @@ const InboxPage = () => {
                       </div>
                     );
                   })}
+                  <div ref={messagesEndRef} />
                 </div>
               )}
             </ScrollArea>
