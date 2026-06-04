@@ -73,7 +73,19 @@ export function useSidebarBadges() {
         closersCount = count ?? 0;
       }
 
-      return { promologCount, leadgenCount, closersCount };
+      // --- WhatsApp (inbox): total de mensajes NO leídos en las conversaciones
+      //     que el usuario ve (la RLS filtra a sus canales / las asignadas).
+      let waInboxCount = 0;
+      if (canAccess("WhatsApp", "Bandeja")) {
+        const { data: waData } = await (supabase as unknown as { from: (t: string) => any })
+          .from("wa_conversations")
+          .select("unread_count")
+          .gt("unread_count", 0);
+        waInboxCount = (waData ?? []).reduce(
+          (sum: number, c: { unread_count: number | null }) => sum + (c.unread_count || 0), 0);
+      }
+
+      return { promologCount, leadgenCount, closersCount, waInboxCount };
     },
     enabled: !!user && !permsLoading,
     staleTime: 60_000,
@@ -84,5 +96,6 @@ export function useSidebarBadges() {
     promologCount: data?.promologCount || 0,
     leadgenCount: data?.leadgenCount || 0,
     closersCount: data?.closersCount || 0,
+    waInboxCount: data?.waInboxCount || 0,
   };
 }
