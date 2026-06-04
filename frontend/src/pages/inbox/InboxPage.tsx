@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -30,6 +30,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { WaConversationStatus, WaMessageDirection } from "./types";
 import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface ConvRow {
   id: string;
@@ -40,7 +42,8 @@ interface ConvRow {
   last_message_preview: string | null;
   unread_count: number;
   assigned_to: string | null;
-  contact: { display_name: string | null; instagram_handle: string | null } | null;
+  channel_id: string | null;
+  contact: { id: string; display_name: string | null; instagram_handle: string | null; wa_jid: string | null } | null;
 }
 
 interface MsgRow {
@@ -104,6 +107,12 @@ const InboxPage = () => {
   const [sending, setSending] = useState(false);
   const [copilotBusy, setCopilotBusy] = useState<string | null>(null); // acción del copiloto en curso
   const [copilotInfo, setCopilotInfo] = useState<{ action: string; text: string } | null>(null); // output read-only de resumir/señales
+  // Panel de info de contacto (Slice 2) — solo admin.
+  const { isAdmin } = useUserRole();
+  const [contactPanelOpen, setContactPanelOpen] = useState(false);
+  const [assignPanelOpen, setAssignPanelOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   const { data: conversations = [], isLoading: convLoading } = useQuery({
     queryKey: ["wa-inbox-conversations"],
@@ -111,7 +120,7 @@ const InboxPage = () => {
       const { data, error } = await (supabase as any)
         .from("wa_conversations")
         .select(
-          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, contact:wa_contacts(display_name, instagram_handle)",
+          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, contact:wa_contacts(id, display_name, instagram_handle, wa_jid)",
         )
         .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(200);
@@ -148,6 +157,17 @@ const InboxPage = () => {
     refetchOnWindowFocus: false,
   });
   const userName = (id: string | null) => (!id ? null : users.find((u) => u.id === id)?.full_name || id.slice(0, 8));
+
+  // Canales (id→label) para el panel de info de contacto (admin).
+  const { data: channels = [] } = useQuery({
+    queryKey: ["wa-inbox-channels-min"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("wa_channels").select("id, label");
+      return (data ?? []) as { id: string; label: string | null }[];
+    },
+    refetchOnWindowFocus: false,
+  });
+  const channelLabel = (id: string | null) => (!id ? null : channels.find((c) => c.id === id)?.label ?? null);
 
   // Realtime: nuevos mensajes / cambios de conversación → refrescar en vivo.
   useEffect(() => {
@@ -348,6 +368,33 @@ const InboxPage = () => {
   // "WhatsApp / Asignar conversaciones" (admin siempre; el resto solo si el admin
   // se lo prendió por rol). La RLS ya NO deja cambiar assigned_to por la API
   // directa, así que el candado vale aunque alguien evite la UI. No toca Evolution.
+  const jidToNumber = (jid: string | null | undefined): string | null => {
+    if (!jid) return null;
+    const [local, domain] = jid.split("@");
+    if (domain === "s.whatsapp.net" && /^\d+$/.test(local)) return "+" + local;
+    return null; // @lid u otro: no es el teléfono real
+  };
+
+  const saveContactName = async (contactId: string | undefined, name: string) => {
+    if (!contactId) return;
+    setSavingName(true);
+    const { error } = await (supabase as any)
+      .from("wa_contacts").update({ display_name: name.trim() || null }).eq("id", contactId);
+    setSavingName(false);
+    if (error) { toast({ title: "No se pudo guardar el nombre", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Nombre actualizado" });
+    qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+  };
+
+  const setConversationStatus = async (status: string) => {
+    if (!selectedId) return;
+    const { error } = await (supabase as any)
+      .from("wa_conversations").update({ status }).eq("id", selectedId);
+    if (error) { toast({ title: "No se pudo cambiar el estado", description: error.message, variant: "destructive" }); return; }
+    toast({ title: `Conversación ${statusMeta[status]?.label?.toLowerCase() ?? status}` });
+    qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+  };
+
   const assignConversation = async (userId: string | null) => {
     if (!selectedId) return;
     setAssignOpen(false);
@@ -448,7 +495,18 @@ const InboxPage = () => {
           <>
             <header className="flex items-center gap-2 border-b border-border px-5 py-3">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{contactLabel(selected.contact)}</p>
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => { setNameDraft(selected.contact?.display_name ?? ""); setContactPanelOpen(true); }}
+                    className="truncate text-left text-sm font-semibold hover:underline"
+                    title="Ver info del contacto"
+                  >
+                    {contactLabel(selected.contact)}
+                  </button>
+                ) : (
+                  <p className="truncate text-sm font-semibold">{contactLabel(selected.contact)}</p>
+                )}
                 <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
                   {selected.contact?.instagram_handle && (
                     <>
@@ -658,6 +716,92 @@ const InboxPage = () => {
                 <p className="whitespace-pre-wrap break-words text-xs text-foreground/90">{copilotInfo.text}</p>
               </div>
             )}
+
+            {/* Panel de info de contacto (Slice 2) — solo admin, abre al click en el nombre */}
+            <Dialog open={contactPanelOpen} onOpenChange={setContactPanelOpen}>
+              <DialogContent className="max-w-sm">
+                <DialogHeader>
+                  <DialogTitle className="sr-only">Info del contacto</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col items-center gap-3 pt-1">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/10 text-2xl font-semibold text-primary">
+                    {(selected?.contact?.display_name || selected?.contact?.instagram_handle || "?").slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="flex w-full items-center gap-1">
+                    <Input
+                      value={nameDraft}
+                      onChange={(e) => setNameDraft(e.target.value)}
+                      placeholder="Nombre del contacto"
+                      className="h-9 text-center"
+                    />
+                    <Button
+                      size="icon" variant="outline" className="h-9 w-9 shrink-0"
+                      disabled={savingName || nameDraft === (selected?.contact?.display_name ?? "")}
+                      onClick={() => saveContactName(selected?.contact?.id, nameDraft)}
+                      title="Guardar nombre"
+                    >
+                      {savingName ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2.5 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="tabular-nums">{jidToNumber(selected?.contact?.wa_jid) ?? "Número oculto (LID)"}</span>
+                  </div>
+                  {selected?.contact?.instagram_handle && (
+                    <div className="flex items-center gap-2">
+                      <Instagram className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span>@{selected.contact.instagram_handle.replace(/^@/, "")}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Radio className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span>{channelLabel(selected?.channel_id ?? null) ?? "—"} · {selected?.department ?? "—"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="flex-1 truncate">{userName(selected?.assigned_to ?? null) ?? "Sin asignar"}</span>
+                    <Popover open={assignPanelOpen} onOpenChange={setAssignPanelOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-7">Reasignar</Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-56 p-0">
+                        <Command>
+                          <CommandInput placeholder="Buscar persona…" className="h-9" />
+                          <CommandList>
+                            <CommandEmpty>Sin resultados.</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem value="sin asignar" onSelect={() => { assignConversation(null); setAssignPanelOpen(false); }}>
+                                Sin asignar
+                              </CommandItem>
+                              {users.map((u) => (
+                                <CommandItem key={u.id} value={u.full_name ?? u.id} onSelect={() => { assignConversation(u.id); setAssignPanelOpen(false); }}>
+                                  {u.full_name ?? u.id.slice(0, 8)}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="flex items-center gap-1 pt-1">
+                    {(["open", "pending", "closed"] as const).map((st) => (
+                      <Button
+                        key={st}
+                        size="sm"
+                        variant={selected?.status === st ? "default" : "outline"}
+                        className="h-7 flex-1 text-xs"
+                        onClick={() => setConversationStatus(st)}
+                      >
+                        {statusMeta[st].label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Barra de "respondiendo a" (Slice 1 responder/citar) */}
             {replyingTo && (
