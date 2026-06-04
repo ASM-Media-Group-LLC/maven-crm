@@ -564,7 +564,10 @@ const InboxPage = () => {
                         <span className={cn("truncate text-sm", (c.unread_count ?? 0) > 0 ? "font-bold" : "font-medium")}>
                           {contactLabel(c.contact)}
                         </span>
-                        <span className="ml-auto shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                        <span className={cn(
+                          "ml-auto shrink-0 text-[10px] tabular-nums",
+                          (c.unread_count ?? 0) > 0 ? "font-semibold text-green-500" : "text-muted-foreground",
+                        )}>
                           {fmtTime(c.last_message_at)}
                         </span>
                       </div>
@@ -573,7 +576,7 @@ const InboxPage = () => {
                           {c.last_message_preview ?? "—"}
                         </span>
                         {(c.unread_count ?? 0) > 0 && (
-                          <span className="ml-auto grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                          <span className="ml-auto grid h-5 min-w-[20px] shrink-0 place-items-center rounded-full bg-green-500 px-1.5 text-[11px] font-bold text-white shadow-sm">
                             {c.unread_count > 99 ? "99+" : c.unread_count}
                           </span>
                         )}
