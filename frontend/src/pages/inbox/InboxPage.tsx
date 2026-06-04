@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2 } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -50,6 +50,7 @@ interface MsgRow {
   msg_type: string;
   media_url: string | null;
   agent_reaction: string | null;
+  reply_to_message_id: string | null;
   sent_at: string;
 }
 
@@ -99,6 +100,7 @@ const InboxPage = () => {
   }, [searchParams]);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
+  const [replyingTo, setReplyingTo] = useState<MsgRow | null>(null);
   const [sending, setSending] = useState(false);
   const [copilotBusy, setCopilotBusy] = useState<string | null>(null); // acción del copiloto en curso
   const [copilotInfo, setCopilotInfo] = useState<{ action: string; text: string } | null>(null); // output read-only de resumir/señales
@@ -125,7 +127,7 @@ const InboxPage = () => {
       if (!selectedId) return [] as MsgRow[];
       const { data, error } = await (supabase as any)
         .from("wa_conversation_messages")
-        .select("id, direction, body, msg_type, media_url, agent_reaction, sent_at")
+        .select("id, direction, body, msg_type, media_url, agent_reaction, reply_to_message_id, sent_at")
         .eq("conversation_id", selectedId)
         .order("sent_at", { ascending: true })
         .limit(500);
@@ -278,18 +280,20 @@ const InboxPage = () => {
     const text = draft.trim();
     if (!text || !selectedId || sending) return;
     const convId = selectedId;
+    const replyTo = replyingTo; // capturado para reintento + persistencia
     setDraft(""); // limpiar el input al instante (snappy)
+    setReplyingTo(null);
 
     // Optimista: mostrar la burbuja saliente YA; se confirma por detrás.
     const optimisticId = "optimistic-" + Date.now();
     qc.setQueryData<MsgRow[]>(["wa-inbox-messages", convId], (old = []) => [
       ...old,
-      { id: optimisticId, direction: "out", body: text, msg_type: "text", media_url: null, sent_at: new Date().toISOString() },
+      { id: optimisticId, direction: "out", body: text, msg_type: "text", media_url: null, agent_reaction: null, reply_to_message_id: replyTo?.id ?? null, sent_at: new Date().toISOString() },
     ]);
 
     setSending(true);
     const { data, error } = await supabase.functions.invoke("wa-inbox-send", {
-      body: { conversation_id: convId, body: text },
+      body: { conversation_id: convId, body: text, reply_to_message_id: replyTo?.id },
     });
     setSending(false);
     const res = data as { ok?: boolean; error?: string } | null;
@@ -298,6 +302,7 @@ const InboxPage = () => {
       qc.setQueryData<MsgRow[]>(["wa-inbox-messages", convId], (old = []) =>
         old.filter((m) => m.id !== optimisticId));
       setDraft(text);
+      setReplyingTo(replyTo);
       toast({
         title: "No se pudo enviar",
         description: error?.message ?? res?.error ?? "Error desconocido",
@@ -513,6 +518,9 @@ const InboxPage = () => {
                     const showBody =
                       m.body || isDeleted ||
                       !(m.media_url && isOut && (m.msg_type === "image" || m.msg_type === "audio"));
+                    const quoted = m.reply_to_message_id
+                      ? messages.find((x) => x.id === m.reply_to_message_id) ?? null
+                      : null;
                     return (
                       <div key={m.id} className={cn("group flex flex-col", isOut ? "items-end" : "items-start")}>
                         <div className={cn("flex max-w-[80%] items-end gap-1", isOut ? "flex-row-reverse" : "flex-row")}>
@@ -524,6 +532,18 @@ const InboxPage = () => {
                               m.agent_reaction && "mb-2",
                             )}
                           >
+                            {!isDeleted && m.reply_to_message_id && (
+                              <div
+                                className={cn(
+                                  "mb-1 rounded border-l-2 px-2 py-1 text-xs",
+                                  isOut ? "border-primary-foreground/50 bg-black/10" : "border-primary bg-background/60",
+                                )}
+                              >
+                                <p className="truncate opacity-80">
+                                  {quoted ? (quoted.body || `[${quoted.msg_type}]`) : "Mensaje citado"}
+                                </p>
+                              </div>
+                            )}
                             {!isDeleted && m.media_url && isOut && m.msg_type === "image" && (
                               <img src={m.media_url} alt="" className="mb-1 max-h-64 rounded-lg" />
                             )}
@@ -566,6 +586,10 @@ const InboxPage = () => {
                                 </button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align={isOut ? "end" : "start"} side="top" className="w-auto">
+                                <DropdownMenuItem onClick={() => setReplyingTo(m)}>
+                                  <Reply className="mr-2 h-4 w-4" /> Responder
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
                                   Reaccionar
                                 </DropdownMenuLabel>
@@ -632,6 +656,26 @@ const InboxPage = () => {
                   </button>
                 </div>
                 <p className="whitespace-pre-wrap break-words text-xs text-foreground/90">{copilotInfo.text}</p>
+              </div>
+            )}
+
+            {/* Barra de "respondiendo a" (Slice 1 responder/citar) */}
+            {replyingTo && (
+              <div className="mx-4 mt-2 flex items-start gap-2 rounded-md border-l-4 border-primary bg-muted/50 px-3 py-1.5 text-xs">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-primary">
+                    {replyingTo.direction === "out" ? "Respondiendo a vos" : `Respondiendo a ${contactLabel(selected?.contact ?? null)}`}
+                  </p>
+                  <p className="truncate text-muted-foreground">{replyingTo.body || `[${replyingTo.msg_type}]`}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyingTo(null)}
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                  aria-label="Cancelar respuesta"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             )}
 
