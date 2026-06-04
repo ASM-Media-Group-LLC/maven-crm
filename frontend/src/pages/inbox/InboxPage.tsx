@@ -11,7 +11,7 @@
 // (supabase as any): las tablas wa_* son nuevas y todavía no están en los
 // tipos generados de Supabase.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Smile } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Smile, Paperclip, Mic } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
@@ -85,6 +85,11 @@ const InboxPage = () => {
   const canAssign = canAccess("WhatsApp", "Asignar conversaciones");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const [searchParams] = useSearchParams();
   // Deep-link: /inbox?c=<conversationId> (ej. desde el botón WhatsApp de Closers) abre directo esa conversación.
   useEffect(() => {
@@ -186,6 +191,72 @@ const InboxPage = () => {
     (supabase as any).rpc("wa_mark_read", { p_conversation_id: selectedId })
       .then(() => qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] }));
   }, [selectedId, selected, qc]);
+
+  // ── Media saliente (Slice A): sube el archivo a Storage y lo manda por
+  //    wa-inbox-send-media (que rutea por la instancia del canal). ──
+  const sendMedia = async (
+    file: Blob, mediaType: "image" | "audio" | "video" | "document", filename: string, ptt = false,
+  ) => {
+    if (!selectedId || mediaBusy) return;
+    const convId = selectedId;
+    setMediaBusy(true);
+    try {
+      const ext = filename.includes(".") ? filename.split(".").pop() : (mediaType === "audio" ? "webm" : "bin");
+      const path = `wa-outbound/${convId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("creator-files")
+        .upload(path, file, { contentType: (file as File).type || undefined });
+      if (upErr) throw upErr;
+      const { data: signed } = await supabase.storage.from("creator-files")
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      const mediaUrl = signed?.signedUrl;
+      if (!mediaUrl) throw new Error("no se pudo firmar la URL");
+
+      const { data, error } = await supabase.functions.invoke("wa-inbox-send-media", {
+        body: {
+          conversation_id: convId, media_url: mediaUrl, media_type: mediaType,
+          mimetype: (file as File).type || undefined, filename, ptt,
+        },
+      });
+      const res = data as { ok?: boolean; error?: string } | null;
+      if (error || !res?.ok) throw new Error(error?.message ?? res?.error ?? "error");
+      qc.invalidateQueries({ queryKey: ["wa-inbox-messages", convId] });
+      qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+    } catch (e) {
+      toast({ title: "No se pudo enviar el archivo", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setMediaBusy(false);
+    }
+  };
+
+  const onFilePicked = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite re-elegir el mismo archivo
+    if (!file) return;
+    sendMedia(file, file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : "document", file.name);
+  };
+
+  // Grabar nota de voz (toggle). En Chrome sale webm/opus; WhatsApp suele
+  // reproducirlo, si no lo hace habría que transcodear a ogg en el gateway.
+  const toggleRecording = async () => {
+    if (recording) { mediaRecorderRef.current?.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      rec.ondataavailable = (ev) => { if (ev.data.size > 0) audioChunksRef.current.push(ev.data); };
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecording(false);
+        const blob = new Blob(audioChunksRef.current, { type: rec.mimeType || "audio/webm" });
+        if (blob.size > 0) sendMedia(blob, "audio", `nota-${Date.now()}.webm`, true);
+      };
+      mediaRecorderRef.current = rec;
+      rec.start();
+      setRecording(true);
+    } catch (e) {
+      toast({ title: "No se pudo grabar", description: (e as Error).message, variant: "destructive" });
+    }
+  };
 
   const sendMessage = async () => {
     const text = draft.trim();
@@ -430,9 +501,17 @@ const InboxPage = () => {
                           : "self-start bg-muted",
                       )}
                     >
-                      <p className="whitespace-pre-wrap break-words">
-                        {m.body || (m.msg_type !== "text" ? `[${m.msg_type}]` : "")}
-                      </p>
+                      {m.media_url && m.direction === "out" && m.msg_type === "image" && (
+                        <img src={m.media_url} alt="" className="mb-1 max-h-64 rounded-lg" />
+                      )}
+                      {m.media_url && m.direction === "out" && m.msg_type === "audio" && (
+                        <audio controls src={m.media_url} className="mb-1 w-56" />
+                      )}
+                      {(m.body || !(m.media_url && m.direction === "out" && (m.msg_type === "image" || m.msg_type === "audio"))) && (
+                        <p className="whitespace-pre-wrap break-words">
+                          {m.body || (m.msg_type !== "text" ? `[${m.msg_type}]` : "")}
+                        </p>
+                      )}
                       <p
                         className={cn(
                           "mt-0.5 text-right text-[10px] tabular-nums",
@@ -516,6 +595,29 @@ const InboxPage = () => {
                   </div>
                 </PopoverContent>
               </Popover>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                className="hidden"
+                onChange={onFilePicked}
+              />
+              <Button
+                variant="outline" size="icon" className="h-10 w-10 shrink-0"
+                title="Adjuntar archivo"
+                disabled={mediaBusy || sending || recording}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant={recording ? "destructive" : "outline"} size="icon" className="h-10 w-10 shrink-0"
+                title={recording ? "Detener y enviar nota de voz" : "Grabar nota de voz"}
+                disabled={mediaBusy || sending}
+                onClick={toggleRecording}
+              >
+                <Mic className="h-4 w-4" />
+              </Button>
               <Input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
