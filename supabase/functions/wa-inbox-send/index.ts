@@ -35,9 +35,10 @@ function json(body: unknown, status = 200): Response {
 async function sendViaEvolution(
   toNumber: string,
   text: string,
+  instance: string,
 ): Promise<{ ok: boolean; externalId?: string; error?: string }> {
   if (!EVOLUTION_URL || !EVOLUTION_API_KEY) return { ok: false, error: "evolution_not_configured" };
-  const url = `${EVOLUTION_URL.replace(/\/$/, "")}/message/sendText/${EVOLUTION_INSTANCE}`;
+  const url = `${EVOLUTION_URL.replace(/\/$/, "")}/message/sendText/${instance}`;
   const payload = EVOLUTION_API_VERSION === "v2"
     ? { number: toNumber, text }
     : { number: toNumber, options: { delay: 0, presence: "composing" }, textMessage: { text } };
@@ -90,10 +91,10 @@ serve(async (req) => {
   const text = (payload.body ?? "").trim();
   if (!conversationId || !text) return json({ ok: false, error: "missing_conversation_or_body" }, 400);
 
-  // ── Resolver conversación → wa_jid del contacto ─────────────────────────────
+  // ── Resolver conversación → wa_jid del contacto + instancia del canal ───────
   const { data: conv } = await (sb as any)
     .from("wa_conversations")
-    .select("id, contact_id, wa_contacts(wa_jid)")
+    .select("id, contact_id, channel_id, channel_jid, wa_contacts(wa_jid)")
     .eq("id", conversationId)
     .maybeSingle();
   if (!conv) return json({ ok: false, error: "conversation_not_found" }, 404);
@@ -104,8 +105,21 @@ serve(async (req) => {
   // los dígitos NO llega (el lid no es el teléfono real del usuario).
   const toNumber = waJid;
 
-  // ── Enviar por Evolution ────────────────────────────────────────────────────
-  const sent = await sendViaEvolution(toNumber, text);
+  // Instancia de SALIDA: el número del CANAL de esta conversación (NO el del bot).
+  // Sin esto, TODO salía por la instancia fija "maven-bot" (el número del bot)
+  // aunque la conversación fuera de otra línea (ej. Closers1 → 3104516401).
+  // Preferimos el evolution_instance VIGENTE del canal (por channel_id); si no,
+  // el channel_jid que quedó guardado al abrir la conversación; y como último
+  // recurso la env var (compat con conversaciones legacy sin canal).
+  let instance = (conv.channel_jid as string | null) || EVOLUTION_INSTANCE;
+  if (conv.channel_id) {
+    const { data: ch } = await (sb as any)
+      .from("wa_channels").select("evolution_instance").eq("id", conv.channel_id).maybeSingle();
+    if (ch?.evolution_instance) instance = ch.evolution_instance as string;
+  }
+
+  // ── Enviar por Evolution (por la instancia del canal de la conversación) ────
+  const sent = await sendViaEvolution(toNumber, text, instance);
   if (!sent.ok) return json({ ok: false, error: sent.error, target: toNumber }, 502);
 
   // ── Persistir el saliente + actualizar metadata ─────────────────────────────
