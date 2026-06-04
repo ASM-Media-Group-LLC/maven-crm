@@ -87,6 +87,46 @@
     </div>
   </div>
 
+  <!-- Modal: detalle de línea (drill-in: Salud / Acciones / Actividad) -->
+  <div id="modal-line" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between p-4 border-b border-slate-100">
+        <h2 class="font-bold text-lg">Línea <span id="ln-name" class="font-mono text-emerald-700"></span></h2>
+        <button id="ln-close" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">&times;</button>
+      </div>
+      <div class="flex gap-1 px-4 pt-2 border-b border-slate-100">
+        <button data-tab="salud" class="ln-tab px-3 py-2 text-sm border-b-2 border-emerald-600 font-semibold text-emerald-700">Salud</button>
+        <button data-tab="acciones" class="ln-tab px-3 py-2 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700">Acciones</button>
+        <button data-tab="actividad" class="ln-tab px-3 py-2 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-700">Actividad</button>
+      </div>
+      <div class="p-4 overflow-y-auto">
+        <div id="ln-salud" class="ln-pane"></div>
+        <div id="ln-acciones" class="ln-pane hidden space-y-5">
+          <div>
+            <h3 class="text-sm font-semibold mb-2">Enviar mensaje de prueba</h3>
+            <div class="flex flex-col gap-2">
+              <input id="ln-test-num" placeholder="Número con país, ej: 573001234567" class="px-2 py-1.5 rounded border border-slate-300 text-sm">
+              <input id="ln-test-txt" placeholder="Mensaje" class="px-2 py-1.5 rounded border border-slate-300 text-sm">
+              <button id="ln-test-send" class="self-start px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">Enviar prueba</button>
+            </div>
+            <div id="ln-test-msg" class="text-xs mt-1"></div>
+          </div>
+          <div class="border-t border-slate-100 pt-4">
+            <h3 class="text-sm font-semibold mb-2">Conexión</h3>
+            <button id="ln-reconnect" class="px-3 py-1.5 rounded border border-slate-300 text-sm hover:bg-slate-50">Reconectar línea</button>
+            <span id="ln-reconnect-msg" class="text-xs ml-2"></span>
+          </div>
+          <div class="border-t border-slate-100 pt-4">
+            <h3 class="text-sm font-semibold mb-2">Grupos</h3>
+            <button id="ln-groups-btn" class="px-3 py-1.5 rounded border border-slate-300 text-sm hover:bg-slate-50">Cargar grupos</button>
+            <div id="ln-groups" class="text-xs mt-2 space-y-0.5 max-h-48 overflow-y-auto"></div>
+          </div>
+        </div>
+        <div id="ln-actividad" class="ln-pane hidden max-h-[55vh] overflow-y-auto"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const KEY = "apikey";
     const $ = (id) => document.getElementById(id);
@@ -145,7 +185,7 @@
                 <p class="text-xs text-slate-400 mt-0.5">📥 ${i.msgsInToday || 0} · 📤 ${i.msgsOutToday || 0} hoy · ⏱ ${fmtUptime(i.uptimeSec)}${i.lastError ? ' · <span class="text-red-500">' + esc(i.lastError) + "</span>" : ""}</p>
               </div>
               <div class="flex items-center gap-2 flex-shrink-0">
-                <button onclick="toggleAct('${i.instance}')" class="text-xs px-2.5 py-1.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-50">Actividad ${expanded === i.instance ? "▴" : "▾"}</button>
+                <button onclick="openLine('${i.instance}')" class="text-xs px-2.5 py-1.5 rounded border border-slate-200 text-slate-600 font-medium hover:bg-slate-50">Abrir ▸</button>
                 ${i.connection === "open" ? `<button onclick="openProfile('${i.instance}')" class="text-xs px-2.5 py-1.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-50">Perfil</button>` : ""}
                 ${action}
               </div>
@@ -254,6 +294,86 @@
         setTimeout(loadLines, 1500);
       } catch (e) { msg.className = "text-xs mb-3 text-red-600"; msg.textContent = "Error: " + esc(e.message); }
     };
+
+    // ── Drill-in: detalle de línea (Salud / Acciones / Actividad) ────────────
+    let lnLine = null;
+    const fmtAgo = (ts) => { if (!ts) return "—"; const s = Math.floor((Date.now() - ts) / 1000); if (s < 60) return s + "s atrás"; if (s < 3600) return Math.floor(s/60) + "m atrás"; if (s < 86400) return Math.floor(s/3600) + "h atrás"; return Math.floor(s/86400) + "d atrás"; };
+    function lnTab(tab) {
+      document.querySelectorAll(".ln-pane").forEach((p) => p.classList.add("hidden"));
+      $("ln-" + tab).classList.remove("hidden");
+      document.querySelectorAll(".ln-tab").forEach((b) => {
+        const on = b.dataset.tab === tab;
+        b.classList.toggle("border-emerald-600", on); b.classList.toggle("text-emerald-700", on); b.classList.toggle("font-semibold", on);
+        b.classList.toggle("border-transparent", !on); b.classList.toggle("text-slate-500", !on);
+      });
+      if (tab === "actividad") loadLineActivity();
+    }
+    function openLine(inst) {
+      lnLine = inst;
+      const i = linesCache.find((x) => x.instance === inst) || {};
+      $("ln-name").textContent = inst;
+      const online = i.connection === "open";
+      $("ln-salud").innerHTML = `
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">Estado</div><div class="font-semibold ${online ? 'text-emerald-600' : 'text-red-600'}">${online ? '● Conectado' : '● ' + esc(i.connection || 'sin conexión')}</div></div>
+          <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">Uptime</div><div class="font-semibold">${fmtUptime(i.uptimeSec)}</div></div>
+          <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">Mensajes hoy</div><div class="font-semibold">📥 ${i.msgsInToday||0} · 📤 ${i.msgsOutToday||0}</div></div>
+          <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">Totales</div><div class="font-semibold">📥 ${i.msgsIn||0} · 📤 ${i.msgsOut||0}</div></div>
+          <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">Reconexiones</div><div class="font-semibold">${i.reconnectCount||0}</div></div>
+          <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">Última caída</div><div class="font-semibold">${fmtAgo(i.lastDisconnectAt)}</div></div>
+          <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">WhatsApp Web</div><div class="font-semibold">${esc(i.baileysVersion || '—')}</div></div>
+          <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">Número</div><div class="font-semibold">${(i.profile&&i.profile.number)?'+'+esc(i.profile.number):'—'}</div></div>
+        </div>
+        ${i.lastError ? '<div class="mt-3 text-xs text-red-600 bg-red-50 rounded p-2">Último error: ' + esc(i.lastError) + '</div>' : ''}`;
+      $("ln-test-msg").textContent = ""; $("ln-reconnect-msg").textContent = ""; $("ln-groups").innerHTML = "";
+      $("ln-test-num").value = ""; $("ln-test-txt").value = "";
+      lnTab("salud");
+      show("modal-line");
+    }
+    async function loadLineActivity() {
+      const div = $("ln-actividad");
+      div.innerHTML = '<p class="text-xs text-slate-400 py-2">cargando…</p>';
+      try {
+        const evs = (await (await fetch("/manager/recent/" + lnLine)).json()).events || [];
+        if (!evs.length) { div.innerHTML = '<p class="text-xs text-slate-400 py-2">sin actividad reciente</p>'; return; }
+        div.innerHTML = evs.map((e) => {
+          const color = e.kind === "in" ? "text-blue-600" : e.kind === "out" ? "text-emerald-600" : "text-slate-400";
+          const who = e.kind === "out" ? "bot →" : (e.from || e.jid || "");
+          const body = e.body || (e.state ? "conexión: " + e.state : "");
+          return `<div class="py-1.5 border-b border-slate-50 last:border-0 text-xs"><span class="text-slate-400 font-mono">${fmtTime(e.at)}</span> <span class="${color} font-semibold">${esc(String(who).slice(0,28))}</span><div class="text-slate-600">${esc(String(body).slice(0,160))}</div></div>`;
+        }).join("");
+      } catch (e) { div.innerHTML = '<p class="text-xs text-red-500 py-2">error: ' + esc(e.message) + '</p>'; }
+    }
+    $("ln-close").onclick = () => hide("modal-line");
+    document.querySelectorAll(".ln-tab").forEach((b) => { b.onclick = () => lnTab(b.dataset.tab); });
+    $("ln-test-send").onclick = async () => {
+      if (!needKey()) return;
+      const number = $("ln-test-num").value.trim(), text = $("ln-test-txt").value.trim();
+      if (!number || !text) { $("ln-test-msg").className = "text-xs mt-1 text-red-600"; $("ln-test-msg").textContent = "Completá número y mensaje."; return; }
+      $("ln-test-msg").className = "text-xs mt-1 text-slate-500"; $("ln-test-msg").textContent = "Enviando…";
+      try {
+        const r = await fetch("/message/sendText/" + lnLine, { method: "POST", headers: Object.assign({ "Content-Type": "application/json" }, authH()), body: JSON.stringify({ number, text }) });
+        if (r.ok) { $("ln-test-msg").className = "text-xs mt-1 text-emerald-600"; $("ln-test-msg").textContent = "✓ Enviado"; }
+        else { const j = await r.json().catch(() => ({})); $("ln-test-msg").className = "text-xs mt-1 text-red-600"; $("ln-test-msg").textContent = "Error: " + (j.error || r.status); }
+      } catch (e) { $("ln-test-msg").className = "text-xs mt-1 text-red-600"; $("ln-test-msg").textContent = "Error: " + e.message; }
+    };
+    $("ln-reconnect").onclick = async () => {
+      if (!needKey()) return;
+      $("ln-reconnect-msg").className = "text-xs ml-2 text-slate-500"; $("ln-reconnect-msg").textContent = "Reconectando…";
+      try { await fetch("/instance/reconnect/" + lnLine, { method: "POST", headers: authH() }); $("ln-reconnect-msg").className = "text-xs ml-2 text-emerald-600"; $("ln-reconnect-msg").textContent = "✓ pedido enviado"; setTimeout(loadLines, 2500); }
+      catch (e) { $("ln-reconnect-msg").className = "text-xs ml-2 text-red-600"; $("ln-reconnect-msg").textContent = "Error: " + e.message; }
+    };
+    $("ln-groups-btn").onclick = async () => {
+      if (!needKey()) return;
+      const div = $("ln-groups"); div.innerHTML = '<span class="text-slate-400">cargando…</span>';
+      try {
+        const j = await (await fetch("/manager/groups/" + lnLine, { headers: authH() })).json();
+        const gs = j.groups || [];
+        if (!gs.length) { div.innerHTML = '<span class="text-slate-400">' + (j.error === "not_connected" ? "línea no conectada" : "sin grupos") + '</span>'; return; }
+        div.innerHTML = gs.map((g) => `<div class="flex justify-between border-b border-slate-50 py-1"><span class="truncate">${esc(g.name)}</span><span class="text-slate-400 ml-2 shrink-0">${g.memberCount}👥</span></div>`).join("");
+      } catch (e) { div.innerHTML = '<span class="text-red-500">error: ' + esc(e.message) + '</span>'; }
+    };
+    window.openLine = openLine;
 
     window.connectLine = connectLine; window.logoutLine = logoutLine; window.toggleAct = toggleAct; window.openProfile = openProfile;
 

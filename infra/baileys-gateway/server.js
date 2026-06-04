@@ -123,6 +123,9 @@ function createSession(instanceName) {
     // Metrics
     bootedAt: Date.now(),
     connectedAt: null,          // timestamp del ultimo 'open'
+    reconnectCount: 0,          // cuántas veces reconectó (salud)
+    lastDisconnectAt: null,     // timestamp de la última caída
+    baileysVersion: null,       // versión de WhatsApp Web que negoció Baileys
     msgsIn: 0,
     msgsOut: 0,
     msgsInToday: 0,
@@ -190,6 +193,7 @@ async function startSocket(instanceName = INSTANCE_NAME) {
   try {
     const fetched = await fetchLatestBaileysVersion();
     version = fetched.version;
+    s.baileysVersion = Array.isArray(version) ? version.join('.') : String(version);
     logger.info({ version }, 'Using Baileys version');
   } catch (e) {
     logger.warn({ err: e.message }, 'fetchLatestBaileysVersion failed, using default');
@@ -234,6 +238,7 @@ async function startSocket(instanceName = INSTANCE_NAME) {
       logger.info({ instance: instanceName }, 'Connected to WhatsApp');
     } else if (connection === 'close') {
       s.connection = 'close';
+      s.lastDisconnectAt = Date.now();
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       s.lastError = lastDisconnect?.error?.message || 'unknown';
       logger.warn({ instance: instanceName, statusCode, err: s.lastError }, 'Connection closed');
@@ -244,6 +249,7 @@ async function startSocket(instanceName = INSTANCE_NAME) {
         // No auto-reconnect on logout: necesita rescanear.
       } else {
         // Reconnect con backoff.
+        s.reconnectCount += 1;
         const delay = 3000;
         logger.info({ instance: instanceName, delay }, 'Reconnecting');
         setTimeout(() => startSocket(instanceName).catch((e) => logger.error({ err: e.message }, 'reconnect failed')), delay);
@@ -483,6 +489,9 @@ app.get('/manager/lines', (_req, res) => {
     connectedAt: s.connectedAt,
     uptimeSec: s.connectedAt ? Math.floor((now - s.connectedAt) / 1000) : null,
     lastError: s.lastError,
+    reconnectCount: s.reconnectCount,
+    lastDisconnectAt: s.lastDisconnectAt,
+    baileysVersion: s.baileysVersion,
   }));
   res.json({ lines });
 });
@@ -519,6 +528,24 @@ app.get('/manager/groups', async (_req, res) => {
     res.json({ groups, cached: false });
   } catch (e) {
     logger.warn({ err: e.message }, 'groupFetchAllParticipating failed');
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Grupos de UNA línea específica (para el drill-in del dashboard).
+app.get('/manager/groups/:instance', async (req, res) => {
+  const s = sessionFromReq(req);
+  if (!s.sock || s.connection !== 'open') return res.json({ groups: [], error: 'not_connected' });
+  try {
+    const raw = await s.sock.groupFetchAllParticipating();
+    const groups = Object.values(raw || {}).map((g) => ({
+      jid: g.id,
+      name: g.subject || '(sin nombre)',
+      memberCount: Array.isArray(g.participants) ? g.participants.length : 0,
+    }));
+    groups.sort((a, b) => b.memberCount - a.memberCount);
+    res.json({ groups });
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -859,6 +886,18 @@ app.delete('/instance/logout/:instance', async (req, res) => {
     res.json({ status: 'logged_out' });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// Reconectar/reiniciar una línea SIN borrar credenciales (re-corre startSocket).
+// Útil cuando una línea quedó 'close' y no reconectó sola.
+app.post('/instance/reconnect/:instance', async (req, res) => {
+  const name = (req.params && req.params.instance) || INSTANCE_NAME;
+  try {
+    startSocket(name).catch((e) => logger.error({ err: e.message, instance: name }, 'manual reconnect failed'));
+    return res.json({ message: 'reconnecting', instance: name });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
   }
 });
 
