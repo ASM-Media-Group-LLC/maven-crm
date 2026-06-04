@@ -235,10 +235,15 @@ export async function logEvent(
 // CORS — incluye el header x-cron-token para que el cron interno pueda
 // invocar estas functions sin JWT.
 // ----------------------------------------------------------------------------
+// Origin permitido para CORS. Por defecto el frontend de prod; configurable con la
+// env var CORS_ALLOW_ORIGIN (p.ej. "*" o "http://localhost:8080" si en dev llamás
+// las edges desde localhost). Antes era "*" (abierto a cualquier sitio).
+const CORS_ALLOW_ORIGIN = Deno.env.get("CORS_ALLOW_ORIGIN") ?? "https://maven.asmtech.ai";
 export const whatsappCors = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": CORS_ALLOW_ORIGIN,
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-cron-token, x-evolution-token",
+  "Vary": "Origin",
 };
 
 // ----------------------------------------------------------------------------
