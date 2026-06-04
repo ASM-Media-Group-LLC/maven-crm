@@ -21,6 +21,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
+  { value: "antiguos", label: "Antiguos" },
   { value: "nuevo", label: "Nuevo" },
   { value: "asignadas", label: "Asignaciones" },
   { value: "confirmadas", label: "Confirmadas" },
@@ -216,6 +217,7 @@ const ClosersContent = () => {
               {TABS.map((tab) => {
                 const stageKey =
                   tab.value === "todas" ? "" :
+                  tab.value === "antiguos" ? "Antiguos" :
                   tab.value === "nuevo" ? "Nuevo" :
                   tab.value === "asignadas" ? "Asignada" :
                   tab.value === "confirmadas" ? "Confirmada" :

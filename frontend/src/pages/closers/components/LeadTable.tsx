@@ -651,6 +651,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           </TableRow>
         );
       case "nuevo":
+      case "antiguos":
         return (
           <TableRow>
             <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
@@ -965,6 +966,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         );
 
       case "nuevo":
+      case "antiguos":
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>

@@ -57,6 +57,7 @@ export const STAGE_LABELS: Record<string, string> = {
 
 export const TAB_STAGE_MAP: Record<string, string[]> = {
   todas: [],
+  antiguos: ["Nuevo"],
   nuevo: ["Nuevo"],
   asignadas: ["Asignada"],
   confirmadas: ["Confirmada"],
@@ -183,12 +184,24 @@ export const useCloserLeads = () => {
   // prefetchear las otras tabs cuando se monta el componente — así al
   // cambiar de tab los datos ya están en caché y no se ve el skeleton.
   const fetchCreatorsForTab = async (tab: string, pageNum: number) => {
-      // ── Nuevo tab: closer_creators with stage 'Nuevo' ──
-      if (tab === "nuevo") {
+      // ── Nuevo / Antiguos: pool de leads SIN asignar (stage 'Nuevo') ──
+      // Partido por antigüedad: "Nuevo" = creados en los últimos 30 días;
+      // "Antiguos" = hace más de 30 días sin que nadie los asigne. Ambos
+      // exigen assigned_to NULL (el pool). Los closers ahora pueden leer
+      // este pool (policy RLS "Closers can view unassigned pool"); antes
+      // RLS lo ocultaba y la pestaña salía vacía.
+      if (tab === "nuevo" || tab === "antiguos") {
+        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
         let query = supabase
           .from("closer_creators")
           .select("*", { count: "exact" })
-          .eq("stage", "Nuevo");
+          .eq("stage", "Nuevo")
+          .is("assigned_to", null);
+
+        // Antigüedad: Nuevo = recientes (≤30d), Antiguos = viejos (>30d)
+        query = tab === "nuevo"
+          ? query.gte("created_at", cutoff)
+          : query.lt("created_at", cutoff);
 
         // Server-side search filter
         if (normalizedSearch) {
@@ -448,8 +461,11 @@ export const useCloserLeads = () => {
   // La RPC get_closer_stage_counts no acepta fechas, así que contamos
   // acá. 661 rows totales = trivial.
   const { data: statusCounts = {} } = useQuery({
-    queryKey: ["closer-creators-counts", user?.id, role, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
+    queryKey: ["closer-creators-counts", "v2", user?.id, role, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
     queryFn: async () => {
+      // (A) Conteos por stage "real" — respeta el rol (closer = solo sus
+      // asignadas) y el rango de fecha sobre passed_date, igual que el
+      // listado de Operaciones.
       let q = supabase.from("closer_creators").select("stage");
       if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
         q = q.eq("assigned_to", effectiveUserId);
@@ -466,6 +482,20 @@ export const useCloserLeads = () => {
         const s = row.stage || "Sin stage";
         counts[s] = (counts[s] || 0) + 1;
       }
+      // (B) Pool SIN asignar partido por antigüedad (Nuevo ≤30d / Antiguos
+      // >30d). Va aparte de (A) porque NO se filtra por assigned_to (todos
+      // ven el pool, incluido el closer tras la policy RLS) ni por el rango
+      // de passed_date (los 'Nuevo' no tienen passed_date). head:true =
+      // solo cuenta, no transfiere filas. Sobrescribe Nuevo/Antiguos de (A).
+      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const [recentRes, oldRes] = await Promise.all([
+        supabase.from("closer_creators").select("id", { count: "exact", head: true })
+          .eq("stage", "Nuevo").is("assigned_to", null).gte("created_at", cutoff),
+        supabase.from("closer_creators").select("id", { count: "exact", head: true })
+          .eq("stage", "Nuevo").is("assigned_to", null).lt("created_at", cutoff),
+      ]);
+      counts["Nuevo"] = recentRes.count || 0;
+      counts["Antiguos"] = oldRes.count || 0;
       return counts;
     },
     enabled: !!user?.id && !!role,
