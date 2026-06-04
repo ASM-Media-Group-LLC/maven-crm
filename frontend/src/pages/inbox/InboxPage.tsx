@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, Sticker } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, Sticker, Maximize2 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -36,6 +36,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { AudioRecorderBar } from "./AudioRecorder";
 import { GifPicker } from "./GifPicker";
 import { StickerPicker } from "./StickerPicker";
+import { MediaLightbox, type LightboxItem } from "./MediaLightbox";
 
 interface ConvRow {
   id: string;
@@ -114,6 +115,18 @@ const InboxPage = () => {
   // Panel de info de contacto (Slice 2) — solo admin.
   const { isAdmin } = useUserRole();
   const [contactPanelOpen, setContactPanelOpen] = useState(false);
+  // Visor de medios (lightbox) tipo WhatsApp. items = todas las fotos/videos
+  // del hilo, para navegar con ← →. Se abre al tocar una foto o el botón
+  // "ver en grande" de un video.
+  const [lightbox, setLightbox] = useState<{ items: LightboxItem[]; index: number } | null>(null);
+  const openMediaViewer = (clickedId: string) => {
+    const items: LightboxItem[] = messages
+      .filter((mm) => !!mm.media_url && mm.msg_type !== "deleted" && (mm.msg_type === "image" || mm.msg_type === "video"))
+      .map((mm) => ({ id: mm.id, url: mm.media_url as string, type: (mm.msg_type === "video" ? "video" : "image") as "image" | "video" }));
+    if (!items.length) return;
+    const idx = items.findIndex((it) => it.id === clickedId);
+    setLightbox({ items, index: idx < 0 ? 0 : idx });
+  };
   const [assignPanelOpen, setAssignPanelOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
@@ -681,11 +694,25 @@ const InboxPage = () => {
                               <img
                                 src={m.media_url}
                                 alt=""
-                                className={cn("mb-1 rounded-lg object-cover", m.msg_type === "sticker" ? "max-h-32" : "max-h-64")}
+                                onClick={m.msg_type === "image" ? () => openMediaViewer(m.id) : undefined}
+                                className={cn(
+                                  "mb-1 rounded-lg object-cover",
+                                  m.msg_type === "sticker" ? "max-h-32" : "max-h-64 cursor-zoom-in",
+                                )}
                               />
                             )}
                             {!isDeleted && m.media_url && m.msg_type === "video" && (
-                              <video controls src={m.media_url} className="mb-1 max-h-64 rounded-lg" />
+                              <div className="relative mb-1">
+                                <video controls src={m.media_url} className="max-h-64 rounded-lg" />
+                                <button
+                                  type="button"
+                                  onClick={() => openMediaViewer(m.id)}
+                                  title="Ver en grande"
+                                  className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1.5 text-white transition hover:bg-black/80"
+                                >
+                                  <Maximize2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             )}
                             {!isDeleted && m.media_url && m.msg_type === "audio" && (
                               <audio controls src={m.media_url} className="mb-1 w-56" />
@@ -1025,6 +1052,13 @@ const InboxPage = () => {
           </>
         )}
       </section>
+      {lightbox && (
+        <MediaLightbox
+          items={lightbox.items}
+          index={lightbox.index}
+          onClose={() => setLightbox(null)}
+        />
+      )}
     </div>
   );
 };
