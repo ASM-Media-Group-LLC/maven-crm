@@ -141,6 +141,7 @@ function createSession(instanceName) {
     config: { webhookUrl: null, rejectCalls: false, markRead: false, alwaysOnline: true, syncFullHistory: false },
     // Tráfico por bucket de tiempo: hourly["YYYY-MM-DDTHH"]={in,out}, daily["YYYY-MM-DD"]={in,out}.
     traffic: { hourly: {}, daily: {} },
+    sseClients: [], // suscriptores del monitor en vivo (SSE)
   };
 }
 
@@ -211,9 +212,15 @@ function sessionFromReq(req) {
 const RECENT_MAX = 30;
 
 function pushRecent(event, s = state) {
-  s.recentEvents.unshift({ ...event, at: new Date().toISOString() });
+  const item = { ...event, at: new Date().toISOString() };
+  s.recentEvents.unshift(item);
   if (s.recentEvents.length > RECENT_MAX) s.recentEvents.length = RECENT_MAX;
   if (event.kind === 'in' || event.kind === 'out') bumpTraffic(s, event.kind);
+  // Monitor en vivo (SSE): empujar el evento a los suscriptores de esta línea.
+  if (s.sseClients && s.sseClients.length) {
+    const data = 'data: ' + JSON.stringify(item) + '\n\n';
+    for (const c of s.sseClients) { try { c.write(data); } catch (e) { /* cliente caído */ } }
+  }
 }
 
 function rolloverDayIfNeeded(s = state) {
@@ -655,6 +662,19 @@ app.get('/manager/metrics/:instance', (req, res) => {
     daily.push({ label: k.slice(5), in: b.in || 0, out: b.out || 0 });
   }
   res.json({ hourly, daily });
+});
+
+// Monitor en vivo (SSE): stream de eventos (in/out/connection) de una línea en
+// tiempo real. El dashboard se suscribe con EventSource (manda la cookie de sesión).
+app.get('/manager/stream/:instance', (req, res) => {
+  const s = sessionFromReq(req);
+  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+  if (res.flushHeaders) res.flushHeaders();
+  res.write(': ok\n\n');
+  s.sseClients = s.sseClients || [];
+  s.sseClients.push(res);
+  const hb = setInterval(() => { try { res.write(': hb\n\n'); } catch (e) { /* */ } }, 25000);
+  req.on('close', () => { clearInterval(hb); s.sseClients = (s.sseClients || []).filter((c) => c !== res); });
 });
 
 // Login del dashboard: valida la password contra MANAGER_PASSWORD (env) server-side

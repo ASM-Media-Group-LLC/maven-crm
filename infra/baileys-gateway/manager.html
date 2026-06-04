@@ -328,6 +328,7 @@
         b.classList.toggle("border-emerald-600", on); b.classList.toggle("text-emerald-700", on); b.classList.toggle("font-semibold", on);
         b.classList.toggle("border-transparent", !on); b.classList.toggle("text-slate-500", !on);
       });
+      if (tab !== "actividad") closeLineStream();
       if (tab === "actividad") loadLineActivity();
       if (tab === "config") loadLineConfig();
       if (tab === "trafico") loadLineTraffic();
@@ -354,21 +355,28 @@
       lnTab("salud");
       show("modal-line");
     }
+    let lnES = null;
+    function closeLineStream() { if (lnES) { try { lnES.close(); } catch (e) { /* */ } lnES = null; } }
+    function renderEv(e) {
+      const color = e.kind === "in" ? "text-blue-600" : e.kind === "out" ? "text-emerald-600" : "text-slate-400";
+      const who = e.kind === "out" ? "bot →" : (e.from || e.jid || "");
+      const body = e.body || (e.state ? "conexión: " + e.state : "");
+      return `<div class="py-1.5 border-b border-slate-50 last:border-0 text-xs"><span class="text-slate-400 font-mono">${fmtTime(e.at)}</span> <span class="${color} font-semibold">${esc(String(who).slice(0,28))}</span><div class="text-slate-600">${esc(String(body).slice(0,160))}</div></div>`;
+    }
     async function loadLineActivity() {
+      closeLineStream();
       const div = $("ln-actividad");
       div.innerHTML = '<p class="text-xs text-slate-400 py-2">cargando…</p>';
       try {
         const evs = (await (await fetch("/manager/recent/" + lnLine)).json()).events || [];
-        if (!evs.length) { div.innerHTML = '<p class="text-xs text-slate-400 py-2">sin actividad reciente</p>'; return; }
-        div.innerHTML = evs.map((e) => {
-          const color = e.kind === "in" ? "text-blue-600" : e.kind === "out" ? "text-emerald-600" : "text-slate-400";
-          const who = e.kind === "out" ? "bot →" : (e.from || e.jid || "");
-          const body = e.body || (e.state ? "conexión: " + e.state : "");
-          return `<div class="py-1.5 border-b border-slate-50 last:border-0 text-xs"><span class="text-slate-400 font-mono">${fmtTime(e.at)}</span> <span class="${color} font-semibold">${esc(String(who).slice(0,28))}</span><div class="text-slate-600">${esc(String(body).slice(0,160))}</div></div>`;
-        }).join("");
+        const live = '<div id="ln-live" class="text-[11px] text-emerald-600 mb-2 flex items-center gap-1 font-semibold"><span class="dot">●</span> EN VIVO</div>';
+        div.innerHTML = live + (evs.length ? evs.map(renderEv).join("") : '<p class="text-xs text-slate-400 py-2">sin actividad todavía</p>');
+        // Stream en vivo: cada mensaje (recibido/enviado) se inserta arriba del feed.
+        lnES = new EventSource("/manager/stream/" + lnLine);
+        lnES.onmessage = (m) => { try { const e = JSON.parse(m.data); const a = $("ln-live"); if (a) a.insertAdjacentHTML("afterend", renderEv(e)); } catch (_e) { /* */ } };
       } catch (e) { div.innerHTML = '<p class="text-xs text-red-500 py-2">error: ' + esc(e.message) + '</p>'; }
     }
-    $("ln-close").onclick = () => hide("modal-line");
+    $("ln-close").onclick = () => { closeLineStream(); hide("modal-line"); };
     document.querySelectorAll(".ln-tab").forEach((b) => { b.onclick = () => lnTab(b.dataset.tab); });
     $("ln-test-send").onclick = async () => {
       if (!needKey()) return;
