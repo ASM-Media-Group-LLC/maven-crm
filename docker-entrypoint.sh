@@ -25,6 +25,7 @@ substitute "__RUNTIME_VITE_SUPABASE_URL__"            "${VITE_SUPABASE_URL:-}"
 substitute "__RUNTIME_VITE_SUPABASE_PUBLISHABLE_KEY__" "${VITE_SUPABASE_PUBLISHABLE_KEY:-}"
 substitute "__RUNTIME_VITE_SUPABASE_PROJECT_ID__"     "${VITE_SUPABASE_PROJECT_ID:-}"
 substitute "__RUNTIME_VITE_PUBLIC_URL__"              "${VITE_PUBLIC_URL:-}"
+substitute "__RUNTIME_VITE_GIPHY_API_KEY__"           "${VITE_GIPHY_API_KEY:-}"
 
 echo "[entrypoint] Runtime env applied: VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-(unset)} VITE_PUBLIC_URL=${VITE_PUBLIC_URL:-(unset)}"
 

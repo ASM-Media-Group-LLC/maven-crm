@@ -9,7 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2, Film } from "lucide-react";
 
-const GIPHY_KEY = (import.meta.env.VITE_GIPHY_API_KEY as string | undefined) || "dc6zaTOxFJmzC";
+// La key se inyecta en runtime: el build deja el placeholder __RUNTIME_VITE_GIPHY_API_KEY__
+// y docker-entrypoint.sh lo reemplaza por el valor real (VITE_GIPHY_API_KEY de Dokploy).
+// Si quedó sin sustituir (placeholder) o vacía, la tratamos como NO configurada.
+const RAW_GIPHY_KEY = (import.meta.env.VITE_GIPHY_API_KEY as string | undefined) || "";
+const GIPHY_KEY = RAW_GIPHY_KEY && !RAW_GIPHY_KEY.startsWith("__RUNTIME_") ? RAW_GIPHY_KEY : "";
 
 interface GiphyImg { url?: string; mp4?: string }
 interface GiphyRaw { id: string; images?: Record<string, GiphyImg> }
@@ -25,15 +29,19 @@ export function GifPicker({ onPick, disabled }: GifPickerProps) {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<GifItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<"config" | "api" | null>(null);
   const tRef = useRef<number | null>(null);
 
   const load = async (query: string) => {
+    if (!GIPHY_KEY) { setErr("config"); setItems([]); return; }
     setLoading(true);
+    setErr(null);
     try {
       const url = query.trim()
         ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=pg-13&bundle=messaging_non_clips`
         : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=pg-13`;
       const resp = await fetch(url);
+      if (!resp.ok) { setErr("api"); setItems([]); return; }
       const json = (await resp.json()) as { data?: GiphyRaw[] };
       const data = json.data ?? [];
       setItems(
@@ -46,6 +54,7 @@ export function GifPicker({ onPick, disabled }: GifPickerProps) {
           .filter((g) => g.preview && g.mp4),
       );
     } catch {
+      setErr("api");
       setItems([]);
     } finally {
       setLoading(false);
@@ -75,7 +84,13 @@ export function GifPicker({ onPick, disabled }: GifPickerProps) {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           )}
-          {!loading && items.length === 0 && (
+          {!loading && err === "config" && (
+            <div className="col-span-2 py-6 text-center text-xs text-muted-foreground">GIFs no configurados (falta la API key de Giphy).</div>
+          )}
+          {!loading && err === "api" && (
+            <div className="col-span-2 py-6 text-center text-xs text-muted-foreground">No se pudieron cargar los GIFs. Revisá la API key de Giphy.</div>
+          )}
+          {!loading && !err && items.length === 0 && (
             <div className="col-span-2 py-6 text-center text-xs text-muted-foreground">Sin resultados</div>
           )}
           {!loading && items.map((g) => (
