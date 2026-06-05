@@ -390,13 +390,13 @@ let groupFollowupsSentThisTick = 0;
 
 // Allowlist de follow-ups grupales ACTIVOS. Tras el incidente del 05/06 (spam +
 // menciones a no-miembros / nombres crudos), solo dejamos los de bajo ruido + alto
-// valor + backlog 0 que mencionan a un CLOSER (miembro del grupo, resuelto a su
-// nombre real). PENDIENTES de sumar (necesitan tuneo antes):
-//  · "closer_contact_overdue" — útil pero ~27 de backlog → necesita resumen por-closer
-//    (1 ping con la lista, no 1 por lead) antes de prenderlo.
+// valor + acotados que mencionan a un CLOSER (miembro del grupo, por su nombre real).
+// "closer_contact_overdue" se reemplazó por "closer_contact_digest" (1 resumen/closer/día,
+// no 1 ping por lead). PENDIENTE de sumar (necesita tuneo antes):
 //  · commitment-based (pre_meeting, meeting_followup, promise_overdue, tracking_stale)
-//    — fueron EL spam → bajar la agresividad de whatsapp-extract-commitments primero.
-const ENABLED_FOLLOWUP_KINDS = new Set(["confirmada_stale", "monetization_followup"]);
+//    — fueron EL spam → bajar la agresividad de whatsapp-extract-commitments + expirar
+//    backlog viejo antes de prenderlos.
+const ENABLED_FOLLOWUP_KINDS = new Set(["confirmada_stale", "monetization_followup", "closer_contact_digest"]);
 
 async function sendFollowup(
   sb: SupabaseClient,
@@ -623,9 +623,10 @@ async function checkCommitmentFollowups(
     await sendFollowup(sb, group, `tracking_stale:${t.id}`, msg);
   }
 
-  // ── Regla 4: closer_contact_overdue ─────────────────────────────────
-  // Para cada closer_creators stage='Asignada' con cadencia vencida en el
-  // contacto siguiente. Cadencia: días 1, 3, 5, 8, 15, 29 desde passed_date.
+  // ── Regla 4: closer_contact_overdue → RESUMEN (digest) por closer ────
+  // Cadencia 1,3,5,8,15,29 días desde passed_date. En vez de 1 ping por lead
+  // vencido (era spam: ~27 de una), agrupamos por closer y mandamos UN solo
+  // resumen con la lista → acotado a 1 mensaje/closer/día (dedup por checkKey).
   const cadence = [1, 3, 5, 8, 15, 29];
   const { data: assigned } = await sb
     .from("closer_creators")
@@ -633,6 +634,7 @@ async function checkCommitmentFollowups(
     .eq("stage", "Asignada")
     .not("assigned_to", "is", null)
     .not("passed_date", "is", null);
+  const overdueByCloser = new Map<string, string[]>();
   for (const cc of (assigned ?? []) as Array<{
     id: string;
     instagram_handle: string | null;
@@ -650,18 +652,23 @@ async function checkCommitmentFollowups(
     if (done >= 6) continue;
     const nextDay = cadence[done];
     if (nextDay == null || daysSince <= nextDay) continue;
-    // Vencido: averiguar el closer + mandar follow-up.
+    const list = overdueByCloser.get(cc.assigned_to) ?? [];
+    list.push(cc.instagram_handle ?? "(sin handle)");
+    overdueByCloser.set(cc.assigned_to, list);
+  }
+  for (const [closerId, handles] of overdueByCloser) {
     const { data: prof } = await sb
       .from("profiles")
       .select("whatsapp_push_name, full_name")
-      .eq("id", cc.assigned_to)
+      .eq("id", closerId)
       .maybeSingle();
-    // Nombre REAL primero (full_name), no el apodo de WhatsApp (evita "@Juli 💘💘").
+    // Nombre REAL primero (full_name), no el apodo de WhatsApp.
     const closerName = prof?.full_name?.split(" ")[0] ?? prof?.whatsapp_push_name ?? "closer";
-    const handle = cc.instagram_handle ?? "(sin handle)";
-    if (await recentlyMentioned(sb, group.id, handle, 12)) continue;
-    const msg = `@${closerName}, contacto día ${nextDay} con @${handle} vencido. ¿Ya la contactaste? Llevás ${done}/6 intentos.`;
-    await sendFollowup(sb, group, `closer_contact_overdue:${cc.id}:${nextDay}`, msg);
+    const top = handles.slice(0, 8);
+    const lista = top.map((h) => `· @${h}`).join("\n");
+    const extra = handles.length > top.length ? `\n…y ${handles.length - top.length} más` : "";
+    const msg = `@${closerName}, tenés ${handles.length} lead${handles.length === 1 ? "" : "s"} con contacto vencido (cadencia 1-3-5-8-15-29):\n${lista}${extra}\n¿Los avanzás hoy?`;
+    await sendFollowup(sb, group, `closer_contact_digest:${closerId}`, msg);
   }
 
   // ── Regla 5: confirmada_stale (confirmada hace 7+ días sin Completada) ─
