@@ -101,16 +101,22 @@ serve(async (req) => {
   // El closer solo abre conversaciones de leads asignados a ÉL. Supervisores/
   // managers/admin pueden abrir cualquiera (triaje/supervisión). Si el lead no es
   // suyo, no se abre y le decimos por qué.
+  //
+  // OJO: estos rechazos devuelven HTTP 200 con { ok:false, error } a propósito (no 4xx).
+  // supabase.functions.invoke NO expone el body de respuestas no-2xx (deja data=null y
+  // un error genérico "Edge Function returned a non-2xx status code"), así que el front
+  // no podría mostrar este mensaje. Con 200 lo lee de data.error (que es lo que ya hacen
+  // WaChatButton y LeadWhatsappButton: chequean !data.ok y muestran data.error).
   if (leadExists) {
     const { data: isSup } = await sb.rpc("is_in_role_group", { _user_id: userId, _group: "supervisor_or_above" });
     if (!isSup) {
       if (!leadOwner) {
-        return json({ ok: false, error: "Este lead no está asignado a vos. Tomalo desde Closers para poder abrir su chat." }, 403);
+        return json({ ok: false, error: "Este lead no está asignado a vos. Tomalo desde Closers para poder abrir su chat." });
       }
       if (leadOwner !== userId) {
         const { data: owner } = await (sb as any).from("profiles").select("full_name").eq("id", leadOwner).maybeSingle();
         const who = owner?.full_name || "otra persona";
-        return json({ ok: false, error: `Este lead ya está asignado a ${who}. No podés abrir su chat.` }, 403);
+        return json({ ok: false, error: `Este lead ya está asignado a ${who}. No podés abrir su chat.` });
       }
     }
   }
