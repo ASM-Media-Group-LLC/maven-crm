@@ -388,12 +388,21 @@ async function recentlyMentioned(
 const MAX_GROUP_FOLLOWUPS_PER_TICK = 4;
 let groupFollowupsSentThisTick = 0;
 
+// DESACTIVADO (2026-06-05): al revivir los follow-ups grupales (#386) se vació de
+// golpe un backlog enorme de "compromisos" sobre-extraídos → spam en el grupo +
+// menciones por nombre crudo / a gente que no está en el grupo (@Luis, @Alvaro, @#21).
+// Quedan OFF hasta tunear: (1) mencionar SOLO a miembros del grupo (validar LID),
+// (2) bajar la agresividad de la extracción de compromisos, (3) acotar el backlog.
+// El EOD y los pings de progreso (LLG/closer) NO pasan por sendFollowup → siguen OK.
+const GROUP_FOLLOWUPS_ENABLED = false;
+
 async function sendFollowup(
   sb: SupabaseClient,
   group: GroupInfo,
   checkKey: string,
   message: string,
 ): Promise<void> {
+  if (!GROUP_FOLLOWUPS_ENABLED) return;
   // Solo en horario laboral del grupo. FAIL-CLOSED: solo mandamos si la RPC
   // confirma POSITIVAMENTE que estamos en horario. Si devuelve false/null o
   // tira error, NO mandamos (antes era fail-open → riesgo de pings fuera de hora).
