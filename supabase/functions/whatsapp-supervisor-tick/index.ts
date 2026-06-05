@@ -388,13 +388,15 @@ async function recentlyMentioned(
 const MAX_GROUP_FOLLOWUPS_PER_TICK = 4;
 let groupFollowupsSentThisTick = 0;
 
-// DESACTIVADO (2026-06-05): al revivir los follow-ups grupales (#386) se vació de
-// golpe un backlog enorme de "compromisos" sobre-extraídos → spam en el grupo +
-// menciones por nombre crudo / a gente que no está en el grupo (@Luis, @Alvaro, @#21).
-// Quedan OFF hasta tunear: (1) mencionar SOLO a miembros del grupo (validar LID),
-// (2) bajar la agresividad de la extracción de compromisos, (3) acotar el backlog.
-// El EOD y los pings de progreso (LLG/closer) NO pasan por sendFollowup → siguen OK.
-const GROUP_FOLLOWUPS_ENABLED = false;
+// Allowlist de follow-ups grupales ACTIVOS. Tras el incidente del 05/06 (spam +
+// menciones a no-miembros / nombres crudos), solo dejamos los de bajo ruido + alto
+// valor + backlog 0 que mencionan a un CLOSER (miembro del grupo, resuelto a su
+// nombre real). PENDIENTES de sumar (necesitan tuneo antes):
+//  · "closer_contact_overdue" — útil pero ~27 de backlog → necesita resumen por-closer
+//    (1 ping con la lista, no 1 por lead) antes de prenderlo.
+//  · commitment-based (pre_meeting, meeting_followup, promise_overdue, tracking_stale)
+//    — fueron EL spam → bajar la agresividad de whatsapp-extract-commitments primero.
+const ENABLED_FOLLOWUP_KINDS = new Set(["confirmada_stale", "monetization_followup"]);
 
 async function sendFollowup(
   sb: SupabaseClient,
@@ -402,7 +404,9 @@ async function sendFollowup(
   checkKey: string,
   message: string,
 ): Promise<void> {
-  if (!GROUP_FOLLOWUPS_ENABLED) return;
+  // Gate por TIPO: solo dispara lo que está en la allowlist (el resto queda OFF
+  // hasta tunearlo). El checkKey es "<kind>:<id>...".
+  if (!ENABLED_FOLLOWUP_KINDS.has(checkKey.split(":")[0])) return;
   // Solo en horario laboral del grupo. FAIL-CLOSED: solo mandamos si la RPC
   // confirma POSITIVAMENTE que estamos en horario. Si devuelve false/null o
   // tira error, NO mandamos (antes era fail-open → riesgo de pings fuera de hora).
@@ -652,7 +656,8 @@ async function checkCommitmentFollowups(
       .select("whatsapp_push_name, full_name")
       .eq("id", cc.assigned_to)
       .maybeSingle();
-    const closerName = prof?.whatsapp_push_name ?? prof?.full_name?.split(" ")[0] ?? "closer";
+    // Nombre REAL primero (full_name), no el apodo de WhatsApp (evita "@Juli 💘💘").
+    const closerName = prof?.full_name?.split(" ")[0] ?? prof?.whatsapp_push_name ?? "closer";
     const handle = cc.instagram_handle ?? "(sin handle)";
     if (await recentlyMentioned(sb, group.id, handle, 12)) continue;
     const msg = `@${closerName}, contacto día ${nextDay} con @${handle} vencido. ¿Ya la contactaste? Llevás ${done}/6 intentos.`;
@@ -681,7 +686,8 @@ async function checkCommitmentFollowups(
       .select("whatsapp_push_name, full_name")
       .eq("id", cc.assigned_to)
       .maybeSingle();
-    const closerName = prof?.whatsapp_push_name ?? prof?.full_name?.split(" ")[0] ?? "closer";
+    // Nombre REAL primero (full_name), no el apodo de WhatsApp (evita "@Juli 💘💘").
+    const closerName = prof?.full_name?.split(" ")[0] ?? prof?.whatsapp_push_name ?? "closer";
     const daysSince = cc.confirmed_date ? Math.floor((now - new Date(cc.confirmed_date).getTime()) / 86_400_000) : "?";
     const msg = `@${closerName}, @${handle} lleva ${daysSince} días confirmada sin pasar a *Completada*. ¿Cómo va la firma?`;
     await sendFollowup(sb, group, `confirmada_stale:${cc.id}`, msg);
@@ -728,7 +734,8 @@ async function checkCommitmentFollowups(
       .select("whatsapp_push_name, full_name")
       .eq("id", o.assigned_to)
       .maybeSingle();
-    const who = prof?.whatsapp_push_name ?? prof?.full_name?.split(" ")[0] ?? "equipo";
+    // Nombre REAL primero (full_name), no el apodo de WhatsApp.
+    const who = prof?.full_name?.split(" ")[0] ?? prof?.whatsapp_push_name ?? "equipo";
     const prod = PRODUCT_ES[o.product] ?? o.product;
     const stageEs = STAGE_ES[o.stage] ?? o.stage;
     const msg = `@${who}, seguimiento de monetización: @${handle} quedó *${stageEs}* con ${prod} y ya toca volver a tocarla. ¿La avanzás hoy?`;
