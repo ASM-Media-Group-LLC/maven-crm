@@ -1,29 +1,29 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, startOfWeek, startOfMonth, isSameMonth, isToday, isAfter, startOfDay } from "date-fns";
-import { es } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Check, X as XIcon, Minus, CircleDashed } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useTimezone } from "@/hooks/useTimezone";
+import { useTimezone, formatDateInTz, formatTimeInTz } from "@/hooks/useTimezone";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import PromologStoryGallery from "./PromologStoryGallery";
+import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
 import type { PromologEntry } from "./PromologEntryCard";
 
 // ── Calendario de promos por creadora ─────────────────────────────────
 // Subtab que muestra, para UNA creadora y un mes/año elegidos, qué días
 // promocionó (verde), cuáles no (rojo), cuáles fueron parciales (ámbar) y
-// cuáles no tienen análisis del bot (gris). Click en un día con stories
-// abre la galería de evidencia de ese día (solo lectura — la edición del
-// veredicto vive en el subtab "Promos").
+// cuáles no tienen análisis del bot (gris). Click en un día abre el MISMO
+// popup de detalle que el subtab "Promos" (PromologEntryDetailDialog), con
+// la galería de evidencia y el veredicto editable por historia.
 //
-// La data NO se reusa de la query global de PromologContent (que está atada
-// al date-range preset del header, default "Hoy"): este calendario hace su
-// propia query acotada a creadora + mes para poder navegar a meses pasados.
+// La data NO se reusa de la query global de PromologContent (atada al
+// date-range del header, default "Hoy"): este calendario hace su propia
+// query acotada a creadora + mes para poder navegar a meses pasados.
 
 interface Creator {
   id: string;
@@ -35,6 +35,8 @@ interface Creator {
 
 interface Props {
   creators: Creator[];
+  // Abre el modal de edición del padre (mismo flujo que "Editar" en Promos).
+  onEditEntry?: (entry: PromologEntry) => void;
 }
 
 const DAY_LABELS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
@@ -46,20 +48,14 @@ const MONTHS_ES = [
 type DayStatus = "promo" | "partial" | "no" | "none";
 
 // Igual que parseAsUtcIfNaive de useTimezone: la columna `date` es un
-// timestamp sin zona (UTC). Sin la "Z" el browser lo tomaría como hora
-// local. Devolvemos la fecha-calendario YYYY-MM-DD en el TZ del user para
-// agrupar las stories por día correctamente.
+// timestamp sin zona (UTC). Devolvemos la fecha-calendario YYYY-MM-DD en el
+// TZ del user para agrupar las stories por día correctamente.
 function dayKeyInTz(input: string, tz: string): string {
   const s = String(input);
   const hasZone = /Z$|[+-]\d{2}:?\d{2}$/.test(s);
   const d = new Date(hasZone ? s : s + "Z");
   if (isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: tz,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d); // "2026-06-05"
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 }
 
 const promotedToResult = (promoted: string | null): string => {
@@ -72,7 +68,6 @@ const promotedToResult = (promoted: string | null): string => {
   }
 };
 
-// Estilos por estado del día (tinte de fondo + borde + color del texto).
 const STATUS_STYLES: Record<DayStatus, string> = {
   promo: "bg-emerald-500/10 border-emerald-500/40 hover:bg-emerald-500/20",
   partial: "bg-amber-500/10 border-amber-500/40 hover:bg-amber-500/20",
@@ -94,24 +89,26 @@ const LegendChip = ({ status, label }: { status: DayStatus; label: string }) => 
   </div>
 );
 
-const PromologCalendarView = ({ creators }: Props) => {
+const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
   const { timezone: userTz } = useTimezone();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [creatorId, setCreatorId] = useState<string>("");
   const [cursor, setCursor] = useState<Date>(() => startOfMonth(new Date()));
-  const [dayDialog, setDayDialog] = useState<{ label: string; stories: PromologEntry[] } | null>(null);
+  const [openDayKey, setOpenDayKey] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth(); // 0-11
-
   const selectedCreator = creators.find((c) => c.id === creatorId);
 
-  // Años disponibles en el dropdown: del 2025 hasta el año actual (el bot
-  // arrancó en 2026; 2025 por las dudas). Navegar con flechas no tiene tope.
   const currentYear = new Date().getFullYear();
   const yearOptions = useMemo(() => {
     const ys: number[] = [];
     for (let y = currentYear; y >= 2025; y--) ys.push(y);
-    if (!ys.includes(year)) ys.push(year); // si navegó fuera del rango, incluirlo
+    if (!ys.includes(year)) ys.push(year);
     return ys.sort((a, b) => b - a);
   }, [currentYear, year]);
 
@@ -125,7 +122,7 @@ const PromologCalendarView = ({ creators }: Props) => {
       const rangeEnd = format(addDays(new Date(year, month + 1, 1), 1), "yyyy-MM-dd");
       const { data, error } = await supabase
         .from("promolog_entries")
-        .select("id, date, promoted, platform, network, evidence_url, ai_confidence, ai_reasoning, story_index, story_count, apify_run_id, analyzed_by_ai, creator_id")
+        .select("id, date, promoted, platform, network, ticket_number, notes, action_taken, has_buy_link, buy_link_type, reviewed_by, evidence_url, ai_confidence, ai_reasoning, story_index, story_count, apify_run_id, analyzed_by_ai, creator_id")
         .eq("creator_id", creatorId)
         .gte("date", rangeStart)
         .lt("date", rangeEnd)
@@ -135,17 +132,44 @@ const PromologCalendarView = ({ creators }: Props) => {
     },
   });
 
-  // Agrupar las stories por día (key YYYY-MM-DD en TZ del user).
+  // Mapea una entry cruda al shape PromologEntry que usa el popup/galería.
+  const mapEntry = (e: any): PromologEntry => ({
+    id: e.id,
+    ticketNumber: e.ticket_number || "",
+    name: selectedCreator?.artistic_name || selectedCreator?.name || "",
+    handle: selectedCreator?.instagram_handle || undefined,
+    network: (e.network || "").toLowerCase(),
+    platform: e.platform || "OnlyFans",
+    result: promotedToResult(e.promoted),
+    date: formatDateInTz(e.date, userTz),
+    time: formatTimeInTz(e.date, userTz),
+    agent: "AI Agent",
+    notes: e.notes || "",
+    creator_id: e.creator_id,
+    reviewed_by: e.reviewed_by || undefined,
+    action_taken: e.action_taken ?? null,
+    evidence_url: e.evidence_url ?? null,
+    buy_link_type: e.buy_link_type ?? null,
+    has_buy_link: e.has_buy_link === true,
+    ai_reasoning: e.ai_reasoning ?? null,
+    ai_confidence: e.ai_confidence != null ? Number(e.ai_confidence) : null,
+    analyzed_by_ai: e.analyzed_by_ai === true,
+    story_index: e.story_index != null ? Number(e.story_index) : null,
+    story_count: e.story_count != null ? Number(e.story_count) : null,
+    apify_run_id: e.apify_run_id ?? null,
+  });
+
+  // Agrupa las stories por día (key YYYY-MM-DD en TZ del user).
   const dayMap = useMemo(() => {
-    const map = new Map<string, { total: number; trueCount: number; partialCount: number; entries: any[] }>();
+    const map = new Map<string, { total: number; trueCount: number; partialCount: number; raw: any[] }>();
     for (const e of monthEntries as any[]) {
       const key = dayKeyInTz(e.date, userTz);
       if (!key) continue;
-      const bucket = map.get(key) ?? { total: 0, trueCount: 0, partialCount: 0, entries: [] };
+      const bucket = map.get(key) ?? { total: 0, trueCount: 0, partialCount: 0, raw: [] };
       bucket.total += 1;
       if (e.promoted === "true") bucket.trueCount += 1;
       else if (e.promoted === "partial") bucket.partialCount += 1;
-      bucket.entries.push(e);
+      bucket.raw.push(e);
       map.set(key, bucket);
     }
     return map;
@@ -158,21 +182,47 @@ const PromologCalendarView = ({ creators }: Props) => {
     return "no";
   };
 
+  // Datos del popup del día abierto — reactivo a `dayMap` para que al cambiar
+  // un veredicto y refrescar, la galería + el resultado del día se actualicen.
+  const dialogData = useMemo(() => {
+    if (!openDayKey) return null;
+    const bucket = dayMap.get(openDayKey);
+    if (!bucket) return null;
+    // Solo stories analizadas por el bot; dedup por story_index (preferir las que tienen evidencia).
+    const sorted = bucket.raw
+      .filter((e) => e.analyzed_by_ai === true)
+      .map(mapEntry)
+      .sort((a, b) => (a.story_index ?? 1e9) - (b.story_index ?? 1e9));
+    const byIndex = new Map<number, PromologEntry>();
+    const noIndex: PromologEntry[] = [];
+    for (const s of sorted) {
+      if (s.story_index == null) { noIndex.push(s); continue; }
+      const prev = byIndex.get(s.story_index);
+      if (!prev || (!prev.evidence_url && s.evidence_url)) byIndex.set(s.story_index, s);
+    }
+    const stories = [...byIndex.values(), ...noIndex];
+    const rep = stories.find((s) => s.result === "Sí") ?? stories[0] ?? mapEntry(bucket.raw[0]);
+    const dayResult = stories.some((s) => s.result === "Sí")
+      ? "Sí"
+      : stories.some((s) => s.result === "No")
+      ? "No"
+      : rep?.result ?? "Pendiente";
+    return { rep, stories, dayResult };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openDayKey, dayMap, selectedCreator, userTz]);
+
   // 6 semanas (42 celdas) arrancando el lunes de la semana del día 1.
   const gridDays = useMemo(() => {
-    const first = startOfMonth(cursor);
-    const gridStart = startOfWeek(first, { weekStartsOn: 1 });
+    const gridStart = startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 });
     return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
   }, [cursor]);
 
   const today = startOfDay(new Date());
 
-  // Resumen del mes (solo días del mes en curso, no futuros).
   const monthSummary = useMemo(() => {
     let promo = 0, partial = 0, no = 0, none = 0;
     for (const d of gridDays) {
-      if (!isSameMonth(d, cursor)) continue;
-      if (isAfter(startOfDay(d), today)) continue; // días futuros no cuentan
+      if (!isSameMonth(d, cursor) || isAfter(startOfDay(d), today)) continue;
       const st = statusFor(dayMap.get(format(d, "yyyy-MM-dd")));
       if (st === "promo") promo++;
       else if (st === "partial") partial++;
@@ -185,32 +235,23 @@ const PromologCalendarView = ({ creators }: Props) => {
   const goPrev = () => setCursor(new Date(year, month - 1, 1));
   const goNext = () => setCursor(new Date(year, month + 1, 1));
 
-  // Abre la galería de evidencia del día clickeado (solo lectura).
-  const openDay = (d: Date, bucket: { entries: any[] }) => {
-    const stories: PromologEntry[] = bucket.entries
-      .filter((e) => e.analyzed_by_ai === true)
-      .map((e) => ({
-        id: e.id,
-        ticketNumber: "",
-        name: selectedCreator?.artistic_name || selectedCreator?.name || "",
-        network: (e.network || "").toLowerCase(),
-        platform: e.platform || "OnlyFans",
-        result: promotedToResult(e.promoted),
-        date: format(d, "yyyy-MM-dd"),
-        time: "",
-        agent: "AI Agent",
-        notes: "",
-        creator_id: e.creator_id,
-        evidence_url: e.evidence_url ?? null,
-        ai_reasoning: e.ai_reasoning ?? null,
-        ai_confidence: e.ai_confidence != null ? Number(e.ai_confidence) : null,
-        analyzed_by_ai: e.analyzed_by_ai === true,
-        story_index: e.story_index != null ? Number(e.story_index) : null,
-        story_count: e.story_count != null ? Number(e.story_count) : null,
-        apify_run_id: e.apify_run_id ?? null,
-      })) as PromologEntry[];
-    if (stories.length === 0) return;
-    setDayDialog({ label: format(d, "EEEE d 'de' MMMM yyyy", { locale: es }), stories });
+  // Override manual del veredicto de una historia (igual que en Promos):
+  // persiste `promoted`, marca review humano y refresca el calendario + la
+  // query global para que ambos reflejen el cambio.
+  const handleSetVerdict = async (story: PromologEntry, verdict: "Sí" | "No") => {
+    if (story.result === verdict) return;
+    setSavingId(story.id);
+    const { error } = await supabase
+      .from("promolog_entries")
+      .update({ promoted: verdict === "Sí" ? "true" : "false", reviewed_by: user?.id })
+      .eq("id", story.id);
+    setSavingId(null);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["promolog-calendar"] });
+    queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
   };
 
   return (
@@ -287,13 +328,11 @@ const PromologCalendarView = ({ creators }: Props) => {
 
           {/* Grid del calendario */}
           <Card className="overflow-hidden p-0">
-            {/* Cabecera de días */}
             <div className="grid grid-cols-7 border-b border-border bg-muted/30">
               {DAY_LABELS_ES.map((d) => (
                 <div key={d} className="px-3 py-2 text-center text-xs font-medium text-muted-foreground">{d}</div>
               ))}
             </div>
-            {/* Celdas */}
             <div className="grid grid-cols-7">
               {gridDays.map((d, i) => {
                 const inMonth = isSameMonth(d, cursor);
@@ -301,13 +340,13 @@ const PromologCalendarView = ({ creators }: Props) => {
                 const bucket = dayMap.get(key);
                 const future = isAfter(startOfDay(d), today);
                 const status: DayStatus = inMonth && !future ? statusFor(bucket) : "none";
-                const clickable = inMonth && !!bucket && bucket.entries.some((e) => e.analyzed_by_ai);
+                const clickable = inMonth && !!bucket && bucket.raw.some((e) => e.analyzed_by_ai);
                 return (
                   <button
                     type="button"
                     key={i}
                     disabled={!clickable}
-                    onClick={() => bucket && openDay(d, bucket)}
+                    onClick={() => setOpenDayKey(key)}
                     className={cn(
                       "relative flex min-h-[84px] flex-col border-b border-r border-border p-2 text-left transition-colors",
                       i % 7 === 0 && "border-l",
@@ -340,21 +379,21 @@ const PromologCalendarView = ({ creators }: Props) => {
             </div>
           </Card>
 
-          {isLoading && (
-            <p className="text-center text-xs text-muted-foreground">Cargando…</p>
-          )}
+          {isLoading && <p className="text-center text-xs text-muted-foreground">Cargando…</p>}
         </>
       )}
 
-      {/* Galería del día (solo lectura) */}
-      <Dialog open={!!dayDialog} onOpenChange={(open) => !open && setDayDialog(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="capitalize">{dayDialog?.label}</DialogTitle>
-          </DialogHeader>
-          {dayDialog && <PromologStoryGallery stories={dayDialog.stories} />}
-        </DialogContent>
-      </Dialog>
+      {/* Popup de detalle del día — el MISMO que el subtab Promos */}
+      <PromologEntryDetailDialog
+        open={!!dialogData}
+        onOpenChange={(open) => !open && setOpenDayKey(null)}
+        entry={dialogData?.rep ?? null}
+        dayStories={dialogData?.stories ?? []}
+        dayResult={dialogData?.dayResult ?? "Pendiente"}
+        onSetVerdict={handleSetVerdict}
+        savingId={savingId}
+        onEdit={onEditEntry ? (e) => { setOpenDayKey(null); onEditEntry(e); } : undefined}
+      />
     </div>
   );
 };

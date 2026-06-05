@@ -46,6 +46,7 @@ import DateRangePresets, { type RangePreset, rangeForPreset } from "@/components
 import PromologDashboardView from "./PromologDashboardView";
 import PromobotPanel from "./PromobotPanel";
 import PromologCalendarView from "./PromologCalendarView";
+import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { ListRow, ListRowButton } from "@/components/ui/list-row";
 import { useTimezone, formatDateInTz, formatTimeInTz } from "@/hooks/useTimezone";
@@ -883,7 +884,7 @@ const PromologContent = () => {
       {activeTab === "promobot" && canPromobot && <PromobotPanel />}
 
       {/* Calendario tab — calendario mensual por creadora: días que promocionó / no / sin análisis */}
-      {activeTab === "calendario" && isManagement && <PromologCalendarView creators={creators} />}
+      {activeTab === "calendario" && isManagement && <PromologCalendarView creators={creators} onEditEntry={handleEditEntry} />}
 
       {/* Dashboard tab — KPIs, podios, insights, trend, acción */}
       {activeTab === "dashboard" && (
@@ -1484,157 +1485,16 @@ const PromologContent = () => {
             el equipo de management — la red social + plataforma ya dicen
             por dónde vino la promo. */}
         {selectedEntry && (
-          <Dialog open={viewEntryOpen} onOpenChange={setViewEntryOpen}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader className="pr-8">
-                <DialogTitle>Detalle de Entrada</DialogTitle>
-                <DialogDescription className="sr-only">Detalle completo de la entrada de Promolog</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                {/* Header: ticket + nombre + handle */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="font-mono text-xs">{selectedEntry.ticketNumber || "—"}</Badge>
-                  <span className="text-sm font-semibold">{selectedEntry.name}</span>
-                  {selectedEntry.handle && (
-                    <span className="text-sm text-muted-foreground">
-                      @{(selectedEntry.handle ?? "").replace(/^@/, "").replace(/\/$/, "").split("/").pop()}
-                    </span>
-                  )}
-                </div>
-
-                {/* Grid de metadata principal */}
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Red social:</span>{" "}
-                    <span className="font-medium capitalize">{selectedEntry.network || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Plataforma destino:</span>{" "}
-                    <span className="font-medium">{selectedEntry.platform || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Resultado:</span>{" "}
-                    <Badge variant={resultToBadgeVariant(dayResult)} className="ml-1 text-xs">
-                      {dayResult}
-                    </Badge>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Agente:</span>{" "}
-                    <span className="font-medium">{selectedEntry.agent}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Fecha:</span>{" "}
-                    <span className="font-medium">{selectedEntry.date}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Hora:</span>{" "}
-                    <span className="font-medium">{selectedEntry.time}</span>
-                  </div>
-                </div>
-
-                {/* Buy link — sólo cuando la promo tiene link visible */}
-                {selectedEntry.has_buy_link && (
-                  <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-1">
-                    <p className="text-xs uppercase tracking-wider text-emerald-400 font-semibold flex items-center gap-1.5">
-                      <Check className="h-3 w-3" />
-                      Link de compra detectado
-                    </p>
-                    <p className="text-sm">
-                      Tipo:{" "}
-                      <Badge variant="success-soft" className="text-[10px] capitalize">
-                        {selectedEntry.buy_link_type || "no especificado"}
-                      </Badge>
-                    </p>
-                  </div>
-                )}
-
-                {/* Acción tomada — qué hizo la creadora para promocionar
-                    (story con sticker, post con CTA, link en bio, etc.). */}
-                {selectedEntry.action_taken && (
-                  <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Qué hizo para promocionar</p>
-                    <p className="text-sm bg-muted/40 rounded-md p-3">{selectedEntry.action_taken}</p>
-                  </div>
-                )}
-
-                {/* Notas — viene del chatter manual o del bot ([AUTO] reasoning). */}
-                {selectedEntry.notes && (
-                  <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Notas</p>
-                    <p className="text-sm bg-muted/40 rounded-md p-3 whitespace-pre-wrap">{selectedEntry.notes}</p>
-                  </div>
-                )}
-
-                {/* AI reasoning + confidence — solo si fue analizada por el
-                    pipeline automático. Es info técnica útil para validar
-                    si la AI clasificó bien (sobre todo en casos ambiguos). */}
-                {!showStoryGallery && selectedEntry.ai_reasoning && (
-                  <div className="rounded-md border border-blue-500/30 bg-blue-500/5 p-3 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs uppercase tracking-wider text-blue-400 font-semibold">Análisis AI</p>
-                      {selectedEntry.ai_confidence != null && (
-                        <Badge variant="secondary-soft" className="text-[10px] tabular-nums">
-                          Confianza: {(selectedEntry.ai_confidence * 100).toFixed(0)}%
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground italic">{selectedEntry.ai_reasoning}</p>
-                  </div>
-                )}
-
-                {/* Evidencia — galería de TODAS las stories del día (cuando el
-                    bot analizó varias) o el pantallazo único (entry manual del
-                    chatter / 1 sola story). */}
-                {showStoryGallery ? (
-                  <PromologStoryGallery stories={selectedDayStories} selectedId={selectedEntry.id} onSetVerdict={handleSetStoryVerdict} savingId={verdictSavingId} />
-                ) : selectedEntry.evidence_url ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Evidencia</p>
-                      <a
-                        href={selectedEntry.evidence_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        Abrir en nueva pestaña
-                      </a>
-                    </div>
-                    <a
-                      href={selectedEntry.evidence_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block rounded-md overflow-hidden border border-border bg-muted/20 hover:border-primary/40 transition-colors"
-                    >
-                      <img
-                        src={selectedEntry.evidence_url}
-                        alt="Pantallazo de la promo"
-                        className="w-full max-h-[400px] object-contain"
-                        onError={(e) => {
-                          // Si la imagen falla (URL CDN de IG expirada, signed URL caducada),
-                          // mostramos un fallback en lugar del icono roto.
-                          const img = e.currentTarget;
-                          img.style.display = "none";
-                          const parent = img.parentElement;
-                          if (parent && !parent.querySelector(".fallback")) {
-                            const fb = document.createElement("div");
-                            fb.className = "fallback p-6 text-center text-xs text-muted-foreground";
-                            fb.textContent = "La imagen ya no está disponible (URL expirada). Hacé click en 'Abrir en nueva pestaña' para verla en su origen.";
-                            parent.appendChild(fb);
-                          }
-                        }}
-                      />
-                    </a>
-                  </div>
-                ) : null}
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setViewEntryOpen(false)}>Cerrar</Button>
-                <Button onClick={() => { setViewEntryOpen(false); handleEditEntry(selectedEntry); }}>Editar</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <PromologEntryDetailDialog
+            open={viewEntryOpen}
+            onOpenChange={setViewEntryOpen}
+            entry={selectedEntry}
+            dayStories={selectedDayStories}
+            dayResult={dayResult}
+            onSetVerdict={handleSetStoryVerdict}
+            savingId={verdictSavingId}
+            onEdit={(e) => { setViewEntryOpen(false); handleEditEntry(e); }}
+          />
         )}
 
         {/* Edit Entry Modal (from table/grid actions) */}
