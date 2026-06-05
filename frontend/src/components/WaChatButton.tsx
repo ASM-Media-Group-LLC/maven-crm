@@ -15,6 +15,10 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { MessageCircle, Loader2, ChevronDown } from "lucide-react";
 
 export function WaChatButton({
@@ -30,6 +34,7 @@ export function WaChatButton({
   const navigate = useNavigate();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
+  const [gateMsg, setGateMsg] = useState<string | null>(null);
 
   const open = async (channelId: string) => {
     setBusy(true);
@@ -38,8 +43,14 @@ export function WaChatButton({
     });
     setBusy(false);
     const res = data as { ok?: boolean; error?: string; conversation_id?: string } | null;
-    if (error || !res?.ok || !res.conversation_id) {
-      toast({ title: "No se pudo abrir el chat", description: res?.error || error?.message || "Error", variant: "destructive" });
+    // Rechazo "suave" del gating (HTTP 200 + ok:false): no es un error, es un aviso de
+    // que el lead no es tuyo → popup claro, no el toast rojo de error.
+    if (res && res.ok === false) {
+      setGateMsg(res.error || "Este lead no está disponible para vos.");
+      return;
+    }
+    if (error || !res?.conversation_id) {
+      toast({ title: "No se pudo abrir el chat", description: error?.message || "Error", variant: "destructive" });
       return;
     }
     navigate(`/inbox?c=${res.conversation_id}`);
@@ -50,14 +61,11 @@ export function WaChatButton({
     return <span className="text-xs text-muted-foreground" title="No tenés canales de WhatsApp asignados">WhatsApp</span>;
   }
   const btnClass = className ?? "h-7 gap-1 text-xs text-emerald-600 hover:text-emerald-700";
-  if (channels.length === 1) {
-    return (
-      <Button variant="ghost" size="sm" className={btnClass} disabled={busy} onClick={() => open(channels[0].id)}>
-        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />} WhatsApp
-      </Button>
-    );
-  }
-  return (
+  const trigger = channels.length === 1 ? (
+    <Button variant="ghost" size="sm" className={btnClass} disabled={busy} onClick={() => open(channels[0].id)}>
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />} WhatsApp
+    </Button>
+  ) : (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className={btnClass} disabled={busy}>
@@ -74,6 +82,22 @@ export function WaChatButton({
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+  return (
+    <>
+      {trigger}
+      <AlertDialog open={!!gateMsg} onOpenChange={(o) => { if (!o) setGateMsg(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Este lead no es tuyo</AlertDialogTitle>
+            <AlertDialogDescription>{gateMsg}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setGateMsg(null)}>Entendido</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
