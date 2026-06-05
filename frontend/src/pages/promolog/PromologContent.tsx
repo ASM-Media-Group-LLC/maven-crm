@@ -45,6 +45,7 @@ import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader"
 import DateRangePresets, { type RangePreset, rangeForPreset } from "@/components/dashboard/DateRangePresets";
 import PromologDashboardView from "./PromologDashboardView";
 import PromobotPanel from "./PromobotPanel";
+import PromologCalendarView from "./PromologCalendarView";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { ListRow, ListRowButton } from "@/components/ui/list-row";
 import { useTimezone, formatDateInTz, formatTimeInTz } from "@/hooks/useTimezone";
@@ -127,6 +128,7 @@ const resultToBadgeVariant = (result: string): "success-soft" | "destructive-sof
 const tabItems = [
   { id: "dashboard" as const, label: "Dashboard", icon: BarChart3 },
   { id: "promos" as const, label: "Promos", icon: Table2 },
+  { id: "calendario" as const, label: "Calendario", icon: CalendarIcon },
   { id: "agentes" as const, label: "Agentes", icon: Users },
   { id: "promobot" as const, label: "Promobot", icon: Bot },
 ];
@@ -355,7 +357,7 @@ const PromologContent = () => {
   // Default = "dashboard": al abrir Promolog la primera vista es el
   // dashboard con KPIs + podios + insights. El user navega a "Promos"
   // si quiere ver el listado, "Agentes" para el detalle por agente.
-  const [activeTab, setActiveTab] = useState<"dashboard" | "promos" | "agentes" | "promobot">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "promos" | "calendario" | "agentes" | "promobot">("dashboard");
   const [agentesView, setAgentesView] = useState<"list" | "grid" | "calendar">("list");
   const [agentWeekOffset, setAgentWeekOffset] = useState(0);
   const [campanasView, setCampanasView] = useState<"list" | "grid">("list");
@@ -860,6 +862,7 @@ const PromologContent = () => {
         <SubtabNav>
           {tabItems.filter(tab => {
             if (tab.id === "agentes") return isManagement;
+            if (tab.id === "calendario") return isManagement;
             if (tab.id === "promobot") return canPromobot;
             return true;
           }).map((tab) => (
@@ -878,6 +881,9 @@ const PromologContent = () => {
 
       {/* Promobot tab — control manual del pipeline (lanzar + monitor de corridas) */}
       {activeTab === "promobot" && canPromobot && <PromobotPanel />}
+
+      {/* Calendario tab — calendario mensual por creadora: días que promocionó / no / sin análisis */}
+      {activeTab === "calendario" && isManagement && <PromologCalendarView creators={creators} />}
 
       {/* Dashboard tab — KPIs, podios, insights, trend, acción */}
       {activeTab === "dashboard" && (
