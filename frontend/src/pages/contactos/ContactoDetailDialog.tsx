@@ -1,4 +1,4 @@
-import { ExternalLink, Phone, Pencil, Sparkles, Trash2, ArrowRight } from "lucide-react";
+import { ExternalLink, Pencil, Sparkles, Trash2, ArrowRight } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { getCountryFlag, getCountryShortDisplay, maskPhone } from "@/lib/country-utils";
-import { WhatsAppLink } from "@/components/MaskedPhone";
+import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
+import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import type { Contacto } from "./ContactosContent";
 
 const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
@@ -51,13 +51,6 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
     .toUpperCase() || "?";
   const recordType = (c as unknown as { record_type?: string }).record_type;
   const tipo = recordType === "reactivado" ? "Reactivado" : "Nuevo";
-  const whatsappNumber = c.whatsapp ? c.whatsapp.replace(/[^0-9]/g, "") : "";
-  const phoneDisplay = c.whatsapp
-    ? maskPhone(c.whatsapp)
-    : c.phone
-    ? maskPhone(`${c.country_code || ""}${c.phone}`)
-    : "—";
-
   const stats: { label: string; value: React.ReactNode }[] = [
     { label: "Creación", value: c.creacion || "—" },
     { label: "Registro", value: c.ticket || "—" },
@@ -90,15 +83,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
     { label: "Ciudad", value: c.city || "—" },
     {
       label: "Contacto",
-      value: whatsappNumber ? (
-        <WhatsAppLink
-          phone={whatsappNumber}
-          className="inline-flex items-center gap-1 text-primary hover:underline"
-        >
-          <Phone className="h-3 w-3" />
-          {phoneDisplay}
-        </WhatsAppLink>
-      ) : phoneDisplay,
+      value: <WaChatButton phone={toE164({ whatsapp: c.whatsapp, countryCode: c.country_code, phone: c.phone })} />,
     },
   ];
 
