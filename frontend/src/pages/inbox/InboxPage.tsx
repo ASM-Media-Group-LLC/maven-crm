@@ -779,7 +779,9 @@ const InboxPage = () => {
                             <p
                               className={cn(
                                 "mt-0.5 flex items-center justify-end gap-1 text-[10px] tabular-nums",
-                                isOut ? "text-primary-foreground/70" : "text-muted-foreground",
+                                isDeleted
+                                  ? "text-red-700/80 dark:text-red-300/80"
+                                  : isOut ? "text-primary-foreground/70" : "text-muted-foreground",
                               )}
                             >
                               {fmtTime(m.sent_at)}
