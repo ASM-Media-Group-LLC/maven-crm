@@ -381,25 +381,41 @@ async function recentlyMentioned(
   return (count ?? 0) > 0;
 }
 
+// Anti-flood de follow-ups grupales: máximo por tick. Si nunca dispararon
+// (como pasó por el bug del FK), al revivirlos hay un backlog grande; este tope
+// hace que se escalonen en ticks de 15 min en vez de inundar el grupo de golpe.
+// Se resetea al inicio de cada invocación del handler.
+const MAX_GROUP_FOLLOWUPS_PER_TICK = 4;
+let groupFollowupsSentThisTick = 0;
+
 async function sendFollowup(
   sb: SupabaseClient,
   group: GroupInfo,
   checkKey: string,
   message: string,
 ): Promise<void> {
-  // Solo mandamos follow-ups en horario laboral del grupo. Si el grupo
-  // tiene RPC whatsapp_group_in_business_hours, lo usamos para gate. Si
-  // falla, default permitir (mejor pasarse de ruidoso que callado).
+  // Solo en horario laboral del grupo. FAIL-CLOSED: solo mandamos si la RPC
+  // confirma POSITIVAMENTE que estamos en horario. Si devuelve false/null o
+  // tira error, NO mandamos (antes era fail-open → riesgo de pings fuera de hora).
+  let isBH = false;
   try {
-    const { data: isBH } = await sb.rpc("whatsapp_group_in_business_hours", { p_group_id: group.id });
-    if (isBH === false) return;
-  } catch (_e) { /* allow on RPC failure */ }
+    const { data } = await sb.rpc("whatsapp_group_in_business_hours", { p_group_id: group.id });
+    isBH = data === true;
+  } catch (_e) { isBH = false; }
+  if (!isBH) return;
 
-  // Claim para dedup (UNIQUE en supervisor_state).
+  // Anti-flood: si ya gastamos el presupuesto de este tick, NO claimamos —
+  // el item queda sin reclamar y el próximo tick lo retoma (se escalona).
+  if (groupFollowupsSentThisTick >= MAX_GROUP_FOLLOWUPS_PER_TICK) return;
+
+  // Claim de dedup GRUPAL en whatsapp_supervisor_group_state (sin el FK
+  // user_id->profiles que rompía el claim con tenant_id y hacía que estos
+  // follow-ups NUNCA dispararan).
   const today = bogotaNow().date;
-  const ok = await tryClaim(sb, group.tenant_id, checkKey, today, {});
+  const ok = await tryClaimGroup(sb, group.id, checkKey, today, {});
   if (!ok) return;
   await sendToGroup(sb, group.id, message);
+  groupFollowupsSentThisTick++;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -832,6 +848,7 @@ serve(async (req) => {
     });
   }
   const sb = adminClient();
+  groupFollowupsSentThisTick = 0; // reset del tope anti-flood (por invocación/tick)
   try {
     const result = await tick(sb);
     await logEvent(sb, {
