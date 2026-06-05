@@ -591,6 +591,7 @@ MODO AUTO-LISTENING (cuando invoked_by="auto"):
   · DECISIÓN DEL OWNER que requiere acción ("cancelar X", "rechazar Y", "asignar a Z") → ejecutar (ver abajo)
   · LINK DE INSTAGRAM en mensaje (handle visible) → llamá lookup_lead_history para dar contexto del lead
   · INTERÉS / OFERTA DE UN PRODUCTO a una creadora (Piclink/Content Protector/Blu/Exchange) con señal concreta → log_monetization_opportunity (ver "OPORTUNIDADES DE MONETIZACIÓN" abajo). Es registro silencioso: si el mensaje no amerita responder, logueá y quedate callado.
+  · FACTURACIÓN de un LEAD/CONFIRMADA mencionada o mostrada ('@x factura $24k', 'monetiza $5k', screenshot de ganancias de una que TODAVÍA no firmó) → set_lead_value(handle, monthly_usd) para que Maven la priorice por valor. Silencioso (✓ corto). OJO: si es una creadora YA COMPLETADA/activa cuyas ganancias se comparten para handoff a chatters, eso es otra cosa (ver "MONETIZACIÓN — CREADORA COMPLETADA"); set_lead_value es para leads/confirmadas EN pipeline.
 - Si NO entra en estos casos (saludos, chistes, "ok", "listo", links de meet, etc) → NO llames reply_to_group, simplemente no respondas (terminá el loop sin tool calls).
 - Cuando dudes si vale la pena hablar, NO hables. Mejor pasarse de prudente que ser ruidoso.
 - NUNCA publiques tu propio razonamiento ni tu decisión de no responder. PROHIBIDO mandar al grupo mensajes tipo "no requiere acción", "es solo una confirmación", "ya registré todo lo anterior", "no hay nada accionable nuevo", "no voy a responder para no hacer ruido". Eso ES ruido y queda mal. Si decidís que no amerita hablar, la ÚNICA acción correcta es NO llamar ninguna tool y cortar — en SILENCIO, sin avisar que te quedás callado. Tu razonamiento es interno: nunca va al grupo.
@@ -1220,6 +1221,20 @@ const TOOLS: Array<{
         reason: { type: "string", description: "razón de la actualización (queda en notes con timestamp + autor)" },
       },
       required: ["handle", "new_status"],
+    },
+  },
+  {
+    name: "set_lead_value",
+    description:
+      "Registrá la FACTURACIÓN mensual (monetización) de un lead o confirmada en su ficha de Closers, cuando alguien la comparte o muestra en el grupo ('@x factura $24k', 'monetiza $5k/mes', screenshot con ganancias). Sirve para que Maven PRIORICE POR VALOR (un lead de $24k pesa muchísimo más que uno de $900) — sin esto, el dato de plata se pierde y todo se ordena por antigüedad. monthly_usd = facturación MENSUAL en USD: si dan un total por varias cuentas, sumalas; si dan un rango, promediá; si es anual, dividí por 12. NUNCA inventes ni estimes por followers — SOLO con un número real dicho/mostrado en el grupo (vale CONFIANZA CALIBRADA). Es registro silencioso (a lo sumo un ✓ corto). Si la creadora no está en el pipeline de closers, devuelve not_found.",
+    input_schema: {
+      type: "object",
+      properties: {
+        handle: { type: "string", description: "handle de IG sin @ (ej. 'milibmiles1')" },
+        monthly_usd: { type: "number", description: "facturación mensual en USD como número (ej. 24000)" },
+        note: { type: "string", description: "contexto breve y REAL (ej. 'argentina, 2 cuentas, dato de Julieth')" },
+      },
+      required: ["handle", "monthly_usd"],
     },
   },
   {
@@ -2568,13 +2583,13 @@ async function executeTool(
       // pueda responder "cuáles son las confirmadas de Julieth?" sin
       // tener que preguntarle al user — la data ya está en Maven.
       let detailQ = sb.from("closer_creators")
-        .select("id, instagram_handle, stage, confirmed_date, completed_date, no_interesada_date, last_contact_date, passed_date")
+        .select("id, instagram_handle, stage, confirmed_date, completed_date, no_interesada_date, last_contact_date, passed_date, estimated_monetization, monthly_monetization")
         .order("updated_at", { ascending: false })
         .limit(200);
       if (closerUserId) detailQ = detailQ.eq("assigned_to", closerUserId);
       const { data: stageRows } = await detailQ;
       const byStage: Record<string, number> = {};
-      const handlesByStage: Record<string, Array<{ handle: string; date: string | null }>> = {};
+      const handlesByStage: Record<string, Array<{ handle: string; date: string | null; monthly_usd: number | null }>> = {};
       for (const r of (stageRows ?? []) as Array<{
         id: string;
         instagram_handle: string | null;
@@ -2584,6 +2599,8 @@ async function executeTool(
         no_interesada_date: string | null;
         last_contact_date: string | null;
         passed_date: string | null;
+        estimated_monetization: number | string | null;
+        monthly_monetization: number | string | null;
       }>) {
         const s = r.stage ?? "Sin stage";
         byStage[s] = (byStage[s] ?? 0) + 1;
@@ -2594,9 +2611,12 @@ async function executeTool(
           : s === "No interesada" || s === "Rechazada" ? r.no_interesada_date
           : s === "Asignada" ? (r.last_contact_date ?? r.passed_date)
           : null;
+        // Facturación mensual para que el bot priorice por VALOR (no por antigüedad).
+        const valNum = Number(r.monthly_monetization ?? r.estimated_monetization ?? 0);
         handlesByStage[s].push({
           handle: r.instagram_handle ?? "(sin handle)",
           date: dateForStage,
+          monthly_usd: Number.isFinite(valNum) && valNum > 0 ? valNum : null,
         });
       }
 
@@ -2646,10 +2666,11 @@ async function executeTool(
       // (lo más útil para el bot). Para Asignadas/Nuevo solo los
       // 20 más recientes para no exceder context. No interesada/
       // Rechazada → 20 más recientes.
-      const trimmedHandles: Record<string, Array<{ handle: string; date: string | null }>> = {};
+      const trimmedHandles: Record<string, Array<{ handle: string; date: string | null; monthly_usd: number | null }>> = {};
       for (const [stage, list] of Object.entries(handlesByStage)) {
         if (stage === "Confirmada" || stage === "Completada") {
-          trimmedHandles[stage] = list; // todos
+          // Ordenadas por FACTURACIÓN (mayor valor primero): así el bot prioriza por plata, no por antigüedad.
+          trimmedHandles[stage] = [...list].sort((a, b) => (b.monthly_usd ?? 0) - (a.monthly_usd ?? 0));
         } else {
           trimmedHandles[stage] = list.slice(0, 20);
         }
@@ -2879,6 +2900,33 @@ async function executeTool(
       }
 
       return { ok: true, updated, errors: errors.length > 0 ? errors : undefined };
+    }
+
+    case "set_lead_value": {
+      const handle = String(input.handle ?? "").trim().replace(/^@/, "").toLowerCase();
+      const monthly = Number(input.monthly_usd);
+      const note = String(input.note ?? "").trim();
+      if (!handle || !Number.isFinite(monthly) || monthly <= 0) return { error: "missing_handle_or_value" };
+      const { data: cc } = await sb
+        .from("closer_creators")
+        .select("id, instagram_handle, estimated_monetization, notes")
+        .ilike("instagram_handle", handle)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cc) return { not_found: true, handle };
+      const noteSuffix = `\n[Bot ${new Date().toISOString().slice(0, 10)}] Facturación registrada: ~$${Math.round(monthly)} USD/mes${note ? ` (${note})` : ""}.`;
+      const est = Number((cc as { estimated_monetization?: number | string | null }).estimated_monetization ?? 0);
+      const update: Record<string, unknown> = {
+        monthly_monetization: monthly,
+        notes: cc.notes ? cc.notes + noteSuffix : noteSuffix.trim(),
+      };
+      // Si la estimación estaba vacía/0, subila también para que las vistas que ordenan
+      // por estimated_monetization prioricen este lead por su valor real.
+      if (!est || est <= 0) update.estimated_monetization = monthly;
+      const { error } = await sb.from("closer_creators").update(update).eq("id", cc.id);
+      if (error) return { error: error.message };
+      return { ok: true, handle, monthly_usd: monthly, updated_estimated: !est || est <= 0 };
     }
 
     case "log_monetization_opportunity": {
@@ -3457,7 +3505,7 @@ async function buildInitialUserMessage(args: {
     lines.push("");
     lines.push("INSTRUCCIONES — seguí la sección 'APERTURA DEL DÍA' del system prompt:");
     lines.push("PARTE A (catchup, silencioso): identificá y ejecutá acciones perdidas de la pausa — reglas nuevas, reportes de jornada, días off, decisiones del owner, confirmadas/completadas — con sus tools (register_daily_report, register_day_off, add_persistent_rule, mark_lead_stage). Si no hay nada accionable, no ejecutes nada.");
-    lines.push("PARTE B (apertura, SIEMPRE con sustancia): traé el foco del día con datos reales de Maven — get_closer_pipeline_status({}) para confirmadas con potencial de cierre hoy + contactos overdue de hoy + cuántas Nuevas sin asignar; get_unassigned_leads({limit:10}) para sugerir las 10 Nuevas de mayor calidad por dónde empezar a contactar; get_monetization_opportunities({}) para las ventas de productos cerca de cerrar; get_team_schedule({}) para quién trabaja y la meta del día. Si es lunes/primer día tras el finde, sumá una línea de recap del finde.");
+    lines.push("PARTE B (apertura, SIEMPRE con sustancia): traé el foco del día con datos reales de Maven — get_closer_pipeline_status({}) para confirmadas con potencial de cierre hoy + contactos overdue de hoy + cuántas Nuevas sin asignar; get_unassigned_leads({limit:10}) para sugerir las 10 Nuevas de mayor calidad por dónde empezar a contactar; get_monetization_opportunities({}) para las ventas de productos cerca de cerrar; get_team_schedule({}) para quién trabaja y la meta del día. Si es lunes/primer día tras el finde, sumá una línea de recap del finde. PRIORIZÁ POR VALOR: handles_by_stage de get_closer_pipeline_status ahora trae monthly_usd por confirmada — listalas de MAYOR a menor facturación (NO por antigüedad), y cualquier confirmada/lead de ≥$10k USD/mes marcala como 🔥 FOCO del día y recomendá sumar a Luis/Alvaro al cierre. Una creadora de $24k pesa muchísimo más que una de $900: que se note en el orden y el énfasis.");
     lines.push("AL FINAL: UNA sola llamada a reply_to_group con la 'Apertura del día' en el formato del system prompt (recap pausa opcional + foco closers + meta LLGs + cierre motivador). PROHIBIDO el mensaje hueco 'nada que registrar': SIEMPRE abrís con el foco del día. Excepción: si get_team_schedule no devuelve a nadie hoy (domingo), solo catchup o silencio.");
     lines.push("NO respondas a cada mensaje individual.");
     return lines.join("\n");

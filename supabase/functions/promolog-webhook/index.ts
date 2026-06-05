@@ -204,6 +204,9 @@ Deno.serve(async (req: Request) => {
   let creatorsSucceeded = 0;
   let creatorsFailed = 0;
   const errors: Array<{ handle: string; error: string }> = [];
+  // Creadoras (de las despachadas) que terminaron con AL MENOS una entry. Las
+  // que no queden acá reciben una entry "No / sin historia" en el sweep final.
+  const creatorsWithEntries = new Set<string>();
 
   for (const [handle, stories] of itemsByHandle) {
     const creatorId = handleToCreator.get(handle);
@@ -219,6 +222,7 @@ Deno.serve(async (req: Request) => {
           apify_run_id: apifyRunId,
           scan_date: scanDate,
         });
+        creatorsWithEntries.add(creatorId);
         entriesCreated++;
         creatorsSucceeded++;
         continue;
@@ -249,6 +253,7 @@ Deno.serve(async (req: Request) => {
             errors.push({ handle, error: `story: ${r.error}` });
           } else if (r && r.inserted) {
             entriesCreated++;
+            creatorsWithEntries.add(creatorId);
           }
         }
       }
@@ -258,6 +263,22 @@ Deno.serve(async (req: Request) => {
       creatorsFailed++;
       errors.push({ handle, error: (e as Error).message });
     }
+  }
+
+  // ── Sweep: las despachadas SIN ninguna entry = escaneadas que no subieron
+  // historia (Apify devolvió "no_story_media" o ni las incluyó). Se les crea
+  // UNA entry "No promocionó / sin historia" con la nota, para que el dashboard
+  // cuente el total real de escaneadas y queden marcadas "No" (no "sin análisis").
+  for (const cid of creatorIds) {
+    if (creatorsWithEntries.has(cid)) continue;
+    await insertEmptyEntry(sb, {
+      creator_id: cid,
+      dispatch_run_id: dispatchRunId,
+      apify_run_id: apifyRunId,
+      scan_date: scanDate,
+    });
+    creatorsWithEntries.add(cid);
+    entriesCreated++;
   }
 
   // ── Update final ────────────────────────────────────────────────────────
@@ -794,13 +815,13 @@ async function insertEmptyEntry(
     network: "Instagram",
     platform: "Ninguna",
     has_buy_link: false,
-    notes: "[AUTO] Sin stories ese día",
+    notes: "[AUTO] No se registraron historias subidas ni promociones en el análisis del perfil.",
     dispatch_run_id: args.dispatch_run_id,
     apify_run_id: args.apify_run_id,
     analyzed_by_ai: true,
     ai_model: LLM_MODEL,
     ai_confidence: 1.0,
-    ai_reasoning: "Profile sin stories del día.",
+    ai_reasoning: "El perfil no tenía historias subidas en el momento del escaneo; no se registró ninguna promoción.",
     story_count: 0,
   });
 }

@@ -1176,10 +1176,23 @@ serve(async (req) => {
             ? (Date.now() - new Date(lastBotMsg.sent_at).getTime()) / 3_600_000
             : 99;
           if (hoursSinceLastBot > 6) {
-            // Bot estuvo dormido > 6h — fire catchup PRIMERO.
-            // Fire-and-forget; el agent va a leer todo lo nocturno
-            // antes de responder al mensaje actual.
-            fireAgent(messageId, group.id, "night_catchup" as "auto");
+            // Claim ATÓMICO: solo la PRIMERA invocación del día dispara el catchup.
+            // Sin esto, varios "buenos días" casi simultáneos disparaban night_catchup
+            // N veces — la apertura tarda unos segundos en generarse, así que para todos
+            // esos mensajes el "último mensaje del bot" seguía siendo el de ayer (>6h) →
+            // APERTURA DUPLICADA (pasó el 04/06: 2 aperturas a 20s). El PK
+            // (group_id, catchup_date) de whatsapp_catchup_claims garantiza una sola por
+            // grupo/día: el primer mensaje gana el INSERT y dispara; los demás chocan con
+            // el PK (error) y se saltean.
+            const today = new Date().toISOString().slice(0, 10);
+            const { error: claimErr } = await sb
+              .from("whatsapp_catchup_claims")
+              .insert({ group_id: group.id, catchup_date: today });
+            if (!claimErr) {
+              // Ganamos el claim → fire-and-forget; el agent lee todo lo nocturno
+              // antes de responder al mensaje actual.
+              fireAgent(messageId, group.id, "night_catchup" as "auto");
+            }
           }
         } catch (e) {
           console.warn("night_catchup check failed:", (e as Error).message);
