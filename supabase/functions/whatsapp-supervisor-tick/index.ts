@@ -151,6 +151,26 @@ async function tryClaim(sb: SupabaseClient, userId: string, kind: string, today:
   return true;
 }
 
+// Igual que tryClaim pero para checks GRUPALES (EOD, follow-ups): claim por
+// (group_id, check_kind, check_date) en whatsapp_supervisor_group_state. NO usa
+// whatsapp_supervisor_state porque su user_id tiene FK->profiles y un group/tenant
+// id la viola → por eso los claims grupales con tenant_id fallaban siempre y esos
+// checks nunca disparaban. Devuelve true si insertó (era nuevo), false si ya existía.
+async function tryClaimGroup(sb: SupabaseClient, groupId: string, kind: string, today: string, payload: Record<string, unknown>): Promise<boolean> {
+  const { error } = await sb.from("whatsapp_supervisor_group_state").insert({
+    group_id: groupId,
+    check_kind: kind,
+    check_date: today,
+    payload,
+  });
+  if (error) {
+    if (error.message.includes("duplicate") || error.message.includes("unique")) return false;
+    console.warn("tryClaimGroup error:", error.message);
+    return false;
+  }
+  return true;
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // LLG checker
 // ─────────────────────────────────────────────────────────────────────────
@@ -712,7 +732,9 @@ async function maybeEndOfDayReport(
   // Solo dentro de los 15 min siguientes al fin del último turno.
   if (nowM < lastEndM || nowM > lastEndM + 15) return;
 
-  const ok = await tryClaim(sb, group.tenant_id, "end_of_day_report", now.date, {});
+  // Claim grupal SIN el FK roto (antes usaba tryClaim(group.tenant_id) → FK-fail →
+  // el EOD nunca disparaba). Ver whatsapp_supervisor_group_state.
+  const ok = await tryClaimGroup(sb, group.id, "end_of_day_report", now.date, {});
   if (!ok) return;
 
   // Delegamos la composición del mensaje al agent (whatsapp-agent con

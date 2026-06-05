@@ -1262,6 +1262,7 @@ const TOOLS: Array<{
         notes: { type: "string", description: "contexto breve y REAL de lo que pasó (ej. 'le ofrecí Piclink gratis + CP con descuento'). No inventes." },
         next_followup_at: { type: "string", description: "opcional: ISO timestamp de cuándo volver a tocarla. Si el closer dice 'le escribo el viernes', calculalo desde la hora actual. Omitir si no lo dicen." },
         lost_reason: { type: "string", description: "si stage='lost', por qué se perdió (si lo dicen)" },
+        monthly_usd: { type: "number", description: "opcional: valor mensual en USD de la oportunidad — facturación de la creadora si es agency/exchange, o precio del plan si es producto. Sirve para priorizar por monto. SOLO con un número real dicho en el grupo (no inventar)." },
       },
       required: ["creator_handle", "product"],
     },
@@ -2936,6 +2937,9 @@ async function executeTool(
       const notes = String(input.notes ?? "").trim();
       const nextFollowup = input.next_followup_at ? String(input.next_followup_at).trim() : null;
       const lostReason = String(input.lost_reason ?? "").trim();
+      const monthlyUsd = input.monthly_usd != null && Number.isFinite(Number(input.monthly_usd)) && Number(input.monthly_usd) > 0
+        ? Number(input.monthly_usd)
+        : null;
       const VALID_PRODUCTS = ["piclink", "content_protector", "blu", "exchange", "agency", "other"];
       const VALID_STAGES = ["interested", "offered", "negotiating", "won", "lost"];
       if (!handle || !product) return { error: "missing_handle_or_product" };
@@ -2970,6 +2974,7 @@ async function executeTool(
         if (noteLine) update.notes = existing.notes ? existing.notes + "\n" + noteLine : noteLine;
         if (nextFollowup) update.next_followup_at = nextFollowup;
         if (stage === "lost" && lostReason) update.lost_reason = lostReason;
+        if (monthlyUsd != null) update.monthly_value_usd = monthlyUsd;
         const { error } = await sb.from("monetization_opportunities").update(update).eq("id", existing.id);
         if (error) return { error: "update_failed", detail: error.message };
         return { ok: true, action: "updated", id: existing.id, handle, product, stage };
@@ -2987,6 +2992,7 @@ async function executeTool(
           notes: noteLine,
           next_followup_at: nextFollowup,
           lost_reason: stage === "lost" ? (lostReason || null) : null,
+          monthly_value_usd: monthlyUsd,
           source: "bot",
         })
         .select("id")

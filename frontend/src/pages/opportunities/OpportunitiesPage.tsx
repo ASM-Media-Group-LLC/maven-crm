@@ -62,8 +62,20 @@ interface Opportunity {
   lost_reason: string | null;
   source: string;
   created_at: string;
+  monthly_value_usd: number | null;
 }
 interface Profile { id: string; full_name: string | null; }
+// Confirmada de reclutamiento (closer_creators) que está por firmar — la mostramos
+// también acá para que un ingreso grande (ej. una creadora de $24k) sea visible en
+// Oportunidades, no solo en el pipeline de Closers.
+interface BigConfirmada {
+  id: string;
+  instagram_handle: string | null;
+  monthly_monetization: number | null;
+  estimated_monetization: number | null;
+  assigned_to: string | null;
+  confirmed_date: string | null;
+}
 
 const fmtDate = (iso: string | null) => {
   if (!iso) return "—";
@@ -71,6 +83,13 @@ const fmtDate = (iso: string | null) => {
   return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short" });
 };
 const isOverdue = (iso: string | null) => !!iso && new Date(iso) < new Date();
+// Monto compacto en USD: $24k, $1.2k, $120, o "—" si no hay valor.
+const fmtUsd = (n: number | null | undefined) => {
+  const v = Number(n);
+  if (n == null || !Number.isFinite(v) || v <= 0) return "—";
+  return v >= 1000 ? `$${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : `$${Math.round(v)}`;
+};
+const confValue = (c: BigConfirmada) => Number(c.monthly_monetization ?? 0) || Number(c.estimated_monetization ?? 0) || 0;
 
 const OpportunitiesPage = () => {
   const qc = useQueryClient();
@@ -102,6 +121,22 @@ const OpportunitiesPage = () => {
   });
   const userName = (id: string | null) =>
     !id ? "—" : users.find((u) => u.id === id)?.full_name || id.slice(0, 8);
+
+  // #4 — Confirmadas de reclutamiento (pipeline de Closers) ordenadas por
+  // facturación. Para que un ingreso grande (ej. creadora de $24k que está por
+  // firmar) sea visible en Oportunidades, no solo en la pantalla de Closers.
+  const { data: confirmadas = [] } = useQuery({
+    queryKey: ["opp-recruitment-confirmadas"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("closer_creators")
+        .select("id, instagram_handle, monthly_monetization, estimated_monetization, assigned_to, confirmed_date")
+        .eq("stage", "Confirmada")
+        .limit(50);
+      if (error) throw error;
+      return ((data ?? []) as BigConfirmada[]).sort((a, b) => confValue(b) - confValue(a));
+    },
+  });
 
   // resumen por etapa (para el header "qué hay cerca de cerrar")
   const counts = useMemo(() => {
@@ -140,6 +175,36 @@ const OpportunitiesPage = () => {
         <SummaryChip label="Ganadas" value={counts.won ?? 0} accent="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" />
       </div>
 
+      {/* #4 — Reclutamiento: confirmadas por firmar (del pipeline de Closers),
+          ordenadas por facturación. Acá aparecen los cierres grandes (ej. $24k)
+          que antes solo se veían en Closers. */}
+      {confirmadas.length > 0 && (
+        <div className="rounded-md border bg-muted/20 p-3">
+          <div className="mb-2 flex items-center gap-1.5">
+            <span className="text-sm">🎯</span>
+            <h2 className="text-sm font-semibold">Reclutamiento — confirmadas por firmar</h2>
+            <span className="text-[11px] text-muted-foreground">(del pipeline de Closers · por facturación)</span>
+          </div>
+          <div className="flex flex-col gap-1">
+            {confirmadas.slice(0, 8).map((c) => {
+              const v = confValue(c);
+              const big = v >= 10000;
+              return (
+                <div key={c.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/40">
+                  <span className="font-mono text-xs">{c.instagram_handle ?? "(sin handle)"}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums ${big ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground"}`}>
+                    {fmtUsd(v)}/mes
+                  </span>
+                  {big && <span className="text-xs" title="Cierre grande">🔥</span>}
+                  <span className="ml-auto text-xs text-muted-foreground">{userName(c.assigned_to)}</span>
+                  <span className="text-[11px] text-muted-foreground">{fmtDate(c.confirmed_date)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Filtro por etapa */}
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground">Ver:</span>
@@ -168,6 +233,7 @@ const OpportunitiesPage = () => {
               <tr className="border-b text-left text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Creadora</th>
                 <th className="px-3 py-2 font-medium">Producto</th>
+                <th className="px-3 py-2 font-medium">Valor/mes</th>
                 <th className="px-3 py-2 font-medium">Etapa</th>
                 <th className="px-3 py-2 font-medium">Trabaja</th>
                 <th className="px-3 py-2 font-medium">Próx. seguimiento</th>
@@ -188,6 +254,7 @@ const OpportunitiesPage = () => {
                       {o.notes && <div className="truncate text-xs font-normal text-muted-foreground max-w-[22rem]">{o.notes}</div>}
                     </td>
                     <td className="px-3 py-2 text-xs">{productLabel(o.product)}</td>
+                    <td className="px-3 py-2 text-xs font-medium tabular-nums">{fmtUsd(o.monthly_value_usd)}</td>
                     <td className="px-3 py-2">
                       <Badge variant="secondary-soft" className={`text-[10px] ${sm.cls}`}>{sm.label}</Badge>
                     </td>
@@ -230,7 +297,7 @@ const SummaryChip = ({ label, value, accent, hint }: { label: string; value: num
 // Alta + edición en un solo diálogo (existing=null → alta).
 const EMPTY = {
   creator_handle: "", product: "piclink", stage: "interested" as Stage,
-  assigned_to: "", next_followup_at: "", notes: "", lost_reason: "",
+  assigned_to: "", next_followup_at: "", notes: "", lost_reason: "", monthly_value_usd: "",
 };
 
 const OpportunityFormDialog = ({
@@ -256,6 +323,7 @@ const OpportunityFormDialog = ({
       next_followup_at: existing.next_followup_at ? existing.next_followup_at.slice(0, 10) : "",
       notes: existing.notes ?? "",
       lost_reason: existing.lost_reason ?? "",
+      monthly_value_usd: existing.monthly_value_usd != null ? String(existing.monthly_value_usd) : "",
     } : EMPTY);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing?.id, open]);
@@ -272,6 +340,7 @@ const OpportunityFormDialog = ({
         next_followup_at: form.next_followup_at ? new Date(form.next_followup_at).toISOString() : null,
         notes: form.notes.trim() || null,
         lost_reason: form.stage === "lost" ? (form.lost_reason.trim() || null) : null,
+        monthly_value_usd: form.monthly_value_usd ? Number(form.monthly_value_usd) : null,
         last_touch_at: new Date().toISOString(),
       };
       if (existing) {
@@ -331,6 +400,16 @@ const OpportunityFormDialog = ({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="space-y-1">
+            <Label>Facturación / valor mensual (USD)</Label>
+            <Input
+              type="number"
+              min="0"
+              value={form.monthly_value_usd}
+              onChange={(e) => setForm({ ...form, monthly_value_usd: e.target.value })}
+              placeholder="Ej. 24000 — para priorizar por monto"
+            />
           </div>
           <div className="flex gap-3">
             <div className="flex-1 space-y-1">
