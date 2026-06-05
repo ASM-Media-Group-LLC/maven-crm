@@ -174,7 +174,9 @@ const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange, onAss
       </TableHeader>
       <TableBody>
         {sorted.map((entry, idx) => (
-          <TableRow key={entry.id} className="cursor-pointer" onClick={() => viewOnly ? onView?.(entry) : onEdit?.(entry)}>
+          {/* Click en la fila → SIEMPRE abre el detalle lindo (galería de stories).
+              Editar queda en el menú "..." para no perderlo. */}
+          <TableRow key={entry.id} className="cursor-pointer" onClick={() => onView?.(entry)}>
             <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
               <div className="flex flex-col">
