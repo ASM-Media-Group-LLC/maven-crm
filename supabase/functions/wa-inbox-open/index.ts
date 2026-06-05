@@ -76,9 +76,13 @@ serve(async (req) => {
   let e164: string | null = null;
   let displayName: string | null = null;
   let leadIdForContact: string | null = null;
+  let leadOwner: string | null = null;   // closer_creators.assigned_to (dueño del lead)
+  let leadExists = false;
   if (leadId) {
     const { data: lead } = await (sb as any).from("closer_creators").select("*").eq("id", leadId).maybeSingle();
     if (lead) {
+      leadExists = true;
+      leadOwner = lead.assigned_to ?? null;
       leadIdForContact = leadId;
       e164 = (lead.phone && String(lead.phone).startsWith("+")) ? String(lead.phone) : null;
       if (!e164 && lead.source_contact_id) {
@@ -92,6 +96,25 @@ serve(async (req) => {
       displayName = lead.name || lead.full_name || lead.creator_name || lead.display_name || lead.instagram_handle || lead.handle || null;
     }
   }
+
+  // ── Gating por dueño del lead ──────────────────────────────────────────────
+  // El closer solo abre conversaciones de leads asignados a ÉL. Supervisores/
+  // managers/admin pueden abrir cualquiera (triaje/supervisión). Si el lead no es
+  // suyo, no se abre y le decimos por qué.
+  if (leadExists) {
+    const { data: isSup } = await sb.rpc("is_in_role_group", { _user_id: userId, _group: "supervisor_or_above" });
+    if (!isSup) {
+      if (!leadOwner) {
+        return json({ ok: false, error: "Este lead no está asignado a vos. Tomalo desde Closers para poder abrir su chat." }, 403);
+      }
+      if (leadOwner !== userId) {
+        const { data: owner } = await (sb as any).from("profiles").select("full_name").eq("id", leadOwner).maybeSingle();
+        const who = owner?.full_name || "otra persona";
+        return json({ ok: false, error: `Este lead ya está asignado a ${who}. No podés abrir su chat.` }, 403);
+      }
+    }
+  }
+
   if (!e164 && payload.phone && String(payload.phone).startsWith("+")) {
     e164 = String(payload.phone);                 // fallback leadgen / sin fila de closer
     displayName = displayName || payload.name || null;
@@ -120,14 +143,22 @@ serve(async (req) => {
   // ── find-or-create wa_conversation (por contact + canal) ───────────────────
   const dept = ["closer", "manager", "recruitment"].includes(channel.department) ? channel.department : "closer";
   let convId: string;
+  // La conversación sigue al dueño del lead: si el lead tiene dueño se asigna a él;
+  // si no (leadgen/sin fila de closer), al que la abre.
+  const ownerForConv = leadOwner ?? userId;
   const { data: existingConv } = await (sb as any)
-    .from("wa_conversations").select("id").eq("contact_id", contactId).eq("channel_id", channelId).maybeSingle();
+    .from("wa_conversations").select("id, assigned_to").eq("contact_id", contactId).eq("channel_id", channelId).maybeSingle();
   if (existingConv) {
     convId = existingConv.id;
+    // Si está SIN asignar, la tomamos para el dueño del lead (p.ej. un inbound que
+    // entró antes de que el closer la abriera). No pisamos una asignación ya hecha.
+    if (leadOwner && !existingConv.assigned_to) {
+      await (sb as any).from("wa_conversations").update({ assigned_to: leadOwner }).eq("id", convId);
+    }
   } else {
     const { data: newConv, error: vErr } = await (sb as any).from("wa_conversations").insert({
       tenant_id: channel.tenant_id, contact_id: contactId, channel_id: channelId,
-      channel_jid: channel.evolution_instance, department: dept, assigned_to: userId, status: "open",
+      channel_jid: channel.evolution_instance, department: dept, assigned_to: ownerForConv, status: "open",
     }).select("id").single();
     if (vErr) return json({ ok: false, error: "conversation_create_failed: " + vErr.message }, 500);
     convId = newConv.id;
