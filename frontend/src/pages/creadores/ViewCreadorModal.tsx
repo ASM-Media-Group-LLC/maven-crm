@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Globe, MessageCircle, Trash2 } from "lucide-react";
-import { useWhaticketLink } from "@/hooks/useWhaticketLink";
+import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -115,7 +115,6 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   const { isAdmin } = useUserRole();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const c = creator;
-  const { data: whaticketUrl } = useWhaticketLink(c.id);
   const initials = c.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
   const regDate = c.registration_date ? format(new Date(c.registration_date), "dd MMM yyyy", { locale: es }) : null;
@@ -187,16 +186,9 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 } />
                 <InfoField icon={Building2} label="Agencia" value={c.creator_business?.company?.name ?? c.creator_business?.assigned_agency} />
                 <InfoField icon={Mail} label="Email" value={c.email} />
-                <InfoField icon={Phone} label="Teléfono" value={c.phone} />
+                <InfoField icon={Phone} label="WhatsApp" value={<WaChatButton phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} />} />
                 <InfoField icon={UserCog} label="Tipo de Manager" value={c.creator_business?.manager_type} />
                 <InfoField icon={CalendarDays} label="Fecha de Registro" value={regDate} />
-                <InfoField icon={MessageCircle} label="Whaticket" value={
-                  whaticketUrl ? (
-                    <a href={whaticketUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                      Abrir Whaticket <ExternalLink className="h-3 w-3" />
-                    </a>
-                  ) : null
-                } />
               </div>
               {c.languages && c.languages.length > 0 && (
                 <div className="mt-3">

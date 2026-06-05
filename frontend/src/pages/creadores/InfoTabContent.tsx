@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useWhaticketLink } from "@/hooks/useWhaticketLink";
+import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import { useModelCategories } from "@/hooks/useModelCategories";
 import { ExternalLink } from "lucide-react";
@@ -95,7 +95,6 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
   const queryClient = useQueryClient();
   const c = creator;
   const biz = c.creator_business;
-  const { data: whaticketUrl } = useWhaticketLink(creatorId);
   // Compañías canónicas — fuente única scouter_companies.
   const { data: scouterCompanies = [] } = useScouterCompanies();
   const agencyOptions = scouterCompanies.length > 0
@@ -320,14 +319,8 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           <InfoField label="Porcentaje con Agencia" value={biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null} />
         )}
 
-        {/* Whaticket (read-only always) */}
-        <InfoField label="Whaticket" value={
-          whaticketUrl ? (
-            <a href={whaticketUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
-              Abrir Whaticket <ExternalLink className="h-3 w-3" />
-            </a>
-          ) : null
-        } />
+        {/* WhatsApp: abre el chat en la bandeja de Maven (sin exponer el número) */}
+        <InfoField label="WhatsApp" value={<WaChatButton phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} />} />
 
         {/* Notas Internas */}
         {isEditing ? (

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Edit, Save, X, Phone, ExternalLink, Linkedin, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
@@ -248,6 +249,17 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
             const displayVal = maskThis
               ? (creator.whatsapp_number ? maskPhone(creator.whatsapp_number) : "—")
               : platform.displayValue(creator);
+
+            // WhatsApp: sin dígitos — botón que abre la bandeja de Maven (como Closers).
+            if (platform.key === "whatsapp_number") {
+              return (
+                <Card key={platform.key} className="group p-4 flex items-center gap-4 transition-all duration-200">
+                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">{platform.icon}</div>
+                  <div className="flex-1 min-w-0"><p className="text-sm font-medium">{platform.label}</p></div>
+                  <WaChatButton phone={toE164({ whatsapp: creator.whatsapp_number })} />
+                </Card>
+              );
+            }
 
             return (
               <Card

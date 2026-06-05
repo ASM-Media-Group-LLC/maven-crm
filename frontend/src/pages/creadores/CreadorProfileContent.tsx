@@ -4,6 +4,7 @@ import { differenceInCalendarDays, setYear, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowLeft, Phone, Cake, Download, LogOut, ChevronRight, CheckCircle2 } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
+import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -199,12 +200,8 @@ const CreadorProfileContent = () => {
             )}
 
             <div className="flex flex-wrap items-center gap-2 mt-3">
-              {isAdmin && c.whatsapp_number && (
-                <a href={`https://wa.me/${c.whatsapp_number.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer">
-                  <Badge variant="secondary-soft" className="gap-1.5 cursor-pointer hover:bg-muted">
-                    <Phone className="h-3 w-3" /> WhatsApp
-                  </Badge>
-                </a>
+              {c.whatsapp_number && (
+                <WaChatButton phone={toE164({ whatsapp: c.whatsapp_number })} className="h-7 gap-1.5 px-2 text-xs text-emerald-600 hover:text-emerald-700" />
               )}
               {c.instagram_handle && (
                 <a href={buildSocialUrl("instagram", c.instagram_handle)} target="_blank" rel="noopener noreferrer">
