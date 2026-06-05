@@ -400,6 +400,7 @@ const PromologContent = () => {
 
   // Entry action state (table/grid actions)
   const [selectedEntry, setSelectedEntry] = useState<PromologEntry | null>(null);
+  const [verdictSavingId, setVerdictSavingId] = useState<string | null>(null);
   const [viewEntryOpen, setViewEntryOpen] = useState(false);
 
   // Todas las stories del día de la creadora seleccionada (para la galería de
@@ -417,6 +418,13 @@ const PromologContent = () => {
     return promoted.length > 0 ? promoted : selectedDayStories;
   }, [selectedDayStories]);
   const showStoryGallery = galleryStories.length > 0;
+  // Resultado del día EN VIVO (refleja cambios de veredicto sin reabrir el popup):
+  // "Sí" si cualquier historia es Sí; si no, "No"; si no hay stories del bot, el del entry.
+  const dayResult = useMemo(() => {
+    if (selectedDayStories.some((s) => s.result === "Sí")) return "Sí";
+    if (selectedDayStories.some((s) => s.result === "No")) return "No";
+    return selectedEntry?.result ?? "Pendiente";
+  }, [selectedDayStories, selectedEntry]);
   const [editEntryOpen, setEditEntryOpen] = useState(false);
   const [deleteEntryOpen, setDeleteEntryOpen] = useState(false);
   const [assignAgentOpen, setAssignAgentOpen] = useState(false);
@@ -565,6 +573,24 @@ const PromologContent = () => {
   };
   const handleNotesChange = async (entryId: string, notes: string | null) => {
     const { error } = await supabase.from("promolog_entries").update({ notes }).eq("id", entryId);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
+  };
+
+  // Override manual del veredicto de UNA historia (desde la galería del popup): persiste
+  // `promoted`, marca review humano y refresca → la dedup recalcula el resultado del día
+  // (Sí si CUALQUIER historia quedó en Sí).
+  const handleSetStoryVerdict = async (story: PromologEntry, verdict: "Sí" | "No") => {
+    if (story.result === verdict) return;
+    setVerdictSavingId(story.id);
+    const { error } = await supabase
+      .from("promolog_entries")
+      .update({ promoted: verdict === "Sí" ? "true" : "false", reviewed_by: user?.id })
+      .eq("id", story.id);
+    setVerdictSavingId(null);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
@@ -1487,8 +1513,8 @@ const PromologContent = () => {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Resultado:</span>{" "}
-                    <Badge variant={resultToBadgeVariant(selectedEntry.result)} className="ml-1 text-xs">
-                      {selectedEntry.result}
+                    <Badge variant={resultToBadgeVariant(dayResult)} className="ml-1 text-xs">
+                      {dayResult}
                     </Badge>
                   </div>
                   <div>
@@ -1559,7 +1585,7 @@ const PromologContent = () => {
                     bot analizó varias) o el pantallazo único (entry manual del
                     chatter / 1 sola story). */}
                 {showStoryGallery ? (
-                  <PromologStoryGallery stories={galleryStories} selectedId={selectedEntry.id} />
+                  <PromologStoryGallery stories={galleryStories} selectedId={selectedEntry.id} onSetVerdict={handleSetStoryVerdict} savingId={verdictSavingId} />
                 ) : selectedEntry.evidence_url ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
