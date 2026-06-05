@@ -50,7 +50,6 @@ import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { ListRow, ListRowButton } from "@/components/ui/list-row";
 import { useTimezone, formatDateInTz, formatTimeInTz } from "@/hooks/useTimezone";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -384,8 +383,6 @@ const PromologContent = () => {
   const [searchAgent, setSearchAgent] = useState("");
   const [searchCampaign, setSearchCampaign] = useState("");
   const [campaignStatusFilter, setCampaignStatusFilter] = useState("");
-  const [agentDateFrom, setAgentDateFrom] = useState<Date | undefined>(undefined);
-  const [agentDateTo, setAgentDateTo] = useState<Date | undefined>(undefined);
   const [campDateFrom, setCampDateFrom] = useState<Date | undefined>(undefined);
   const [campDateTo, setCampDateTo] = useState<Date | undefined>(undefined);
 
@@ -450,20 +447,22 @@ const PromologContent = () => {
     },
   });
 
-  // Fetch agent stats separately without limit
+  // Fetch agent stats separately without limit. Usa el MISMO date-range global
+  // del header (dateFrom/dateTo) que Dashboard y Promos — el subtab Agentes ya
+  // no tiene su propio selector de fechas.
   const { data: agentEntries = [] } = useQuery({
-    queryKey: ["promolog-agent-entries", agentDateFrom?.toISOString(), agentDateTo?.toISOString()],
+    queryKey: ["promolog-agent-entries", dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
       let query = supabase
         .from("promolog_entries")
         .select("reviewed_by, created_by, promoted, network, date")
         .order("date", { ascending: false });
 
-      if (agentDateFrom) {
-        query = query.gte("date", agentDateFrom.toISOString().split("T")[0]);
+      if (dateFrom) {
+        query = query.gte("date", dateFrom.toISOString().split("T")[0]);
       }
-      if (agentDateTo) {
-        const toEnd = new Date(agentDateTo);
+      if (dateTo) {
+        const toEnd = new Date(dateTo);
         toEnd.setDate(toEnd.getDate() + 1);
         query = query.lt("date", toEnd.toISOString().split("T")[0]);
       }
@@ -991,38 +990,6 @@ const PromologContent = () => {
       {/* Agentes tab */}
       {activeTab === "agentes" && (
         <div className="flex-1 min-h-0 overflow-auto p-6 space-y-6">
-          {/* Filters row */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar agente..." className="pl-9 h-9" value={searchAgent} onChange={(e) => setSearchAgent(e.target.value)} />
-            </div>
-            <DateRangePicker
-              from={agentDateFrom}
-              to={agentDateTo}
-              onApply={(from, to) => { setAgentDateFrom(from); setAgentDateTo(to); }}
-              placeholder="Selecciona fechas"
-              className="h-9"
-            />
-            {(searchAgent || agentDateFrom || agentDateTo) && (
-              <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchAgent(""); setAgentDateFrom(undefined); setAgentDateTo(undefined); }}>
-                <X className="mr-1.5 h-4 w-4" />
-                Limpiar filtros
-              </Button>
-            )}
-            <div className="ml-auto flex gap-1">
-              <Button variant={agentesView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("list")}>
-                <List className="h-4 w-4" />
-              </Button>
-              <Button variant={agentesView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("grid")}>
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-              <Button variant={agentesView === "calendar" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("calendar")}>
-                <CalendarIcon className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
           <AnalyticsSectionBanner
             title="Rendimiento de Agentes"
             subtitle={
