@@ -2,7 +2,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, X, UserPlus, LayoutGrid, List, LayoutDashboard, ListChecks, Eye } from "lucide-react";
+import { Search, X, UserPlus, LayoutGrid, List, LayoutDashboard, ListChecks, Eye, TrendingUp } from "lucide-react";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useCloserLeads, PLATFORMS, type DateFieldType, type CloserCreatorRow } from "./hooks/useCloserLeads";
 import { useClosersKpiPopup } from "./hooks/useClosersKpiPopup";
@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { usePermissions } from "@/hooks/usePermissions";
+import OpportunitiesPage from "@/pages/opportunities/OpportunitiesPage";
 
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
@@ -58,7 +59,7 @@ const ClosersContent = () => {
   const [kpiPopup, setKpiPopup] = useState<KpiPopupState | null>(null);
   const { data: kpiPopupResult, isLoading: kpiPopupLoading } = useClosersKpiPopup(kpiPopup, { dateFrom, dateTo, dateField, viewAsCloserId });
   // Subtab top-level — Dashboard (KPI cards) vs Operaciones (tabs/filtros/tabla)
-  const [viewTab, setViewTab] = useState<"dashboard" | "operaciones">("dashboard");
+  const [viewTab, setViewTab] = useState<"dashboard" | "operaciones" | "oportunidades">("dashboard");
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null; source: string } | null>(null);
@@ -191,6 +192,15 @@ const ClosersContent = () => {
                 <ListChecks className="mr-1.5 h-4 w-4" />
                 Operaciones
               </SubtabNavItem>
+              {canAccess("Closers", "Oportunidades") && (
+                <SubtabNavItem
+                  active={viewTab === "oportunidades"}
+                  onClick={() => setViewTab("oportunidades")}
+                >
+                  <TrendingUp className="mr-1.5 h-4 w-4" />
+                  Oportunidades
+                </SubtabNavItem>
+              )}
             </SubtabNav>
           </div>
 
@@ -206,6 +216,13 @@ const ClosersContent = () => {
                 onPipelineClick={(key) => setKpiPopup({ kind: "pipeline", key })}
                 onRevenueClick={(platform) => setKpiPopup({ kind: "revenue", platform })}
               />
+            </div>
+          )}
+
+          {/* OPORTUNIDADES — la pantalla de Oportunidades de monetización, ahora embebida como subtab de Closers */}
+          {viewTab === "oportunidades" && (
+            <div className="flex-1 min-h-0 overflow-auto">
+              <OpportunitiesPage />
             </div>
           )}
 

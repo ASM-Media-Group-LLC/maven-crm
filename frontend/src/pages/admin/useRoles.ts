@@ -78,7 +78,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // Closers tabs top-level (Dashboard / Operaciones) + sub-tabs internos
   // de la tabla Operaciones (status filters) + acciones críticas.
   { group: "Operaciones",   module: "Closers",       submodules: [
-    "Dashboard", "Operaciones",
+    "Dashboard", "Operaciones", "Oportunidades",
     "Ver Todas", "Ver Nuevo", "Ver Asignadas", "Ver Confirmadas", "Ver Completadas", "Ver No Interesadas",
     "Editar Status", "Asignar Closer", "Editar Comisiones", "Convertir a Creadora", "Exportar",
   ] },

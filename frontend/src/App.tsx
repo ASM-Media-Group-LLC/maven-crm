@@ -278,8 +278,8 @@ const App = () => (
                 <Route path="/inbox" element={<PermissionRoute module="WhatsApp" submodule="Bandeja"><InboxPage /></PermissionRoute>} />
                 <Route path="/inbox/canales" element={<PermissionRoute module="WhatsApp" submodule="Canales"><InboxChannelsPage /></PermissionRoute>} />
                 <Route path="/inbox/bots" element={<PermissionRoute module="WhatsApp" submodule="Canales"><InboxBotsPage /></PermissionRoute>} />
-                {/* Oportunidades de monetización — lanzamiento oscuro: admin-only hasta abrir a managers/supervisores. */}
-                <Route path="/oportunidades" element={<AdminRoute><OpportunitiesPage /></AdminRoute>} />
+                {/* Oportunidades ahora vive como subtab dentro de Closers (gated por Closers/Oportunidades). El path viejo redirige. */}
+                <Route path="/oportunidades" element={<Navigate to="/closers" replace />} />
                 <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />
                 <Route path="/promolog" element={<PermissionRoute module="Promolog"><Promolog /></PermissionRoute>} />
                 {/* Migrated areas from kash-call-qa — placeholders for now */}
