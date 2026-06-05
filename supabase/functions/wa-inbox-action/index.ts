@@ -102,9 +102,13 @@ serve(async (req) => {
 
   // ── Reflejar en la DB ────────────────────────────────────────────────────────
   if (action === "delete") {
-    await sb.from("wa_conversation_messages")
-      .update({ body: "🚫 Mensaje eliminado", msg_type: "deleted", media_url: null })
+    // Soft-delete NO destructivo: ya se revocó en WhatsApp (arriba). Acá NO pisamos
+    // body/media_url — solo marcamos deleted_at para que el equipo lo siga viendo
+    // (la burbuja se pinta de rojo con "mensaje eliminado" en la bandeja).
+    const { error: upErr } = await sb.from("wa_conversation_messages")
+      .update({ deleted_at: new Date().toISOString() })
       .eq("id", messageId);
+    if (upErr) return json({ ok: false, error: `db: ${upErr.message}` }, 500);
   } else if (action === "react") {
     // Guardamos la reacción del agente en el propio mensaje (texto simple) para
     // reflejarla en la UI. "" la quita.

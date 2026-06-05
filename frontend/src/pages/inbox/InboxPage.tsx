@@ -62,6 +62,7 @@ interface MsgRow {
   reply_to_message_id: string | null;
   sent_at: string;
   status: string | null;
+  deleted_at: string | null;
 }
 
 // Palomitas de WhatsApp para los mensajes SALIENTES según el estado de entrega:
@@ -168,7 +169,7 @@ const InboxPage = () => {
       if (!selectedId) return [] as MsgRow[];
       const { data, error } = await (supabase as any)
         .from("wa_conversation_messages")
-        .select("id, direction, body, msg_type, media_url, agent_reaction, reply_to_message_id, sent_at, status")
+        .select("id, direction, body, msg_type, media_url, agent_reaction, reply_to_message_id, sent_at, status, deleted_at")
         .eq("conversation_id", selectedId)
         .order("sent_at", { ascending: true })
         .limit(500);
@@ -693,12 +694,10 @@ const InboxPage = () => {
                 <div className="flex flex-col gap-2">
                   {messages.map((m) => {
                     const isOut = m.direction === "out";
-                    const isDeleted = m.msg_type === "deleted";
+                    const isDeleted = !!m.deleted_at;
                     const mediaShown = !!m.media_url && ["image", "sticker", "video", "audio", "document"].includes(m.msg_type);
                     const bodyIsPlaceholder = !!m.body && /^\[[^\]]+\]$/.test(m.body.trim());
-                    const showBody = isDeleted
-                      ? true
-                      : (!mediaShown ? true : (!!m.body && !bodyIsPlaceholder && m.msg_type !== "document"));
+                    const showBody = !mediaShown ? true : (!!m.body && !bodyIsPlaceholder && m.msg_type !== "document");
                     const quoted = m.reply_to_message_id
                       ? messages.find((x) => x.id === m.reply_to_message_id) ?? null
                       : null;
@@ -708,12 +707,13 @@ const InboxPage = () => {
                           <div
                             className={cn(
                               "relative min-w-0 rounded-2xl px-3 py-2 text-sm",
-                              isOut ? "bg-primary text-primary-foreground" : "bg-muted",
-                              isDeleted && "opacity-70",
+                              isDeleted
+                                ? "border border-red-400 bg-red-100 text-red-950 dark:border-red-700 dark:bg-red-950/50 dark:text-red-50"
+                                : isOut ? "bg-primary text-primary-foreground" : "bg-muted",
                               m.agent_reaction && "mb-2",
                             )}
                           >
-                            {!isDeleted && m.reply_to_message_id && (
+                            {m.reply_to_message_id && (
                               <div
                                 className={cn(
                                   "mb-1 rounded border-l-2 px-2 py-1 text-xs",
@@ -725,7 +725,7 @@ const InboxPage = () => {
                                 </p>
                               </div>
                             )}
-                            {!isDeleted && m.media_url && (m.msg_type === "image" || m.msg_type === "sticker") && (
+                            {m.media_url && (m.msg_type === "image" || m.msg_type === "sticker") && (
                               <img
                                 src={m.media_url}
                                 alt=""
@@ -736,7 +736,7 @@ const InboxPage = () => {
                                 )}
                               />
                             )}
-                            {!isDeleted && m.media_url && m.msg_type === "video" && (
+                            {m.media_url && m.msg_type === "video" && (
                               <div className="relative mb-1">
                                 <video controls src={m.media_url} className="max-h-64 rounded-lg" />
                                 <button
@@ -749,10 +749,10 @@ const InboxPage = () => {
                                 </button>
                               </div>
                             )}
-                            {!isDeleted && m.media_url && m.msg_type === "audio" && (
+                            {m.media_url && m.msg_type === "audio" && (
                               <audio controls src={m.media_url} className="mb-1 w-56" />
                             )}
-                            {!isDeleted && m.media_url && m.msg_type === "document" && (
+                            {m.media_url && m.msg_type === "document" && (
                               <a
                                 href={m.media_url}
                                 target="_blank"
@@ -767,8 +767,13 @@ const InboxPage = () => {
                               </a>
                             )}
                             {showBody && (
-                              <p className={cn("whitespace-pre-wrap break-words", isDeleted && "italic opacity-80")}>
-                                {isDeleted ? "🚫 Mensaje eliminado" : (m.body || (m.msg_type !== "text" ? `[${m.msg_type}]` : ""))}
+                              <p className="whitespace-pre-wrap break-words">
+                                {m.body || (m.msg_type !== "text" ? `[${m.msg_type}]` : "")}
+                              </p>
+                            )}
+                            {isDeleted && (
+                              <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium italic text-red-600 dark:text-red-300">
+                                <Trash2 className="h-3 w-3" /> mensaje eliminado
                               </p>
                             )}
                             <p
