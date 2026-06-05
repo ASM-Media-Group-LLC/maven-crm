@@ -210,7 +210,15 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               <SocialLink icon={<XIcon className="h-4 w-4" />} handle={c.twitter_handle} rawHandle={c.twitter_handle} url={buildSocialUrl("twitter", c.twitter_handle)} />
               <SocialLink icon={<span className="text-xs font-bold">YT</span>} handle={c.youtube_handle} rawHandle={c.youtube_handle} url={buildSocialUrl("youtube", c.youtube_handle)} />
               <SocialLink icon={<span className="text-xs font-bold">OF</span>} handle={c.onlyfans_url ? "Ver perfil" : null} url={c.onlyfans_url ?? ""} />
-              <SocialLink icon={<Phone className="h-4 w-4" />} handle={isAdmin && c.whatsapp_number ? "WhatsApp" : null} url={isAdmin && c.whatsapp_number ? `https://wa.me/${c.whatsapp_number.replace(/[^0-9]/g, "")}` : ""} />
+              {c.whatsapp_number && (
+                <div className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-3">
+                    <PlatformIcon><Phone className="h-4 w-4" /></PlatformIcon>
+                    <span className="text-sm font-medium">WhatsApp</span>
+                  </div>
+                  <WaChatButton phone={toE164({ whatsapp: c.whatsapp_number })} />
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="notas" className="pr-3">
