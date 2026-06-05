@@ -410,14 +410,9 @@ const PromologContent = () => {
     () => collectDayStories(entries, selectedEntry),
     [entries, selectedEntry],
   );
-  // Qué historias mostrar en la galería del popup: si la modelo promocionó ese día,
-  // SOLO las stories donde promocionó (la evidencia que importa); si no promocionó,
-  // TODAS sus historias (para validar que efectivamente no hubo promo).
-  const galleryStories = useMemo(() => {
-    const promoted = selectedDayStories.filter((s) => s.result === "Sí");
-    return promoted.length > 0 ? promoted : selectedDayStories;
-  }, [selectedDayStories]);
-  const showStoryGallery = galleryStories.length > 0;
+  // Mostramos SIEMPRE todas las historias del día (cada una marcada Sí/No con su toggle).
+  // El resultado del día se computa abajo (dayResult): Sí si cualquiera quedó en Sí.
+  const showStoryGallery = selectedDayStories.length > 0;
   // Resultado del día EN VIVO (refleja cambios de veredicto sin reabrir el popup):
   // "Sí" si cualquier historia es Sí; si no, "No"; si no hay stories del bot, el del entry.
   const dayResult = useMemo(() => {
@@ -1585,7 +1580,7 @@ const PromologContent = () => {
                     bot analizó varias) o el pantallazo único (entry manual del
                     chatter / 1 sola story). */}
                 {showStoryGallery ? (
-                  <PromologStoryGallery stories={galleryStories} selectedId={selectedEntry.id} onSetVerdict={handleSetStoryVerdict} savingId={verdictSavingId} />
+                  <PromologStoryGallery stories={selectedDayStories} selectedId={selectedEntry.id} onSetVerdict={handleSetStoryVerdict} savingId={verdictSavingId} />
                 ) : selectedEntry.evidence_url ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
