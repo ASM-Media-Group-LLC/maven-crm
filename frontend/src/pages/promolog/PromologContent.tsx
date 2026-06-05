@@ -73,7 +73,7 @@ import PromologTable from "./PromologTable";
 import PromologGrid from "./PromologGrid";
 import PromologAgentDetailView from "./PromologAgentDetailView";
 import PromologStoryGallery from "./PromologStoryGallery";
-import { collectDayStories, shouldShowGallery } from "./storyEvidence";
+import { collectDayStories } from "./storyEvidence";
 import PromologPerformanceView from "./PromologPerformanceView";
 import AnalyticsSectionBanner from "@/components/analytics/AnalyticsSectionBanner";
 import DataTableShell from "@/components/ui/data-table-shell";
@@ -292,26 +292,32 @@ const PromologContent = () => {
     });
   }, [promologEntries, profilesMap, userTz]);
 
-  // Deduplicate entries: group by creator_id + day + network + platform + result
+  // 1 fila por MODELO + DÍA (no por resultado). El bot crea 1 entry por story; acá
+  // las colapsamos: si la modelo promocionó en ALGUNA story ese día, la fila la
+  // representa esa promo (resultado "Sí" + plataforma + evidencia de la story que
+  // promocionó); si no promocionó en ninguna, la story más completa ("No"). Antes la
+  // key incluía el resultado → una modelo con 1 promo + otras sin promo salía 2 veces.
   const dedupedEntries = useMemo(() => {
     const groups = new Map<string, PromologEntry[]>();
     for (const entry of entries) {
-      const key = `${entry.creator_id || ""}|${entry.date}|${entry.network}|${entry.platform}|${entry.result}`;
+      const key = `${entry.creator_id || ""}|${entry.date}`;
       const group = groups.get(key);
       if (group) group.push(entry);
       else groups.set(key, [entry]);
     }
-    // From each group, pick the most complete entry
-    const result: PromologEntry[] = [];
-    for (const group of groups.values()) {
-      if (group.length === 1) { result.push(group[0]); continue; }
-      // Score: prefer entries with notes, reviewed_by, human agent
-      const scored = group.map(e => ({
+    // Score: preferir entries con evidencia, notas, review humano, agente humano.
+    const pickBest = (list: PromologEntry[]) => {
+      const scored = list.map(e => ({
         entry: e,
-        score: (e.notes ? 2 : 0) + (e.reviewed_by ? 2 : 0) + (e.agent !== "AI Agent" ? 3 : 0),
+        score: (e.evidence_url ? 2 : 0) + (e.notes ? 2 : 0) + (e.reviewed_by ? 2 : 0) + (e.agent !== "AI Agent" ? 3 : 0),
       }));
       scored.sort((a, b) => b.score - a.score);
-      result.push(scored[0].entry);
+      return scored[0].entry;
+    };
+    const result: PromologEntry[] = [];
+    for (const group of groups.values()) {
+      const promoted = group.filter(e => e.result === "Sí");
+      result.push(promoted.length > 0 ? pickBest(promoted) : pickBest(group));
     }
     return result;
   }, [entries]);
@@ -403,7 +409,14 @@ const PromologContent = () => {
     () => collectDayStories(entries, selectedEntry),
     [entries, selectedEntry],
   );
-  const showStoryGallery = shouldShowGallery(selectedDayStories);
+  // Qué historias mostrar en la galería del popup: si la modelo promocionó ese día,
+  // SOLO las stories donde promocionó (la evidencia que importa); si no promocionó,
+  // TODAS sus historias (para validar que efectivamente no hubo promo).
+  const galleryStories = useMemo(() => {
+    const promoted = selectedDayStories.filter((s) => s.result === "Sí");
+    return promoted.length > 0 ? promoted : selectedDayStories;
+  }, [selectedDayStories]);
+  const showStoryGallery = galleryStories.length > 0;
   const [editEntryOpen, setEditEntryOpen] = useState(false);
   const [deleteEntryOpen, setDeleteEntryOpen] = useState(false);
   const [assignAgentOpen, setAssignAgentOpen] = useState(false);
@@ -1546,7 +1559,7 @@ const PromologContent = () => {
                     bot analizó varias) o el pantallazo único (entry manual del
                     chatter / 1 sola story). */}
                 {showStoryGallery ? (
-                  <PromologStoryGallery stories={selectedDayStories} selectedId={selectedEntry.id} />
+                  <PromologStoryGallery stories={galleryStories} selectedId={selectedEntry.id} />
                 ) : selectedEntry.evidence_url ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
