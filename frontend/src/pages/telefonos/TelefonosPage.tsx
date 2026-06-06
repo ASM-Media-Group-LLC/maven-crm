@@ -205,7 +205,13 @@ export default function TelefonosPage() {
     let pip: any = null;
     if (PiP) {
       try {
-        pip = await PiP.requestWindow({ width: PHONE_W, height: PHONE_H + PHONE_BAR });
+        // Adaptar al alto de la pantalla (CLAVE en resoluciones bajas): la ventana no puede ser más alta
+        // que la pantalla (Chrome la topa), así que la achicamos manteniendo el aspecto del teléfono
+        // (más angosta cuando hay menos alto) → el Android entra completo, NUNCA se corta.
+        const availH = (window.screen && window.screen.availHeight) || window.innerHeight || (PHONE_H + PHONE_BAR);
+        const winH = Math.max(420, Math.min(PHONE_H + PHONE_BAR, availH - 96));
+        const w = Math.max(240, Math.round((winH - PHONE_BAR) * (PHONE_W / PHONE_H)));
+        pip = await PiP.requestWindow({ width: w, height: winH });
         pip.document.body.style.cssText =
           "margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#000;color:#9ca3af;font-family:system-ui,sans-serif;font-size:14px";
         pip.document.body.textContent = "Iniciando teléfono…";
@@ -463,11 +469,12 @@ export default function TelefonosPage() {
             </DialogTitle>
           </DialogHeader>
           {active && (
+            {/* alto tope min(PHONE_H, 80vh) + aspecto fijo → el ancho sigue al alto en pantallas bajas (no corta) */}
             <iframe
               src={active.url}
               title={active.name}
               className="bg-black"
-              style={{ width: PHONE_W, height: `min(${PHONE_H}px, 80vh)`, border: 0, display: "block" }}
+              style={{ height: `min(${PHONE_H}px, 80vh)`, aspectRatio: `${PHONE_W} / ${PHONE_H}`, border: 0, display: "block" }}
               allow="clipboard-read; clipboard-write; microphone; camera; autoplay"
             />
           )}
