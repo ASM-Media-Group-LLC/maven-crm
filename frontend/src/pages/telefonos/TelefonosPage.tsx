@@ -14,9 +14,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Smartphone, Loader2, Play, RefreshCw, Power, Clock, Plus, BarChart3 } from "lucide-react";
 
-// Tab "Teléfonos" (Operaciones). El closer ve SOLO los teléfonos asignados; el admin ve todos y asigna.
-// "Abrir" arranca el cloud phone y lo muestra en un <iframe>. Control de tiempo: countdown de 20 min con
-// auto-cierre, latido cada 60s (para el reaper del micro) y botón Extender. Cero marca Multilogin.
+// Tab "Teléfonos" (Operaciones). El closer ve SOLO los asignados; el admin ve todos y asigna.
+// "Abrir" arranca el cloud phone y lo muestra SIEMPRE en una ventana flotante always-on-top
+// (Document Picture-in-Picture, Chrome) → flota sobre Maven y sobre cualquier otra app. En navegadores
+// sin PiP cae a un modal in-page. Control de tiempo: countdown 20min + auto-cierre + latido 60s + Extender.
+// Los timers viven DENTRO de la ventanita PiP → siguen vivos aunque el closer navegue otra parte de Maven.
 
 type Phone = {
   id: string;
@@ -45,6 +47,8 @@ const fmt = (s: number) => {
   const sec = Math.max(0, s) % 60;
   return `${m}:${String(sec).padStart(2, "0")}`;
 };
+const cp = (action: string, extra: Record<string, unknown> = {}) =>
+  supabase.functions.invoke("cloudphone", { body: { action, ...extra } });
 
 export default function TelefonosPage() {
   const { toast } = useToast();
@@ -53,6 +57,7 @@ export default function TelefonosPage() {
   const [phones, setPhones] = useState<Phone[]>([]);
   const [users, setUsers] = useState<Usr[]>([]);
   const [opening, setOpening] = useState<string | null>(null);
+  // fallback in-page (solo navegadores sin PiP)
   const [active, setActive] = useState<{ id: string; name: string; url: string } | null>(null);
   const [secsLeft, setSecsLeft] = useState(MAX_SECONDS);
   const [usageOpen, setUsageOpen] = useState(false);
@@ -60,10 +65,14 @@ export default function TelefonosPage() {
 
   const warnedRef = useRef(false);
   const closeRef = useRef<() => void>(() => {});
+  const mountedRef = useRef(true);
+  const loadRef = useRef<() => void>(() => {});
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke("cloudphone", { body: { action: "list" } });
+    const { data, error } = await cp("list");
+    if (!mountedRef.current) return;
     setLoading(false);
     const res = data as { ok?: boolean; isAdmin?: boolean; phones?: Phone[]; error?: string } | null;
     if (error || !res?.ok) {
@@ -77,24 +86,123 @@ export default function TelefonosPage() {
     setIsAdmin(!!res.isAdmin);
     setPhones(res.phones ?? []);
     if (res.isAdmin) {
-      const { data: u } = await supabase.functions.invoke("cloudphone", { body: { action: "users" } });
+      const { data: u } = await cp("users");
       const ur = u as { ok?: boolean; users?: Usr[] } | null;
-      if (ur?.ok && ur.users) setUsers(ur.users);
+      if (mountedRef.current && ur?.ok && ur.users) setUsers(ur.users);
     }
   }, [toast]);
+  loadRef.current = load;
 
   useEffect(() => {
     load();
   }, [load]);
 
+  // ── Ventana flotante always-on-top (Document Picture-in-Picture) ──
+  // Self-contained: timers/latido viven en la ventana PiP, sobreviven a que este componente se desmonte.
+  // deno-lint-ignore no-explicit-any
+  const mountPipPhone = (pip: any, id: string, name: string, url: string, initialSecs: number) => {
+    const doc = pip.document;
+    doc.body.replaceChildren();
+    doc.body.style.cssText = "margin:0;background:#000;font-family:system-ui,-apple-system,sans-serif;overflow:hidden";
+
+    const bar = doc.createElement("div");
+    bar.style.cssText =
+      "display:flex;align-items:center;justify-content:space-between;gap:8px;height:34px;padding:0 8px;background:#111;color:#fff;box-sizing:border-box";
+    const titleEl = doc.createElement("div");
+    titleEl.textContent = name;
+    titleEl.style.cssText = "font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+    const right = doc.createElement("div");
+    right.style.cssText = "display:flex;align-items:center;gap:6px;flex:none";
+    const clock = doc.createElement("span");
+    clock.style.cssText = "font-size:12px;font-variant-numeric:tabular-nums;color:#9ca3af;min-width:38px;text-align:right";
+    const extendBtn = doc.createElement("button");
+    extendBtn.textContent = "+20";
+    extendBtn.title = "Extender 20 min";
+    extendBtn.style.cssText = "background:#374151;color:#fff;border:0;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px";
+    const closeBtn = doc.createElement("button");
+    closeBtn.textContent = "Cerrar";
+    closeBtn.style.cssText = "background:#dc2626;color:#fff;border:0;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:600";
+    right.append(clock, extendBtn, closeBtn);
+    bar.append(titleEl, right);
+    doc.body.append(bar);
+
+    const frame = doc.createElement("iframe");
+    frame.src = url;
+    frame.allow = "clipboard-read; clipboard-write; microphone; camera; autoplay";
+    frame.style.cssText = "display:block;width:100%;height:calc(100vh - 34px);border:0;background:#000";
+    doc.body.append(frame);
+
+    let secs = initialSecs;
+    let warned = false;
+    let closed = false;
+    const paint = () => {
+      clock.textContent = fmt(secs);
+      clock.style.color = secs <= 120 ? "#f87171" : "#9ca3af";
+    };
+    paint();
+
+    const closePhone = () => {
+      if (closed) return;
+      closed = true;
+      cp("stop", { profileId: id }).catch(() => {});
+      try { pip.close(); } catch { /* ya cerrada */ }
+      if (mountedRef.current) loadRef.current();
+    };
+
+    const tick = pip.setInterval(() => {
+      secs -= 1;
+      if (secs <= 120 && !warned) {
+        warned = true;
+        titleEl.textContent = name + " · ⚠ 2 min";
+      }
+      if (secs <= 0) {
+        closePhone();
+        return;
+      }
+      paint();
+    }, 1000);
+
+    const hb = pip.setInterval(() => {
+      cp("heartbeat", { profileId: id }).catch(() => {});
+    }, 60000);
+
+    extendBtn.onclick = async () => {
+      const { data } = await cp("extend", { profileId: id });
+      const r = data as { ok?: boolean; secondsLeft?: number } | null;
+      secs = r?.secondsLeft || MAX_SECONDS;
+      warned = false;
+      titleEl.textContent = name;
+      paint();
+    };
+    closeBtn.onclick = closePhone;
+    pip.addEventListener("pagehide", () => {
+      pip.clearInterval(tick);
+      pip.clearInterval(hb);
+      closePhone();
+    });
+  };
+
   const open = async (p: Phone) => {
     setOpening(p.id);
-    const { data, error } = await supabase.functions.invoke("cloudphone", {
-      body: { action: "start", profileId: p.id, serial_name: p.serial_name },
-    });
+    // deno-lint-ignore no-explicit-any
+    const PiP = (window as any).documentPictureInPicture;
+    // deno-lint-ignore no-explicit-any
+    let pip: any = null;
+    if (PiP) {
+      try {
+        pip = await PiP.requestWindow({ width: 390, height: 820 });
+        pip.document.body.style.cssText =
+          "margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#000;color:#9ca3af;font-family:system-ui,sans-serif;font-size:14px";
+        pip.document.body.textContent = "Iniciando teléfono…";
+      } catch {
+        pip = null;
+      }
+    }
+    const { data, error } = await cp("start", { profileId: p.id, serial_name: p.serial_name });
     setOpening(null);
     const res = data as { ok?: boolean; url?: string; secondsLeft?: number; error?: string } | null;
     if (error || !res?.ok || !res.url) {
+      try { pip?.close(); } catch { /* noop */ }
       toast({
         title: "No se pudo abrir el teléfono",
         description: error?.message || res?.error || "No llegó la URL",
@@ -102,33 +210,37 @@ export default function TelefonosPage() {
       });
       return;
     }
-    warnedRef.current = false;
-    setSecsLeft(res.secondsLeft || MAX_SECONDS);
-    setActive({ id: p.id, name: p.serial_name || p.id, url: res.url });
+    const secs = res.secondsLeft || MAX_SECONDS;
+    if (pip) {
+      mountPipPhone(pip, p.id, p.serial_name || p.id, res.url, secs);
+      load(); // refrescar tarjetas (quedará "En uso")
+    } else {
+      // fallback in-page (navegador sin PiP)
+      warnedRef.current = false;
+      setSecsLeft(secs);
+      setActive({ id: p.id, name: p.serial_name || p.id, url: res.url });
+    }
   };
 
   const close = useCallback(async () => {
     const a = active;
     setActive(null);
     if (a) {
-      await supabase.functions.invoke("cloudphone", { body: { action: "stop", profileId: a.id } });
-      load(); // refrescar estados
+      await cp("stop", { profileId: a.id });
+      load();
     }
   }, [active, load]);
   closeRef.current = close;
 
   const extend = async () => {
     if (!active) return;
-    const { data } = await supabase.functions.invoke("cloudphone", {
-      body: { action: "extend", profileId: active.id },
-    });
+    const { data } = await cp("extend", { profileId: active.id });
     const res = data as { ok?: boolean; secondsLeft?: number } | null;
     warnedRef.current = false;
     setSecsLeft(res?.secondsLeft || MAX_SECONDS);
-    toast({ title: "Sesión extendida", description: "Se reinició el reloj." });
   };
 
-  // Countdown + latido mientras el iframe está abierto.
+  // Countdown + latido del fallback in-page.
   useEffect(() => {
     if (!active) return;
     const tick = setInterval(() => {
@@ -136,18 +248,17 @@ export default function TelefonosPage() {
         const n = s - 1;
         if (n === 120 && !warnedRef.current) {
           warnedRef.current = true;
-          toast({ title: "Te quedan 2 minutos", description: "Se va a cerrar solo. Tocá Extender si seguís." });
+          toast({ title: "Te quedan 2 minutos", description: "Se cierra solo. Tocá Extender si seguís." });
         }
         if (n <= 0) {
           closeRef.current();
-          toast({ title: "Sesión cerrada por tiempo" });
           return 0;
         }
         return n;
       });
     }, 1000);
     const hb = setInterval(() => {
-      supabase.functions.invoke("cloudphone", { body: { action: "heartbeat", profileId: active.id } });
+      cp("heartbeat", { profileId: active.id }).catch(() => {});
     }, 60000);
     return () => {
       clearInterval(tick);
@@ -156,8 +267,11 @@ export default function TelefonosPage() {
   }, [active, toast]);
 
   const assign = async (p: Phone, userId: string | null) => {
-    const { data, error } = await supabase.functions.invoke("cloudphone", {
-      body: { action: "assign", profileId: p.id, userId, serial_name: p.serial_name, remark: p.remark },
+    const { data, error } = await cp("assign", {
+      profileId: p.id,
+      userId,
+      serial_name: p.serial_name,
+      remark: p.remark,
     });
     const res = data as { ok?: boolean; error?: string } | null;
     if (error || !res?.ok) {
@@ -169,7 +283,7 @@ export default function TelefonosPage() {
 
   const openUsage = async () => {
     setUsageOpen(true);
-    const { data } = await supabase.functions.invoke("cloudphone", { body: { action: "usage" } });
+    const { data } = await cp("usage");
     const res = data as { ok?: boolean; byUser?: UsageRow[]; recent?: RecentRow[] } | null;
     if (res?.ok) setUsage({ byUser: res.byUser ?? [], recent: res.recent ?? [] });
   };
@@ -257,7 +371,7 @@ export default function TelefonosPage() {
         </div>
       )}
 
-      {/* Iframe del teléfono. Ocultamos la ✕ default del diálogo ([&>button]:hidden) para no pisar "Cerrar". */}
+      {/* Fallback in-page (solo navegadores sin Picture-in-Picture). Oculta la ✕ default para no pisar Cerrar. */}
       <Dialog open={!!active} onOpenChange={(o) => { if (!o) close(); }}>
         <DialogContent className="max-w-[420px] p-0 gap-0 overflow-hidden [&>button]:hidden">
           <DialogHeader className="px-3 py-2 border-b">
@@ -268,12 +382,11 @@ export default function TelefonosPage() {
                   className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-mono ${
                     lowTime ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" : "bg-muted text-muted-foreground"
                   }`}
-                  title="Tiempo restante de la sesión"
                 >
                   <Clock className="h-3 w-3" />
                   {fmt(secsLeft)}
                 </span>
-                <Button variant="ghost" size="sm" onClick={extend} className="h-7 px-2" title="Extender +20 min">
+                <Button variant="ghost" size="sm" onClick={extend} className="h-7 px-2" title="Extender 20 min">
                   <Plus className="h-3.5 w-3.5" />
                 </Button>
                 <Button variant="ghost" size="sm" onClick={close} className="h-7 px-2">
@@ -326,9 +439,7 @@ export default function TelefonosPage() {
                 <div className="space-y-1">
                   {usage.recent.map((r, i) => (
                     <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="truncate">
-                        {r.serial_name} · {r.full_name || "—"}
-                      </span>
+                      <span className="truncate">{r.serial_name} · {r.full_name || "—"}</span>
                       <span>{r.minutes} min{r.end_reason && r.end_reason !== "manual" ? ` (${r.end_reason})` : ""}</span>
                     </div>
                   ))}
