@@ -469,7 +469,6 @@ export default function TelefonosPage() {
             </DialogTitle>
           </DialogHeader>
           {active && (
-            {/* alto tope min(PHONE_H, 80vh) + aspecto fijo → el ancho sigue al alto en pantallas bajas (no corta) */}
             <iframe
               src={active.url}
               title={active.name}
