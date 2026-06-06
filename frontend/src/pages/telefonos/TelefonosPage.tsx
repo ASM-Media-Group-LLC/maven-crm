@@ -141,11 +141,13 @@ export default function TelefonosPage() {
     };
     paint();
 
-    const closePhone = () => {
+    const closePhone = async () => {
       if (closed) return;
       closed = true;
-      cp("stop", { profileId: id }).catch(() => {});
       try { pip.close(); } catch { /* ya cerrada */ }
+      // saca "En uso" al instante (optimista); después confirma el stop y reconcilia con el server
+      if (mountedRef.current) setPhones((prev) => prev.map((x) => (x.id === id ? { ...x, session: null } : x)));
+      try { await cp("stop", { profileId: id }); } catch { /* noop */ }
       if (mountedRef.current) loadRef.current();
     };
 
@@ -226,6 +228,7 @@ export default function TelefonosPage() {
     const a = active;
     setActive(null);
     if (a) {
+      setPhones((prev) => prev.map((x) => (x.id === a.id ? { ...x, session: null } : x)));
       await cp("stop", { profileId: a.id });
       load();
     }
