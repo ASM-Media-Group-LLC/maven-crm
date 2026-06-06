@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectTrigger,
@@ -11,16 +12,16 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
+import KpiCard from "@/components/dashboard/KpiCard";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Smartphone, Loader2, Play, RefreshCw, Power, Clock, LayoutDashboard } from "lucide-react";
+import { Smartphone, Loader2, Play, RefreshCw, Power, Clock, LayoutDashboard, Activity, ListChecks } from "lucide-react";
 
-// Tab "Teléfonos" (Operaciones), estilo Maven: subtabs Dashboard + Dispositivos (gateables por rol).
-// El teléfono abre SIEMPRE en una ventana flotante always-on-top (Picture-in-Picture, Chrome) en
-// aspecto vertical angosto (~340 de ancho) para que el Android LLENE la ventana sin espacio blanco
-// (a más ancho, geelark mete su toolbar lateral y deja blanco). Fallback in-page si no hay PiP.
-// Control de tiempo: countdown 20min + auto-cierre + latido (timers dentro de la ventanita).
+// Tab "Teléfonos" (Operaciones), estilo Maven (header + Tabs + KpiCards como Panel de control).
+// Subtabs Dashboard + Dispositivos (gateables por rol). El teléfono abre en una ventana flotante
+// always-on-top (Picture-in-Picture, Chrome) en tamaño ~cuadrado (~440px) para que se vea la toolbar
+// lateral de geelark sin dejar espacio blanco. Fallback in-page si no hay PiP. Control de tiempo:
+// countdown 20min + auto-cierre + latido (timers dentro de la ventanita).
 
 type Phone = {
   id: string;
@@ -43,8 +44,10 @@ type RecentRow = {
   minutes: number;
 };
 
-const PHONE_W = 340; // ancho de la ventana/iframe — angosto a propósito (geelark esconde su toolbar y llena)
-const PHONE_BAR = 34; // alto de la barra de control de la ventanita PiP
+// Tamaño del teléfono: ~cuadrado para que geelark muestre su toolbar lateral y el Android llene sin blanco.
+const PHONE_W = 440;
+const PHONE_H = 430;
+const PHONE_BAR = 34;
 const MAX_SECONDS = 20 * 60;
 const fmt = (s: number) => {
   const m = Math.floor(Math.max(0, s) / 60);
@@ -59,10 +62,6 @@ export default function TelefonosPage() {
   const { canAccess } = usePermissions();
   const canDash = canAccess("Telefonos", "Dashboard");
   const canDevices = canAccess("Telefonos", "Dispositivos");
-  const subtabs = [
-    canDash ? { v: "dashboard", label: "Dashboard", Icon: LayoutDashboard } : null,
-    canDevices ? { v: "dispositivos", label: "Dispositivos", Icon: Smartphone } : null,
-  ].filter(Boolean) as { v: string; label: string; Icon: typeof Smartphone }[];
   const [tab, setTab] = useState<string>(canDash ? "dashboard" : "dispositivos");
 
   const [loading, setLoading] = useState(true);
@@ -70,7 +69,7 @@ export default function TelefonosPage() {
   const [phones, setPhones] = useState<Phone[]>([]);
   const [users, setUsers] = useState<Usr[]>([]);
   const [opening, setOpening] = useState<string | null>(null);
-  const [active, setActive] = useState<{ id: string; name: string; url: string } | null>(null); // fallback in-page
+  const [active, setActive] = useState<{ id: string; name: string; url: string } | null>(null);
   const [secsLeft, setSecsLeft] = useState(MAX_SECONDS);
   const [usage, setUsage] = useState<{ byUser: UsageRow[]; recent: RecentRow[] } | null>(null);
 
@@ -111,8 +110,7 @@ export default function TelefonosPage() {
     load();
   }, [load]);
 
-  // ── Ventana flotante always-on-top (Document Picture-in-Picture). Self-contained: timers/latido
-  // viven en la ventana PiP (sobreviven a que este componente se desmonte si el closer navega Maven).
+  // ── Ventana flotante always-on-top (Document Picture-in-Picture). Timers/latido viven en la ventana PiP.
   // deno-lint-ignore no-explicit-any
   const mountPipPhone = (pip: any, id: string, name: string, url: string, initialSecs: number) => {
     const doc = pip.document;
@@ -204,7 +202,7 @@ export default function TelefonosPage() {
     let pip: any = null;
     if (PiP) {
       try {
-        pip = await PiP.requestWindow({ width: PHONE_W, height: PHONE_W * 2 + PHONE_BAR });
+        pip = await PiP.requestWindow({ width: PHONE_W, height: PHONE_H + PHONE_BAR });
         pip.document.body.style.cssText =
           "margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#000;color:#9ca3af;font-family:system-ui,sans-serif;font-size:14px";
         pip.document.body.textContent = "Iniciando teléfono…";
@@ -298,86 +296,79 @@ export default function TelefonosPage() {
   const lowTime = secsLeft <= 120;
   const inUseCount = phones.filter((p) => p.session).length;
   const totalMin = (usage?.byUser ?? []).reduce((a, u) => a + u.minutes, 0);
+  const totalSessions = (usage?.byUser ?? []).reduce((a, u) => a + u.sessions, 0);
 
   const Devices = (
-    <>
-      {loading ? (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
-        </div>
-      ) : phones.length === 0 ? (
-        <p className="text-muted-foreground">
-          {isAdmin ? "No hay teléfonos disponibles." : "No tenés teléfonos asignados todavía."}
-        </p>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {phones.map((p) => (
-            <Card key={p.id} className="overflow-hidden">
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Smartphone className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span className="font-medium truncate">{p.serial_name || p.id}</span>
-                  </div>
-                  {p.session ? (
-                    <Badge className="bg-emerald-600 hover:bg-emerald-600 shrink-0">En uso</Badge>
-                  ) : (
-                    p.usecase_name && <Badge variant="secondary" className="shrink-0">{p.usecase_name}</Badge>
-                  )}
+    loading ? (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
+      </div>
+    ) : phones.length === 0 ? (
+      <p className="text-muted-foreground">
+        {isAdmin ? "No hay teléfonos disponibles." : "No tenés teléfonos asignados todavía."}
+      </p>
+    ) : (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {phones.map((p) => (
+          <Card key={p.id} className="overflow-hidden">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Smartphone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="font-medium truncate">{p.serial_name || p.id}</span>
                 </div>
-                {p.remark && <div className="text-sm text-muted-foreground truncate" title={p.remark}>{p.remark}</div>}
-                <Button size="sm" className="w-full" onClick={() => open(p)} disabled={opening === p.id}>
-                  {opening === p.id ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Play className="h-4 w-4 mr-2" />
-                  )}
-                  Abrir
-                </Button>
-                {isAdmin && (
-                  <div className="pt-2 border-t">
-                    <div className="text-xs text-muted-foreground mb-1">Asignar a</div>
-                    <Select
-                      value={p.assigned_to ?? "none"}
-                      onValueChange={(v) => assign(p, v === "none" ? null : v)}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Sin asignar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin asignar</SelectItem>
-                        {users.map((u) => (
-                          <SelectItem key={u.id} value={u.id}>
-                            {u.full_name || u.id.slice(0, 8)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {p.session ? (
+                  <Badge className="bg-emerald-600 hover:bg-emerald-600 shrink-0">En uso</Badge>
+                ) : (
+                  p.usecase_name && <Badge variant="secondary" className="shrink-0">{p.usecase_name}</Badge>
                 )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </>
+              </div>
+              {p.remark && <div className="text-sm text-muted-foreground truncate" title={p.remark}>{p.remark}</div>}
+              <Button size="sm" className="w-full" onClick={() => open(p)} disabled={opening === p.id}>
+                {opening === p.id ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4 mr-2" />
+                )}
+                Abrir
+              </Button>
+              {isAdmin && (
+                <div className="pt-2 border-t">
+                  <div className="text-xs text-muted-foreground mb-1">Asignar a</div>
+                  <Select
+                    value={p.assigned_to ?? "none"}
+                    onValueChange={(v) => assign(p, v === "none" ? null : v)}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Sin asignar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin asignar</SelectItem>
+                      {users.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.full_name || u.id.slice(0, 8)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
   );
 
   const Dashboard = (
     <div className="space-y-4">
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
-        <Card><CardContent className="p-4">
-          <div className="text-xs text-muted-foreground">Teléfonos</div>
-          <div className="text-2xl font-semibold">{phones.length}</div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="text-xs text-muted-foreground">En uso ahora</div>
-          <div className="text-2xl font-semibold text-emerald-600">{inUseCount}</div>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <div className="text-xs text-muted-foreground">Minutos (30 días)</div>
-          <div className="text-2xl font-semibold">{totalMin}</div>
-        </CardContent></Card>
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <KpiCard label="Teléfonos" value={phones.length} icon={Smartphone} color="bg-blue-500"
+          subtitle="Total disponibles" onClick={canDevices ? () => setTab("dispositivos") : undefined} />
+        <KpiCard label="En uso ahora" value={inUseCount} icon={Activity} color="bg-emerald-500"
+          subtitle="Prendidos en este momento" onClick={canDevices ? () => setTab("dispositivos") : undefined} />
+        <KpiCard label="Minutos" value={totalMin} icon={Clock} color="bg-violet-500" subtitle="Últimos 30 días" />
+        <KpiCard label="Sesiones" value={totalSessions} icon={ListChecks} color="bg-amber-500" subtitle="Últimos 30 días" />
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <Card><CardContent className="p-4">
@@ -387,11 +378,11 @@ export default function TelefonosPage() {
           ) : usage.byUser.length === 0 ? (
             <p className="text-sm text-muted-foreground">Todavía no hay uso registrado.</p>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {usage.byUser.map((u) => (
                 <div key={u.user_id} className="flex items-center justify-between text-sm">
                   <span className="truncate">{u.full_name || u.user_id.slice(0, 8)}</span>
-                  <span className="text-muted-foreground">{u.minutes} min · {u.sessions} sesiones</span>
+                  <span className="text-muted-foreground tabular-nums">{u.minutes} min · {u.sessions} ses.</span>
                 </div>
               ))}
             </div>
@@ -402,11 +393,11 @@ export default function TelefonosPage() {
           {!usage || usage.recent.length === 0 ? (
             <p className="text-sm text-muted-foreground">Sin sesiones recientes.</p>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {usage.recent.map((r, i) => (
                 <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
                   <span className="truncate">{r.serial_name} · {r.full_name || "—"}</span>
-                  <span>{r.minutes} min{r.end_reason && r.end_reason !== "manual" ? ` (${r.end_reason})` : ""}</span>
+                  <span className="tabular-nums">{r.minutes} min{r.end_reason && r.end_reason !== "manual" ? ` (${r.end_reason})` : ""}</span>
                 </div>
               ))}
             </div>
@@ -417,23 +408,11 @@ export default function TelefonosPage() {
   );
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Smartphone className="h-5 w-5" />
-            <h1 className="text-xl font-semibold">Teléfonos</h1>
-          </div>
-          {subtabs.length > 1 && (
-            <SubtabNav>
-              {subtabs.map((s) => (
-                <SubtabNavItem key={s.v} active={tab === s.v} onClick={() => setTab(s.v)}>
-                  <s.Icon className="h-4 w-4 mr-1.5" />
-                  {s.label}
-                </SubtabNavItem>
-              ))}
-            </SubtabNav>
-          )}
+    <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Teléfonos</h1>
+          <p className="text-sm text-muted-foreground">Operá tus teléfonos asignados sin salir de Maven.</p>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
@@ -441,9 +420,24 @@ export default function TelefonosPage() {
         </Button>
       </div>
 
-      {tab === "dashboard" && canDash ? Dashboard : Devices}
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          {canDash && (
+            <TabsTrigger value="dashboard">
+              <LayoutDashboard className="h-4 w-4 mr-1.5" /> Dashboard
+            </TabsTrigger>
+          )}
+          {canDevices && (
+            <TabsTrigger value="dispositivos">
+              <Smartphone className="h-4 w-4 mr-1.5" /> Dispositivos
+            </TabsTrigger>
+          )}
+        </TabsList>
+        {canDash && <TabsContent value="dashboard" className="mt-4">{Dashboard}</TabsContent>}
+        {canDevices && <TabsContent value="dispositivos" className="mt-4">{Devices}</TabsContent>}
+      </Tabs>
 
-      {/* Fallback in-page (navegadores sin PiP). Aspecto vertical angosto (igual que la ventanita). */}
+      {/* Fallback in-page (navegadores sin PiP). Mismo tamaño que la ventanita (muestra la toolbar de geelark). */}
       <Dialog open={!!active} onOpenChange={(o) => { if (!o) close(); }}>
         <DialogContent className="w-auto max-w-[95vw] p-0 gap-0 overflow-hidden [&>button]:hidden">
           <DialogHeader className="px-3 py-2 border-b">
@@ -470,12 +464,12 @@ export default function TelefonosPage() {
               src={active.url}
               title={active.name}
               className="bg-black"
-              style={{ width: PHONE_W, height: "min(680px, 80vh)", border: 0, display: "block" }}
+              style={{ width: PHONE_W, height: `min(${PHONE_H}px, 80vh)`, border: 0, display: "block" }}
               allow="clipboard-read; clipboard-write; microphone; camera; autoplay"
             />
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </main>
   );
 }
