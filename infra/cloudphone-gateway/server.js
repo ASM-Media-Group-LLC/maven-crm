@@ -54,7 +54,7 @@ app.get("/diag", async (_req, res) => {
   const out = {};
   for (const [k, cmd, args] of [
     ["adb", "adb", ["--version"]],
-    ["xcli", "xcli", ["--version"]],
+    ["mlx", "mlx", ["--version"]],
   ]) {
     try {
       const { stdout } = await sh(cmd, args);

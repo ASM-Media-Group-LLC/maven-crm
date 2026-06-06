@@ -20,13 +20,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Agente Multilogin X (headless) ---
-# Instalación oficial en Linux: descargar el .deb y extraerlo.
-WORKDIR /opt
-RUN curl -L -f -o mlxdeb.deb "https://mlxdists.s3.eu-west-3.amazonaws.com/mlx/latest/multiloginx-amd64.deb" \
-    && dpkg-deb -x mlxdeb.deb /opt/mlx \
-    && rm mlxdeb.deb
-# [CONFIRMAR] ruta real de xcli y mlx-launcher dentro del .deb (probable /opt/mlx/usr/bin).
-ENV PATH="/opt/mlx/usr/bin:/opt/mlx/usr/local/bin:${PATH}"
+# Slice 1 confirmó: el .deb trae UN solo binario `mlx` (wrapper en /usr/bin/mlx que ejecuta
+# /opt/mlx/agent.bin). HAY QUE EXTRAER A LA RAÍZ "/" para que el wrapper encuentre /opt/mlx/agent.bin
+# (extraer a /opt/mlx lo dejaba en /opt/mlx/opt/mlx/agent.bin → el wrapper tiraba "agent.bin: not found").
+RUN curl -L -f -o /tmp/mlxdeb.deb "https://mlxdists.s3.eu-west-3.amazonaws.com/mlx/latest/multiloginx-amd64.deb" \
+    && dpkg-deb -x /tmp/mlxdeb.deb / \
+    && rm /tmp/mlxdeb.deb
+# /usr/bin/mlx ya queda en el PATH por defecto.
 
 WORKDIR /app
 COPY package.json ./
