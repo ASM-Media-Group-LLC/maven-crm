@@ -11,14 +11,16 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { useToast } from "@/hooks/use-toast";
-import { Smartphone, Loader2, Play, RefreshCw, Power, Clock, Plus, BarChart3 } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
+import { Smartphone, Loader2, Play, RefreshCw, Power, Clock, LayoutDashboard } from "lucide-react";
 
-// Tab "Teléfonos" (Operaciones). El closer ve SOLO los asignados; el admin ve todos y asigna.
-// "Abrir" arranca el cloud phone y lo muestra SIEMPRE en una ventana flotante always-on-top
-// (Document Picture-in-Picture, Chrome) → flota sobre Maven y sobre cualquier otra app. En navegadores
-// sin PiP cae a un modal in-page. Control de tiempo: countdown 20min + auto-cierre + latido 60s + Extender.
-// Los timers viven DENTRO de la ventanita PiP → siguen vivos aunque el closer navegue otra parte de Maven.
+// Tab "Teléfonos" (Operaciones), estilo Maven: subtabs Dashboard + Dispositivos (gateables por rol).
+// El teléfono abre SIEMPRE en una ventana flotante always-on-top (Picture-in-Picture, Chrome) en
+// aspecto vertical angosto (~340 de ancho) para que el Android LLENE la ventana sin espacio blanco
+// (a más ancho, geelark mete su toolbar lateral y deja blanco). Fallback in-page si no hay PiP.
+// Control de tiempo: countdown 20min + auto-cierre + latido (timers dentro de la ventanita).
 
 type Phone = {
   id: string;
@@ -41,6 +43,8 @@ type RecentRow = {
   minutes: number;
 };
 
+const PHONE_W = 340; // ancho de la ventana/iframe — angosto a propósito (geelark esconde su toolbar y llena)
+const PHONE_BAR = 34; // alto de la barra de control de la ventanita PiP
 const MAX_SECONDS = 20 * 60;
 const fmt = (s: number) => {
   const m = Math.floor(Math.max(0, s) / 60);
@@ -52,15 +56,22 @@ const cp = (action: string, extra: Record<string, unknown> = {}) =>
 
 export default function TelefonosPage() {
   const { toast } = useToast();
+  const { canAccess } = usePermissions();
+  const canDash = canAccess("Telefonos", "Dashboard");
+  const canDevices = canAccess("Telefonos", "Dispositivos");
+  const subtabs = [
+    canDash ? { v: "dashboard", label: "Dashboard", Icon: LayoutDashboard } : null,
+    canDevices ? { v: "dispositivos", label: "Dispositivos", Icon: Smartphone } : null,
+  ].filter(Boolean) as { v: string; label: string; Icon: typeof Smartphone }[];
+  const [tab, setTab] = useState<string>(canDash ? "dashboard" : "dispositivos");
+
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [phones, setPhones] = useState<Phone[]>([]);
   const [users, setUsers] = useState<Usr[]>([]);
   const [opening, setOpening] = useState<string | null>(null);
-  // fallback in-page (solo navegadores sin PiP)
-  const [active, setActive] = useState<{ id: string; name: string; url: string } | null>(null);
+  const [active, setActive] = useState<{ id: string; name: string; url: string } | null>(null); // fallback in-page
   const [secsLeft, setSecsLeft] = useState(MAX_SECONDS);
-  const [usageOpen, setUsageOpen] = useState(false);
   const [usage, setUsage] = useState<{ byUser: UsageRow[]; recent: RecentRow[] } | null>(null);
 
   const warnedRef = useRef(false);
@@ -89,6 +100,9 @@ export default function TelefonosPage() {
       const { data: u } = await cp("users");
       const ur = u as { ok?: boolean; users?: Usr[] } | null;
       if (mountedRef.current && ur?.ok && ur.users) setUsers(ur.users);
+      const { data: us } = await cp("usage");
+      const usr = us as { ok?: boolean; byUser?: UsageRow[]; recent?: RecentRow[] } | null;
+      if (mountedRef.current && usr?.ok) setUsage({ byUser: usr.byUser ?? [], recent: usr.recent ?? [] });
     }
   }, [toast]);
   loadRef.current = load;
@@ -97,8 +111,8 @@ export default function TelefonosPage() {
     load();
   }, [load]);
 
-  // ── Ventana flotante always-on-top (Document Picture-in-Picture) ──
-  // Self-contained: timers/latido viven en la ventana PiP, sobreviven a que este componente se desmonte.
+  // ── Ventana flotante always-on-top (Document Picture-in-Picture). Self-contained: timers/latido
+  // viven en la ventana PiP (sobreviven a que este componente se desmonte si el closer navega Maven).
   // deno-lint-ignore no-explicit-any
   const mountPipPhone = (pip: any, id: string, name: string, url: string, initialSecs: number) => {
     const doc = pip.document;
@@ -107,7 +121,7 @@ export default function TelefonosPage() {
 
     const bar = doc.createElement("div");
     bar.style.cssText =
-      "display:flex;align-items:center;justify-content:space-between;gap:8px;height:34px;padding:0 8px;background:#111;color:#fff;box-sizing:border-box";
+      `display:flex;align-items:center;justify-content:space-between;gap:8px;height:${PHONE_BAR}px;padding:0 8px;background:#111;color:#fff;box-sizing:border-box`;
     const titleEl = doc.createElement("div");
     titleEl.textContent = name;
     titleEl.style.cssText = "font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
@@ -129,7 +143,7 @@ export default function TelefonosPage() {
     const frame = doc.createElement("iframe");
     frame.src = url;
     frame.allow = "clipboard-read; clipboard-write; microphone; camera; autoplay";
-    frame.style.cssText = "display:block;width:100%;height:calc(100vh - 34px);border:0;background:#000";
+    frame.style.cssText = `display:block;width:100%;height:calc(100vh - ${PHONE_BAR}px);border:0;background:#000`;
     doc.body.append(frame);
 
     let secs = initialSecs;
@@ -145,7 +159,6 @@ export default function TelefonosPage() {
       if (closed) return;
       closed = true;
       try { pip.close(); } catch { /* ya cerrada */ }
-      // saca "En uso" al instante (optimista); después confirma el stop y reconcilia con el server
       if (mountedRef.current) setPhones((prev) => prev.map((x) => (x.id === id ? { ...x, session: null } : x)));
       try { await cp("stop", { profileId: id }); } catch { /* noop */ }
       if (mountedRef.current) loadRef.current();
@@ -163,7 +176,6 @@ export default function TelefonosPage() {
       }
       paint();
     }, 1000);
-
     const hb = pip.setInterval(() => {
       cp("heartbeat", { profileId: id }).catch(() => {});
     }, 60000);
@@ -192,7 +204,7 @@ export default function TelefonosPage() {
     let pip: any = null;
     if (PiP) {
       try {
-        pip = await PiP.requestWindow({ width: 390, height: 820 });
+        pip = await PiP.requestWindow({ width: PHONE_W, height: PHONE_W * 2 + PHONE_BAR });
         pip.document.body.style.cssText =
           "margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#000;color:#9ca3af;font-family:system-ui,sans-serif;font-size:14px";
         pip.document.body.textContent = "Iniciando teléfono…";
@@ -215,9 +227,8 @@ export default function TelefonosPage() {
     const secs = res.secondsLeft || MAX_SECONDS;
     if (pip) {
       mountPipPhone(pip, p.id, p.serial_name || p.id, res.url, secs);
-      load(); // refrescar tarjetas (quedará "En uso")
+      load();
     } else {
-      // fallback in-page (navegador sin PiP)
       warnedRef.current = false;
       setSecsLeft(secs);
       setActive({ id: p.id, name: p.serial_name || p.id, url: res.url });
@@ -284,36 +295,12 @@ export default function TelefonosPage() {
     setPhones((prev) => prev.map((x) => (x.id === p.id ? { ...x, assigned_to: userId } : x)));
   };
 
-  const openUsage = async () => {
-    setUsageOpen(true);
-    const { data } = await cp("usage");
-    const res = data as { ok?: boolean; byUser?: UsageRow[]; recent?: RecentRow[] } | null;
-    if (res?.ok) setUsage({ byUser: res.byUser ?? [], recent: res.recent ?? [] });
-  };
-
   const lowTime = secsLeft <= 120;
+  const inUseCount = phones.filter((p) => p.session).length;
+  const totalMin = (usage?.byUser ?? []).reduce((a, u) => a + u.minutes, 0);
 
-  return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Smartphone className="h-5 w-5" />
-          <h1 className="text-xl font-semibold">Teléfonos</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {isAdmin && (
-            <Button variant="outline" size="sm" onClick={openUsage}>
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Uso
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Actualizar
-          </Button>
-        </div>
-      </div>
-
+  const Devices = (
+    <>
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
@@ -373,10 +360,92 @@ export default function TelefonosPage() {
           ))}
         </div>
       )}
+    </>
+  );
 
-      {/* Fallback in-page (solo navegadores sin Picture-in-Picture). Oculta la ✕ default para no pisar Cerrar. */}
+  const Dashboard = (
+    <div className="space-y-4">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
+        <Card><CardContent className="p-4">
+          <div className="text-xs text-muted-foreground">Teléfonos</div>
+          <div className="text-2xl font-semibold">{phones.length}</div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <div className="text-xs text-muted-foreground">En uso ahora</div>
+          <div className="text-2xl font-semibold text-emerald-600">{inUseCount}</div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <div className="text-xs text-muted-foreground">Minutos (30 días)</div>
+          <div className="text-2xl font-semibold">{totalMin}</div>
+        </CardContent></Card>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card><CardContent className="p-4">
+          <div className="text-sm font-medium mb-2">Minutos por persona (30 días)</div>
+          {!usage ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Cargando…</div>
+          ) : usage.byUser.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Todavía no hay uso registrado.</p>
+          ) : (
+            <div className="space-y-1">
+              {usage.byUser.map((u) => (
+                <div key={u.user_id} className="flex items-center justify-between text-sm">
+                  <span className="truncate">{u.full_name || u.user_id.slice(0, 8)}</span>
+                  <span className="text-muted-foreground">{u.minutes} min · {u.sessions} sesiones</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <div className="text-sm font-medium mb-2">Sesiones recientes</div>
+          {!usage || usage.recent.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin sesiones recientes.</p>
+          ) : (
+            <div className="space-y-1">
+              {usage.recent.map((r, i) => (
+                <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="truncate">{r.serial_name} · {r.full_name || "—"}</span>
+                  <span>{r.minutes} min{r.end_reason && r.end_reason !== "manual" ? ` (${r.end_reason})` : ""}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent></Card>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="p-4 md:p-6 space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Smartphone className="h-5 w-5" />
+            <h1 className="text-xl font-semibold">Teléfonos</h1>
+          </div>
+          {subtabs.length > 1 && (
+            <SubtabNav>
+              {subtabs.map((s) => (
+                <SubtabNavItem key={s.v} active={tab === s.v} onClick={() => setTab(s.v)}>
+                  <s.Icon className="h-4 w-4 mr-1.5" />
+                  {s.label}
+                </SubtabNavItem>
+              ))}
+            </SubtabNav>
+          )}
+        </div>
+        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+          Actualizar
+        </Button>
+      </div>
+
+      {tab === "dashboard" && canDash ? Dashboard : Devices}
+
+      {/* Fallback in-page (navegadores sin PiP). Aspecto vertical angosto (igual que la ventanita). */}
       <Dialog open={!!active} onOpenChange={(o) => { if (!o) close(); }}>
-        <DialogContent className="max-w-[420px] p-0 gap-0 overflow-hidden [&>button]:hidden">
+        <DialogContent className="w-auto max-w-[95vw] p-0 gap-0 overflow-hidden [&>button]:hidden">
           <DialogHeader className="px-3 py-2 border-b">
             <DialogTitle className="flex items-center justify-between gap-2 text-sm">
               <span className="truncate">{active?.name}</span>
@@ -389,9 +458,7 @@ export default function TelefonosPage() {
                   <Clock className="h-3 w-3" />
                   {fmt(secsLeft)}
                 </span>
-                <Button variant="ghost" size="sm" onClick={extend} className="h-7 px-2" title="Extender 20 min">
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
+                <Button variant="ghost" size="sm" onClick={extend} className="h-7 px-2" title="Extender 20 min">+20</Button>
                 <Button variant="ghost" size="sm" onClick={close} className="h-7 px-2">
                   <Power className="h-4 w-4 mr-1" /> Cerrar
                 </Button>
@@ -402,53 +469,10 @@ export default function TelefonosPage() {
             <iframe
               src={active.url}
               title={active.name}
-              className="w-full bg-black"
-              style={{ height: "72vh", border: 0 }}
+              className="bg-black"
+              style={{ width: PHONE_W, height: "min(680px, 80vh)", border: 0, display: "block" }}
               allow="clipboard-read; clipboard-write; microphone; camera; autoplay"
             />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Reporte de uso (admin) */}
-      <Dialog open={usageOpen} onOpenChange={setUsageOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Uso de teléfonos (últimos 30 días)</DialogTitle>
-          </DialogHeader>
-          {!usage ? (
-            <div className="flex items-center gap-2 text-muted-foreground py-6">
-              <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
-            </div>
-          ) : (
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-              <div>
-                <div className="text-sm font-medium mb-2">Minutos por persona</div>
-                {usage.byUser.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Todavía no hay uso registrado.</p>
-                ) : (
-                  <div className="space-y-1">
-                    {usage.byUser.map((u) => (
-                      <div key={u.user_id} className="flex items-center justify-between text-sm">
-                        <span className="truncate">{u.full_name || u.user_id.slice(0, 8)}</span>
-                        <span className="text-muted-foreground">{u.minutes} min · {u.sessions} sesiones</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div>
-                <div className="text-sm font-medium mb-2">Sesiones recientes</div>
-                <div className="space-y-1">
-                  {usage.recent.map((r, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="truncate">{r.serial_name} · {r.full_name || "—"}</span>
-                      <span>{r.minutes} min{r.end_reason && r.end_reason !== "manual" ? ` (${r.end_reason})` : ""}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
           )}
         </DialogContent>
       </Dialog>
