@@ -1,99 +1,94 @@
-// cloudphone-gateway — Slice 1 (de-risk)
-// Propósito: probar la cadena REAL en el VPS: arrancar un cloud phone (vía el agente MLX
-// headless, launcher local :45001) -> adb connect + glogin -> capturar 1 frame PNG.
-// NO embebe ni streamea todavía (eso es Slice 2). NO toca Maven.
+// cloudphone-gateway — Slice 2: wrapper de la CLOUD API de Multilogin para cloud phones.
 //
-// Honestidad: las funciones marcadas [CONFIRMAR] dependen de comandos exactos de xcli/launcher
-// que se validan corriendo el contenedor (ese es justamente el objetivo del Slice 1). El tramo
-// de adb (connect/glogin/screencap) sí está definido por la doc oficial.
+// Hallazgo del de-risk (2026-06-06): los cloud phones NO van por el launcher local (:45001, eso es
+// para browser) sino por la cloud API `api.multilogin.com/mobile_profiles/phone/*` (body {ids:[...]},
+// Bearer token). El `start` devuelve una URL web del teléfono (https://phone.geelark.com/...&token=)
+// que es IFRAME-EMBEBIBLE → Maven la mete en un <iframe>. No hace falta ADB/scrcpy/WebRTC.
+//
+// Endpoints que expone este micro (los consume Maven):
+//   GET  /health
+//   GET  /folders                  → folders mobile (asignación folder-por-closer)
+//   POST /phones/status  {ids}     → estado de teléfonos
+//   POST /phones/:id/start         → arranca y devuelve { url } (geelark, para el iframe)
+//   POST /phones/:id/stop          → apaga
+//   POST /phones/adb-info {ids}    → info ADB (alternativa; no se usa para el iframe)
+//
+// Auth: por ahora gated por SPIKE_TOKEN (header x-spike-token). Slice 3 = JWT de Supabase + folder-por-closer.
 
 const express = require("express");
-const { execFile } = require("child_process");
-
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
 const PORT = process.env.PORT || 8090;
-const SPIKE_TOKEN = process.env.SPIKE_TOKEN || ""; // protege el endpoint de prueba (arranca teléfonos = gasta minutos)
+const SPIKE_TOKEN = process.env.SPIKE_TOKEN || "";
+// MLX_TOKEN: idealmente un AUTOMATION token largo (expiration_period=8760h) para no vencerse.
+// Ver README (se mintea con signin -> GET /workspace/automation_token, campo data.token).
+const MLX_TOKEN = process.env.MLX_TOKEN || "";
+const CLOUD = process.env.MLX_CLOUD_URL || "https://api.multilogin.com";
 
-function sh(cmd, args, opts = {}) {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { timeout: 90000, maxBuffer: 1024 * 1024 * 64, ...opts }, (err, stdout, stderr) => {
-      if (err) return reject(Object.assign(err, { stdout, stderr }));
-      resolve({ stdout, stderr });
-    });
+async function mlx(path, { method = "GET", body } = {}) {
+  const res = await fetch(CLOUD + path, {
+    method,
+    headers: { Authorization: `Bearer ${MLX_TOKEN}`, "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
   });
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch { json = { raw: text.slice(0, 500) }; }
+  return { status: res.status, json };
 }
 
-// [CONFIRMAR] Arrancar un MOBILE profile. El endpoint de browser documentado es
-//   GET launcher.mlx.yt:45001/api/v2/profile/f/{folder}/p/{profile}/start
-// pero el de MOBILE + cómo obtener el ADB hay que confirmarlo (probablemente vía `xcli`).
-async function startProfile(folderId, profileId) {
-  // TODO(slice1): reemplazar por el comando real de xcli para mobile (confirmar con `xcli --help`
-  // dentro del contenedor). Tentativo:
-  const { stdout } = await sh("xcli", ["profile", "start", "-f", folderId, "-p", profileId]);
-  return stdout.toString();
-}
-
-// [CONFIRMAR] Obtener IP:PORT + password de ADB del profile corriendo.
-// En la GUI sale al hacer hover del ícono verde (IP/port/password). Programático: confirmar
-// el comando de xcli/launcher que lo expone.
-async function getAdbInfo(/* profileId */) {
-  throw new Error(
-    "getAdbInfo: pendiente de confirmar el comando xcli/launcher en runtime (Slice 1). " +
-      "Correr `xcli --help` / `xcli profile --help` dentro del contenedor para descubrirlo.",
-  );
+function guard(req, res) {
+  if (!SPIKE_TOKEN || req.get("x-spike-token") !== SPIKE_TOKEN) {
+    res.status(401).json({ ok: false, error: "unauthorized" });
+    return false;
+  }
+  return true;
 }
 
 app.get("/health", (_req, res) =>
-  res.json({ ok: true, service: "cloudphone-gateway", slice: 1, ts: new Date().toISOString() }),
+  res.json({ ok: true, service: "cloudphone-gateway", slice: 2, hasToken: !!MLX_TOKEN, ts: new Date().toISOString() }),
 );
 
-// Diagnóstico del entorno: confirma que xcli/adb existen y el agente responde. Sin secretos.
-app.get("/diag", async (_req, res) => {
-  const out = {};
-  for (const [k, cmd, args] of [
-    ["adb", "adb", ["--version"]],
-    ["mlx", "mlx", ["--version"]],
-  ]) {
-    try {
-      const { stdout } = await sh(cmd, args);
-      out[k] = String(stdout).split("\n")[0];
-    } catch (e) {
-      out[k] = `ERR: ${e.message}`;
-    }
-  }
-  res.json({ ok: true, tools: out });
+// Folders mobile (cada folder = un closer, en el modelo folder-por-closer).
+app.get("/folders", async (req, res) => {
+  if (!guard(req, res)) return;
+  const r = await mlx("/workspace/folders?folder_type=mobile");
+  res.status(r.status).json(r.json);
 });
 
-// Prueba de la cadena completa: start -> adb connect -> glogin -> screencap (1 frame PNG base64).
-// Protegido por SPIKE_TOKEN porque arrancar un teléfono consume minutos de cloud.
-app.post("/spike/capture", async (req, res) => {
-  if (!SPIKE_TOKEN || req.get("x-spike-token") !== SPIKE_TOKEN) {
-    return res.status(401).json({ ok: false, error: "unauthorized" });
-  }
-  const { folderId, profileId } = req.body || {};
-  if (!folderId || !profileId) {
-    return res.status(400).json({ ok: false, error: "folderId y profileId requeridos" });
-  }
-  const log = [];
-  try {
-    log.push("startProfile…");
-    await startProfile(folderId, profileId);
-    log.push("getAdbInfo…");
-    const { host, port, password } = await getAdbInfo(profileId);
-    const target = `${host}:${port}`;
-    log.push(`adb connect ${target}`);
-    await sh("adb", ["connect", target]);
-    log.push("glogin…");
-    await sh("adb", ["-s", target, "shell", "glogin", password]);
-    log.push("screencap…");
-    const { stdout } = await sh("adb", ["-s", target, "exec-out", "screencap", "-p"], { encoding: "buffer" });
-    const png = Buffer.isBuffer(stdout) ? stdout : Buffer.from(stdout);
-    return res.json({ ok: true, log, frameBytes: png.length, framePngBase64: png.toString("base64") });
-  } catch (e) {
-    return res.status(500).json({ ok: false, log, error: e.message, stderr: e.stderr && String(e.stderr) });
-  }
+// Estado de teléfonos. Body: { ids: ["<profileId>", ...] }
+app.post("/phones/status", async (req, res) => {
+  if (!guard(req, res)) return;
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  const r = await mlx("/mobile_profiles/phone/statuses", { method: "POST", body: { ids } });
+  res.status(r.status).json(r.json);
 });
 
-app.listen(PORT, () => console.log(`cloudphone-gateway escuchando en :${PORT}`));
+// Arranca un teléfono y devuelve la URL web (geelark) para embeber en el <iframe> de Maven.
+app.post("/phones/:id/start", async (req, res) => {
+  if (!guard(req, res)) return;
+  const r = await mlx("/mobile_profiles/phone/start", { method: "POST", body: { ids: [req.params.id] } });
+  const detail = r.json?.data?.success_details?.[0];
+  res.status(r.status).json({ ok: r.status === 200 && !!detail?.url, url: detail?.url || null, raw: r.json });
+});
+
+// Apaga un teléfono (importante para no quemar minutos de cloud).
+app.post("/phones/:id/stop", async (req, res) => {
+  if (!guard(req, res)) return;
+  const r = await mlx("/mobile_profiles/phone/stop", { method: "POST", body: { ids: [req.params.id] } });
+  res.status(r.status).json(r.json);
+});
+
+// Info de ADB (control programático alternativo; NO se usa para el iframe). Body: { ids: [...] }
+app.post("/phones/adb-info", async (req, res) => {
+  if (!guard(req, res)) return;
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  const r = await mlx("/mobile_profiles/phone/adb/info", { method: "POST", body: { ids } });
+  res.status(r.status).json(r.json);
+});
+
+// TODO(slice3): GET /phones?folder=<id> (listar perfiles de un folder — confirmar endpoint exacto vía
+//   network capture) + auth real con JWT de Supabase aplicando folder-por-closer + endpoint de "mover
+//   teléfono a folder" (asignación). + (opcional) proxear la URL geelark para ocultar también esa marca.
+app.listen(PORT, () => console.log(`cloudphone-gateway escuchando en :${PORT} (slice 2, cloud-phone API)`));
