@@ -1,40 +1,119 @@
-// cloudphone-gateway — Slice 2: wrapper de la CLOUD API de Multilogin para cloud phones.
+// cloudphone-gateway — wrapper de la CLOUD API de Multilogin para cloud phones.
 //
-// Hallazgo del de-risk (2026-06-06): los cloud phones NO van por el launcher local (:45001, eso es
-// para browser) sino por la cloud API `api.multilogin.com/mobile_profiles/phone/*` (body {ids:[...]},
-// Bearer token). El `start` devuelve una URL web del teléfono (https://phone.geelark.com/...&token=)
-// que es IFRAME-EMBEBIBLE → Maven la mete en un <iframe>. No hace falta ADB/scrcpy/WebRTC.
+// Los cloud phones (= GeeLark por debajo) se manejan 100% por `api.multilogin.com/mobile_profiles/phone/*`
+// (body {ids:[...]}, Bearer token). El `start` devuelve una URL web del teléfono
+// (https://phone.geelark.com/...&token=) que es IFRAME-EMBEBIBLE → Maven la mete en un <iframe>.
+// No hace falta ADB/scrcpy/WebRTC, ni el agente MLX (que además hijackeaba la API).
 //
-// Endpoints que expone este micro (los consume Maven):
-//   GET  /health
-//   GET  /folders                  → folders mobile (asignación folder-por-closer)
-//   POST /phones/status  {ids}     → estado de teléfonos
-//   POST /phones/:id/start         → arranca y devuelve { url } (geelark, para el iframe)
-//   POST /phones/:id/stop          → apaga
-//   POST /phones/adb-info {ids}    → info ADB (alternativa; no se usa para el iframe)
+// AUTH (lección aprendida 2026-06-06): el bloqueo nunca fue el agente — era un TOKEN VENCIDO.
+// Síntoma: GET .../phone/list con token malo → 401 "Wrong JWT token"; el MISMO token malo en un POST
+// → 501 "Unsupported method (POST)" (espejismo). Por eso este micro se auto-gestiona el token:
+//   1) POST /user/signin {email, password: md5(password)} → data.token (regular, ~30 min)
+//   2) GET  /workspace/automation_token?expiration_period=8760h → data.token (largo, ~1 año)
+//   3) cachea en memoria; si una llamada da 401/403/501, re-mintea una vez y reintenta.
+// Si no hay email+password pero sí MLX_TOKEN, usa ese (modo manual; vos lo mantenés).
 //
-// Auth: por ahora gated por SPIKE_TOKEN (header x-spike-token). Slice 3 = JWT de Supabase + folder-por-closer.
+// Endpoints que consume Maven:
+//   GET  /health                 → vivo + modo de auth (sin filtrar secretos)
+//   GET  /diag                    → (guard) hace un GET real y devuelve el status → verificación
+//   GET  /folders                 → (guard) folders mobile (asignación folder-por-closer)
+//   GET  /phones                  → (guard) lista de teléfonos (paginada)
+//   POST /phones/status  {ids}    → (guard) estado de teléfonos
+//   POST /phones/:id/start        → (guard) arranca y devuelve { url } (geelark, para el iframe)
+//   POST /phones/:id/stop         → (guard) apaga (importante: gasta minutos de cloud)
+//   POST /phones/adb-info {ids}   → (guard) info ADB (alternativa; no se usa para el iframe)
+//
+// Auth del micro hacia Maven: por ahora SPIKE_TOKEN (header x-spike-token). Slice 3 = JWT de Supabase.
 
 const express = require("express");
+const crypto = require("crypto");
+
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
 const PORT = process.env.PORT || 8090;
 const SPIKE_TOKEN = process.env.SPIKE_TOKEN || "";
-// MLX_TOKEN: idealmente un AUTOMATION token largo (expiration_period=8760h) para no vencerse.
-// Ver README (se mintea con signin -> GET /workspace/automation_token, campo data.token).
-const MLX_TOKEN = process.env.MLX_TOKEN || "";
 const CLOUD = process.env.MLX_CLOUD_URL || "https://api.multilogin.com";
 
-async function mlx(path, { method = "GET", body } = {}) {
+const MLX_EMAIL = process.env.MLX_EMAIL || "";
+const MLX_PASSWORD = process.env.MLX_PASSWORD || ""; // plano; se md5'ea en el signin
+const MLX_TOKEN_OVERRIDE = process.env.MLX_TOKEN || ""; // token manual opcional (sin email/pass)
+const TOKEN_TTL = process.env.MLX_TOKEN_TTL || "8760h"; // expiración del automation token
+
+const HAS_CREDS = !!(MLX_EMAIL && MLX_PASSWORD);
+// User-Agent tipo browser: no es necesario (probado), pero no molesta y nos camufla.
+const UA =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36";
+
+const md5 = (s) => crypto.createHash("md5").update(s).digest("hex");
+
+let tokenCache = { token: null, mintedAt: 0, mode: HAS_CREDS ? "signin" : MLX_TOKEN_OVERRIDE ? "override" : "none" };
+
+// signin → (intenta) automation token largo. Si el automation falla, cae al token regular del signin
+// (que igual sirve para la API; el auto-refresh on-401 cubre su vencimiento a los ~30 min).
+async function signinAndMint() {
+  const si = await fetch(CLOUD + "/user/signin", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "User-Agent": UA, Accept: "application/json" },
+    body: JSON.stringify({ email: MLX_EMAIL, password: md5(MLX_PASSWORD) }),
+  });
+  const sj = await si.json().catch(() => ({}));
+  const regular = sj?.data?.token;
+  if (!regular) {
+    throw new Error("signin falló: " + si.status + " " + JSON.stringify(sj).slice(0, 200));
+  }
+  try {
+    const at = await fetch(CLOUD + "/workspace/automation_token?expiration_period=" + encodeURIComponent(TOKEN_TTL), {
+      headers: { Authorization: "Bearer " + regular, "User-Agent": UA, Accept: "application/json" },
+    });
+    const aj = await at.json().catch(() => ({}));
+    if (aj?.data?.token) return { token: aj.data.token, mode: "signin-automation" };
+  } catch (_) {
+    /* cae al regular */
+  }
+  return { token: regular, mode: "signin-regular" };
+}
+
+async function getToken(force = false) {
+  if (!force && tokenCache.token) return tokenCache.token;
+  if (HAS_CREDS) {
+    const r = await signinAndMint();
+    tokenCache = { token: r.token, mintedAt: Date.now(), mode: r.mode };
+    console.log("[auth] token refrescado vía", r.mode);
+    return r.token;
+  }
+  if (MLX_TOKEN_OVERRIDE) {
+    tokenCache = { token: MLX_TOKEN_OVERRIDE, mintedAt: Date.now(), mode: "override" };
+    return MLX_TOKEN_OVERRIDE;
+  }
+  throw new Error("sin credenciales: seteá MLX_EMAIL+MLX_PASSWORD (recomendado) o MLX_TOKEN");
+}
+
+// Llama la cloud API con el token cacheado. Si da 401/403/501 y podemos re-mintear, lo hace una vez.
+async function mlx(path, { method = "GET", body, _retry = false } = {}) {
+  const token = await getToken();
   const res = await fetch(CLOUD + path, {
     method,
-    headers: { Authorization: `Bearer ${MLX_TOKEN}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: "Bearer " + token,
+      "Content-Type": "application/json",
+      "User-Agent": UA,
+      Accept: "application/json",
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
+  if ((res.status === 401 || res.status === 403 || res.status === 501) && !_retry && HAS_CREDS) {
+    console.log("[auth]", res.status, "en", path, "→ re-minteo token y reintento");
+    await getToken(true);
+    return mlx(path, { method, body, _retry: true });
+  }
   const text = await res.text();
   let json;
-  try { json = JSON.parse(text); } catch { json = { raw: text.slice(0, 500) }; }
+  try {
+    json = JSON.parse(text);
+  } catch {
+    json = { raw: text.slice(0, 500) };
+  }
   return { status: res.status, json };
 }
 
@@ -47,13 +126,51 @@ function guard(req, res) {
 }
 
 app.get("/health", (_req, res) =>
-  res.json({ ok: true, service: "cloudphone-gateway", slice: 2, hasToken: !!MLX_TOKEN, ts: new Date().toISOString() }),
+  res.json({
+    ok: true,
+    service: "cloudphone-gateway",
+    authMode: HAS_CREDS ? "signin" : MLX_TOKEN_OVERRIDE ? "override" : "none",
+    tokenCached: !!tokenCache.token,
+    tokenAgeSec: tokenCache.mintedAt ? Math.round((Date.now() - tokenCache.mintedAt) / 1000) : null,
+    ts: new Date().toISOString(),
+  }),
 );
 
-// Folders mobile (cada folder = un closer, en el modelo folder-por-closer).
+// Verificación end-to-end: hace un GET real y reporta el status (200 = auth + cloud API OK).
+app.get("/diag", async (req, res) => {
+  if (!guard(req, res)) return;
+  try {
+    const r = await mlx("/mobile_profiles/phone/list?page=1&page_size=10&sort=desc&order_by=created_at");
+    const phones = r.json?.data?.phones || r.json?.data || [];
+    res.status(r.status === 200 ? 200 : 502).json({
+      ok: r.status === 200,
+      status: r.status,
+      authMode: tokenCache.mode,
+      phoneCount: Array.isArray(phones) ? phones.length : null,
+      body: r.status === 200 ? undefined : r.json,
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// Folders mobile (cada folder = un closer en el modelo folder-por-closer).
 app.get("/folders", async (req, res) => {
   if (!guard(req, res)) return;
   const r = await mlx("/workspace/folders?folder_type=mobile");
+  res.status(r.status).json(r.json);
+});
+
+// Lista de teléfonos (paginada). Maven la usa para pintar las tarjetas.
+app.get("/phones", async (req, res) => {
+  if (!guard(req, res)) return;
+  const qs = new URLSearchParams({
+    page: String(req.query.page || "1"),
+    page_size: String(req.query.page_size || "50"),
+    sort: "desc",
+    order_by: "created_at",
+  });
+  const r = await mlx("/mobile_profiles/phone/list?" + qs.toString());
   res.status(r.status).json(r.json);
 });
 
@@ -73,7 +190,7 @@ app.post("/phones/:id/start", async (req, res) => {
   res.status(r.status).json({ ok: r.status === 200 && !!detail?.url, url: detail?.url || null, raw: r.json });
 });
 
-// Apaga un teléfono (importante para no quemar minutos de cloud).
+// Apaga un teléfono (gasta minutos de cloud → siempre cerrar al salir).
 app.post("/phones/:id/stop", async (req, res) => {
   if (!guard(req, res)) return;
   const r = await mlx("/mobile_profiles/phone/stop", { method: "POST", body: { ids: [req.params.id] } });
@@ -88,7 +205,8 @@ app.post("/phones/adb-info", async (req, res) => {
   res.status(r.status).json(r.json);
 });
 
-// TODO(slice3): GET /phones?folder=<id> (listar perfiles de un folder — confirmar endpoint exacto vía
-//   network capture) + auth real con JWT de Supabase aplicando folder-por-closer + endpoint de "mover
-//   teléfono a folder" (asignación). + (opcional) proxear la URL geelark para ocultar también esa marca.
-app.listen(PORT, () => console.log(`cloudphone-gateway escuchando en :${PORT} (slice 2, cloud-phone API)`));
+// TODO(slice3): mover teléfono a folder (asignación) + auth real con JWT de Supabase aplicando
+//   folder-por-closer + (opcional) proxear la URL geelark para ocultar también esa marca.
+app.listen(PORT, () =>
+  console.log(`cloudphone-gateway escuchando en :${PORT} (cloud-phone API, auth=${HAS_CREDS ? "signin" : MLX_TOKEN_OVERRIDE ? "override" : "none"})`),
+);

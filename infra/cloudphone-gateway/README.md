@@ -2,48 +2,52 @@
 
 Microservicio que permite operar los **cloud phones de Multilogin desde Maven** sin que el
 empleado sepa qué herramienta hay de fondo. **Todo el cerebro + infra vive acá** (Dokploy);
-Maven tendrá apenas **un tab** que consume este servicio. Mismo patrón que `infra/baileys-gateway`.
+Maven tiene apenas **un tab** que consume este servicio. Mismo patrón que `infra/baileys-gateway`.
 
 > Temporal: Multilogin es el backend de hoy. A futuro se reemplaza por la granja propia
-> cambiando solo el "adapter" — el resto (asignaciones, auth, UI de Maven) queda.
+> cambiando solo este micro (el "adapter") — el resto (asignaciones, auth, UI de Maven) queda.
 
-## Arquitectura
-```
-VPS / Dokploy (1 servicio):
-  Xvfb (:99) ──> Agente MLX headless ──> launcher local :45001
-                                           ▲
-  microservicio Node ──(start profile)─────┘
-       │
-       ├─ adb connect IP:PORT ; adb shell glogin PASSWORD   (control del device)
-       ├─ [Slice 2] scrcpy/ADB → WebRTC                      (stream a Maven)
-       └─ [Slice 3] asignaciones closer↔celular + auth (JWT Supabase) + auditoría
-Maven: 1 tab (closer ve SOLO sus celulares + stream embebido | admin asigna). Cero marca MLX.
-```
+## Cómo funciona de verdad (hallazgos del de-risk)
+- Los cloud phones de Multilogin **son GeeLark por debajo**. Se manejan 100% por la **cloud API**
+  `api.multilogin.com/mobile_profiles/phone/*` (body `{ids:[...]}`, `Authorization: Bearer <token>`).
+- `POST .../phone/start` devuelve una **URL web del teléfono** (`https://phone.geelark.com/...&token=`)
+  que es **iframe-embebible** → Maven la mete en un `<iframe>`. **No** hace falta ADB/scrcpy/WebRTC,
+  **ni** el agente MLX (que encima hijackeaba `api.multilogin.com`).
+- **El bloqueo nunca fue el agente: era un TOKEN VENCIDO.** Con token malo, `GET .../phone/list`
+  responde `401 "Wrong JWT token"`, pero el mismo token malo en un POST responde
+  `501 "Unsupported method (POST)"` (un espejismo que nos mandó a perseguir un fantasma).
 
-## Estado: Slice 1 (de-risk) — SCAFFOLD, pendiente de verificación en runtime
-El objetivo del Slice 1 es **probar la cadena real en el VPS**: arrancar un cloud phone →
-`adb connect` + `glogin` → capturar 1 frame. Endpoints:
-- `GET /health` — vivo.
-- `GET /diag` — confirma que `adb` y `xcli` están en el PATH y responden.
-- `POST /spike/capture` (header `x-spike-token`) — body `{folderId, profileId}` → corre la cadena
-  y devuelve 1 frame PNG en base64.
+## Auth (auto-gestionado)
+El micro maneja su propio token para no romperse por vencimiento:
+1. `POST /user/signin` `{email, password: md5(password)}` → `data.token` (regular, ~30 min).
+2. `GET /workspace/automation_token?expiration_period=8760h` → `data.token` (largo, ~1 año).
+3. Cachea en memoria; si una llamada da `401/403/501`, **re-mintea una vez y reintenta**.
 
-## `[CONFIRMAR]` (se resuelve corriendo el contenedor — ese es el punto del Slice 1)
-1. Ruta real de `xcli` / `mlx-launcher` dentro del `.deb` extraído (PATH del Dockerfile).
-2. Flags exactos de `xcli login` (token vs email/password; 2FA) — ver `entrypoint.sh`.
-3. Nombre/flags del binario del launcher (`mlx-launcher`?).
-4. Comando `xcli` para **arrancar un MOBILE profile** y para **obtener el ADB** (IP:PORT + glogin password)
-   → `server.js` `startProfile()` / `getAdbInfo()` son tentativos. Descubrir con `xcli --help` dentro del contenedor.
-5. Libs exactas que pide el agente (lista de `apt-get` del Dockerfile).
+Configurás **una** de estas dos formas (ver `.env.example`):
+- **Recomendado:** `MLX_EMAIL` + `MLX_PASSWORD` (cuenta dueña). Cero mantenimiento.
+- **Manual:** `MLX_TOKEN` con un automation token 8760h (lo renovás vos ~1×/año).
+
+## Endpoints (los consume Maven; todos menos `/health` piden header `x-spike-token`)
+- `GET  /health` — vivo + modo de auth (no filtra secretos).
+- `GET  /diag` — hace un GET real a la cloud API y devuelve el status (`200` = todo OK). Para verificar.
+- `GET  /folders` — folders mobile (asignación **folder-por-closer**).
+- `GET  /phones?page=1&page_size=50` — lista de teléfonos.
+- `POST /phones/status` `{ids}` — estado.
+- `POST /phones/:id/start` → `{ ok, url }` (URL geelark para el `<iframe>`).
+- `POST /phones/:id/stop` — apaga (¡gasta minutos de cloud!).
+- `POST /phones/adb-info` `{ids}` — info ADB (alternativa; no se usa para el iframe).
 
 ## Deploy (Dokploy)
-1. Crear un **servicio nuevo** (tipo Dockerfile) en el proyecto `maven_v3`, apuntando a `infra/cloudphone-gateway/`.
-2. Cargar **secretos** (Environment): `MLX_TOKEN` (o `MLX_EMAIL`+`MLX_PASSWORD`) y `SPIKE_TOKEN`. **Nunca** en el repo.
-3. Deploy. Revisar logs: que Xvfb arranque, `xcli login` autentique y el launcher quede en :45001.
-4. `GET /diag` → confirmar adb + xcli. Luego `docker exec` al contenedor → `xcli --help` para descubrir los comandos del punto 4.
-5. `POST /spike/capture` con un `folderId`/`profileId` reales → si vuelve un PNG, **cadena validada** ✅.
+1. Servicio tipo **Dockerfile** en `maven_v3`, apuntando a `infra/cloudphone-gateway/`. Imagen
+   `node:20-slim` (sin agente). Autodeploy ON + watch path `infra/cloudphone-gateway/**`.
+2. Cargar **secretos** (Environment): `MLX_EMAIL`+`MLX_PASSWORD` (o `MLX_TOKEN`) y `SPIKE_TOKEN`.
+   **Nunca** en el repo. Ojo: en Dokploy, cambiar env **requiere redeploy** para inyectarse.
+3. Redeploy. Verificar: `GET /diag` con el `x-spike-token` → `{ ok: true, status: 200, phoneCount: N }`.
+
+## Modelo de asignación
+- **Folder-por-closer**: un folder mobile de Multilogin por closer; asignar = mover el teléfono a su folder.
+- Auth del micro hacia Maven: hoy `SPIKE_TOKEN`. **Slice 3** = JWT de Supabase mapeando closer→folder.
 
 ## Notas
-- Auth por **token del Owner** → los closers NO tienen cuenta Multilogin (marca oculta + sin plan team).
-- Arrancar teléfonos **gasta minutos de cloud** → en Slice 5, start/stop on-demand.
-- Riesgos a medir: latencia (device→VPS→browser), concurrencia (N streams), CPU del VPS.
+- Arrancar teléfonos **gasta minutos de cloud** → start/stop on-demand (cerrar al salir del iframe).
+- A medir en Slice 4: latencia del iframe y cuántas sesiones simultáneas aguanta el plan.
