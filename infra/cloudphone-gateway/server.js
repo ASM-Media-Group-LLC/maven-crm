@@ -161,16 +161,37 @@ app.get("/folders", async (req, res) => {
   res.status(r.status).json(r.json);
 });
 
-// Lista de teléfonos (paginada). Maven la usa para pintar las tarjetas.
+// Solo estos campos del teléfono salen hacia Maven. NUNCA exponer `proxy` (trae credenciales del
+// proxy) ni `equipment_info` (IMEI/MAC/teléfono real = fingerprint). Maven solo necesita pintar tarjetas.
+const SAFE_PHONE_FIELDS = [
+  "id",
+  "serial_name",
+  "serial_no",
+  "folder_id",
+  "status",
+  "remark",
+  "usecase_name",
+  "last_launched_at",
+];
+function sanitizePhone(p) {
+  const o = {};
+  for (const k of SAFE_PHONE_FIELDS) if (p && k in p) o[k] = p[k];
+  return o;
+}
+
+// Lista de teléfonos (paginada, saneada). Maven la usa para pintar las tarjetas.
 app.get("/phones", async (req, res) => {
   if (!guard(req, res)) return;
   const qs = new URLSearchParams({
     page: String(req.query.page || "1"),
-    page_size: String(req.query.page_size || "50"),
+    page_size: String(req.query.page_size || "100"),
     sort: "desc",
     order_by: "created_at",
   });
   const r = await mlx("/mobile_profiles/phone/list?" + qs.toString());
+  if (r.status === 200 && Array.isArray(r.json?.data?.items)) {
+    r.json.data.items = r.json.data.items.map(sanitizePhone);
+  }
   res.status(r.status).json(r.json);
 });
 
