@@ -480,6 +480,15 @@ const SpammerCard = ({
                 Restringida
               </span>
             )}
+            {!r.is_restricted && r.scan_status === "awaiting_screenshot" && (
+              <span
+                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300"
+                title="No pudimos leer el perfil automáticamente. Reintentá el scan o subí un screenshot — no significa que esté restringida."
+              >
+                <AlertCircle className="h-2.5 w-2.5" />
+                Sin leer
+              </span>
+            )}
           </div>
           <p className="truncate text-xs text-muted-foreground">
             {r.display_name ?? "—"}
@@ -506,6 +515,13 @@ const SpammerCard = ({
           <div className="flex items-start gap-1.5 text-xs text-rose-400">
             <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
             <span className="line-clamp-2">{r.scan_error ?? "Scan fallido"}</span>
+          </div>
+        ) : !r.is_restricted && r.scan_status === "awaiting_screenshot" ? (
+          <div className="flex items-start gap-1.5 text-xs text-amber-400">
+            <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+            <span className="line-clamp-2">
+              No se pudo leer — reintentá el scan o subí un screenshot.
+            </span>
           </div>
         ) : r.ai_analysis ? (
           <p className="line-clamp-2 text-xs leading-snug text-foreground/85">
@@ -924,10 +940,9 @@ const RestrictedScreenshotZone = ({ account }: { account: SpammerAccount }) => {
               : "Mejorar análisis con screenshots"}
           </p>
           <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
-            Como IG oculta la cuenta a viewers no-loggeados, el bot no puede leer
-            bio/foto/link. Sacá screenshots del perfil desde tu browser
-            (logueado) y subilos acá — podés agregar varios (bio, posts, link,
-            etc) y Claude vision los lee y enriquece el análisis.
+            {account.is_restricted
+              ? "Como IG oculta la cuenta a viewers no-loggeados, el bot no puede leer bio/foto/link. Sacá screenshots del perfil desde tu browser (logueado) y subilos acá — podés agregar varios (bio, posts, link, etc) y Claude vision los lee y enriquece el análisis."
+              : "No pudimos leer la cuenta automáticamente (muy nueva o IG bloqueó la lectura). Sacá screenshots del perfil desde tu browser (logueado) y subilos acá — podés agregar varios (bio, posts, link, etc) y Claude vision los lee y arma el análisis con la data real."}
           </p>
           <label className="inline-flex">
             <input
@@ -1121,6 +1136,28 @@ const SpammerDetailDialog = ({
               <RestrictedScreenshotZone account={r} />
             </div>
           </details>
+        )}
+
+        {/* No pudimos leer (NO es restricción real) — cuenta nueva o IG
+            bloqueó la lectura. El closer reintenta el scan o sube un
+            screenshot de su propia cuenta logueada para analizarla igual. */}
+        {!r.is_restricted && r.scan_status === "awaiting_screenshot" && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-400" />
+              <div className="text-xs leading-relaxed">
+                <span className="font-semibold text-amber-400 uppercase tracking-wider text-[10px] block mb-1">
+                  No pudimos leer el perfil automáticamente
+                </span>
+                <span className="text-foreground/80">
+                  Suele pasar con cuentas muy nuevas (todavía sin indexar) o cuando IG bloquea la lectura
+                  desde el servidor. <strong>No</strong> significa que la cuenta esté restringida. Reintentá
+                  el scan con el botón de abajo, o subí un screenshot del perfil (logueado) para analizarla igual.
+                </span>
+              </div>
+            </div>
+            <RestrictedScreenshotZone account={r} />
+          </div>
         )}
 
         {/* Bio */}

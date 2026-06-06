@@ -242,34 +242,79 @@ Deno.serve(async (req) => {
       console.error("ig fetch failed:", fetchErr);
     }
 
-    // ScrapeCreators sin sesión logueada NO detecta correctamente las
-    // cuentas restringidas — devuelve un snapshot con todos los campos
-    // vacíos en lugar de marcar is_restricted=true. Si vemos que el
-    // snapshot existe pero no tiene NINGÚN dato sustantivo (sin bio,
-    // sin followers, sin posts, sin foto), asumimos que es restringida
-    // y promovemos el snapshot a is_restricted=true. El branch de
-    // screenshot abajo se encarga del resto.
-    //
-    // Fallback adicional: si snapshot vino null (fetch tiró excepción
-    // o devolvió null), también asumimos restricted en vez de marcar
-    // failed — el user puede subir screenshots y rescatar el análisis
-    // con Claude vision.
+    // ─── "No pudimos leer" ≠ "restringida" (fix falsos positivos 2026-06-06) ───
+    // is_restricted SOLO se setea con señal POSITIVA y confirmada de que IG
+    // ocultó la cuenta (confirmRestrictedViaPosts dentro de fetchIgProfile).
+    // Un snapshot vacío o null = "el scraper no pudo leerla" (cuenta muy
+    // nueva sin indexar, cuota agotada, o IG bloqueó la IP de Supabase) —
+    // NO es lo mismo que restringida. ANTES asumíamos restricted en ambos
+    // casos y marcábamos cuentas sanas como "restringida" (deal-breaker),
+    // confundiendo a los closers (reporte 2026-06-06: 9/11 cuentas marcadas
+    // restringidas eran en realidad ilegibles, no restringidas). Ahora:
+    //   · Confirmada restringida            → is_restricted=true (flujo de abajo).
+    //   · No se pudo leer + hay screenshots → vision analiza, is_restricted=false.
+    //   · No se pudo leer + sin screenshots → awaiting_screenshot, is_restricted=false.
+    const confirmedRestricted = !!snapshot?.is_restricted;
     const snapshotIsEmpty =
       !!snapshot &&
       !snapshot.biography &&
       (snapshot.followers_count == null || snapshot.followers_count === 0) &&
       (snapshot.posts_count == null || snapshot.posts_count === 0) &&
       !snapshot.profile_pic_url;
-    if (snapshot && snapshotIsEmpty && !snapshot.is_restricted) {
-      console.warn(
-        `[snapshot empty] ${accountRow.instagram_handle} — asumiendo restricted (ScrapeCreators sin sesión no detecta restringidas).`,
+    const couldNotRead = !snapshot || snapshotIsEmpty;
+
+    // Cargar screenshots manuales una sola vez — sirven para enriquecer
+    // tanto "confirmada restringida" como "no pudimos leer".
+    let manualPaths: string[] = [];
+    if (confirmedRestricted || couldNotRead) {
+      const { data: full } = await sb
+        .from("scouter_spammer_accounts")
+        .select("manual_screenshot_path, manual_screenshot_paths")
+        .eq("id", accountRow.id)
+        .maybeSingle();
+      const row = full as
+        | { manual_screenshot_path?: string | null; manual_screenshot_paths?: string[] | null }
+        | null;
+      const arrayPaths = (row?.manual_screenshot_paths ?? []).filter(
+        (p): p is string => !!p,
       );
-      snapshot = { ...snapshot, is_restricted: true };
+      const legacyPath = row?.manual_screenshot_path;
+      manualPaths = arrayPaths.length > 0 ? arrayPaths : legacyPath ? [legacyPath] : [];
     }
-    if (!snapshot) {
+
+    // No se pudo leer y NO hay screenshots → awaiting_screenshot SIN marcar
+    // restringida. El closer puede re-escanear (por si fue bloqueo
+    // transitorio) o subir un screenshot de su propia cuenta logueada.
+    // NO pisamos ai_score/ai_analysis previos: si un blip transitorio deja
+    // ilegible una cuenta que ya tenía análisis bueno, no lo borramos.
+    if (couldNotRead && !confirmedRestricted && manualPaths.length === 0) {
       console.warn(
-        `[snapshot null] ${accountRow.instagram_handle} — fetch falló, asumiendo restricted para que el user suba screenshots.`,
+        `[no se pudo leer] ${accountRow.instagram_handle} — snapshot ${snapshot ? "vacío" : "null"}; awaiting_screenshot (sin marcar restricted).`,
       );
+      await sb
+        .from("scouter_spammer_accounts")
+        .update({
+          scan_status: "awaiting_screenshot",
+          is_restricted: false,
+          scan_error:
+            "No pudimos leer el perfil automáticamente (cuenta muy nueva o IG bloqueó la lectura). Reintentá el scan o subí un screenshot del perfil.",
+          last_scanned_at: new Date().toISOString(),
+        })
+        .eq("id", accountRow.id);
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          account_id: accountRow.id,
+          awaiting_screenshot: true,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Acá: confirmada restringida, o ilegible pero con screenshots para
+    // rescatar. Garantizamos snapshot base (si vino null) preservando el
+    // flag REAL (no lo inventamos).
+    if (!snapshot) {
       snapshot = {
         username: accountRow.instagram_handle,
         full_name: null,
@@ -279,81 +324,41 @@ Deno.serve(async (req) => {
         posts_count: null,
         profile_pic_url: null,
         is_verified: false,
-        is_restricted: true,
+        is_restricted: confirmedRestricted,
       } as IgProfileSnapshot;
     }
 
-    // Si la cuenta vino marcada como restricted y el user ya subió un
-    // screenshot manual, lo mandamos a Claude vision para extraer bio +
-    // nombre + followers + link + posts + verified, y mergeamos esos
-    // campos sobre el snapshot vacío. is_restricted queda en true (el
-    // problema real de visibilidad sigue ahí — las creators target topan
-    // con el wall cuando reciban el DM), pero el AI puede analizar con
-    // la data verdadera de la cuenta.
-    if (snapshot?.is_restricted) {
-      const { data: full } = await sb
-        .from("scouter_spammer_accounts")
-        .select("manual_screenshot_path, manual_screenshot_paths")
-        .eq("id", accountRow.id)
-        .maybeSingle();
-      const row = full as
-        | {
-            manual_screenshot_path?: string | null;
-            manual_screenshot_paths?: string[] | null;
-          }
-        | null;
-      // Soportamos el array nuevo (manual_screenshot_paths) + fallback al
-      // campo legacy single (manual_screenshot_path). Si hay varias, las
-      // procesamos todas y mergeamos los resultados — campos populados en
-      // una screenshot pisan los nulls de las anteriores.
-      const arrayPaths = (row?.manual_screenshot_paths ?? []).filter(
-        (p): p is string => !!p,
-      );
-      const legacyPath = row?.manual_screenshot_path;
-      const paths =
-        arrayPaths.length > 0 ? arrayPaths : legacyPath ? [legacyPath] : [];
-      if (paths.length > 0) {
-        try {
-          let merged: Partial<IgProfileSnapshot> = {};
-          for (const path of paths) {
-            const enriched = await extractFromScreenshot(
-              sb,
-              OPENROUTER_API_KEY,
-              SCAN_MODEL,
-              path,
-              accountRow.instagram_handle,
-            );
-            if (enriched) {
-              // Merge: campos non-null/non-empty del screenshot nuevo pisan
-              // los anteriores. Permite ir refinando con más capturas.
-              for (const [k, v] of Object.entries(enriched)) {
-                if (v !== null && v !== undefined && v !== "") {
-                  (merged as Record<string, unknown>)[k] = v;
-                }
+    // Enriquecer con screenshots (vision) si los hay — vale tanto para
+    // restringidas confirmadas como para cuentas que no pudimos leer pero
+    // el closer subió capturas. is_restricted NO cambia acá: lo decide la
+    // señal real (confirmRestrictedViaPosts), NO la presencia de captura.
+    // Si hay varias capturas, mergeamos: campos populados en una pisan los
+    // nulls de las anteriores (permite ir refinando con más capturas).
+    if (manualPaths.length > 0) {
+      try {
+        let merged: Partial<IgProfileSnapshot> = {};
+        for (const path of manualPaths) {
+          const enriched = await extractFromScreenshot(
+            sb,
+            OPENROUTER_API_KEY,
+            SCAN_MODEL,
+            path,
+            accountRow.instagram_handle,
+          );
+          if (enriched) {
+            for (const [k, v] of Object.entries(enriched)) {
+              if (v !== null && v !== undefined && v !== "") {
+                (merged as Record<string, unknown>)[k] = v;
               }
             }
           }
-          if (Object.keys(merged).length > 0) {
-            snapshot = { ...snapshot, ...merged, is_restricted: true };
-          }
-        } catch (visionErr) {
-          console.warn("vision extract failed:", (visionErr as Error).message);
         }
+        if (Object.keys(merged).length > 0) {
+          snapshot = { ...snapshot, ...merged };
+        }
+      } catch (visionErr) {
+        console.warn("vision extract failed:", (visionErr as Error).message);
       }
-      // Cambio 2026-05-25: cuando la cuenta está restringida y no hay
-      // screenshots manuales, ANTES marcábamos 'awaiting_screenshot'
-      // y pedíamos al user subir capturas. Pero como dijo el user:
-      // "si IG marcó la cuenta como restringida, los DMs caen en spam
-      // de la creadora — no tiene sentido pedir screenshots para
-      // enriquecer un análisis de una cuenta que ya está perdida para
-      // outreach". Mejor: dejamos fluir al AI scan con is_restricted=true
-      // como signal principal, Claude genera el análisis explicando la
-      // situación + red_flag de "cuenta restringida = mensajes a spam =
-      // baja respuesta", y el user decide si cambiar de cuenta o
-      // arreglar la restricción (verificar email/tel, limpiar contenido).
-      //
-      // Si tiene screenshots, igual los procesamos para enriquecer la
-      // bio/followers en el análisis (mismo bloque de vision arriba).
     }
 
     // La foto de IG viene como CDN URL con tokens que caducan o que IG
@@ -608,13 +613,13 @@ async function fetchIgProfile(username: string): Promise<IgProfileSnapshot | nul
     } | null;
     const u_ = data?.data?.user;
     if (!u_) {
-      // IG devuelve `{"status":"ok"}` sin data.user cuando la cuenta
-      // está restricted y no hay cookies de sesión. Lo tratamos como
-      // restricted confirmado (mejor falso positivo de restricted que
-      // perder el scan entero).
-      if (data?.status === "ok") {
-        return makeRestrictedSnapshot(u);
-      }
+      // IG devuelve `{"status":"ok"}` sin data.user tanto cuando la cuenta
+      // está restringida COMO cuando bloquea la IP del scraper (las IPs de
+      // Supabase edge se bloquean seguido). No podemos distinguir los dos
+      // casos desde acá, así que devolvemos null = "no pudimos leer" y el
+      // handler lo manda a awaiting_screenshot SIN marcar restringida
+      // falsamente. La restricción real se confirma vía ScrapeCreators
+      // (/v2/posts → isRestricted) en el intento 1, que es la señal fiable.
       return null;
     }
     return {
