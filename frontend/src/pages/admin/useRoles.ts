@@ -82,6 +82,9 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     "Ver Todas", "Ver Nuevo", "Ver Asignadas", "Ver Confirmadas", "Ver Completadas", "Ver No Interesadas",
     "Editar Status", "Asignar Closer", "Editar Comisiones", "Convertir a Creadora", "Exportar",
   ] },
+  // Teléfonos (cloud phones): tab único, sin sub-tabs. Por defecto solo admin (sin fila => sin acceso);
+  // habilitalo a los roles que quieras (closer, etc.) desde este modal.
+  { group: "Operaciones",   module: "Telefonos",     submodules: [] },
   // Inbox WhatsApp propio: Bandeja (ver/responder) · IA (copiloto ✨, controla el costo) · Canales (admin de números) · Asignar conversaciones (reasignar a otros; default solo admin).
   { group: "Operaciones",   module: "WhatsApp",      submodules: ["Bandeja", "IA", "Canales", "Asignar conversaciones"] },
   { group: "Operaciones",   module: "Tickets",       submodules: ["Crear Ticket", "Editar Ticket", "Eliminar Ticket", "Asignar Ticket"] },
