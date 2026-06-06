@@ -44,8 +44,9 @@ type RecentRow = {
   minutes: number;
 };
 
-// Tamaño del teléfono: ~cuadrado para que geelark muestre su toolbar lateral y el Android llene sin blanco.
-const PHONE_W = 440;
+// Tamaño del teléfono: ~cuadrado/compacto. A ~420 de ancho geelark muestra su toolbar lateral con el
+// Android completo (nav bar incluida) sin entrar en "modo teléfono grande" (que lo agranda y lo corta).
+const PHONE_W = 420;
 const PHONE_H = 430;
 const PHONE_BAR = 34;
 const MAX_SECONDS = 20 * 60;
