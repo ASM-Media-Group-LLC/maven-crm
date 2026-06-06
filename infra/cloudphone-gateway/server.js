@@ -19,8 +19,11 @@
 //   GET  /folders                 → (guard) folders mobile (asignación folder-por-closer)
 //   GET  /phones                  → (guard) lista de teléfonos (paginada)
 //   POST /phones/status  {ids}    → (guard) estado de teléfonos
-//   POST /phones/:id/start        → (guard) arranca y devuelve { url } (geelark, para el iframe)
-//   POST /phones/:id/stop         → (guard) apaga (importante: gasta minutos de cloud)
+//   POST /phones/:id/start        → (guard) arranca, registra sesión, devuelve { url, secondsLeft }
+//   POST /phones/:id/stop         → (guard) apaga + cierra sesión
+//   POST /phones/:id/heartbeat    → (guard) latido (mantiene viva la sesión) → { secondsLeft }
+//   POST /phones/:id/extend       → (guard) resetea el reloj de la sesión
+//   GET  /sessions                → (guard) sesiones activas + recién terminadas (log + vista admin)
 //   POST /phones/adb-info {ids}   → (guard) info ADB (alternativa; no se usa para el iframe)
 //
 // Auth del micro hacia Maven: por ahora SPIKE_TOKEN (header x-spike-token). Slice 3 = JWT de Supabase.
@@ -125,6 +128,58 @@ function guard(req, res) {
   return true;
 }
 
+// ───────────────── Sesiones + reaper (control de tiempo) ─────────────────
+// Las sesiones viven EN MEMORIA (no en Supabase) → cero cron facturable; el laburo vive en este VPS.
+// El reaper apaga teléfonos olvidados/colgados. Maven manda un "latido" mientras el iframe está abierto.
+const SESSION_MAX_MS = (Number(process.env.CLOUDPHONE_MAX_MIN) || 20) * 60 * 1000; // tope duro por sesión
+const SESSION_STALE_MS = (Number(process.env.CLOUDPHONE_STALE_SEC) || 150) * 1000; // sin latido → muerto
+const REAP_INTERVAL_MS = 30 * 1000;
+const sessions = new Map(); // profileId -> { userId, startedAt, lastBeat }
+const recentlyEnded = []; // {profileId,userId,startedAt,endedAt,reason} (cap 100, para el log del edge)
+
+function noteEnded(profileId, s, reason) {
+  recentlyEnded.push({ profileId, userId: s?.userId || null, startedAt: s?.startedAt || null, endedAt: Date.now(), reason });
+  if (recentlyEnded.length > 100) recentlyEnded.shift();
+}
+
+async function stopPhone(id) {
+  return mlx("/mobile_profiles/phone/stop", { method: "POST", body: { ids: [id] } });
+}
+
+// Reaper: corre cada 30s pero es NO-OP si no hay sesiones (idle = costo ~0).
+async function reapTick() {
+  if (sessions.size === 0) return;
+  const now = Date.now();
+  for (const [id, s] of [...sessions]) {
+    const expired = now - s.startedAt > SESSION_MAX_MS;
+    const stale = now - s.lastBeat > SESSION_STALE_MS;
+    if (expired || stale) {
+      await stopPhone(id).catch(() => {});
+      noteEnded(id, s, expired ? "timeout" : "stale");
+      sessions.delete(id);
+      console.log(`[reaper] apagado ${id} (${expired ? "max" : "sin latido"})`);
+    }
+  }
+}
+
+// Boot reconcile (+90s): apaga teléfonos PRENDIDOS sin sesión (huérfanos/leaks de antes de un redeploy).
+// A los 90s los usuarios activos ya re-registraron su sesión vía latido → se respetan.
+async function bootReconcile() {
+  try {
+    const r = await mlx("/mobile_profiles/phone/list?page=1&page_size=100&sort=desc&order_by=created_at");
+    const items = Array.isArray(r.json?.data?.items) ? r.json.data.items : [];
+    let stopped = 0;
+    for (const p of items) {
+      if (!p?.id || sessions.has(p.id)) continue; // sesión activa → no tocar
+      await stopPhone(p.id).catch(() => {});
+      stopped++;
+    }
+    console.log(`[boot] reconcile: apagados ${stopped} teléfono(s) sin sesión`);
+  } catch (e) {
+    console.log("[boot] reconcile err:", e.message);
+  }
+}
+
 app.get("/health", (_req, res) =>
   res.json({
     ok: true,
@@ -203,19 +258,90 @@ app.post("/phones/status", async (req, res) => {
   res.status(r.status).json(r.json);
 });
 
-// Arranca un teléfono y devuelve la URL web (geelark) para embeber en el <iframe> de Maven.
+// Arranca un teléfono y devuelve la URL web (geelark) para el <iframe>. Registra la sesión.
 app.post("/phones/:id/start", async (req, res) => {
   if (!guard(req, res)) return;
-  const r = await mlx("/mobile_profiles/phone/start", { method: "POST", body: { ids: [req.params.id] } });
+  const id = req.params.id;
+  const userId = req.body?.userId || null;
+  // un-teléfono-a-la-vez: si el mismo usuario tiene otro abierto, apagarlo primero.
+  if (userId) {
+    for (const [pid, s] of [...sessions]) {
+      if (pid !== id && s.userId === userId) {
+        await stopPhone(pid).catch(() => {});
+        noteEnded(pid, s, "replaced");
+        sessions.delete(pid);
+      }
+    }
+  }
+  const r = await mlx("/mobile_profiles/phone/start", { method: "POST", body: { ids: [id] } });
   const detail = r.json?.data?.success_details?.[0];
-  res.status(r.status).json({ ok: r.status === 200 && !!detail?.url, url: detail?.url || null, raw: r.json });
+  const ok = r.status === 200 && !!detail?.url;
+  if (ok) sessions.set(id, { userId, startedAt: Date.now(), lastBeat: Date.now() });
+  res.status(r.status).json({
+    ok,
+    url: detail?.url || null,
+    secondsLeft: ok ? Math.round(SESSION_MAX_MS / 1000) : 0,
+    raw: r.json,
+  });
 });
 
-// Apaga un teléfono (gasta minutos de cloud → siempre cerrar al salir).
+// Apaga un teléfono (gasta minutos → siempre cerrar al salir). Cierra la sesión.
 app.post("/phones/:id/stop", async (req, res) => {
   if (!guard(req, res)) return;
-  const r = await mlx("/mobile_profiles/phone/stop", { method: "POST", body: { ids: [req.params.id] } });
+  const id = req.params.id;
+  const s = sessions.get(id);
+  const r = await stopPhone(id);
+  if (s) {
+    noteEnded(id, s, "manual");
+    sessions.delete(id);
+  }
   res.status(r.status).json(r.json);
+});
+
+// Latido: Maven lo manda cada ~60s mientras el iframe está abierto. Mantiene viva la sesión.
+// Si llega un latido para una sesión desconocida (p.ej. tras un redeploy), la re-registra.
+app.post("/phones/:id/heartbeat", (req, res) => {
+  if (!guard(req, res)) return;
+  const id = req.params.id;
+  let s = sessions.get(id);
+  if (!s) {
+    s = { userId: req.body?.userId || null, startedAt: Date.now(), lastBeat: Date.now() };
+    sessions.set(id, s);
+  } else {
+    s.lastBeat = Date.now();
+  }
+  res.json({ ok: true, secondsLeft: Math.max(0, Math.round((SESSION_MAX_MS - (Date.now() - s.startedAt)) / 1000)) });
+});
+
+// Extender: resetea el reloj de la sesión (botón "Extender" en Maven).
+app.post("/phones/:id/extend", (req, res) => {
+  if (!guard(req, res)) return;
+  const s = sessions.get(req.params.id);
+  if (s) {
+    s.startedAt = Date.now();
+    s.lastBeat = Date.now();
+  }
+  res.json({ ok: !!s, secondsLeft: s ? Math.round(SESSION_MAX_MS / 1000) : 0 });
+});
+
+// Sesiones activas + recién terminadas (el edge reconcilia el log + vista admin "en uso").
+app.get("/sessions", (req, res) => {
+  if (!guard(req, res)) return;
+  const now = Date.now();
+  const active = [...sessions.entries()].map(([profileId, s]) => ({
+    profileId,
+    userId: s.userId,
+    startedAt: new Date(s.startedAt).toISOString(),
+    secondsLeft: Math.max(0, Math.round((SESSION_MAX_MS - (now - s.startedAt)) / 1000)),
+  }));
+  const ended = recentlyEnded.map((e) => ({
+    profileId: e.profileId,
+    userId: e.userId,
+    startedAt: e.startedAt ? new Date(e.startedAt).toISOString() : null,
+    endedAt: new Date(e.endedAt).toISOString(),
+    reason: e.reason,
+  }));
+  res.json({ ok: true, active, ended });
 });
 
 // Info de ADB (control programático alternativo; NO se usa para el iframe). Body: { ids: [...] }
@@ -226,8 +352,10 @@ app.post("/phones/adb-info", async (req, res) => {
   res.status(r.status).json(r.json);
 });
 
-// TODO(slice3): mover teléfono a folder (asignación) + auth real con JWT de Supabase aplicando
-//   folder-por-closer + (opcional) proxear la URL geelark para ocultar también esa marca.
+// Arranca el reaper (no-op si no hay sesiones) + el boot-reconcile (apaga huérfanos tras un redeploy).
+setInterval(() => reapTick().catch(() => {}), REAP_INTERVAL_MS);
+setTimeout(() => bootReconcile().catch(() => {}), 90 * 1000);
+
 app.listen(PORT, () =>
   console.log(`cloudphone-gateway escuchando en :${PORT} (cloud-phone API, auth=${HAS_CREDS ? "signin" : MLX_TOKEN_OVERRIDE ? "override" : "none"})`),
 );
