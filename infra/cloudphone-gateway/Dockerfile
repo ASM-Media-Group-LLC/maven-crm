@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       xvfb x11-utils \
       adb \
       libnss3 libgbm1 libasound2 libxss1 libxtst6 libatk1.0-0 libatk-bridge2.0-0 libgtk-3-0 \
+      libayatana-appindicator3-1 libnotify4 \
     && rm -rf /var/lib/apt/lists/*
 
 # Node 20 (microservicio)
