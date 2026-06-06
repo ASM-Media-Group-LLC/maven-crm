@@ -19,9 +19,10 @@ import { Smartphone, Loader2, Play, RefreshCw, Power, Clock, LayoutDashboard, Ac
 
 // Tab "Teléfonos" (Operaciones), estilo Maven (header + Tabs + KpiCards como Panel de control).
 // Subtabs Dashboard + Dispositivos (gateables por rol). El teléfono abre en una ventana flotante
-// always-on-top (Picture-in-Picture, Chrome) en tamaño ~cuadrado (~440px) para que se vea la toolbar
-// lateral de geelark sin dejar espacio blanco. Fallback in-page si no hay PiP. Control de tiempo:
-// countdown 20min + auto-cierre + latido (timers dentro de la ventanita).
+// always-on-top (Picture-in-Picture, Chrome). El tamaño es ADAPTATIVO a la resolución de cada
+// pantalla: el Android llena el alto disponible (clave en monitores bajos tipo 1366×768) y se
+// recentra en cada resize, sin cortarse ni dejar blanco. Fallback in-page si no hay PiP. Control
+// de tiempo: countdown 20min + auto-cierre + latido (timers dentro de la ventanita).
 
 type Phone = {
   id: string;
@@ -44,10 +45,10 @@ type RecentRow = {
   minutes: number;
 };
 
-// Tamaño del teléfono: vertical angosto (aspecto ~0.5). A este ancho geelark esconde su toolbar lateral
-// y el Android LLENA la ventana (sin blanco ni corte) — es el único tamaño donde el embed renderiza limpio.
-// (A más ancho geelark muestra su toolbar pero corta el teléfono / deja blanco. La ventana es resizable:
-// el usuario puede arrastrarla más ancha si quiere la toolbar de geelark.)
+// Aspecto del teléfono: vertical angosto (~0.5). A este ancho geelark esconde su toolbar lateral y
+// el Android LLENA el frame (sin blanco ni corte) — es el único tamaño donde el embed renderiza limpio.
+// El iframe NO se estira a 100%: se dimensiona por JS al aspecto fijo y se centra (ver fit()), así que
+// si el usuario ensancha la ventana sobran barras NEGRAS a los lados, nunca el blanco interno de geelark.
 const PHONE_W = 340;
 const PHONE_H = 680;
 const PHONE_BAR = 34;
@@ -118,7 +119,7 @@ export default function TelefonosPage() {
   const mountPipPhone = (pip: any, id: string, name: string, url: string, initialSecs: number) => {
     const doc = pip.document;
     doc.body.replaceChildren();
-    doc.body.style.cssText = "margin:0;background:#000;font-family:system-ui,-apple-system,sans-serif;overflow:hidden";
+    doc.body.style.cssText = "margin:0;background:#000;font-family:system-ui,-apple-system,sans-serif;overflow:hidden;display:flex;flex-direction:column;height:100vh";
 
     const bar = doc.createElement("div");
     bar.style.cssText =
@@ -141,11 +142,40 @@ export default function TelefonosPage() {
     bar.append(titleEl, right);
     doc.body.append(bar);
 
+    // Escenario: ocupa todo el alto bajo la barra y CENTRA el teléfono. El
+    // iframe se dimensiona por JS (fit) con el aspecto fijo del teléfono → nunca
+    // se corta ni deja blanco; si la ventana es más ancha, sobran barras negras.
+    const stage = doc.createElement("div");
+    stage.style.cssText =
+      "flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;background:#000;overflow:hidden";
+    doc.body.append(stage);
+
     const frame = doc.createElement("iframe");
     frame.src = url;
     frame.allow = "clipboard-read; clipboard-write; microphone; camera; autoplay";
-    frame.style.cssText = `display:block;width:100%;height:calc(100vh - ${PHONE_BAR}px);border:0;background:#000`;
-    doc.body.append(frame);
+    frame.style.cssText = "display:block;border:0;background:#000";
+    stage.append(frame);
+
+    // Fit ADAPTATIVO: el teléfono llena el alto disponible (o el ancho si la
+    // ventana quedó muy angosta) manteniendo el aspecto. Se recalcula en cada
+    // resize → se adapta a CUALQUIER resolución y a que el usuario arrastre la
+    // ventana, sin cortar el Android ni dejar el blanco interno de geelark.
+    const PHONE_ASPECT = PHONE_W / PHONE_H;
+    const fit = () => {
+      const availW = pip.innerWidth;
+      const availH = pip.innerHeight - PHONE_BAR;
+      if (availW <= 0 || availH <= 0) return;
+      let h = availH;
+      let w = Math.round(h * PHONE_ASPECT);
+      if (w > availW) {
+        w = availW;
+        h = Math.round(w / PHONE_ASPECT);
+      }
+      frame.style.width = w + "px";
+      frame.style.height = h + "px";
+    };
+    fit();
+    pip.addEventListener("resize", fit);
 
     let secs = initialSecs;
     let warned = false;
@@ -208,10 +238,21 @@ export default function TelefonosPage() {
         // Adaptar al alto de la pantalla (CLAVE en resoluciones bajas): la ventana no puede ser más alta
         // que la pantalla (Chrome la topa), así que la achicamos manteniendo el aspecto del teléfono
         // (más angosta cuando hay menos alto) → el Android entra completo, NUNCA se corta.
-        const availH = (window.screen && window.screen.availHeight) || window.innerHeight || (PHONE_H + PHONE_BAR);
-        const winH = Math.max(420, Math.min(PHONE_H + PHONE_BAR, availH - 96));
-        const w = Math.max(240, Math.round((winH - PHONE_BAR) * (PHONE_W / PHONE_H)));
-        pip = await PiP.requestWindow({ width: w, height: winH });
+        // Tamaño inicial ADAPTATIVO a la pantalla: el teléfono ocupa casi todo
+        // el alto disponible (clave en pantallas bajas tipo 1366×768) y el ancho
+        // acompaña el aspecto (sin blanco). Topado al alto Y ancho del monitor —
+        // Chrome no deja la PiP más grande que la pantalla. Si igual no entra a
+        // lo alto, achicamos el ancho para que el teléfono entre completo.
+        const availH = (window.screen && window.screen.availHeight) || window.innerHeight || 800;
+        const availW = (window.screen && window.screen.availWidth) || window.innerWidth || 400;
+        let winH = Math.max(360, Math.min(PHONE_H + PHONE_BAR, availH - 48));
+        let winW = Math.round((winH - PHONE_BAR) * (PHONE_W / PHONE_H));
+        const maxW = Math.max(240, availW - 48);
+        if (winW > maxW) {
+          winW = maxW;
+          winH = Math.round(winW / (PHONE_W / PHONE_H)) + PHONE_BAR;
+        }
+        pip = await PiP.requestWindow({ width: winW, height: winH });
         pip.document.body.style.cssText =
           "margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#000;color:#9ca3af;font-family:system-ui,sans-serif;font-size:14px";
         pip.document.body.textContent = "Iniciando teléfono…";
