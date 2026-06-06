@@ -82,6 +82,9 @@ import NuevoCreador from "./pages/NuevoCreador";
 import CreadorProfile from "./pages/CreadorProfile";
 import PersonalizadosPage from "./pages/creadores/personalizados/PersonalizadosPage";
 
+// Teléfonos (cloud phones)
+import TelefonosPage from "./pages/telefonos/TelefonosPage";
+
 // Eventos
 import Eventos from "./pages/Eventos";
 import NuevoEvento from "./pages/NuevoEvento";
@@ -282,6 +285,7 @@ const App = () => (
                 <Route path="/oportunidades" element={<Navigate to="/closers" replace />} />
                 <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />
                 <Route path="/promolog" element={<PermissionRoute module="Promolog"><Promolog /></PermissionRoute>} />
+                <Route path="/telefonos" element={<PermissionRoute module="Telefonos"><TelefonosPage /></PermissionRoute>} />
                 {/* Migrated areas from kash-call-qa — placeholders for now */}
                 <Route path="/scouter-assist" element={<PermissionRoute module="Scouter Assist"><ScouterAssist /></PermissionRoute>} />
                 <Route path="/agency-qa" element={<PermissionRoute module="Agency QA"><AgencyQA /></PermissionRoute>} />
