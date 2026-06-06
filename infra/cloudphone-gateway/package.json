@@ -1,0 +1,13 @@
+{
+  "name": "cloudphone-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gateway que opera cloud phones de Multilogin desde Maven con la marca oculta. Slice 1 = de-risk (agente MLX headless + adb + captura de 1 frame).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
