@@ -292,6 +292,13 @@ app.post("/phones/:id/start", async (req, res) => {
   if (!guard(req, res)) return;
   const id = req.params.id;
   const userId = req.body?.userId || null;
+  // LOCK 1-sesión-por-teléfono: si OTRO usuario lo tiene activo (con latido reciente, no stale),
+  // bloqueamos SIN gastar minutos. Varios pueden estar ASIGNADOS al teléfono, pero solo uno
+  // logueado a la vez. (Mismo usuario re-abriendo, o sesión stale/abandonada → se permite tomar.)
+  const cur = sessions.get(id);
+  if (cur && cur.userId && cur.userId !== userId && Date.now() - cur.lastBeat <= SESSION_STALE_MS) {
+    return res.status(409).json({ ok: false, inUse: true, inUseByUserId: cur.userId, secondsLeft: 0 });
+  }
   // un-teléfono-a-la-vez: si el mismo usuario tiene otro abierto, apagarlo primero.
   if (userId) {
     for (const [pid, s] of [...sessions]) {

@@ -31,8 +31,8 @@ type Phone = {
   status?: number;
   remark?: string;
   usecase_name?: string;
-  assigned_to?: string | null;
-  session?: { userId: string | null; secondsLeft?: number } | null;
+  assigned_to?: string[]; // varios asignados por teléfono
+  session?: { userId: string | null; secondsLeft?: number; user_name?: string | null } | null;
 };
 type Usr = { id: string; full_name: string | null };
 type UsageRow = { user_id: string; full_name: string | null; minutes: number; sessions: number };
@@ -262,7 +262,20 @@ export default function TelefonosPage() {
     }
     const { data, error } = await cp("start", { profileId: p.id, serial_name: p.serial_name });
     setOpening(null);
-    const res = data as { ok?: boolean; url?: string; secondsLeft?: number; error?: string } | null;
+    const res = data as {
+      ok?: boolean; url?: string; secondsLeft?: number; error?: string;
+      inUse?: boolean; inUseBy?: string | null;
+    } | null;
+    // Lock de concurrencia: otro usuario lo tiene abierto → avisar y NO abrir.
+    if (res?.inUse) {
+      try { pip?.close(); } catch { /* noop */ }
+      toast({
+        title: "Teléfono en uso",
+        description: `Lo está usando ${res.inUseBy ?? "otra persona"}. Esperá a que lo cierre para abrirlo.`,
+        variant: "destructive",
+      });
+      return;
+    }
     if (error || !res?.ok || !res.url) {
       try { pip?.close(); } catch { /* noop */ }
       toast({
@@ -328,10 +341,12 @@ export default function TelefonosPage() {
     };
   }, [active, toast]);
 
-  const assign = async (p: Phone, userId: string | null) => {
+  const userName = (id: string) => users.find((u) => u.id === id)?.full_name || id.slice(0, 8);
+
+  const assign = async (p: Phone, userIds: string[]) => {
     const { data, error } = await cp("assign", {
       profileId: p.id,
-      userId,
+      userIds,
       serial_name: p.serial_name,
       remark: p.remark,
     });
@@ -340,7 +355,7 @@ export default function TelefonosPage() {
       toast({ title: "No se pudo asignar", description: error?.message || res?.error, variant: "destructive" });
       return;
     }
-    setPhones((prev) => prev.map((x) => (x.id === p.id ? { ...x, assigned_to: userId } : x)));
+    setPhones((prev) => prev.map((x) => (x.id === p.id ? { ...x, assigned_to: userIds } : x)));
   };
 
   const lowTime = secsLeft <= 120;
@@ -368,7 +383,9 @@ export default function TelefonosPage() {
                   <span className="font-medium truncate">{p.serial_name || p.id}</span>
                 </div>
                 {p.session ? (
-                  <Badge className="bg-emerald-600 hover:bg-emerald-600 shrink-0">En uso</Badge>
+                  <Badge className="bg-emerald-600 hover:bg-emerald-600 shrink-0">
+                    En uso{p.session.user_name ? ` · ${p.session.user_name}` : ""}
+                  </Badge>
                 ) : (
                   p.usecase_name && <Badge variant="secondary" className="shrink-0">{p.usecase_name}</Badge>
                 )}
@@ -383,22 +400,43 @@ export default function TelefonosPage() {
                 Abrir
               </Button>
               {isAdmin && (
-                <div className="pt-2 border-t">
-                  <div className="text-xs text-muted-foreground mb-1">Asignar a</div>
-                  <Select
-                    value={p.assigned_to ?? "none"}
-                    onValueChange={(v) => assign(p, v === "none" ? null : v)}
-                  >
+                <div className="pt-2 border-t space-y-1.5">
+                  <div className="text-xs text-muted-foreground">Asignados (varios; uno logueado a la vez)</div>
+                  <div className="flex flex-wrap gap-1">
+                    {(p.assigned_to ?? []).length === 0 ? (
+                      <span className="text-xs italic text-muted-foreground">Sin asignar</span>
+                    ) : (
+                      (p.assigned_to ?? []).map((aid) => (
+                        <Badge key={aid} variant="secondary" className="gap-1 pr-1">
+                          {userName(aid)}
+                          <button
+                            type="button"
+                            onClick={() => assign(p, (p.assigned_to ?? []).filter((x) => x !== aid))}
+                            className="ml-0.5 rounded px-1 leading-none hover:bg-foreground/10"
+                            title="Quitar"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+                  <Select value="" onValueChange={(v) => { if (v) assign(p, [...(p.assigned_to ?? []), v]); }}>
                     <SelectTrigger className="h-8">
-                      <SelectValue placeholder="Sin asignar" />
+                      <SelectValue placeholder="+ Agregar persona" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Sin asignar</SelectItem>
-                      {users.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.full_name || u.id.slice(0, 8)}
-                        </SelectItem>
-                      ))}
+                      {users.filter((u) => !(p.assigned_to ?? []).includes(u.id)).length === 0 ? (
+                        <div className="px-2 py-1.5 text-xs text-muted-foreground">Todos asignados</div>
+                      ) : (
+                        users
+                          .filter((u) => !(p.assigned_to ?? []).includes(u.id))
+                          .map((u) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.full_name || u.id.slice(0, 8)}
+                            </SelectItem>
+                          ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

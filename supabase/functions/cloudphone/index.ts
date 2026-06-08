@@ -118,9 +118,14 @@ serve(async (req) => {
       }
       const items: Array<Record<string, unknown>> = (r.body?.data as { items?: [] })?.items ?? [];
       const { data: assigns } = await sb.from("cloudphone_assignments").select("profile_id, assigned_to");
-      const byId = new Map(
-        (assigns ?? []).map((a: { profile_id: string; assigned_to: string | null }) => [a.profile_id, a.assigned_to]),
-      );
+      // varios asignados por teléfono → mapa profile_id -> [user_id]
+      const byPhone = new Map<string, string[]>();
+      for (const a of (assigns ?? []) as Array<{ profile_id: string; assigned_to: string | null }>) {
+        if (!a.assigned_to) continue;
+        const arr = byPhone.get(a.profile_id) ?? [];
+        arr.push(a.assigned_to);
+        byPhone.set(a.profile_id, arr);
+      }
       // sesiones vivas desde el micro (autoritativo). Si el micro es viejo (sin /sessions), gotSessions=false.
       // deno-lint-ignore no-explicit-any
       let active: any[] = [];
@@ -136,7 +141,16 @@ serve(async (req) => {
         }
       } catch { /* micro viejo: sin reconcile */ }
       const activeIds = new Set(active.map((a) => a.profileId));
-      const activeByProfile = new Map(active.map((a) => [a.profileId, a]));
+      // enriquecer cada sesión con el NOMBRE de quien la tiene (para mostrar "En uso por X").
+      const sessUserIds = [...new Set(active.map((a) => a.userId).filter(Boolean))];
+      const sessNames = new Map<string, string | null>();
+      if (sessUserIds.length) {
+        const { data: sp } = await sb.from("profiles").select("id, full_name").in("id", sessUserIds);
+        for (const pr of (sp ?? []) as Array<{ id: string; full_name: string | null }>) sessNames.set(pr.id, pr.full_name);
+      }
+      const activeByProfile = new Map(
+        active.map((a) => [a.profileId, { ...a, user_name: sessNames.get(a.userId) ?? null }]),
+      );
       if (gotSessions) {
         try {
           await reconcileLog(sb, activeIds, ended);
@@ -144,26 +158,38 @@ serve(async (req) => {
       }
       let phones = items.map((p) => ({
         ...p,
-        assigned_to: byId.get(String(p.id)) ?? null,
+        assigned_to: byPhone.get(String(p.id)) ?? [],
         session: activeByProfile.get(String(p.id)) ?? null,
       }));
-      if (!isAdmin) phones = phones.filter((p) => p.assigned_to === uid);
+      if (!isAdmin) phones = phones.filter((p) => (p.assigned_to as string[]).includes(uid));
       return json({ ok: true, isAdmin, phones });
     }
 
     if (action === "start") {
       if (!profileId || !(await canUse(profileId))) return json({ ok: false, error: "forbidden" }, 403);
-      // un-teléfono-a-la-vez (log): cerrar otras sesiones abiertas de este usuario (el micro también las apaga).
-      await sb
-        .from("cloudphone_sessions")
-        .update({ ended_at: new Date().toISOString(), end_reason: "replaced" })
-        .is("ended_at", null)
-        .eq("user_id", uid);
       const r = await gw(`/phones/${encodeURIComponent(profileId)}/start`, {
         method: "POST",
         body: JSON.stringify({ userId: uid }),
       });
+      // LOCK: el micro rechaza si OTRO usuario lo tiene activo. Resolvemos el nombre y devolvemos
+      // 200 con {ok:false, inUse} para que el front muestre el aviso (no se gastan minutos).
+      if (r.body?.inUse) {
+        let inUseBy: string | null = null;
+        const other = r.body?.inUseByUserId as string | undefined;
+        if (other) {
+          const { data: who } = await sb.from("profiles").select("full_name").eq("id", other).maybeSingle();
+          inUseBy = (who as { full_name?: string } | null)?.full_name ?? null;
+        }
+        return json({ ok: false, inUse: true, inUseBy, error: "in_use" });
+      }
       if (r.body?.ok) {
+        // recién con el arranque OK: cerramos las otras sesiones abiertas del usuario en el log
+        // (un-teléfono-a-la-vez) e insertamos la nueva.
+        await sb
+          .from("cloudphone_sessions")
+          .update({ ended_at: new Date().toISOString(), end_reason: "replaced" })
+          .is("ended_at", null)
+          .eq("user_id", uid);
         await sb.from("cloudphone_sessions").insert({
           profile_id: profileId,
           serial_name: payload?.serial_name ?? null,
@@ -212,16 +238,26 @@ serve(async (req) => {
     if (action === "assign") {
       if (!isAdmin) return json({ ok: false, error: "forbidden" }, 403);
       if (!profileId) return json({ ok: false, error: "missing_profileId" }, 400);
-      const row = {
-        profile_id: profileId,
-        assigned_to: payload?.userId ?? null,
-        assigned_by: uid,
-        serial_name: payload?.serial_name ?? null,
-        remark: payload?.remark ?? null,
-        updated_at: new Date().toISOString(),
-      };
-      const { error } = await sb.from("cloudphone_assignments").upsert(row, { onConflict: "profile_id" });
-      if (error) return json({ ok: false, error: error.message }, 500);
+      // Set COMPLETO de asignados del teléfono: borramos los actuales e insertamos los nuevos.
+      // Acepta userIds:[...] (multi) o userId (single, retrocompat). [] = sin asignar.
+      const userIds: string[] = Array.isArray(payload?.userIds)
+        ? (payload.userIds as string[]).filter(Boolean)
+        : payload?.userId
+          ? [payload.userId as string]
+          : [];
+      const { error: delErr } = await sb.from("cloudphone_assignments").delete().eq("profile_id", profileId);
+      if (delErr) return json({ ok: false, error: delErr.message }, 500);
+      if (userIds.length) {
+        const rows = userIds.map((u) => ({
+          profile_id: profileId,
+          assigned_to: u,
+          assigned_by: uid,
+          serial_name: payload?.serial_name ?? null,
+          remark: payload?.remark ?? null,
+        }));
+        const { error: insErr } = await sb.from("cloudphone_assignments").insert(rows);
+        if (insErr) return json({ ok: false, error: insErr.message }, 500);
+      }
       return json({ ok: true });
     }
     if (action === "users") {
