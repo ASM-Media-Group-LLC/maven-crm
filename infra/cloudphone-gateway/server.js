@@ -50,12 +50,27 @@ const UA =
 
 const md5 = (s) => crypto.createHash("md5").update(s).digest("hex");
 
+// fetch con timeout (AbortController). CLAVE: en Node un fetch sin timeout NO corta NUNCA, así que
+// si Multilogin se pone lento o deja de responder, el request quedaba colgado para siempre y el micro
+// terminaba zombie (caída permanente hasta reinicio manual — incidente 2026-06-07). Con timeout, un
+// hipo de MLX falla rápido y el micro se auto-recupera (la próxima llamada reintenta).
+const MLX_TIMEOUT_MS = Number(process.env.MLX_TIMEOUT_MS) || 12000;
+async function fetchT(url, opts = {}, ms = MLX_TIMEOUT_MS) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 let tokenCache = { token: null, mintedAt: 0, mode: HAS_CREDS ? "signin" : MLX_TOKEN_OVERRIDE ? "override" : "none" };
 
 // signin → (intenta) automation token largo. Si el automation falla, cae al token regular del signin
 // (que igual sirve para la API; el auto-refresh on-401 cubre su vencimiento a los ~30 min).
 async function signinAndMint() {
-  const si = await fetch(CLOUD + "/user/signin", {
+  const si = await fetchT(CLOUD + "/user/signin", {
     method: "POST",
     headers: { "Content-Type": "application/json", "User-Agent": UA, Accept: "application/json" },
     body: JSON.stringify({ email: MLX_EMAIL, password: md5(MLX_PASSWORD) }),
@@ -66,7 +81,7 @@ async function signinAndMint() {
     throw new Error("signin falló: " + si.status + " " + JSON.stringify(sj).slice(0, 200));
   }
   try {
-    const at = await fetch(CLOUD + "/workspace/automation_token?expiration_period=" + encodeURIComponent(TOKEN_TTL), {
+    const at = await fetchT(CLOUD + "/workspace/automation_token?expiration_period=" + encodeURIComponent(TOKEN_TTL), {
       headers: { Authorization: "Bearer " + regular, "User-Agent": UA, Accept: "application/json" },
     });
     const aj = await at.json().catch(() => ({}));
@@ -95,7 +110,7 @@ async function getToken(force = false) {
 // Llama la cloud API con el token cacheado. Si da 401/403/501 y podemos re-mintear, lo hace una vez.
 async function mlx(path, { method = "GET", body, _retry = false } = {}) {
   const token = await getToken();
-  const res = await fetch(CLOUD + path, {
+  const res = await fetchT(CLOUD + path, {
     method,
     headers: {
       Authorization: "Bearer " + token,
@@ -234,20 +249,34 @@ function sanitizePhone(p) {
   return o;
 }
 
-// Lista de teléfonos (paginada, saneada). Maven la usa para pintar las tarjetas.
+// Caché EN MEMORIA de la lista de teléfonos: el /phones del tab se sirve desde acá (instantáneo) y un
+// refresco en background la mantiene fresca. Así un Multilogin lento NO bloquea el tab — se sirve la
+// última lista conocida (los campos del teléfono cambian poco; unos segundos de staleness es
+// irrelevante para pintar tarjetas). Es la otra mitad del fix del incidente 2026-06-07.
+const PHONES_REFRESH_MS = (Number(process.env.CLOUDPHONE_LIST_REFRESH_SEC) || 60) * 1000;
+let phonesCache = { items: [], at: 0, ok: false };
+async function refreshPhones() {
+  const r = await mlx("/mobile_profiles/phone/list?page=1&page_size=100&sort=desc&order_by=created_at");
+  if (r.status === 200 && Array.isArray(r.json?.data?.items)) {
+    phonesCache = { items: r.json.data.items.map(sanitizePhone), at: Date.now(), ok: true };
+  }
+  return r;
+}
+
+// Lista de teléfonos (saneada). Sirve desde caché si la tenemos (instantáneo, sobrevive a MLX lento);
+// si la caché está fría (recién arrancó y aún no refrescó), intenta UN fetch en vivo con timeout.
 app.get("/phones", async (req, res) => {
   if (!guard(req, res)) return;
-  const qs = new URLSearchParams({
-    page: String(req.query.page || "1"),
-    page_size: String(req.query.page_size || "100"),
-    sort: "desc",
-    order_by: "created_at",
-  });
-  const r = await mlx("/mobile_profiles/phone/list?" + qs.toString());
-  if (r.status === 200 && Array.isArray(r.json?.data?.items)) {
-    r.json.data.items = r.json.data.items.map(sanitizePhone);
+  if (phonesCache.ok) {
+    return res.json({ data: { items: phonesCache.items }, cached: true, cacheAgeMs: Date.now() - phonesCache.at });
   }
-  res.status(r.status).json(r.json);
+  try {
+    const r = await refreshPhones();
+    if (phonesCache.ok) return res.json({ data: { items: phonesCache.items } });
+    return res.status(r.status).json(r.json);
+  } catch (e) {
+    return res.status(504).json({ ok: false, error: "mlx_timeout: " + (e?.message || e) });
+  }
 });
 
 // Estado de teléfonos. Body: { ids: ["<profileId>", ...] }
@@ -355,6 +384,11 @@ app.post("/phones/adb-info", async (req, res) => {
 // Arranca el reaper (no-op si no hay sesiones) + el boot-reconcile (apaga huérfanos tras un redeploy).
 setInterval(() => reapTick().catch(() => {}), REAP_INTERVAL_MS);
 setTimeout(() => bootReconcile().catch(() => {}), 90 * 1000);
+
+// Mantener caliente la caché de teléfonos: refresco en background + uno inicial al arrancar (para no
+// esperar el primer intervalo). Si MLX falla, se loguea y se reintenta al próximo tick — nunca cuelga.
+setInterval(() => refreshPhones().catch((e) => console.log("[phones] refresh err:", e?.message || e)), PHONES_REFRESH_MS);
+refreshPhones().catch((e) => console.log("[phones] initial refresh err:", e?.message || e));
 
 app.listen(PORT, () =>
   console.log(`cloudphone-gateway escuchando en :${PORT} (cloud-phone API, auth=${HAS_CREDS ? "signin" : MLX_TOKEN_OVERRIDE ? "override" : "none"})`),

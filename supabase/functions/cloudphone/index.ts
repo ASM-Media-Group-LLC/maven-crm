@@ -32,9 +32,13 @@ const GW_URL = (Deno.env.get("CLOUDPHONE_URL") ?? "").replace(/\/$/, "");
 const GW_TOKEN = Deno.env.get("CLOUDPHONE_SPIKE_TOKEN") ?? "";
 const SESSION_CAP_MS = 20 * 60 * 1000; // fallback para reconciliar duración de sesiones cerradas por reaper
 
+// Timeout del lado edge: si el micro no responde a tiempo (p.ej. reiniciando), cortamos rápido y
+// devolvemos un error claro, en vez de colgar hasta el límite de Supabase (~10s) y tirar 500 genérico.
+const GW_TIMEOUT_MS = 8000;
 async function gw(path: string, init: RequestInit = {}) {
   const res = await fetch(GW_URL + path, {
     ...init,
+    signal: AbortSignal.timeout(GW_TIMEOUT_MS),
     headers: { "x-spike-token": GW_TOKEN, "Content-Type": "application/json", ...(init.headers || {}) },
   });
   const text = await res.text();
@@ -100,7 +104,18 @@ serve(async (req) => {
     };
 
     if (action === "list") {
-      const r = await gw("/phones?page=1&page_size=100");
+      let r: { status: number; body: Record<string, unknown> };
+      try {
+        r = await gw("/phones?page=1&page_size=100");
+      } catch (_e) {
+        // El gateway no respondió a tiempo (micro reiniciando/lento). Error CLARO con 200 para que el
+        // front muestre un mensaje amable (lee res.error), en vez del genérico "non-2xx" tras el cuelgue.
+        return json({
+          ok: false,
+          error: "El gateway de teléfonos no respondió (puede estar reiniciando). Reintentá en un momento.",
+          gateway_timeout: true,
+        });
+      }
       const items: Array<Record<string, unknown>> = (r.body?.data as { items?: [] })?.items ?? [];
       const { data: assigns } = await sb.from("cloudphone_assignments").select("profile_id, assigned_to");
       const byId = new Map(
