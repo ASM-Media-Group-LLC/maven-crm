@@ -397,6 +397,12 @@ const PromologContent = () => {
   const [entryEvidencePreview, setEntryEvidencePreview] = useState<string>("");
   const [uploadingEvidence, setUploadingEvidence] = useState(false);
   const entryFileInputRef = useRef<HTMLInputElement>(null);
+  // Multi-foto para la promo MANUAL (modal "Agregar Promo"), espejo de cómo el bot
+  // guarda 1 fila por story: cada foto = una story con su propio Sí/No (promoted).
+  // (El modal de EDITAR sigue con foto única vía entryEvidencePreview.)
+  const [entryPhotos, setEntryPhotos] = useState<Array<{ url: string; promoted: boolean }>>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const entryPhotosInputRef = useRef<HTMLInputElement>(null);
 
   // Entry action state (table/grid actions)
   const [selectedEntry, setSelectedEntry] = useState<PromologEntry | null>(null);
@@ -658,6 +664,36 @@ const PromologContent = () => {
     }
   };
 
+  // Sube VARIAS fotos para la promo manual. Cada foto entra como {url, promoted:true}
+  // por default; el user marca Sí/No por foto. Al guardar se crea 1 fila por foto
+  // (igual que el bot guarda 1 fila por story). Mismo bucket + signed URL durable.
+  const handleEntryPhotosChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    setUploadingPhotos(true);
+    try {
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) continue;
+        const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+        const path = `promolog-manual/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("creator-files")
+          .upload(path, file, { contentType: file.type, upsert: true });
+        if (upErr) throw upErr;
+        const { data: signed, error: signErr } = await supabase.storage
+          .from("creator-files")
+          .createSignedUrl(path, 60 * 60 * 24 * 365);
+        if (signErr || !signed?.signedUrl) throw signErr ?? new Error("No se pudo firmar la URL");
+        setEntryPhotos((prev) => [...prev, { url: signed.signedUrl, promoted: true }]);
+      }
+    } catch (err) {
+      toast({ title: "Error subiendo evidencia", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setUploadingPhotos(false);
+      if (e.target) e.target.value = ""; // permitir re-subir el mismo archivo
+    }
+  };
+
   const resetEntryModal = () => {
     setEntryResult("si");
     setEntryNetwork("");
@@ -665,6 +701,7 @@ const PromologContent = () => {
     setEntryContactType("");
     setEntryNotes("");
     setEntryEvidencePreview("");
+    setEntryPhotos([]);
     setEntryStrategy("");
     setEntryCustomPlatform("");
   };
@@ -1389,20 +1426,37 @@ const PromologContent = () => {
                       <span className="text-sm font-medium">Notas</span>
                       <Textarea value={entryNotes} onChange={(e) => setEntryNotes(e.target.value)} placeholder="Agregar notas..." className="min-h-[80px]" />
                     </div>
+                    {/* Evidencia MULTI-foto (igual que las stories del bot): subís una o
+                        varias y marcás Sí/No por cada una. Al guardar = 1 fila por foto. */}
                     <div className="space-y-2">
-                      <span className="text-sm font-medium">Evidencia (Pantallazo)</span>
-                      <div className="border-2 border-dashed border-input rounded-md p-4 text-center cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => entryFileInputRef.current?.click()}>
+                      <span className="text-sm font-medium">Evidencia (fotos)</span>
+                      <div className="border-2 border-dashed border-input rounded-md p-4 text-center cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => entryPhotosInputRef.current?.click()}>
                         <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
-                        <span className="text-xs text-muted-foreground">Subir Evidencia</span>
-                        <input ref={entryFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleEntryFileChange} />
+                        <span className="text-xs text-muted-foreground">{uploadingPhotos ? "Subiendo…" : "Subir una o varias fotos"}</span>
+                        <input ref={entryPhotosInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleEntryPhotosChange} />
                       </div>
-                      {entryEvidencePreview && (
-                        <div className="space-y-2">
-                          <img src={entryEvidencePreview} alt="Evidencia" className="w-full rounded-md border border-input max-h-48 object-contain" />
-                          <button type="button" className="flex items-center gap-1 text-xs text-primary hover:underline" onClick={() => window.open(entryEvidencePreview, "_blank")}>
-                            <ExternalLink className="h-3 w-3" />Abrir en nueva pestaña
-                          </button>
-                        </div>
+                      {entryPhotos.length > 0 && (
+                        <>
+                          <div className="grid grid-cols-2 gap-2">
+                            {entryPhotos.map((ph, i) => (
+                              <div key={i} className="relative overflow-hidden rounded-md border border-input">
+                                <img src={ph.url} alt={`Evidencia ${i + 1}`} className="h-28 w-full object-cover" />
+                                <button type="button" title="Quitar" onClick={() => setEntryPhotos((prev) => prev.filter((_, j) => j !== i))} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                                {entryResult === "si" && (
+                                  <div className="absolute inset-x-0 bottom-0 flex">
+                                    <button type="button" onClick={() => setEntryPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, promoted: true } : p)))} className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${ph.promoted ? "bg-emerald-600 text-white" : "bg-black/60 text-white/80 hover:bg-black/70"}`}>Sí</button>
+                                    <button type="button" onClick={() => setEntryPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, promoted: false } : p)))} className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${!ph.promoted ? "bg-rose-600 text-white" : "bg-black/60 text-white/80 hover:bg-black/70"}`}>No</button>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          {entryResult === "si" && (
+                            <p className="text-[11px] text-muted-foreground">Marcá Sí/No en cada foto. El día queda "Sí" si al menos una es Sí.</p>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -1412,37 +1466,44 @@ const PromologContent = () => {
                 <div className="shrink-0 p-6 pt-4 border-t">
                   <DialogFooter>
                     <Button variant="outline" onClick={() => { setEntryModalOpen(false); toast({ title: "Registro cancelado" }); }}>Cancelar</Button>
-                    <Button disabled={uploadingEvidence} onClick={async () => {
+                    <Button disabled={uploadingPhotos} onClick={async () => {
                       if (!selectedCreatorForEntry) return;
-                      if (entryResult === "si") {
-                        // Tipo de Contacto se eliminó del flow: el equipo ya
-                        // no lo usaba, agregaba fricción y la combinación
-                        // red social + plataforma + estrategia ya cuenta la
-                        // historia. Solo validamos Red Social + Plataforma.
-                        if (!entryNetwork || !entryPlatform) {
-                          toast({ title: "Campos requeridos", description: "Completa Red Social y Plataforma.", variant: "destructive" });
-                          return;
-                        }
+                      const isSi = entryResult === "si";
+                      // Solo validamos Red Social + Plataforma (Tipo de Contacto se
+                      // eliminó del flow; red + plataforma ya cuentan la historia).
+                      if (isSi && (!entryNetwork || !entryPlatform)) {
+                        toast({ title: "Campos requeridos", description: "Completa Red Social y Plataforma.", variant: "destructive" });
+                        return;
                       }
                       const platformValue = entryPlatform === "otra" ? entryCustomPlatform : entryPlatform;
-                      const { error } = await supabase.from("promolog_entries").insert({
+                      const base = {
                         creator_id: selectedCreatorForEntry.id,
                         date: new Date().toISOString(),
-                        promoted: entryResult === "si" ? "true" : "false",
-                        network: entryResult === "si" ? entryNetwork : "n/a",
-                        platform: entryResult === "si" ? platformValue : null,
+                        network: isSi ? entryNetwork : "n/a",
+                        platform: isSi ? platformValue : null,
                         notes: entryNotes || null,
-                        action_taken: entryResult === "si" ? entryStrategy || null : null,
-                        evidence_url: entryEvidencePreview || null,
+                        action_taken: isSi ? entryStrategy || null : null,
                         reviewed_by: user?.id,
                         created_by: user?.id,
-                      });
+                      };
+                      // 1 fila por foto (igual que el bot guarda 1 fila por story); cada
+                      // foto con su propio Sí/No. Sin fotos → 1 fila con el resultado general.
+                      const rows = entryPhotos.length > 0
+                        ? entryPhotos.map((ph, i) => ({
+                            ...base,
+                            promoted: isSi ? (ph.promoted ? "true" : "false") : "false",
+                            evidence_url: ph.url,
+                            story_index: i,
+                            story_count: entryPhotos.length,
+                          }))
+                        : [{ ...base, promoted: isSi ? "true" : "false", evidence_url: null }];
+                      const { error } = await supabase.from("promolog_entries").insert(rows);
                       if (error) {
                         toast({ title: "Error", description: error.message, variant: "destructive" });
                         return;
                       }
-      queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
-                      toast({ title: "Promoción registrada", description: `La entrada para ${selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name} ha sido guardada.` });
+                      queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
+                      toast({ title: "Promoción registrada", description: `${rows.length > 1 ? `${rows.length} fotos guardadas` : "Entrada guardada"} para ${selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name}.` });
                       resetEntryModal();
                       setEntryModalOpen(false);
                     }}>Guardar Promoción</Button>
