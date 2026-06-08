@@ -727,6 +727,15 @@ const PromologContent = () => {
     setStatsCollapsed(e.currentTarget.scrollTop > 40);
   }, []);
 
+  // Reset a la página 1 cuando cambia el rango de fechas o CUALQUIER filtro.
+  // Bug (2026-06-08): sin esto, si estabas en una página alta (ej. p.15 de
+  // "Este mes" = 359 registros) y cambiabas a un rango más chico ("Hoy" = 3
+  // páginas), la tabla quedaba en una página fuera de rango → "No hay entradas"
+  // aunque sí había registros. Se veía como "el filtro de tiempo no funciona".
+  useEffect(() => {
+    setPromoPage(1);
+  }, [dateFrom, dateTo, selectedStatus, selectedNetwork, selectedCardPlatform, searchEntry, selectedCreatorFilter]);
+
   // KPI modal state. "creadores_escaneados" abre un modal especial con
   // las creadoras únicas agrupadas por categoría (Elite, A+, ...). Los
   // otros tipos siguen mostrando entries individuales.
