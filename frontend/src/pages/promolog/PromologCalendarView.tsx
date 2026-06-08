@@ -12,7 +12,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
-import { collectDayStories } from "./storyEvidence";
 import type { PromologEntry } from "./PromologEntryCard";
 
 // ── Calendario de promos por creadora ─────────────────────────────────
@@ -190,13 +189,22 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     if (!openDayKey) return null;
     const bucket = dayMap.get(openDayKey);
     if (!bucket || bucket.raw.length === 0) return null;
-    // TODAS las entries del día (bot + manuales). La galería se arma con el MISMO
-    // helper que Promos (collectDayStories): bot→por scan, manual→por día con foto,
-    // así el popup se ve igual para ambos.
+    // La galería muestra TODAS las fotos del día (historias del bot + fotos
+    // manuales JUNTAS), para que coincida con el contador X/Y de la celda. Dedup
+    // seguro: bot por run+índice (un re-run del webhook puede duplicar una story);
+    // manuales nunca se dedupean entre sí (cada foto = fila propia). Solo entran
+    // las filas con foto.
     const all = bucket.raw.map(mapEntry);
+    const seen = new Map<string, PromologEntry>();
+    for (const s of all) {
+      if (!s.evidence_url) continue;
+      const key = s.apify_run_id && s.story_index != null ? `${s.apify_run_id}:${s.story_index}` : `id:${s.id}`;
+      const prev = seen.get(key);
+      if (!prev || (!prev.evidence_url && s.evidence_url)) seen.set(key, s);
+    }
+    const stories = [...seen.values()].sort((a, b) => (a.story_index ?? 1e9) - (b.story_index ?? 1e9));
     const rep = all.find((s) => s.result === "Sí") ?? all[0];
-    const stories = collectDayStories(all, rep);
-    // El resultado del día refleja TODAS las entries (no solo las de la galería).
+    // El resultado del día refleja TODAS las entries del día (no solo la galería).
     const dayResult = all.some((s) => s.result === "Sí")
       ? "Sí"
       : all.some((s) => s.result === "No")
@@ -335,7 +343,9 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
                 const bucket = dayMap.get(key);
                 const future = isAfter(startOfDay(d), today);
                 const status: DayStatus = inMonth && !future ? statusFor(bucket) : "none";
-                const clickable = inMonth && !!bucket && bucket.raw.some((e) => e.analyzed_by_ai);
+                // Clickeable si hay CUALQUIER entry ese día (antes exigía una de IA →
+                // los días de solo promos manuales no abrían).
+                const clickable = inMonth && !!bucket && bucket.total > 0;
                 return (
                   <button
                     type="button"
