@@ -61,6 +61,9 @@ export interface PromologEntry {
   // ID del run de Apify que generó esta entry (bot). Agrupa la galería de
   // evidencia: todas las stories de un mismo scan, sin importar su fecha de posteo.
   apify_run_id?: string | null;
+  // Fecha CRUDA (timestamp UTC de DB). `date` es solo display formateado; el form
+  // de Editar usa esta para insertar fotos nuevas del día con la fecha correcta.
+  rawDate?: string | null;
 }
 
 interface PromologEntryCardProps {

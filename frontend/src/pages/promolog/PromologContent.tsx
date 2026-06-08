@@ -47,6 +47,7 @@ import PromologDashboardView from "./PromologDashboardView";
 import PromobotPanel from "./PromobotPanel";
 import PromologCalendarView from "./PromologCalendarView";
 import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
+import PromologEntryFormDialog from "./PromologEntryFormDialog";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { ListRow, ListRowButton } from "@/components/ui/list-row";
 import { useTimezone, formatDateInTz, formatTimeInTz } from "@/hooks/useTimezone";
@@ -290,6 +291,7 @@ const PromologContent = () => {
         story_index: pe.story_index != null ? Number(pe.story_index) : null,
         story_count: pe.story_count != null ? Number(pe.story_count) : null,
         apify_run_id: pe.apify_run_id ?? null,
+        rawDate: pe.date ?? null,
       };
     });
   }, [promologEntries, profilesMap, userTz]);
@@ -533,35 +535,9 @@ const PromologContent = () => {
     setViewEntryOpen(true);
   };
   const handleEditEntry = (entry: PromologEntry) => {
+    // El form (PromologEntryFormDialog) se autocarga desde `entry` + las stories
+    // del día (selectedDayStories), así que acá solo seleccionamos y abrimos.
     setSelectedEntry(entry);
-    // Pre-cargar los state vars del modal con los valores actuales del
-    // entry. Antes el modal se abría con todo en blanco aunque la DB
-    // tuviera la info — confundía al chatter y obligaba a rellenar de
-    // nuevo lo que el bot AI ya había clasificado. Ahora el modal
-    // refleja lo que está en la DB y solo hay que ajustar lo necesario.
-    // entryResult acepta solo "si"/"no" — si la entry está "Pendiente"
-    // o "Parcial", default "no" para que el chatter pueda promover a "si".
-    setEntryResult(entry.result === "Sí" ? "si" : "no");
-    // Network: la DB guarda "Instagram", el form usa "instagram" (lowercase).
-    setEntryNetwork((entry.network || "").toLowerCase());
-    // Platform: la DB puede tener "OnlyFans" / "onlyfans" / "Unlok" / "Otra".
-    // Mapeamos al valor que el form espera ("onlyfans"/"unlok"/"otra"). Si
-    // viene algo no estándar lo tratamos como "otra" y guardamos el valor
-    // original como custom platform para que el user lo vea.
-    const platRaw = (entry.platform || "").toLowerCase().trim();
-    if (platRaw === "onlyfans" || platRaw === "unlok") {
-      setEntryPlatform(platRaw);
-      setEntryCustomPlatform("");
-    } else if (platRaw && platRaw !== "ninguna") {
-      setEntryPlatform("otra");
-      setEntryCustomPlatform(entry.platform ?? "");
-    } else {
-      setEntryPlatform("");
-      setEntryCustomPlatform("");
-    }
-    setEntryNotes(entry.notes ?? "");
-    setEntryStrategy(entry.action_taken ?? "");
-    setEntryEvidencePreview(entry.evidence_url ?? "");
     setEditEntryOpen(true);
   };
   const handleDeleteEntry = (entry: PromologEntry) => {
@@ -633,77 +609,6 @@ const PromologContent = () => {
     setCampaignMonth(undefined);
     setCampaignGoalMonthly("");
     setCampaignGoalWeekly("");
-  };
-
-  const handleEntryFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    // Preview instantáneo (blob local) mientras sube. OJO: el blob NO se
-    // persiste — antes guardábamos esa URL `blob:` como evidence_url y se veía
-    // rota apenas recargabas / para cualquier otro user. Ahora subimos el
-    // archivo a Storage y guardamos un signed URL durable.
-    setEntryEvidencePreview(URL.createObjectURL(file));
-    setUploadingEvidence(true);
-    try {
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `promolog-manual/${crypto.randomUUID()}.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from("creator-files")
-        .upload(path, file, { contentType: file.type, upsert: true });
-      if (upErr) throw upErr;
-      const { data: signed, error: signErr } = await supabase.storage
-        .from("creator-files")
-        .createSignedUrl(path, 60 * 60 * 24 * 365); // 1 año
-      if (signErr || !signed?.signedUrl) throw signErr ?? new Error("No se pudo firmar la URL");
-      setEntryEvidencePreview(signed.signedUrl); // URL durable → se guarda como evidence_url
-    } catch (err) {
-      toast({ title: "Error subiendo evidencia", description: (err as Error).message, variant: "destructive" });
-      setEntryEvidencePreview(""); // limpiar para no guardar un blob roto
-    } finally {
-      setUploadingEvidence(false);
-    }
-  };
-
-  // Sube VARIAS fotos para la promo manual. Cada foto entra como {url, promoted:true}
-  // por default; el user marca Sí/No por foto. Al guardar se crea 1 fila por foto
-  // (igual que el bot guarda 1 fila por story). Mismo bucket + signed URL durable.
-  const handleEntryPhotosChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (files.length === 0) return;
-    setUploadingPhotos(true);
-    try {
-      for (const file of files) {
-        if (!file.type.startsWith("image/")) continue;
-        const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-        const path = `promolog-manual/${crypto.randomUUID()}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from("creator-files")
-          .upload(path, file, { contentType: file.type, upsert: true });
-        if (upErr) throw upErr;
-        const { data: signed, error: signErr } = await supabase.storage
-          .from("creator-files")
-          .createSignedUrl(path, 60 * 60 * 24 * 365);
-        if (signErr || !signed?.signedUrl) throw signErr ?? new Error("No se pudo firmar la URL");
-        setEntryPhotos((prev) => [...prev, { url: signed.signedUrl, promoted: true }]);
-      }
-    } catch (err) {
-      toast({ title: "Error subiendo evidencia", description: (err as Error).message, variant: "destructive" });
-    } finally {
-      setUploadingPhotos(false);
-      if (e.target) e.target.value = ""; // permitir re-subir el mismo archivo
-    }
-  };
-
-  const resetEntryModal = () => {
-    setEntryResult("si");
-    setEntryNetwork("");
-    setEntryPlatform("");
-    setEntryContactType("");
-    setEntryNotes("");
-    setEntryEvidencePreview("");
-    setEntryPhotos([]);
-    setEntryStrategy("");
-    setEntryCustomPlatform("");
   };
 
   const getInitials = (name: string) => name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -1331,7 +1236,6 @@ const PromologContent = () => {
                                   className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 rounded-md transition-colors"
                                   onClick={() => {
                                     setSelectedCreatorForEntry(creator);
-                                    resetEntryModal();
                                     setEntryModalOpen(true);
                                     setCreatorsModalOpen(false);
                                   }}
@@ -1371,173 +1275,13 @@ const PromologContent = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Registration Modal */}
-        <Dialog open={entryModalOpen} onOpenChange={setEntryModalOpen}>
-          <DialogContent className="max-w-lg max-h-[80vh] !flex !flex-col gap-0 p-0 overflow-hidden">
-            {selectedCreatorForEntry && (
-              <>
-                {/* Fixed header */}
-                <div className="shrink-0 p-6 pb-4 space-y-4">
-                  <DialogHeader className="pr-8">
-                    <DialogTitle>Registrar Promoción</DialogTitle>
-                    <DialogDescription className="sr-only">Registrar una nueva entrada de promoción para esta creadora</DialogDescription>
-                  </DialogHeader>
-                  <Card className="bg-muted">
-                    <CardContent className="p-3 flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        {selectedCreatorForEntry.profile_photo_url ? <AvatarImage src={selectedCreatorForEntry.profile_photo_url} alt={selectedCreatorForEntry.name} /> : null}
-                        <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">{getInitials(selectedCreatorForEntry.name)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold">{selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name}</span>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          {selectedCreatorForEntry.instagram_handle && <span className="flex items-center gap-0.5"><InstagramIcon className="h-3 w-3" />@{selectedCreatorForEntry.instagram_handle}</span>}
-                          {selectedCreatorForEntry.twitter_handle && <span className="flex items-center gap-0.5"><XIcon className="h-3 w-3" />@{selectedCreatorForEntry.twitter_handle}</span>}
-                          {selectedCreatorForEntry.tiktok_handle && <span className="flex items-center gap-0.5"><TikTokIcon className="h-3 w-3" />@{selectedCreatorForEntry.tiktok_handle}</span>}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">¿Promocionó Hoy?</span>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button type="button" onClick={() => setEntryResult("si")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${entryResult === "si" ? "bg-primary text-primary-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                        <Check className="h-4 w-4" />Sí Promocionó
-                      </button>
-                      <button type="button" onClick={() => setEntryResult("no")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${entryResult === "no" ? "bg-secondary text-secondary-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                        <X className="h-4 w-4" />No Promocionó
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Scrollable content */}
-                <div className="flex-1 min-h-0 overflow-y-auto px-6">
-                  <div className="space-y-4 py-4">
-                    {entryResult === "si" && (
-                      <>
-                        <div className="space-y-2">
-                          <span className="text-sm font-medium">Red Social <span className="text-destructive">*</span></span>
-                          <div className="grid grid-cols-4 gap-2">
-                            {networkOptions.map((opt) => {
-                              const Icon = opt.icon;
-                              const isSelected = entryNetwork === opt.value;
-                              return (
-                                <button key={opt.value} type="button" onClick={() => setEntryNetwork(opt.value)} className={`flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                                  <Icon className="h-5 w-5" />{opt.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <span className="text-sm font-medium">Plataforma <span className="text-destructive">*</span></span>
-                          <div className="grid grid-cols-3 gap-2">
-                            {platformOptions.map((opt) => {
-                              const isSelected = entryPlatform === opt.value;
-                              return (
-                                <button key={opt.value} type="button" onClick={() => setEntryPlatform(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                                  {opt.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Always visible fields */}
-                    <div className="space-y-2">
-                      <span className="text-sm font-medium">Notas</span>
-                      <Textarea value={entryNotes} onChange={(e) => setEntryNotes(e.target.value)} placeholder="Agregar notas..." className="min-h-[80px]" />
-                    </div>
-                    {/* Evidencia MULTI-foto (igual que las stories del bot): subís una o
-                        varias y marcás Sí/No por cada una. Al guardar = 1 fila por foto. */}
-                    <div className="space-y-2">
-                      <span className="text-sm font-medium">Evidencia (fotos)</span>
-                      <div className="border-2 border-dashed border-input rounded-md p-4 text-center cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => entryPhotosInputRef.current?.click()}>
-                        <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
-                        <span className="text-xs text-muted-foreground">{uploadingPhotos ? "Subiendo…" : "Subir una o varias fotos"}</span>
-                        <input ref={entryPhotosInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleEntryPhotosChange} />
-                      </div>
-                      {entryPhotos.length > 0 && (
-                        <>
-                          <div className="grid grid-cols-2 gap-2">
-                            {entryPhotos.map((ph, i) => (
-                              <div key={i} className="relative overflow-hidden rounded-md border border-input">
-                                <img src={ph.url} alt={`Evidencia ${i + 1}`} className="h-28 w-full object-cover" />
-                                <button type="button" title="Quitar" onClick={() => setEntryPhotos((prev) => prev.filter((_, j) => j !== i))} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80">
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
-                                {entryResult === "si" && (
-                                  <div className="absolute inset-x-0 bottom-0 flex">
-                                    <button type="button" onClick={() => setEntryPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, promoted: true } : p)))} className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${ph.promoted ? "bg-emerald-600 text-white" : "bg-black/60 text-white/80 hover:bg-black/70"}`}>Sí</button>
-                                    <button type="button" onClick={() => setEntryPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, promoted: false } : p)))} className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${!ph.promoted ? "bg-rose-600 text-white" : "bg-black/60 text-white/80 hover:bg-black/70"}`}>No</button>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          {entryResult === "si" && (
-                            <p className="text-[11px] text-muted-foreground">Marcá Sí/No en cada foto. El día queda "Sí" si al menos una es Sí.</p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Fixed footer */}
-                <div className="shrink-0 p-6 pt-4 border-t">
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => { setEntryModalOpen(false); toast({ title: "Registro cancelado" }); }}>Cancelar</Button>
-                    <Button disabled={uploadingPhotos} onClick={async () => {
-                      if (!selectedCreatorForEntry) return;
-                      const isSi = entryResult === "si";
-                      // Solo validamos Red Social + Plataforma (Tipo de Contacto se
-                      // eliminó del flow; red + plataforma ya cuentan la historia).
-                      if (isSi && (!entryNetwork || !entryPlatform)) {
-                        toast({ title: "Campos requeridos", description: "Completa Red Social y Plataforma.", variant: "destructive" });
-                        return;
-                      }
-                      const platformValue = entryPlatform === "otra" ? entryCustomPlatform : entryPlatform;
-                      const base = {
-                        creator_id: selectedCreatorForEntry.id,
-                        date: new Date().toISOString(),
-                        network: isSi ? entryNetwork : "n/a",
-                        platform: isSi ? platformValue : null,
-                        notes: entryNotes || null,
-                        action_taken: isSi ? entryStrategy || null : null,
-                        reviewed_by: user?.id,
-                        created_by: user?.id,
-                      };
-                      // 1 fila por foto (igual que el bot guarda 1 fila por story); cada
-                      // foto con su propio Sí/No. Sin fotos → 1 fila con el resultado general.
-                      const rows = entryPhotos.length > 0
-                        ? entryPhotos.map((ph, i) => ({
-                            ...base,
-                            promoted: isSi ? (ph.promoted ? "true" : "false") : "false",
-                            evidence_url: ph.url,
-                            story_index: i,
-                            story_count: entryPhotos.length,
-                          }))
-                        : [{ ...base, promoted: isSi ? "true" : "false", evidence_url: null }];
-                      const { error } = await supabase.from("promolog_entries").insert(rows);
-                      if (error) {
-                        toast({ title: "Error", description: error.message, variant: "destructive" });
-                        return;
-                      }
-                      queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
-                      toast({ title: "Promoción registrada", description: `${rows.length > 1 ? `${rows.length} fotos guardadas` : "Entrada guardada"} para ${selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name}.` });
-                      resetEntryModal();
-                      setEntryModalOpen(false);
-                    }}>Guardar Promoción</Button>
-                  </DialogFooter>
-                </div>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
+        {/* Registrar Promoción — form compartido (mismo componente que Editar). */}
+        <PromologEntryFormDialog
+          mode="add"
+          open={entryModalOpen}
+          onOpenChange={setEntryModalOpen}
+          creator={selectedCreatorForEntry}
+        />
 
         {/* View Entry Modal — ahora muestra todo lo que el bot Promolog
             graba: red social, plataforma destino, link de compra, acción
@@ -1559,153 +1303,15 @@ const PromologContent = () => {
           />
         )}
 
-        {/* Edit Entry Modal (from table/grid actions) */}
+        {/* Editar Promoción — form compartido (mismo componente que Registrar). */}
         {selectedEntry && (
-          <Dialog open={editEntryOpen} onOpenChange={setEditEntryOpen}>
-            <DialogContent className="max-w-lg max-h-[80vh] !flex !flex-col gap-0 p-0 overflow-hidden">
-              {/* Fixed header */}
-              <div className="shrink-0 p-6 pb-4 space-y-4">
-                <DialogHeader className="pr-8">
-                  <DialogTitle>Editar Promoción</DialogTitle>
-                  <DialogDescription className="sr-only">Editar los detalles de promoción</DialogDescription>
-                </DialogHeader>
-                <Card className="bg-muted">
-                  <CardContent className="p-3 flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">{getInitials(selectedEntry.name)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-semibold">{selectedEntry.name}</span>
-                      {selectedEntry.handle && <span className="text-xs text-muted-foreground">@{selectedEntry.handle}</span>}
-                    </div>
-                  </CardContent>
-                </Card>
-                <div className="space-y-2">
-                  <span className="text-sm font-medium">¿Promocionó Hoy?</span>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button type="button" onClick={() => setEntryResult("si")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${entryResult === "si" ? "bg-cyan-500 text-white" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                      <Check className="h-4 w-4" />Sí Promocionó
-                    </button>
-                    <button type="button" onClick={() => setEntryResult("no")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${entryResult === "no" ? "bg-blue-500 text-white" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                      <X className="h-4 w-4" />No Promocionó
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Scrollable content */}
-              <div className="flex-1 min-h-0 overflow-y-auto px-6">
-                <div className="space-y-4 py-4">
-                  {entryResult === "si" && (
-                    <>
-                      <div className="space-y-2">
-                        <span className="text-sm font-medium">Red Social <span className="text-destructive">*</span></span>
-                        <div className="grid grid-cols-4 gap-2">
-                          {networkOptions.map((opt) => {
-                            const Icon = opt.icon;
-                            const isSelected = entryNetwork === opt.value;
-                            return (
-                              <button key={opt.value} type="button" onClick={() => setEntryNetwork(opt.value)} className={`flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                                <Icon className="h-5 w-5" />{opt.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <span className="text-sm font-medium">Plataforma <span className="text-destructive">*</span></span>
-                        <div className="grid grid-cols-3 gap-2">
-                          {platformOptions.map((opt) => {
-                            const isSelected = entryPlatform === opt.value;
-                            return (
-                              <button key={opt.value} type="button" onClick={() => { setEntryPlatform(opt.value); if (opt.value !== "otra") setEntryCustomPlatform(""); }} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                                {opt.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        {entryPlatform === "otra" && (
-                          <Input placeholder="Nombre de la plataforma..." value={entryCustomPlatform} onChange={(e) => setEntryCustomPlatform(e.target.value)} />
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <span className="text-sm font-medium">¿Qué se hizo para que promocione?</span>
-                        <div className="grid grid-cols-2 gap-2">
-                          {strategyOptions.map((opt) => {
-                            const isSelected = entryStrategy === opt.value;
-                            return (
-                              <button key={opt.value} type="button" onClick={() => setEntryStrategy(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-2.5 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                                {opt.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Always visible fields */}
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Notas</span>
-                    <Textarea value={entryNotes} onChange={(e) => setEntryNotes(e.target.value)} placeholder={entryResult === "no" ? "¿Por qué no se pudo hacer la promo?..." : "Agregar notas..."} className="min-h-[80px]" />
-                  </div>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Evidencia (Pantallazo)</span>
-                    <div className="border-2 border-dashed border-input rounded-md p-4 text-center cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => entryFileInputRef.current?.click()}>
-                      <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
-                      <span className="text-xs text-muted-foreground">Subir Evidencia</span>
-                      <input ref={entryFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleEntryFileChange} />
-                    </div>
-                    {entryEvidencePreview && (
-                      <div className="space-y-2">
-                        <img src={entryEvidencePreview} alt="Evidencia" className="w-full rounded-md border border-input max-h-48 object-contain" />
-                        <button type="button" className="flex items-center gap-1 text-xs text-primary hover:underline" onClick={() => window.open(entryEvidencePreview, "_blank")}>
-                          <ExternalLink className="h-3 w-3" />Abrir en nueva pestaña
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Fixed footer */}
-              <div className="shrink-0 p-6 pt-4 border-t">
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => { setEditEntryOpen(false); toast({ title: "Edición cancelada" }); }}>Cancelar</Button>
-                  <Button disabled={uploadingEvidence} className="bg-cyan-500 hover:bg-cyan-600 text-white" onClick={async () => {
-                    if (!selectedEntry) return;
-                    if (entryResult === "si") {
-                      if (!entryNetwork || !entryPlatform) {
-                        toast({ title: "Campos requeridos", description: "Completa Red Social y Plataforma.", variant: "destructive" });
-                        return;
-                      }
-                    }
-                    const platformValue = entryPlatform === "otra" ? entryCustomPlatform : entryPlatform;
-                    const { error } = await supabase.from("promolog_entries").update({
-                      promoted: entryResult === "si" ? "true" : "false",
-                      network: entryResult === "si" ? entryNetwork : "n/a",
-                      platform: entryResult === "si" ? platformValue : null,
-                      // contact_type eliminado del flow — el field sigue en DB
-                      // (no se dropea por ahora) pero la UI no lo escribe ni
-                      // lee. Si después el equipo necesita rescatarlo, basta
-                      // con re-agregar el campo + selector aquí.
-                      notes: entryNotes || null,
-                      action_taken: entryResult === "si" ? entryStrategy || null : null,
-                      evidence_url: entryEvidencePreview || null,
-                    }).eq("id", selectedEntry.id);
-                    if (error) {
-                      toast({ title: "Error", description: error.message, variant: "destructive" });
-                      return;
-                    }
-                    queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
-                    toast({ title: "Promoción actualizada", description: `Los cambios para ${selectedEntry.name} han sido guardados.` });
-                    resetEntryModal();
-                    setEditEntryOpen(false);
-                  }}>Guardar Cambios</Button>
-                </DialogFooter>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <PromologEntryFormDialog
+            mode="edit"
+            open={editEntryOpen}
+            onOpenChange={setEditEntryOpen}
+            entry={selectedEntry}
+            dayStories={selectedDayStories}
+          />
         )}
 
         {/* Delete Entry Dialog */}

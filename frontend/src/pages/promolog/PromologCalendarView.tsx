@@ -146,6 +146,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     agent: "AI Agent",
     notes: e.notes || "",
     creator_id: e.creator_id,
+    rawDate: e.date,
     reviewed_by: e.reviewed_by || undefined,
     action_taken: e.action_taken ?? null,
     evidence_url: e.evidence_url ?? null,
