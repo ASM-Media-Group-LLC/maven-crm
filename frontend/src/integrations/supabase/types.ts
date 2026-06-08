@@ -2600,6 +2600,9 @@ export type Database = {
           wishlist_amazon: string | null
           wishlist_url: string | null
           youtube_handle: string | null
+          facebook_handle: string | null
+          reddit_handle: string | null
+          other_url: string | null
         }
         Insert: {
           age?: number | null
@@ -2717,6 +2720,9 @@ export type Database = {
           wishlist_amazon?: string | null
           wishlist_url?: string | null
           youtube_handle?: string | null
+          facebook_handle?: string | null
+          reddit_handle?: string | null
+          other_url?: string | null
         }
         Update: {
           age?: number | null
@@ -2834,6 +2840,9 @@ export type Database = {
           wishlist_amazon?: string | null
           wishlist_url?: string | null
           youtube_handle?: string | null
+          facebook_handle?: string | null
+          reddit_handle?: string | null
+          other_url?: string | null
         }
         Relationships: []
       }

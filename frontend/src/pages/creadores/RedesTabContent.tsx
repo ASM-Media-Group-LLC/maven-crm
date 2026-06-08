@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Edit, Save, X, Phone, ExternalLink, Linkedin, Link } from "lucide-react";
+import { Edit, Save, X, Phone, ExternalLink, Linkedin, Link, Facebook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
@@ -31,6 +31,9 @@ interface EditData {
   whatsapp_number: string;
   linkedin_handle: string;
   piclink_url: string;
+  facebook_handle: string;
+  reddit_handle: string;
+  other_url: string;
 }
 
 interface PlatformConfig {
@@ -128,6 +131,33 @@ const platforms: PlatformConfig[] = [
     placeholder: "https://piclink.com/...",
     displayValue: (c) => c.piclink_url || "—",
     buildUrl: (c) => c.piclink_url || "",
+  },
+  {
+    key: "facebook_handle",
+    label: "Facebook",
+    editLabel: "Facebook URL",
+    icon: <Facebook className="h-5 w-5" />,
+    placeholder: "https://facebook.com/username",
+    displayValue: (c) => displayHandle(c.facebook_handle) || "—",
+    buildUrl: (c) => buildSocialUrl("facebook", c.facebook_handle),
+  },
+  {
+    key: "reddit_handle",
+    label: "Reddit",
+    editLabel: "Reddit URL",
+    icon: <span className="text-xs font-bold">R</span>,
+    placeholder: "https://reddit.com/user/username",
+    displayValue: (c) => displayHandle(c.reddit_handle) || "—",
+    buildUrl: (c) => buildSocialUrl("reddit", c.reddit_handle),
+  },
+  {
+    key: "other_url",
+    label: "Otra",
+    editLabel: "Otra red / Link",
+    icon: <Link className="h-5 w-5" />,
+    placeholder: "https://...",
+    displayValue: (c) => c.other_url || "—",
+    buildUrl: (c) => c.other_url || "",
   },
 ];
 
@@ -266,6 +296,9 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
     whatsapp_number: "",
     linkedin_handle: "",
     piclink_url: "",
+    facebook_handle: "",
+    reddit_handle: "",
+    other_url: "",
   });
 
   const startEditing = () => {
@@ -279,6 +312,9 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
       whatsapp_number: creator.whatsapp_number ?? "",
       linkedin_handle: creator.linkedin_handle ?? "",
       piclink_url: creator.piclink_url ?? "",
+      facebook_handle: creator.facebook_handle ?? "",
+      reddit_handle: creator.reddit_handle ?? "",
+      other_url: creator.other_url ?? "",
     });
     setIsEditing(true);
   };
@@ -303,6 +339,9 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
           whatsapp_number: editData.whatsapp_number || null,
           linkedin_handle: editData.linkedin_handle || null,
           piclink_url: editData.piclink_url || null,
+          facebook_handle: editData.facebook_handle || null,
+          reddit_handle: editData.reddit_handle || null,
+          other_url: editData.other_url || null,
         })
         .eq("id", creatorId);
 

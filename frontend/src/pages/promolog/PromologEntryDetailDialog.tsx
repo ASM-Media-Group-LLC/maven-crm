@@ -1,4 +1,4 @@
-import { Check, ExternalLink } from "lucide-react";
+import { Check, ExternalLink, Facebook } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,8 +9,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { buildSocialUrl, type SocialPlatform } from "@/lib/utils";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import XIcon from "@/components/icons/XIcon";
+import TikTokIcon from "@/components/icons/TikTokIcon";
 import PromologStoryGallery from "./PromologStoryGallery";
 import type { PromologEntry } from "./PromologEntryCard";
+
+const SOCIAL_PLATFORMS = ["instagram", "tiktok", "twitter", "x", "youtube", "linkedin", "facebook", "reddit"];
 
 // Popup "Detalle de Entrada" de Promolog. Extraído de PromologContent para
 // reusarlo idéntico en el subtab Promos (click en una fila) y en el subtab
@@ -53,8 +61,42 @@ const PromologEntryDetailDialog = ({
   savingId,
   onEdit,
 }: Props) => {
+  // Redes de la modelo (para los chips clickeables). El entry solo trae la red
+  // escaneada (IG); las demás salen del perfil de la creadora por creator_id.
+  const { data: creatorSocials } = useQuery({
+    queryKey: ["promolog-entry-socials", entry?.creator_id],
+    enabled: open && !!entry?.creator_id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("creators")
+        .select("instagram_handle, facebook_handle, reddit_handle, twitter_handle, tiktok_handle, youtube_handle, other_url")
+        .eq("id", entry!.creator_id!)
+        .maybeSingle();
+      return data;
+    },
+  });
+
   if (!entry) return null;
   const showStoryGallery = dayStories.length > 0;
+
+  // Nombre / @handle → IG de la cuenta escaneada en este entry.
+  const igUrl = buildSocialUrl("instagram", entry.handle);
+  const cleanHandleDisplay = (entry.handle ?? "").replace(/^@/, "").replace(/\/$/, "").split("/").pop();
+  // "Red social" → perfil de esa red (IG en la práctica; genérico por las dudas).
+  const networkKey = (entry.network || "").toLowerCase();
+  const networkUrl = SOCIAL_PLATFORMS.includes(networkKey) ? buildSocialUrl(networkKey as SocialPlatform, entry.handle) : "";
+  // Chips de todas sus redes seteadas en el perfil.
+  const socialChips = creatorSocials
+    ? [
+        { label: "Instagram", icon: <InstagramIcon className="h-3.5 w-3.5" />, url: buildSocialUrl("instagram", creatorSocials.instagram_handle) },
+        { label: "Facebook", icon: <Facebook className="h-3.5 w-3.5" />, url: buildSocialUrl("facebook", creatorSocials.facebook_handle) },
+        { label: "Reddit", icon: <span className="text-[10px] font-bold leading-none">R</span>, url: buildSocialUrl("reddit", creatorSocials.reddit_handle) },
+        { label: "X", icon: <XIcon className="h-3.5 w-3.5" />, url: buildSocialUrl("twitter", creatorSocials.twitter_handle) },
+        { label: "TikTok", icon: <TikTokIcon className="h-3.5 w-3.5" />, url: buildSocialUrl("tiktok", creatorSocials.tiktok_handle) },
+        { label: "YouTube", icon: <span className="text-[10px] font-bold leading-none">YT</span>, url: buildSocialUrl("youtube", creatorSocials.youtube_handle) },
+        { label: "Otra", icon: <ExternalLink className="h-3.5 w-3.5" />, url: creatorSocials.other_url || "" },
+      ].filter((c) => c.url)
+    : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -67,11 +109,28 @@ const PromologEntryDetailDialog = ({
           {/* Header: ticket + nombre + handle */}
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="font-mono text-xs">{entry.ticketNumber || "—"}</Badge>
-            <span className="text-sm font-semibold">{entry.name}</span>
+            {igUrl ? (
+              <a
+                href={igUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                title="Abrir Instagram de la modelo"
+              >
+                {entry.name}
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            ) : (
+              <span className="text-sm font-semibold">{entry.name}</span>
+            )}
             {entry.handle && (
-              <span className="text-sm text-muted-foreground">
-                @{(entry.handle ?? "").replace(/^@/, "").replace(/\/$/, "").split("/").pop()}
-              </span>
+              igUrl ? (
+                <a href={igUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary hover:underline">
+                  @{cleanHandleDisplay}
+                </a>
+              ) : (
+                <span className="text-sm text-muted-foreground">@{cleanHandleDisplay}</span>
+              )
             )}
           </div>
 
@@ -79,7 +138,20 @@ const PromologEntryDetailDialog = ({
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <span className="text-muted-foreground">Red social:</span>{" "}
-              <span className="font-medium capitalize">{entry.network || "—"}</span>
+              {networkUrl ? (
+                <a
+                  href={networkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium capitalize text-primary hover:underline inline-flex items-center gap-1"
+                  title="Abrir el perfil de esa red"
+                >
+                  {entry.network || "—"}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              ) : (
+                <span className="font-medium capitalize">{entry.network || "—"}</span>
+              )}
             </div>
             <div>
               <span className="text-muted-foreground">Plataforma destino:</span>{" "}
@@ -104,6 +176,28 @@ const PromologEntryDetailDialog = ({
               <span className="font-medium">{entry.time}</span>
             </div>
           </div>
+
+          {/* Redes de la modelo — chips clickeables a sus perfiles (IG, Facebook,
+              Reddit, X, TikTok, YouTube, Otra), traídos del perfil de la creadora. */}
+          {socialChips.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Redes de la modelo</p>
+              <div className="flex flex-wrap gap-1.5">
+                {socialChips.map((c) => (
+                  <a
+                    key={c.label}
+                    href={c.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-2.5 py-1 text-xs transition-colors hover:border-primary/50 hover:text-primary"
+                  >
+                    {c.icon}
+                    {c.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Buy link — sólo cuando la promo tiene link visible */}
           {entry.has_buy_link && (
