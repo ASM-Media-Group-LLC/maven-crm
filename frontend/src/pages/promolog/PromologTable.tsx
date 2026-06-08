@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,9 +32,16 @@ interface Props {
   onAssignAgent?: (entry: PromologEntry) => void;
   isManagement?: boolean;
   viewOnly?: boolean;
+  // Orden CONTROLADO por el padre: cuando se pasa `onSort`, la tabla NO ordena
+  // (asume que `entries` ya viene ordenado por el padre sobre el dataset completo
+  // antes de paginar) y solo refleja el sentido del orden + reporta los clicks.
+  // Sin `onSort` → cae al orden interno legacy (ordena el array recibido).
+  sortKey?: SortKey;
+  sortAsc?: boolean;
+  onSort?: (key: SortKey) => void;
 }
 
-type SortKey = "model" | "network" | "platform" | "result" | "agent" | "date";
+export type SortKey = "model" | "network" | "platform" | "result" | "agent" | "date";
 
 const getSortValue = (entry: PromologEntry, key: SortKey): string => {
   switch (key) {
@@ -47,6 +54,19 @@ const getSortValue = (entry: PromologEntry, key: SortKey): string => {
     default: return "";
   }
 };
+
+// Orden compartido con el padre. El padre lo aplica al dataset COMPLETO antes de
+// paginar (si ordenáramos solo el slice de la página, el orden no sería global —
+// las filas quedarían desparramadas entre páginas).
+export const sortPromologEntries = (
+  entries: PromologEntry[],
+  key: SortKey,
+  asc: boolean,
+): PromologEntry[] =>
+  [...entries].sort((a, b) => {
+    const cmp = getSortValue(a, key).localeCompare(getSortValue(b, key));
+    return asc ? cmp : -cmp;
+  });
 
 const NetworkIcon = ({ network }: { network: string }) => {
   switch (network) {
@@ -113,32 +133,61 @@ const InlineNotes = ({ value, onSave }: { value: string; onSave: (v: string | nu
   );
 };
 
-const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange, onAssignAgent, isManagement, viewOnly }: Props) => {
-  const [sortKey, setSortKey] = useState<SortKey>("date");
-  const [sortAsc, setSortAsc] = useState(false);
+const PromologTable = ({
+  entries,
+  onView,
+  onEdit,
+  onDelete,
+  onNotesChange,
+  onAssignAgent,
+  isManagement,
+  viewOnly,
+  sortKey: controlledSortKey,
+  sortAsc: controlledSortAsc,
+  onSort,
+}: Props) => {
+  // Orden interno LEGACY (solo se usa si el padre no controla el orden via onSort).
+  const [localSortKey, setLocalSortKey] = useState<SortKey>("date");
+  const [localSortAsc, setLocalSortAsc] = useState(false);
+
+  const controlled = onSort !== undefined;
+  const activeKey: SortKey | null = controlled ? (controlledSortKey ?? null) : localSortKey;
+  const activeAsc = controlled ? (controlledSortAsc ?? true) : localSortAsc;
 
   const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortAsc(!sortAsc);
+    if (controlled) {
+      onSort!(key);
+      return;
+    }
+    if (localSortKey === key) {
+      setLocalSortAsc(!localSortAsc);
     } else {
-      setSortKey(key);
-      setSortAsc(true);
+      setLocalSortKey(key);
+      setLocalSortAsc(true);
     }
   };
 
-  const sorted = [...entries].sort((a, b) => {
-    const aVal = getSortValue(a, sortKey);
-    const bVal = getSortValue(b, sortKey);
-    const cmp = aVal.localeCompare(bVal);
-    return sortAsc ? cmp : -cmp;
-  });
+  // Controlado → el padre ya ordenó el dataset completo y nos pasó la página; render tal cual.
+  // No controlado → ordenamos el array recibido (legacy).
+  const rows = controlled
+    ? entries
+    : sortPromologEntries(entries, localSortKey, localSortAsc);
 
-  const SortHeader = ({ label, sortKeyName }: { label: string; sortKeyName: SortKey }) => (
-    <Button variant="ghost" size="sm" className="h-8 -ml-3 text-xs font-medium" onClick={() => handleSort(sortKeyName)}>
-      {label}
-      <ArrowUpDown className="ml-1 h-3 w-3" />
-    </Button>
-  );
+  const SortHeader = ({ label, sortKeyName }: { label: string; sortKeyName: SortKey }) => {
+    const isActive = activeKey === sortKeyName;
+    const Icon = isActive ? (activeAsc ? ArrowUp : ArrowDown) : ArrowUpDown;
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className={`h-8 -ml-3 text-xs font-medium ${isActive ? "text-primary" : ""}`}
+        onClick={() => handleSort(sortKeyName)}
+      >
+        {label}
+        <Icon className={`ml-1 h-3 w-3 ${isActive ? "opacity-100" : "opacity-50"}`} />
+      </Button>
+    );
+  };
 
   if (entries.length === 0) {
     return (
@@ -173,7 +222,7 @@ const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange, onAss
         </TableRow>
       </TableHeader>
       <TableBody>
-        {sorted.map((entry, idx) => (
+        {rows.map((entry, idx) => (
           // Click en la fila → SIEMPRE abre el detalle lindo (galería). Editar queda en "...".
           <TableRow key={entry.id} className="cursor-pointer" onClick={() => onView?.(entry)}>
             <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>

@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import DataTableShell from "@/components/ui/data-table-shell";
-import PromologTable from "./PromologTable";
+import PromologTable, { type SortKey, sortPromologEntries } from "./PromologTable";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useQueryClient } from "@tanstack/react-query";
@@ -81,6 +81,19 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  // Orden de la tabla — en el padre para ordenar el set COMPLETO antes de paginar
+  // (si lo hiciera la tabla, solo ordenaría la página visible). null = orden de la query.
+  const [entrySortKey, setEntrySortKey] = useState<SortKey | null>(null);
+  const [entrySortAsc, setEntrySortAsc] = useState(true);
+  const handleEntrySort = (key: SortKey) => {
+    if (entrySortKey === key) {
+      setEntrySortAsc((a) => !a);
+    } else {
+      setEntrySortKey(key);
+      setEntrySortAsc(true);
+    }
+    setPage(1);
+  };
   const [statsCollapsed, setStatsCollapsed] = useState(false);
   const [viewingEntry, setViewingEntry] = useState<PromologEntry | null>(null);
 
@@ -237,6 +250,12 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
     });
   }, [entries, searchTerm, filterNetwork, filterPlatform]);
 
+  // Orden global antes de paginar (ver nota en el estado de orden).
+  const sortedFiltered = useMemo(
+    () => (entrySortKey ? sortPromologEntries(filtered, entrySortKey, entrySortAsc) : filtered),
+    [filtered, entrySortKey, entrySortAsc],
+  );
+
   const handleNotesChange = async (entryId: string, notes: string | null) => {
     const { error } = await supabase.from("promolog_entries").update({ notes }).eq("id", entryId);
     if (error) {
@@ -339,10 +358,13 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
               onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
             >
               <PromologTable
-                entries={filtered.slice((page - 1) * pageSize, page * pageSize)}
+                entries={sortedFiltered.slice((page - 1) * pageSize, page * pageSize)}
                 onView={(entry) => setViewingEntry(entry)}
                 onNotesChange={handleNotesChange}
                 viewOnly
+                sortKey={entrySortKey ?? undefined}
+                sortAsc={entrySortAsc}
+                onSort={handleEntrySort}
               />
             </DataTableShell>
           </div>

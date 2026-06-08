@@ -70,7 +70,7 @@ import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
-import PromologTable from "./PromologTable";
+import PromologTable, { type SortKey, sortPromologEntries } from "./PromologTable";
 import PromologGrid from "./PromologGrid";
 import PromologAgentDetailView from "./PromologAgentDetailView";
 import PromologStoryGallery from "./PromologStoryGallery";
@@ -759,6 +759,21 @@ const PromologContent = () => {
   const [searchEntry, setSearchEntry] = useState("");
   const [promoPage, setPromoPage] = useState(1);
   const [promoPageSize, setPromoPageSize] = useState(25);
+  // Orden de la tabla de Promos — vive ACÁ (en el padre) para ordenar el dataset
+  // COMPLETO antes de paginar. Si viviera en la tabla, solo ordenaría la página
+  // visible (las filas quedaban desparramadas entre páginas). null = sin orden
+  // explícito → se respeta el orden de la query (creación desc).
+  const [promoSortKey, setPromoSortKey] = useState<SortKey | null>(null);
+  const [promoSortAsc, setPromoSortAsc] = useState(true);
+  const handlePromoSort = (key: SortKey) => {
+    if (promoSortKey === key) {
+      setPromoSortAsc((a) => !a);
+    } else {
+      setPromoSortKey(key);
+      setPromoSortAsc(true);
+    }
+    setPromoPage(1); // volver a la página 1 para ver el inicio del nuevo orden
+  };
   const [statsCollapsed, setStatsCollapsed] = useState(false);
   const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setStatsCollapsed(e.currentTarget.scrollTop > 40);
@@ -821,6 +836,13 @@ const PromologContent = () => {
       return true;
     });
   }, [dedupedEntries, selectedCreatorFilter, selectedStatus, selectedNetwork, selectedCardPlatform, searchEntry]);
+
+  // Orden GLOBAL antes de paginar. Sin orden explícito (null) se respeta el orden
+  // de la query; con orden se ordena el set completo y recién ahí se corta la página.
+  const sortedFilteredEntries = useMemo(
+    () => (promoSortKey ? sortPromologEntries(filteredEntries, promoSortKey, promoSortAsc) : filteredEntries),
+    [filteredEntries, promoSortKey, promoSortAsc],
+  );
 
   // Resumen por creator para el KPI "Creadores escaneados" + su modal.
   // Una creadora cuenta como "Promocionó" si tiene AL MENOS una entry
@@ -1015,13 +1037,16 @@ const PromologContent = () => {
                 onPageSizeChange={(s) => { setPromoPageSize(s); setPromoPage(1); }}
               >
                 <PromologTable
-                  entries={filteredEntries.slice((promoPage - 1) * promoPageSize, promoPage * promoPageSize)}
+                  entries={sortedFilteredEntries.slice((promoPage - 1) * promoPageSize, promoPage * promoPageSize)}
                   onView={handleViewEntry}
                   onEdit={handleEditEntry}
                   onDelete={handleDeleteEntry}
                   onNotesChange={handleNotesChange}
                   onAssignAgent={handleAssignAgent}
                   isManagement={isManagement}
+                  sortKey={promoSortKey ?? undefined}
+                  sortAsc={promoSortAsc}
+                  onSort={handlePromoSort}
                 />
               </DataTableShell>
             ) : (
