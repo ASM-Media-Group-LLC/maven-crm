@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bot, Minus, X } from "lucide-react";
 import ClariAiChat from "./ClariAiChat";
 import { useAiConversations } from "@/hooks/useAiConversations";
@@ -33,37 +33,59 @@ const ClariAvatar = ({
   );
 };
 
-// ClariAiFab — botón flotante + ventana de chat estilo Facebook
-// Messenger desktop. Tres estados:
-//   - cerrado:    solo el FAB
-//   - minimizado: el FAB + barra arriba a la derecha (no implementada
-//                 visualmente — al "minimizar" simplemente colapsa al
-//                 FAB que sigue mostrando un dot indicando que hay
-//                 conversación activa)
-//   - abierto:    ventana flotante 380x600 anclada bottom-right con
-//                 header (avatar + título + minimizar + cerrar) y body
-//                 con el ClariAiChat completo
-//
-// La ventana NO se cierra cuando se hace click afuera (a diferencia
-// del Sheet original) — solo se cierra con el botón X o la tecla Esc,
-// imitando el comportamiento del messenger de FB.
+// ── Arrastre del FAB ──────────────────────────────────────────────────
+// El botón es movible: el usuario lo arrastra a donde no le moleste (antes
+// tapaba la paginación de algunas tablas). La posición se guarda en
+// localStorage para que persista entre sesiones. Si no hay posición
+// guardada, arranca en la esquina inferior derecha (bottom-6 right-6).
+const FAB_SIZE = 56; // h-14 w-14
+const MARGIN = 8; // margen mínimo al borde de la ventana
+const POS_KEY = "clari.fab.pos"; // { x, y } = left/top en px
+const DRAG_THRESHOLD = 5; // px de movimiento para considerar "arrastre" (vs click)
+
+const clampToViewport = (p: { x: number; y: number }) => {
+  const maxX = window.innerWidth - FAB_SIZE - MARGIN;
+  const maxY = window.innerHeight - FAB_SIZE - MARGIN;
+  return {
+    x: Math.max(MARGIN, Math.min(p.x, Math.max(MARGIN, maxX))),
+    y: Math.max(MARGIN, Math.min(p.y, Math.max(MARGIN, maxY))),
+  };
+};
+
+// ClariAiFab — botón flotante (arrastrable) + ventana de chat estilo
+// Facebook Messenger desktop. La ventana queda anclada al FAB (arriba si
+// hay lugar, sino abajo) y sigue al botón cuando lo movés.
 const ClariAiFab = () => {
-  // hasActivity rastrea si ya hubo interacción para mostrar un
-  // indicador en el FAB cuando está cerrado/minimizado. La activamos
-  // la primera vez que se abre la ventana — es una heurística simple,
-  // no perfectamente "tenés mensajes nuevos" porque no hay backend
-  // de unread events todavía.
   const [open, setOpen] = useState(false);
   const [hasActivity, setHasActivity] = useState(false);
-  // Persistir el historial conversacional. La conversación se auto-crea
-  // al abrir Clari por primera vez en esta sesión y los mensajes
-  // quedan en `ai_messages`. Un cron de Postgres limpia conversations
-  // de más de 14 días (ver migration). NO usamos el historial para
-  // alargar el prompt — Clari arranca cada respuesta sin recordar
-  // mensajes pasados; la persistencia es solo para que el user pueda
-  // releerlos.
   const [conversationId, setConversationId] = useState<string | null>(null);
   const { createConversation } = useAiConversations();
+
+  // Posición del FAB (left/top en px). null = default esquina inf. derecha.
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const dragRef = useRef<
+    { startX: number; startY: number; origX: number; origY: number; moved: boolean } | null
+  >(null);
+
+  // Cargar posición persistida al montar.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(POS_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (typeof p?.x === "number" && typeof p?.y === "number") setPos(clampToViewport(p));
+      }
+    } catch {
+      /* localStorage puede fallar */
+    }
+  }, []);
+
+  // Re-clampar si la ventana se achica (que el FAB no quede fuera de pantalla).
+  useEffect(() => {
+    const onResize = () => setPos((prev) => (prev ? clampToViewport(prev) : prev));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     if (!open || conversationId) return;
@@ -87,36 +109,86 @@ const ClariAiFab = () => {
     setHasActivity(true);
   };
 
-  // Esc cierra la ventana — se monta/desmonta con el render condicional.
-  if (typeof window !== "undefined") {
-    // No usamos useEffect global porque la ventana es condicional;
-    // adjuntamos el listener inline cuando se abre.
-  }
+  // Drag con pointer events + pointer capture: distinguimos click de arrastre
+  // por el umbral DRAG_THRESHOLD. Si no se movió → es click (toggle abrir).
+  const onPointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: rect.left, origY: rect.top, moved: false };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
+  }, []);
+
+  const onPointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    d.moved = true;
+    setPos(clampToViewport({ x: d.origX + dx, y: d.origY + dy }));
+  }, []);
+
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      const d = dragRef.current;
+      dragRef.current = null;
+      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+      if (!d) return;
+      if (d.moved) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const next = clampToViewport({ x: rect.left, y: rect.top });
+        setPos(next);
+        try { localStorage.setItem(POS_KEY, JSON.stringify(next)); } catch { /* noop */ }
+      } else {
+        // No se arrastró → tratar como click.
+        setOpen((o) => {
+          if (!o) setHasActivity(true);
+          return !o;
+        });
+      }
+    },
+    [],
+  );
+
+  // Estilo de la ventana de chat: si el FAB fue movido, la anclamos a su
+  // posición (arriba si hay lugar, sino abajo; alineada por la derecha del
+  // FAB) y la clampeamos a la pantalla. Sin mover → default bottom-right.
+  const WIN_W = 380;
+  const winStyle: React.CSSProperties | undefined = (() => {
+    if (!pos || typeof window === "undefined") return undefined;
+    const winH = Math.min(600, window.innerHeight - 32);
+    let top = pos.y - winH - MARGIN; // preferimos arriba del FAB
+    if (top < MARGIN) top = pos.y + FAB_SIZE + MARGIN; // sino, abajo
+    top = Math.max(MARGIN, Math.min(top, window.innerHeight - winH - MARGIN));
+    let left = pos.x + FAB_SIZE - WIN_W; // alinear borde derecho con el FAB
+    left = Math.max(MARGIN, Math.min(left, window.innerWidth - WIN_W - MARGIN));
+    return { left, top };
+  })();
 
   return (
     <>
-      {/* FAB flotante. Sigue visible incluso con la ventana abierta
-          para que el usuario pueda re-clickear y minimizar (toggle).
-          Usamos el ícono Bot (robotsito) — el avatar de Clari queda
-          reservado para el header de la ventana de chat y las burbujas. */}
+      {/* FAB flotante ARRASTRABLE. touch-none evita el scroll al arrastrar en
+          touch; cursor-grab indica que es movible. El click (sin arrastre)
+          togglea la ventana. */}
       <button
-        onClick={() => (open ? setOpen(false) : handleOpen())}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg ring-2 ring-primary/30 transition-all duration-200 hover:scale-110 hover:shadow-xl hover:ring-primary/60"
-        aria-label={open ? "Minimizar Clari AI" : "Abrir Clari AI"}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        className={`fixed z-50 flex h-14 w-14 touch-none cursor-grab items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg ring-2 ring-primary/30 transition-[box-shadow,transform] duration-200 hover:shadow-xl hover:ring-primary/60 active:cursor-grabbing ${pos ? "" : "bottom-6 right-6"}`}
+        style={pos ? { left: pos.x, top: pos.y } : undefined}
+        aria-label={open ? "Minimizar Clari AI" : "Abrir Clari AI (arrastrable)"}
+        title="Clari AI — arrastrame para moverme"
       >
         <Bot className="h-6 w-6" />
-        {/* Dot de actividad — visible solo cuando hay actividad y la
-            ventana está cerrada. */}
         {!open && hasActivity && (
           <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-500 shadow-sm" />
         )}
       </button>
 
-      {/* Ventana flotante estilo Messenger — fixed, bottom-right, no
-          modal (no oscurece el resto de la app). El backdrop NO cierra. */}
+      {/* Ventana flotante estilo Messenger — sigue al FAB si fue movido. */}
       {open && (
         <div
-          className="fixed bottom-24 right-6 z-50 flex h-[600px] max-h-[calc(100vh-7rem)] w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl ring-1 ring-black/5 animate-in fade-in slide-in-from-bottom-4 duration-200"
+          className={`fixed z-50 flex h-[600px] max-h-[calc(100vh-2rem)] w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl ring-1 ring-black/5 animate-in fade-in slide-in-from-bottom-4 duration-200 ${winStyle ? "" : "bottom-24 right-6"}`}
+          style={winStyle}
           role="dialog"
           aria-label="Clari AI chat"
         >
