@@ -188,6 +188,21 @@ Deno.serve(async (req: Request) => {
     if (h) handleToCreator.set(h, c.id);
   }
 
+  // Multi-cuenta: sumar las cuentas IG EXTRA (creator_social_accounts) al mapa,
+  // así una story de CUALQUIER cuenta de la creadora cae en su mismo creator_id
+  // (la dedup luego colapsa a 1 fila/creadora/día = "Sí" si promocionó en alguna).
+  const { data: extraAccounts } = creatorIds.length
+    ? await (sb as any)
+        .from("creator_social_accounts")
+        .select("creator_id, username")
+        .eq("network", "instagram")
+        .in("creator_id", creatorIds)
+    : { data: [] as Array<{ creator_id: string; username: string }> };
+  for (const a of (extraAccounts ?? []) as Array<{ creator_id: string; username: string }>) {
+    const h = normalizeHandle(a.username ?? "");
+    if (h && !handleToCreator.has(h)) handleToCreator.set(h, a.creator_id);
+  }
+
   // ── Agrupar items por handle ────────────────────────────────────────────
   const itemsByHandle = new Map<string, any[]>();
   for (const it of items.data) {

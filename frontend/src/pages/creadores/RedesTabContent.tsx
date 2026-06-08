@@ -6,7 +6,7 @@ import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
@@ -131,9 +131,129 @@ const platforms: PlatformConfig[] = [
   },
 ];
 
+// Cuentas IG ADICIONALES (multi-cuenta). La principal vive en creators.instagram_handle;
+// las extra en creator_social_accounts y el bot de Promolog las escanea junto con la
+// principal (1 fila/story → la dedup colapsa a "Sí" si promocionó en cualquiera).
+// Add/quitar/activar gated a admin+manager (igual que la RLS).
+const normalizeIg = (raw: string) =>
+  raw
+    .trim()
+    .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
+    .replace(/[/?#].*$/, "")
+    .replace(/^@+/, "")
+    .trim();
+
+const ExtraIgAccounts = ({ creatorId, canManage }: { creatorId: string; canManage: boolean }) => {
+  const queryClient = useQueryClient();
+  const [newUsername, setNewUsername] = useState("");
+  const [busy, setBusy] = useState(false);
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["creator-ig-accounts", creatorId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creator_social_accounts")
+        .select("id, username, active")
+        .eq("creator_id", creatorId)
+        .eq("network", "instagram")
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; username: string; active: boolean }>;
+    },
+  });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["creator-ig-accounts", creatorId] });
+
+  const add = async () => {
+    const u = normalizeIg(newUsername);
+    if (!u) return;
+    setBusy(true);
+    const { error } = await supabase
+      .from("creator_social_accounts")
+      .insert({ creator_id: creatorId, network: "instagram", username: u });
+    setBusy(false);
+    if (error) {
+      toast.error(/duplicate|unique/i.test(error.message) ? "Esa cuenta ya está agregada" : "No se pudo agregar la cuenta");
+      return;
+    }
+    setNewUsername("");
+    refresh();
+    toast.success("Cuenta agregada");
+  };
+  const remove = async (id: string) => {
+    const { error } = await supabase.from("creator_social_accounts").delete().eq("id", id);
+    if (error) { toast.error("No se pudo quitar la cuenta"); return; }
+    refresh();
+  };
+  const toggle = async (id: string, active: boolean) => {
+    const { error } = await supabase
+      .from("creator_social_accounts")
+      .update({ active, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) { toast.error("No se pudo cambiar el estado"); return; }
+    refresh();
+  };
+
+  return (
+    <Card className="p-4 mt-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0"><InstagramIcon className="h-5 w-5" /></div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Cuentas de Instagram adicionales</p>
+          <p className="text-xs text-muted-foreground">El bot de Promolog escanea estas además de la principal (marca "Sí" si promocionó en cualquiera).</p>
+        </div>
+      </div>
+
+      {accounts.length === 0 ? (
+        <p className="text-xs italic text-muted-foreground">Sin cuentas adicionales. La principal se configura arriba.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {accounts.map((a) => (
+            <div key={a.id} className="flex items-center gap-2 rounded-md border border-border/60 px-2.5 py-1.5">
+              <InstagramIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className={`flex-1 truncate text-sm ${a.active ? "" : "text-muted-foreground line-through"}`}>@{a.username}</span>
+              {canManage ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => toggle(a.id, !a.active)}
+                    className={`rounded px-2 py-0.5 text-[11px] font-medium ${a.active ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground"}`}
+                    title={a.active ? "Activa (se escanea) — click para pausar" : "Inactiva — click para activar"}
+                  >
+                    {a.active ? "Activa" : "Inactiva"}
+                  </button>
+                  <button type="button" onClick={() => remove(a.id)} title="Quitar" className="text-muted-foreground transition-colors hover:text-rose-400">
+                    <X className="h-4 w-4" />
+                  </button>
+                </>
+              ) : (
+                <span className={`text-[11px] ${a.active ? "text-emerald-500" : "text-muted-foreground"}`}>{a.active ? "Activa" : "Inactiva"}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {canManage && (
+        <div className="flex gap-2">
+          <Input
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+            placeholder="@otra_cuenta o link de IG"
+            className="h-9"
+          />
+          <Button size="sm" className="h-9 shrink-0" onClick={add} disabled={busy || !newUsername.trim()}>
+            {busy ? "Agregando…" : "Agregar"}
+          </Button>
+        </div>
+      )}
+    </Card>
+  );
+};
+
 const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
   const queryClient = useQueryClient();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, role } = useUserRole();
+  const canManage = isAdmin || role === "manager";
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState<EditData>({
@@ -291,6 +411,9 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
           })}
         </div>
       )}
+
+      {/* Cuentas IG adicionales — multi-cuenta para que el Promobot las escanee todas. */}
+      <ExtraIgAccounts creatorId={creatorId} canManage={canManage} />
     </>
   );
 };

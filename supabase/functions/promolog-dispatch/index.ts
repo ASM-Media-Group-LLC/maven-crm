@@ -140,6 +140,30 @@ Deno.serve(async (req: Request) => {
     : MAX_CREATORS_PER_DISPATCH;
   const batch = (creators as any[]).slice(0, limit);
 
+  // ── Multi-cuenta: cuentas IG EXTRA por creadora ─────────────────────────
+  // Cada modelo puede tener varias cuentas de IG. El handle principal vive en
+  // creators.instagram_handle; las adicionales en creator_social_accounts.
+  // El bot escanea principal + extras activas (el webhook mapea cualquier
+  // username de vuelta a la misma creadora → la dedup colapsa a 1 fila/día).
+  const batchIds = batch.map((c: any) => c.id);
+  const extraByCreator = new Map<string, string[]>();
+  if (batchIds.length) {
+    const { data: extra } = await (sb as any)
+      .from("creator_social_accounts")
+      .select("creator_id, username")
+      .eq("network", "instagram")
+      .eq("active", true)
+      .in("creator_id", batchIds);
+    for (const a of (extra ?? []) as Array<{ creator_id: string; username: string }>) {
+      const arr = extraByCreator.get(a.creator_id) ?? [];
+      arr.push(a.username);
+      extraByCreator.set(a.creator_id, arr);
+    }
+  }
+  for (const c of batch as any[]) {
+    c.extra_usernames = extraByCreator.get(c.id) ?? [];
+  }
+
   // ── Partir en lotes y lanzar un Apify run por lote ──────────────────────
   // Un Apify run = una invocación del webhook. Lotes chicos para que el
   // webhook nunca procese demasiadas stories de una (ver CREATORS_PER_APIFY_RUN).
@@ -202,7 +226,15 @@ async function launchChunk(
   //   includeHighlights:false → solo stories en vivo (no highlights viejos)
   // Proxy residencial para reducir bloqueos de IG.
   const apifyInput = {
-    usernames: chunk.map((c) => normalizeHandle(c.instagram_handle)),
+    // principal + cuentas extra activas, deduplicado y normalizado.
+    usernames: [
+      ...new Set(
+        chunk
+          .flatMap((c) => [c.instagram_handle, ...(c.extra_usernames ?? [])])
+          .map((h) => normalizeHandle(h))
+          .filter(Boolean),
+      ),
+    ],
     sessionCookie: env.IG_SESSION,
     includeHighlights: false,
     proxyConfiguration: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
