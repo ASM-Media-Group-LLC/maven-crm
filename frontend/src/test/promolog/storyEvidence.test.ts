@@ -33,9 +33,17 @@ describe("storyEvidence — galería de stories de Promolog", () => {
       expect(collectDayStories([], undefined)).toEqual([]);
     });
 
-    it("devuelve [] para entries manuales (no del bot)", () => {
-      const manual = makeEntry({ id: "m1", analyzed_by_ai: false });
+    it("entry manual SIN foto → [] (no hay galería que mostrar)", () => {
+      const manual = makeEntry({ id: "m1", analyzed_by_ai: false, apify_run_id: null, evidence_url: null });
       expect(collectDayStories([manual], manual)).toEqual([]);
+    });
+
+    it("entries manuales CON foto → galería del día (mismo creador+día), sin mezclar otra fecha", () => {
+      const m0 = makeEntry({ id: "m0", analyzed_by_ai: false, apify_run_id: null, story_index: 0, evidence_url: "https://cdn/0.jpg", date: "8 jun 2026" });
+      const m1 = makeEntry({ id: "m1", analyzed_by_ai: false, apify_run_id: null, story_index: 1, evidence_url: "https://cdn/1.jpg", date: "8 jun 2026" });
+      const otroDia = makeEntry({ id: "mx", analyzed_by_ai: false, apify_run_id: null, story_index: 0, evidence_url: "https://cdn/x.jpg", date: "7 jun 2026" });
+      const result = collectDayStories([m1, m0, otroDia], m0);
+      expect(result.map((e) => e.id)).toEqual(["m0", "m1"]);
     });
 
     it("devuelve [] cuando la entry no tiene creator_id", () => {

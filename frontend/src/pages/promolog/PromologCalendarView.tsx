@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
+import { collectDayStories } from "./storyEvidence";
 import type { PromologEntry } from "./PromologEntryCard";
 
 // ── Calendario de promos por creadora ─────────────────────────────────
@@ -188,24 +189,17 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
   const dialogData = useMemo(() => {
     if (!openDayKey) return null;
     const bucket = dayMap.get(openDayKey);
-    if (!bucket) return null;
-    // Solo stories analizadas por el bot; dedup por story_index (preferir las que tienen evidencia).
-    const sorted = bucket.raw
-      .filter((e) => e.analyzed_by_ai === true)
-      .map(mapEntry)
-      .sort((a, b) => (a.story_index ?? 1e9) - (b.story_index ?? 1e9));
-    const byIndex = new Map<number, PromologEntry>();
-    const noIndex: PromologEntry[] = [];
-    for (const s of sorted) {
-      if (s.story_index == null) { noIndex.push(s); continue; }
-      const prev = byIndex.get(s.story_index);
-      if (!prev || (!prev.evidence_url && s.evidence_url)) byIndex.set(s.story_index, s);
-    }
-    const stories = [...byIndex.values(), ...noIndex];
-    const rep = stories.find((s) => s.result === "Sí") ?? stories[0] ?? mapEntry(bucket.raw[0]);
-    const dayResult = stories.some((s) => s.result === "Sí")
+    if (!bucket || bucket.raw.length === 0) return null;
+    // TODAS las entries del día (bot + manuales). La galería se arma con el MISMO
+    // helper que Promos (collectDayStories): bot→por scan, manual→por día con foto,
+    // así el popup se ve igual para ambos.
+    const all = bucket.raw.map(mapEntry);
+    const rep = all.find((s) => s.result === "Sí") ?? all[0];
+    const stories = collectDayStories(all, rep);
+    // El resultado del día refleja TODAS las entries (no solo las de la galería).
+    const dayResult = all.some((s) => s.result === "Sí")
       ? "Sí"
-      : stories.some((s) => s.result === "No")
+      : all.some((s) => s.result === "No")
       ? "No"
       : rep?.result ?? "Pendiente";
     return { rep, stories, dayResult };

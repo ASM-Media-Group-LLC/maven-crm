@@ -12,37 +12,33 @@
 
 import type { PromologEntry } from "./PromologEntryCard";
 
-// Devuelve TODAS las stories analizadas por la IA que pertenecen al mismo
-// creador + día que `entry`, ordenadas por story_index (slide 0,1,2…).
+// Devuelve TODAS las fotos/stories del día que pertenecen al mismo `entry`,
+// ordenadas por story_index (slide 0,1,2…), tanto del BOT como MANUALES — así el
+// popup de detalle muestra la MISMA galería para los dos (antes las manuales caían
+// a una "foto única" suelta y se veían distinto que las del bot).
 //
-// Reglas:
-//  · Solo aplica a entries del bot (analyzed_by_ai). Las manuales del chatter
-//    son 1-por-promo con su propio screenshot subido → se muestran solas, no
-//    como galería.
-//  · Dedupe por story_index (un re-run del webhook el mismo día podría duplicar
-//    una story): se conserva la que tenga evidencia; si ninguna tiene, la
-//    primera en orden.
-//  · Las entries sin story_index (legacy o la entry "sin stories del día") se
-//    devuelven al final, preservando el orden por id.
+// Agrupación (sin mezclar fuentes, para no colisionar story_index):
+//  · BOT (tiene apify_run_id): por SCAN (apify_run_id), NO por fecha. Cada story
+//    trae su propia fecha de posteo (un highlight puede ser de hace meses), así
+//    que agrupar por `date` partía la galería en grupos de 1. Dedupe por
+//    story_index (un re-run del webhook puede duplicar una story): se conserva la
+//    que tiene evidencia. Entries sin story_index → al final.
+//  · MANUAL (sin apify_run_id): misma creadora + mismo día, solo filas CON foto.
+//    Cada foto es una fila propia (no hay re-runs que dupliquen índice) → se
+//    devuelven todas, sin dedup. Sin foto → [] (no hay galería que mostrar).
 export function collectDayStories(
   allEntries: PromologEntry[],
   entry: PromologEntry | null | undefined,
 ): PromologEntry[] {
-  if (!entry || !entry.analyzed_by_ai || entry.creator_id == null) return [];
+  if (!entry || entry.creator_id == null) return [];
 
-  // Agrupamos por SCAN (apify_run_id), NO por la fecha de la story. Cada story
-  // trae su propia fecha de posteo (un highlight puede ser de hace meses), así
-  // que agrupar por `date` partía la galería en grupos de 1 → solo se veía 1
-  // foto. Todas las stories de un mismo run de Apify = una galería. Fallback a
-  // `date` para entries legacy/manuales sin apify_run_id.
-  const sameScan = allEntries.filter(
-    (e) =>
-      e.analyzed_by_ai === true &&
-      e.creator_id != null &&
-      e.creator_id === entry.creator_id &&
-      (entry.apify_run_id
-        ? e.apify_run_id === entry.apify_run_id
-        : e.date === entry.date),
+  const isManual = !entry.apify_run_id;
+  const sameScan = allEntries.filter((e) =>
+    e.creator_id != null &&
+    e.creator_id === entry.creator_id &&
+    (isManual
+      ? !e.apify_run_id && e.date === entry.date && !!e.evidence_url
+      : e.apify_run_id === entry.apify_run_id),
   );
 
   const sorted = sameScan.slice().sort((a, b) => {
@@ -52,7 +48,9 @@ export function collectDayStories(
     return (a.id || "").localeCompare(b.id || "");
   });
 
-  // Dedupe por story_index, preservando orden de inserción (= orden ordenado).
+  // Manual: cada foto es una fila propia → todas. Bot: dedupe por story_index.
+  if (isManual) return sorted;
+
   const byIndex = new Map<number, PromologEntry>();
   const noIndex: PromologEntry[] = [];
   for (const e of sorted) {
