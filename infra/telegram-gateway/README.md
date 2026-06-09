@@ -1,52 +1,54 @@
 # telegram-gateway
 
 Microservicio que **lee canales de Telegram** vía MTProto (GramJS) para la verificación
-automática de promos de **Promolog** en Telegram. Equivalente al scraper de IG, pero
-usando la **API oficial** de Telegram con una cuenta logueada. Leer canales públicos
-como usuario es benigno (no es granja de cuentas ni evasión).
+automática de promos de **Promolog** en Telegram. Mismo patrón que el **baileys-gateway**:
+login por web en `/manager`, sesión persistida en un volumen `/data`, auth `apikey`.
+API oficial de Telegram (sin Apify ni scraping de HTML). Leer canales públicos como
+usuario es benigno (no es granja de cuentas ni evasión).
 
-## Qué valida este spike
+## Secretos (env — en Dokploy, NUNCA en repo ni chat)
 
-1. Que con la sesión podemos resolver un canal por `@handle` y leer sus posts recientes.
-2. Qué pasa en **canales con DRM** (contenido protegido / `noforwards`): confirmamos que
-   el **texto + links llegan** (suficiente, porque promo = referencia a su OnlyFans) y
-   medimos si la **media se puede bajar** (`mediaDownloadable` por post).
-
-## Secretos (env — se setean en Dokploy, NUNCA en el repo ni en chat)
-
-| Variable | De dónde sale |
+| Variable | Qué es |
 |---|---|
-| `TELEGRAM_API_ID` | https://my.telegram.org → API development tools → crear app |
+| `TELEGRAM_GW_API_KEY` → `API_KEY` | apikey de las APIs hacia Maven (la inventás; va también en las edge functions) |
+| `MANAGER_PASSWORD` | contraseña del login del dashboard `/manager` |
+| `TELEGRAM_API_ID` | de https://my.telegram.org (API development tools) |
 | `TELEGRAM_API_HASH` | idem |
-| `TELEGRAM_SESSION` | lo genera `node login.js` (ver abajo) |
-| `SPIKE_TOKEN` | secreto compartido con las edge functions de Maven (auth del micro) |
 
-## Paso 1 — generar la sesión (UNA vez, en tu compu)
+> La **sesión NO es un secreto/env**: se genera logueándote por web y se guarda en el
+> volumen `/data`. No hay que correr scripts locales ni pegar session strings.
 
-```bash
-cd infra/telegram-gateway
-npm install
-TELEGRAM_API_ID=123456 TELEGRAM_API_HASH=abc... node login.js
-# pide teléfono + código + (2FA si tenés) → imprime el SESSION string
-```
+## Deploy (Dokploy)
 
-Copiá ese string y pegalo como secreto **`TELEGRAM_SESSION`** en Dokploy. **No lo
-pegues en el chat ni lo commitees.**
+App nueva, Provider = Git → repo `maven-crm`, branch `main`,
+**Compose Path = `infra/telegram-gateway/docker-compose.yml`**. Cargá los 4 secretos de
+arriba. Dominio: **nip.io o subdominio propio, NO traefik.me** (lección del cloudphone).
 
-## Paso 2 — deploy en Dokploy
+## Login (una sola vez, por web)
 
-App nueva apuntando a `infra/telegram-gateway` (autodeploy desde `main`). Seteá los 4
-secretos de arriba. Puerto interno `8091`. Recomendado: subdominio propio (evitar
-traefik.me; ver lección del cloudphone-gateway).
+1. Abrí `https://<dominio>/manager` → entrá con `MANAGER_PASSWORD`.
+2. Poné el teléfono de la cuenta → "Enviar código" → escribí el código que te llega por
+   Telegram (+ password 2FA si la cuenta tiene). Listo: la sesión queda guardada en el volumen.
+3. En el mismo `/manager`, "Probar un canal" → escribís `@canal` y ves los posts de las
+   últimas 24h (texto, links, si la media es descargable, permalink).
 
-## Endpoints
+Recomendado: usar una **cuenta dedicada** (no la personal). Para canales **privados**,
+esa cuenta tiene que estar **unida** al canal.
 
-- `GET /diag` (header `x-spike-token`) → conecta + `getMe`; confirma que la sesión sirve.
-- `GET /channel/:handle/recent?hours=24` (header `x-spike-token`) → posts recientes:
+## Endpoints (auth header `apikey: <API_KEY>`)
+
+- `GET /diag` → conecta + `getMe` (¿la sesión sirve?).
+- `GET /channel/:handle/recent?hours=24` → posts recientes:
   `{ id, date, text, links[], hasMedia, mediaDownloadable, permalink }` + `protected`.
+
+## DRM / canales protegidos (noforwards)
+
+El **texto + links siempre llegan** (alcanza, porque promo = referencia a su OnlyFans).
+La **media puede no poder bajarse** (`mediaDownloadable:false`) → ahí se usa evidencia
+texto-only, o se marca "revisar manual" si fuera media sin texto.
 
 ## Siguiente (post-spike)
 
-- Bajar+guardar la media en Storage cuando se pueda; clasificar (promo = referencia a OF)
-  vía links/CTA + Gemini para lo ambiguo; escribir a `promolog_entries` (network='telegram').
-- Wire al cron de Promolog + UI (TelegramPostCard como evidencia).
+Bajar+guardar media cuando se pueda; clasificar (promo = referencia a OF) por links/CTA
++ Gemini para lo ambiguo; escribir a `promolog_entries` (network='telegram'); UI
+`TelegramPostCard` como evidencia; cron de Promolog.

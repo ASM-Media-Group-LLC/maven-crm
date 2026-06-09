@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Telegram Gateway · Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 min-h-screen text-slate-100 p-4">
+  <div class="max-w-xl mx-auto space-y-4">
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold">Telegram Gateway</h1>
+      <span id="badge" class="text-xs px-2 py-1 rounded bg-slate-700">cargando…</span>
+    </div>
+
+    <!-- No logueado: login por web (teléfono → código → 2FA) -->
+    <div id="login" class="hidden bg-white text-slate-900 rounded-2xl shadow p-5 space-y-3">
+      <p class="text-sm text-slate-500">Logueá la cuenta de Telegram que va a leer los canales. (Una sola vez; la sesión queda guardada.)</p>
+      <div id="step1" class="space-y-2">
+        <label class="text-sm font-medium">Teléfono (con +código país)</label>
+        <input id="phone" placeholder="+57..." class="w-full px-3 py-2 rounded border border-slate-300" />
+        <button id="sendCode" class="w-full py-2 rounded bg-sky-600 hover:bg-sky-700 text-white font-semibold">Enviar código</button>
+      </div>
+      <div id="step2" class="hidden space-y-2">
+        <label class="text-sm font-medium">Código que te llegó por Telegram</label>
+        <input id="code" inputmode="numeric" placeholder="12345" class="w-full px-3 py-2 rounded border border-slate-300" />
+        <label class="text-sm font-medium">Password 2FA (si tenés; sino dejalo vacío)</label>
+        <input id="pw2fa" type="password" placeholder="(opcional)" class="w-full px-3 py-2 rounded border border-slate-300" />
+        <button id="verify" class="w-full py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Verificar</button>
+      </div>
+      <div id="loginErr" class="text-sm text-red-600 hidden"></div>
+    </div>
+
+    <!-- Logueado: estado + lector de prueba -->
+    <div id="ok" class="hidden bg-white text-slate-900 rounded-2xl shadow p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <p class="text-sm">Conectado como <b id="acct"></b></p>
+        <button id="logout" class="text-xs px-2 py-1 rounded bg-slate-200 hover:bg-slate-300">Cerrar sesión</button>
+      </div>
+      <div class="space-y-2">
+        <label class="text-sm font-medium">Probar un canal (últimas 24h)</label>
+        <div class="flex gap-2">
+          <input id="chan" placeholder="@canal o t.me/canal" class="flex-1 px-3 py-2 rounded border border-slate-300" />
+          <button id="read" class="px-4 py-2 rounded bg-sky-600 hover:bg-sky-700 text-white font-semibold">Leer</button>
+        </div>
+        <pre id="out" class="text-xs bg-slate-100 rounded p-3 overflow-auto max-h-96 whitespace-pre-wrap"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const apikey = () => localStorage.getItem('apikey') || '';
+    const $ = (id) => document.getElementById(id);
+    const showErr = (m) => { const e = $('loginErr'); e.textContent = m; e.classList.remove('hidden'); };
+
+    async function refresh() {
+      const r = await fetch('/manager/status');
+      const j = await r.json();
+      if (j.loggedIn) {
+        $('badge').textContent = 'conectado'; $('badge').className = 'text-xs px-2 py-1 rounded bg-emerald-600';
+        $('acct').textContent = j.account || '?';
+        $('ok').classList.remove('hidden'); $('login').classList.add('hidden');
+      } else {
+        $('badge').textContent = 'sin sesión'; $('badge').className = 'text-xs px-2 py-1 rounded bg-amber-600';
+        $('login').classList.remove('hidden'); $('ok').classList.add('hidden');
+      }
+    }
+
+    $('sendCode').onclick = async () => {
+      $('loginErr').classList.add('hidden');
+      const r = await fetch('/manager/telegram/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: $('phone').value }) });
+      const j = await r.json();
+      if (j.ok) { $('step2').classList.remove('hidden'); $('sendCode').disabled = true; }
+      else showErr(j.error || 'No se pudo enviar el código');
+    };
+
+    $('verify').onclick = async () => {
+      $('loginErr').classList.add('hidden');
+      const r = await fetch('/manager/telegram/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: $('code').value, password: $('pw2fa').value }) });
+      const j = await r.json();
+      if (j.ok) { await refresh(); }
+      else if (j.need2fa) showErr('Esta cuenta tiene 2FA: poné el password y reintentá.');
+      else showErr(j.error || 'Código inválido');
+    };
+
+    $('logout').onclick = async () => { await fetch('/manager/telegram/logout', { method: 'POST' }); $('step2').classList.add('hidden'); $('sendCode').disabled = false; await refresh(); };
+
+    $('read').onclick = async () => {
+      $('out').textContent = 'leyendo…';
+      const h = $('chan').value.trim().replace(/^@/, '').replace(/^https?:\/\/t\.me\//i, '').replace(/\/.*$/, '');
+      const r = await fetch('/channel/' + encodeURIComponent(h) + '/recent?hours=24', { headers: { apikey: apikey() } });
+      const j = await r.json();
+      $('out').textContent = JSON.stringify(j, null, 2);
+    };
+
+    refresh();
+  </script>
+</body>
+</html>

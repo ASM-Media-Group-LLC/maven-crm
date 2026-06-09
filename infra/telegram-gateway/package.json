@@ -1,15 +1,18 @@
 {
-  "name": "telegram-gateway",
+  "name": "maven-telegram-gateway",
   "version": "0.1.0",
   "private": true,
-  "description": "Gateway que LEE canales de Telegram via MTProto (GramJS) para la verificacion de promos de Promolog. Lee canales publicos como un usuario (benigno). Spike: validar acceso + que se puede en canales protegidos (DRM/noforwards).",
+  "description": "Gateway que LEE canales de Telegram via MTProto (GramJS) para Promolog. Login por web (/manager), sesion persistida en volumen /data. Mismo patron que el baileys-gateway.",
   "main": "server.js",
+  "type": "commonjs",
   "scripts": {
-    "start": "node server.js",
-    "login": "node login.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
     "telegram": "^2"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
