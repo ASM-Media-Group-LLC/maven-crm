@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
+import TelegramIcon from "@/components/icons/TelegramIcon";
 import { displayHandle, buildSocialUrl } from "@/lib/utils";
 import { maskPhone } from "@/lib/country-utils";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -34,6 +35,7 @@ interface EditData {
   facebook_handle: string;
   reddit_handle: string;
   other_url: string;
+  telegram_handle: string;
 }
 
 interface PlatformConfig {
@@ -149,6 +151,15 @@ const platforms: PlatformConfig[] = [
     placeholder: "https://reddit.com/user/username",
     displayValue: (c) => displayHandle(c.reddit_handle) || "—",
     buildUrl: (c) => buildSocialUrl("reddit", c.reddit_handle),
+  },
+  {
+    key: "telegram_handle",
+    label: "Telegram",
+    editLabel: "Telegram URL",
+    icon: <TelegramIcon className="h-5 w-5" />,
+    placeholder: "https://t.me/usuario_o_canal",
+    displayValue: (c) => displayHandle(c.telegram_handle) || "—",
+    buildUrl: (c) => buildSocialUrl("telegram", c.telegram_handle),
   },
   {
     key: "other_url",
@@ -299,6 +310,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
     facebook_handle: "",
     reddit_handle: "",
     other_url: "",
+    telegram_handle: "",
   });
 
   const startEditing = () => {
@@ -315,6 +327,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
       facebook_handle: creator.facebook_handle ?? "",
       reddit_handle: creator.reddit_handle ?? "",
       other_url: creator.other_url ?? "",
+      telegram_handle: creator.telegram_handle ?? "",
     });
     setIsEditing(true);
   };
@@ -342,6 +355,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
           facebook_handle: editData.facebook_handle || null,
           reddit_handle: editData.reddit_handle || null,
           other_url: editData.other_url || null,
+          telegram_handle: editData.telegram_handle || null,
         })
         .eq("id", creatorId);
 

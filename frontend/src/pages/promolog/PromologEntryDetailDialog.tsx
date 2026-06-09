@@ -15,6 +15,7 @@ import { buildSocialUrl, type SocialPlatform } from "@/lib/utils";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import XIcon from "@/components/icons/XIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
+import TelegramIcon from "@/components/icons/TelegramIcon";
 import PromologStoryGallery from "./PromologStoryGallery";
 import type { PromologEntry } from "./PromologEntryCard";
 
@@ -69,7 +70,7 @@ const PromologEntryDetailDialog = ({
     queryFn: async () => {
       const { data } = await supabase
         .from("creators")
-        .select("instagram_handle, facebook_handle, reddit_handle, twitter_handle, tiktok_handle, youtube_handle, other_url")
+        .select("instagram_handle, facebook_handle, reddit_handle, twitter_handle, tiktok_handle, youtube_handle, telegram_handle, other_url")
         .eq("id", entry!.creator_id!)
         .maybeSingle();
       return data;
@@ -89,6 +90,7 @@ const PromologEntryDetailDialog = ({
   const socialChips = creatorSocials
     ? [
         { label: "Instagram", icon: <InstagramIcon className="h-3.5 w-3.5" />, url: buildSocialUrl("instagram", creatorSocials.instagram_handle) },
+        { label: "Telegram", icon: <TelegramIcon className="h-3.5 w-3.5" />, url: buildSocialUrl("telegram", creatorSocials.telegram_handle) },
         { label: "Facebook", icon: <Facebook className="h-3.5 w-3.5" />, url: buildSocialUrl("facebook", creatorSocials.facebook_handle) },
         { label: "Reddit", icon: <span className="text-[10px] font-bold leading-none">R</span>, url: buildSocialUrl("reddit", creatorSocials.reddit_handle) },
         { label: "X", icon: <XIcon className="h-3.5 w-3.5" />, url: buildSocialUrl("twitter", creatorSocials.twitter_handle) },

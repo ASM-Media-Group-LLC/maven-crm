@@ -99,6 +99,7 @@ interface FormData {
   youtube_handle: string;
   linkedin_handle: string;
   onlyfans_url: string;
+  telegram_handle: string;
   profile_photo_url: string;
   bio: string;
   category: string;
@@ -132,6 +133,7 @@ const defaultForm: FormData = {
   youtube_handle: "",
   linkedin_handle: "",
   onlyfans_url: "",
+  telegram_handle: "",
   profile_photo_url: "",
   bio: "",
   category: "",
@@ -285,6 +287,7 @@ const NuevoCreadorForm = () => {
           youtube_handle: form.youtube_handle || null,
           linkedin_handle: form.linkedin_handle || null,
           onlyfans_url: form.onlyfans_url || null,
+          telegram_handle: form.telegram_handle || null,
           profile_photo_url: form.profile_photo_url || null,
           bio: form.bio || null,
           internal_notes: form.internal_notes || null,
@@ -468,6 +471,9 @@ const NuevoCreadorForm = () => {
                   </Field>
                   <Field label="OnlyFans URL">
                     <Input value={form.onlyfans_url} onChange={(e) => set("onlyfans_url", e.target.value)} placeholder="https://onlyfans.com/..." />
+                  </Field>
+                  <Field label="Telegram URL">
+                    <Input value={form.telegram_handle} onChange={(e) => set("telegram_handle", e.target.value)} placeholder="https://t.me/usuario_o_canal" />
                   </Field>
                 </div>
                 <div className="space-y-4">

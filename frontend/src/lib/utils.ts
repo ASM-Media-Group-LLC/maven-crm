@@ -24,7 +24,7 @@ export function cleanHandle(handle: string | null | undefined): string {
   return h.replace(/^@+/, "");
 }
 
-export type SocialPlatform = "instagram" | "tiktok" | "twitter" | "x" | "youtube" | "linkedin" | "facebook" | "reddit";
+export type SocialPlatform = "instagram" | "tiktok" | "twitter" | "x" | "youtube" | "linkedin" | "facebook" | "reddit" | "telegram";
 
 const platformBaseUrls: Record<SocialPlatform, (handle: string) => string> = {
   instagram: (h) => `https://instagram.com/${h}`,
@@ -35,6 +35,7 @@ const platformBaseUrls: Record<SocialPlatform, (handle: string) => string> = {
   linkedin: (h) => `https://linkedin.com/in/${h}`,
   facebook: (h) => `https://facebook.com/${h}`,
   reddit: (h) => `https://reddit.com/user/${h}`,
+  telegram: (h) => `https://t.me/${h}`,
 };
 
 /**

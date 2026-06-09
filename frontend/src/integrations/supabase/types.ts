@@ -2603,6 +2603,7 @@ export type Database = {
           facebook_handle: string | null
           reddit_handle: string | null
           other_url: string | null
+          telegram_handle: string | null
         }
         Insert: {
           age?: number | null
@@ -2723,6 +2724,7 @@ export type Database = {
           facebook_handle?: string | null
           reddit_handle?: string | null
           other_url?: string | null
+          telegram_handle?: string | null
         }
         Update: {
           age?: number | null
@@ -2843,6 +2845,7 @@ export type Database = {
           facebook_handle?: string | null
           reddit_handle?: string | null
           other_url?: string | null
+          telegram_handle?: string | null
         }
         Relationships: []
       }
