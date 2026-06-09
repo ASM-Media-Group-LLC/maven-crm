@@ -1,0 +1,15 @@
+{
+  "name": "telegram-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gateway que LEE canales de Telegram via MTProto (GramJS) para la verificacion de promos de Promolog. Lee canales publicos como un usuario (benigno). Spike: validar acceso + que se puede en canales protegidos (DRM/noforwards).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "login": "node login.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "telegram": "^2"
+  }
+}
