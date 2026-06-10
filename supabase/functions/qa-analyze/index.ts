@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SYSTEM_PROMPT } from "./prompt.ts";
 import { logAnthropicUsage } from "../_shared/usage.ts";
+import { buildQaEmailHtml, buildQaEmailSubject, labelForOutcome, type QaEmailPayload } from "./qaEmail.ts";
 
 // qa-analyze — corre el análisis con Claude (Anthropic API) de un
 // qa_calls.id existente. Migrado de Gemini/Groq → Anthropic para igualar
@@ -51,8 +52,9 @@ interface CallRow {
   audio_metrics: unknown | null;
   closer_id: string | null;
   model_id: string | null;
+  claude_score: number | null;
   closer: { name: string } | null;
-  model: { name: string; category: string | null; country: string | null } | null;
+  model: { name: string; category: string | null; country: string | null; ig_url: string | null } | null;
 }
 
 interface PastCallRow {
@@ -148,7 +150,7 @@ serve(async (req) => {
     const { data: call, error: callErr } = await supabase
       .from("qa_calls")
       .select(
-        "id, transcript, audio_metrics, closer_id, model_id, closer:profiles!closer_id(name:full_name), model:qa_models(name, category, country)",
+        "id, transcript, audio_metrics, closer_id, model_id, claude_score, closer:profiles!closer_id(name:full_name), model:qa_models(name, category, country, ig_url)",
       )
       .eq("id", callId)
       .maybeSingle();
@@ -391,6 +393,21 @@ serve(async (req) => {
 
     if (updateErr) throw updateErr;
 
+    // ── Email del reporte (SERVER-SIDE) ────────────────────────────────────
+    // Antes el correo se disparaba fire-and-forget DESDE EL NAVEGADOR
+    // (AgencyNewQa) al terminar el análisis; si el usuario cerraba la pestaña
+    // antes, no salía (caso real: QA de Miguel 2026-06-10). Ahora lo manda el
+    // server, así no depende del front. Solo en el PRIMER análisis (no en
+    // re-análisis) y solo si qa_config lo pide. Falla silenciosa.
+    const wasFirstAnalysis = !(typeof c.claude_score === "number" && c.claude_score > 0);
+    if (wasFirstAnalysis) {
+      try {
+        await sendQaReportEmail(supabase, updated, analysis, score, c.model, c.closer);
+      } catch (mailErr) {
+        console.error("qa-analyze: email del reporte falló:", (mailErr as Error).message);
+      }
+    }
+
     // Redistribuir participation_pct entre los participants de la call
     // (qa_call_participants) ahora que claude_analysis está poblado.
     // La RPC mira audio_metrics.speakers + claude_analysis.closer_speaker_label
@@ -439,6 +456,79 @@ serve(async (req) => {
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────
+
+// Manda el email del reporte de QA server-side (reemplaza el fire-and-forget
+// del navegador que se perdía si cerraban la pestaña). Lee qa_config, respeta
+// los toggles de notificación, arma el HTML con el mismo template que el front
+// y delega el envío a send-notification-email (resuelve el email del uploader
+// + Resend). model/closer vienen del read inicial (sin re-query).
+async function sendQaReportEmail(
+  supabase: ReturnType<typeof createClient>,
+  call: Record<string, unknown>,
+  analysis: unknown,
+  score: number,
+  model: { name?: string; category?: string | null; ig_url?: string | null } | null,
+  closer: { name?: string } | null,
+): Promise<void> {
+  const { data: cfg } = await supabase.from("qa_config").select("*").eq("id", 1).maybeSingle();
+  if (!cfg) return;
+  const config = cfg as {
+    notify_on_analyzed?: boolean;
+    notify_on_low_score?: boolean;
+    low_score_threshold?: number | null;
+    notification_emails?: string[] | null;
+  };
+  const shouldNotify =
+    config.notify_on_analyzed === true ||
+    (config.notify_on_low_score === true && score < (config.low_score_threshold ?? 60));
+  if (!shouldNotify) return;
+
+  const recipients = config.notification_emails ?? [];
+  const uploaderUserId = (call.uploaded_by as string | null) ?? null;
+  if (recipients.length === 0 && !uploaderUserId) return;
+
+  const a = (analysis ?? {}) as {
+    summary?: string;
+    call_outcome?: string | null;
+    call_outcome_reason?: string | null;
+    dimensions?: Array<{ name: string; score: number; feedback: string }>;
+    red_flags?: Array<{ type: string; description: string; quote: string }>;
+    key_moments?: Array<{ kind: "positivo" | "negativo"; quote: string; why: string }>;
+    improvements?: string[];
+  };
+  const outcome = a.call_outcome ?? null;
+  const payload: QaEmailPayload = {
+    callId: call.id as string,
+    createdAt: (call.created_at as string) ?? "",
+    closerName: closer?.name ?? "(sin nombre)",
+    modelName: model?.name ?? "(sin nombre)",
+    modelCategory: model?.category ?? null,
+    modelIgUrl: model?.ig_url ?? null,
+    appUrl: Deno.env.get("APP_URL") || "https://maven.asmtech.ai",
+    callDate: (call.call_date as string) ?? "",
+    evaluatorName: (call.evaluator_name as string) ?? "",
+    overallScore: score,
+    summary: a.summary ?? "",
+    callOutcome: outcome,
+    callOutcomeLabel: labelForOutcome(outcome),
+    callOutcomeReason: a.call_outcome_reason ?? null,
+    dimensions: (a.dimensions ?? []).map((d) => ({ name: d.name, score: d.score, feedback: d.feedback })),
+    redFlags: (a.red_flags ?? []).map((f) => ({ type: f.type, description: f.description, quote: f.quote })),
+    keyMoments: (a.key_moments ?? []).map((k) => ({ kind: k.kind, quote: k.quote, why: k.why })),
+    improvements: a.improvements ?? [],
+  };
+
+  const { error: mailErr } = await supabase.functions.invoke("send-notification-email", {
+    body: {
+      to: recipients,
+      subject: buildQaEmailSubject(payload),
+      html: buildQaEmailHtml(payload),
+      tag: "qa",
+      also_include_user_ids: uploaderUserId ? [uploaderUserId] : undefined,
+    },
+  });
+  if (mailErr) throw new Error((mailErr as Error).message ?? "send-notification-email falló");
+}
 
 function jsonError(error: string, status: number): Response {
   return new Response(JSON.stringify({ error }), {

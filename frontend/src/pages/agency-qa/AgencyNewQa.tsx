@@ -389,20 +389,11 @@ const AgencyNewQa = () => {
         toast.success(`Análisis IA listo · score ${result.score}/100`, {
           description: "Aparece en Calls con detalle completo.",
         });
-        // 9. Fire-and-forget del webhook a Apps Script para mail + Drive
-        // doc + Sheet log. El examiner no espera el GAS (~10-30s); el
-        // toast aparece cuando termina, o un warning si falla.
-        void fireWebhook.mutateAsync({ callId: row.id })
-          .then(() => {
-            toast.success("Reporte enviado por mail", {
-              description: "Apps Script recibió el análisis.",
-            });
-          })
-          .catch((webhookErr) => {
-            toast.warning("Reporte: webhook falló", {
-              description: (webhookErr as Error).message,
-            });
-          });
+        // 9. El email del reporte ahora lo manda qa-analyze SERVER-SIDE al
+        // terminar el análisis — NO depende de que esta pestaña siga abierta.
+        // Antes se disparaba acá fire-and-forget y se perdía si el examiner
+        // cerraba la pestaña (caso real: QA de Miguel 2026-06-10). El botón
+        // "Reenviar email" en QA History / detalle sigue para reenvíos manuales.
       } catch (analyzeErr) {
         toast.error("Análisis IA falló — la QA quedó guardada igual", {
           description: (analyzeErr as Error).message,
