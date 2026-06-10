@@ -19,6 +19,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { usePermissions } from "@/hooks/usePermissions";
 import OpportunitiesPage from "@/pages/opportunities/OpportunitiesPage";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
@@ -63,6 +67,8 @@ const ClosersContent = () => {
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null; source: string } | null>(null);
+  const [convertTarget, setConvertTarget] = useState<CloserCreatorRow | null>(null);
+  const [converting, setConverting] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [statsCollapsed, setStatsCollapsed] = useState(false);
   const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -71,7 +77,15 @@ const ClosersContent = () => {
     }
   }, []);
 
-  const handleConvertToCreator = async (c: CloserCreatorRow) => {
+  // Click en "Convertir a Creadora" → abre el popup de confirmación
+  // (antes convertía de una, sin preguntar).
+  const handleConvertToCreator = (c: CloserCreatorRow) => setConvertTarget(c);
+
+  // Conversión real, recién al confirmar en el popup: inserta en creators.
+  const doConvertToCreator = async () => {
+    const c = convertTarget;
+    if (!c) return;
+    setConverting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No se pudo obtener el usuario autenticado");
@@ -87,8 +101,11 @@ const ClosersContent = () => {
       if (error) throw error;
       toast({ title: "Creadora creada", description: `${c.instagram_handle} fue convertida a creadora.` });
       queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
+      setConvertTarget(null);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setConverting(false);
     }
   };
 
@@ -417,6 +434,23 @@ const ClosersContent = () => {
         isLoading={kpiPopupLoading}
         popupKey={kpiPopup ? (kpiPopup.kind === "pipeline" ? `pipeline:${kpiPopup.key}` : `revenue:${kpiPopup.platform}`) : null}
       />
+
+      <AlertDialog open={!!convertTarget} onOpenChange={(o) => { if (!o) setConvertTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Convertir a creadora?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vas a crear una creadora a partir de <strong>{convertTarget?.instagram_handle || "este lead"}</strong>. Se creará un perfil en el módulo de Creadoras. El lead seguirá en el pipeline de closers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={converting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); doConvertToCreator(); }} disabled={converting}>
+              {converting ? "Convirtiendo…" : "Convertir a Creadora"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 };
