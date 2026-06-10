@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, X, Upload } from "lucide-react";
+import { Check, X, Upload, Facebook, Youtube, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -35,11 +35,20 @@ import type { PromologEntry } from "./PromologEntryCard";
 // apify_run_id, etc. quedan intactos en las filas existentes. Quitar una foto
 // borra esa fila; agregar una inserta una nueva (con la fecha del día).
 
+// Glyph simple para redes sin ícono propio (Reddit no está en lucide).
+const RedditGlyph = ({ className }: { className?: string }) => (
+  <span className={`${className ?? ""} inline-flex items-center justify-center font-bold`}>R</span>
+);
+
 const networkOptions = [
   { value: "instagram", label: "Instagram", icon: InstagramIcon },
   { value: "tiktok", label: "TikTok", icon: TikTokIcon },
   { value: "x", label: "X", icon: XIcon },
   { value: "telegram", label: "Telegram", icon: TelegramIcon },
+  { value: "reddit", label: "Reddit", icon: RedditGlyph },
+  { value: "facebook", label: "Facebook", icon: Facebook },
+  { value: "youtube", label: "YouTube", icon: Youtube },
+  { value: "otra", label: "Otra", icon: LinkIcon },
 ] as const;
 
 const platformOptions = [
