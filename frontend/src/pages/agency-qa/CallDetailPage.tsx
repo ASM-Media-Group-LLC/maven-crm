@@ -1346,6 +1346,11 @@ const CallDetailPage = ({
   const profileQ = useMyProfile();
   const sectionFeedbackQ = useQaSectionFeedback(callId);
   const feedbackHistoryQ = useQaHumanFeedback(callId);
+  // CRÍTICO: este useState va ACÁ ARRIBA, antes del early-return de loading.
+  // Si va después del `if (callQ.isLoading || !callQ.data) return`, la cuenta de
+  // hooks cambia entre el render de carga y el de datos → React error #310
+  // (pantalla en blanco). Pasaba al abrir un QA recién subido (sin caché).
+  const [resendOpen, setResendOpen] = useState(false);
 
   const evaluatorName =
     profileQ.data?.full_name?.trim() ||
@@ -1388,7 +1393,7 @@ const CallDetailPage = ({
   // pedimos confirmación antes de mandar (mismo flow que el "Borrar QA"
   // en AgencyQaHistory). Evita los double-clicks accidentales y los
   // dobles envíos cuando varios users entran al mismo call.
-  const [resendOpen, setResendOpen] = useState(false);
+  // (`resendOpen` se declara arriba, junto al resto de los hooks.)
   const handleResend = async () => {
     try {
       await fireWebhook.mutateAsync({ callId: call.id });
