@@ -45,12 +45,15 @@ type RecentRow = {
   minutes: number;
 };
 
-// Aspecto del teléfono: vertical angosto (~0.5). A este ancho geelark esconde su toolbar lateral y
-// el Android LLENA el frame (sin blanco ni corte) — es el único tamaño donde el embed renderiza limpio.
-// El iframe NO se estira a 100%: se dimensiona por JS al aspecto fijo y se centra (ver fit()), así que
-// si el usuario ensancha la ventana sobran barras NEGRAS a los lados, nunca el blanco interno de geelark.
-const PHONE_W = 340;
-const PHONE_H = 680;
+// Aspecto del teléfono: ~cuadrado (420×430). A ~420 de ancho geelark MUESTRA su toolbar
+// lateral con el Android COMPLETO (nav bar incluida) — sin entrar en "modo teléfono grande"
+// que lo agranda y corta la nav bar. (Un aspecto angosto ~0.5 deja el teléfono solo pero
+// ESCONDE la toolbar y, en pantallas bajas, corta el Android abajo → era el bug.)
+// El iframe NO se estira a 100%: se dimensiona por JS al aspecto fijo y se centra (ver fit()),
+// así que si el usuario ensancha la ventana sobran barras NEGRAS a los lados, nunca el blanco
+// interno de geelark. La ventana inicial se adapta al alto de pantalla (resoluciones bajas).
+const PHONE_W = 420;
+const PHONE_H = 430;
 const PHONE_BAR = 34;
 const MAX_SECONDS = 20 * 60;
 const fmt = (s: number) => {
