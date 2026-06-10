@@ -48,6 +48,10 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
     tiktok_handle: "",
     twitter_handle: "",
     youtube_handle: "",
+    reddit_handle: "",
+    telegram_handle: "",
+    facebook_handle: "",
+    other_url: "",
     onlyfans_url: "",
     whatsapp_number: "",
     bio: "",
@@ -71,6 +75,10 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
         tiktok_handle: creator.tiktok_handle ?? "",
         twitter_handle: creator.twitter_handle ?? "",
         youtube_handle: creator.youtube_handle ?? "",
+        reddit_handle: creator.reddit_handle ?? "",
+        telegram_handle: creator.telegram_handle ?? "",
+        facebook_handle: creator.facebook_handle ?? "",
+        other_url: creator.other_url ?? "",
         onlyfans_url: creator.onlyfans_url ?? "",
         whatsapp_number: creator.whatsapp_number ?? "",
         bio: creator.bio ?? "",
@@ -104,6 +112,10 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           tiktok_handle: form.tiktok_handle.trim() || null,
           twitter_handle: form.twitter_handle.trim() || null,
           youtube_handle: form.youtube_handle.trim() || null,
+          reddit_handle: form.reddit_handle.trim() || null,
+          telegram_handle: form.telegram_handle.trim() || null,
+          facebook_handle: form.facebook_handle.trim() || null,
+          other_url: form.other_url.trim() || null,
           onlyfans_url: form.onlyfans_url.trim() || null,
           whatsapp_number: form.whatsapp_number.trim() || null,
           bio: form.bio.trim() || null,
@@ -255,6 +267,22 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               <div className="space-y-1.5">
                 <Label>YouTube</Label>
                 <Input value={form.youtube_handle} onChange={(e) => handleChange("youtube_handle", e.target.value)} placeholder="@canal" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Telegram</Label>
+                <Input value={form.telegram_handle} onChange={(e) => handleChange("telegram_handle", e.target.value)} placeholder="@usuario o t.me/..." />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Reddit</Label>
+                <Input value={form.reddit_handle} onChange={(e) => handleChange("reddit_handle", e.target.value)} placeholder="u/usuario" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Facebook</Label>
+                <Input value={form.facebook_handle} onChange={(e) => handleChange("facebook_handle", e.target.value)} placeholder="usuario o URL" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Otra red / Link</Label>
+                <Input value={form.other_url} onChange={(e) => handleChange("other_url", e.target.value)} placeholder="https://..." />
               </div>
               <div className="space-y-1.5">
                 <Label>OnlyFans URL</Label>

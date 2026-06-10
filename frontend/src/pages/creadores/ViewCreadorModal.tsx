@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Globe, MessageCircle, Trash2 } from "lucide-react";
+import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Globe, MessageCircle, Trash2, Facebook, Link as LinkIcon } from "lucide-react";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
+import TelegramIcon from "@/components/icons/TelegramIcon";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -210,6 +211,10 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               <SocialLink icon={<XIcon className="h-4 w-4" />} handle={c.twitter_handle} rawHandle={c.twitter_handle} url={buildSocialUrl("twitter", c.twitter_handle)} />
               <SocialLink icon={<span className="text-xs font-bold">YT</span>} handle={c.youtube_handle} rawHandle={c.youtube_handle} url={buildSocialUrl("youtube", c.youtube_handle)} />
               <SocialLink icon={<span className="text-xs font-bold">OF</span>} handle={c.onlyfans_url ? "Ver perfil" : null} url={c.onlyfans_url ?? ""} />
+              <SocialLink icon={<TelegramIcon className="h-4 w-4" />} handle={c.telegram_handle} rawHandle={c.telegram_handle} url={buildSocialUrl("telegram", c.telegram_handle)} />
+              <SocialLink icon={<span className="text-xs font-bold">R</span>} handle={c.reddit_handle} rawHandle={c.reddit_handle} url={buildSocialUrl("reddit", c.reddit_handle)} />
+              <SocialLink icon={<Facebook className="h-4 w-4" />} handle={c.facebook_handle} rawHandle={c.facebook_handle} url={buildSocialUrl("facebook", c.facebook_handle)} />
+              <SocialLink icon={<LinkIcon className="h-4 w-4" />} handle={c.other_url ? "Ver" : null} url={c.other_url ?? ""} />
               {c.whatsapp_number && (
                 <div className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">

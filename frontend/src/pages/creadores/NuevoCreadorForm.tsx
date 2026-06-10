@@ -100,6 +100,9 @@ interface FormData {
   linkedin_handle: string;
   onlyfans_url: string;
   telegram_handle: string;
+  reddit_handle: string;
+  facebook_handle: string;
+  other_url: string;
   profile_photo_url: string;
   bio: string;
   category: string;
@@ -134,6 +137,9 @@ const defaultForm: FormData = {
   linkedin_handle: "",
   onlyfans_url: "",
   telegram_handle: "",
+  reddit_handle: "",
+  facebook_handle: "",
+  other_url: "",
   profile_photo_url: "",
   bio: "",
   category: "",
@@ -288,6 +294,9 @@ const NuevoCreadorForm = () => {
           linkedin_handle: form.linkedin_handle || null,
           onlyfans_url: form.onlyfans_url || null,
           telegram_handle: form.telegram_handle || null,
+          reddit_handle: form.reddit_handle || null,
+          facebook_handle: form.facebook_handle || null,
+          other_url: form.other_url || null,
           profile_photo_url: form.profile_photo_url || null,
           bio: form.bio || null,
           internal_notes: form.internal_notes || null,
@@ -474,6 +483,15 @@ const NuevoCreadorForm = () => {
                   </Field>
                   <Field label="Telegram URL">
                     <Input value={form.telegram_handle} onChange={(e) => set("telegram_handle", e.target.value)} placeholder="https://t.me/usuario_o_canal" />
+                  </Field>
+                  <Field label="Reddit URL">
+                    <Input value={form.reddit_handle} onChange={(e) => set("reddit_handle", e.target.value)} placeholder="https://reddit.com/user/username" />
+                  </Field>
+                  <Field label="Facebook URL">
+                    <Input value={form.facebook_handle} onChange={(e) => set("facebook_handle", e.target.value)} placeholder="https://facebook.com/username" />
+                  </Field>
+                  <Field label="Otra red / Link">
+                    <Input value={form.other_url} onChange={(e) => set("other_url", e.target.value)} placeholder="https://..." />
                   </Field>
                 </div>
                 <div className="space-y-4">
