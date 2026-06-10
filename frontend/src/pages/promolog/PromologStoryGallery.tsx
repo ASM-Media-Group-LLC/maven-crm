@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Check, X as XMark, ExternalLink, ImageOff, ChevronLeft, ChevronRight, X as CloseIcon, Maximize2, Loader2 } from "lucide-react";
+import { Check, X as XMark, ExternalLink, ImageOff, ChevronLeft, ChevronRight, X as CloseIcon, Maximize2, Loader2, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { PromologEntry } from "./PromologEntryCard";
 import { summarizeStories } from "./storyEvidence";
+import TelegramIcon from "@/components/icons/TelegramIcon";
 
 // Galería de evidencia: muestra las historias del día de una creadora, cada una con
 // su thumbnail, veredicto (promovió/no), confianza y razonamiento de la IA. El
@@ -107,6 +108,33 @@ const LightboxImage = ({ url }: { url: string | null | undefined }) => {
   );
 };
 
+// ── Telegram: la evidencia es un link t.me (no una imagen) y el contenido suele
+// ser protegido (DRM) → no hay foto. En vez de una imagen rota, mostramos el
+// TEXTO del post (que en DRM siempre llega) con la marca de Telegram.
+const isTgEvidence = (s: PromologEntry) =>
+  (s.network || "").toLowerCase() === "telegram" || /^https?:\/\/t\.me\//i.test(s.evidence_url || "");
+
+const TelegramTile = ({ story }: { story: PromologEntry }) => (
+  <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-sky-500/10 to-transparent p-2 text-center">
+    <TelegramIcon className="h-6 w-6 text-sky-400" />
+    {story.notes
+      ? <span className="line-clamp-3 text-[10px] leading-tight text-foreground/80">{story.notes}</span>
+      : <span className="text-[10px] leading-tight text-muted-foreground">Post de Telegram</span>}
+    <span className="inline-flex items-center gap-0.5 text-[9px] text-muted-foreground"><Lock className="h-2.5 w-2.5" /> protegido</span>
+  </div>
+);
+
+const TelegramLightbox = ({ story }: { story: PromologEntry }) => (
+  <div className="flex max-h-[72vh] w-full max-w-[440px] flex-col gap-3 overflow-y-auto rounded-lg bg-white/5 p-5">
+    <div className="flex items-center gap-2 text-sky-300">
+      <TelegramIcon className="h-5 w-5" />
+      <span className="text-sm font-semibold">Telegram</span>
+      <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-white/50"><Lock className="h-3 w-3" /> protegido (DRM)</span>
+    </div>
+    <p className="whitespace-pre-wrap text-sm leading-relaxed text-white/90">{story.notes || "(sin texto en el post)"}</p>
+  </div>
+);
+
 interface Props {
   stories: PromologEntry[];
   selectedId?: string;
@@ -179,7 +207,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
             >
               {/* Imagen — al clickear abre el lightbox (verla en grande) */}
               <button type="button" onClick={() => setLightboxId(s.id)} className="relative block aspect-[9/16] w-full">
-                <StoryThumb url={s.evidence_url} />
+                {isTgEvidence(s) ? <TelegramTile story={s} /> : <StoryThumb url={s.evidence_url} />}
                 {slide > 0 && (
                   <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
                     #{slide}
@@ -249,7 +277,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
           )}
 
           <div className="flex max-h-[90vh] w-full max-w-md flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
-            <LightboxImage url={active.evidence_url} />
+            {isTgEvidence(active) ? <TelegramLightbox story={active} /> : <LightboxImage url={active.evidence_url} />}
             <div className="w-full space-y-2 text-center">
               <div className="flex items-center justify-center gap-2">
                 <span className="text-xs tabular-nums text-white/70">
