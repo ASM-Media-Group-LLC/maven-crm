@@ -40,11 +40,19 @@
       <div class="space-y-2">
         <label class="text-sm font-medium">Probar un canal (últimas 24h)</label>
         <div class="flex gap-2">
-          <input id="chan" placeholder="@canal o t.me/canal" class="flex-1 px-3 py-2 rounded border border-slate-300" />
+          <input id="chan" placeholder="@canal o t.me/canal (público / ya unido)" class="flex-1 px-3 py-2 rounded border border-slate-300" />
           <button id="read" class="px-4 py-2 rounded bg-sky-600 hover:bg-sky-700 text-white font-semibold">Leer</button>
         </div>
-        <pre id="out" class="text-xs bg-slate-100 rounded p-3 overflow-auto max-h-96 whitespace-pre-wrap"></pre>
       </div>
+      <div class="space-y-2 border-t border-slate-200 pt-3">
+        <label class="text-sm font-medium">Unirse a un canal y leer</label>
+        <div class="flex gap-2">
+          <input id="joinlink" placeholder="https://t.me/+abc...  o  @canal" class="flex-1 px-3 py-2 rounded border border-slate-300" />
+          <button id="join" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Unirse y leer</button>
+        </div>
+        <p class="text-xs text-slate-500">Une la cuenta al canal (privado o público) si hace falta y lee las últimas 24h. Esto es lo que Maven hará al guardar el Telegram de una creadora.</p>
+      </div>
+      <pre id="out" class="text-xs bg-slate-100 rounded p-3 overflow-auto max-h-96 whitespace-pre-wrap"></pre>
     </div>
   </div>
 
@@ -89,6 +97,15 @@
       $('out').textContent = 'leyendo…';
       const h = $('chan').value.trim().replace(/^@/, '').replace(/^https?:\/\/t\.me\//i, '').replace(/\/.*$/, '');
       const r = await fetch('/channel/' + encodeURIComponent(h) + '/recent?hours=24', { headers: { apikey: apikey() } });
+      const j = await r.json();
+      $('out').textContent = JSON.stringify(j, null, 2);
+    };
+
+    $('join').onclick = async () => {
+      const link = $('joinlink').value.trim();
+      if (!link) { $('out').textContent = 'Pegá un link de invitación (t.me/+...) o @canal.'; return; }
+      $('out').textContent = 'uniéndome y leyendo…';
+      const r = await fetch('/channel/join', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: apikey() }, body: JSON.stringify({ link, hours: 24 }) });
       const j = await r.json();
       $('out').textContent = JSON.stringify(j, null, 2);
     };

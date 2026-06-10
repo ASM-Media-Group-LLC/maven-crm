@@ -96,43 +96,125 @@ app.get("/diag", apiGuard, async (req, res) => {
 });
 
 const URL_RE = /https?:\/\/[^\s)]+/gi;
-function buildPermalink(handle, id) {
-  const h = String(handle).replace(/^@/, "").replace(/^https?:\/\/t\.me\//i, "").replace(/\/.*$/, "");
-  return `https://t.me/${h}/${id}`;
+
+// Permalink: público → t.me/<user>/<id>; privado → t.me/c/<channelId>/<id>.
+function permalinkFor(entity, id) {
+  const uname = entity && entity.username;
+  if (uname) return `https://t.me/${uname}/${id}`;
+  const cid = entity && entity.id != null ? String(entity.id) : "0";
+  return `https://t.me/c/${cid}/${id}`;
 }
 
-// Posts recientes (últimas `hours`) de un canal por @handle.
+function channelMeta(entity) {
+  if (!entity) return null;
+  return {
+    id: entity.id != null ? String(entity.id) : null,
+    title: entity.title || null,
+    username: entity.username || null,
+    protected: !!entity.noforwards,
+  };
+}
+
+// Lee los posts de las últimas `hours` de un entity YA accesible.
 // SPIKE: `mediaDownloadable` baja la miniatura para confirmar si se puede (en
 // canales protegidos/DRM suele fallar; el texto+links siempre llegan).
+async function recentPosts(c, entity, hours) {
+  const sinceSec = Math.floor(Date.now() / 1000) - hours * 3600;
+  const msgs = await c.getMessages(entity, { limit: 50 });
+  const posts = [];
+  for (const m of msgs) {
+    if (!m || !m.date || m.date < sinceSec) continue;
+    const text = m.message || "";
+    const hasMedia = !!m.media;
+    let mediaDownloadable = false;
+    if (hasMedia) {
+      try {
+        const buf = await c.downloadMedia(m, { thumb: -1 });
+        mediaDownloadable = !!buf && buf.length > 0;
+      } catch (_) { mediaDownloadable = false; }
+    }
+    posts.push({
+      id: m.id, date: m.date, text,
+      links: text.match(URL_RE) || [],
+      hasMedia, mediaDownloadable,
+      permalink: permalinkFor(entity, m.id),
+    });
+  }
+  return posts;
+}
+
+// Normaliza la entrada: link de invitación privado vs canal público.
+//   t.me/+hash  ó  t.me/joinchat/hash → { kind:'invite', hash }
+//   @user  ó  t.me/user               → { kind:'public', username }
+function parseChannelInput(input) {
+  let s = String(input || "").trim();
+  s = s.replace(/^https?:\/\/(t\.me|telegram\.me)\//i, "").replace(/^@/, "");
+  const inv = s.match(/^\+([\w-]+)/) || s.match(/^joinchat\/([\w-]+)/i);
+  if (inv) return { kind: "invite", hash: inv[1] };
+  return { kind: "public", username: s.replace(/[?/].*$/, "") };
+}
+
+// Une la cuenta al canal (si hace falta) y devuelve el entity resuelto.
+// Idempotente: si ya somos miembros igual resuelve; si el canal pide aprobación
+// del admin, devuelve { pending:true }.
+async function joinAndResolve(c, input) {
+  const p = parseChannelInput(input);
+  let joined = false, alreadyMember = false, pending = false, entity = null;
+  if (p.kind === "invite") {
+    let info = null;
+    try { info = await c.invoke(new Api.messages.CheckChatInvite({ hash: p.hash })); } catch (_) { /* link inválido/expirado: aflora abajo */ }
+    if (info && info.chat) { entity = info.chat; alreadyMember = true; }
+    else {
+      try {
+        const upd = await c.invoke(new Api.messages.ImportChatInvite({ hash: p.hash }));
+        entity = (upd.chats && upd.chats[0]) || null;
+        joined = true;
+      } catch (e) {
+        const msg = String((e && e.errorMessage) || (e && e.message) || e);
+        if (msg.includes("USER_ALREADY_PARTICIPANT")) alreadyMember = true;
+        else if (msg.includes("INVITE_REQUEST_SENT")) pending = true;
+        else throw e;
+      }
+    }
+  } else {
+    entity = await c.getEntity(p.username);
+    try { await c.invoke(new Api.channels.JoinChannel({ channel: entity })); joined = true; }
+    catch (e) {
+      const msg = String((e && e.errorMessage) || (e && e.message) || e);
+      if (msg.includes("USER_ALREADY_PARTICIPANT")) alreadyMember = true; else throw e;
+    }
+  }
+  return { entity, joined, alreadyMember, pending };
+}
+
+// Posts recientes (últimas `hours`) de un canal YA accesible, por @handle/id.
 app.get("/channel/:handle/recent", apiGuard, async (req, res) => {
   const handle = req.params.handle;
   const hours = Number(req.query.hours) || 24;
-  const sinceSec = Math.floor(Date.now() / 1000) - hours * 3600;
   try {
     const c = await getClient();
     const entity = await c.getEntity(handle);
-    const isProtected = !!(entity && entity.noforwards);
-    const msgs = await c.getMessages(entity, { limit: 50 });
-    const posts = [];
-    for (const m of msgs) {
-      if (!m || !m.date || m.date < sinceSec) continue;
-      const text = m.message || "";
-      let hasMedia = !!m.media;
-      let mediaDownloadable = false;
-      if (hasMedia) {
-        try {
-          const buf = await c.downloadMedia(m, { thumb: -1 });
-          mediaDownloadable = !!buf && buf.length > 0;
-        } catch (_) { mediaDownloadable = false; }
-      }
-      posts.push({
-        id: m.id, date: m.date, text,
-        links: text.match(URL_RE) || [],
-        hasMedia, mediaDownloadable,
-        permalink: buildPermalink(handle, m.id),
-      });
-    }
-    res.json({ ok: true, channel: handle, protected: isProtected, count: posts.length, posts });
+    const posts = await recentPosts(c, entity, hours);
+    res.json({ ok: true, channel: handle, protected: !!entity.noforwards, count: posts.length, posts });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String((e && e.message) || e) });
+  }
+});
+
+// Unirse a un canal por link (privado t.me/+hash o público @canal) y leer sus
+// posts recientes. Esto es lo que Maven llamará al guardar el Telegram de una
+// creadora. Idempotente: si la cuenta ya es miembro, igual lee.
+app.post("/channel/join", apiGuard, async (req, res) => {
+  const link = ((req.body && (req.body.link || req.body.handle)) || "").trim();
+  const hours = Number(req.body && req.body.hours) || 24;
+  if (!link) return res.status(400).json({ ok: false, error: "falta link" });
+  try {
+    const c = await getClient();
+    const { entity, joined, alreadyMember, pending } = await joinAndResolve(c, link);
+    if (pending) return res.json({ ok: true, pending: true, note: "solicitud de unión enviada — esperá aprobación del admin del canal" });
+    if (!entity) return res.status(404).json({ ok: false, error: "no se pudo resolver el canal (link inválido/expirado)" });
+    const posts = await recentPosts(c, entity, hours);
+    res.json({ ok: true, joined, alreadyMember, channel: channelMeta(entity), protected: !!entity.noforwards, count: posts.length, posts });
   } catch (e) {
     res.status(500).json({ ok: false, error: String((e && e.message) || e) });
   }
