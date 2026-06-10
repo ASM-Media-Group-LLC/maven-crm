@@ -23,12 +23,13 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, CheckCheck, AlertCircle, Sticker, Maximize2, Pin, Star, Archive, MailOpen, Eraser } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, CheckCheck, AlertCircle, Sticker, Maximize2, Pin, Star, Archive, MailOpen, Eraser, Tags, Plus } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
+  ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent, ContextMenuCheckboxItem,
 } from "@/components/ui/context-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -56,6 +57,7 @@ interface ConvRow {
   pinned: boolean;
   favorite: boolean;
   manually_unread: boolean;
+  labels: { label_id: string }[] | null;
   contact: { id: string; display_name: string | null; instagram_handle: string | null; wa_jid: string | null } | null;
 }
 
@@ -131,8 +133,12 @@ const InboxPage = () => {
   const [search, setSearch] = useState("");
   // Filtro de la lista (chips estilo WhatsApp) + ver archivados + confirmación destructiva.
   const [chatFilter, setChatFilter] = useState<"todos" | "no_leidos" | "favoritos">("todos");
+  const [labelFilter, setLabelFilter] = useState<string | null>(null); // id de lista personal activa
   const [showArchived, setShowArchived] = useState(false);
   const [destructive, setDestructive] = useState<{ kind: "clear" | "delete"; id: string; label: string } | null>(null);
+  // Diálogo "Nueva lista" (forConversation: si viene de "Añadir a la lista" de un chat, lo agrega a la nueva lista).
+  const [listDialog, setListDialog] = useState<{ forConversation: string | null } | null>(null);
+  const [newListName, setNewListName] = useState("");
   const [draft, setDraft] = useState("");
   const [replyingTo, setReplyingTo] = useState<MsgRow | null>(null);
   const [sending, setSending] = useState(false);
@@ -164,12 +170,24 @@ const InboxPage = () => {
       const { data, error } = await (supabase as any)
         .from("wa_conversations")
         .select(
-          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, archived, pinned, favorite, manually_unread, contact:wa_contacts(id, display_name, instagram_handle, wa_jid)",
+          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, archived, pinned, favorite, manually_unread, labels:wa_conversation_labels(label_id), contact:wa_contacts(id, display_name, instagram_handle, wa_jid)",
         )
         .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(200);
       if (error) throw error;
       return (data ?? []) as ConvRow[];
+    },
+    refetchOnWindowFocus: false,
+  });
+
+  // Mis listas/etiquetas personales (la RLS filtra a las del usuario).
+  const { data: myLabels = [] } = useQuery({
+    queryKey: ["wa-inbox-labels"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("wa_labels").select("id, name").order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as { id: string; name: string }[];
     },
     refetchOnWindowFocus: false,
   });
@@ -270,7 +288,8 @@ const InboxPage = () => {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let list = conversations.filter((c) => (showArchived ? c.archived : !c.archived));
-    if (chatFilter === "no_leidos") list = list.filter(isUnread);
+    if (labelFilter) list = list.filter((c) => (c.labels ?? []).some((l) => l.label_id === labelFilter));
+    else if (chatFilter === "no_leidos") list = list.filter(isUnread);
     else if (chatFilter === "favoritos") list = list.filter((c) => c.favorite);
     if (q) {
       list = list.filter(
@@ -282,7 +301,7 @@ const InboxPage = () => {
     // Fijados primero; dentro de cada grupo se respeta el orden por fecha de la query
     // (sort estable). Los archivados no se fijan arriba.
     return [...list].sort((a, b) => Number(b.pinned && !b.archived) - Number(a.pinned && !a.archived));
-  }, [conversations, search, chatFilter, showArchived]);
+  }, [conversations, search, chatFilter, labelFilter, showArchived]);
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
 
@@ -557,6 +576,38 @@ const InboxPage = () => {
     if (selectedId === id) qc.invalidateQueries({ queryKey: ["wa-inbox-messages", id] });
   };
 
+  // ── Listas/etiquetas personales (estilo WhatsApp) ────────────────────────
+  const toggleLabel = async (conversationId: string, labelId: string, add: boolean) => {
+    const q = add
+      ? (supabase as any).from("wa_conversation_labels").insert({ conversation_id: conversationId, label_id: labelId })
+      : (supabase as any).from("wa_conversation_labels").delete().eq("conversation_id", conversationId).eq("label_id", labelId);
+    const { error } = await q;
+    if (error) { toast({ title: "No se pudo actualizar la lista", description: error.message, variant: "destructive" }); return; }
+    qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+  };
+  const createLabel = async () => {
+    const name = newListName.trim();
+    if (!name) return;
+    const forConv = listDialog?.forConversation ?? null;
+    const { data, error } = await (supabase as any).from("wa_labels").insert({ name }).select("id").single();
+    if (error) { toast({ title: "No se pudo crear la lista", description: error.message, variant: "destructive" }); return; }
+    if (forConv && data?.id) {
+      await (supabase as any).from("wa_conversation_labels").insert({ conversation_id: forConv, label_id: data.id });
+    }
+    setListDialog(null);
+    setNewListName("");
+    qc.invalidateQueries({ queryKey: ["wa-inbox-labels"] });
+    qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+    toast({ title: "Lista creada" });
+  };
+  const deleteLabel = async (labelId: string) => {
+    const { error } = await (supabase as any).from("wa_labels").delete().eq("id", labelId);
+    if (error) { toast({ title: "No se pudo borrar la lista", description: error.message, variant: "destructive" }); return; }
+    if (labelFilter === labelId) setLabelFilter(null);
+    qc.invalidateQueries({ queryKey: ["wa-inbox-labels"] });
+    qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+  };
+
   const setConversationStatus = async (status: string) => {
     if (!selectedId) return;
     const { error } = await (supabase as any)
@@ -608,31 +659,52 @@ const InboxPage = () => {
             className="h-9 pl-8"
           />
         </div>
-        {/* Filtros (chips) + ver archivados */}
-        <div className="flex items-center gap-1 px-3 pb-2">
+        {/* Filtros (chips): presets + mis listas personales + nueva lista + archivados */}
+        <div className="flex items-center gap-1 overflow-x-auto px-3 pb-2">
           {([["todos", "Todos"], ["no_leidos", "No leídos"], ["favoritos", "Favoritos"]] as const).map(([key, label]) => (
             <button
               key={key}
               type="button"
-              onClick={() => { setChatFilter(key); setShowArchived(false); }}
+              onClick={() => { setChatFilter(key); setLabelFilter(null); setShowArchived(false); }}
               className={cn(
-                "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                !showArchived && chatFilter === key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+                "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                !labelFilter && !showArchived && chatFilter === key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
               )}
             >
               {label}
             </button>
           ))}
+          {myLabels.map((lb) => (
+            <button
+              key={lb.id}
+              type="button"
+              onClick={() => { setLabelFilter(lb.id); setShowArchived(false); }}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                labelFilter === lb.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+              )}
+            >
+              <Tags className="h-3 w-3" /> {lb.name}
+            </button>
+          ))}
           <button
             type="button"
-            onClick={() => setShowArchived((v) => !v)}
+            onClick={() => { setNewListName(""); setListDialog({ forConversation: null }); }}
+            title="Nueva lista"
+            className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground hover:bg-muted/70"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowArchived((v) => !v); setLabelFilter(null); }}
             title="Archivados"
             className={cn(
-              "ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+              "grid h-6 w-6 shrink-0 place-items-center rounded-full transition-colors",
               showArchived ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
             )}
           >
-            <Archive className="h-3 w-3" /> Archivados
+            <Archive className="h-3 w-3" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -703,6 +775,30 @@ const InboxPage = () => {
                       <ContextMenuItem onClick={() => toggleFlag(c.id, "favorite", !c.favorite)}>
                         <Star className="mr-2 h-4 w-4" /> {c.favorite ? "Quitar de Favoritos" : "Añadir a Favoritos"}
                       </ContextMenuItem>
+                      <ContextMenuSub>
+                        <ContextMenuSubTrigger>
+                          <Tags className="mr-2 h-4 w-4" /> Añadir a la lista
+                        </ContextMenuSubTrigger>
+                        <ContextMenuSubContent className="w-52">
+                          {myLabels.length === 0 && (
+                            <div className="px-2 py-1.5 text-xs text-muted-foreground">Sin listas todavía</div>
+                          )}
+                          {myLabels.map((lb) => (
+                            <ContextMenuCheckboxItem
+                              key={lb.id}
+                              checked={(c.labels ?? []).some((x) => x.label_id === lb.id)}
+                              onCheckedChange={(v) => toggleLabel(c.id, lb.id, !!v)}
+                              onSelect={(e) => e.preventDefault()}
+                            >
+                              {lb.name}
+                            </ContextMenuCheckboxItem>
+                          ))}
+                          <ContextMenuSeparator />
+                          <ContextMenuItem onClick={() => { setNewListName(""); setListDialog({ forConversation: c.id }); }}>
+                            <Plus className="mr-2 h-4 w-4" /> Nueva lista…
+                          </ContextMenuItem>
+                        </ContextMenuSubContent>
+                      </ContextMenuSub>
                       {isAdmin && (
                         <>
                           <ContextMenuSeparator />
@@ -1244,6 +1340,39 @@ const InboxPage = () => {
             <Button variant="destructive" onClick={runDestructive}>
               {destructive?.kind === "clear" ? "Vaciar" : "Eliminar"}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Nueva lista + gestionar mis listas personales */}
+      <Dialog open={!!listDialog} onOpenChange={(o) => !o && setListDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nueva lista</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={newListName}
+            onChange={(e) => setNewListName(e.target.value)}
+            placeholder="Nombre de la lista (ej. VIP, Reclamos…)"
+            onKeyDown={(e) => { if (e.key === "Enter") createLabel(); }}
+            autoFocus
+          />
+          {myLabels.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Mis listas</p>
+              {myLabels.map((lb) => (
+                <div key={lb.id} className="flex items-center justify-between rounded-md border border-border/60 px-2.5 py-1.5 text-sm">
+                  <span className="inline-flex items-center gap-1.5"><Tags className="h-3.5 w-3.5 text-muted-foreground" />{lb.name}</span>
+                  <button type="button" onClick={() => deleteLabel(lb.id)} title="Borrar lista" className="text-muted-foreground transition-colors hover:text-rose-400">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setListDialog(null)}>Cerrar</Button>
+            <Button onClick={createLabel} disabled={!newListName.trim()}>Crear</Button>
           </div>
         </DialogContent>
       </Dialog>
