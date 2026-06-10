@@ -45,15 +45,13 @@ type RecentRow = {
   minutes: number;
 };
 
-// Aspecto del teléfono: ~cuadrado (420×430). A ~420 de ancho geelark MUESTRA su toolbar
-// lateral con el Android COMPLETO (nav bar incluida) — sin entrar en "modo teléfono grande"
-// que lo agranda y corta la nav bar. (Un aspecto angosto ~0.5 deja el teléfono solo pero
-// ESCONDE la toolbar y, en pantallas bajas, corta el Android abajo → era el bug.)
-// El iframe NO se estira a 100%: se dimensiona por JS al aspecto fijo y se centra (ver fit()),
-// así que si el usuario ensancha la ventana sobran barras NEGRAS a los lados, nunca el blanco
-// interno de geelark. La ventana inicial se adapta al alto de pantalla (resoluciones bajas).
+// Tamaño LÓGICO del teléfono: 420×680. Ancho 420 → geelark muestra su toolbar lateral;
+// alto 680 → el Android entra COMPLETO (nav bar incluida). El iframe se renderiza SIEMPRE a
+// este tamaño fijo y se ESCALA (zoom, ver fit()) para entrar en la ventana → en pantallas
+// bajas (720p) se ve todo más chico pero NUNCA se corta abajo. (Antes el iframe se estiraba
+// al aspecto y en pantallas bajas recortaba el Android / no se podía agrandar la ventana.)
 const PHONE_W = 420;
-const PHONE_H = 430;
+const PHONE_H = 680;
 const PHONE_BAR = 34;
 const MAX_SECONDS = 20 * 60;
 const fmt = (s: number) => {
@@ -159,23 +157,20 @@ export default function TelefonosPage() {
     frame.style.cssText = "display:block;border:0;background:#000";
     stage.append(frame);
 
-    // Fit ADAPTATIVO: el teléfono llena el alto disponible (o el ancho si la
-    // ventana quedó muy angosta) manteniendo el aspecto. Se recalcula en cada
-    // resize → se adapta a CUALQUIER resolución y a que el usuario arrastre la
-    // ventana, sin cortar el Android ni dejar el blanco interno de geelark.
-    const PHONE_ASPECT = PHONE_W / PHONE_H;
+    // El iframe se renderiza a un tamaño LÓGICO FIJO (PHONE_W×PHONE_H) donde geelark muestra
+    // la toolbar lateral + el teléfono completo (nav bar incluida), y se ESCALA (zoom) para
+    // entrar en la ventana. Así NUNCA se corta abajo: en pantallas bajas se ve todo más chico,
+    // no recortado. Se recalcula en cada resize → se adapta a cualquier resolución y a que el
+    // usuario arrastre la ventana.
+    frame.style.width = PHONE_W + "px";
+    frame.style.height = PHONE_H + "px";
+    frame.style.transformOrigin = "center center";
     const fit = () => {
       const availW = pip.innerWidth;
       const availH = pip.innerHeight - PHONE_BAR;
       if (availW <= 0 || availH <= 0) return;
-      let h = availH;
-      let w = Math.round(h * PHONE_ASPECT);
-      if (w > availW) {
-        w = availW;
-        h = Math.round(w / PHONE_ASPECT);
-      }
-      frame.style.width = w + "px";
-      frame.style.height = h + "px";
+      const scale = Math.min(availW / PHONE_W, availH / PHONE_H);
+      frame.style.transform = `scale(${scale})`;
     };
     fit();
     pip.addEventListener("resize", fit);
