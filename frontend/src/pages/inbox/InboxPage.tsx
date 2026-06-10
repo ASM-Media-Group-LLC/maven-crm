@@ -23,10 +23,13 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, CheckCheck, AlertCircle, Sticker, Maximize2 } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, CheckCheck, AlertCircle, Sticker, Maximize2, Pin, Star, Archive, MailOpen, Eraser } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
+} from "@/components/ui/context-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { WaConversationStatus, WaMessageDirection } from "./types";
@@ -49,6 +52,10 @@ interface ConvRow {
   unread_count: number;
   assigned_to: string | null;
   channel_id: string | null;
+  archived: boolean;
+  pinned: boolean;
+  favorite: boolean;
+  manually_unread: boolean;
   contact: { id: string; display_name: string | null; instagram_handle: string | null; wa_jid: string | null } | null;
 }
 
@@ -122,6 +129,10 @@ const InboxPage = () => {
     if (c) setSelectedId(c);
   }, [searchParams]);
   const [search, setSearch] = useState("");
+  // Filtro de la lista (chips estilo WhatsApp) + ver archivados + confirmación destructiva.
+  const [chatFilter, setChatFilter] = useState<"todos" | "no_leidos" | "favoritos">("todos");
+  const [showArchived, setShowArchived] = useState(false);
+  const [destructive, setDestructive] = useState<{ kind: "clear" | "delete"; id: string; label: string } | null>(null);
   const [draft, setDraft] = useState("");
   const [replyingTo, setReplyingTo] = useState<MsgRow | null>(null);
   const [sending, setSending] = useState(false);
@@ -153,7 +164,7 @@ const InboxPage = () => {
       const { data, error } = await (supabase as any)
         .from("wa_conversations")
         .select(
-          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, contact:wa_contacts(id, display_name, instagram_handle, wa_jid)",
+          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, archived, pinned, favorite, manually_unread, contact:wa_contacts(id, display_name, instagram_handle, wa_jid)",
         )
         .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(200);
@@ -254,24 +265,39 @@ const InboxPage = () => {
     };
   }, [qc, selectedId]);
 
+  const isUnread = (c: ConvRow) => (c.unread_count ?? 0) > 0 || c.manually_unread;
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return conversations;
-    return conversations.filter(
-      (c) =>
-        contactLabel(c.contact).toLowerCase().includes(q) ||
-        (c.last_message_preview ?? "").toLowerCase().includes(q),
-    );
-  }, [conversations, search]);
+    let list = conversations.filter((c) => (showArchived ? c.archived : !c.archived));
+    if (chatFilter === "no_leidos") list = list.filter(isUnread);
+    else if (chatFilter === "favoritos") list = list.filter((c) => c.favorite);
+    if (q) {
+      list = list.filter(
+        (c) =>
+          contactLabel(c.contact).toLowerCase().includes(q) ||
+          (c.last_message_preview ?? "").toLowerCase().includes(q),
+      );
+    }
+    // Fijados primero; dentro de cada grupo se respeta el orden por fecha de la query
+    // (sort estable). Los archivados no se fijan arriba.
+    return [...list].sort((a, b) => Number(b.pinned && !b.archived) - Number(a.pinned && !a.archived));
+  }, [conversations, search, chatFilter, showArchived]);
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
 
   // Al abrir una conversación con no-leídos, marcarla leída (resetea el bubble).
   // Via RPC porque la policy UPDATE de wa_conversations está gateada por permiso.
   useEffect(() => {
-    if (!selectedId || !selected || (selected.unread_count ?? 0) === 0) return;
-    (supabase as any).rpc("wa_mark_read", { p_conversation_id: selectedId })
-      .then(() => qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] }));
+    if (!selectedId || !selected) return;
+    const needsRead = (selected.unread_count ?? 0) > 0;
+    const needsManual = selected.manually_unread;
+    if (!needsRead && !needsManual) return;
+    (async () => {
+      if (needsRead) await (supabase as any).rpc("wa_mark_read", { p_conversation_id: selectedId });
+      if (needsManual) await (supabase as any).rpc("wa_set_conversation_flag", { p_conversation_id: selectedId, p_flag: "manually_unread", p_value: false });
+      qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+    })();
   }, [selectedId, selected, qc]);
 
   // Foto real del contacto: al abrir el panel, se la pedimos al gateway (vía edge).
@@ -501,6 +527,36 @@ const InboxPage = () => {
     qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
   };
 
+  // ── Acciones del menú de click derecho de la lista de chats ──────────────
+  const toggleFlag = async (id: string, flag: "archived" | "pinned" | "favorite" | "manually_unread", value: boolean) => {
+    const { error } = await (supabase as any).rpc("wa_set_conversation_flag", { p_conversation_id: id, p_flag: flag, p_value: value });
+    if (error) { toast({ title: "No se pudo actualizar el chat", description: error.message, variant: "destructive" }); return; }
+    qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+  };
+  // Marcar leído/no leído: leído resetea el no-leído real (wa_mark_read) + la marca manual.
+  const markRead = async (id: string, read: boolean) => {
+    if (read) {
+      await (supabase as any).rpc("wa_mark_read", { p_conversation_id: id });
+      await (supabase as any).rpc("wa_set_conversation_flag", { p_conversation_id: id, p_flag: "manually_unread", p_value: false });
+    } else {
+      await (supabase as any).rpc("wa_set_conversation_flag", { p_conversation_id: id, p_flag: "manually_unread", p_value: true });
+    }
+    qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+  };
+  // Vaciar / Eliminar (solo admin, solo bandeja de Maven) — confirma vía dialog.
+  const runDestructive = async () => {
+    if (!destructive) return;
+    const { kind, id } = destructive;
+    const fn = kind === "clear" ? "wa_clear_conversation" : "wa_delete_conversation";
+    const { error } = await (supabase as any).rpc(fn, { p_conversation_id: id });
+    setDestructive(null);
+    if (error) { toast({ title: "No se pudo completar", description: error.message, variant: "destructive" }); return; }
+    toast({ title: kind === "clear" ? "Chat vaciado" : "Chat eliminado" });
+    if (kind === "delete" && selectedId === id) setSelectedId(null);
+    qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+    if (selectedId === id) qc.invalidateQueries({ queryKey: ["wa-inbox-messages", id] });
+  };
+
   const setConversationStatus = async (status: string) => {
     if (!selectedId) return;
     const { error } = await (supabase as any)
@@ -552,6 +608,33 @@ const InboxPage = () => {
             className="h-9 pl-8"
           />
         </div>
+        {/* Filtros (chips) + ver archivados */}
+        <div className="flex items-center gap-1 px-3 pb-2">
+          {([["todos", "Todos"], ["no_leidos", "No leídos"], ["favoritos", "Favoritos"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => { setChatFilter(key); setShowArchived(false); }}
+              className={cn(
+                "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                !showArchived && chatFilter === key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setShowArchived((v) => !v)}
+            title="Archivados"
+            className={cn(
+              "ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+              showArchived ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+            )}
+          >
+            <Archive className="h-3 w-3" /> Archivados
+          </button>
+        </div>
         <div className="flex-1 overflow-y-auto">
           {convLoading ? (
             <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
@@ -563,43 +646,78 @@ const InboxPage = () => {
             </div>
           ) : (
             <ul className="divide-y divide-border">
-              {filtered.map((c) => (
+              {filtered.map((c) => {
+                const unread = isUnread(c);
+                return (
                 <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedId(c.id); setCopilotInfo(null); }}
-                    className={cn(
-                      "flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40",
-                      selectedId === c.id && "bg-muted/60",
-                    )}
-                  >
-                    <WaContactAvatar conversationId={c.id} name={contactLabel(c.contact)} className="h-11 w-11 text-sm" />
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className={cn("min-w-0 flex-1 truncate text-sm", (c.unread_count ?? 0) > 0 ? "font-bold" : "font-medium")}>
-                          {contactLabel(c.contact)}
-                        </span>
-                        <span className={cn(
-                          "ml-auto shrink-0 text-[10px] tabular-nums",
-                          (c.unread_count ?? 0) > 0 ? "font-semibold text-green-500" : "text-muted-foreground",
-                        )}>
-                          {fmtTime(c.last_message_at)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={cn("min-w-0 flex-1 truncate text-xs", (c.unread_count ?? 0) > 0 ? "font-medium text-foreground" : "text-muted-foreground")}>
-                          {c.last_message_preview ?? "—"}
-                        </span>
-                        {(c.unread_count ?? 0) > 0 && (
-                          <span className="ml-auto grid h-5 min-w-[20px] shrink-0 place-items-center rounded-full bg-green-500 px-1.5 text-[11px] font-bold text-white shadow-sm">
-                            {c.unread_count > 99 ? "99+" : c.unread_count}
-                          </span>
+                  <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedId(c.id); setCopilotInfo(null); }}
+                        className={cn(
+                          "flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40",
+                          selectedId === c.id && "bg-muted/60",
                         )}
-                      </div>
-                    </div>
-                  </button>
+                      >
+                        <WaContactAvatar conversationId={c.id} name={contactLabel(c.contact)} className="h-11 w-11 text-sm" />
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            {c.pinned && !c.archived && <Pin className="h-3 w-3 shrink-0 text-muted-foreground" />}
+                            <span className={cn("min-w-0 flex-1 truncate text-sm", unread ? "font-bold" : "font-medium")}>
+                              {contactLabel(c.contact)}
+                            </span>
+                            {c.favorite && <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />}
+                            <span className={cn(
+                              "ml-auto shrink-0 text-[10px] tabular-nums",
+                              unread ? "font-semibold text-green-500" : "text-muted-foreground",
+                            )}>
+                              {fmtTime(c.last_message_at)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={cn("min-w-0 flex-1 truncate text-xs", unread ? "font-medium text-foreground" : "text-muted-foreground")}>
+                              {c.last_message_preview ?? "—"}
+                            </span>
+                            {(c.unread_count ?? 0) > 0 ? (
+                              <span className="ml-auto grid h-5 min-w-[20px] shrink-0 place-items-center rounded-full bg-green-500 px-1.5 text-[11px] font-bold text-white shadow-sm">
+                                {c.unread_count > 99 ? "99+" : c.unread_count}
+                              </span>
+                            ) : c.manually_unread ? (
+                              <span className="ml-auto h-2.5 w-2.5 shrink-0 rounded-full bg-green-500" title="No leído" />
+                            ) : null}
+                          </div>
+                        </div>
+                      </button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="w-56">
+                      <ContextMenuItem onClick={() => toggleFlag(c.id, "archived", !c.archived)}>
+                        <Archive className="mr-2 h-4 w-4" /> {c.archived ? "Desarchivar chat" : "Archivar chat"}
+                      </ContextMenuItem>
+                      <ContextMenuItem onClick={() => toggleFlag(c.id, "pinned", !c.pinned)}>
+                        <Pin className="mr-2 h-4 w-4" /> {c.pinned ? "Desfijar chat" : "Fijar chat"}
+                      </ContextMenuItem>
+                      <ContextMenuItem onClick={() => markRead(c.id, unread)}>
+                        <MailOpen className="mr-2 h-4 w-4" /> {unread ? "Marcar como leído" : "Marcar como no leído"}
+                      </ContextMenuItem>
+                      <ContextMenuItem onClick={() => toggleFlag(c.id, "favorite", !c.favorite)}>
+                        <Star className="mr-2 h-4 w-4" /> {c.favorite ? "Quitar de Favoritos" : "Añadir a Favoritos"}
+                      </ContextMenuItem>
+                      {isAdmin && (
+                        <>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem className="text-amber-600 focus:text-amber-600" onClick={() => setDestructive({ kind: "clear", id: c.id, label: contactLabel(c.contact) })}>
+                            <Eraser className="mr-2 h-4 w-4" /> Vaciar chat
+                          </ContextMenuItem>
+                          <ContextMenuItem className="text-destructive focus:text-destructive" onClick={() => setDestructive({ kind: "delete", id: c.id, label: contactLabel(c.contact) })}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar chat
+                          </ContextMenuItem>
+                        </>
+                      )}
+                    </ContextMenuContent>
+                  </ContextMenu>
                 </li>
-              ))}
+              )})}
             </ul>
           )}
         </div>
@@ -1107,6 +1225,28 @@ const InboxPage = () => {
           onClose={() => setLightbox(null)}
         />
       )}
+
+      {/* Confirmación de Vaciar / Eliminar (solo admin · solo bandeja de Maven) */}
+      <Dialog open={!!destructive} onOpenChange={(o) => !o && setDestructive(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{destructive?.kind === "clear" ? "Vaciar chat" : "Eliminar chat"}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {destructive?.kind === "clear" ? (
+              <>Se borrarán todos los mensajes de <b>{destructive?.label}</b> en la bandeja de Maven (el chat queda vacío). <b>No afecta al WhatsApp real.</b> No se puede deshacer.</>
+            ) : (
+              <>Se eliminará la conversación con <b>{destructive?.label}</b> y sus mensajes de la bandeja de Maven. <b>No afecta al WhatsApp real.</b> No se puede deshacer.</>
+            )}
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setDestructive(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={runDestructive}>
+              {destructive?.kind === "clear" ? "Vaciar" : "Eliminar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
