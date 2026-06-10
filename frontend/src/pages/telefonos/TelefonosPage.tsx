@@ -162,14 +162,18 @@ export default function TelefonosPage() {
     // entrar en la ventana. Así NUNCA se corta abajo: en pantallas bajas se ve todo más chico,
     // no recortado. Se recalcula en cada resize → se adapta a cualquier resolución y a que el
     // usuario arrastre la ventana.
-    frame.style.width = PHONE_W + "px";
     frame.style.height = PHONE_H + "px";
     frame.style.transformOrigin = "center center";
     const fit = () => {
       const availW = pip.innerWidth;
       const availH = pip.innerHeight - PHONE_BAR;
       if (availW <= 0 || availH <= 0) return;
+      // Alto BLOQUEADO al teléfono completo (PHONE_H, nav bar incluida); ancho ELÁSTICO:
+      // si la ventana es más ancha que teléfono+sidebar, geelark recibe ese ancho extra
+      // (logical) para desplegar sus paneles (Upload/Export/Cámara) SIN cortarlos. Para ver
+      // un panel: ENSANCHÁ la ventana arrastrando el borde. El zoom mantiene todo a escala.
       const scale = Math.min(availW / PHONE_W, availH / PHONE_H);
+      frame.style.width = Math.max(PHONE_W, Math.round(availW / scale)) + "px";
       frame.style.transform = `scale(${scale})`;
     };
     fit();
