@@ -451,7 +451,11 @@ const PromologContent = () => {
     return [...byNet.entries()]
       .map(([network, list]) => {
         const rep = list.find((e) => e.evidence_url) || list[0];
-        const stories = collectDayStories(entries, rep);
+        // collectDayStories (rama manual) junta por creador+día SIN mirar la red →
+        // hay que filtrar por red, si no X y Facebook mostraban lo mismo (mezclado).
+        const stories = collectDayStories(entries, rep).filter(
+          (s) => (s.network || "").toLowerCase() === network,
+        );
         return { network, stories, promoted: list.some((e) => e.result === "Sí") };
       })
       .sort((a, b) => {
