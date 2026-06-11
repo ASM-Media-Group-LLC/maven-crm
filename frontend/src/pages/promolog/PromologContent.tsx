@@ -432,6 +432,33 @@ const PromologContent = () => {
     () => collectDayStories(entries, selectedEntry),
     [entries, selectedEntry],
   );
+  // Evidencia del día AGRUPADA POR RED para el popup: junta TODAS las entries del
+  // día de la creadora (todas las redes) y arma la galería de cada una. Así el
+  // popup muestra Evidencia Instagram / X / Telegram juntas, no solo la red "mejor".
+  const selectedDayByNetwork = useMemo(() => {
+    if (!selectedEntry?.creator_id) return [];
+    const ORDER = ["instagram", "telegram", "x", "twitter", "tiktok", "facebook", "reddit", "youtube"];
+    const day = entries.filter(
+      (e) => e.creator_id === selectedEntry.creator_id && e.date === selectedEntry.date,
+    );
+    const byNet = new Map<string, PromologEntry[]>();
+    for (const e of day) {
+      const net = (e.network || "otra").toLowerCase();
+      const arr = byNet.get(net);
+      if (arr) arr.push(e);
+      else byNet.set(net, [e]);
+    }
+    return [...byNet.entries()]
+      .map(([network, list]) => {
+        const rep = list.find((e) => e.evidence_url) || list[0];
+        const stories = collectDayStories(entries, rep);
+        return { network, stories, promoted: list.some((e) => e.result === "Sí") };
+      })
+      .sort((a, b) => {
+        const ia = ORDER.indexOf(a.network), ib = ORDER.indexOf(b.network);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      });
+  }, [entries, selectedEntry]);
   // Mostramos SIEMPRE todas las historias del día (cada una marcada Sí/No con su toggle).
   // El resultado del día se computa abajo (dayResult): Sí si cualquiera quedó en Sí.
   const showStoryGallery = selectedDayStories.length > 0;
@@ -1310,6 +1337,7 @@ const PromologContent = () => {
             onOpenChange={setViewEntryOpen}
             entry={selectedEntry}
             dayStories={selectedDayStories}
+            dayNetworks={selectedDayByNetwork}
             dayResult={dayResult}
             onSetVerdict={handleSetStoryVerdict}
             savingId={verdictSavingId}

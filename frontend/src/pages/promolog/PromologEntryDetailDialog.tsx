@@ -21,6 +21,20 @@ import type { PromologEntry } from "./PromologEntryCard";
 
 const SOCIAL_PLATFORMS = ["instagram", "tiktok", "twitter", "x", "youtube", "linkedin", "facebook", "reddit"];
 
+// Ícono + nombre de red para las secciones de evidencia por red del popup.
+const DetailNetworkIcon = ({ network }: { network: string }) => {
+  switch (network) {
+    case "instagram": return <InstagramIcon className="h-4 w-4" />;
+    case "telegram": return <TelegramIcon className="h-4 w-4" />;
+    case "x": case "twitter": return <XIcon className="h-4 w-4" />;
+    case "tiktok": return <TikTokIcon className="h-4 w-4" />;
+    case "facebook": return <Facebook className="h-4 w-4" />;
+    default: return <ExternalLink className="h-4 w-4" />;
+  }
+};
+const detailNetworkLabel = (n: string): string =>
+  ({ instagram: "Instagram", telegram: "Telegram", x: "X", twitter: "X", tiktok: "TikTok", facebook: "Facebook", reddit: "Reddit", youtube: "YouTube" } as Record<string, string>)[n] || n;
+
 // Popup "Detalle de Entrada" de Promolog. Extraído de PromologContent para
 // reusarlo idéntico en el subtab Promos (click en una fila) y en el subtab
 // Calendario (click en un día). Muestra: header (ticket+nombre+@), grid de
@@ -44,6 +58,9 @@ interface Props {
   entry: PromologEntry | null;
   /** Todas las historias del día (galería). Vacío = mostrar evidencia única. */
   dayStories: PromologEntry[];
+  /** Evidencia del día agrupada POR RED (Instagram/X/Telegram). Si se pasa, el
+   *  popup muestra una sección por cada red revisada ese día. */
+  dayNetworks?: Array<{ network: string; stories: PromologEntry[]; promoted: boolean }>;
   /** Resultado del día ya recalculado (Sí si cualquier historia es Sí). */
   dayResult: string;
   onSetVerdict?: (story: PromologEntry, verdict: "Sí" | "No") => void;
@@ -57,6 +74,7 @@ const PromologEntryDetailDialog = ({
   onOpenChange,
   entry,
   dayStories,
+  dayNetworks,
   dayResult,
   onSetVerdict,
   savingId,
@@ -235,7 +253,7 @@ const PromologEntryDetailDialog = ({
 
           {/* AI reasoning + confidence — solo si fue analizada por el pipeline
               automático y NO hay galería (la galería ya muestra el reasoning por story). */}
-          {!showStoryGallery && entry.ai_reasoning && (
+          {!(dayNetworks && dayNetworks.length > 0) && !showStoryGallery && entry.ai_reasoning && (
             <div className="rounded-md border border-blue-500/30 bg-blue-500/5 p-3 space-y-1">
               <div className="flex items-center justify-between">
                 <p className="text-xs uppercase tracking-wider text-blue-400 font-semibold">Análisis AI</p>
@@ -251,7 +269,26 @@ const PromologEntryDetailDialog = ({
 
           {/* Evidencia — galería de TODAS las stories del día (cuando el bot
               analizó varias) o el pantallazo único (entry manual / 1 story). */}
-          {showStoryGallery ? (
+          {dayNetworks && dayNetworks.length > 0 ? (
+            <div className="space-y-4">
+              {dayNetworks.map((dn) => (
+                <div key={dn.network} className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-foreground"><DetailNetworkIcon network={dn.network} /></span>
+                    <span className="text-sm font-semibold">{detailNetworkLabel(dn.network)}</span>
+                    <Badge variant={dn.promoted ? "success-soft" : "secondary-soft"} className="text-[10px]">
+                      {dn.promoted ? "Promocionó" : "Revisada · sin promo"}
+                    </Badge>
+                  </div>
+                  {dn.stories.length > 0 ? (
+                    <PromologStoryGallery stories={dn.stories} selectedId={entry.id} onSetVerdict={onSetVerdict} savingId={savingId} />
+                  ) : (
+                    <p className="px-1 text-xs italic text-muted-foreground">Revisada ese día · sin actividad.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : showStoryGallery ? (
             <PromologStoryGallery stories={dayStories} selectedId={entry.id} onSetVerdict={onSetVerdict} savingId={savingId} />
           ) : entry.evidence_url ? (
             <div className="space-y-2">
