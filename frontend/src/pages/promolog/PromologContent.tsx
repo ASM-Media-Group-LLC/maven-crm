@@ -451,6 +451,15 @@ const PromologContent = () => {
   // Evidencia del día AGRUPADA POR RED para el popup: junta TODAS las entries del
   // día de la creadora (todas las redes) y arma la galería de cada una. Así el
   // popup muestra Evidencia Instagram / X / Telegram juntas, no solo la red "mejor".
+  // TODAS las entries del día (todas las redes) del entry seleccionado → para que el
+  // form de Editar precargue por red (multi-red, igual que Agregar).
+  const selectedDayEntries = useMemo(() => {
+    if (!selectedEntry?.creator_id) return [];
+    return entries.filter(
+      (e) => e.creator_id === selectedEntry.creator_id && e.date === selectedEntry.date,
+    );
+  }, [entries, selectedEntry]);
+
   const selectedDayByNetwork = useMemo(() => {
     if (!selectedEntry?.creator_id) return [];
     const ORDER = ["instagram", "telegram", "x", "twitter", "tiktok", "facebook", "reddit", "youtube"];
@@ -1373,6 +1382,7 @@ const PromologContent = () => {
             onOpenChange={setEditEntryOpen}
             entry={selectedEntry}
             dayStories={selectedDayStories}
+            dayEntries={selectedDayEntries}
           />
         )}
 

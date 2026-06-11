@@ -23,6 +23,7 @@ import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import type { PromologEntry } from "./PromologEntryCard";
+import { displayPlatform } from "./promoScore";
 
 // ── Form de Registrar/Editar Promoción ────────────────────────────────────────
 // AGREGAR (add): el operario puede marcar VARIAS redes; por cada red marca si la
@@ -83,6 +84,8 @@ interface Props {
   entry?: PromologEntry | null;
   /** edit: todas las stories/filas del día (para precargar las fotos). */
   dayStories?: PromologEntry[];
+  /** edit: TODAS las entries del día (todas las redes) → precarga multi-red. */
+  dayEntries?: PromologEntry[];
   /** se llama tras guardar OK (el padre puede invalidar queries propias). */
   onSaved?: () => void;
 }
@@ -97,7 +100,7 @@ const toPlatformValue = (platform: string | null | undefined): { value: string; 
 
 const cleanHandle = (h: string) => h.replace(/^@/, "").replace(/\/$/, "").split("/").pop();
 
-const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, dayStories, onSaved }: Props) => {
+const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, dayStories, dayEntries, onSaved }: Props) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -116,10 +119,14 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [originalIds, setOriginalIds] = useState<string[]>([]);
 
-  // ADD (multi-red: por red su Sí/No + sus fotos).
+  // ADD + EDIT (multi-red: por red su Sí/No + sus fotos).
   const [selectedNets, setSelectedNets] = useState<string[]>([]);
   const [netResult, setNetResult] = useState<Record<string, "si" | "no">>({});
   const [netPhotos, setNetPhotos] = useState<Record<string, Photo[]>>({});
+  // EDIT: ids originales por red (para update/borrado) + cuáles son MANUALES
+  // (solo esos se pueden borrar; nunca borramos filas del bot).
+  const [netOriginalIds, setNetOriginalIds] = useState<Record<string, string[]>>({});
+  const [netManualIds, setNetManualIds] = useState<Record<string, string[]>>({});
 
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -146,6 +153,43 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
           : [];
       setPhotos(initial);
       setOriginalIds(initial.map((ph) => ph.id).filter(Boolean) as string[]);
+      // Si la plataforma del rep quedó "Ninguna", inferirla de la señal (Unlok/OF).
+      if (!p.value) {
+        const dp = displayPlatform(entry);
+        if (dp === "OnlyFans") setPlatform("onlyfans");
+        else if (dp === "Unlok") setPlatform("unlok");
+        else if (dp) { setPlatform("otra"); setCustomPlatform(dp); }
+      }
+      // Multi-red: agrupar TODAS las entries del día por red → precargar secciones.
+      const group = dayEntries && dayEntries.length ? dayEntries : [entry];
+      const NET_VALUES = ["instagram", "tiktok", "x", "telegram", "reddit", "facebook", "youtube", "otra"];
+      const toNetValue = (n?: string | null) => {
+        const v = (n || "").toLowerCase();
+        if (v === "twitter") return "x";
+        return NET_VALUES.includes(v) ? v : "otra";
+      };
+      const byNet: Record<string, PromologEntry[]> = {};
+      for (const e of group) {
+        const net = toNetValue(e.network);
+        (byNet[net] ||= []).push(e);
+      }
+      const nets = Object.keys(byNet);
+      const nr: Record<string, "si" | "no"> = {};
+      const np: Record<string, Photo[]> = {};
+      const noi: Record<string, string[]> = {};
+      const nmi: Record<string, string[]> = {};
+      for (const net of nets) {
+        const list = byNet[net];
+        nr[net] = list.some((e) => e.result === "Sí") ? "si" : "no";
+        np[net] = list.filter((e) => e.evidence_url).map((e) => ({ id: e.id, url: e.evidence_url as string, promoted: e.result === "Sí" }));
+        noi[net] = list.map((e) => e.id);
+        nmi[net] = list.filter((e) => e.analyzed_by_ai !== true).map((e) => e.id);
+      }
+      setSelectedNets(nets);
+      setNetResult(nr);
+      setNetPhotos(np);
+      setNetOriginalIds(noi);
+      setNetManualIds(nmi);
     } else {
       setResult("si");
       setNetwork("");
@@ -154,6 +198,8 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
       setSelectedNets([]);
       setNetResult({});
       setNetPhotos({});
+      setNetOriginalIds({});
+      setNetManualIds({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -243,6 +289,8 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
       if (prev.includes(v)) {
         setNetResult((r) => { const n = { ...r }; delete n[v]; return n; });
         setNetPhotos((p) => { const n = { ...p }; delete n[v]; return n; });
+        setNetOriginalIds((o) => { const n = { ...o }; delete n[v]; return n; });
+        setNetManualIds((m) => { const n = { ...m }; delete n[v]; return n; });
         return prev.filter((x) => x !== v);
       }
       setNetResult((r) => ({ ...r, [v]: "si" }));
@@ -290,41 +338,61 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
         if (error) throw error;
         toast({ title: "Promoción registrada", description: `${selectedNets.length} ${selectedNets.length === 1 ? "red" : "redes"} guardada(s) para hoy.` });
       } else {
+        // EDIT multi-red: upsert por red. NUNCA borra filas del bot (solo fotos manuales removidas).
         if (!entry) return;
-        const isSi = result === "si";
-        if (isSi && (!network || !platform)) {
-          toast({ title: "Campos requeridos", description: "Completá Red Social y Plataforma.", variant: "destructive" });
+        if (selectedNets.length === 0) {
+          toast({ title: "Elegí al menos una red", description: "Marcá las redes del día.", variant: "destructive" });
           setSaving(false);
           return;
         }
-        const shared = {
-          network: isSi ? network : "n/a",
-          platform: isSi ? platformValue : null,
-          action_taken: isSi ? strategy || null : null,
-          notes: notes || null,
-        };
-        const promotedFor = (p: boolean) => (isSi ? (p ? "true" : "false") : "false");
-        const rawDate = entry.rawDate || dayStories?.find((s) => s.rawDate)?.rawDate || new Date().toISOString();
-        const ops: any[] = [];
-        const keptIds = new Set<string>();
-        photos.forEach((ph, i) => {
-          if (ph.id) {
-            keptIds.add(ph.id);
-            ops.push(supabase.from("promolog_entries").update({ ...shared, promoted: promotedFor(ph.promoted), evidence_url: ph.url, story_index: i, story_count: photos.length }).eq("id", ph.id));
-          } else {
-            ops.push(supabase.from("promolog_entries").insert({ creator_id: entry.creator_id, date: rawDate, reviewed_by: user?.id, created_by: user?.id, ...shared, promoted: promotedFor(ph.promoted), evidence_url: ph.url, story_index: i, story_count: photos.length }));
-          }
-        });
-        if (photos.length === 0) {
-          keptIds.add(entry.id);
-          ops.push(supabase.from("promolog_entries").update({ ...shared, promoted: isSi ? "true" : "false", evidence_url: null }).eq("id", entry.id));
+        if (addAnySi && !platform) {
+          toast({ title: "Falta la plataforma", description: "Elegí a dónde apunta la promo (OnlyFans/Unlok).", variant: "destructive" });
+          setSaving(false);
+          return;
         }
-        const toDelete = originalIds.filter((id) => !keptIds.has(id));
-        if (toDelete.length) ops.push(supabase.from("promolog_entries").delete().in("id", toDelete));
+        const rawDate =
+          entry.rawDate || dayStories?.find((s) => s.rawDate)?.rawDate || dayEntries?.find((s) => s.rawDate)?.rawDate || new Date().toISOString();
+        const ops: any[] = [];
+        for (const net of selectedNets) {
+          const isSi = netResult[net] === "si";
+          const ph = netPhotos[net] || [];
+          const origIds = netOriginalIds[net] || [];
+          const manualIds = new Set(netManualIds[net] || []);
+          const shared = {
+            network: net,
+            platform: isSi ? platformValue : null,
+            action_taken: isSi ? strategy || null : null,
+            notes: notes || null,
+          };
+          const promotedStr = isSi ? "true" : "false";
+          const photoIds = new Set(ph.filter((p) => p.id).map((p) => p.id as string));
+          // Fotos: update existentes (por id) / insert nuevas.
+          ph.forEach((p, i) => {
+            if (p.id) {
+              ops.push(supabase.from("promolog_entries").update({ ...shared, promoted: promotedStr, evidence_url: p.url, story_index: i, story_count: ph.length }).eq("id", p.id));
+            } else {
+              ops.push(supabase.from("promolog_entries").insert({ creator_id: entry.creator_id, date: rawDate, reviewed_by: user?.id, created_by: user?.id, ...shared, promoted: promotedStr, evidence_url: p.url, story_index: i, story_count: ph.length }));
+            }
+          });
+          // Filas existentes que ya no están como foto: borrar SOLO si es manual; las del bot
+          // se alinean al nuevo resultado (sin tocar su evidencia ni su ai_reasoning).
+          for (const id of origIds) {
+            if (photoIds.has(id)) continue;
+            if (manualIds.has(id)) {
+              ops.push(supabase.from("promolog_entries").delete().eq("id", id));
+            } else {
+              ops.push(supabase.from("promolog_entries").update({ ...shared, promoted: promotedStr }).eq("id", id));
+            }
+          }
+          // Red nueva sin filas previas ni fotos → insertar marcador del día.
+          if (origIds.length === 0 && ph.length === 0) {
+            ops.push(supabase.from("promolog_entries").insert({ creator_id: entry.creator_id, date: rawDate, reviewed_by: user?.id, created_by: user?.id, ...shared, promoted: promotedStr, evidence_url: null }));
+          }
+        }
         const results = await Promise.all(ops);
         const firstErr = results.find((r: any) => r?.error)?.error;
         if (firstErr) throw firstErr;
-        toast({ title: "Promoción actualizada", description: `Cambios guardados${photos.length > 1 ? ` (${photos.length} fotos)` : ""}.` });
+        toast({ title: "Promoción actualizada", description: `${selectedNets.length} ${selectedNets.length === 1 ? "red" : "redes"} guardada(s).` });
       }
       queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
       queryClient.invalidateQueries({ queryKey: ["promolog-calendar"] });
@@ -378,25 +446,14 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
               )}
             </CardContent>
           </Card>
-          {mode === "edit" && (
-            <div className="space-y-2">
-              <span className="text-sm font-medium">¿Promocionó Hoy?</span>
-              <div className="grid grid-cols-2 gap-3">
-                <button type="button" onClick={() => setResult("si")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${result === "si" ? "bg-primary text-primary-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                  <Check className="h-4 w-4" />Sí Promocionó
-                </button>
-                <button type="button" onClick={() => setResult("no")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${result === "no" ? "bg-secondary text-secondary-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                  <X className="h-4 w-4" />No Promocionó
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Contenido scrolleable */}
         <div className="flex-1 min-h-0 overflow-y-auto px-6">
           <div className="space-y-4 py-4">
-            {mode === "add" ? (
+            {/* UI multi-red para AMBOS modos (add + edit). El bloque single-red de
+                abajo quedó como legacy muerto (nunca se renderiza). */}
+            {(mode === "add" || mode === "edit") ? (
               <>
                 {/* Multi-select de redes */}
                 <div className="space-y-2">
