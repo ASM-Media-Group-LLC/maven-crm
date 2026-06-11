@@ -135,6 +135,7 @@ const InboxPage = () => {
   const [chatFilter, setChatFilter] = useState<"todos" | "no_leidos" | "favoritos">("todos");
   const [labelFilter, setLabelFilter] = useState<string | null>(null); // id de lista personal activa
   const [showArchived, setShowArchived] = useState(false);
+  const [channelFilter, setChannelFilter] = useState<string | null>(null); // id de canal activo (null = todos)
   const [destructive, setDestructive] = useState<{ kind: "clear" | "delete"; id: string; label: string } | null>(null);
   // Diálogo "Nueva lista" (forConversation: si viene de "Añadir a la lista" de un chat, lo agrega a la nueva lista).
   const [listDialog, setListDialog] = useState<{ forConversation: string | null } | null>(null);
@@ -220,16 +221,17 @@ const InboxPage = () => {
   });
   const userName = (id: string | null) => (!id ? null : users.find((u) => u.id === id)?.full_name || id.slice(0, 8));
 
-  // Canales (id→label) para el panel de info de contacto (admin).
+  // Canales (id→label) para el panel de info + el filtro por canal de la bandeja.
   const { data: channels = [] } = useQuery({
     queryKey: ["wa-inbox-channels-min"],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("wa_channels").select("id, label");
-      return (data ?? []) as { id: string; label: string | null }[];
+      const { data } = await (supabase as any).from("wa_channels").select("id, label, evolution_instance");
+      return (data ?? []) as { id: string; label: string | null; evolution_instance: string | null }[];
     },
     refetchOnWindowFocus: false,
   });
-  const channelLabel = (id: string | null) => (!id ? null : channels.find((c) => c.id === id)?.label ?? null);
+  const channelLabel = (id: string | null) =>
+    !id ? null : (() => { const c = channels.find((c) => c.id === id); return c ? (c.label || c.evolution_instance) : null; })();
 
   // Autoscroll del hilo: al abrir/recargar una conversación lleva al último mensaje;
   // al llegar mensajes nuevos baja solo si ya estabas cerca del fondo (no te corta
@@ -291,6 +293,7 @@ const InboxPage = () => {
     if (labelFilter) list = list.filter((c) => (c.labels ?? []).some((l) => l.label_id === labelFilter));
     else if (chatFilter === "no_leidos") list = list.filter(isUnread);
     else if (chatFilter === "favoritos") list = list.filter((c) => c.favorite);
+    if (channelFilter) list = list.filter((c) => c.channel_id === channelFilter); // filtro por canal (ortogonal)
     if (q) {
       list = list.filter(
         (c) =>
@@ -659,6 +662,35 @@ const InboxPage = () => {
             className="h-9 pl-8"
           />
         </div>
+        {/* Filtro por CANAL (línea/número) — solo si hay más de uno. Ortogonal a los chips de abajo. */}
+        {channels.length > 1 && (
+          <div className="flex items-center gap-1 overflow-x-auto px-3 pb-1.5">
+            <span className="shrink-0 pr-0.5 text-[11px] font-medium text-muted-foreground">Canal</span>
+            <button
+              type="button"
+              onClick={() => setChannelFilter(null)}
+              className={cn(
+                "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                !channelFilter ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+              )}
+            >
+              Todos
+            </button>
+            {channels.map((ch) => (
+              <button
+                key={ch.id}
+                type="button"
+                onClick={() => setChannelFilter(ch.id)}
+                className={cn(
+                  "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                  channelFilter === ch.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+                )}
+              >
+                {ch.label || ch.evolution_instance || "—"}
+              </button>
+            ))}
+          </div>
+        )}
         {/* Filtros (chips): presets + mis listas personales + nueva lista + archivados */}
         <div className="flex items-center gap-1 overflow-x-auto px-3 pb-2">
           {([["todos", "Todos"], ["no_leidos", "No leídos"], ["favoritos", "Favoritos"]] as const).map(([key, label]) => (
@@ -748,6 +780,14 @@ const InboxPage = () => {
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
+                            {!channelFilter && channels.length > 1 && c.channel_id && (
+                              <span
+                                className="shrink-0 max-w-[90px] truncate rounded bg-muted px-1 py-0.5 text-[9px] font-medium text-muted-foreground"
+                                title={channelLabel(c.channel_id) ?? undefined}
+                              >
+                                {channelLabel(c.channel_id)}
+                              </span>
+                            )}
                             <span className={cn("min-w-0 flex-1 truncate text-xs", unread ? "font-medium text-foreground" : "text-muted-foreground")}>
                               {c.last_message_preview ?? "—"}
                             </span>
