@@ -344,6 +344,7 @@ const PromologContent = () => {
           partial: e.result === "Parcial",
           analyzed_by_ai: e.analyzed_by_ai,
           ai_reasoning: e.ai_reasoning,
+          platform: e.platform,
           has_buy_link: e.has_buy_link,
           buy_link_type: e.buy_link_type,
           ai_confidence: e.ai_confidence,

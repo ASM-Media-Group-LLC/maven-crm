@@ -23,6 +23,7 @@ import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { type PromologEntry } from "./PromologEntryCard";
 import PromoQualityBar from "./PromoQualityBar";
+import { displayPlatform } from "./promoScore";
 
 interface Props {
   entries: PromologEntry[];
@@ -269,9 +270,11 @@ const PromologTable = ({
               </div>
             </TableCell>
             <TableCell>
-              <Badge variant="primary-soft" className="text-xs">
-                {entry.platform}
-              </Badge>
+              {displayPlatform(entry) ? (
+                <Badge variant="primary-soft" className="text-xs">{displayPlatform(entry)}</Badge>
+              ) : (
+                <span className="text-xs text-muted-foreground">—</span>
+              )}
             </TableCell>
             <TableCell>
               <Badge variant={resultVariant[entry.result] || "secondary-soft"} className="text-xs">

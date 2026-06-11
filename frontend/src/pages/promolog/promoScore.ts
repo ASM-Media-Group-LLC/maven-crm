@@ -37,10 +37,48 @@ export interface ScoreInput {
   partial?: boolean;
   analyzed_by_ai?: boolean; // true = entry de bot; false = manual (chatter/humano)
   ai_reasoning?: string | null;
+  platform?: string | null;
   has_buy_link?: boolean;
   buy_link_type?: string | null;
   ai_confidence?: number | null;
   notes?: string | null;
+}
+
+// Plataformas que la agencia MANEJA → solo estas suman al score (decisión del dueño
+// 2026-06-11: OnlyFans + Unlok; las demás, ej. Fansly/Piclink, no las manejamos).
+const MANAGED = new Set(["onlyfans", "unlok"]);
+const KNOWN_UNMANAGED = new Set(["fansly", "piclink", "linktree"]);
+
+/** ¿La promo es a una plataforma que manejamos (OF o Unlok)? Solo esas suman. */
+export function isManagedPromo(e: ScoreInput): boolean {
+  const p = (e.platform || "").toLowerCase();
+  const b = (e.buy_link_type || "").toLowerCase();
+  const r = (e.ai_reasoning || "").toLowerCase();
+  if (MANAGED.has(p) || MANAGED.has(b)) return true;
+  if (/unlok/.test(r)) return true; // Gemini nombra "Unlok/Unlokme" en el reasoning
+  if (p === "otra" || KNOWN_UNMANAGED.has(p) || KNOWN_UNMANAGED.has(b)) return false;
+  if (b === "other") return false; // "other" sin señal de Unlok → otra plataforma, no manejada
+  return true; // OF explícito o promo indirecta sin plataforma → asumimos OF (default del negocio)
+}
+
+/** Nombre lindo de la plataforma para la UI (o null si no se identificó plataforma). */
+export function displayPlatform(e: {
+  platform?: string | null;
+  buy_link_type?: string | null;
+  ai_reasoning?: string | null;
+  has_buy_link?: boolean;
+}): string | null {
+  const p = (e.platform || "").toLowerCase();
+  const b = (e.buy_link_type || "").toLowerCase();
+  const r = (e.ai_reasoning || "").toLowerCase();
+  if (p === "onlyfans" || b === "onlyfans") return "OnlyFans";
+  if (p === "unlok" || b === "unlok" || /unlok/.test(r)) return "Unlok";
+  if (p === "fansly" || b === "fansly") return "Fansly";
+  if (p === "piclink" || b === "piclink") return "Piclink";
+  if (p === "linktree" || b === "linktree") return "Linktree";
+  if (e.has_buy_link && b === "other") return "Otra";
+  if (p && p !== "ninguna" && p !== "otra") return e.platform!;
+  return null; // sin plataforma identificada
 }
 
 export interface NetworkScore {
@@ -62,6 +100,8 @@ const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 /** Calidad 0-1 de UNA entry promocionada. 0 si no promocionó. */
 export function qualityForEntry(e: ScoreInput): number {
   if (!e.promoted) return 0;
+  // Promocionó pero a una plataforma que NO manejamos (Fansly/Piclink/…) → no suma.
+  if (!isManagedPromo(e)) return 0;
   const net = canonicalNetwork(e.network);
   const notes = (e.notes || "").toLowerCase();
   const hasLink = e.has_buy_link === true || !!e.buy_link_type || /(onlyfans|enlace|\blink\b|fans)/.test(notes);
