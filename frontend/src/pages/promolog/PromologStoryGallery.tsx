@@ -171,12 +171,13 @@ const TelegramLightbox = ({ story }: { story: PromologEntry }) => {
   );
 };
 
-// ── Vista de CHAT de Telegram ───────────────────────────────────────────────
-// Recrea el canal como se ve en la app de Telegram: header del canal + wallpaper
-// + burbujas de mensajes (texto del post, links en azul, hora) + veredicto
-// editable por mensaje. Los posts sin texto se muestran como "foto/video
-// (protegido)" — el contenido DRM no se puede extraer. Se usa cuando TODAS las
-// historias del día son de Telegram.
+// ── Evidencia de Telegram: CAPTURAS de celular (formato IG) ─────────────────
+// Recreamos el canal como SCREENSHOTS de celular: cada captura es un mockup de
+// teléfono con los posts (bubbles) que entran en una pantalla (~5); si la
+// creadora posteó más, se paginan en varias capturas (15 bubbles → 3 capturas).
+// Cada captura se marca Sí si alguno de sus bubbles tiene promo. La media
+// protegida (DRM) no se puede extraer → se representa. La galería muestra las
+// capturas (click = ver en grande). Se usa cuando TODAS las historias son de TG.
 const renderTgText = (text: string) =>
   (text || "").split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
     /^https?:\/\//.test(part)
@@ -184,72 +185,149 @@ const renderTgText = (text: string) =>
       : <span key={i}>{part}</span>,
   );
 
-const TelegramChatView = ({
-  stories,
-  onSetVerdict,
-  savingId,
+const BUBBLES_PER_SHOT = 5;
+
+// Una burbuja de mensaje (post). `mini` = versión chica para el thumbnail de la
+// captura; full = lightbox (con veredicto editable por post).
+const TgBubble = ({
+  s, channel, onSetVerdict, savingId, mini,
 }: {
-  stories: PromologEntry[];
-  onSetVerdict?: (s: PromologEntry, v: "Sí" | "No") => void;
-  savingId?: string | null;
+  s: PromologEntry; channel: string;
+  onSetVerdict?: (s: PromologEntry, v: "Sí" | "No") => void; savingId?: string | null; mini?: boolean;
 }) => {
-  const channel = tgChannelName(stories[0]);
-  const initial = (channel.trim()[0] || "T").toUpperCase();
-  const summary = summarizeStories(stories);
-  let lastDate = "";
+  const promo = s.result === "Sí";
   return (
-    <div className="overflow-hidden rounded-2xl shadow-xl ring-1 ring-black/20">
-      {/* Header del canal */}
-      <div className="flex items-center gap-2.5 bg-[#5d7a96] px-3 py-2 text-white">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/25 text-sm font-bold">{initial}</span>
-        <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-sm font-semibold">{channel}</p>
-          <p className="text-[11px] text-white/75">{stories.length} {stories.length === 1 ? "mensaje" : "mensajes"} · canal</p>
+    <div className="flex">
+      <div className={`relative max-w-[90%] rounded-2xl rounded-tl-md bg-white shadow-sm ${mini ? "px-1.5 py-1" : "px-2.5 py-1.5"}`}>
+        {promo && (
+          <span className={`absolute -right-1.5 -top-1.5 flex items-center justify-center rounded-full bg-emerald-500 text-white ${mini ? "h-3 w-3" : "h-5 w-5"}`}>
+            <Check className={mini ? "h-2 w-2" : "h-3 w-3"} />
+          </span>
+        )}
+        <p className={`font-semibold text-[#3a8fd6] ${mini ? "text-[7px] leading-tight" : "text-[12px]"}`}>{channel}</p>
+        {s.notes
+          ? <p className={`whitespace-pre-wrap break-words text-slate-900 ${mini ? "line-clamp-3 text-[7px] leading-tight" : "text-[13.5px] leading-snug"}`}>{mini ? s.notes : renderTgText(s.notes)}</p>
+          : <p className={`inline-flex items-center gap-1 italic text-slate-400 ${mini ? "text-[7px]" : "py-1 text-[12px]"}`}><Lock className={mini ? "h-2 w-2" : "h-3 w-3"} /> foto/video (protegido)</p>}
+        <div className="flex items-center justify-end">
+          <span className={`text-slate-400 ${mini ? "text-[6px]" : "text-[10px]"}`}>{s.time}</span>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-black/20 px-2 py-0.5 text-[10px]"><Lock className="h-2.5 w-2.5" /> protegido</span>
+        {!mini && onSetVerdict && (
+          <div className="mt-1 border-t border-slate-100 pt-1">
+            <VerdictToggle story={s} onSetVerdict={onSetVerdict} saving={savingId === s.id} />
+          </div>
+        )}
       </div>
-      {/* Hilo de mensajes sobre el wallpaper de Telegram */}
+    </div>
+  );
+};
+
+// Una CAPTURA = mockup de celular con un grupo de bubbles (header del canal +
+// barra de estado + wallpaper + bubbles + barra inferior).
+const TgScreenshotCard = ({
+  channel, bubbles, onSetVerdict, savingId, mini,
+}: {
+  channel: string; bubbles: PromologEntry[];
+  onSetVerdict?: (s: PromologEntry, v: "Sí" | "No") => void; savingId?: string | null; mini?: boolean;
+}) => {
+  const initial = (channel.trim()[0] || "T").toUpperCase();
+  return (
+    <div className={`overflow-hidden bg-black ${mini ? "rounded-lg ring-2 ring-black" : "rounded-[28px] shadow-2xl ring-[6px] ring-black"}`}>
+      {/* Barra de estado (formato celular) */}
+      <div className={`flex items-center justify-between bg-[#527da3] text-white/90 ${mini ? "px-2 pt-0.5 text-[6px]" : "px-4 pt-1.5 text-[10px]"}`}>
+        <span>Telegram</span>
+        <span>{mini ? "" : "📶 🔋"}</span>
+      </div>
+      {/* Header del canal */}
+      <div className={`flex items-center gap-2 bg-[#527da3] text-white ${mini ? "px-2 py-1" : "px-2.5 py-2"}`}>
+        <ChevronLeft className={`opacity-80 ${mini ? "h-2.5 w-2.5" : "h-4 w-4"}`} />
+        <span className={`flex shrink-0 items-center justify-center rounded-full bg-white/25 font-bold ${mini ? "h-3.5 w-3.5 text-[7px]" : "h-7 w-7 text-[11px]"}`}>{initial}</span>
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className={`truncate font-semibold ${mini ? "text-[8px]" : "text-[13px]"}`}>{channel}</p>
+          <p className={`text-white/70 ${mini ? "text-[6px]" : "text-[10px]"}`}>canal</p>
+        </div>
+        <span className={mini ? "text-[8px]" : "text-base"}>⋮</span>
+      </div>
+      {/* Chat sobre el wallpaper */}
       <div
-        className="max-h-[56vh] space-y-1.5 overflow-y-auto px-3 py-3"
-        style={{
-          backgroundColor: "#c5d3dd",
-          backgroundImage: "radial-gradient(rgba(255,255,255,0.5) 1.3px, transparent 1.3px)",
-          backgroundSize: "20px 20px",
-        }}
+        className={mini ? "space-y-1 px-2 py-2" : "space-y-2 px-3 py-3"}
+        style={{ backgroundColor: "#c5d3dd", backgroundImage: "radial-gradient(rgba(255,255,255,0.5) 1.3px, transparent 1.3px)", backgroundSize: mini ? "10px 10px" : "20px 20px" }}
       >
-        {stories.map((s) => {
-          const showDate = !!s.date && s.date !== lastDate;
-          if (s.date) lastDate = s.date;
+        {bubbles.map((b) => (
+          <TgBubble key={b.id} s={b} channel={channel} mini={mini} onSetVerdict={mini ? undefined : onSetVerdict} savingId={savingId} />
+        ))}
+      </div>
+      {/* Barra inferior */}
+      {!mini && (
+        <div className="flex items-center gap-2 bg-[#17212b] px-3 py-2 text-[12px] text-[#6d7f8f]">
+          <span className="flex-1">Difusión</span>
+          <Lock className="h-3.5 w-3.5" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Galería de CAPTURAS de Telegram (estilo IG): pagina los bubbles del día en
+// capturas de ~BUBBLES_PER_SHOT, cada una marcada Sí si tiene algún promo.
+const TelegramScreenshots = ({
+  stories, onSetVerdict, savingId,
+}: {
+  stories: PromologEntry[]; onSetVerdict?: (s: PromologEntry, v: "Sí" | "No") => void; savingId?: string | null;
+}) => {
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const channel = tgChannelName(stories[0]);
+  const ordered = [...stories].sort((a, b) => (a.story_index ?? 0) - (b.story_index ?? 0));
+  const shots: PromologEntry[][] = [];
+  for (let i = 0; i < ordered.length; i += BUBBLES_PER_SHOT) shots.push(ordered.slice(i, i + BUBBLES_PER_SHOT));
+  const summary = summarizeStories(stories);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Evidencia · {shots.length} {shots.length === 1 ? "captura" : "capturas"} de Telegram
+        </p>
+        <div className="flex items-center gap-1.5">
+          {summary.promoted > 0 && <Badge variant="success-soft" className="text-[10px]">{summary.promoted} promovió</Badge>}
+          {summary.notPromoted > 0 && <Badge variant="destructive-soft" className="text-[10px]">{summary.notPromoted} no</Badge>}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {shots.map((bubbles, idx) => {
+          const anyPromo = bubbles.some((b) => b.result === "Sí");
           return (
-            <div key={s.id}>
-              {showDate && (
-                <div className="flex justify-center py-1.5">
-                  <span className="rounded-full bg-black/20 px-2.5 py-0.5 text-[11px] font-medium text-white">{s.date}</span>
-                </div>
-              )}
-              <div className="flex">
-                <div className="max-w-[88%] rounded-2xl rounded-tl-md bg-white px-2.5 py-1.5 shadow-sm">
-                  <p className="text-[12px] font-semibold text-[#3a8fd6]">{channel}</p>
-                  {s.notes
-                    ? <p className="whitespace-pre-wrap break-words text-[13.5px] leading-snug text-slate-900">{renderTgText(s.notes)}</p>
-                    : <p className="inline-flex items-center gap-1 py-1 text-[12px] italic text-slate-400"><Lock className="h-3 w-3" /> foto/video (protegido)</p>}
-                  <div className="mt-0.5 flex items-center justify-end">
-                    <span className="text-[10px] text-slate-400">{s.time}</span>
-                  </div>
-                  <div className="mt-1 border-t border-slate-100 pt-1">
-                    <VerdictToggle story={s} onSetVerdict={onSetVerdict} saving={savingId === s.id} />
-                  </div>
-                </div>
+            <div key={idx} className="space-y-1.5">
+              <button type="button" onClick={() => setOpenIdx(idx)} className="block w-full overflow-hidden rounded-lg ring-1 ring-border transition-transform hover:scale-[1.02]">
+                <TgScreenshotCard channel={channel} bubbles={bubbles} mini />
+              </button>
+              <div className="flex items-center justify-between gap-1 px-0.5">
+                <span className="truncate text-[10px] text-muted-foreground">Captura {idx + 1} · {bubbles.length} {bubbles.length === 1 ? "post" : "posts"}</span>
+                <Badge variant={anyPromo ? "success-soft" : "destructive-soft"} className="gap-0.5 text-[10px]">
+                  {anyPromo ? <><Check className="h-3 w-3" /> Sí</> : <><XMark className="h-3 w-3" /> No</>}
+                </Badge>
               </div>
             </div>
           );
         })}
       </div>
-      {/* Footer */}
-      <div className="flex items-center justify-between gap-2 bg-[#1f2c39] px-3 py-1.5 text-[11px] text-white/70">
-        <span>{summary.promoted} promovió · {summary.notPromoted} no</span>
-        <span className="inline-flex items-center gap-1 text-right"><Lock className="h-3 w-3 shrink-0" /> recreado del texto · media DRM no extraíble</span>
-      </div>
+
+      {/* Lightbox: la captura en grande, con veredicto editable por post */}
+      {openIdx != null && shots[openIdx] && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4" onClick={() => setOpenIdx(null)} role="dialog" aria-modal="true">
+          <button type="button" onClick={() => setOpenIdx(null)} className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20" aria-label="Cerrar"><CloseIcon className="h-5 w-5" /></button>
+          {shots.length > 1 && (
+            <>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setOpenIdx((openIdx - 1 + shots.length) % shots.length); }} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20 sm:left-4" aria-label="Anterior"><ChevronLeft className="h-6 w-6" /></button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setOpenIdx((openIdx + 1) % shots.length); }} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20 sm:right-4" aria-label="Siguiente"><ChevronRight className="h-6 w-6" /></button>
+            </>
+          )}
+          <div className="flex max-h-[90vh] w-full max-w-[330px] flex-col items-center gap-2 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <TgScreenshotCard channel={channel} bubbles={shots[openIdx]} onSetVerdict={onSetVerdict} savingId={savingId} />
+            <span className="shrink-0 text-xs text-white/60">Captura {openIdx + 1}/{shots.length}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -296,10 +374,10 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
   const activeSlide = active ? (active.story_index != null ? active.story_index + 1 : activeIdx + 1) : 0;
   const activeConf = active?.ai_confidence != null ? Math.round(active.ai_confidence * 100) : null;
 
-  // Si TODAS las historias del día son de Telegram, mostramos la vista de CHAT
-  // (burbujas estilo Telegram) en vez de la grilla de miniaturas.
+  // Si TODAS las historias del día son de Telegram, mostramos las CAPTURAS de
+  // celular paginadas (estilo IG) en vez de la grilla de miniaturas.
   if (stories.length > 0 && stories.every(isTgEvidence)) {
-    return <TelegramChatView stories={stories} onSetVerdict={onSetVerdict} savingId={savingId} />;
+    return <TelegramScreenshots stories={stories} onSetVerdict={onSetVerdict} savingId={savingId} />;
   }
 
   return (
