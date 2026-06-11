@@ -330,7 +330,12 @@ const PromologContent = () => {
           const ia = NETWORK_ORDER.indexOf(a), ib = NETWORK_ORDER.indexOf(b);
           return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
         });
-      result.push({ ...best, networks });
+      // Redes donde SÍ promocionó (subconjunto de networks) → la columna las pinta
+      // full; las "solo revisadas, sin promo" salen en gris.
+      const promotedNetworks = Array.from(new Set(
+        group.filter(e => e.result === "Sí").map(e => (e.network || "").toLowerCase()).filter(Boolean),
+      ));
+      result.push({ ...best, networks, promotedNetworks });
     }
     return result;
   }, [entries]);

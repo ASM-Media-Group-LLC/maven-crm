@@ -29,6 +29,9 @@ export interface PromologEntry {
   // por modelo+día; el bot/manual crea 1 entry por red). Se llena en el dedupe de
   // PromologContent. La columna "Red Social" muestra el logo de cada una.
   networks?: string[];
+  // Subconjunto de `networks` donde promocionó (Sí). La columna pinta esas full y
+  // las "solo revisadas, sin promo" en gris.
+  promotedNetworks?: string[];
   platform: string;
   result: string;
   date: string;

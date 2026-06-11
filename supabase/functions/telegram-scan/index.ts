@@ -150,6 +150,22 @@ Deno.serve(async (req: Request) => {
         if (insErr) { results.push({ creator: c.name, insertError: insErr.message }); }
         else inserted++;
       }
+      // Marker "revisada · sin actividad" si el canal no tuvo posts → la columna
+      // Red Social muestra Telegram en gris (dejamos constancia del scan). 1/día.
+      if (posts.length === 0 && !dryRun) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: ex } = await sb.from("promolog_entries")
+          .select("id").eq("creator_id", c.id).eq("network", "Telegram").gte("date", today).limit(1);
+        if (!ex || !ex.length) {
+          await sb.from("promolog_entries").insert({
+            tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
+            promoted: "false", network: "Telegram", platform: "Ninguna",
+            notes: null, evidence_url: null,
+            analyzed_by_ai: true, ai_model: "heuristic-of-v1", ai_reasoning: "sin-actividad",
+            scraped_at: new Date().toISOString(),
+          });
+        }
+      }
       results.push({
         creator: c.name, ok: true, channel: j.channel?.title ?? null, protected: !!j.protected,
         joined: !!j.joined, alreadyMember: !!j.alreadyMember, posts: posts.length, promoted: promotedCount,

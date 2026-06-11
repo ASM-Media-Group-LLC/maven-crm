@@ -135,7 +135,7 @@ Deno.serve(async (req: Request) => {
   if (!APIFY_TOKEN) return json({ error: "falta APIFY_TOKEN (secreto de la edge function)" }, 500);
 
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
-  const hours = Number(body.hours) || 30;
+  const hours = Number(body.hours) || 24;
   const onlyIds = Array.isArray(body.only_creator_ids) ? body.only_creator_ids as string[] : null;
   const limit = Number(body.limit) || 0; // probar con N creadoras
   const dryRun = body.dry_run === true;
@@ -186,7 +186,27 @@ Deno.serve(async (req: Request) => {
       const db = parseTweetDate(b?.createdAt || b?.created_at)?.getTime() || 0;
       return da - db;
     });
-    if (!tweets.length) { results.push({ creator: c.name, tweets: 0 }); continue; }
+    if (!tweets.length) {
+      // Marker "revisada · sin actividad": deja constancia de que SÍ la chequeamos
+      // en X hoy (aunque no tuiteó) → la columna Red Social muestra X en gris.
+      // Idempotente: 1 marker por creadora/día (no pisa si ya hay entry de X hoy).
+      if (!dryRun) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: ex } = await sb.from("promolog_entries")
+          .select("id").eq("creator_id", c.id).eq("network", "X").gte("date", today).limit(1);
+        if (!ex || !ex.length) {
+          await sb.from("promolog_entries").insert({
+            tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
+            promoted: "false", network: "X", platform: "Ninguna",
+            notes: null, evidence_url: null,
+            analyzed_by_ai: true, ai_model: "regla-texto-x", ai_reasoning: "sin-actividad",
+            scraped_at: new Date().toISOString(),
+          });
+        }
+      }
+      results.push({ creator: c.name, tweets: 0, marker: true });
+      continue;
+    }
 
     let inserted = 0, promotedCount = 0, skipped = 0;
     for (let i = 0; i < tweets.length; i++) {

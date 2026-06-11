@@ -251,12 +251,19 @@ const PromologTable = ({
             <TableCell>
               {/* Solo los logos de las redes ANALIZADAS ese día (sin texto, para
                   no ocupar espacio). Tooltip por ícono con el nombre de la red. */}
-              <div className="flex items-center gap-2 text-muted-foreground">
-                {(entry.networks?.length ? entry.networks : [entry.network]).filter(Boolean).map((n) => (
-                  <span key={n} title={networkLabel[n] || n} className="inline-flex items-center justify-center">
-                    <NetworkIcon network={n} />
-                  </span>
-                ))}
+              <div className="flex items-center gap-2">
+                {(entry.networks?.length ? entry.networks : [entry.network]).filter(Boolean).map((n) => {
+                  const promoted = (entry.promotedNetworks ?? []).includes(n);
+                  return (
+                    <span
+                      key={n}
+                      title={`${networkLabel[n] || n}${promoted ? " · promocionó" : " · revisada, sin promo"}`}
+                      className={`inline-flex items-center justify-center ${promoted ? "text-foreground" : "text-muted-foreground/40"}`}
+                    >
+                      <NetworkIcon network={n} />
+                    </span>
+                  );
+                })}
               </div>
             </TableCell>
             <TableCell>
