@@ -74,13 +74,14 @@ const postLinks = (it: any): string[] => {
 };
 
 function classifyFb(it: any, ofUrl: string): { promoted: boolean; reason: string } {
+  // FB ≠ X: en Facebook las creadoras suben contenido personal/normal (FB restringe
+  // OF). Una foto NO es promo por sí sola → exige señal EXPLÍCITA de OF (link a OF/
+  // agregador, mención de onlyfans, o CTA de promo). Sin señal → No, aunque haya foto.
   const text = postText(it);
   const links = postLinks(it);
-  const { count: media } = postMedia(it);
   const sig = ofSignals(text + " " + links.join(" "), ofHandleFromUrl(ofUrl));
   if (sig.length) return { promoted: true, reason: sig.join("+") };
-  if (media > 0) return { promoted: true, reason: "media/funnel" };
-  return { promoted: false, reason: "solo-texto" };
+  return { promoted: false, reason: "sin-senal-of" };
 }
 
 // facebook_handle → URL de FB (acepta URL completa o username pelado).
