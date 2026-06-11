@@ -109,31 +109,67 @@ const LightboxImage = ({ url }: { url: string | null | undefined }) => {
 };
 
 // ── Telegram: la evidencia es un link t.me (no una imagen) y el contenido suele
-// ser protegido (DRM) → no hay foto. En vez de una imagen rota, mostramos el
-// TEXTO del post (que en DRM siempre llega) con la marca de Telegram.
+// ser protegido (DRM) → no podemos traer la foto/video. En vez de una imagen
+// rota, RECREAMOS el post como se ve en Telegram: header de canal + recuadro de
+// media "protegida" + el texto del post como caption (en DRM el texto siempre
+// llega) + hora. Paleta oscura de Telegram.
 const isTgEvidence = (s: PromologEntry) =>
   (s.network || "").toLowerCase() === "telegram" || /^https?:\/\/t\.me\//i.test(s.evidence_url || "");
 
+const tgChannelName = (s: PromologEntry) => s.name?.trim() || "Canal de Telegram";
+
+// Tile chico (celda de la grilla): mini-post estilo Telegram.
 const TelegramTile = ({ story }: { story: PromologEntry }) => (
-  <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-sky-500/10 to-transparent p-2 text-center">
-    <TelegramIcon className="h-6 w-6 text-sky-400" />
-    {story.notes
-      ? <span className="line-clamp-3 text-[10px] leading-tight text-foreground/80">{story.notes}</span>
-      : <span className="text-[10px] leading-tight text-muted-foreground">Post de Telegram</span>}
-    <span className="inline-flex items-center gap-0.5 text-[9px] text-muted-foreground"><Lock className="h-2.5 w-2.5" /> protegido</span>
+  <div className="flex h-full w-full flex-col overflow-hidden bg-[#17212b] text-left">
+    <div className="flex items-center gap-1.5 bg-[#202b36] px-2 py-1.5">
+      <TelegramIcon className="h-3.5 w-3.5 shrink-0 text-[#5eb5f7]" />
+      <span className="truncate text-[10px] font-medium text-white/90">{tgChannelName(story)}</span>
+    </div>
+    <div className="flex flex-1 flex-col items-center justify-center gap-1 bg-gradient-to-br from-[#0e1621] to-[#1c2733] p-1.5 text-center">
+      <Lock className="h-4 w-4 shrink-0 text-[#5eb5f7]/60" />
+      {story.notes
+        ? <span className="line-clamp-3 text-[9px] leading-tight text-white/75">{story.notes}</span>
+        : <span className="text-[9px] text-[#6d7f8f]">post sin texto</span>}
+    </div>
   </div>
 );
 
-const TelegramLightbox = ({ story }: { story: PromologEntry }) => (
-  <div className="flex max-h-[72vh] w-full max-w-[440px] flex-col gap-3 overflow-y-auto rounded-lg bg-white/5 p-5">
-    <div className="flex items-center gap-2 text-sky-300">
-      <TelegramIcon className="h-5 w-5" />
-      <span className="text-sm font-semibold">Telegram</span>
-      <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-white/50"><Lock className="h-3 w-3" /> protegido (DRM)</span>
+// Lightbox: recreación completa del post de Telegram.
+const TelegramLightbox = ({ story }: { story: PromologEntry }) => {
+  const channel = tgChannelName(story);
+  const initial = (channel[0] || "T").toUpperCase();
+  return (
+    <div className="w-full max-w-[420px] overflow-hidden rounded-2xl bg-[#17212b] shadow-2xl ring-1 ring-white/10">
+      {/* Header tipo chat de Telegram */}
+      <div className="flex items-center gap-2.5 bg-[#202b36] px-4 py-2.5">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#2aabee] to-[#229ed9] text-sm font-bold text-white">{initial}</span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-white">{channel}</p>
+          <p className="text-[11px] text-[#6d7f8f]">canal · Telegram</p>
+        </div>
+        <TelegramIcon className="h-5 w-5 shrink-0 text-[#5eb5f7]" />
+      </div>
+      {/* Cuerpo del post */}
+      <div className="p-3">
+        {/* Media protegida — no se puede traer por DRM, la representamos. */}
+        <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#0e1621] to-[#1c2733] ring-1 ring-white/5">
+          <ImageOff className="h-8 w-8 text-[#5eb5f7]/70" />
+          <span className="inline-flex items-center gap-1 rounded-full bg-black/40 px-2.5 py-1 text-[11px] text-white/70">
+            <Lock className="h-3 w-3" /> Foto/Video protegido (DRM)
+          </span>
+        </div>
+        {/* Caption (el texto real del post) */}
+        {story.notes
+          ? <p className="mt-2.5 whitespace-pre-wrap text-[13.5px] leading-relaxed text-[#e9edf0]">{story.notes}</p>
+          : <p className="mt-2.5 text-[13px] italic text-[#6d7f8f]">(post sin texto)</p>}
+        {/* Footer: fecha/hora del post */}
+        <div className="mt-2 flex items-center justify-end gap-1 text-[11px] text-[#6d7f8f]">
+          {[story.date, story.time].filter(Boolean).join(" · ")}
+        </div>
+      </div>
     </div>
-    <p className="whitespace-pre-wrap text-sm leading-relaxed text-white/90">{story.notes || "(sin texto en el post)"}</p>
-  </div>
-);
+  );
+};
 
 interface Props {
   stories: PromologEntry[];
