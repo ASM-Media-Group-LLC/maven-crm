@@ -298,7 +298,9 @@ const NuevoCreadorForm = () => {
           onlyfans_url: form.onlyfans_url || null,
           telegram_handle: form.telegram_handle.trim() || null,
           reddit_handle: cleanHandle(form.reddit_handle) || null,
-          facebook_handle: cleanHandle(form.facebook_handle) || null,
+          // Facebook: guardamos la URL ENTERA (los perfiles tipo profile.php?id=… no
+          // tienen username pelado; el bot fb-scan usa la URL directo).
+          facebook_handle: form.facebook_handle.trim() || null,
           other_url: form.other_url || null,
           profile_photo_url: form.profile_photo_url || null,
           bio: form.bio || null,

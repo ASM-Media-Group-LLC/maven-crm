@@ -116,7 +116,8 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           youtube_handle: cleanHandle(form.youtube_handle) || null,
           reddit_handle: cleanHandle(form.reddit_handle) || null,
           telegram_handle: form.telegram_handle.trim() || null,
-          facebook_handle: cleanHandle(form.facebook_handle) || null,
+          // Facebook: URL entera (perfiles profile.php?id=… no tienen username pelado).
+          facebook_handle: form.facebook_handle.trim() || null,
           other_url: form.other_url.trim() || null,
           onlyfans_url: form.onlyfans_url.trim() || null,
           whatsapp_number: form.whatsapp_number.trim() || null,
