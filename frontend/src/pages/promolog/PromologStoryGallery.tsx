@@ -198,25 +198,26 @@ const TgBubble = ({
   );
 };
 
-// Una CAPTURA = screenshot de celular (barra de estado + header del canal +
-// wallpaper con las burbujas + barra de difusión). Altura = contenido (no queda
-// vacía). `big` = lightbox legible.
+// Una CAPTURA = screenshot de Telegram (barra de estado + header del canal +
+// wallpaper con las burbujas + barra de difusión). `fill` = llena un contenedor
+// 9:16 a sangre completa (como las historias de IG en la grilla). `big` = lightbox
+// legible. Las barras no se encogen (shrink-0) y el chat ocupa el resto (flex-1).
 const TgPhone = ({
-  channel, bubbles, big, onSetVerdict, savingId,
+  channel, bubbles, big, fill, onSetVerdict, savingId,
 }: {
-  channel: string; bubbles: PromologEntry[]; big?: boolean;
+  channel: string; bubbles: PromologEntry[]; big?: boolean; fill?: boolean;
   onSetVerdict?: (s: PromologEntry, v: "Sí" | "No") => void; savingId?: string | null;
 }) => {
   const initial = (channel.trim()[0] || "T").toUpperCase();
   return (
-    <div className={`flex w-full flex-col overflow-hidden bg-black ${big ? "rounded-[26px] shadow-2xl ring-[5px] ring-black" : "rounded-xl ring-2 ring-black/80"}`}>
+    <div className={`flex w-full flex-col bg-[#c5d3dd] ${fill ? "h-full" : ""}`}>
       {/* Barra de estado */}
-      <div className={`flex items-center justify-between bg-[#527da3] text-white/90 ${big ? "px-4 pt-1.5 text-[10px]" : "px-2 pt-0.5 text-[6px]"}`}>
-        <span>{big ? "Telegram" : ""}</span>
+      <div className={`flex shrink-0 items-center justify-between bg-[#527da3] text-white/90 ${big ? "px-4 pt-1.5 text-[10px]" : "px-2 pt-0.5 text-[6px]"}`}>
+        <span>{big ? "9:41" : ""}</span>
         <span>📶🔋</span>
       </div>
       {/* Header del canal */}
-      <div className={`flex items-center bg-[#527da3] text-white ${big ? "gap-2 px-3 py-2" : "gap-1 px-1.5 py-1"}`}>
+      <div className={`flex shrink-0 items-center bg-[#527da3] text-white ${big ? "gap-2 px-3 py-2" : "gap-1 px-1.5 py-1"}`}>
         <ChevronLeft className={`opacity-80 ${big ? "h-4 w-4" : "h-2.5 w-2.5"}`} />
         <span className={`flex shrink-0 items-center justify-center rounded-full bg-white/25 font-bold ${big ? "h-8 w-8 text-xs" : "h-4 w-4 text-[7px]"}`}>{initial}</span>
         <div className="min-w-0 flex-1 leading-tight">
@@ -225,17 +226,17 @@ const TgPhone = ({
         </div>
         <span className={big ? "text-base" : "text-[8px]"}>⋮</span>
       </div>
-      {/* Chat sobre el wallpaper */}
+      {/* Chat sobre el wallpaper (ocupa todo el alto disponible) */}
       <div
-        className={`flex flex-col ${big ? "gap-2 px-3 py-3" : "gap-1 px-1.5 py-1.5"}`}
-        style={{ backgroundColor: "#c5d3dd", backgroundImage: "radial-gradient(rgba(255,255,255,0.55) 1.4px, transparent 1.4px)", backgroundSize: big ? "22px 22px" : "12px 12px" }}
+        className={`flex flex-col ${fill ? "flex-1 overflow-hidden" : ""} ${big ? "gap-2 px-3 py-3" : "gap-1 px-1.5 py-1.5"}`}
+        style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.55) 1.4px, transparent 1.4px)", backgroundSize: big ? "22px 22px" : "12px 12px" }}
       >
         {bubbles.map((b) => (
           <TgBubble key={b.id} s={b} channel={channel} big={big} onSetVerdict={big ? onSetVerdict : undefined} savingId={savingId} />
         ))}
       </div>
       {/* Barra de difusión */}
-      <div className={`flex items-center gap-2 bg-[#17212b] text-[#6d7f8f] ${big ? "px-4 py-2.5 text-[12px]" : "px-1.5 py-1 text-[6.5px]"}`}>
+      <div className={`flex shrink-0 items-center gap-2 bg-[#17212b] text-[#6d7f8f] ${big ? "px-4 py-2.5 text-[12px]" : "px-1.5 py-1 text-[6.5px]"}`}>
         <span className="flex-1">Difusión</span>
         <Lock className={big ? "h-3.5 w-3.5" : "h-2 w-2"} />
       </div>
@@ -280,16 +281,23 @@ const TelegramScreenshots = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {shots.map((bubbles, idx) => {
           const anyPromo = bubbles.some((b) => b.result === "Sí");
           return (
-            <div key={idx} className="space-y-1.5">
-              <button type="button" onClick={() => setOpenIdx(idx)} className="block w-full transition-transform hover:scale-[1.02]">
-                <TgPhone channel={channel} bubbles={bubbles} />
+            <div key={idx} className="group relative overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/40">
+              {/* Captura a sangre completa (9:16), como las historias de IG */}
+              <button type="button" onClick={() => setOpenIdx(idx)} className="relative block aspect-[9/16] w-full overflow-hidden">
+                <TgPhone channel={channel} bubbles={bubbles} fill />
+                <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                  Captura {idx + 1}
+                </span>
+                <span className="absolute bottom-1.5 right-1.5 rounded bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                  <Maximize2 className="h-3 w-3" />
+                </span>
               </button>
-              <div className="flex items-center justify-between gap-1 px-0.5">
-                <span className="truncate text-[10px] text-muted-foreground">Captura {idx + 1} · {bubbles.length} {bubbles.length === 1 ? "post" : "posts"}</span>
+              <div className="flex items-center justify-between gap-1 p-1.5">
+                <span className="truncate text-[10px] text-muted-foreground">{bubbles.length} {bubbles.length === 1 ? "post" : "posts"}</span>
                 <Badge variant={anyPromo ? "success-soft" : "destructive-soft"} className="gap-0.5 text-[10px]">
                   {anyPromo ? <><Check className="h-3 w-3" /> Sí</> : <><XMark className="h-3 w-3" /> No</>}
                 </Badge>
@@ -309,8 +317,10 @@ const TelegramScreenshots = ({
               <button type="button" onClick={(e) => { e.stopPropagation(); setOpenIdx((openIdx + 1) % shots.length); }} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20 sm:right-4" aria-label="Siguiente"><ChevronRight className="h-6 w-6" /></button>
             </>
           )}
-          <div className="flex max-h-[90vh] w-full max-w-[320px] flex-col items-center gap-2 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <TgPhone channel={channel} bubbles={shots[openIdx]} big onSetVerdict={onSetVerdict} savingId={savingId} />
+          <div className="flex max-h-[90vh] w-full max-w-[300px] flex-col items-center gap-2 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
+              <TgPhone channel={channel} bubbles={shots[openIdx]} big onSetVerdict={onSetVerdict} savingId={savingId} />
+            </div>
             <span className="shrink-0 text-xs text-white/60">Captura {openIdx + 1}/{shots.length}</span>
           </div>
         </div>
@@ -319,28 +329,17 @@ const TelegramScreenshots = ({
   );
 };
 
-// Tile compacto de UN post (solo para el caso mixto IG+Telegram en la grilla de IG).
-const TelegramTile = ({ story }: { story: PromologEntry }) => {
-  const channel = tgChannelName(story);
-  return (
-    <div className="flex h-full w-full flex-col overflow-hidden text-left">
-      <div className="flex items-center gap-1.5 bg-[#527da3] px-2 py-1.5 text-white">
-        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/25 text-[8px] font-bold">{(channel.trim()[0] || "T").toUpperCase()}</span>
-        <span className="truncate text-[10px] font-semibold leading-none">{channel}</span>
-      </div>
-      <div
-        className="flex flex-1 flex-col justify-end p-2"
-        style={{ backgroundColor: "#c5d3dd", backgroundImage: "radial-gradient(rgba(255,255,255,0.5) 1.3px, transparent 1.3px)", backgroundSize: "12px 12px" }}
-      >
-        <TgBubble s={story} channel={channel} />
-      </div>
-    </div>
-  );
-};
+// Tile de UN post (caso mixto IG+Telegram en la grilla de IG): el mismo screenshot
+// full-bleed, con un solo post.
+const TelegramTile = ({ story }: { story: PromologEntry }) => (
+  <TgPhone channel={tgChannelName(story)} bubbles={[story]} fill />
+);
 
 // Lightbox de UN post (caso mixto).
 const TelegramLightbox = ({ story }: { story: PromologEntry }) => (
-  <TgPhone channel={tgChannelName(story)} bubbles={[story]} big />
+  <div className="w-full max-w-[300px] overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
+    <TgPhone channel={tgChannelName(story)} bubbles={[story]} big />
+  </div>
 );
 
 interface Props {
