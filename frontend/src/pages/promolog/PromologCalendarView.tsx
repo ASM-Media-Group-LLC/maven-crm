@@ -210,7 +210,33 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
       : all.some((s) => s.result === "No")
       ? "No"
       : rep?.result ?? "Pendiente";
-    return { rep, stories, dayResult };
+    // Agrupado POR RED para que el popup muestre una sección por red (igual que el
+    // subtab Promos) — así queda claro de qué red es cada screenshot.
+    const NET_ORDER = ["instagram", "telegram", "x", "twitter", "tiktok", "facebook", "reddit", "youtube"];
+    const byNet = new Map<string, PromologEntry[]>();
+    for (const s of all) {
+      const net = (s.network || "otra").toLowerCase();
+      const a = byNet.get(net);
+      if (a) a.push(s); else byNet.set(net, [s]);
+    }
+    const dayNetworks = [...byNet.entries()].map(([network, netAll]) => {
+      const seenN = new Map<string, PromologEntry>();
+      for (const s of netAll) {
+        if (!s.evidence_url) continue;
+        const key = s.apify_run_id && s.story_index != null ? `${s.apify_run_id}:${s.story_index}` : `id:${s.id}`;
+        const prev = seenN.get(key);
+        if (!prev || (!prev.evidence_url && s.evidence_url)) seenN.set(key, s);
+      }
+      return {
+        network,
+        stories: [...seenN.values()].sort((a, b) => (a.story_index ?? 1e9) - (b.story_index ?? 1e9)),
+        promoted: netAll.some((s) => s.result === "Sí"),
+      };
+    }).sort((a, b) => {
+      const ia = NET_ORDER.indexOf(a.network), ib = NET_ORDER.indexOf(b.network);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+    return { rep, stories, dayResult, dayNetworks };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openDayKey, dayMap, selectedCreator, userTz]);
 
@@ -394,6 +420,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
         onOpenChange={(open) => !open && setOpenDayKey(null)}
         entry={dialogData?.rep ?? null}
         dayStories={dialogData?.stories ?? []}
+        dayNetworks={dialogData?.dayNetworks ?? []}
         dayResult={dialogData?.dayResult ?? "Pendiente"}
         onSetVerdict={handleSetVerdict}
         savingId={savingId}
