@@ -25,6 +25,10 @@ export interface PromologEntry {
   name: string;
   handle?: string;
   network: string;
+  // Todas las redes ANALIZADAS para esta modelo ese día (la fila está deduplicada
+  // por modelo+día; el bot/manual crea 1 entry por red). Se llena en el dedupe de
+  // PromologContent. La columna "Red Social" muestra el logo de cada una.
+  networks?: string[];
   platform: string;
   result: string;
   date: string;

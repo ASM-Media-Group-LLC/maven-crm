@@ -318,10 +318,19 @@ const PromologContent = () => {
       scored.sort((a, b) => b.score - a.score);
       return scored[0].entry;
     };
+    const NETWORK_ORDER = ["instagram", "telegram", "tiktok", "x", "twitter", "facebook", "reddit", "youtube"];
     const result: PromologEntry[] = [];
     for (const group of groups.values()) {
       const promoted = group.filter(e => e.result === "Sí");
-      result.push(promoted.length > 0 ? pickBest(promoted) : pickBest(group));
+      const best = promoted.length > 0 ? pickBest(promoted) : pickBest(group);
+      // Todas las redes ANALIZADAS ese día (distintas), ordenadas estable. La
+      // columna "Red Social" muestra el logo de cada una (todo conectado por modelo+día).
+      const networks = Array.from(new Set(group.map(e => (e.network || "").toLowerCase()).filter(Boolean)))
+        .sort((a, b) => {
+          const ia = NETWORK_ORDER.indexOf(a), ib = NETWORK_ORDER.indexOf(b);
+          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+      result.push({ ...best, networks });
     }
     return result;
   }, [entries]);
@@ -732,7 +741,7 @@ const PromologContent = () => {
         const statusMap: Record<string, string> = { si_promociono: "Sí", no_promociono: "No", parcial: "Parcial", pendiente: "Pendiente" };
         if (entry.result !== statusMap[selectedStatus]) return false;
       }
-      if (selectedNetwork !== "" && entry.network !== selectedNetwork) return false;
+      if (selectedNetwork !== "" && !(entry.networks ?? [entry.network]).includes(selectedNetwork)) return false;
       if (selectedCardPlatform !== "" && !(entry.platform || "").toLowerCase().includes(selectedCardPlatform)) return false;
       if (searchEntry) {
         const q = searchEntry.toLowerCase();

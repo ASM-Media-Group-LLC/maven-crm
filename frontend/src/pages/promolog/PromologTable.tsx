@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Facebook, MoreHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,10 +70,14 @@ export const sortPromologEntries = (
 
 const NetworkIcon = ({ network }: { network: string }) => {
   switch (network) {
-    case "instagram": return <InstagramIcon className="h-3.5 w-3.5" />;
-    case "tiktok": return <TikTokIcon className="h-3.5 w-3.5" />;
-    case "x": return <XIcon className="h-3.5 w-3.5" />;
-    case "telegram": return <TelegramIcon className="h-3.5 w-3.5" />;
+    case "instagram": return <InstagramIcon className="h-4 w-4" />;
+    case "tiktok": return <TikTokIcon className="h-4 w-4" />;
+    case "x":
+    case "twitter": return <XIcon className="h-4 w-4" />;
+    case "telegram": return <TelegramIcon className="h-4 w-4" />;
+    case "facebook": return <Facebook className="h-4 w-4" />;
+    case "reddit": return <span className="text-[11px] font-bold leading-none">R</span>;
+    case "youtube": return <span className="text-[9px] font-bold leading-none">YT</span>;
     default: return null;
   }
 };
@@ -82,7 +86,11 @@ const networkLabel: Record<string, string> = {
   instagram: "Instagram",
   tiktok: "TikTok",
   x: "X / Twitter",
+  twitter: "X / Twitter",
   telegram: "Telegram",
+  facebook: "Facebook",
+  reddit: "Reddit",
+  youtube: "YouTube",
 };
 
 const resultVariant: Record<string, "success-soft" | "destructive-soft" | "warning-soft" | "secondary-soft"> = {
@@ -241,10 +249,15 @@ const PromologTable = ({
               </div>
             </TableCell>
             <TableCell>
-              <Badge variant="secondary-soft" className="gap-1 text-xs">
-                <NetworkIcon network={entry.network} />
-                {networkLabel[entry.network] || entry.network}
-              </Badge>
+              {/* Solo los logos de las redes ANALIZADAS ese día (sin texto, para
+                  no ocupar espacio). Tooltip por ícono con el nombre de la red. */}
+              <div className="flex items-center gap-2 text-muted-foreground">
+                {(entry.networks?.length ? entry.networks : [entry.network]).filter(Boolean).map((n) => (
+                  <span key={n} title={networkLabel[n] || n} className="inline-flex items-center justify-center">
+                    <NetworkIcon network={n} />
+                  </span>
+                ))}
+              </div>
             </TableCell>
             <TableCell>
               <Badge variant="primary-soft" className="text-xs">
