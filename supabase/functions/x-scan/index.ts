@@ -85,15 +85,71 @@ function expandedLinks(it: any): string[] {
   return out;
 }
 
-// Regla Funnel: señal explícita O foto/video → promovió; solo texto → No.
+// Promo SOLO con señal explícita de OF (link/mención/agregador/CTA) — igual que FB
+// e IG. Se quitó "cualquier foto = promo": daba falsos positivos (fútbol, marcas,
+// memes). Si no hay señal de texto pero hay imagen, la VISIÓN decide (en el loop).
 function classifyX(it: any, ofUrl: string): { promoted: boolean; reason: string } {
   const text: string = it?.text || it?.fullText || "";
   const links = expandedLinks(it);
-  const { count: media } = tweetMedia(it);
   const sig = ofSignals(text + " " + links.join(" "), ofHandleFromUrl(ofUrl));
   if (sig.length) return { promoted: true, reason: sig.join("+") };
-  if (media > 0) return { promoted: true, reason: "media/funnel" };
-  return { promoted: false, reason: "solo-texto" };
+  return { promoted: false, reason: "sin-senal-of" };
+}
+
+// ── Visión: ¿la IMAGEN del tweet promociona OF? Solo se llama si el texto no dio
+// señal pero hay imagen → distingue un flyer-promo de una foto/meme/fútbol. Cap
+// MAX_VISION para no hacer timeout a volumen de X (las promos reales suelen tener
+// el link en el texto, así que la visión es un repesca acotada).
+const VISION_MODEL = "google/gemini-2.5-flash";
+const MAX_VISION_PER_RUN = 30;
+const X_VISION_PROMPT = `Sos analista de una agencia de OnlyFans. Mirá esta imagen de un post de X (Twitter) de una creadora y decí si el POST PROMOCIONA su OnlyFans.
+Marcá promoted=true SOLO si hay una señal CLARA de promo a contenido pago EN la imagen o el texto: link a onlyfans/fansly/linktr.ee/beacons/allmylinks/piclink (escrito o visible), la palabra "OnlyFans"/"OF", logo/branding de OF, o un CTA explícito ("link in bio", "suscríbete", "mi contenido exclusivo", precio/descuento).
+NO marques promoted=true por ser una foto sugerente, un meme, fútbol, una marca/sponsor o contenido personal sin esas señales.
+Respondé SOLO JSON: {"promoted": true|false, "reason": "breve"}`;
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  return btoa(bin);
+}
+
+async function visionIsOfPromo(imageUrl: string, apiKey: string, text: string): Promise<{ promoted: boolean; reason: string }> {
+  let dataUri: string;
+  try {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 15000);
+    const resp = await fetch(imageUrl, { signal: ac.signal });
+    clearTimeout(t);
+    if (!resp.ok) return { promoted: false, reason: `img_${resp.status}` };
+    const mime = (resp.headers.get("content-type") || "image/jpeg").split(";")[0];
+    dataUri = `data:${mime};base64,${bytesToBase64(new Uint8Array(await resp.arrayBuffer()))}`;
+  } catch (e) {
+    return { promoted: false, reason: `img_fetch:${(e as Error).message}` };
+  }
+  const content = [
+    { type: "text", text: text ? `Texto del tweet: "${text.slice(0, 300)}"\n\n${X_VISION_PROMPT}` : X_VISION_PROMPT },
+    { type: "image_url", image_url: { url: dataUri } },
+  ];
+  try {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 30000);
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}`, "HTTP-Referer": "https://maven.asmtech.me", "X-Title": "Maven Promolog X" },
+      body: JSON.stringify({ model: VISION_MODEL, messages: [{ role: "user", content }], response_format: { type: "json_object" }, temperature: 0.1, max_tokens: 300 }),
+      signal: ac.signal,
+    });
+    clearTimeout(t);
+    if (!resp.ok) return { promoted: false, reason: `or_${resp.status}` };
+    const raw = ((await resp.json()) as any)?.choices?.[0]?.message?.content ?? "";
+    let parsed: any = null;
+    try { parsed = JSON.parse(raw); } catch { try { parsed = JSON.parse(String(raw).replace(/```(?:json)?/gi, "").trim()); } catch { /* noop */ } }
+    if (!parsed) return { promoted: false, reason: "vision_parse" };
+    return { promoted: parsed.promoted === true, reason: String(parsed.reason || "").slice(0, 200) };
+  } catch (e) {
+    return { promoted: false, reason: `vision:${(e as Error).message}` };
+  }
 }
 
 // "Thu Jun 11 06:33:02 +0000 2026" o ISO → Date.
@@ -118,6 +174,7 @@ Deno.serve(async (req: Request) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const APIFY_TOKEN = Deno.env.get("APIFY_TOKEN") || "";
+  const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || ""; // visión (igual que IG/FB)
   const CRON_TOKEN = Deno.env.get("CRON_INTERNAL_TOKEN");
   const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -181,6 +238,7 @@ Deno.serve(async (req: Request) => {
 
   // 2) Clasificar + insertar (1 fila por tweet), idempotente por evidence_url.
   const results: unknown[] = [];
+  let visionUsed = 0; // cap de costo/tiempo: total de llamadas de visión en la corrida
   for (const c of list) {
     const tweets = (tweetsByCreator.get(c.id) || []).sort((a, b) => {
       const da = parseTweetDate(a?.createdAt || a?.created_at)?.getTime() || 0;
@@ -212,10 +270,17 @@ Deno.serve(async (req: Request) => {
     let inserted = 0, promotedCount = 0, skipped = 0;
     for (let i = 0; i < tweets.length; i++) {
       const it = tweets[i];
-      const { promoted, reason } = classifyX(it, c.onlyfans_url);
-      if (promoted) promotedCount++;
+      let { promoted, reason } = classifyX(it, c.onlyfans_url);
       const permalink: string = it?.url || it?.twitterUrl || "";
       const { firstImage } = tweetMedia(it);
+      // Visión SOLO si no hubo señal de texto pero hay imagen (el promo puede estar
+      // quemado en el arte). El modelo decide; una foto/meme personal → No.
+      if (!promoted && OPENROUTER_API_KEY && firstImage && visionUsed < MAX_VISION_PER_RUN) {
+        visionUsed++;
+        const v = await visionIsOfPromo(firstImage, OPENROUTER_API_KEY, it?.text || it?.fullText || "");
+        if (v.promoted) { promoted = true; reason = `vision-of:${v.reason}`; }
+      }
+      if (promoted) promotedCount++;
       const evidence = firstImage || permalink || null;
       if (dryRun) continue;
       if (!evidence) { skipped++; continue; }
