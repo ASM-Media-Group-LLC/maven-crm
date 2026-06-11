@@ -143,6 +143,7 @@ Deno.serve(async (req: Request) => {
 
   let q = sb.from("creators")
     .select("id, name, twitter_handle, onlyfans_url")
+    .eq("status", "active") // solo creadoras activas (no escanear bajas/terminated)
     .not("twitter_handle", "is", null).neq("twitter_handle", "");
   if (onlyIds && onlyIds.length) q = q.in("id", onlyIds);
   const { data: creators, error: cErr } = await q;

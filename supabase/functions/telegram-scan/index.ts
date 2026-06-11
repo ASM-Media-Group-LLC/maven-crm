@@ -96,6 +96,7 @@ Deno.serve(async (req: Request) => {
   // Creadoras con Telegram (la principal vive en creators.telegram_handle).
   let q = sb.from("creators")
     .select("id, name, instagram_handle, telegram_handle, onlyfans_url")
+    .eq("status", "active") // solo creadoras activas (no escanear bajas/terminated)
     .not("telegram_handle", "is", null)
     .neq("telegram_handle", "");
   if (onlyIds && onlyIds.length) q = q.in("id", onlyIds);
