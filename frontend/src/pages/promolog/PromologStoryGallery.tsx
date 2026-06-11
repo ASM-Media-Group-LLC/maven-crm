@@ -171,6 +171,89 @@ const TelegramLightbox = ({ story }: { story: PromologEntry }) => {
   );
 };
 
+// ── Vista de CHAT de Telegram ───────────────────────────────────────────────
+// Recrea el canal como se ve en la app de Telegram: header del canal + wallpaper
+// + burbujas de mensajes (texto del post, links en azul, hora) + veredicto
+// editable por mensaje. Los posts sin texto se muestran como "foto/video
+// (protegido)" — el contenido DRM no se puede extraer. Se usa cuando TODAS las
+// historias del día son de Telegram.
+const renderTgText = (text: string) =>
+  (text || "").split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+    /^https?:\/\//.test(part)
+      ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-[#168acd] underline break-all">{part}</a>
+      : <span key={i}>{part}</span>,
+  );
+
+const TelegramChatView = ({
+  stories,
+  onSetVerdict,
+  savingId,
+}: {
+  stories: PromologEntry[];
+  onSetVerdict?: (s: PromologEntry, v: "Sí" | "No") => void;
+  savingId?: string | null;
+}) => {
+  const channel = tgChannelName(stories[0]);
+  const initial = (channel.trim()[0] || "T").toUpperCase();
+  const summary = summarizeStories(stories);
+  let lastDate = "";
+  return (
+    <div className="overflow-hidden rounded-2xl shadow-xl ring-1 ring-black/20">
+      {/* Header del canal */}
+      <div className="flex items-center gap-2.5 bg-[#5d7a96] px-3 py-2 text-white">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/25 text-sm font-bold">{initial}</span>
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="truncate text-sm font-semibold">{channel}</p>
+          <p className="text-[11px] text-white/75">{stories.length} {stories.length === 1 ? "mensaje" : "mensajes"} · canal</p>
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-black/20 px-2 py-0.5 text-[10px]"><Lock className="h-2.5 w-2.5" /> protegido</span>
+      </div>
+      {/* Hilo de mensajes sobre el wallpaper de Telegram */}
+      <div
+        className="max-h-[56vh] space-y-1.5 overflow-y-auto px-3 py-3"
+        style={{
+          backgroundColor: "#c5d3dd",
+          backgroundImage: "radial-gradient(rgba(255,255,255,0.5) 1.3px, transparent 1.3px)",
+          backgroundSize: "20px 20px",
+        }}
+      >
+        {stories.map((s) => {
+          const showDate = !!s.date && s.date !== lastDate;
+          if (s.date) lastDate = s.date;
+          return (
+            <div key={s.id}>
+              {showDate && (
+                <div className="flex justify-center py-1.5">
+                  <span className="rounded-full bg-black/20 px-2.5 py-0.5 text-[11px] font-medium text-white">{s.date}</span>
+                </div>
+              )}
+              <div className="flex">
+                <div className="max-w-[88%] rounded-2xl rounded-tl-md bg-white px-2.5 py-1.5 shadow-sm">
+                  <p className="text-[12px] font-semibold text-[#3a8fd6]">{channel}</p>
+                  {s.notes
+                    ? <p className="whitespace-pre-wrap break-words text-[13.5px] leading-snug text-slate-900">{renderTgText(s.notes)}</p>
+                    : <p className="inline-flex items-center gap-1 py-1 text-[12px] italic text-slate-400"><Lock className="h-3 w-3" /> foto/video (protegido)</p>}
+                  <div className="mt-0.5 flex items-center justify-end">
+                    <span className="text-[10px] text-slate-400">{s.time}</span>
+                  </div>
+                  <div className="mt-1 border-t border-slate-100 pt-1">
+                    <VerdictToggle story={s} onSetVerdict={onSetVerdict} saving={savingId === s.id} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* Footer */}
+      <div className="flex items-center justify-between gap-2 bg-[#1f2c39] px-3 py-1.5 text-[11px] text-white/70">
+        <span>{summary.promoted} promovió · {summary.notPromoted} no</span>
+        <span className="inline-flex items-center gap-1 text-right"><Lock className="h-3 w-3 shrink-0" /> recreado del texto · media DRM no extraíble</span>
+      </div>
+    </div>
+  );
+};
+
 interface Props {
   stories: PromologEntry[];
   selectedId?: string;
@@ -212,6 +295,12 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
 
   const activeSlide = active ? (active.story_index != null ? active.story_index + 1 : activeIdx + 1) : 0;
   const activeConf = active?.ai_confidence != null ? Math.round(active.ai_confidence * 100) : null;
+
+  // Si TODAS las historias del día son de Telegram, mostramos la vista de CHAT
+  // (burbujas estilo Telegram) en vez de la grilla de miniaturas.
+  if (stories.length > 0 && stories.every(isTgEvidence)) {
+    return <TelegramChatView stories={stories} onSetVerdict={onSetVerdict} savingId={savingId} />;
+  }
 
   return (
     <div className="space-y-2">
