@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { cn } from "@/lib/utils";
+import { cn, cleanHandle } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Users, Pencil, Upload, X, Check,
@@ -287,15 +287,18 @@ const NuevoCreadorForm = () => {
           age: form.age || null,
           birth_date: form.birth_date || null,
           languages: form.languages.length > 0 ? form.languages : null,
-          instagram_handle: form.instagram_handle || null,
-          twitter_handle: form.twitter_handle || null,
-          tiktok_handle: form.tiktok_handle || null,
-          youtube_handle: form.youtube_handle || null,
-          linkedin_handle: form.linkedin_handle || null,
+          // Handles normalizados a username pelado (cleanHandle saca @ y URLs) para
+          // que los bots (X, etc.) los lean. Telegram NO se toca: el gateway acepta
+          // t.me/+invite y @canal, normalizarlo rompería los invite-links privados.
+          instagram_handle: cleanHandle(form.instagram_handle) || null,
+          twitter_handle: cleanHandle(form.twitter_handle) || null,
+          tiktok_handle: cleanHandle(form.tiktok_handle) || null,
+          youtube_handle: cleanHandle(form.youtube_handle) || null,
+          linkedin_handle: cleanHandle(form.linkedin_handle) || null,
           onlyfans_url: form.onlyfans_url || null,
-          telegram_handle: form.telegram_handle || null,
-          reddit_handle: form.reddit_handle || null,
-          facebook_handle: form.facebook_handle || null,
+          telegram_handle: form.telegram_handle.trim() || null,
+          reddit_handle: cleanHandle(form.reddit_handle) || null,
+          facebook_handle: cleanHandle(form.facebook_handle) || null,
           other_url: form.other_url || null,
           profile_photo_url: form.profile_photo_url || null,
           bio: form.bio || null,

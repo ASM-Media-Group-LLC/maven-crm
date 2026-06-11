@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { useUpdateCreador } from "./useCreadores";
 import { toast } from "@/hooks/use-toast";
-import { buildSocialUrl } from "@/lib/utils";
+import { buildSocialUrl, cleanHandle } from "@/lib/utils";
 import { useModelCategories } from "@/hooks/useModelCategories";
 import type { CreatorWithBusiness } from "./useCreadores";
 
@@ -108,13 +108,15 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           country: form.country.trim() || null,
           city: form.city.trim() || null,
           category: form.category || null,
-          instagram_handle: form.instagram_handle.trim() || null,
-          tiktok_handle: form.tiktok_handle.trim() || null,
-          twitter_handle: form.twitter_handle.trim() || null,
-          youtube_handle: form.youtube_handle.trim() || null,
-          reddit_handle: form.reddit_handle.trim() || null,
+          // Handles normalizados (cleanHandle saca @ y URLs) para que los bots los
+          // lean. Telegram NO: el gateway acepta t.me/+invite y @canal.
+          instagram_handle: cleanHandle(form.instagram_handle) || null,
+          tiktok_handle: cleanHandle(form.tiktok_handle) || null,
+          twitter_handle: cleanHandle(form.twitter_handle) || null,
+          youtube_handle: cleanHandle(form.youtube_handle) || null,
+          reddit_handle: cleanHandle(form.reddit_handle) || null,
           telegram_handle: form.telegram_handle.trim() || null,
-          facebook_handle: form.facebook_handle.trim() || null,
+          facebook_handle: cleanHandle(form.facebook_handle) || null,
           other_url: form.other_url.trim() || null,
           onlyfans_url: form.onlyfans_url.trim() || null,
           whatsapp_number: form.whatsapp_number.trim() || null,
