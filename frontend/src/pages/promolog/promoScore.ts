@@ -35,9 +35,12 @@ export interface ScoreInput {
   network?: string | null;
   promoted: boolean;
   partial?: boolean;
+  analyzed_by_ai?: boolean; // true = entry de bot; false = manual (chatter/humano)
   ai_reasoning?: string | null;
   has_buy_link?: boolean;
+  buy_link_type?: string | null;
   ai_confidence?: number | null;
+  notes?: string | null;
 }
 
 export interface NetworkScore {
@@ -60,13 +63,20 @@ const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 export function qualityForEntry(e: ScoreInput): number {
   if (!e.promoted) return 0;
   const net = canonicalNetwork(e.network);
+  const notes = (e.notes || "").toLowerCase();
+  const hasLink = e.has_buy_link === true || !!e.buy_link_type || /(onlyfans|enlace|\blink\b|fans)/.test(notes);
   let q: number;
-  if (net === "instagram") {
-    // IG tiene señales ricas (visión): link explícito a OF pesa fuerte + confianza.
+
+  if (!e.analyzed_by_ai) {
+    // Manual / verificada por un humano (chatter): es una promo REAL confirmada → base
+    // alta. No tenemos puntaje fino de calidad → un link la sube. Fase 2 (IA) la afina.
+    q = 0.75 + (hasLink ? 0.25 : 0);
+  } else if (net === "instagram") {
+    // IG bot (visión): link explícito a OF pesa fuerte + confianza de la visión.
     const conf = e.ai_confidence != null ? clamp01(e.ai_confidence) : 0.6;
     q = 0.45 + (e.has_buy_link ? 0.35 : 0) + 0.2 * conf;
   } else {
-    // X / Telegram / Facebook: solo tokens cortos en ai_reasoning.
+    // X / Telegram / Facebook bot: solo tokens cortos en ai_reasoning.
     const r = (e.ai_reasoning || "").toLowerCase();
     if (/(onlyfans|of_handle|link_agg)/.test(r)) q = 1.0; // link/handle de OF explícito
     else if (r.includes("vision-of")) q = 0.85; // la visión confirmó promo de OF en la imagen

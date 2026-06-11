@@ -189,9 +189,12 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
             network: (e.network || "").toLowerCase(),
             promoted: e.promoted === "true",
             partial: e.promoted === "partial",
+            analyzed_by_ai: e.analyzed_by_ai === true,
             ai_reasoning: e.ai_reasoning,
             has_buy_link: e.has_buy_link === true,
+            buy_link_type: e.buy_link_type,
             ai_confidence: e.ai_confidence != null ? Number(e.ai_confidence) : null,
+            notes: e.notes,
           })),
         ),
       );

@@ -342,9 +342,12 @@ const PromologContent = () => {
           network: e.network,
           promoted: e.result === "Sí",
           partial: e.result === "Parcial",
+          analyzed_by_ai: e.analyzed_by_ai,
           ai_reasoning: e.ai_reasoning,
           has_buy_link: e.has_buy_link,
+          buy_link_type: e.buy_link_type,
           ai_confidence: e.ai_confidence,
+          notes: e.notes,
         })),
       );
       result.push({ ...best, networks, promotedNetworks, dayScore, networkScores });
