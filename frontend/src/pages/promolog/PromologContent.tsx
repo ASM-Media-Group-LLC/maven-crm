@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isSameDay, addDays, startOfWeek, isToday, isFuture, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
+import { computeDayScore } from "./promoScore";
 import {
   Users,
   Search,
@@ -335,7 +336,18 @@ const PromologContent = () => {
       const promotedNetworks = Array.from(new Set(
         group.filter(e => e.result === "Sí").map(e => (e.network || "").toLowerCase()).filter(Boolean),
       ));
-      result.push({ ...best, networks, promotedNetworks });
+      // Score de calidad del día (peso×calidad por red) desde TODO el grupo del día.
+      const { score: dayScore, networks: networkScores } = computeDayScore(
+        group.map((e) => ({
+          network: e.network,
+          promoted: e.result === "Sí",
+          partial: e.result === "Parcial",
+          ai_reasoning: e.ai_reasoning,
+          has_buy_link: e.has_buy_link,
+          ai_confidence: e.ai_confidence,
+        })),
+      );
+      result.push({ ...best, networks, promotedNetworks, dayScore, networkScores });
     }
     return result;
   }, [entries]);

@@ -22,6 +22,7 @@ import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { type PromologEntry } from "./PromologEntryCard";
+import PromoQualityBar from "./PromoQualityBar";
 
 interface Props {
   entries: PromologEntry[];
@@ -203,7 +204,7 @@ const PromologTable = ({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead colSpan={9} className="text-center py-16 text-muted-foreground">
+              <TableHead colSpan={10} className="text-center py-16 text-muted-foreground">
                 <p className="text-lg font-medium">No hay entradas</p>
                 <p className="text-sm">Registra una nueva entrada para comenzar</p>
               </TableHead>
@@ -224,6 +225,7 @@ const PromologTable = ({
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Red Social" sortKeyName="network" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Plataforma" sortKeyName="platform" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Resultado" sortKeyName="result" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]" title="Calidad de la promo del día (IG 60% · X/TG/FB ~13% c/u × calidad)">Calidad</TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" sortKeyName="agent" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
           <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-right">Acciones</TableHead>
@@ -275,6 +277,13 @@ const PromologTable = ({
               <Badge variant={resultVariant[entry.result] || "secondary-soft"} className="text-xs">
                 {entry.result}
               </Badge>
+            </TableCell>
+            <TableCell className="min-w-[150px]">
+              {entry.networkScores?.length ? (
+                <PromoQualityBar networks={entry.networkScores} score={entry.dayScore ?? 0} />
+              ) : (
+                <span className="text-xs text-muted-foreground">—</span>
+              )}
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">
               {entry.agent === "AI Agent" ? (

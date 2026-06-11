@@ -13,6 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
 import type { PromologEntry } from "./PromologEntryCard";
+import { computeDayScore, type DayScore } from "./promoScore";
+import PromoQualityBar from "./PromoQualityBar";
 
 // ── Calendario de promos por creadora ─────────────────────────────────
 // Subtab que muestra, para UNA creadora y un mes/año elegidos, qué días
@@ -176,6 +178,27 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     return map;
   }, [monthEntries, userTz]);
 
+  // Score de calidad por día (peso×calidad por red) desde las entries crudas del bucket.
+  const dayScores = useMemo(() => {
+    const m = new Map<string, DayScore>();
+    for (const [key, bucket] of dayMap.entries()) {
+      m.set(
+        key,
+        computeDayScore(
+          bucket.raw.map((e: any) => ({
+            network: (e.network || "").toLowerCase(),
+            promoted: e.promoted === "true",
+            partial: e.promoted === "partial",
+            ai_reasoning: e.ai_reasoning,
+            has_buy_link: e.has_buy_link === true,
+            ai_confidence: e.ai_confidence != null ? Number(e.ai_confidence) : null,
+          })),
+        ),
+      );
+    }
+    return m;
+  }, [dayMap]);
+
   const statusFor = (bucket?: { total: number; trueCount: number; partialCount: number }): DayStatus => {
     if (!bucket || bucket.total === 0) return "none";
     if (bucket.trueCount > 0) return "promo";
@@ -261,6 +284,20 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     return { promo, partial, no, none };
   }, [gridDays, dayMap, cursor, today]);
 
+  // Promedio de calidad del mes = promedio de los scores diarios de los días ESCANEADOS
+  // (los días sin análisis no diluyen el número).
+  const monthAvgScore = useMemo(() => {
+    let sum = 0, n = 0;
+    for (const d of gridDays) {
+      if (!isSameMonth(d, cursor) || isAfter(startOfDay(d), today)) continue;
+      const key = format(d, "yyyy-MM-dd");
+      if (!dayMap.get(key)) continue; // solo días con registro
+      sum += dayScores.get(key)?.score ?? 0;
+      n++;
+    }
+    return n > 0 ? sum / n : null;
+  }, [gridDays, dayScores, dayMap, cursor, today]);
+
   const goPrev = () => setCursor(new Date(year, month - 1, 1));
   const goNext = () => setCursor(new Date(year, month + 1, 1));
 
@@ -343,7 +380,11 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
               <div>
                 <p className="text-sm font-semibold leading-tight">{selectedCreator?.artistic_name || selectedCreator?.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {MONTHS_ES[month]} {year} · {monthSummary.promo} promocionó · {monthSummary.no} no · {monthSummary.none} sin análisis
+                  {MONTHS_ES[month]} {year} ·{" "}
+                  <span className="font-semibold text-foreground">
+                    {monthAvgScore != null ? `${Math.round(monthAvgScore * 100)}% calidad` : "— calidad"}
+                  </span>{" "}
+                  · {monthSummary.promo} promocionó · {monthSummary.no} no · {monthSummary.none} sin análisis
                 </p>
               </div>
             </div>
@@ -392,12 +433,21 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
                       {d.getDate()}
                     </span>
                     {inMonth && !future && status !== "none" && (
-                      <div className="mt-auto flex items-center justify-between gap-1">
-                        <StatusDot status={status} />
-                        {bucket && bucket.total > 0 && (
-                          <span className="text-[10px] tabular-nums text-muted-foreground">
-                            {bucket.trueCount + bucket.partialCount}/{bucket.total}
-                          </span>
+                      <div className="mt-auto flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <StatusDot status={status} />
+                          {bucket && bucket.total > 0 && (
+                            <span className="text-[10px] tabular-nums text-muted-foreground">
+                              {bucket.trueCount + bucket.partialCount}/{bucket.total}
+                            </span>
+                          )}
+                        </div>
+                        {dayScores.get(key) && (
+                          <PromoQualityBar
+                            variant="thin"
+                            networks={dayScores.get(key)!.networks}
+                            score={dayScores.get(key)!.score}
+                          />
                         )}
                       </div>
                     )}

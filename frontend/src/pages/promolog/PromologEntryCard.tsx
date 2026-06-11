@@ -18,6 +18,7 @@ import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
+import type { NetworkScore } from "./promoScore";
 
 export interface PromologEntry {
   id: string;
@@ -32,6 +33,10 @@ export interface PromologEntry {
   // Subconjunto de `networks` donde promocionó (Sí). La columna pinta esas full y
   // las "solo revisadas, sin promo" en gris.
   promotedNetworks?: string[];
+  // Score de CALIDAD del día (0-1) y desglose por red (peso×calidad), calculado en el
+  // dedupe de PromologContent. Lo consume la columna "Calidad" (barra segmentada).
+  dayScore?: number;
+  networkScores?: NetworkScore[];
   platform: string;
   result: string;
   date: string;
