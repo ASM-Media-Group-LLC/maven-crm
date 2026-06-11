@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   Mail,
   Trash2,
+  RotateCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,6 +39,7 @@ import {
   useQaCalls,
   useFireQaWebhook,
   useDeleteQaCall,
+  useReprocessQaCall,
   scoreColor,
 } from "@/hooks/useAgencyQa";
 
@@ -54,10 +56,14 @@ import {
 
 const computeStatus = (call: {
   audio_path: string | null;
-  transcript: string;
+  transcript: string | null;
   claude_score: number;
   claude_analysis: { summary?: string };
-}): "ready" | "no-analysis" | "broken" => {
+  status?: string | null;
+}): "ready" | "no-analysis" | "broken" | "processing" | "failed" => {
+  // El status real del pipeline manda (subida nueva = 'processing' hasta que termina).
+  if (call.status === "processing") return "processing";
+  if (call.status === "failed") return "failed";
   if (!call.transcript) return "broken";
   const hasAnalysis =
     call.claude_score > 0 || (call.claude_analysis?.summary?.length ?? 0) > 0;
@@ -89,6 +95,22 @@ const StatusBadge = ({
       >
         <Clock className="h-3 w-3" />
         Sin análisis
+      </Badge>
+    );
+  }
+  if (status === "processing") {
+    return (
+      <Badge variant="outline" className="gap-1 border-sky-500/40 text-sky-400">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Procesando…
+      </Badge>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <Badge variant="outline" className="gap-1 border-rose-500/40 text-rose-400">
+        <AlertTriangle className="h-3 w-3" />
+        Falló
       </Badge>
     );
   }
@@ -153,6 +175,21 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
   const callsQ = useQaCalls();
   const fireWebhook = useFireQaWebhook();
   const deleteCall = useDeleteQaCall();
+  const reprocess = useReprocessQaCall();
+
+  // Reintenta transcribir+analizar una QA que quedó 'processing'/'failed'
+  // (ej. un blip transitorio de ElevenLabs). La fila ya existe → no se pierde nada.
+  const handleRetry = (e: React.MouseEvent, callId: string) => {
+    e.stopPropagation();
+    if (reprocess.isPending) return;
+    toast.loading("Reprocesando…", { id: `retry-${callId}` });
+    reprocess
+      .mutateAsync(callId)
+      .then((r) => toast.success(`Listo · score ${r.score}/100`, { id: `retry-${callId}` }))
+      .catch((err) =>
+        toast.error("Falló de nuevo", { id: `retry-${callId}`, description: (err as Error).message }),
+      );
+  };
   const { canAccess } = usePermissions();
   const { isAdmin } = useUserRole();
   const canDelete = canAccess("Agency QA", "Borrar Calls");
@@ -372,6 +409,17 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                       {/* Acciones — Reenviar + Borrar */}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {(status === "failed" || status === "processing") && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleRetry(e, call.id)}
+                              disabled={reprocess.isPending}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sky-500/10 hover:text-sky-400 disabled:opacity-50"
+                              title="Reintentar transcripción + análisis"
+                            >
+                              <RotateCw className={reprocess.isPending ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={(e) => askResend(e, call.id, label)}

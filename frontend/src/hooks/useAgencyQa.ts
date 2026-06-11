@@ -105,6 +105,10 @@ export interface QaCall {
    *  predate the column. QA History falls back to evaluator_name match
    *  when uploaded_by is NULL. */
   uploaded_by?: string | null;
+  /** Estado del pipeline: processing (subida guardada, transcribiendo/analizando),
+   *  ready (listo), failed (falló — se puede Reintentar). Legacy → 'ready'. */
+  status?: string | null;
+  error_message?: string | null;
 }
 
 /** Row shape returned by the joined list query — calls + flattened
@@ -462,9 +466,10 @@ export interface CreateQaCallInput {
   model_id: string;
   call_date: string;        // ISO yyyy-mm-dd
   evaluator_name: string;
-  transcript: string;
+  transcript?: string | null; // opcional: las subidas nuevas crean la fila SIN transcript (status=processing)
   audio_path?: string | null;
   audio_metrics?: unknown | null;
+  status?: string;            // 'processing' para subidas nuevas; default 'ready'
 }
 
 export const useCreateQaCall = () => {
@@ -483,12 +488,13 @@ export const useCreateQaCall = () => {
           model_id: input.model_id,
           call_date: input.call_date,
           evaluator_name: input.evaluator_name,
-          transcript: input.transcript,
+          transcript: input.transcript ?? null,
           audio_path: input.audio_path ?? null,
           claude_analysis: {},
           claude_score: 0,
           audio_metrics: input.audio_metrics ?? null,
           uploaded_by: uploaderId,
+          status: input.status ?? "ready",
         })
         .select("*")
         .single();
@@ -499,6 +505,63 @@ export const useCreateQaCall = () => {
       qc.invalidateQueries({ queryKey: ["qa-calls"] });
       qc.invalidateQueries({ queryKey: ["qa-models-with-stats"] });
       qc.invalidateQueries({ queryKey: ["qa-analytics"] });
+    },
+  });
+};
+
+/** Reprocesa una QA: transcribe (si falta) + analiza, actualizando la fila y su
+ *  `status`. Lo usa la subida nueva (la fila se crea en 'processing' y esto la
+ *  completa) y el botón "Reintentar" cuando una quedó 'failed'. Como la fila YA
+ *  existe en la DB, si esto falla la subida NO se pierde: queda 'failed' con el
+ *  motivo, lista para reintentar. */
+export const useReprocessQaCall = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (callId: string): Promise<{ score: number }> => {
+      const edgeErr = async (error: unknown): Promise<string> => {
+        const ctx = (error as { context?: { json?: () => Promise<unknown> } })?.context;
+        if (ctx && typeof ctx.json === "function") {
+          try {
+            const b = (await ctx.json()) as { error?: string };
+            if (b?.error) return b.error;
+          } catch { /* body no-json */ }
+        }
+        return (error as Error)?.message ?? "Error";
+      };
+      const { data: row, error: rErr } = await sb
+        .from("qa_calls").select("id, audio_path, transcript").eq("id", callId).single();
+      if (rErr) throw rErr;
+      if (!row?.audio_path) throw new Error("La QA no tiene audio para procesar.");
+      await sb.from("qa_calls").update({ status: "processing", error_message: null }).eq("id", callId);
+      try {
+        let transcript: string | null = (row.transcript as string | null) || null;
+        if (!transcript) {
+          const { data: tr, error: tErr } = await supabase.functions.invoke("qa-transcribe", {
+            body: { audio_path: row.audio_path, language: "es" },
+          });
+          if (tErr) throw new Error(await edgeErr(tErr));
+          const p = tr as { text?: string; audio_metrics?: unknown; error?: string };
+          if (p?.error) throw new Error(p.error);
+          transcript = (p?.text ?? "").trim();
+          if (!transcript) throw new Error("La transcripción está vacía. ¿El audio tiene voz audible?");
+          await sb.from("qa_calls").update({ transcript, audio_metrics: p?.audio_metrics ?? null }).eq("id", callId);
+        }
+        const { data: an, error: aErr } = await supabase.functions.invoke("qa-analyze", { body: { call_id: callId } });
+        if (aErr) throw new Error(await edgeErr(aErr));
+        if ((an as { error?: string })?.error) throw new Error((an as { error: string }).error);
+        await sb.from("qa_calls").update({ status: "ready", error_message: null }).eq("id", callId);
+        return { score: (an as { score?: number })?.score ?? 0 };
+      } catch (e) {
+        await sb.from("qa_calls")
+          .update({ status: "failed", error_message: String((e as Error).message).slice(0, 500) })
+          .eq("id", callId);
+        throw e;
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["qa-calls"] });
+      qc.invalidateQueries({ queryKey: ["qa-analytics"] });
+      qc.invalidateQueries({ queryKey: ["qa-models-with-stats"] });
     },
   });
 };

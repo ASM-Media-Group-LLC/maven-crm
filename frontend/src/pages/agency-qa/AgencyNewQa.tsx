@@ -42,6 +42,7 @@ import { compressAudioIfNeeded } from "@/lib/audioCompress";
 import {
   useAnalyzeQaCall,
   useCreateQaCall,
+  useReprocessQaCall,
   useCurrentTenantId,
   useFetchIgAvatar,
   useFireQaWebhook,
@@ -102,6 +103,7 @@ const AgencyNewQa = () => {
   const create = useCreateQaCall();
   const analyze = useAnalyzeQaCall();
   const transcribe = useTranscribeAudio();
+  const reprocess = useReprocessQaCall();
   const uploadAudio = useUploadQaAudio();
   const upsertCloser = useUpsertQaCloser();
   const upsertModel = useUpsertQaModel();
@@ -311,32 +313,19 @@ const AgencyNewQa = () => {
       });
       toast.dismiss("upload");
 
-      // 4. Transcribir (el edge baja desde Storage → ElevenLabs Scribe).
-      setSubmitStage("Transcribiendo…");
-      toast.loading("Transcribiendo audio…", { id: "transcribe" });
-      const transcribeResult = await transcribe.mutateAsync({
-        audioPath: savedAudioPath,
-      });
-      toast.dismiss("transcribe");
-      const transcriptText = transcribeResult.text.trim();
-      if (transcriptText.length === 0) {
-        throw new Error("La transcripción está vacía. ¿El audio tiene voz audible?");
-      }
-
-      // 5. Insert qa_calls con id explícito + transcript + audio_path.
-      // audio_metrics ahora incluye words[] con timestamps por palabra
-      // que el frontend usa para captions sincronizadas en el detail.
-      // El trigger AFTER INSERT en qa_calls auto-crea el participant
-      // primary en qa_call_participants — la UI solo agrega supports.
+      // 4. Crear la fila YA (estado "procesando"), ANTES de transcribir. El audio
+      // ya está en Storage, así la subida NUNCA se pierde aunque la transcripción
+      // falle o se corte el navegador. (Antes la fila se creaba DESPUÉS de
+      // transcribir → si fallaba, el closer perdía la QA sin saberlo. Caso real:
+      // Miguel 2026-06-11.) El trigger AFTER INSERT auto-crea el participant primary.
       setSubmitStage("Guardando QA…");
       const row = await create.mutateAsync({
         closer_id: qaCloserId,
         model_id: qaModelId,
         call_date: callDate,
         evaluator_name: evaluatorName.trim() || defaultEvaluator,
-        transcript: transcriptText,
         audio_path: savedAudioPath,
-        audio_metrics: transcribeResult.audio_metrics,
+        status: "processing",
       });
 
       // 5.5 Insertar closers de soporte como participants.
@@ -382,21 +371,22 @@ const AgencyNewQa = () => {
       setSupportCloserIds([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
 
-      // 8. Disparar análisis IA.
-      setSubmitStage("Analizando con IA…");
+      // 8. Transcribir + analizar (server-side). La fila ya existe en 'processing';
+      // esto la completa (status → 'ready'). El email lo manda qa-analyze
+      // server-side al terminar. Si falla, reprocess deja la fila en 'failed' con
+      // el motivo → se Reintenta desde Calls. La subida NO se pierde.
+      setSubmitStage("Transcribiendo y analizando…");
+      toast.loading("Transcribiendo y analizando…", { id: "process" });
       try {
-        const result = await analyze.mutateAsync(row.id);
-        toast.success(`Análisis IA listo · score ${result.score}/100`, {
-          description: "Aparece en Calls con detalle completo.",
+        const result = await reprocess.mutateAsync(row.id);
+        toast.dismiss("process");
+        toast.success(`QA lista · score ${result.score}/100`, {
+          description: "Aparece en Calls con el detalle completo.",
         });
-        // 9. El email del reporte ahora lo manda qa-analyze SERVER-SIDE al
-        // terminar el análisis — NO depende de que esta pestaña siga abierta.
-        // Antes se disparaba acá fire-and-forget y se perdía si el examiner
-        // cerraba la pestaña (caso real: QA de Miguel 2026-06-10). El botón
-        // "Reenviar email" en QA History / detalle sigue para reenvíos manuales.
-      } catch (analyzeErr) {
-        toast.error("Análisis IA falló — la QA quedó guardada igual", {
-          description: (analyzeErr as Error).message,
+      } catch (procErr) {
+        toast.dismiss("process");
+        toast.error("La QA quedó GUARDADA, pero falló el procesado", {
+          description: `${(procErr as Error).message} · Reintentá desde Calls (no se perdió).`,
         });
       }
     } catch (err) {
