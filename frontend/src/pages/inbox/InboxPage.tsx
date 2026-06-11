@@ -304,7 +304,7 @@ const InboxPage = () => {
     // Fijados primero; dentro de cada grupo se respeta el orden por fecha de la query
     // (sort estable). Los archivados no se fijan arriba.
     return [...list].sort((a, b) => Number(b.pinned && !b.archived) - Number(a.pinned && !a.archived));
-  }, [conversations, search, chatFilter, labelFilter, showArchived]);
+  }, [conversations, search, chatFilter, labelFilter, showArchived, channelFilter]);
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null;
 
