@@ -17,6 +17,7 @@ import {
   Instagram as InstagramIcon,
   Link2,
   Gauge,
+  Sparkles,
 } from "lucide-react";
 import { format, eachDayOfInterval, isSameDay, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -75,6 +76,8 @@ interface Props {
   activeCreatorsCount?: number;
   // Métricas del período anterior equivalente, para los deltas ▲/▼.
   prevMetrics?: { promos: number; successRate: number } | null;
+  // Roster activo (lista) para el feed de "Acciones recomendadas".
+  activeCreators?: Array<{ id: string; name: string | null; category: string | null; instagram_handle: string | null; profile_photo_url: string | null }>;
 }
 
 const PromologDashboardView = ({
@@ -86,6 +89,7 @@ const PromologDashboardView = ({
   onOpenEntry,
   activeCreatorsCount,
   prevMetrics,
+  activeCreators,
 }: Props) => {
   const navigate = useNavigate();
 
@@ -299,9 +303,40 @@ const PromologDashboardView = ({
 
   // ── Acción requerida ────────────────────────────────────────────────
   // (1) Elite que NO promocionaron en el período.
-  const eliteNotPromoted = useMemo(() => {
-    return creatorsAgg.filter(c => (c.category === "Elite" || c.category === "A+") && c.promoCount === 0);
-  }, [creatorsAgg]);
+  // Feed "Acciones recomendadas": señales accionables por creadora en el rango.
+  // Mismo payload que después consumirá el bot de WhatsApp asesor. Prioridad:
+  //   1 = tier alto (Elite/A+) sin promocionar · 2 = promo de baja calidad ·
+  //   3 = solo promociona en IG (empujar multi-red para subir el score).
+  const recommendations = useMemo(() => {
+    const byCreator = new Map<string, { promoted: boolean; nets: Set<string>; bestScore: number }>();
+    for (const e of filteredEntries) {
+      if (!e.creator_id) continue;
+      const cur = byCreator.get(e.creator_id) ?? { promoted: false, nets: new Set<string>(), bestScore: 0 };
+      if (e.result === "Sí") cur.promoted = true;
+      (e.promotedNetworks ?? []).forEach((n) => cur.nets.add(n));
+      cur.bestScore = Math.max(cur.bestScore, e.dayScore ?? 0);
+      byCreator.set(e.creator_id, cur);
+    }
+    type Rec = { id: string; name: string; handle: string | null; photo: string | null; category: string | null; kind: string; priority: number; reason: string };
+    const recs: Rec[] = [];
+    for (const c of activeCreators ?? []) {
+      const tierHigh = c.category === "Elite" || c.category === "A+";
+      const st = byCreator.get(c.id);
+      const base = { id: c.id, name: c.name ?? "—", handle: c.instagram_handle, photo: c.profile_photo_url, category: c.category };
+      if (!st || !st.promoted) {
+        // No promocionó: solo lo accionamos si es tier alto (el resto ya sale en "Menos Promoción").
+        if (tierHigh) recs.push({ ...base, kind: "tier_sin_promo", priority: 1, reason: "Tier alto sin promocionar — empujar promo" });
+        continue;
+      }
+      if (st.bestScore > 0 && st.bestScore < 0.4) {
+        recs.push({ ...base, kind: "baja_calidad", priority: 2, reason: `Promo floja (${Math.round(st.bestScore * 100)}%) — pedir link de compra` });
+      } else if (st.nets.size === 1 && st.nets.has("instagram")) {
+        recs.push({ ...base, kind: "solo_ig", priority: 3, reason: "Solo promociona en IG — empujar otra red (sube el score)" });
+      }
+    }
+    recs.sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name));
+    return recs;
+  }, [filteredEntries, activeCreators]);
   // (2) Entries pendientes de revisar (status="Pendiente" — la AI no
   // pudo clasificar con confianza, o el humano aún no revisó).
   const pendingEntries = useMemo(() => {
@@ -576,45 +611,43 @@ const PromologDashboardView = ({
 
       {/* ═══ Row 5: Acción Requerida ═══════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* (a) Elite que no promocionaron */}
-        <Card className={eliteNotPromoted.length > 0 ? "border-rose-500/30" : ""}>
+        {/* (a) Acciones recomendadas — feed accionable (mismo payload del futuro bot asesor) */}
+        <Card className={recommendations.length > 0 ? "border-amber-500/30" : ""}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <AlertCircle className={`h-4 w-4 ${eliteNotPromoted.length > 0 ? "text-rose-400" : "text-muted-foreground"}`} />
+                <Sparkles className={`h-4 w-4 ${recommendations.length > 0 ? "text-amber-400" : "text-muted-foreground"}`} />
                 <div>
-                  <h3 className="text-sm font-semibold">Elite/A+ que NO promocionaron</h3>
-                  <p className="text-xs text-muted-foreground">Atención prioritaria — son las top tier</p>
+                  <h3 className="text-sm font-semibold">Acciones recomendadas</h3>
+                  <p className="text-xs text-muted-foreground">Qué pedirle al chatter — priorizado</p>
                 </div>
               </div>
-              <Badge variant={eliteNotPromoted.length > 0 ? "destructive-soft" : "secondary-soft"} className="text-[10px]">
-                {eliteNotPromoted.length}
+              <Badge variant={recommendations.length > 0 ? "warning-soft" : "secondary-soft"} className="text-[10px]">
+                {recommendations.length}
               </Badge>
             </div>
-            {eliteNotPromoted.length === 0 ? (
+            {recommendations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-4 text-center">
                 <CheckCircle2 className="h-6 w-6 text-emerald-400 mb-1" />
-                <p className="text-xs text-emerald-400 font-medium">Todas las Elite cumplieron 🎉</p>
+                <p className="text-xs text-emerald-400 font-medium">Nada urgente 🎉</p>
               </div>
             ) : (
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                {eliteNotPromoted.map((c) => (
-                  <ListRowButton
-                    key={c.creatorId}
-                    onClick={() => goToCreator(c.creatorId)}
-                    className="justify-between"
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                {recommendations.slice(0, 20).map((r) => (
+                  <ListRowButton key={r.id} onClick={() => goToCreator(r.id)} className="justify-between gap-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
                       <Avatar className="h-6 w-6">
-                        {c.photo ? <AvatarImage src={c.photo} alt={c.name} /> : null}
-                        <AvatarFallback className="text-[10px]">{getInitials(c.name)}</AvatarFallback>
+                        {r.photo ? <AvatarImage src={r.photo} alt={r.name} /> : null}
+                        <AvatarFallback className="text-[10px]">{getInitials(r.name)}</AvatarFallback>
                       </Avatar>
-                      <span className="font-medium text-xs truncate">{c.name}</span>
+                      <div className="min-w-0 flex-1">
+                        <span className="block truncate text-xs font-medium">{r.name}</span>
+                        <span className="block truncate text-[10px] text-muted-foreground">{r.reason}</span>
+                      </div>
                     </div>
-                    <Badge variant="destructive-soft" className="text-[9px] gap-1 shrink-0">
-                      <XCircle className="h-3 w-3" />
-                      Sin promo
-                    </Badge>
+                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold ${REC_TONE[r.priority] ?? "bg-muted text-muted-foreground"}`}>
+                      P{r.priority}
+                    </span>
                   </ListRowButton>
                 ))}
               </div>
@@ -667,6 +700,13 @@ const PromologDashboardView = ({
 };
 
 // ─── Sub-components ──────────────────────────────────────────────────
+
+// Color del chip de prioridad en el feed de acciones recomendadas.
+const REC_TONE: Record<number, string> = {
+  1: "bg-rose-500/15 text-rose-400",
+  2: "bg-amber-500/15 text-amber-400",
+  3: "bg-sky-500/15 text-sky-400",
+};
 
 const POSITION_STYLES = [
   // Oro
