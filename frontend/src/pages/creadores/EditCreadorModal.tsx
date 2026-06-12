@@ -27,7 +27,7 @@ import type { CreatorWithBusiness } from "./useCreadores";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
-import ExtraPlatformAccounts from "./ExtraPlatformAccounts";
+import ExtraAccountsInline from "./ExtraAccountsInline";
 import { useUserRole } from "@/hooks/useUserRole";
 
 interface Props {
@@ -265,30 +265,37 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               <div className="space-y-1.5">
                 <Label>Instagram</Label>
                 <Input value={form.instagram_handle} onChange={(e) => handleChange("instagram_handle", e.target.value)} placeholder="@usuario" />
+                <ExtraAccountsInline creatorId={creator?.id} network="instagram" canManage={canManageAccounts} />
               </div>
               <div className="space-y-1.5">
                 <Label>Twitter/X</Label>
                 <Input value={form.twitter_handle} onChange={(e) => handleChange("twitter_handle", e.target.value)} placeholder="@usuario" />
+                <ExtraAccountsInline creatorId={creator?.id} network="x" canManage={canManageAccounts} />
               </div>
               <div className="space-y-1.5">
                 <Label>TikTok</Label>
                 <Input value={form.tiktok_handle} onChange={(e) => handleChange("tiktok_handle", e.target.value)} placeholder="@usuario" />
+                <ExtraAccountsInline creatorId={creator?.id} network="tiktok" canManage={canManageAccounts} />
               </div>
               <div className="space-y-1.5">
                 <Label>YouTube</Label>
                 <Input value={form.youtube_handle} onChange={(e) => handleChange("youtube_handle", e.target.value)} placeholder="@canal" />
+                <ExtraAccountsInline creatorId={creator?.id} network="youtube" canManage={canManageAccounts} />
               </div>
               <div className="space-y-1.5">
                 <Label>Telegram</Label>
                 <Input value={form.telegram_handle} onChange={(e) => handleChange("telegram_handle", e.target.value)} placeholder="@usuario o t.me/..." />
+                <ExtraAccountsInline creatorId={creator?.id} network="telegram" canManage={canManageAccounts} />
               </div>
               <div className="space-y-1.5">
                 <Label>Reddit</Label>
                 <Input value={form.reddit_handle} onChange={(e) => handleChange("reddit_handle", e.target.value)} placeholder="u/usuario" />
+                <ExtraAccountsInline creatorId={creator?.id} network="reddit" canManage={canManageAccounts} />
               </div>
               <div className="space-y-1.5">
                 <Label>Facebook</Label>
                 <Input value={form.facebook_handle} onChange={(e) => handleChange("facebook_handle", e.target.value)} placeholder="usuario o URL" />
+                <ExtraAccountsInline creatorId={creator?.id} network="facebook" canManage={canManageAccounts} />
               </div>
               <div className="space-y-1.5">
                 <Label>Otra red / Link</Label>
@@ -303,17 +310,6 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 <Input value={form.whatsapp_number} onChange={(e) => handleChange("whatsapp_number", e.target.value)} placeholder="+1 234 567 8900" />
               </div>
             </div>
-            {/* Cuentas ADICIONALES por red (ej. 2º Instagram) — el bot de Promolog las
-                escanea junto con la principal. Se guardan al instante (no con "Guardar"). */}
-            {creator?.id && (
-              <div className="space-y-1 pt-1">
-                <p className="text-[11px] text-muted-foreground">Cuentas adicionales por red (el bot las escanea junto con la principal):</p>
-                <ExtraPlatformAccounts creatorId={creator.id} network="instagram" label="Instagram" icon={<InstagramIcon className="h-4 w-4" />} canManage={canManageAccounts} placeholder="@otra_cuenta o link de IG" />
-                <ExtraPlatformAccounts creatorId={creator.id} network="x" label="X (Twitter)" icon={<XIcon className="h-4 w-4" />} canManage={canManageAccounts} placeholder="@otra_cuenta o link de X" />
-                <ExtraPlatformAccounts creatorId={creator.id} network="facebook" label="Facebook" icon={<Facebook className="h-4 w-4" />} canManage={canManageAccounts} placeholder="usuario o link de Facebook" />
-                <ExtraPlatformAccounts creatorId={creator.id} network="telegram" label="Telegram" icon={<TelegramIcon className="h-4 w-4" />} canManage={canManageAccounts} placeholder="@canal o link de Telegram" />
-              </div>
-            )}
           </section>
 
           <section className="space-y-1.5 pt-2 border-t border-border/60">
