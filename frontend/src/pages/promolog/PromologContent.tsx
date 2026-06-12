@@ -249,6 +249,38 @@ const PromologContent = () => {
     },
   });
 
+  // Métricas del PERÍODO ANTERIOR equivalente (misma longitud, justo antes del rango)
+  // para los deltas ▲/▼ del Dashboard. Query liviana (solo creator_id/date/promoted) +
+  // dedup por creador+día con la misma semántica que el Dashboard (un creador-día cuenta
+  // como promo si tuvo ≥1 entry promocionada).
+  const { data: prevMetrics = null } = useQuery({
+    queryKey: ["promolog-prev-metrics", user?.id, dateFrom?.toISOString(), dateTo?.toISOString(), isManagement],
+    enabled: !!dateFrom && !!dateTo,
+    queryFn: async () => {
+      const lenDays = Math.max(1, Math.round((dateTo!.getTime() - dateFrom!.getTime()) / 86_400_000) + 1);
+      const prevToStr = dateFrom!.toISOString().split("T")[0]; // exclusivo: arranca el rango actual
+      const prevFromStr = new Date(dateFrom!.getTime() - lenDays * 86_400_000).toISOString().split("T")[0];
+      let q = supabase
+        .from("promolog_entries")
+        .select("creator_id, date, promoted")
+        .gte("date", prevFromStr)
+        .lt("date", prevToStr)
+        .limit(10000);
+      if (!isManagement && user?.id) q = q.or(`reviewed_by.eq.${user.id},created_by.eq.${user.id}`);
+      const { data, error } = await q;
+      if (error) throw error;
+      const groups = new Map<string, boolean>();
+      for (const r of (data ?? []) as Array<{ creator_id: string | null; date: string; promoted: string | null }>) {
+        const key = `${r.creator_id || ""}|${r.date}`;
+        const isPromo = r.promoted === "true" || r.promoted === "yes";
+        groups.set(key, (groups.get(key) || false) || isPromo);
+      }
+      const creatorDays = groups.size;
+      const promos = [...groups.values()].filter(Boolean).length;
+      return { promos, successRate: creatorDays > 0 ? Math.round((promos / creatorDays) * 100) : 0 };
+    },
+  });
+
   // Timezone preferido del user — afecta cómo se renderizan TODAS las
   // fechas/horas en Promolog. Cuando el user cambia el TZ en el topbar,
   // este memo recalcula y todas las entries se re-renderean con la nueva
@@ -939,6 +971,7 @@ const PromologContent = () => {
           onOpenKpiModal={openKpiModal}
           onOpenEntry={handleViewEntry}
           activeCreatorsCount={creators.length}
+          prevMetrics={prevMetrics}
         />
       )}
 

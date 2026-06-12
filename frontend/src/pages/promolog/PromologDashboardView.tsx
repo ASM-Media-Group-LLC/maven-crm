@@ -73,6 +73,8 @@ interface Props {
   onOpenEntry?: (entry: PromologEntry) => void;
   // Total de creadoras ACTIVAS (roster) para la métrica de cobertura.
   activeCreatorsCount?: number;
+  // Métricas del período anterior equivalente, para los deltas ▲/▼.
+  prevMetrics?: { promos: number; successRate: number } | null;
 }
 
 const PromologDashboardView = ({
@@ -83,6 +85,7 @@ const PromologDashboardView = ({
   onOpenKpiModal,
   onOpenEntry,
   activeCreatorsCount,
+  prevMetrics,
 }: Props) => {
   const navigate = useNavigate();
 
@@ -363,7 +366,11 @@ const PromologDashboardView = ({
           icon={TrendingUp}
           color="bg-emerald-500"
           onClick={() => onOpenKpiModal("completadas")}
-          footer={<span className="text-[10px] text-muted-foreground">promos ÷ escaneadas</span>}
+          footer={
+            <span className="text-[10px] text-muted-foreground">
+              promos ÷ escaneadas{prevMetrics ? <> · <DeltaSpan diff={successRate - prevMetrics.successRate} suffix="pp" /> vs ant.</> : null}
+            </span>
+          }
         />
         <KpiCard
           label="Sin revisar"
@@ -378,7 +385,11 @@ const PromologDashboardView = ({
           icon={Table2}
           color="bg-violet-500"
           onClick={() => onOpenKpiModal("ingresados")}
-          footer={<span className="text-[10px] text-muted-foreground">de {totalEntries} escaneadas</span>}
+          footer={
+            <span className="text-[10px] text-muted-foreground">
+              de {totalEntries} escaneadas{prevMetrics ? <> · <DeltaSpan diff={promosCount - prevMetrics.promos} /> vs ant.</> : null}
+            </span>
+          }
         />
       </div>
 
@@ -740,6 +751,17 @@ const PodioCard = ({ title, subtitle, icon, items, onClick }: PodioCardProps) =>
     </CardContent>
   </Card>
 );
+
+// Delta ▲/▼ contra el período anterior (verde = subió, rojo = bajó, gris = igual).
+const DeltaSpan = ({ diff, suffix = "" }: { diff: number; suffix?: string }) => {
+  if (diff === 0) return <span className="text-muted-foreground">=</span>;
+  const up = diff > 0;
+  return (
+    <span className={up ? "text-emerald-400" : "text-rose-400"}>
+      {up ? "▲" : "▼"}{Math.abs(diff)}{suffix}
+    </span>
+  );
+};
 
 interface InsightCardProps {
   icon: ReactNode;
