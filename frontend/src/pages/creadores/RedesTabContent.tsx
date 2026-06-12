@@ -16,6 +16,7 @@ import { displayHandle, buildSocialUrl } from "@/lib/utils";
 import { maskPhone } from "@/lib/country-utils";
 import { useUserRole } from "@/hooks/useUserRole";
 import type { CreatorFull } from "./useCreadores";
+import ExtraPlatformAccounts from "./ExtraPlatformAccounts";
 
 interface RedesTabContentProps {
   creator: CreatorFull;
@@ -465,8 +466,11 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
         </div>
       )}
 
-      {/* Cuentas IG adicionales — multi-cuenta para que el Promobot las escanee todas. */}
-      <ExtraIgAccounts creatorId={creatorId} canManage={canManage} />
+      {/* Cuentas adicionales por red (multi-cuenta) — el bot escanea todas las activas. */}
+      <ExtraPlatformAccounts creatorId={creatorId} network="instagram" label="Instagram" icon={<InstagramIcon className="h-4 w-4" />} canManage={canManage} placeholder="@otra_cuenta o link de IG" />
+      <ExtraPlatformAccounts creatorId={creatorId} network="x" label="X (Twitter)" icon={<XIcon className="h-4 w-4" />} canManage={canManage} placeholder="@otra_cuenta o link de X" />
+      <ExtraPlatformAccounts creatorId={creatorId} network="facebook" label="Facebook" icon={<Facebook className="h-4 w-4" />} canManage={canManage} placeholder="usuario o link de Facebook" />
+      <ExtraPlatformAccounts creatorId={creatorId} network="telegram" label="Telegram" icon={<TelegramIcon className="h-4 w-4" />} canManage={canManage} placeholder="@canal o link de Telegram" />
     </>
   );
 };

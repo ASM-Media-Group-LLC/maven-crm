@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Facebook } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,11 @@ import { toast } from "@/hooks/use-toast";
 import { buildSocialUrl, cleanHandle } from "@/lib/utils";
 import { useModelCategories } from "@/hooks/useModelCategories";
 import type { CreatorWithBusiness } from "./useCreadores";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import XIcon from "@/components/icons/XIcon";
+import TelegramIcon from "@/components/icons/TelegramIcon";
+import ExtraPlatformAccounts from "./ExtraPlatformAccounts";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface Props {
   open: boolean;
@@ -58,6 +63,8 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   });
   const [nameError, setNameError] = useState(false);
   const updateMutation = useUpdateCreador();
+  const { isAdmin, role } = useUserRole();
+  const canManageAccounts = isAdmin || role === "manager";
   const { data: categories = [] } = useModelCategories();
   const CATEGORIES = categories.length > 0 ? categories.map((c) => c.code) : CATEGORIES_FALLBACK;
 
@@ -296,6 +303,17 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 <Input value={form.whatsapp_number} onChange={(e) => handleChange("whatsapp_number", e.target.value)} placeholder="+1 234 567 8900" />
               </div>
             </div>
+            {/* Cuentas ADICIONALES por red (ej. 2º Instagram) — el bot de Promolog las
+                escanea junto con la principal. Se guardan al instante (no con "Guardar"). */}
+            {creator?.id && (
+              <div className="space-y-1 pt-1">
+                <p className="text-[11px] text-muted-foreground">Cuentas adicionales por red (el bot las escanea junto con la principal):</p>
+                <ExtraPlatformAccounts creatorId={creator.id} network="instagram" label="Instagram" icon={<InstagramIcon className="h-4 w-4" />} canManage={canManageAccounts} placeholder="@otra_cuenta o link de IG" />
+                <ExtraPlatformAccounts creatorId={creator.id} network="x" label="X (Twitter)" icon={<XIcon className="h-4 w-4" />} canManage={canManageAccounts} placeholder="@otra_cuenta o link de X" />
+                <ExtraPlatformAccounts creatorId={creator.id} network="facebook" label="Facebook" icon={<Facebook className="h-4 w-4" />} canManage={canManageAccounts} placeholder="usuario o link de Facebook" />
+                <ExtraPlatformAccounts creatorId={creator.id} network="telegram" label="Telegram" icon={<TelegramIcon className="h-4 w-4" />} canManage={canManageAccounts} placeholder="@canal o link de Telegram" />
+              </div>
+            )}
           </section>
 
           <section className="space-y-1.5 pt-2 border-t border-border/60">
