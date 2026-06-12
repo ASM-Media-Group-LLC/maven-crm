@@ -100,6 +100,8 @@ const PromobotPanel = () => {
   const [runs, setRuns] = useState<DispatchRun[]>([]);
   const [loadingCreators, setLoadingCreators] = useState(true);
   const [loadingRuns, setLoadingRuns] = useState(true);
+  const [runsLimit, setRunsLimit] = useState(RUNS_LIMIT);
+  const [runFilter, setRunFilter] = useState<"all" | "error" | "ok">("all");
 
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set()); // por instagram_handle
@@ -129,18 +131,21 @@ const PromobotPanel = () => {
   }, [toast]);
 
   const fetchRuns = useCallback(async () => {
-    const { data, error } = await (supabase as any)
+    let q = (supabase as any)
       .from("promolog_dispatch_runs")
       .select("id, started_at, finished_at, status, apify_run_id, creators_count, creators_succeeded, creators_failed, entries_created, cost_usd, dispatched_by, error, payload")
-      .order("started_at", { ascending: false })
-      .limit(RUNS_LIMIT);
+      .order("started_at", { ascending: false });
+    if (runFilter === "error") q = q.in("status", ["timeout", "failed", "partial"]);
+    else if (runFilter === "ok") q = q.eq("status", "succeeded");
+    q = q.limit(runsLimit);
+    const { data, error } = await q;
     if (error) {
       toast({ title: "Error cargando corridas", description: error.message, variant: "destructive" });
     } else {
       setRuns((data ?? []) as DispatchRun[]);
     }
     setLoadingRuns(false);
-  }, [toast]);
+  }, [toast, runsLimit, runFilter]);
 
   // Agregados de salud: 30d de corridas (costo, éxito, desperdicio, última OK) +
   // cobertura de hoy (creadoras distintas con entry). Solo cubre el pipeline de IG
@@ -485,11 +490,23 @@ const PromobotPanel = () => {
       {/* ── Corridas recientes ──────────────────────────────────────────── */}
       <Card>
         <CardContent className="space-y-3 p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium">Corridas recientes</span>
-            <Button size="sm" variant="ghost" onClick={() => { fetchRuns(); fetchHealth(); }} className="h-7 gap-1 text-xs">
-              <RefreshCw className={`h-3.5 w-3.5 ${hasActiveRun ? "animate-spin" : ""}`} /> Refrescar
-            </Button>
+            <div className="flex items-center gap-1">
+              {([["all", "Todas"], ["error", "Con error"], ["ok", "OK"]] as const).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => { setRunFilter(k); setRunsLimit(RUNS_LIMIT); }}
+                  className={`rounded-full px-2 py-0.5 text-[11px] transition-colors ${runFilter === k ? "bg-primary/15 text-primary ring-1 ring-primary/30" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {label}
+                </button>
+              ))}
+              <Button size="sm" variant="ghost" onClick={() => { fetchRuns(); fetchHealth(); }} className="h-7 gap-1 text-xs">
+                <RefreshCw className={`h-3.5 w-3.5 ${hasActiveRun ? "animate-spin" : ""}`} /> Refrescar
+              </Button>
+            </div>
           </div>
 
           {loadingRuns ? (
@@ -499,6 +516,7 @@ const PromobotPanel = () => {
           ) : runs.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">Todavía no hay corridas</div>
           ) : (
+            <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -551,6 +569,14 @@ const PromobotPanel = () => {
                 </tbody>
               </table>
             </div>
+            {runs.length >= runsLimit && (
+              <div className="flex justify-center pt-1">
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setRunsLimit((n) => n + 15)}>
+                  Ver más
+                </Button>
+              </div>
+            )}
+            </>
           )}
         </CardContent>
       </Card>
