@@ -271,7 +271,9 @@ const PromologContent = () => {
       if (error) throw error;
       const groups = new Map<string, boolean>();
       for (const r of (data ?? []) as Array<{ creator_id: string | null; date: string; promoted: string | null }>) {
-        const key = `${r.creator_id || ""}|${r.date}`;
+        // Agrupar por creador+DÍA (no por timestamp): el campo `date` es un timestamp con
+        // hora, así que recortamos a YYYY-MM-DD para contar creador-días como el Dashboard.
+        const key = `${r.creator_id || ""}|${(r.date || "").slice(0, 10)}`;
         const isPromo = r.promoted === "true" || r.promoted === "yes";
         groups.set(key, (groups.get(key) || false) || isPromo);
       }
