@@ -62,6 +62,9 @@ export interface PromologEntry {
   // Razonamiento de la AI cuando analyzed_by_ai = true.
   ai_reasoning?: string | null;
   ai_confidence?: number | null;
+  // Cuenta de la red de donde vino la entry (multi-cuenta): ej. la 2ª IG. La setean
+  // los scanners; el popup muestra "@source_handle" para saber qué cuenta promocionó.
+  source_handle?: string | null;
   // true si la entry la creó el pipeline automático (Apify + Gemini Vision).
   // Las entries del bot son 1-por-story; las manuales (chatter) son 1-por-promo.
   analyzed_by_ai?: boolean;

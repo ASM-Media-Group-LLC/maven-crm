@@ -271,11 +271,22 @@ const PromologEntryDetailDialog = ({
               analizó varias) o el pantallazo único (entry manual / 1 story). */}
           {dayNetworks && dayNetworks.length > 0 ? (
             <div className="space-y-4">
-              {dayNetworks.map((dn) => (
+              {dayNetworks.map((dn) => {
+                // Cuentas (handles) que promocionaron en esta red — para multi-cuenta
+                // (ej. 2ª IG). Lo setean los scanners en promolog_entries.source_handle.
+                const accts = [...new Set(
+                  dn.stories
+                    .filter((s) => s.result === "Sí" && s.source_handle)
+                    .map((s) => (s.source_handle as string).replace(/^@+/, "")),
+                )];
+                return (
                 <div key={dn.network} className="space-y-1.5">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-foreground"><DetailNetworkIcon network={dn.network} /></span>
                     <span className="text-sm font-semibold">{detailNetworkLabel(dn.network)}</span>
+                    {accts.length > 0 && (
+                      <span className="text-xs text-muted-foreground">· {accts.map((a) => `@${a}`).join(", ")}</span>
+                    )}
                     <Badge variant={dn.promoted ? "success-soft" : "secondary-soft"} className="text-[10px]">
                       {dn.promoted ? "Promocionó" : "Revisada · sin promo"}
                     </Badge>
@@ -286,7 +297,8 @@ const PromologEntryDetailDialog = ({
                     <p className="px-1 text-xs italic text-muted-foreground">Revisada ese día · sin actividad.</p>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : showStoryGallery ? (
             <PromologStoryGallery stories={dayStories} selectedId={entry.id} onSetVerdict={onSetVerdict} savingId={savingId} />

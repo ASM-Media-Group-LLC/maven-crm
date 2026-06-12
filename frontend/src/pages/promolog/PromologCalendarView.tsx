@@ -124,7 +124,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
       const rangeEnd = format(addDays(new Date(year, month + 1, 1), 1), "yyyy-MM-dd");
       const { data, error } = await supabase
         .from("promolog_entries")
-        .select("id, date, promoted, platform, network, ticket_number, notes, action_taken, has_buy_link, buy_link_type, reviewed_by, evidence_url, ai_confidence, ai_reasoning, story_index, story_count, apify_run_id, analyzed_by_ai, creator_id")
+        .select("id, date, promoted, platform, network, ticket_number, notes, action_taken, has_buy_link, buy_link_type, reviewed_by, evidence_url, ai_confidence, ai_reasoning, story_index, story_count, apify_run_id, analyzed_by_ai, creator_id, source_handle")
         .eq("creator_id", creatorId)
         .gte("date", rangeStart)
         .lt("date", rangeEnd)
@@ -160,6 +160,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     story_index: e.story_index != null ? Number(e.story_index) : null,
     story_count: e.story_count != null ? Number(e.story_count) : null,
     apify_run_id: e.apify_run_id ?? null,
+    source_handle: e.source_handle ?? null,
   });
 
   // Agrupa las stories por día (key YYYY-MM-DD en TZ del user).

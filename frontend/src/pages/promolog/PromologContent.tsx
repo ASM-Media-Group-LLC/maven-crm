@@ -293,6 +293,7 @@ const PromologContent = () => {
         story_count: pe.story_count != null ? Number(pe.story_count) : null,
         apify_run_id: pe.apify_run_id ?? null,
         rawDate: pe.date ?? null,
+        source_handle: pe.source_handle ?? null,
       };
     });
   }, [promologEntries, profilesMap, userTz]);
