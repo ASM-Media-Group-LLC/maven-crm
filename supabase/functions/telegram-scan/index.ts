@@ -42,13 +42,13 @@ function ofHandleFromUrl(url: string): string {
 //   - link/palabra de onlyfans, o su handle de OF (de creators.onlyfans_url)
 //   - otras plataformas de contenido (fansly/fanvue)
 //   - señales claras de promo (promo/descuento/precio/suscribite/"link abajo")
-function classifyPromo(text: string, onlyfansUrl: string): { promoted: boolean; reason: string } {
+function classifyPromo(text: string, ofHandles: string[]): { promoted: boolean; reason: string } {
   const raw = text || "";
   const t = raw.toLowerCase();
-  const ofHandle = ofHandleFromUrl(onlyfansUrl);
   const signals: string[] = [];
   if (/onlyfans\.com|\bonlyfans\b|\bo\.?f\.?\b/i.test(raw)) signals.push("onlyfans");
-  if (ofHandle && t.includes(ofHandle)) signals.push("of_handle");
+  // Cualquier nickname de OF (principal + secundarias) cuenta como señal.
+  if (ofHandles.some((h) => h && t.includes(h.toLowerCase()))) signals.push("of_handle");
   if (/\bfansly\b|\bfanvue\b|\bfans\b/i.test(raw)) signals.push("plataforma");
   if (/promo|promoci[oó]n|descuento|oferta|\b\d{1,3}\s?%|\b\d+\s?(usd|\$|d[oó]lares)|suscr[ií]b|\bsub\b|link\s+(en|abajo|aqu[ií]|bio)|mi\s+link|c[oó]mprame|contenido\s+(exclusivo|nuevo)/i.test(raw)) signals.push("promo");
   const promoted = signals.includes("onlyfans") || signals.includes("of_handle") || signals.includes("plataforma") || signals.includes("promo");
@@ -103,6 +103,22 @@ Deno.serve(async (req: Request) => {
   const { data: creators, error: cErr } = await q;
   if (cErr) return jsonResponse({ error: cErr.message }, 500);
 
+  // Nicknames de OF por creadora (principal onlyfans_url + secundarias) → señal of_handle.
+  const ofNicksByCreator = new Map<string, string[]>();
+  for (const c of creators || []) { const p = ofHandleFromUrl(c.onlyfans_url); ofNicksByCreator.set(c.id, p ? [p] : []); }
+  const creatorIds = (creators || []).map((c: any) => c.id);
+  if (creatorIds.length) {
+    const { data: ofExtra } = await sb.from("creator_social_accounts")
+      .select("creator_id, username").eq("network", "onlyfans").eq("active", true).in("creator_id", creatorIds);
+    for (const a of (ofExtra ?? []) as Array<{ creator_id: string; username: string }>) {
+      const nick = String(a.username || "").replace(/^@+/, "").toLowerCase().trim();
+      if (!nick) continue;
+      const arr = ofNicksByCreator.get(a.creator_id) ?? [];
+      if (!arr.includes(nick)) arr.push(nick);
+      ofNicksByCreator.set(a.creator_id, arr);
+    }
+  }
+
   const results: unknown[] = [];
   for (const c of creators || []) {
     try {
@@ -119,7 +135,7 @@ Deno.serve(async (req: Request) => {
       let inserted = 0, promotedCount = 0, skipped = 0;
       for (let i = 0; i < posts.length; i++) {
         const p = posts[i];
-        const { promoted, reason } = classifyPromo(p.text, c.onlyfans_url);
+        const { promoted, reason } = classifyPromo(p.text, ofNicksByCreator.get(c.id) ?? []);
         if (promoted) promotedCount++;
         if (dryRun) continue;
 
@@ -144,6 +160,7 @@ Deno.serve(async (req: Request) => {
           analyzed_by_ai: true,
           ai_model: "heuristic-of-v1",
           ai_reasoning: reason,
+          source_handle: (c.telegram_handle || "").trim() || null,
           story_index: i,
           story_count: posts.length,
           scraped_at: new Date().toISOString(),

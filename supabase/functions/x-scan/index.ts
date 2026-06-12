@@ -49,11 +49,12 @@ function ofHandleFromUrl(url: string): string {
 }
 
 // Señales de promo sobre texto + links expandidos (gratis, sin LLM).
-function ofSignals(haystack: string, ofHandle: string): string[] {
+function ofSignals(haystack: string, ofHandles: string[]): string[] {
   const raw = (haystack || "").toLowerCase();
   const s: string[] = [];
   if (/onlyfans\.com|\bonlyfans\b|\bo\.?f\.?\b/i.test(raw)) s.push("onlyfans");
-  if (ofHandle && raw.includes(ofHandle)) s.push("of_handle");
+  // Cualquiera de sus nicknames de OF (principal + secundarias) cuenta como señal.
+  if (ofHandles.some((h) => h && raw.includes(h.toLowerCase()))) s.push("of_handle");
   if (/linktr\.ee|beacons\.ai|allmylinks|hoo\.be|linkr\.bio|fanvue|fansly|fans\.ly|coomer|throne|piclink|campsite\.bio|snipfeed|tap\.bio|justfor\.fans|loyalfans|manyvids|fapello/i.test(raw)) s.push("link_agg");
   if (/(link en bio|link in (my )?bio|ve al link|mira (el|mi) link|mi link|link abajo|abajo (el|mi) link|en el link|mi p[áa]gina|ya fuiste|checa mi|mira mi|te espero en|mi contenido|contenido (exclusivo|completo|nuevo)|suscr[ií]b|\bsub a mi\b|premium|\bvip\b|descuento|oferta|c[óo]mprame|mi of\b|aqu[ií] me lo|sin censura|\+18|18\+)/i.test(raw)) s.push("promo");
   return s;
@@ -88,10 +89,10 @@ function expandedLinks(it: any): string[] {
 // Promo SOLO con señal explícita de OF (link/mención/agregador/CTA) — igual que FB
 // e IG. Se quitó "cualquier foto = promo": daba falsos positivos (fútbol, marcas,
 // memes). Si no hay señal de texto pero hay imagen, la VISIÓN decide (en el loop).
-function classifyX(it: any, ofUrl: string): { promoted: boolean; reason: string } {
+function classifyX(it: any, ofHandles: string[]): { promoted: boolean; reason: string } {
   const text: string = it?.text || it?.fullText || "";
   const links = expandedLinks(it);
-  const sig = ofSignals(text + " " + links.join(" "), ofHandleFromUrl(ofUrl));
+  const sig = ofSignals(text + " " + links.join(" "), ofHandles);
   if (sig.length) return { promoted: true, reason: sig.join("+") };
   return { promoted: false, reason: "sin-senal-of" };
 }
@@ -213,6 +214,31 @@ Deno.serve(async (req: Request) => {
   const byHandle = new Map<string, { id: string; name: string; onlyfans_url: string }>();
   for (const c of list) byHandle.set(normHandle(c.twitter_handle), { id: c.id, name: c.name, onlyfans_url: c.onlyfans_url });
 
+  // Multi-cuenta: nicknames de OF por creadora (principal onlyfans_url + secundarias)
+  // y cuentas X EXTRA (también se escanean). creator_social_accounts: network in (x, onlyfans).
+  const ofNicksByCreator = new Map<string, string[]>();
+  for (const c of list) { const p = ofHandleFromUrl(c.onlyfans_url); ofNicksByCreator.set(c.id, p ? [p] : []); }
+  const creatorIds = list.map((c) => c.id);
+  if (creatorIds.length) {
+    const cById = new Map(list.map((c) => [c.id, c]));
+    const { data: extra } = await sb.from("creator_social_accounts")
+      .select("creator_id, network, username")
+      .in("creator_id", creatorIds).in("network", ["x", "onlyfans"]).eq("active", true);
+    for (const a of (extra ?? []) as Array<{ creator_id: string; network: string; username: string }>) {
+      const u = String(a.username || "").trim();
+      if (!u) continue;
+      if (a.network === "onlyfans") {
+        const nick = u.replace(/^@+/, "").toLowerCase();
+        const arr = ofNicksByCreator.get(a.creator_id) ?? [];
+        if (nick && !arr.includes(nick)) arr.push(nick);
+        ofNicksByCreator.set(a.creator_id, arr);
+      } else { // x extra → se escanea como la principal, mapea a la misma creadora
+        const c = cById.get(a.creator_id);
+        if (c) byHandle.set(normHandle(u), { id: c.id, name: c.name, onlyfans_url: c.onlyfans_url });
+      }
+    }
+  }
+
   // 1) Traer tweets en lotes.
   const tweetsByCreator = new Map<string, any[]>(); // creatorId → tweets
   const runStats: unknown[] = [];
@@ -270,7 +296,8 @@ Deno.serve(async (req: Request) => {
     let inserted = 0, promotedCount = 0, skipped = 0;
     for (let i = 0; i < tweets.length; i++) {
       const it = tweets[i];
-      let { promoted, reason } = classifyX(it, c.onlyfans_url);
+      let { promoted, reason } = classifyX(it, ofNicksByCreator.get(c.id) ?? []);
+      const srcHandle = normHandle(it?.author?.userName || it?.author?.username || it?.username || "") || null;
       const permalink: string = it?.url || it?.twitterUrl || "";
       const { firstImage } = tweetMedia(it);
       // Visión SOLO si no hubo señal de texto pero hay imagen (el promo puede estar
@@ -302,6 +329,7 @@ Deno.serve(async (req: Request) => {
         analyzed_by_ai: true,
         ai_model: "regla-texto-x",
         ai_reasoning: reason,
+        source_handle: srcHandle,
         story_index: i,
         story_count: tweets.length,
         scraped_at: new Date().toISOString(),
