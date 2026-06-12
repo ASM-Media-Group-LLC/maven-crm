@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Play, RefreshCw, Loader2, Search, Bot, CheckCircle2, XCircle, Clock,
-  AlertTriangle, Users, Zap,
+  AlertTriangle, Users, Zap, DollarSign, Activity, Trash2, ScanLine,
 } from "lucide-react";
 
 // PromobotPanel — control manual del pipeline de verificación de Promolog.
@@ -50,8 +50,23 @@ interface DispatchRun {
   payload: { input?: { usernames?: string[] }; creator_ids?: string[] } | null;
 }
 
+interface PipelineHealth {
+  costToday: number;
+  cost7d: number;
+  cost30d: number;
+  runs30: number;
+  runsOk30: number;
+  runsBad30: number;       // timeout + failed
+  zeroEntryRuns30: number; // corridas terminadas con 0 entries (desperdicio)
+  wastedCost30: number;    // costo de esas corridas
+  lastSuccessAt: string | null;
+  scannedToday: number;    // creadoras distintas con entry hoy
+}
+
 const RUNS_LIMIT = 15;
 const ACTIVE_POLL_MS = 15_000;
+// El cron corre 1×/día → si la última corrida exitosa fue hace más que esto, algo se cayó.
+const STALE_HOURS = 26;
 
 // Estados que cuentan como "todavía trabajando" → mientras haya uno así,
 // refrescamos la tabla cada 15s para ver cuando termina.
@@ -94,6 +109,9 @@ const PromobotPanel = () => {
   // corrida cuyo detalle de modelos se está viendo (drill-down de "Modelos").
   const [runModels, setRunModels] = useState<DispatchRun | null>(null);
 
+  // Salud del pipeline (agregados de los últimos 30d de corridas + cobertura de hoy).
+  const [health, setHealth] = useState<PipelineHealth | null>(null);
+
   // ── Fetchers ──────────────────────────────────────────────────────────────
   const fetchCreators = useCallback(async () => {
     setLoadingCreators(true);
@@ -123,10 +141,58 @@ const PromobotPanel = () => {
     setLoadingRuns(false);
   }, [toast]);
 
+  // Agregados de salud: 30d de corridas (costo, éxito, desperdicio, última OK) +
+  // cobertura de hoy (creadoras distintas con entry). Solo cubre el pipeline de IG
+  // (promolog_dispatch_runs); X/Telegram/Facebook corren en sus propios crons.
+  const fetchHealth = useCallback(async () => {
+    const now = Date.now();
+    const since30 = new Date(now - 30 * 86_400_000).toISOString();
+    const startToday = new Date();
+    startToday.setHours(0, 0, 0, 0);
+
+    const { data: r } = await (supabase as any)
+      .from("promolog_dispatch_runs")
+      .select("started_at, finished_at, status, entries_created, cost_usd")
+      .gte("started_at", since30);
+    const rows = (r ?? []) as Array<{ started_at: string; finished_at: string | null; status: string; entries_created: number | null; cost_usd: number | null }>;
+
+    const ms7 = now - 7 * 86_400_000;
+    const msToday = startToday.getTime();
+    const costSince = (ms: number) =>
+      rows.filter((x) => new Date(x.started_at).getTime() >= ms).reduce((s, x) => s + (x.cost_usd ?? 0), 0);
+    const terminal = rows.filter((x) => !ACTIVE_STATUSES.has(x.status));
+    const zero = terminal.filter((x) => (x.entries_created ?? 0) === 0);
+    const lastSuccessAt = rows
+      .filter((x) => x.status === "succeeded" && x.finished_at)
+      .map((x) => x.finished_at as string)
+      .sort()
+      .pop() ?? null;
+
+    const { data: e } = await (supabase as any)
+      .from("promolog_entries")
+      .select("creator_id")
+      .gte("created_at", startToday.toISOString());
+    const scannedToday = new Set((e ?? []).map((x: any) => x.creator_id).filter(Boolean)).size;
+
+    setHealth({
+      costToday: costSince(msToday),
+      cost7d: costSince(ms7),
+      cost30d: costSince(now - 30 * 86_400_000),
+      runs30: rows.length,
+      runsOk30: rows.filter((x) => x.status === "succeeded").length,
+      runsBad30: rows.filter((x) => x.status === "timeout" || x.status === "failed").length,
+      zeroEntryRuns30: zero.length,
+      wastedCost30: zero.reduce((s, x) => s + (x.cost_usd ?? 0), 0),
+      lastSuccessAt,
+      scannedToday,
+    });
+  }, []);
+
   useEffect(() => {
     fetchCreators();
     fetchRuns();
-  }, [fetchCreators, fetchRuns]);
+    fetchHealth();
+  }, [fetchCreators, fetchRuns, fetchHealth]);
 
   // Auto-refresh mientras haya una corrida activa.
   const hasActiveRun = useMemo(() => runs.some((r) => ACTIVE_STATUSES.has(r.status)), [runs]);
@@ -216,7 +282,7 @@ const PromobotPanel = () => {
     });
     if (scope === "selected") setSelected(new Set());
     // refrescamos enseguida — la corrida arranca en "running"
-    setTimeout(fetchRuns, 800);
+    setTimeout(() => { fetchRuns(); fetchHealth(); }, 800);
   };
 
   const selectedCount = selected.size;
@@ -311,12 +377,75 @@ const PromobotPanel = () => {
         </CardContent>
       </Card>
 
+      {/* ── Salud del pipeline ──────────────────────────────────────────── */}
+      {health && (() => {
+        const staleH = health.lastSuccessAt
+          ? (Date.now() - new Date(health.lastSuccessAt).getTime()) / 3_600_000
+          : Infinity;
+        const stale = staleH > STALE_HOURS;
+        const usd = (n: number) => `$${n.toFixed(2)}`;
+        const ago = (h: number) => (h === Infinity ? "nunca" : h < 1 ? `${Math.round(h * 60)} min` : `${Math.round(h)} h`);
+        const gap = totalEligible > 0 ? totalEligible - health.scannedToday : 0;
+        return (
+          <Card className={stale ? "border-rose-500/40" : ""}>
+            <CardContent className="space-y-3 p-4">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Salud del pipeline</span>
+                <Badge variant="secondary-soft" className="text-[10px]">solo IG</Badge>
+                <span className="ml-auto text-[10px] text-muted-foreground">
+                  última OK: {health.lastSuccessAt ? `hace ${ago(staleH)}` : "—"}
+                </span>
+              </div>
+              {stale && (
+                <div className="flex items-center gap-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>
+                    El bot no completa una corrida desde hace <b>{ago(staleH)}</b> (debería correr 1×/día).
+                    Revisá el cron o lanzá una corrida manual.
+                  </span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <HealthStat
+                  icon={<DollarSign className="h-3.5 w-3.5" />}
+                  label="Costo hoy"
+                  value={usd(health.costToday)}
+                  sub={`7d ${usd(health.cost7d)} · 30d ${usd(health.cost30d)}`}
+                />
+                <HealthStat
+                  icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                  label="Corridas 30d"
+                  value={`${health.runsOk30} OK`}
+                  sub={health.runsBad30 > 0 ? `${health.runsBad30} con error` : "sin errores"}
+                  tone={health.runsBad30 > 0 ? "bad" : "ok"}
+                />
+                <HealthStat
+                  icon={<Trash2 className="h-3.5 w-3.5" />}
+                  label="Desperdicio 30d"
+                  value={`${health.zeroEntryRuns30}`}
+                  sub={`corridas 0-entries · ${usd(health.wastedCost30)}`}
+                  tone={health.zeroEntryRuns30 > 0 ? "warn" : "ok"}
+                />
+                <HealthStat
+                  icon={<ScanLine className="h-3.5 w-3.5" />}
+                  label="Escaneadas hoy"
+                  value={`${health.scannedToday}/${totalEligible || "—"}`}
+                  sub={gap > 0 ? `${gap} sin escanear` : "cobertura completa"}
+                  tone={gap > 0 ? "warn" : "ok"}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* ── Corridas recientes ──────────────────────────────────────────── */}
       <Card>
         <CardContent className="space-y-3 p-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Corridas recientes</span>
-            <Button size="sm" variant="ghost" onClick={fetchRuns} className="h-7 gap-1 text-xs">
+            <Button size="sm" variant="ghost" onClick={() => { fetchRuns(); fetchHealth(); }} className="h-7 gap-1 text-xs">
               <RefreshCw className={`h-3.5 w-3.5 ${hasActiveRun ? "animate-spin" : ""}`} /> Refrescar
             </Button>
           </div>
@@ -450,5 +579,26 @@ const PromobotPanel = () => {
     </div>
   );
 };
+
+const HealthStat = ({
+  icon, label, value, sub, tone = "ok",
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  sub: string;
+  tone?: "ok" | "warn" | "bad";
+}) => (
+  <div className="rounded-lg border border-border bg-card/40 p-2.5">
+    <div className="flex items-center gap-1.5 text-muted-foreground">
+      {icon}
+      <span className="text-[10px] font-semibold uppercase tracking-wider">{label}</span>
+    </div>
+    <p className={`mt-0.5 text-lg font-bold tabular-nums ${tone === "bad" ? "text-rose-400" : tone === "warn" ? "text-amber-400" : ""}`}>
+      {value}
+    </p>
+    <p className="truncate text-[10px] text-muted-foreground">{sub}</p>
+  </div>
+);
 
 export default PromobotPanel;
