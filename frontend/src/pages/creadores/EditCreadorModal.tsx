@@ -308,6 +308,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               <div className="space-y-1.5">
                 <Label>WhatsApp</Label>
                 <Input value={form.whatsapp_number} onChange={(e) => handleChange("whatsapp_number", e.target.value)} placeholder="+1 234 567 8900" />
+                <ExtraAccountsInline creatorId={creator?.id} network="whatsapp" canManage={canManageAccounts} />
               </div>
             </div>
           </section>
