@@ -2,6 +2,18 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_shared/whatsapp.ts";
 
+// Link clickeable de IG de una creadora. Acepta handle, @handle o URL completa
+// (instagram_handle a veces viene como URL) → https://instagram.com/<handle>.
+// Pedido de Alvaro: SIEMPRE referirse a una creadora con el link, NO con @handle
+// pelado (el @ es solo para pinguear miembros del equipo). "(sin handle)" se deja igual.
+function igLink(raw: string | null | undefined): string {
+  const s = String(raw ?? "").trim();
+  if (!s || s === "(sin handle)") return s || "(sin handle)";
+  const m = s.match(/instagram\.com\/([A-Za-z0-9_.]+)/i);
+  const h = (m ? m[1] : s).replace(/^@+/, "").replace(/[/?#].*$/, "").trim();
+  return h ? `https://instagram.com/${h}` : s;
+}
+
 // whatsapp-supervisor-tick — el corazón del supervisor proactivo.
 //
 // Corre cada 15 min (pg_cron). En cada tick:
@@ -298,7 +310,7 @@ async function checkCloser(
         const top = await topUnassignedLeads(sb, 4);
         const msg = top.length > 0
           ? `@${mention} venís sin leads asignados hoy. Sin tomar, de mayor calidad: ${
-            top.map((l) => `@${l.handle} (${l.quality})`).join(", ")
+            top.map((l) => `${igLink(l.handle)} (${l.quality})`).join(", ")
           } — agarrá 2-3 y arrancales el seguimiento hoy. ¿Cuáles te asignás?`
           : `@${mention} venís sin leads asignados hoy y el pool de Nuevas está vacío. ¿Reactivamos algún seguimiento pendiente o conseguimos más leads?`;
         await sendToGroup(sb, group.id, msg);
@@ -563,7 +575,7 @@ async function checkCommitmentFollowups(
     } catch (_e) { /* no context, no problem */ }
 
     const due = m.due_at ? new Date(m.due_at).toLocaleTimeString("es-ES", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit" }) : "?";
-    const msg = `⏰ @${who}, en ~30 min reunión con @${handle} (${due} Bogotá).${context}`;
+    const msg = `⏰ @${who}, en ~30 min reunión con ${igLink(handle)} (${due} Bogotá).${context}`;
     await sendFollowup(sb, group, `pre_meeting:${m.id}`, msg);
   }
 
@@ -582,7 +594,7 @@ async function checkCommitmentFollowups(
     const target = m.target_subject ?? m.subject;
     if (await recentlyMentioned(sb, group.id, target, 1)) continue;
     const who = m.committed_by_text ?? "equipo";
-    const msg = `@${who}, ¿cómo fue la reunión con ${target.startsWith("@") ? target : "@" + target}? 👀`;
+    const msg = `@${who}, ¿cómo fue la reunión con ${igLink(target)}? 👀`;
     await sendFollowup(sb, group, `meeting_followup:${m.id}`, msg);
   }
 
@@ -665,7 +677,7 @@ async function checkCommitmentFollowups(
     // Nombre REAL primero (full_name), no el apodo de WhatsApp.
     const closerName = prof?.full_name?.split(" ")[0] ?? prof?.whatsapp_push_name ?? "closer";
     const top = handles.slice(0, 8);
-    const lista = top.map((h) => `· @${h}`).join("\n");
+    const lista = top.map((h) => `· ${igLink(h)}`).join("\n");
     const extra = handles.length > top.length ? `\n…y ${handles.length - top.length} más` : "";
     const msg = `@${closerName}, tenés ${handles.length} lead${handles.length === 1 ? "" : "s"} con contacto vencido (cadencia 1-3-5-8-15-29):\n${lista}${extra}\n¿Los avanzás hoy?`;
     await sendFollowup(sb, group, `closer_contact_digest:${closerId}`, msg);
@@ -696,7 +708,7 @@ async function checkCommitmentFollowups(
     // Nombre REAL primero (full_name), no el apodo de WhatsApp (evita "@Juli 💘💘").
     const closerName = prof?.full_name?.split(" ")[0] ?? prof?.whatsapp_push_name ?? "closer";
     const daysSince = cc.confirmed_date ? Math.floor((now - new Date(cc.confirmed_date).getTime()) / 86_400_000) : "?";
-    const msg = `@${closerName}, @${handle} lleva ${daysSince} días confirmada sin pasar a *Completada*. ¿Cómo va la firma?`;
+    const msg = `@${closerName}, ${igLink(handle)} lleva ${daysSince} días confirmada sin pasar a *Completada*. ¿Cómo va la firma?`;
     await sendFollowup(sb, group, `confirmada_stale:${cc.id}`, msg);
   }
 
@@ -745,7 +757,7 @@ async function checkCommitmentFollowups(
     const who = prof?.full_name?.split(" ")[0] ?? prof?.whatsapp_push_name ?? "equipo";
     const prod = PRODUCT_ES[o.product] ?? o.product;
     const stageEs = STAGE_ES[o.stage] ?? o.stage;
-    const msg = `@${who}, seguimiento de monetización: @${handle} quedó *${stageEs}* con ${prod} y ya toca volver a tocarla. ¿La avanzás hoy?`;
+    const msg = `@${who}, seguimiento de monetización: ${igLink(handle)} quedó *${stageEs}* con ${prod} y ya toca volver a tocarla. ¿La avanzás hoy?`;
     await sendFollowup(sb, group, `monetization_followup:${o.id}`, msg);
   }
 }
