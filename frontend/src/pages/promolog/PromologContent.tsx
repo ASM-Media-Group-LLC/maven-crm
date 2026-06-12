@@ -937,6 +937,7 @@ const PromologContent = () => {
           dateFrom={dateFrom}
           dateTo={dateTo}
           onOpenKpiModal={openKpiModal}
+          onOpenEntry={handleViewEntry}
         />
       )}
 

@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   XCircle,
   Instagram as InstagramIcon,
+  Link2,
 } from "lucide-react";
 import { format, eachDayOfInterval, isSameDay, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -27,6 +28,7 @@ import { ListRowButton } from "@/components/ui/list-row";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { categoryTone } from "@/components/dashboard/categoryTones";
 import { type PromologEntry } from "./PromologEntryCard";
+import { displayPlatform } from "./promoScore";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 
@@ -66,6 +68,8 @@ interface Props {
   dateFrom: Date | undefined;
   dateTo: Date | undefined;
   onOpenKpiModal: (kind: "creadores_escaneados" | "completadas" | "no_chequeadas" | "ingresados") => void;
+  // Abre el popup de veredicto de una entry (para revisar Pendientes en el lugar).
+  onOpenEntry?: (entry: PromologEntry) => void;
 }
 
 const PromologDashboardView = ({
@@ -74,6 +78,7 @@ const PromologDashboardView = ({
   dateFrom,
   dateTo,
   onOpenKpiModal,
+  onOpenEntry,
 }: Props) => {
   const navigate = useNavigate();
 
@@ -121,10 +126,18 @@ const PromologDashboardView = ({
   const creatorsPromotedCount = creatorsAgg.filter(c => c.promoCount > 0).length;
   const creatorsNotPromotedCount = creatorsScannedCount - creatorsPromotedCount;
   const totalEntries = filteredEntries.length;
-  const successRate = totalEntries > 0
-    ? Math.round((filteredEntries.filter(e => e.result === "Sí").length / totalEntries) * 100)
-    : 0;
+  // Promos REALES (Sí), distinto de totalEntries (que incluye los "No" escaneados).
+  const promoSi = useMemo(() => filteredEntries.filter(e => e.result === "Sí"), [filteredEntries]);
+  const promosCount = promoSi.length;
+  const successRate = totalEntries > 0 ? Math.round((promosCount / totalEntries) * 100) : 0;
   const pendingCount = dedupedEntries.filter(e => e.result === "Pendiente").length;
+
+  // Tipo de promo: DIRECTA (link de compra visible) vs INDIRECTA (CTA sin link).
+  // Es la distinción clave para OF (las creadoras evitan links explícitos por el ban
+  // algorítmico de IG). has_buy_link lo setea Gemini.
+  const directas = useMemo(() => promoSi.filter(e => e.has_buy_link === true).length, [promoSi]);
+  const indirectas = promosCount - directas;
+  const directPct = promosCount > 0 ? Math.round((directas / promosCount) * 100) : 0;
 
   // ── Podio 1: Top 3 por volumen de promos (más promocionaron) ────────
   const topByVolume = useMemo(() => {
@@ -218,7 +231,8 @@ const PromologDashboardView = ({
   const topPlatform = useMemo(() => {
     const counts = new Map<string, number>();
     for (const e of filteredEntries.filter(x => x.result === "Sí")) {
-      const k = (e.platform || "").toLowerCase() || "otra";
+      // displayPlatform normaliza OnlyFans/Unlok/etc. (o "Sin plataforma" si no se identificó).
+      const k = displayPlatform(e) ?? "Sin plataforma";
       counts.set(k, (counts.get(k) ?? 0) + 1);
     }
     const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
@@ -258,7 +272,7 @@ const PromologDashboardView = ({
   // ── Acción requerida ────────────────────────────────────────────────
   // (1) Elite que NO promocionaron en el período.
   const eliteNotPromoted = useMemo(() => {
-    return creatorsAgg.filter(c => c.category === "Elite" && c.promoCount === 0);
+    return creatorsAgg.filter(c => (c.category === "Elite" || c.category === "A+") && c.promoCount === 0);
   }, [creatorsAgg]);
   // (2) Entries pendientes de revisar (status="Pendiente" — la AI no
   // pudo clasificar con confianza, o el humano aún no revisó).
@@ -317,6 +331,7 @@ const PromologDashboardView = ({
           icon={TrendingUp}
           color="bg-emerald-500"
           onClick={() => onOpenKpiModal("completadas")}
+          footer={<span className="text-[10px] text-muted-foreground">promos ÷ escaneadas</span>}
         />
         <KpiCard
           label="Sin revisar"
@@ -326,11 +341,12 @@ const PromologDashboardView = ({
           onClick={() => onOpenKpiModal("no_chequeadas")}
         />
         <KpiCard
-          label="Promos totales"
-          value={String(totalEntries)}
+          label="Promos (Sí)"
+          value={String(promosCount)}
           icon={Table2}
           color="bg-violet-500"
           onClick={() => onOpenKpiModal("ingresados")}
+          footer={<span className="text-[10px] text-muted-foreground">de {totalEntries} escaneadas</span>}
         />
       </div>
 
@@ -397,10 +413,44 @@ const PromologDashboardView = ({
         <InsightCard
           icon={<span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-white text-[9px] font-bold">OF</span>}
           label="Plataforma destino"
-          value={topPlatform ? (topPlatform[0] === "ninguna" ? "Sin plataforma" : topPlatform[0]) : "—"}
+          value={topPlatform ? topPlatform[0] : "—"}
           subtitle={topPlatform ? `${topPlatform[1]} promos` : "Sin promos"}
         />
       </div>
+
+      {/* ═══ Row 3.5: Tipo de promo — Directa vs Indirecta ═════════ */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-sky-400" />
+              <div>
+                <h3 className="text-sm font-semibold">Tipo de promo</h3>
+                <p className="text-xs text-muted-foreground">Directa (link de compra visible) vs indirecta (CTA sin link)</p>
+              </div>
+            </div>
+            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{promosCount} promos</span>
+          </div>
+          {promosCount === 0 ? (
+            <p className="py-2 text-center text-xs text-muted-foreground">Sin promos en el rango.</p>
+          ) : (
+            <>
+              <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted/40 ring-1 ring-border/50">
+                <div className="bg-emerald-500" style={{ width: `${directPct}%` }} title={`Directa: ${directas}`} />
+                <div className="bg-sky-500/60" style={{ width: `${100 - directPct}%` }} title={`Indirecta: ${indirectas}`} />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-sm bg-emerald-500" /> Directa <b className="tabular-nums">{directas}</b> ({directPct}%)
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-sm bg-sky-500/60" /> Indirecta <b className="tabular-nums">{indirectas}</b> ({100 - directPct}%)
+                </span>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ═══ Row 4: Trend chart — barras 14 días ═══════════════════ */}
       <Card>
@@ -469,7 +519,7 @@ const PromologDashboardView = ({
               <div className="flex items-center gap-2">
                 <AlertCircle className={`h-4 w-4 ${eliteNotPromoted.length > 0 ? "text-rose-400" : "text-muted-foreground"}`} />
                 <div>
-                  <h3 className="text-sm font-semibold">Elite que NO promocionaron</h3>
+                  <h3 className="text-sm font-semibold">Elite/A+ que NO promocionaron</h3>
                   <p className="text-xs text-muted-foreground">Atención prioritaria — son las top tier</p>
                 </div>
               </div>
@@ -533,7 +583,7 @@ const PromologDashboardView = ({
                 {pendingEntries.map((entry) => (
                   <ListRowButton
                     key={entry.id}
-                    onClick={() => goToCreator(entry.creator_id ?? "")}
+                    onClick={() => (onOpenEntry ? onOpenEntry(entry) : goToCreator(entry.creator_id ?? ""))}
                     className="justify-between"
                   >
                     <div className="min-w-0 flex-1 flex items-center gap-2">
