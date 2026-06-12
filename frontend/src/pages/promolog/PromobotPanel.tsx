@@ -61,6 +61,7 @@ interface PipelineHealth {
   wastedCost30: number;    // costo de esas corridas
   lastSuccessAt: string | null;
   scannedToday: number;    // creadoras distintas con entry hoy
+  scannedTodayIds: Set<string>; // sus creator_ids (para detectar caídas)
 }
 
 const RUNS_LIMIT = 15;
@@ -104,8 +105,8 @@ const PromobotPanel = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set()); // por instagram_handle
 
   const [launching, setLaunching] = useState(false);
-  // scope del diálogo de confirmación: "all" | "selected" | null
-  const [confirmScope, setConfirmScope] = useState<"all" | "selected" | null>(null);
+  // scope del diálogo de confirmación: "all" | "selected" | "fallen" | null
+  const [confirmScope, setConfirmScope] = useState<"all" | "selected" | "fallen" | null>(null);
   // corrida cuyo detalle de modelos se está viendo (drill-down de "Modelos").
   const [runModels, setRunModels] = useState<DispatchRun | null>(null);
 
@@ -172,7 +173,7 @@ const PromobotPanel = () => {
       .from("promolog_entries")
       .select("creator_id")
       .gte("created_at", startToday.toISOString());
-    const scannedToday = new Set((e ?? []).map((x: any) => x.creator_id).filter(Boolean)).size;
+    const scannedSet = new Set<string>((e ?? []).map((x: any) => x.creator_id).filter(Boolean));
 
     setHealth({
       costToday: costSince(msToday),
@@ -184,7 +185,8 @@ const PromobotPanel = () => {
       zeroEntryRuns30: zero.length,
       wastedCost30: zero.reduce((s, x) => s + (x.cost_usd ?? 0), 0),
       lastSuccessAt,
-      scannedToday,
+      scannedToday: scannedSet.size,
+      scannedTodayIds: scannedSet,
     });
   }, []);
 
@@ -258,11 +260,34 @@ const PromobotPanel = () => {
     });
   };
 
+  // Caídas: creadoras de corridas timeout/failed de HOY que quedaron SIN entry
+  // (anti-join payload.creator_ids ↔ escaneadas hoy). Son las que el bot perdió en
+  // silencio y se pueden reescanear con only_handles (la maquinaria ya existe).
+  const fallen = useMemo(() => {
+    if (!health) return [] as string[];
+    const startToday = new Date();
+    startToday.setHours(0, 0, 0, 0);
+    const out = new Set<string>();
+    for (const r of runs) {
+      if (r.status !== "timeout" && r.status !== "failed") continue;
+      if (new Date(r.started_at).getTime() < startToday.getTime()) continue;
+      const ids = r.payload?.creator_ids ?? [];
+      const handles = r.payload?.input?.usernames ?? [];
+      ids.forEach((id, i) => {
+        if (id && !health.scannedTodayIds.has(id)) {
+          const h = (handles[i] ?? "").replace(/^@/, "").trim();
+          if (h) out.add(h);
+        }
+      });
+    }
+    return [...out];
+  }, [runs, health]);
+
   // ── Lanzar dispatch ─────────────────────────────────────────────────────
-  const launch = async (scope: "all" | "selected") => {
+  const launch = async (scope: "all" | "selected" | "fallen") => {
     setConfirmScope(null);
     setLaunching(true);
-    const only_handles = scope === "selected" ? Array.from(selected) : undefined;
+    const only_handles = scope === "selected" ? Array.from(selected) : scope === "fallen" ? fallen : undefined;
     const { data, error } = await supabase.functions.invoke("promolog-dispatch", {
       body: { force: true, ...(only_handles ? { only_handles } : {}) },
     });
@@ -435,6 +460,23 @@ const PromobotPanel = () => {
                   tone={gap > 0 ? "warn" : "ok"}
                 />
               </div>
+              {fallen.length > 0 && (
+                <div className="flex items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+                  <span className="text-amber-300">
+                    {fallen.length} creadora(s) quedaron sin escanear hoy por corridas con error.
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 shrink-0 gap-1"
+                    disabled={launching}
+                    onClick={() => setConfirmScope("fallen")}
+                  >
+                    {launching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                    Reescanear ({fallen.length})
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         );
@@ -521,6 +563,8 @@ const PromobotPanel = () => {
             <DialogDescription>
               {confirmScope === "all"
                 ? `Vas a lanzar el análisis de las ${totalEligible} modelos elegibles.`
+                : confirmScope === "fallen"
+                ? `Vas a reescanear ${fallen.length} creadora(s) que quedaron sin escanear hoy por corridas con error.`
                 : `Vas a lanzar el análisis de ${selectedCount} modelo(s) seleccionada(s).`}
               {" "}Esto dispara un scrape en Apify + análisis con Gemini (tiene costo) y saltea el límite de 1 corrida/día.
             </DialogDescription>
