@@ -300,6 +300,7 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               <div className="space-y-1.5">
                 <Label>Otra red / Link</Label>
                 <Input value={form.other_url} onChange={(e) => handleChange("other_url", e.target.value)} placeholder="https://..." />
+                <ExtraAccountsInline creatorId={creator?.id} network="other" canManage={canManageAccounts} />
               </div>
               <div className="space-y-1.5">
                 <Label>OnlyFans URL</Label>

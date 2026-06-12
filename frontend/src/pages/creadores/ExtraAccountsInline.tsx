@@ -38,6 +38,7 @@ const ExtraAccountsInline = ({ creatorId, network, canManage }: Props) => {
   const queryClient = useQueryClient();
   const { isAdmin } = useUserRole();
   const isWhatsapp = network === "whatsapp";
+  const isOther = network === "other"; // "Otra red" → link libre (no se normaliza a handle)
   // WhatsApp: número visible + gestionable SOLO por admin; el resto ve solo el símbolo.
   const effectiveCanManage = isWhatsapp ? canManage && isAdmin : canManage;
   const showValue = !isWhatsapp || isAdmin;
@@ -64,7 +65,7 @@ const ExtraAccountsInline = ({ creatorId, network, canManage }: Props) => {
   const refresh = () => queryClient.invalidateQueries({ queryKey: qKey });
 
   const add = async () => {
-    const u = isWhatsapp ? normalizeWhatsapp(value) : normalizeUsername(value);
+    const u = isWhatsapp ? normalizeWhatsapp(value) : isOther ? value.trim() : normalizeUsername(value);
     if (!u || !creatorId) return;
     setBusy(true);
     const { error } = await supabase
@@ -107,10 +108,10 @@ const ExtraAccountsInline = ({ creatorId, network, canManage }: Props) => {
           <button
             type="button"
             onClick={() => effectiveCanManage && toggle(a.id, !a.active)}
-            title={a.active ? "Activa — click para pausar" : "Pausada — click para activar"}
-            className={a.active ? "" : "line-through"}
+            title={a.active ? `${a.username} — click para pausar` : `${a.username} — click para activar`}
+            className={`${a.active ? "" : "line-through"} ${isOther ? "inline-block max-w-[160px] truncate align-bottom" : ""}`}
           >
-            {isWhatsapp ? (showValue ? a.username : "WhatsApp") : `@${a.username}`}
+            {isWhatsapp ? (showValue ? a.username : "WhatsApp") : isOther ? a.username : `@${a.username}`}
           </button>
           {effectiveCanManage && (
             <button type="button" onClick={() => remove(a.id)} title="Quitar" className="text-muted-foreground hover:text-rose-400">
@@ -128,7 +129,7 @@ const ExtraAccountsInline = ({ creatorId, network, canManage }: Props) => {
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } if (e.key === "Escape") { setAdding(false); setValue(""); } }}
             onBlur={() => { if (!value.trim()) setAdding(false); }}
-            placeholder={isWhatsapp ? "+1 234 567 8900" : "@otra cuenta o link"}
+            placeholder={isWhatsapp ? "+1 234 567 8900" : isOther ? "https://... (link)" : "@otra cuenta o link"}
             className="h-7 w-44 text-xs"
           />
           <button type="button" onClick={add} disabled={busy || !value.trim()} className="rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground disabled:opacity-50">
@@ -141,7 +142,7 @@ const ExtraAccountsInline = ({ creatorId, network, canManage }: Props) => {
           onClick={() => setAdding(true)}
           className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-border/70 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
         >
-          <Plus className="h-3 w-3" /> {isWhatsapp ? "otro número" : "otra cuenta"}
+          <Plus className="h-3 w-3" /> {isWhatsapp ? "otro número" : isOther ? "otro link" : "otra cuenta"}
         </button>
       ))}
     </div>
