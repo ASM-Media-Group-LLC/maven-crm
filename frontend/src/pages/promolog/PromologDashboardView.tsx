@@ -16,6 +16,7 @@ import {
   XCircle,
   Instagram as InstagramIcon,
   Link2,
+  Gauge,
 } from "lucide-react";
 import { format, eachDayOfInterval, isSameDay, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -70,6 +71,8 @@ interface Props {
   onOpenKpiModal: (kind: "creadores_escaneados" | "completadas" | "no_chequeadas" | "ingresados") => void;
   // Abre el popup de veredicto de una entry (para revisar Pendientes en el lugar).
   onOpenEntry?: (entry: PromologEntry) => void;
+  // Total de creadoras ACTIVAS (roster) para la métrica de cobertura.
+  activeCreatorsCount?: number;
 }
 
 const PromologDashboardView = ({
@@ -79,6 +82,7 @@ const PromologDashboardView = ({
   dateTo,
   onOpenKpiModal,
   onOpenEntry,
+  activeCreatorsCount,
 }: Props) => {
   const navigate = useNavigate();
 
@@ -139,6 +143,19 @@ const PromologDashboardView = ({
   const indirectas = promosCount - directas;
   const directPct = promosCount > 0 ? Math.round((directas / promosCount) * 100) : 0;
 
+  // Calidad promedio: media del dayScore (peso×calidad, IG 60% + multi-red) de los
+  // creadora-días que SÍ sumaron (dayScore>0). "Cuando promocionan, qué tan buena es
+  // la promo" — reutiliza el computeDayScore que ya viene en cada entry deduplicada.
+  const qualityAvg = useMemo(() => {
+    const withScore = filteredEntries.filter(e => (e.dayScore ?? 0) > 0);
+    if (!withScore.length) return 0;
+    return Math.round((withScore.reduce((s, e) => s + (e.dayScore ?? 0), 0) / withScore.length) * 100);
+  }, [filteredEntries]);
+  const qualityColor = qualityAvg >= 70 ? "#10b981" : qualityAvg >= 40 ? "#f59e0b" : qualityAvg > 0 ? "#f43f5e" : "transparent";
+
+  // Cobertura del pipeline: cuántas de las activas se escanearon en el rango.
+  const coverGap = activeCreatorsCount ? Math.max(0, activeCreatorsCount - creatorsScannedCount) : 0;
+
   // ── Podio 1: Top 3 por volumen de promos (más promocionaron) ────────
   const topByVolume = useMemo(() => {
     return [...creatorsAgg]
@@ -176,23 +193,31 @@ const PromologDashboardView = ({
   // (1) Streak: usando los entries crudos del filtered, buscar la
   //     creadora con más días consecutivos promocionando.
   const longestStreak = useMemo(() => {
-    // Agrupamos entries promoted por creator → set de días.
+    // Racha CONSECUTIVA real: agrupamos los días con promo por creadora (usando rawDate,
+    // YYYY-MM-DD, para no depender del string formateado), ordenamos y contamos el run
+    // de días consecutivos más largo. Acotada al rango cargado, pero ya es una racha de
+    // verdad (antes contaba el total de días distintos, que no es lo mismo).
     const daysByCreator = new Map<string, { name: string; days: Set<string> }>();
-    for (const e of filteredEntries.filter(x => x.result === "Sí")) {
+    for (const e of filteredEntries) {
+      if (e.result !== "Sí") continue;
+      const key = (e.rawDate || "").slice(0, 10);
+      if (!key) continue;
       const id = e.creator_id || `__no_id__${e.name}`;
       const slot = daysByCreator.get(id);
-      if (slot) slot.days.add(e.date);
-      else daysByCreator.set(id, { name: e.name, days: new Set([e.date]) });
+      if (slot) slot.days.add(key);
+      else daysByCreator.set(id, { name: e.name, days: new Set([key]) });
     }
     let best: { name: string; streak: number } = { name: "—", streak: 0 };
     for (const { name, days } of daysByCreator.values()) {
-      // En el set tenemos strings tipo "28 may 2026". El cálculo de streak
-      // requiere convertirlos a Date y ordenarlos. Para mantener simple,
-      // contamos el número de días — el "streak real" sería días
-      // consecutivos, pero como el listado de entries es limitado a 500
-      // (~últimos días), usamos daysWithPromo como aproximación práctica.
-      // TODO: streak true requiere tomar todo el historial.
-      if (days.size > best.streak) best = { name, streak: days.size };
+      const sorted = [...days].sort();
+      let run = 0, max = 0, prev: number | null = null;
+      for (const k of sorted) {
+        const t = Date.parse(`${k}T00:00:00Z`);
+        run = (prev !== null && t - prev === 86_400_000) ? run + 1 : 1;
+        prev = t;
+        if (run > max) max = run;
+      }
+      if (max > best.streak) best = { name, streak: max };
     }
     return best;
   }, [filteredEntries]);
@@ -250,21 +275,21 @@ const PromologDashboardView = ({
     if (diff > maxDays - 1) start = new Date(end.getTime() - (maxDays - 1) * 86_400_000);
     if (diff < 0) start = new Date(end.getTime() - (maxDays - 1) * 86_400_000);
     const days = eachDayOfInterval({ start, end });
+    // Bucket por día UNA sola vez con el día crudo (rawDate → YYYY-MM-DD), en vez de
+    // comparar el string formateado de la entry (formateado en el TZ del user) contra
+    // otro string formateado por date-fns (TZ del browser) — eso desfasaba/vaciaba barras.
+    const byDay = new Map<string, { si: number; no: number }>();
+    for (const e of filteredEntries) {
+      const key = (e.rawDate || "").slice(0, 10);
+      if (!key) continue;
+      const slot = byDay.get(key) ?? { si: 0, no: 0 };
+      if (e.result === "Sí") slot.si += 1;
+      else if (e.result === "No") slot.no += 1;
+      byDay.set(key, slot);
+    }
     return days.map((d) => {
-      const dayEntries = filteredEntries.filter((e) => {
-        // entry.date es ya un string formateado "28 may 2026"
-        // mejor parsear vía RegExp invertido — pero por simplicidad
-        // hacemos un nuevo Date y comparamos día.
-        // Sus campos `date` originales se perdieron en el map; usamos
-        // el `time` como fallback. Como fix práctico, comparamos por
-        // el string format que ya tenemos:
-        const dayLabel = format(d, "d MMM yyyy", { locale: es });
-        // entry.date tiene formato "28 may 2026" (toLocaleDateString)
-        return e.date === dayLabel;
-      });
-      const si = dayEntries.filter(e => e.result === "Sí").length;
-      const no = dayEntries.filter(e => e.result === "No").length;
-      return { day: d, si, no, total: si + no };
+      const slot = byDay.get(format(d, "yyyy-MM-dd")) ?? { si: 0, no: 0 };
+      return { day: d, si: slot.si, no: slot.no, total: slot.si + slot.no };
     });
   }, [filteredEntries, dateFrom, dateTo]);
   const maxTrendCount = Math.max(1, ...trendData.map(d => d.total));
@@ -313,15 +338,22 @@ const PromologDashboardView = ({
           color="bg-blue-500"
           onClick={() => onOpenKpiModal("creadores_escaneados")}
           footer={
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-emerald-500/30">
-                <CheckCircle2 className="h-3 w-3" />
-                Promocionaron: <span className="tabular-nums">{creatorsPromotedCount}</span>
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-400 ring-1 ring-rose-500/30">
-                <XCircle className="h-3 w-3" />
-                No promocionaron: <span className="tabular-nums">{creatorsNotPromotedCount}</span>
-              </span>
+            <div className="space-y-1">
+              {activeCreatorsCount ? (
+                <p className={`text-[10px] ${coverGap > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
+                  de {activeCreatorsCount} activas{coverGap > 0 ? ` · ${coverGap} sin escanear` : " · cobertura completa"}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-emerald-500/30">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Promocionaron: <span className="tabular-nums">{creatorsPromotedCount}</span>
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-400 ring-1 ring-rose-500/30">
+                  <XCircle className="h-3 w-3" />
+                  No promocionaron: <span className="tabular-nums">{creatorsNotPromotedCount}</span>
+                </span>
+              </div>
             </div>
           }
         />
@@ -418,7 +450,27 @@ const PromologDashboardView = ({
         />
       </div>
 
-      {/* ═══ Row 3.5: Tipo de promo — Directa vs Indirecta ═════════ */}
+      {/* ═══ Row 3.5: Calidad promedio + Tipo de promo ════════════ */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      {/* (a) Calidad de promo — media del dayScore (peso×calidad) */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <Gauge className="h-4 w-4 text-emerald-400" />
+            <div>
+              <h3 className="text-sm font-semibold">Calidad de promo</h3>
+              <p className="text-xs text-muted-foreground">Promedio (peso×calidad, IG 60% + multi-red) de las que sumaron</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl font-bold tabular-nums">{qualityAvg}%</span>
+            <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted/40 ring-1 ring-border/50">
+              <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${qualityAvg}%`, backgroundColor: qualityColor }} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      {/* (b) Tipo de promo — Directa vs Indirecta */}
       <Card>
         <CardContent className="p-4">
           <div className="mb-2 flex items-center justify-between">
@@ -451,6 +503,7 @@ const PromologDashboardView = ({
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* ═══ Row 4: Trend chart — barras 14 días ═══════════════════ */}
       <Card>

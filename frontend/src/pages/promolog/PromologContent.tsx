@@ -938,6 +938,7 @@ const PromologContent = () => {
           dateTo={dateTo}
           onOpenKpiModal={openKpiModal}
           onOpenEntry={handleViewEntry}
+          activeCreatorsCount={creators.length}
         />
       )}
 
