@@ -58,7 +58,7 @@ Deno.serve(async (req: Request) => {
   const cutoff = new Date(Date.now() - MIN_RUNNING_MINUTES * 60_000).toISOString();
   const { data: stuckRuns, error: qErr } = await (sb as any)
     .from("promolog_dispatch_runs")
-    .select("id, apify_run_id, started_at, payload")
+    .select("id, apify_run_id, started_at, payload, retry_count")
     .eq("status", "running")
     .lt("started_at", cutoff)
     .order("started_at", { ascending: true })
@@ -122,7 +122,13 @@ Deno.serve(async (req: Request) => {
           dispatch_run_id: dispatchRunId,
         }),
       });
-      const action = webhookResp.ok ? "webhook_triggered" : `webhook_failed_${webhookResp.status}`;
+      let action = webhookResp.ok ? "webhook_triggered" : `webhook_failed_${webhookResp.status}`;
+      // Reintento automático: si Apify NO terminó OK (TIMED-OUT/FAILED/ABORTED) y este run
+      // no es ya un reintento, re-despachar UNA vez las creadoras que quedaron sin entry hoy.
+      if (webhookResp.ok && apifyStatus !== "SUCCEEDED" && (run.retry_count ?? 0) === 0) {
+        const n = await retryFallen(sb, run, { SUPABASE_URL, ANON_KEY, CRON_TOKEN });
+        if (n > 0) action += `+retry(${n})`;
+      }
       results.push({ dispatch_run_id: dispatchRunId, apify_status: apifyStatus, action });
     } catch (e) {
       results.push({ dispatch_run_id: dispatchRunId, apify_status: apifyStatus, action: `webhook_error:${(e as Error).message.slice(0, 40)}` });
@@ -131,6 +137,53 @@ Deno.serve(async (req: Request) => {
 
   return json({ ok: true, processed: results.length, results });
 });
+
+// retryFallen — re-despacha UNA vez las creadoras de un run terminal (timeout/failed)
+// que quedaron SIN entry hoy. Mapea creator_ids → instagram_handle por la vista de
+// elegibles (1:1 y solo activas; el payload.input.usernames está deduplicado/mezclado
+// con cuentas extra, no sirve para mapear). Marca el run con retry_count=1 (anti-loop).
+async function retryFallen(
+  // deno-lint-ignore no-explicit-any
+  sb: any,
+  // deno-lint-ignore no-explicit-any
+  run: any,
+  env: { SUPABASE_URL: string; ANON_KEY: string; CRON_TOKEN: string | undefined },
+): Promise<number> {
+  const ids: string[] = run.payload?.creator_ids ?? [];
+  if (!ids.length || !env.CRON_TOKEN) return 0;
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: ent } = await sb
+    .from("promolog_entries")
+    .select("creator_id")
+    .in("creator_id", ids)
+    .gte("date", today);
+  const have = new Set((ent ?? []).map((e: { creator_id: string | null }) => e.creator_id).filter(Boolean));
+  const missingIds = ids.filter((id) => !have.has(id));
+  if (!missingIds.length) return 0;
+
+  const { data: cr } = await sb
+    .from("v_promolog_eligible_creators")
+    .select("id, instagram_handle")
+    .in("id", missingIds);
+  const handles = [...new Set((cr ?? []).map((c: { instagram_handle: string | null }) => c.instagram_handle).filter(Boolean))];
+  if (!handles.length) return 0;
+
+  try {
+    await fetch(`${env.SUPABASE_URL}/functions/v1/promolog-dispatch`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.ANON_KEY}`,
+        "x-cron-token": env.CRON_TOKEN,
+      },
+      body: JSON.stringify({ force: true, only_handles: handles, retry_of: run.id }),
+    });
+    // Marcar el original como reintentado (no se vuelve a reintentar).
+    await sb.from("promolog_dispatch_runs").update({ retry_count: 1 }).eq("id", run.id);
+  } catch (_) { /* best-effort: si falla, el próximo tick NO reintenta (sigue retry_count=0) */ }
+
+  return (handles as string[]).length;
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

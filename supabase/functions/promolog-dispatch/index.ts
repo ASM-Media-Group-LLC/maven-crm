@@ -100,7 +100,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // ── Parse body (opcional: force=true para saltar rate-limit) ───────────
-  let body: { force?: boolean; max_creators?: number; only_handles?: string[] } = {};
+  let body: { force?: boolean; max_creators?: number; only_handles?: string[]; retry_of?: string } = {};
   try {
     if (req.headers.get("content-type")?.includes("application/json")) {
       body = await req.json();
@@ -186,7 +186,7 @@ Deno.serve(async (req: Request) => {
 
   const results: ChunkResult[] = [];
   for (const chunk of chunks) {
-    results.push(await launchChunk(sb, chunk, { SUPABASE_URL, ANON_KEY, APIFY_TOKEN, IG_SESSION, dispatchedBy }));
+    results.push(await launchChunk(sb, chunk, { SUPABASE_URL, ANON_KEY, APIFY_TOKEN, IG_SESSION, dispatchedBy, retryOf: body.retry_of ?? null }));
   }
 
   const launched = results.filter((r) => r.apify_run_id);
@@ -229,7 +229,7 @@ interface ChunkResult {
 async function launchChunk(
   sb: any,
   chunk: any[],
-  env: { SUPABASE_URL: string; ANON_KEY: string; APIFY_TOKEN: string; IG_SESSION: string; dispatchedBy: string | null },
+  env: { SUPABASE_URL: string; ANON_KEY: string; APIFY_TOKEN: string; IG_SESSION: string; dispatchedBy: string | null; retryOf?: string | null },
 ): Promise<ChunkResult> {
   // Input del actor automation-lab/instagram-stories-scraper:
   //   usernames: handles sin @  ·  sessionCookie: el sessionid de IG
@@ -258,7 +258,9 @@ async function launchChunk(
       status: "pending",
       creators_count: chunk.length,
       dispatched_by: env.dispatchedBy,
-      payload: { input: apifyInput, creator_ids: chunk.map((c) => c.id) },
+      // retry_count=1 si esta corrida ES un reintento → promolog-poll no la vuelve a reintentar.
+      retry_count: env.retryOf ? 1 : 0,
+      payload: { input: apifyInput, creator_ids: chunk.map((c) => c.id), ...(env.retryOf ? { retry_of: env.retryOf } : {}) },
     })
     .select("id")
     .single();
