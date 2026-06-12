@@ -259,6 +259,7 @@ Deno.serve(async (req: Request) => {
               apifyRunId,
               scanDate,
               openrouterKey: OPENROUTER_API_KEY,
+              sourceHandle: handle,
             }).catch((e) => ({ error: (e as Error).message })),
           ),
         );
@@ -383,6 +384,7 @@ async function processStory(args: {
   apifyRunId: string;
   scanDate: string;
   openrouterKey: string;
+  sourceHandle: string;
 }): Promise<{ inserted: boolean } | { error: string }> {
   const { story, openrouterKey } = args;
   // mediaType: viejo actor usa `type` ("video"); nuevo (automation-lab) usa
@@ -486,6 +488,7 @@ async function processStory(args: {
     analysis_level: analysisLevel,
     needs_review: needsReview,
     is_video: isVideo,
+    source_handle: args.sourceHandle,
   });
 
   return { inserted };
@@ -663,6 +666,7 @@ async function insertAnalyzedEntry(
     analysis_level?: string;       // "thumbnail_only" | "video_full" | "video_tried_lower_conf" | "video_failed:..."
     needs_review?: boolean;        // true si confidence final < NEEDS_REVIEW_THRESHOLD
     is_video?: boolean;
+    source_handle?: string;        // cuenta IG de la que vino la story (multi-cuenta)
   },
 ): Promise<boolean> {
   // Normalizar platform al vocabulario que la UI espera
@@ -704,6 +708,7 @@ async function insertAnalyzedEntry(
     story_count: args.story_count,
     story_media_url: args.media_url,
     scraped_at: args.scraped_at,
+    source_handle: args.source_handle ?? null,
   });
 
   if (error) {
