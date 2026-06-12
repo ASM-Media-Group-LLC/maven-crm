@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAddCreadorWithBusiness } from "./useCreadores";
+import BufferedAccountsInline from "./BufferedAccountsInline";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import { useModelCategories } from "@/hooks/useModelCategories";
 import CommissionTiersEditor, { type CommissionTier } from "@/components/commission/CommissionTiersEditor";
@@ -167,6 +168,8 @@ const NuevoCreadorForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [form, setForm] = useState<FormData>(defaultForm);
+  // Cuentas adicionales por red (se guardan en creator_social_accounts TRAS crear).
+  const [extraAccts, setExtraAccts] = useState<Record<string, string[]>>({});
   const [step, setStep] = useState(1);
   const mutation = useAddCreadorWithBusiness();
   const { data: scouterCompanies = [] } = useScouterCompanies();
@@ -322,6 +325,9 @@ const NuevoCreadorForm = () => {
           billing_address: form.billing_address || null,
         },
         documents,
+        additionalAccounts: Object.entries(extraAccts).flatMap(([network, list]) =>
+          (list || []).map((username) => ({ network, username })),
+        ),
       });
       toast({ title: "Creador guardado exitosamente" });
       navigate("/creadores");
@@ -470,33 +476,42 @@ const NuevoCreadorForm = () => {
                   </Field>
                   <Field label="Instagram URL">
                     <Input value={form.instagram_handle} onChange={(e) => set("instagram_handle", e.target.value)} placeholder="https://instagram.com/username" />
+                    <BufferedAccountsInline network="instagram" accounts={extraAccts.instagram ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, instagram: l }))} />
                   </Field>
                   <Field label="Twitter/X URL">
                     <Input value={form.twitter_handle} onChange={(e) => set("twitter_handle", e.target.value)} placeholder="https://x.com/username" />
+                    <BufferedAccountsInline network="x" accounts={extraAccts.x ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, x: l }))} />
                   </Field>
                   <Field label="TikTok URL">
                     <Input value={form.tiktok_handle} onChange={(e) => set("tiktok_handle", e.target.value)} placeholder="https://tiktok.com/@username" />
+                    <BufferedAccountsInline network="tiktok" accounts={extraAccts.tiktok ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, tiktok: l }))} />
                   </Field>
                   <Field label="YouTube URL">
                     <Input value={form.youtube_handle} onChange={(e) => set("youtube_handle", e.target.value)} placeholder="https://youtube.com/@channel" />
+                    <BufferedAccountsInline network="youtube" accounts={extraAccts.youtube ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, youtube: l }))} />
                   </Field>
                   <Field label="LinkedIn URL">
                     <Input value={form.linkedin_handle} onChange={(e) => set("linkedin_handle", e.target.value)} placeholder="https://linkedin.com/in/..." />
                   </Field>
                   <Field label="OnlyFans URL">
                     <Input value={form.onlyfans_url} onChange={(e) => set("onlyfans_url", e.target.value)} placeholder="https://onlyfans.com/..." />
+                    <BufferedAccountsInline network="onlyfans" accounts={extraAccts.onlyfans ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, onlyfans: l }))} />
                   </Field>
                   <Field label="Telegram URL">
                     <Input value={form.telegram_handle} onChange={(e) => set("telegram_handle", e.target.value)} placeholder="https://t.me/usuario_o_canal" />
+                    <BufferedAccountsInline network="telegram" accounts={extraAccts.telegram ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, telegram: l }))} />
                   </Field>
                   <Field label="Reddit URL">
                     <Input value={form.reddit_handle} onChange={(e) => set("reddit_handle", e.target.value)} placeholder="https://reddit.com/user/username" />
+                    <BufferedAccountsInline network="reddit" accounts={extraAccts.reddit ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, reddit: l }))} />
                   </Field>
                   <Field label="Facebook URL">
                     <Input value={form.facebook_handle} onChange={(e) => set("facebook_handle", e.target.value)} placeholder="https://facebook.com/username" />
+                    <BufferedAccountsInline network="facebook" accounts={extraAccts.facebook ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, facebook: l }))} />
                   </Field>
                   <Field label="Otra red / Link">
                     <Input value={form.other_url} onChange={(e) => set("other_url", e.target.value)} placeholder="https://..." />
+                    <BufferedAccountsInline network="other" accounts={extraAccts.other ?? []} onChange={(l) => setExtraAccts((p) => ({ ...p, other: l }))} />
                   </Field>
                 </div>
                 <div className="space-y-4">

@@ -185,7 +185,21 @@ interface DocumentInput {
 
 interface AddCreadorFullInput extends AddCreadorWithBusinessInput {
   documents?: DocumentInput[];
+  // Cuentas adicionales por red (creator_social_accounts) bufferadas en el form de crear.
+  additionalAccounts?: Array<{ network: string; username: string }>;
 }
+
+// Redes de "handle pelado" donde la 1ª cuenta puede llenar la columna principal de
+// creators si quedó vacía (safeguard "la 1ª que se agregue será la principal").
+// Excluimos facebook/telegram/onlyfans/other porque sus columnas guardan URL/invite
+// completos y promover un username pelado las rompería.
+const PROMOTE_COL: Record<string, string> = {
+  instagram: "instagram_handle",
+  x: "twitter_handle",
+  tiktok: "tiktok_handle",
+  youtube: "youtube_handle",
+  reddit: "reddit_handle",
+};
 
 export function useUpdateCreador() {
   const qc = useQueryClient();
@@ -222,9 +236,31 @@ export function useCreadorById(id: string) {
 export function useAddCreadorWithBusiness() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ creator, business, documents }: AddCreadorFullInput): Promise<string> => {
+    mutationFn: async ({ creator, business, documents, additionalAccounts }: AddCreadorFullInput): Promise<string> => {
       const { data: { user } } = await supabase.auth.getUser();
       const creatorPayload = { ...creator, created_by: creator.created_by || user?.id || null };
+
+      // Procesar cuentas adicionales: agrupar por red, promover la 1ª a principal
+      // si la columna quedó vacía (solo redes de handle), el resto quedan como extras.
+      const byNet = new Map<string, string[]>();
+      for (const a of additionalAccounts || []) {
+        const u = (a.username || "").trim();
+        if (!u) continue;
+        const arr = byNet.get(a.network) || [];
+        if (!arr.includes(u)) arr.push(u);
+        byNet.set(a.network, arr);
+      }
+      const remaining: Array<{ network: string; username: string }> = [];
+      for (const [network, list] of byNet) {
+        const col = PROMOTE_COL[network];
+        if (col && !(creatorPayload as Record<string, unknown>)[col]) {
+          (creatorPayload as Record<string, unknown>)[col] = list[0];
+          list.slice(1).forEach((u) => remaining.push({ network, username: u }));
+        } else {
+          list.forEach((u) => remaining.push({ network, username: u }));
+        }
+      }
+
       const { data, error } = await supabase.from("creators").insert(creatorPayload).select("id").single();
       if (error) throw error;
       const creatorId = data.id;
@@ -243,6 +279,20 @@ export function useAddCreadorWithBusiness() {
         }));
         const { error: docError } = await supabase.from("creator_documents").insert(docs);
         if (docError) throw docError;
+      }
+
+      // Cuentas adicionales: best-effort (la creadora ya quedó creada; si falla un
+      // extra no tiene sentido romper todo — se puede re-agregar en Editar).
+      if (remaining.length > 0) {
+        const rows = remaining.map((a) => ({
+          creator_id: creatorId,
+          network: a.network,
+          username: a.username,
+          active: true,
+          created_by: user?.id || null,
+        }));
+        const { error: accError } = await supabase.from("creator_social_accounts").insert(rows);
+        if (accError) console.warn("[useAddCreadorWithBusiness] cuentas adicionales:", accError.message);
       }
       return creatorId;
     },
