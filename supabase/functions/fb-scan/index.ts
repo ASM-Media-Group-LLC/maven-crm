@@ -200,28 +200,48 @@ Deno.serve(async (req: Request) => {
   const capped = list.length > MAX_CREATORS;
   list = list.slice(0, MAX_CREATORS);
 
-  // Nicknames de OF por creadora (principal onlyfans_url + secundarias) → señal of_handle.
+  // Multi-cuenta: nicknames de OF por creadora (principal onlyfans_url + secundarias)
+  // → señal of_handle; y cuentas FACEBOOK extra (también se escanean). Una sola query
+  // a creator_social_accounts: network in (onlyfans, facebook).
   const ofNicksByCreator = new Map<string, string[]>();
   for (const c of list) { const p = ofHandleFromUrl(c.onlyfans_url); ofNicksByCreator.set(c.id, p ? [p] : []); }
+  const fbExtraByCreator = new Map<string, string[]>();
   const creatorIds = list.map((c) => c.id);
   if (creatorIds.length) {
-    const { data: ofExtra } = await sb.from("creator_social_accounts")
-      .select("creator_id, username").eq("network", "onlyfans").eq("active", true).in("creator_id", creatorIds);
-    for (const a of (ofExtra ?? []) as Array<{ creator_id: string; username: string }>) {
-      const nick = String(a.username || "").replace(/^@+/, "").toLowerCase().trim();
-      if (!nick) continue;
-      const arr = ofNicksByCreator.get(a.creator_id) ?? [];
-      if (!arr.includes(nick)) arr.push(nick);
-      ofNicksByCreator.set(a.creator_id, arr);
+    const { data: extra } = await sb.from("creator_social_accounts")
+      .select("creator_id, network, username").in("network", ["onlyfans", "facebook"]).eq("active", true).in("creator_id", creatorIds);
+    for (const a of (extra ?? []) as Array<{ creator_id: string; network: string; username: string }>) {
+      const u = String(a.username || "").trim();
+      if (!u) continue;
+      if (a.network === "onlyfans") {
+        const nick = u.replace(/^@+/, "").toLowerCase();
+        const arr = ofNicksByCreator.get(a.creator_id) ?? [];
+        if (nick && !arr.includes(nick)) arr.push(nick);
+        ofNicksByCreator.set(a.creator_id, arr);
+      } else { // facebook extra → se escanea igual que la principal
+        const arr = fbExtraByCreator.get(a.creator_id) ?? [];
+        if (!arr.includes(u)) arr.push(u);
+        fbExtraByCreator.set(a.creator_id, arr);
+      }
     }
+  }
+
+  // Targets de escaneo: principal (facebook_handle) + cada cuenta FB extra. Cada
+  // target se escanea por separado y la fila lleva source_handle = la cuenta.
+  const targets: Array<{ c: (typeof list)[number]; handle: string }> = [];
+  for (const c of list) {
+    targets.push({ c, handle: c.facebook_handle });
+    for (const u of fbExtraByCreator.get(c.id) ?? []) targets.push({ c, handle: u });
   }
 
   const results: unknown[] = [];
   let rawSample: unknown = null;
   let visionUsed = 0; // cap de costo: total de llamadas de visión en la corrida
-  for (const c of list) {
+  for (const t of targets) {
+    const c = t.c;
+    const handle = t.handle;
     try {
-      const items = await runApify(APIFY_TOKEN, fbUrl(c.facebook_handle), since, 15);
+      const items = await runApify(APIFY_TOKEN, fbUrl(handle), since, 15);
       if (dryRun && !rawSample && items[0]) rawSample = { keys: Object.keys(items[0]).slice(0, 40), first: items[0] };
 
       if (!items.length) {
@@ -275,7 +295,7 @@ Deno.serve(async (req: Request) => {
           notes: (postText(it) || "").slice(0, 2000) || null,
           evidence_url: evidence,
           analyzed_by_ai: true, ai_model: "regla-texto-fb", ai_reasoning: reason,
-          source_handle: (c.facebook_handle || "").trim() || null,
+          source_handle: (handle || "").trim() || null,
           story_index: i, story_count: items.length, scraped_at: new Date().toISOString(),
         });
         if (insErr) results.push({ creator: c.name, insertError: insErr.message });

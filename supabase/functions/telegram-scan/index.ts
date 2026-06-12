@@ -103,29 +103,49 @@ Deno.serve(async (req: Request) => {
   const { data: creators, error: cErr } = await q;
   if (cErr) return jsonResponse({ error: cErr.message }, 500);
 
-  // Nicknames de OF por creadora (principal onlyfans_url + secundarias) → señal of_handle.
+  // Multi-cuenta: nicknames de OF por creadora (principal onlyfans_url + secundarias)
+  // → señal of_handle; y canales TELEGRAM extra (también se escanean). Una sola query
+  // a creator_social_accounts: network in (onlyfans, telegram).
   const ofNicksByCreator = new Map<string, string[]>();
   for (const c of creators || []) { const p = ofHandleFromUrl(c.onlyfans_url); ofNicksByCreator.set(c.id, p ? [p] : []); }
+  const tgExtraByCreator = new Map<string, string[]>();
   const creatorIds = (creators || []).map((c: any) => c.id);
   if (creatorIds.length) {
-    const { data: ofExtra } = await sb.from("creator_social_accounts")
-      .select("creator_id, username").eq("network", "onlyfans").eq("active", true).in("creator_id", creatorIds);
-    for (const a of (ofExtra ?? []) as Array<{ creator_id: string; username: string }>) {
-      const nick = String(a.username || "").replace(/^@+/, "").toLowerCase().trim();
-      if (!nick) continue;
-      const arr = ofNicksByCreator.get(a.creator_id) ?? [];
-      if (!arr.includes(nick)) arr.push(nick);
-      ofNicksByCreator.set(a.creator_id, arr);
+    const { data: extra } = await sb.from("creator_social_accounts")
+      .select("creator_id, network, username").in("network", ["onlyfans", "telegram"]).eq("active", true).in("creator_id", creatorIds);
+    for (const a of (extra ?? []) as Array<{ creator_id: string; network: string; username: string }>) {
+      const u = String(a.username || "").trim();
+      if (!u) continue;
+      if (a.network === "onlyfans") {
+        const nick = u.replace(/^@+/, "").toLowerCase();
+        const arr = ofNicksByCreator.get(a.creator_id) ?? [];
+        if (nick && !arr.includes(nick)) arr.push(nick);
+        ofNicksByCreator.set(a.creator_id, arr);
+      } else { // telegram extra → se escanea igual que el canal principal
+        const arr = tgExtraByCreator.get(a.creator_id) ?? [];
+        if (!arr.includes(u)) arr.push(u);
+        tgExtraByCreator.set(a.creator_id, arr);
+      }
     }
   }
 
-  const results: unknown[] = [];
+  // Targets de escaneo: canal principal (telegram_handle) + cada canal TG extra. Cada
+  // target se une/escanea por separado y la fila lleva source_handle = ese canal.
+  const targets: Array<{ c: any; handle: string }> = [];
   for (const c of creators || []) {
+    targets.push({ c, handle: c.telegram_handle });
+    for (const u of tgExtraByCreator.get(c.id) ?? []) targets.push({ c, handle: u });
+  }
+
+  const results: unknown[] = [];
+  for (const t of targets) {
+    const c = t.c;
+    const handle = t.handle;
     try {
       const r = await fetch(`${GW_URL}/channel/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: GW_API_KEY },
-        body: JSON.stringify({ link: c.telegram_handle, hours }),
+        body: JSON.stringify({ link: handle, hours }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.ok) { results.push({ creator: c.name, ok: false, error: j.error || `gw ${r.status}` }); continue; }
@@ -160,7 +180,7 @@ Deno.serve(async (req: Request) => {
           analyzed_by_ai: true,
           ai_model: "heuristic-of-v1",
           ai_reasoning: reason,
-          source_handle: (c.telegram_handle || "").trim() || null,
+          source_handle: (handle || "").trim() || null,
           story_index: i,
           story_count: posts.length,
           scraped_at: new Date().toISOString(),

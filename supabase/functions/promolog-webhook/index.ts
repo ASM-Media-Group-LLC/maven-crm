@@ -82,6 +82,26 @@ GUÍA:
 - En "reasoning" citá la señal concreta ("sticker 'OF' arriba a la derecha", "caption: 'link en bio'") o, si no promociona, decilo ("solo una selfie en lencería, sin link ni CTA").
 - Si la imagen está borrosa o el texto ilegible y NO podés saber si hay un link/CTA, poné confidence < 0.6 para revisión manual — pero NO marques promoted=true por las dudas: marcá lo que efectivamente ves.`;
 
+// Extrae el nickname de OnlyFans de una URL (onlyfans.com/<nick>) o handle pelado.
+function ofNickFromUrl(url: string): string {
+  let s = (url || "").trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) {
+    try { s = new URL(s).pathname.split("/").filter(Boolean)[0] ?? ""; } catch { return ""; }
+  }
+  return s.replace(/^@+/, "").toLowerCase().trim();
+}
+
+// Cláusula que se anexa al VISION_PROMPT con los nicks de OF de la creadora: si
+// Gemini ve el nick (watermark/overlay/texto/caption), lo cuenta como promo directa.
+function ofNicksClause(nicks: string[]): string {
+  const clean = (nicks || []).filter(Boolean);
+  if (!clean.length) return "";
+  const list = clean.map((n) => `@${n}`).join(", ");
+  return `\n\nNICKNAMES DE ONLYFANS DE ESTA CREADORA: ${list}.\n` +
+    `Si ves CUALQUIERA de estos nombres EXACTOS en la imagen/video (watermark, overlay, sticker, texto sobreimpreso) o en el caption, contá eso como un PUNTERO a contenido pago aunque NO haya link clickeable: poné has_buy_link=true, buy_link_type="onlyfans", platform_mentioned="onlyfans", promoted=true, promotion_type="direct", y citá el nick visto en "reasoning". OJO: tiene que ser el NICK como texto/watermark visible, NO inferirlo de que la foto se parece a ella.`;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -179,28 +199,43 @@ Deno.serve(async (req: Request) => {
   const creatorIds: string[] = run.payload?.creator_ids ?? [];
   const { data: creatorsData } = await (sb as any)
     .from("creators")
-    .select("id, instagram_handle")
+    .select("id, instagram_handle, onlyfans_url")
     .in("id", creatorIds);
 
   const handleToCreator = new Map<string, string>();
+  // Multi-cuenta OF: nicknames de OnlyFans por creadora (principal onlyfans_url +
+  // secundarias). Se pasan al prompt de Gemini para que cuente un watermark/overlay/
+  // mención del nick (aunque no haya link clickeable) como promoción directa.
+  const ofNicksByCreator = new Map<string, string[]>();
   for (const c of (creatorsData ?? []) as any[]) {
     const h = normalizeHandle(c.instagram_handle ?? "");
     if (h) handleToCreator.set(h, c.id);
+    const nick = ofNickFromUrl(c.onlyfans_url ?? "");
+    ofNicksByCreator.set(c.id, nick ? [nick] : []);
   }
 
-  // Multi-cuenta: sumar las cuentas IG EXTRA (creator_social_accounts) al mapa,
-  // así una story de CUALQUIER cuenta de la creadora cae en su mismo creator_id
-  // (la dedup luego colapsa a 1 fila/creadora/día = "Sí" si promocionó en alguna).
+  // Multi-cuenta: sumar las cuentas IG EXTRA al mapa de handles (así una story de
+  // CUALQUIER cuenta IG cae en el mismo creator_id; la dedup colapsa a 1 fila/día),
+  // y los nicks de OF EXTRA a la señal del prompt. Una sola query: network in (ig, of).
   const { data: extraAccounts } = creatorIds.length
     ? await (sb as any)
         .from("creator_social_accounts")
-        .select("creator_id, username")
-        .eq("network", "instagram")
+        .select("creator_id, network, username")
+        .in("network", ["instagram", "onlyfans"])
         .in("creator_id", creatorIds)
-    : { data: [] as Array<{ creator_id: string; username: string }> };
-  for (const a of (extraAccounts ?? []) as Array<{ creator_id: string; username: string }>) {
-    const h = normalizeHandle(a.username ?? "");
-    if (h && !handleToCreator.has(h)) handleToCreator.set(h, a.creator_id);
+    : { data: [] as Array<{ creator_id: string; network: string; username: string }> };
+  for (const a of (extraAccounts ?? []) as Array<{ creator_id: string; network: string; username: string }>) {
+    if (a.network === "instagram") {
+      const h = normalizeHandle(a.username ?? "");
+      if (h && !handleToCreator.has(h)) handleToCreator.set(h, a.creator_id);
+    } else { // onlyfans extra → suma como nick para el prompt
+      const nick = String(a.username ?? "").replace(/^@+/, "").toLowerCase().trim();
+      if (nick) {
+        const arr = ofNicksByCreator.get(a.creator_id) ?? [];
+        if (!arr.includes(nick)) arr.push(nick);
+        ofNicksByCreator.set(a.creator_id, arr);
+      }
+    }
   }
 
   // ── Agrupar items por handle ────────────────────────────────────────────
@@ -260,6 +295,7 @@ Deno.serve(async (req: Request) => {
               scanDate,
               openrouterKey: OPENROUTER_API_KEY,
               sourceHandle: handle,
+              ofNicks: ofNicksByCreator.get(creatorId) ?? [],
             }).catch((e) => ({ error: (e as Error).message })),
           ),
         );
@@ -385,6 +421,7 @@ async function processStory(args: {
   scanDate: string;
   openrouterKey: string;
   sourceHandle: string;
+  ofNicks: string[];
 }): Promise<{ inserted: boolean } | { error: string }> {
   const { story, openrouterKey } = args;
   // mediaType: viejo actor usa `type` ("video"); nuevo (automation-lab) usa
@@ -407,7 +444,7 @@ async function processStory(args: {
   const caption: string | null = story.caption ?? null;
 
   // ── Nivel 1: thumbnail + caption ────────────────────────────────────────
-  const l1 = await analyzeImageStory(mediaUrl, caption, openrouterKey);
+  const l1 = await analyzeImageStory(mediaUrl, caption, openrouterKey, args.ofNicks);
   if ("error" in l1) {
     // Si bajamos la imagen pero el modelo no devolvió un veredicto legible
     // (JSON inválido, refusal, timeout), NO descartamos la story: persistimos
@@ -445,7 +482,7 @@ async function processStory(args: {
 
   // ── Nivel 2 (opcional): video completo si es video Y l1 dudoso ──────────
   if (isVideo && videoUrl && l1.analysis.confidence < VIDEO_REANALYZE_THRESHOLD) {
-    const l2 = await analyzeVideoStory(videoUrl, caption, openrouterKey);
+    const l2 = await analyzeVideoStory(videoUrl, caption, openrouterKey, args.ofNicks);
     if (!("error" in l2)) {
       // Si nivel 2 da más confianza, usamos su resultado. Sino, mantenemos l1
       // pero anotamos que se intentó.
@@ -501,6 +538,7 @@ async function analyzeImageStory(
   imageUrl: string,
   caption: string | null,
   apiKey: string,
+  ofNicks: string[] = [],
 ): Promise<
   | { analysis: StoryAnalysis; imageBytes: Uint8Array; mime: string }
   | { error: string; imageBytes?: Uint8Array; mime?: string }
@@ -523,10 +561,11 @@ async function analyzeImageStory(
   }
 
   const dataUri = `data:${mime};base64,${bytesToBase64(imageBytes)}`;
+  const promptText = VISION_PROMPT + ofNicksClause(ofNicks);
   const content = [
     {
       type: "text",
-      text: caption ? `Caption de la story: "${caption}"\n\n${VISION_PROMPT}` : VISION_PROMPT,
+      text: caption ? `Caption de la story: "${caption}"\n\n${promptText}` : promptText,
     },
     { type: "image_url", image_url: { url: dataUri } },
   ];
@@ -546,11 +585,13 @@ async function analyzeVideoStory(
   videoUrl: string,
   caption: string | null,
   apiKey: string,
+  ofNicks: string[] = [],
 ): Promise<{ analysis: StoryAnalysis } | { error: string }> {
+  const promptText = VISION_PROMPT + ofNicksClause(ofNicks);
   const content = [
     {
       type: "text",
-      text: caption ? `Caption de la story: "${caption}"\n\n${VISION_PROMPT}` : VISION_PROMPT,
+      text: caption ? `Caption de la story: "${caption}"\n\n${promptText}` : promptText,
     },
     { type: "video_url", video_url: { url: videoUrl } },
   ];
