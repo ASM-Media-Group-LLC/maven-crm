@@ -265,52 +265,52 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               <div className="space-y-1.5">
                 <Label>Instagram</Label>
                 <Input value={form.instagram_handle} onChange={(e) => handleChange("instagram_handle", e.target.value)} placeholder="@usuario" />
-                <ExtraAccountsInline creatorId={creator?.id} network="instagram" canManage={canManageAccounts} />
+                <ExtraAccountsInline creatorId={creator?.id} network="instagram" canManage={canManageAccounts} primaryFilled={!!(form.instagram_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("instagram_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Twitter/X</Label>
                 <Input value={form.twitter_handle} onChange={(e) => handleChange("twitter_handle", e.target.value)} placeholder="@usuario" />
-                <ExtraAccountsInline creatorId={creator?.id} network="x" canManage={canManageAccounts} />
+                <ExtraAccountsInline creatorId={creator?.id} network="x" canManage={canManageAccounts} primaryFilled={!!(form.twitter_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("twitter_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>TikTok</Label>
                 <Input value={form.tiktok_handle} onChange={(e) => handleChange("tiktok_handle", e.target.value)} placeholder="@usuario" />
-                <ExtraAccountsInline creatorId={creator?.id} network="tiktok" canManage={canManageAccounts} />
+                <ExtraAccountsInline creatorId={creator?.id} network="tiktok" canManage={canManageAccounts} primaryFilled={!!(form.tiktok_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("tiktok_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>YouTube</Label>
                 <Input value={form.youtube_handle} onChange={(e) => handleChange("youtube_handle", e.target.value)} placeholder="@canal" />
-                <ExtraAccountsInline creatorId={creator?.id} network="youtube" canManage={canManageAccounts} />
+                <ExtraAccountsInline creatorId={creator?.id} network="youtube" canManage={canManageAccounts} primaryFilled={!!(form.youtube_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("youtube_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Telegram</Label>
                 <Input value={form.telegram_handle} onChange={(e) => handleChange("telegram_handle", e.target.value)} placeholder="@usuario o t.me/..." />
-                <ExtraAccountsInline creatorId={creator?.id} network="telegram" canManage={canManageAccounts} />
+                <ExtraAccountsInline creatorId={creator?.id} network="telegram" canManage={canManageAccounts} primaryFilled={!!(form.telegram_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("telegram_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Reddit</Label>
                 <Input value={form.reddit_handle} onChange={(e) => handleChange("reddit_handle", e.target.value)} placeholder="u/usuario" />
-                <ExtraAccountsInline creatorId={creator?.id} network="reddit" canManage={canManageAccounts} />
+                <ExtraAccountsInline creatorId={creator?.id} network="reddit" canManage={canManageAccounts} primaryFilled={!!(form.reddit_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("reddit_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Facebook</Label>
                 <Input value={form.facebook_handle} onChange={(e) => handleChange("facebook_handle", e.target.value)} placeholder="usuario o URL" />
-                <ExtraAccountsInline creatorId={creator?.id} network="facebook" canManage={canManageAccounts} />
+                <ExtraAccountsInline creatorId={creator?.id} network="facebook" canManage={canManageAccounts} primaryFilled={!!(form.facebook_handle || "").trim()} onPromoteToPrimary={(v) => handleChange("facebook_handle", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Otra red / Link</Label>
                 <Input value={form.other_url} onChange={(e) => handleChange("other_url", e.target.value)} placeholder="https://..." />
-                <ExtraAccountsInline creatorId={creator?.id} network="other" canManage={canManageAccounts} />
+                <ExtraAccountsInline creatorId={creator?.id} network="other" canManage={canManageAccounts} primaryFilled={!!(form.other_url || "").trim()} onPromoteToPrimary={(v) => handleChange("other_url", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>OnlyFans URL</Label>
                 <Input value={form.onlyfans_url} onChange={(e) => handleChange("onlyfans_url", e.target.value)} placeholder="https://onlyfans.com/..." />
-                <ExtraAccountsInline creatorId={creator?.id} network="onlyfans" canManage={canManageAccounts} />
+                <ExtraAccountsInline creatorId={creator?.id} network="onlyfans" canManage={canManageAccounts} primaryFilled={!!(form.onlyfans_url || "").trim()} onPromoteToPrimary={(v) => handleChange("onlyfans_url", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>WhatsApp</Label>
                 <Input value={form.whatsapp_number} onChange={(e) => handleChange("whatsapp_number", e.target.value)} placeholder="+1 234 567 8900" />
-                <ExtraAccountsInline creatorId={creator?.id} network="whatsapp" canManage={canManageAccounts} />
+                <ExtraAccountsInline creatorId={creator?.id} network="whatsapp" canManage={canManageAccounts} primaryFilled={!!(form.whatsapp_number || "").trim()} onPromoteToPrimary={(v) => handleChange("whatsapp_number", v)} />
               </div>
             </div>
           </section>

@@ -30,11 +30,16 @@ const normalizeWhatsapp = (raw: string): string => {
 
 interface Props {
   creatorId?: string;
-  network: string; // instagram | x | tiktok | youtube | telegram | reddit | facebook | whatsapp
+  network: string; // instagram | x | tiktok | youtube | telegram | reddit | facebook | whatsapp | onlyfans | other
   canManage: boolean;
+  // Safeguard "1ª = principal": si la red NO tiene cuenta principal todavía, la
+  // primera cuenta que se agregue va a la columna principal (la que linkea el
+  // nombre en toda Maven), NO a creator_social_accounts.
+  primaryFilled?: boolean;
+  onPromoteToPrimary?: (value: string) => void;
 }
 
-const ExtraAccountsInline = ({ creatorId, network, canManage }: Props) => {
+const ExtraAccountsInline = ({ creatorId, network, canManage, primaryFilled, onPromoteToPrimary }: Props) => {
   const queryClient = useQueryClient();
   const { isAdmin } = useUserRole();
   const isWhatsapp = network === "whatsapp";
@@ -67,6 +72,14 @@ const ExtraAccountsInline = ({ creatorId, network, canManage }: Props) => {
   const add = async () => {
     const u = isWhatsapp ? normalizeWhatsapp(value) : isOther ? value.trim() : normalizeUsername(value);
     if (!u || !creatorId) return;
+    // Safeguard "1ª = principal": red sin principal + es la primera cuenta → va al
+    // campo principal del form (se guarda con "Guardar"), no como secundaria.
+    if (onPromoteToPrimary && primaryFilled === false && accounts.length === 0) {
+      onPromoteToPrimary(isOther ? value.trim() : u);
+      setValue("");
+      setAdding(false);
+      return;
+    }
     setBusy(true);
     const { error } = await supabase
       .from("creator_social_accounts")
