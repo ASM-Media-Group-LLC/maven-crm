@@ -309,8 +309,6 @@ Deno.serve(async (req: Request) => {
           }
         }
       }
-
-      creatorsSucceeded++;
     } catch (e) {
       creatorsFailed++;
       errors.push({ handle, error: (e as Error).message });
@@ -332,6 +330,12 @@ Deno.serve(async (req: Request) => {
     creatorsWithEntries.add(cid);
     entriesCreated++;
   }
+
+  // creators_succeeded = COBERTURA real (creadoras distintas con al menos una entry),
+  // no "las que tenían stories en el dataset". Antes contaba solo el loop de itemsByHandle
+  // (reportaba 3 de 12 cuando el sweep cubría el resto). Cobertura = lo que realmente
+  // se escaneó; promocionar o no es otra cosa.
+  creatorsSucceeded = creatorsWithEntries.size;
 
   // ── Update final ────────────────────────────────────────────────────────
   await (sb as any)

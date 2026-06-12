@@ -169,9 +169,19 @@ Deno.serve(async (req: Request) => {
   // webhook nunca procese demasiadas stories de una (ver CREATORS_PER_APIFY_RUN).
   const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "";
 
+  // Lotes BALANCEADOS: en vez de cortar de a CREATORS_PER_APIFY_RUN fijo (que dejaba
+  // un lote sobrante de 1 creadora —ej. 61/12 = 5×12 + 1× 1— que corría sola ~10min y
+  // rozaba el timeout), repartimos en ceil(N/max) lotes lo más parejos posible. Cada
+  // lote queda ≤ CREATORS_PER_APIFY_RUN y sin colas de 1.
   const chunks: any[][] = [];
-  for (let i = 0; i < batch.length; i += CREATORS_PER_APIFY_RUN) {
-    chunks.push(batch.slice(i, i + CREATORS_PER_APIFY_RUN));
+  const numChunks = Math.max(1, Math.ceil(batch.length / CREATORS_PER_APIFY_RUN));
+  const base = Math.floor(batch.length / numChunks);
+  const extra = batch.length % numChunks; // los primeros `extra` lotes llevan 1 más
+  let idx = 0;
+  for (let k = 0; k < numChunks; k++) {
+    const size = base + (k < extra ? 1 : 0);
+    if (size > 0) chunks.push(batch.slice(idx, idx + size));
+    idx += size;
   }
 
   const results: ChunkResult[] = [];
