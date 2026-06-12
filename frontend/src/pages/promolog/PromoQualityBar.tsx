@@ -1,21 +1,13 @@
-// Barra segmentada de CALIDAD de promo (Fase 1).
+// Barra de CALIDAD de promo (Fase 1) — vista de usuario.
 //
-// Cada red ocupa un ancho proporcional a su PESO (IG 60%, X/TG/FB ~13,3% c/u) y se
-// rellena según la CALIDAD de su promo (0-100%). Así el área coloreada de cada banda
-// = peso×calidad = lo que aporta al score, y la "llenura" total de la barra = el score.
-//
-// La identidad de cada red se ve en la columna "Red Social" contigua (en la tabla) y
-// en el tooltip; acá usamos color de marca por banda para no recargar.
+// A nivel usuario es UNA sola barra continua llena hasta el score del día (0-100%),
+// con el % al lado. El score sale del modelo interno (Σ peso_red × calidad, IG 60% +
+// X/TG/FB ~13,3% c/u) — ese desglose por red es INTERNO: vive en el tooltip y en el
+// popup de detalle, NO en la barra (antes se dibujaba un segmento por red y se veía
+// fragmentada/inconsistente, con bloques "flotando" cuando una red promocionaba y otra no).
 
 import { cn } from "@/lib/utils";
 import type { NetworkScore } from "./promoScore";
-
-const NET_COLOR: Record<string, string> = {
-  instagram: "#E1306C", // rosa IG
-  x: "#8b98a5", // gris-azulado (X es B/N → visible en dark)
-  telegram: "#229ED9", // azul Telegram
-  facebook: "#1877F2", // azul Facebook
-};
 
 const NET_LABEL: Record<string, string> = {
   instagram: "Instagram",
@@ -26,6 +18,15 @@ const NET_LABEL: Record<string, string> = {
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 
+// Color del relleno según nivel de calidad (lectura de un vistazo). Un solo color por
+// barra → consistente dentro de cada fila (nada de segmentos de distinto color).
+function fillColor(score: number): string {
+  if (score >= 0.7) return "#10b981"; // emerald — alta
+  if (score >= 0.4) return "#f59e0b"; // amber — media
+  if (score > 0) return "#f43f5e"; // rose — baja
+  return "transparent";
+}
+
 interface Props {
   networks: NetworkScore[];
   score: number;
@@ -35,41 +36,28 @@ interface Props {
 
 export default function PromoQualityBar({ networks, score, variant = "full", className }: Props) {
   const thin = variant === "thin";
-  const totalWeight = networks.reduce((s, n) => s + n.weight, 0) || 1;
+
+  // Tooltip = desglose por red (el detalle "interno" sigue disponible al pasar el mouse).
+  const promoted = networks.filter((n) => n.promoted && n.quality > 0);
+  const breakdown = promoted.length
+    ? promoted.map((n) => `${NET_LABEL[n.network] ?? n.network} ${pct(n.quality)}`).join(" · ")
+    : "sin promo que sume al score";
+  const tip = `Calidad de promo: ${pct(score)} — ${breakdown}`;
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <div
         className={cn(
-          "flex flex-1 overflow-hidden rounded-full bg-muted/40 ring-1 ring-border/50",
+          "relative flex-1 overflow-hidden rounded-full bg-muted/40 ring-1 ring-border/50",
           thin ? "h-1.5" : "h-2.5",
         )}
         style={{ minWidth: thin ? 32 : 84 }}
-        title={thin ? `Calidad de promo: ${pct(score)}` : undefined}
+        title={tip}
       >
-        {networks.map((n) => {
-          const color = NET_COLOR[n.network] || "#888";
-          const tip = !n.scanned
-            ? `${NET_LABEL[n.network]} · sin escanear`
-            : n.promoted
-            ? `${NET_LABEL[n.network]} · calidad ${pct(n.quality)} → aporta ${pct(n.contribution)}`
-            : `${NET_LABEL[n.network]} · revisada, sin promo`;
-          return (
-            <div
-              key={n.network}
-              className="relative h-full border-r border-background/60 last:border-r-0"
-              style={{ flexBasis: `${(n.weight / totalWeight) * 100}%` }}
-              title={tip}
-            >
-              {n.promoted && n.quality > 0 && (
-                <div
-                  className="absolute inset-y-0 left-0"
-                  style={{ width: pct(n.quality), backgroundColor: color }}
-                />
-              )}
-            </div>
-          );
-        })}
+        <div
+          className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-300"
+          style={{ width: pct(score), backgroundColor: fillColor(score) }}
+        />
       </div>
       {!thin && (
         <span className="w-9 shrink-0 text-right text-xs font-semibold tabular-nums">{pct(score)}</span>
