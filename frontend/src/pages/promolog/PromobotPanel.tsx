@@ -93,6 +93,16 @@ const fmtTime = (iso: string) => {
 const creatorLabel = (c: EligibleCreator) =>
   c.artistic_name || c.name || c.instagram_handle;
 
+// Redes que se pueden escanear a mano + la edge function de cada una. IG usa
+// promolog-dispatch (only_handles); las demás su scanner con only_creator_ids.
+const NET_OPTIONS: Array<{ key: string; label: string; fn: string }> = [
+  { key: "instagram", label: "Instagram", fn: "promolog-dispatch" },
+  { key: "x", label: "X", fn: "x-scan" },
+  { key: "telegram", label: "Telegram", fn: "telegram-scan" },
+  { key: "facebook", label: "Facebook", fn: "fb-scan" },
+];
+const NET_LABEL: Record<string, string> = Object.fromEntries(NET_OPTIONS.map((n) => [n.key, n.label]));
+
 const PromobotPanel = () => {
   const { toast } = useToast();
 
@@ -102,6 +112,14 @@ const PromobotPanel = () => {
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [runsLimit, setRunsLimit] = useState(RUNS_LIMIT);
   const [runFilter, setRunFilter] = useState<"all" | "error" | "ok">("all");
+  // Redes a escanear en el lanzamiento manual (IG por default).
+  const [selectedNetworks, setSelectedNetworks] = useState<Set<string>>(new Set(["instagram"]));
+  const toggleNet = (k: string) =>
+    setSelectedNetworks((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k); else next.add(k);
+      return next;
+    });
 
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set()); // por instagram_handle
@@ -288,35 +306,48 @@ const PromobotPanel = () => {
     return [...out];
   }, [runs, health]);
 
-  // ── Lanzar dispatch ─────────────────────────────────────────────────────
+  // ── Lanzar análisis (multi-red) ─────────────────────────────────────────
+  // Dispara la edge function de CADA red seleccionada. IG (promolog-dispatch) usa
+  // only_handles; X/Telegram/Facebook usan su scanner con only_creator_ids. Los
+  // scanners no-IG corren sincrónicos (Apify/gateway) y pueden tardar — los lanzamos
+  // sin bloquear (fire-and-forget); las entries aparecen al terminar.
   const launch = async (scope: "all" | "selected" | "fallen") => {
     setConfirmScope(null);
     setLaunching(true);
+    // "fallen" (reescanear caídas) es siempre del pipeline de IG.
+    const nets = scope === "fallen" ? ["instagram"] : Array.from(selectedNetworks);
     const only_handles = scope === "selected" ? Array.from(selected) : scope === "fallen" ? fallen : undefined;
-    const { data, error } = await supabase.functions.invoke("promolog-dispatch", {
-      body: { force: true, ...(only_handles ? { only_handles } : {}) },
-    });
-    setLaunching(false);
+    const only_creator_ids = scope === "selected"
+      ? creators.filter((c) => selected.has(c.instagram_handle)).map((c) => c.id)
+      : undefined;
 
-    if (error) {
-      toast({ title: "No se pudo lanzar", description: error.message, variant: "destructive" });
-      return;
+    for (const net of nets) {
+      if (net === "instagram") {
+        supabase.functions
+          .invoke("promolog-dispatch", { body: { force: true, ...(only_handles ? { only_handles } : {}) } })
+          .catch((e) => console.warn("promolog-dispatch:", e?.message));
+      } else {
+        const fn = NET_OPTIONS.find((n) => n.key === net)?.fn;
+        if (fn) {
+          supabase.functions
+            .invoke(fn, { body: { ...(only_creator_ids ? { only_creator_ids } : {}) } })
+            .catch((e) => console.warn(`${fn}:`, e?.message));
+        }
+      }
     }
-    if (data?.skipped) {
-      toast({ title: "No se lanzó", description: data.reason ?? "Sin creadoras elegibles", variant: "destructive" });
-      return;
-    }
+
+    if (scope === "selected") setSelected(new Set());
+    setTimeout(() => { fetchRuns(); fetchHealth(); }, 1200);
+    setLaunching(false);
     toast({
       title: "Análisis lanzado",
-      description: `${data?.creators_dispatched ?? "—"} modelo(s) en cola. Las entries aparecen cuando Apify termina y el poll reconcilia.`,
+      description: `Redes: ${nets.map((n) => NET_LABEL[n] ?? n).join(", ")}. IG aparece en "Corridas recientes"; X/Telegram/Facebook insertan al terminar (pueden tardar unos minutos).`,
     });
-    if (scope === "selected") setSelected(new Set());
-    // refrescamos enseguida — la corrida arranca en "running"
-    setTimeout(() => { fetchRuns(); fetchHealth(); }, 800);
   };
 
   const selectedCount = selected.size;
   const totalEligible = creators.length;
+  const netCount = selectedNetworks.size;
 
   return (
     <div className="space-y-4 px-6 pb-8">
@@ -346,7 +377,7 @@ const PromobotPanel = () => {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={launching || selectedCount === 0}
+                disabled={launching || selectedCount === 0 || netCount === 0}
                 onClick={() => setConfirmScope("selected")}
               >
                 {launching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
@@ -354,13 +385,32 @@ const PromobotPanel = () => {
               </Button>
               <Button
                 size="sm"
-                disabled={launching || loadingCreators || totalEligible === 0}
+                disabled={launching || loadingCreators || totalEligible === 0 || netCount === 0}
                 onClick={() => setConfirmScope("all")}
               >
                 {launching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                 Analizar todas
               </Button>
             </div>
+          </div>
+
+          {/* Redes a escanear (multi-red) */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground">Redes a escanear:</span>
+            {NET_OPTIONS.map((n) => {
+              const on = selectedNetworks.has(n.key);
+              return (
+                <button
+                  key={n.key}
+                  type="button"
+                  onClick={() => toggleNet(n.key)}
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1 transition-colors ${on ? "bg-primary/15 text-primary ring-primary/40" : "text-muted-foreground ring-border/60 hover:text-foreground"}`}
+                >
+                  {n.label}
+                </button>
+              );
+            })}
+            {netCount === 0 && <span className="text-[11px] text-rose-400">· elegí al menos una red</span>}
           </div>
 
           {/* Buscador + lista de modelos */}
@@ -592,6 +642,7 @@ const PromobotPanel = () => {
                 : confirmScope === "fallen"
                 ? `Vas a reescanear ${fallen.length} creadora(s) que quedaron sin escanear hoy por corridas con error.`
                 : `Vas a lanzar el análisis de ${selectedCount} modelo(s) seleccionada(s).`}
+              {confirmScope !== "fallen" && ` Redes: ${[...selectedNetworks].map((n) => NET_LABEL[n] ?? n).join(", ")}.`}
               {" "}Esto dispara un scrape en Apify + análisis con Gemini (tiene costo) y saltea el límite de 1 corrida/día.
             </DialogDescription>
           </DialogHeader>
