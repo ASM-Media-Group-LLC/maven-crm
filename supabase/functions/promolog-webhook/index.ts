@@ -77,6 +77,7 @@ Devolvé SOLO JSON con esta forma:
 
 GUÍA:
 - Necesitás una señal CONCRETA para marcar promoted=true: un link/sticker/URL, una mención de su plataforma de pago, o una frase de llamado a la acción. Sin eso → "none".
+- ⚠️ DISTINCIÓN CLAVE — "ganar dinero" NO es promoción de su contenido: un CTA a GANAR PLATA / hacer dinero / "gana aquí" / "ganancias de $X diarios" / oportunidad / negocio / referido / afiliado / trabajá desde casa apunta a que el FAN gane dinero (reclutamiento/afiliados), NO a comprar el contenido pago de ELLA. Eso es promoted=false, promotion_type="none" (aunque haya un link/sticker visible), SALVO que ADEMÁS haya señal real de su contenido (su nick de OnlyFans, "mi contenido / suscribite / VIP / contenido exclusivo / +18"). Promocionar = vender SU contenido, no ofrecer una forma de ganar plata.
 - Si platform_mentioned="ninguna" Y has_buy_link=false Y el texto no tiene ningún CTA → promoted=false (none). NO la marques "indirect" solo por verse sugerente.
 - Los emojis (🍑🔥💦😈🥵) por sí solos NO son promoción; solo cuentan si acompañan un CTA real.
 - En "reasoning" citá la señal concreta ("sticker 'OF' arriba a la derecha", "caption: 'link en bio'") o, si no promociona, decilo ("solo una selfie en lencería, sin link ni CTA").
@@ -501,8 +502,13 @@ async function processStory(args: {
     }
   }
 
-  // ── Flag para review manual si confidence sigue baja ────────────────────
-  const needsReview = final.confidence < NEEDS_REVIEW_THRESHOLD;
+  // ── Flag para review manual ─────────────────────────────────────────────
+  // (1) confianza baja, o (2) promo con link "other": Gemini detectó un link/CTA
+  // pero NO lo pudo atar a una plataforma de pago conocida (OnlyFans/Piclink/…).
+  // Esos son los ambiguos tipo "gana aquí / ganancias diarias" (referido/afiliado)
+  // que parecen promo pero no son de su contenido → que un humano confirme.
+  const needsReview = final.confidence < NEEDS_REVIEW_THRESHOLD ||
+    (final.promoted && final.buy_link_type === "other");
 
   // ── Evidencia durable: subimos el thumbnail (bytes del nivel 1, ya en
   //    memoria) a Storage. La URL de IG/Apify (mediaUrl) expira en horas;
