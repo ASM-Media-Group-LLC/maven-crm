@@ -141,7 +141,8 @@ const PromologDashboardView = ({
   const promoSi = useMemo(() => filteredEntries.filter(e => e.result === "Sí"), [filteredEntries]);
   const promosCount = promoSi.length;
   const successRate = totalEntries > 0 ? Math.round((promosCount / totalEntries) * 100) : 0;
-  const pendingCount = dedupedEntries.filter(e => e.result === "Pendiente").length;
+  // "Sin revisar" = pendientes de la IA + las que marcó para revisión manual (needs_review).
+  const pendingCount = dedupedEntries.filter(e => e.result === "Pendiente" || e.needs_review).length;
 
   // Tipo de promo: DIRECTA (link de compra visible) vs INDIRECTA (CTA sin link).
   // Es la distinción clave para OF (las creadoras evitan links explícitos por el ban
@@ -340,7 +341,7 @@ const PromologDashboardView = ({
   // (2) Entries pendientes de revisar (status="Pendiente" — la AI no
   // pudo clasificar con confianza, o el humano aún no revisó).
   const pendingEntries = useMemo(() => {
-    return dedupedEntries.filter(e => e.result === "Pendiente").slice(0, 5);
+    return dedupedEntries.filter(e => e.result === "Pendiente" || e.needs_review).slice(0, 5);
   }, [dedupedEntries]);
 
   // ── Render helpers ──────────────────────────────────────────────────

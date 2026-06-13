@@ -328,6 +328,7 @@ const PromologContent = () => {
         apify_run_id: pe.apify_run_id ?? null,
         rawDate: pe.date ?? null,
         source_handle: pe.source_handle ?? null,
+        needs_review: pe.needs_review === true,
       };
     });
   }, [promologEntries, profilesMap, userTz]);
@@ -386,7 +387,8 @@ const PromologContent = () => {
           notes: e.notes,
         })),
       );
-      result.push({ ...best, networks, promotedNetworks, dayScore, networkScores });
+      // needs_review del día = true si CUALQUIER entry del grupo lo tiene (no solo la "best").
+      result.push({ ...best, networks, promotedNetworks, dayScore, networkScores, needs_review: group.some((e) => e.needs_review === true) });
     }
     return result;
   }, [entries]);
