@@ -754,6 +754,7 @@ async function insertAnalyzedEntry(
     story_media_url: args.media_url,
     scraped_at: args.scraped_at,
     source_handle: args.source_handle ?? null,
+    needs_review: args.needs_review ?? false,
   });
 
   if (error) {
@@ -811,6 +812,7 @@ async function insertUnreadableEntry(
     story_count: args.story_count,
     story_media_url: args.media_url,
     scraped_at: args.scraped_at,
+    needs_review: true,
   });
 
   if (error) {
