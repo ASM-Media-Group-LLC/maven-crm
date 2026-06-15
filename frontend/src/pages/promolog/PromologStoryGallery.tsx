@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, X as XMark, ExternalLink, ImageOff, ChevronLeft, ChevronRight, X as CloseIcon, Maximize2, Loader2, Lock } from "lucide-react";
+import { Check, X as XMark, ExternalLink, ImageOff, ChevronLeft, ChevronRight, X as CloseIcon, Maximize2, Loader2, Lock, Facebook } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { PromologEntry } from "./PromologEntryCard";
 import { summarizeStories } from "./storyEvidence";
@@ -342,6 +342,41 @@ const TelegramLightbox = ({ story }: { story: PromologEntry }) => (
   </div>
 );
 
+// ── Facebook ────────────────────────────────────────────────────────────────────
+// Los posts NUEVOS de FB suben la foto al bucket promolog-evidence → evidence_url es
+// una URL de storage y cae al <img> normal (StoryThumb). Pero las filas viejas y los
+// posts sin foto guardan el PERMALINK (facebook.com) en evidence_url: en vez de un
+// <img> roto ("Sin imagen"), mostramos un card "Ver en Facebook" clickeable.
+const isFbLink = (s: PromologEntry) =>
+  (s.network || "").toLowerCase() === "facebook" &&
+  /^https?:\/\/([\w-]+\.)*facebook\.com/i.test(s.evidence_url || "");
+
+// Tile full-bleed para la grilla (el wrapper ya abre el lightbox al clickear).
+const FbLinkTile = () => (
+  <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[#1877F2]/10 p-3 text-center">
+    <Facebook className="h-7 w-7 text-[#1877F2]" />
+    <span className="text-[11px] font-medium leading-tight text-foreground">Post de Facebook</span>
+    <span className="text-[10px] leading-tight text-muted-foreground">Tocá para abrir</span>
+  </div>
+);
+
+// Versión grande del lightbox: card branded que abre el post en una pestaña nueva.
+const FbLinkLightbox = ({ story }: { story: PromologEntry }) => (
+  <a
+    href={story.evidence_url || "#"}
+    target="_blank"
+    rel="noopener noreferrer"
+    onClick={(e) => e.stopPropagation()}
+    className="flex aspect-[9/16] max-h-[72vh] w-full max-w-[420px] flex-col items-center justify-center gap-3 rounded-lg bg-[#1877F2]/15 text-center transition-colors hover:bg-[#1877F2]/25"
+  >
+    <Facebook className="h-14 w-14 text-[#1877F2]" />
+    <span className="text-sm font-medium text-white">Post de Facebook</span>
+    <span className="inline-flex items-center gap-1 text-xs text-white/70">
+      Abrir en Facebook <ExternalLink className="h-3 w-3" />
+    </span>
+  </a>
+);
+
 interface Props {
   stories: PromologEntry[];
   selectedId?: string;
@@ -420,7 +455,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
             >
               {/* Imagen — al clickear abre el lightbox (verla en grande) */}
               <button type="button" onClick={() => setLightboxId(s.id)} className="relative block aspect-[9/16] w-full">
-                {isTgEvidence(s) ? <TelegramTile story={s} /> : <StoryThumb url={s.evidence_url} />}
+                {isTgEvidence(s) ? <TelegramTile story={s} /> : isFbLink(s) ? <FbLinkTile /> : <StoryThumb url={s.evidence_url} />}
                 {slide > 0 && (
                   <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
                     #{slide}
@@ -490,7 +525,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
           )}
 
           <div className="flex max-h-[90vh] w-full max-w-md flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
-            {isTgEvidence(active) ? <TelegramLightbox story={active} /> : <LightboxImage url={active.evidence_url} />}
+            {isTgEvidence(active) ? <TelegramLightbox story={active} /> : isFbLink(active) ? <FbLinkLightbox story={active} /> : <LightboxImage url={active.evidence_url} />}
             <div className="w-full space-y-2 text-center">
               <div className="flex items-center justify-center gap-2">
                 <span className="text-xs tabular-nums text-white/70">

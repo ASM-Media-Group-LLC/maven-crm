@@ -12,8 +12,11 @@
 //      lotes/async — hay un cap defensivo.]
 //   3. Clasifica con la MISMA heurística (regla "Funnel" de Jhon): señal explícita
 //      (link OF/agregador, menciona OF, CTA) o foto/video → promovió; solo texto → No.
-//   4. Inserta 1 fila por post (network="Facebook"); evidence_url = imagen real del
-//      post o el permalink. Marker "sin-actividad" si no posteó. Idempotente.
+//   4. Inserta 1 fila por post (network="Facebook"); SUBE la foto del post al bucket
+//      promolog-evidence (signed URL durable en evidence_url, como IG) y guarda el
+//      permalink en story_media_url. Si no hay foto/falla la subida → evidence_url =
+//      permalink. Marker "sin-actividad" si no posteó. Idempotente (dedup por permalink
+//      en story_media_url, no por evidence_url que ahora cambia cada corrida).
 //
 // Auth: X-Cron-Token o JWT admin/manager. Deployar con --no-verify-jwt.
 // SECRETOS: APIFY_TOKEN, CRON_INTERNAL_TOKEN.
@@ -102,20 +105,51 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-async function visionIsOfPromo(imageUrl: string, apiKey: string, text: string): Promise<{ promoted: boolean; reason: string }> {
-  let dataUri: string;
+const EVIDENCE_BUCKET = "promolog-evidence";
+
+// Descarga los bytes de una imagen (fbcdn) UNA vez para reusarlos en visión Y en la
+// subida al bucket (antes se bajaban solo para visión y se descartaban). Best-effort.
+async function fetchImageBytes(url: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
   try {
     const ac = new AbortController();
     const t = setTimeout(() => ac.abort(), 15000);
-    const resp = await fetch(imageUrl, { signal: ac.signal });
+    const resp = await fetch(url, { signal: ac.signal });
     clearTimeout(t);
-    if (!resp.ok) return { promoted: false, reason: `img_${resp.status}` };
+    if (!resp.ok) return null;
     const mime = (resp.headers.get("content-type") || "image/jpeg").split(";")[0];
     const bytes = new Uint8Array(await resp.arrayBuffer());
-    dataUri = `data:${mime};base64,${bytesToBase64(bytes)}`;
-  } catch (e) {
-    return { promoted: false, reason: `img_fetch:${(e as Error).message}` };
+    return { bytes, mime };
+  } catch {
+    return null;
   }
+}
+
+// persistEvidence — sube la foto del post al bucket privado `promolog-evidence` y
+// devuelve un signed URL durable (1 año), IGUAL que las stories de IG (promolog-
+// webhook). Las URLs fbcdn expiran en horas → subimos la imagen para tener evidencia
+// permanente que el popup pueda renderizar. Best-effort: null si falla (el caller cae
+// al permalink). Path estable por post (key saneada) + upsert → un re-run sobreescribe.
+async function persistEvidence(
+  sb: any,
+  args: { bytes: Uint8Array; mime: string; creatorId: string; key: string },
+): Promise<string | null> {
+  try {
+    const ext = args.mime.includes("png") ? "png" : args.mime.includes("webp") ? "webp" : "jpg";
+    const safe = args.key.replace(/[^A-Za-z0-9]+/g, "_").slice(-80) || "post";
+    const path = `${TENANT_ID}/facebook/${args.creatorId}/${safe}.${ext}`;
+    const { error } = await sb.storage.from(EVIDENCE_BUCKET).upload(path, args.bytes, { contentType: args.mime, upsert: true });
+    if (error) { console.error("fb persistEvidence upload:", error.message); return null; }
+    const { data, error: signErr } = await sb.storage.from(EVIDENCE_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (signErr) { console.error("fb persistEvidence sign:", signErr.message); return null; }
+    return data?.signedUrl ?? null;
+  } catch (e) {
+    console.error("fb persistEvidence error:", (e as Error).message);
+    return null;
+  }
+}
+
+// Visión sobre la imagen del post (recibe el dataUri ya armado, sin re-fetchear).
+async function visionIsOfPromo(dataUri: string, apiKey: string, text: string): Promise<{ promoted: boolean; reason: string }> {
   const content = [
     { type: "text", text: text ? `Texto del post: "${text.slice(0, 300)}"\n\n${FB_VISION_PROMPT}` : FB_VISION_PROMPT },
     { type: "image_url", image_url: { url: dataUri } },
@@ -247,11 +281,11 @@ Deno.serve(async (req: Request) => {
       if (!items.length) {
         if (!dryRun) {
           const { data: ex } = await sb.from("promolog_entries")
-            .select("id").eq("creator_id", c.id).eq("network", "Facebook").gte("date", today).limit(1);
+            .select("id").eq("creator_id", c.id).eq("network", "facebook").gte("date", today).limit(1);
           if (!ex || !ex.length) {
             await sb.from("promolog_entries").insert({
               tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
-              promoted: "false", network: "Facebook", platform: "Ninguna",
+              promoted: "false", network: "facebook", platform: "Ninguna",
               notes: null, evidence_url: null,
               analyzed_by_ai: true, ai_model: "regla-texto-fb", ai_reasoning: "sin-actividad",
               scraped_at: new Date().toISOString(),
@@ -265,35 +299,57 @@ Deno.serve(async (req: Request) => {
       let inserted = 0, promotedCount = 0, skipped = 0;
       for (let i = 0; i < items.length; i++) {
         const it = items[i];
-        let { promoted, reason } = classifyFb(it, ofNicksByCreator.get(c.id) ?? []);
+        const permalink = postUrl(it);
         const { firstImage } = postMedia(it);
+        // Clave de dedup ESTABLE = permalink del post (la URL de imagen fbcdn cambia en
+        // cada scrape por el token oe=). Se guarda en story_media_url.
+        const dedupKey = permalink || firstImage || null;
+        if (!dedupKey) { skipped++; continue; }
+
+        // Dedup ANTES de gastar visión/subida: si ya tenemos este post, lo saltamos.
+        // (las filas viejas se backfillearon story_media_url = su permalink.)
+        if (!dryRun) {
+          const { data: dupe } = await sb.from("promolog_entries")
+            .select("id").eq("creator_id", c.id).eq("network", "facebook").eq("story_media_url", dedupKey).limit(1);
+          if (dupe && dupe.length) { skipped++; continue; }
+        }
+
+        let { promoted, reason } = classifyFb(it, ofNicksByCreator.get(c.id) ?? []);
+
+        // Bytes de la imagen: se bajan UNA vez y se reusan para visión Y para subir.
+        let imgBytes: Uint8Array | null = null;
+        let imgMime = "image/jpeg";
+        if (firstImage) {
+          const f = await fetchImageBytes(firstImage);
+          if (f) { imgBytes = f.bytes; imgMime = f.mime; }
+        }
+
         // Visión SOLO si el texto no dio señal pero hay imagen: el promo de OF puede
         // estar QUEMADO en el arte. El modelo decide (una selfie personal → No).
-        if (!promoted && OPENROUTER_API_KEY && firstImage && visionUsed < MAX_VISION_PER_RUN) {
+        if (!promoted && OPENROUTER_API_KEY && imgBytes && visionUsed < MAX_VISION_PER_RUN) {
           visionUsed++;
-          const v = await visionIsOfPromo(firstImage, OPENROUTER_API_KEY, postText(it));
+          const v = await visionIsOfPromo(`data:${imgMime};base64,${bytesToBase64(imgBytes)}`, OPENROUTER_API_KEY, postText(it));
           if (v.promoted) { promoted = true; reason = `vision-of:${v.reason}`; }
         }
         if (promoted) promotedCount++;
-        // Evidencia = PERMALINK del post (estable): las URLs de imagen de FB (fbcdn)
-        // cambian en cada scrape (token oe=) → si dedupeáramos por imagen, cada
-        // corrida duplicaría. El permalink es estable y "Abrir original" abre el post.
-        const evidence = postUrl(it) || firstImage || null;
-        if (dryRun || !evidence) { if (!evidence) skipped++; continue; }
+        if (dryRun) continue;
 
-        const { data: dupe } = await sb.from("promolog_entries")
-          .select("id").eq("creator_id", c.id).eq("network", "Facebook").eq("evidence_url", evidence).limit(1);
-        if (dupe && dupe.length) { skipped++; continue; }
+        // SUBIMOS la foto real al bucket (evidencia durable y renderizable, como IG).
+        // Si no hay imagen o falla la subida, evidence_url cae al permalink (link al post).
+        let durableUrl: string | null = null;
+        if (imgBytes) durableUrl = await persistEvidence(sb, { bytes: imgBytes, mime: imgMime, creatorId: c.id, key: dedupKey });
+        const evidence = durableUrl || permalink || firstImage || null;
 
         const d = postDate(it);
         const when = d ? new Date(d) : null;
         const { error: insErr } = await sb.from("promolog_entries").insert({
           tenant_id: TENANT_ID, creator_id: c.id,
           date: (when && !isNaN(when.getTime()) ? when : new Date()).toISOString(),
-          promoted: promoted ? "true" : "false", network: "Facebook",
+          promoted: promoted ? "true" : "false", network: "facebook",
           platform: promoted ? "OnlyFans" : "Ninguna",
           notes: (postText(it) || "").slice(0, 2000) || null,
           evidence_url: evidence,
+          story_media_url: dedupKey, // permalink estable: dedup + "Abrir original"
           analyzed_by_ai: true, ai_model: "regla-texto-fb", ai_reasoning: reason,
           source_handle: (handle || "").trim() || null,
           story_index: i, story_count: items.length, scraped_at: new Date().toISOString(),
