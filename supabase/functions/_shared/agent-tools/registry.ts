@@ -8,13 +8,17 @@ import type { AgentCtx, AgentTool, ToolDomain, ToolScope } from "./types.ts";
 import { promologTools } from "./promolog.ts";
 import { monetizacionTools } from "./monetizacion.ts";
 import { creadorasTools } from "./creadoras.ts";
+import { equipoTools } from "./equipo.ts";
+import { qaTools } from "./qa.ts";
 
 export const TOOL_REGISTRY: AgentTool[] = [
   ...promologTools,
   ...monetizacionTools,
   ...creadorasTools,
-  // Próximos dominios: ventas, equipo, qa (muchos saldrán de migrar las 25 tools
-  // inline del whatsapp-agent).
+  ...equipoTools,
+  ...qaTools,
+  // Próximos dominios: ventas (esperar fresh de of_gross_earnings) + migrar las 25
+  // tools inline del whatsapp-agent.
 ];
 
 const byName = new Map(TOOL_REGISTRY.map((t) => [t.name, t]));
