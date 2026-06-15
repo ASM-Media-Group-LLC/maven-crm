@@ -181,6 +181,40 @@ const InboxPage = () => {
     refetchOnWindowFocus: false,
   });
 
+  // Fallback del deep-link: si /inbox?c=<id> apunta a una conversación que NO está en la
+  // lista cargada, la traemos por id. Pasa cuando el botón de WhatsApp (Closers/Contactos/
+  // Creadoras) recién la creó (last_message_at NULL → ordenada al final, fuera del .limit(200)),
+  // cuando la lista RLS-filtrada del closer no la incluye, o con cache stale. Sin esto,
+  // `selected` quedaba null → panel "Elegí una conversación para verla" (parecía que "no abría").
+  const inList = !!selectedId && conversations.some((c) => c.id === selectedId);
+  const { data: fallbackConv = null } = useQuery({
+    queryKey: ["wa-inbox-conversation-one", selectedId],
+    queryFn: async () => {
+      if (!selectedId) return null;
+      const { data, error } = await (supabase as any)
+        .from("wa_conversations")
+        .select(
+          "id, contact_id, department, status, last_message_at, last_message_preview, unread_count, assigned_to, channel_id, archived, pinned, favorite, manually_unread, labels:wa_conversation_labels(label_id), contact:wa_contacts(id, display_name, instagram_handle, wa_jid)",
+        )
+        .eq("id", selectedId)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as ConvRow | null;
+    },
+    enabled: !!selectedId && !inList,
+    refetchOnWindowFocus: false,
+  });
+
+  // Lista efectiva = la cargada + (si hace falta) la conversación del deep-link traída por id,
+  // al frente para que se vea y quede resaltada al abrirla desde el botón de WhatsApp.
+  const allConversations = useMemo(
+    () =>
+      fallbackConv && !conversations.some((c) => c.id === fallbackConv.id)
+        ? [fallbackConv, ...conversations]
+        : conversations,
+    [conversations, fallbackConv],
+  );
+
   // Mis listas/etiquetas personales (la RLS filtra a las del usuario).
   const { data: myLabels = [] } = useQuery({
     queryKey: ["wa-inbox-labels"],
@@ -289,7 +323,7 @@ const InboxPage = () => {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let list = conversations.filter((c) => (showArchived ? c.archived : !c.archived));
+    let list = allConversations.filter((c) => (showArchived ? c.archived : !c.archived));
     if (labelFilter) list = list.filter((c) => (c.labels ?? []).some((l) => l.label_id === labelFilter));
     else if (chatFilter === "no_leidos") list = list.filter(isUnread);
     else if (chatFilter === "favoritos") list = list.filter((c) => c.favorite);
@@ -304,9 +338,9 @@ const InboxPage = () => {
     // Fijados primero; dentro de cada grupo se respeta el orden por fecha de la query
     // (sort estable). Los archivados no se fijan arriba.
     return [...list].sort((a, b) => Number(b.pinned && !b.archived) - Number(a.pinned && !a.archived));
-  }, [conversations, search, chatFilter, labelFilter, showArchived, channelFilter]);
+  }, [allConversations, search, chatFilter, labelFilter, showArchived, channelFilter]);
 
-  const selected = conversations.find((c) => c.id === selectedId) ?? null;
+  const selected = allConversations.find((c) => c.id === selectedId) ?? null;
 
   // Al abrir una conversación con no-leídos, marcarla leída (resetea el bubble).
   // Via RPC porque la policy UPDATE de wa_conversations está gateada por permiso.
