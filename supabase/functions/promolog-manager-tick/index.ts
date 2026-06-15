@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, authorizeCronOrJwt, whatsappCors } from "../_shared/whatsapp.ts";
+import { runTool } from "../_shared/agent-tools/registry.ts";
 
 // promolog-manager-tick — supervisor PROACTIVO para el grupo de MANAGERS (distinto del
 // de closers/LLG). Lee get_promolog_action_feed (las acciones de Promolog del día) y
@@ -72,10 +73,13 @@ serve(async (req) => {
   const dryRun = body?.dry_run === true;
 
   const sb = adminClient();
-  const { data: feed, error } = await sb.rpc("get_promolog_action_feed", { p_tenant: TENANT_ID });
-  if (error) return json({ ok: false, error: error.message }, 500);
-
-  const rows = (feed ?? []) as FeedRow[];
+  // Vía el catálogo de tools compartido (mismo tool que usará el bot de managers y el orquestador).
+  let rows: FeedRow[];
+  try {
+    rows = (await runTool("get_promolog_action_feed", {}, { sb, tenantId: TENANT_ID })) as FeedRow[];
+  } catch (e) {
+    return json({ ok: false, error: (e as Error).message }, 500);
+  }
   const message = compose(rows);
   if (!message) return json({ ok: true, sent: false, reason: "nada_que_reportar", count: 0 });
 
