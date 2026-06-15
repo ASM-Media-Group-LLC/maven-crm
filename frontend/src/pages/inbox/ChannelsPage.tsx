@@ -26,7 +26,11 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Radio, Users, Plus, Loader2, Bot, ArrowLeft } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Radio, Users, Plus, Loader2, Bot, ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import type { WaChannel, WaChannelDepartment, WaChannelType } from "./types";
 
 const DEPTS: { value: WaChannelDepartment; label: string }[] = [
@@ -60,6 +64,21 @@ const ChannelsPage = () => {
   const [newOpen, setNewOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [membersFor, setMembersFor] = useState<ChannelRow | null>(null);
+  // Editar / eliminar un canal (admin). editForm suma `active` (activar/desactivar).
+  const [editing, setEditing] = useState<ChannelRow | null>(null);
+  const [editForm, setEditForm] = useState({ ...EMPTY_FORM, active: true });
+  const [deleting, setDeleting] = useState<ChannelRow | null>(null);
+  const openEdit = (c: ChannelRow) => {
+    setEditForm({
+      label: c.label ?? "",
+      evolution_instance: c.evolution_instance,
+      phone_e164: c.phone_e164 ?? "",
+      department: c.department,
+      type: c.type,
+      active: c.active,
+    });
+    setEditing(c);
+  };
 
   const { data: channels = [], isLoading } = useQuery({
     queryKey: ["wa-channels"],
@@ -109,6 +128,45 @@ const ChannelsPage = () => {
     onError: (e: Error) => toast({ title: "No se pudo crear", description: e.message, variant: "destructive" }),
   });
 
+  const updateChannel = useMutation({
+    mutationFn: async () => {
+      if (!editing) return;
+      const instance = editForm.evolution_instance.trim();
+      if (!instance) throw new Error("Falta el nombre de la instancia de Evolution.");
+      const { error } = await (supabase as any).from("wa_channels").update({
+        label: editForm.label.trim() || null,
+        evolution_instance: instance,
+        phone_e164: editForm.phone_e164.trim() || null,
+        department: editForm.department,
+        type: editForm.type,
+        active: editForm.active,
+      }).eq("id", editing.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Canal actualizado" });
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["wa-channels"] });
+    },
+    onError: (e: Error) => toast({ title: "No se pudo actualizar", description: e.message, variant: "destructive" }),
+  });
+
+  // Eliminar = hard delete. Los miembros caen por ON DELETE CASCADE; las conversaciones
+  // de este canal quedan con channel_id = NULL (no se borran) y salen de la bandeja.
+  const deleteChannel = useMutation({
+    mutationFn: async () => {
+      if (!deleting) return;
+      const { error } = await (supabase as any).from("wa_channels").delete().eq("id", deleting.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Canal eliminado" });
+      setDeleting(null);
+      qc.invalidateQueries({ queryKey: ["wa-channels"] });
+    },
+    onError: (e: Error) => toast({ title: "No se pudo eliminar", description: e.message, variant: "destructive" }),
+  });
+
   const userName = (id: string) => users.find((u) => u.id === id)?.full_name || id.slice(0, 8);
 
   return (
@@ -151,12 +209,19 @@ const ChannelsPage = () => {
                 <th className="px-3 py-2 font-medium">Depto</th>
                 <th className="px-3 py-2 font-medium">Tipo</th>
                 <th className="px-3 py-2 text-right font-medium">Atienden</th>
+                <th className="px-3 py-2 text-right font-medium">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {channels.map((c) => (
-                <tr key={c.id} className="border-b last:border-0">
-                  <td className="px-3 py-2 font-medium">{c.label || "(sin etiqueta)"}</td>
+                <tr key={c.id} className={`border-b last:border-0 ${c.active ? "" : "opacity-50"}`}>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{c.label || "(sin etiqueta)"}</span>
+                      {!c.active && <Badge variant="secondary-soft" className="text-[10px]">Inactivo</Badge>}
+                    </div>
+                    {c.phone_e164 && <div className="text-xs text-muted-foreground">{c.phone_e164}</div>}
+                  </td>
                   <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{c.evolution_instance}</td>
                   <td className="px-3 py-2"><Badge variant="secondary-soft" className="text-[10px]">{deptLabel(c.department)}</Badge></td>
                   <td className="px-3 py-2 text-xs">{c.type === "dedicated" ? "Dedicado" : "Compartido"}</td>
@@ -164,6 +229,20 @@ const ChannelsPage = () => {
                     <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => setMembersFor(c)}>
                       <Users className="h-3.5 w-3.5" /> {c.member_ids.length}
                     </Button>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Editar canal" onClick={() => openEdit(c)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="icon"
+                        className="h-7 w-7 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
+                        title="Eliminar canal" onClick={() => setDeleting(c)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -224,6 +303,86 @@ const ChannelsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Editar canal */}
+      <Dialog open={editing !== null} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar canal</DialogTitle>
+            <DialogDescription>
+              Cambiá la etiqueta, el número, el departamento o el tipo. Desactivalo para ocultarlo de los selectores sin borrarlo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Etiqueta</Label>
+              <Input value={editForm.label} onChange={(e) => setEditForm({ ...editForm, label: e.target.value })} placeholder="Ej. Closers-1 / Línea Julieth" />
+            </div>
+            <div className="space-y-1">
+              <Label>Instancia de Evolution *</Label>
+              <Input value={editForm.evolution_instance} onChange={(e) => setEditForm({ ...editForm, evolution_instance: e.target.value })} className="font-mono" />
+            </div>
+            <div className="space-y-1">
+              <Label>Número (opcional)</Label>
+              <Input value={editForm.phone_e164} onChange={(e) => setEditForm({ ...editForm, phone_e164: e.target.value })} placeholder="+57…" />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1 space-y-1">
+                <Label>Departamento</Label>
+                <Select value={editForm.department} onValueChange={(v) => setEditForm({ ...editForm, department: v as WaChannelDepartment })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DEPTS.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1 space-y-1">
+                <Label>Tipo</Label>
+                <Select value={editForm.type} onValueChange={(v) => setEditForm({ ...editForm, type: v as WaChannelType })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="shared">Compartido</SelectItem>
+                    <SelectItem value="dedicated">Dedicado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <label className="flex cursor-pointer items-center gap-2 pt-1">
+              <Checkbox checked={editForm.active} onCheckedChange={(v) => setEditForm({ ...editForm, active: v === true })} />
+              <span className="text-sm">Activo <span className="text-muted-foreground">(si lo desactivás, deja de aparecer en los selectores)</span></span>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
+            <Button onClick={() => updateChannel.mutate()} disabled={updateChannel.isPending || !editForm.evolution_instance.trim()}>
+              {updateChannel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Eliminar canal (confirmación) */}
+      <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este canal?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará <b>{deleting?.label || deleting?.evolution_instance}</b>
+              {deleting?.phone_e164 ? ` (${deleting.phone_e164})` : ""}. Las conversaciones de este canal
+              no se borran, pero quedan sin canal y dejan de aparecer en la bandeja. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteChannel.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); deleteChannel.mutate(); }}
+              className="bg-rose-500 text-white hover:bg-rose-600"
+            >
+              {deleteChannel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Miembros del canal */}
       <MembersDialog
