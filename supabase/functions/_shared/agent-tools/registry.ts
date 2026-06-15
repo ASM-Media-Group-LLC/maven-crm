@@ -6,11 +6,15 @@
 // agente = elegir qué tools del catálogo le damos (config, no código).
 import type { AgentCtx, AgentTool, ToolDomain, ToolScope } from "./types.ts";
 import { promologTools } from "./promolog.ts";
+import { monetizacionTools } from "./monetizacion.ts";
+import { creadorasTools } from "./creadoras.ts";
 
 export const TOOL_REGISTRY: AgentTool[] = [
   ...promologTools,
-  // Próximos dominios: ventas, leads, monetizacion, qa, equipo
-  // (muchos saldrán de migrar las 25 tools inline del whatsapp-agent).
+  ...monetizacionTools,
+  ...creadorasTools,
+  // Próximos dominios: ventas, equipo, qa (muchos saldrán de migrar las 25 tools
+  // inline del whatsapp-agent).
 ];
 
 const byName = new Map(TOOL_REGISTRY.map((t) => [t.name, t]));

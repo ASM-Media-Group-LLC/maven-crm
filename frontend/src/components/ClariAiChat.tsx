@@ -44,6 +44,8 @@ import { supabase } from "@/integrations/supabase/client";
 const ENDPOINT_URLS = {
   "ai-sales-chat": `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-sales-chat`,
   "clari-help": `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clari-help`,
+  // Orquestador cross-CRM (Clari con tools sobre todo el catálogo). Staff only.
+  "ai-orchestrator": `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-orchestrator`,
 } as const;
 
 type EndpointKey = keyof typeof ENDPOINT_URLS;

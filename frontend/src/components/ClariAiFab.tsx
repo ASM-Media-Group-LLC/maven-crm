@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Bot, Minus, X } from "lucide-react";
 import ClariAiChat from "./ClariAiChat";
 import { useAiConversations } from "@/hooks/useAiConversations";
+import { useUserRole } from "@/hooks/useUserRole";
 
 // ClariAvatar — círculo con la imagen del personaje en /clari-avatar.png.
 // Si la imagen falla a cargar (404, network), cae a un Bot icon sobre
@@ -60,6 +61,22 @@ const ClariAiFab = () => {
   const [hasActivity, setHasActivity] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const { createConversation } = useAiConversations();
+  // Modo del chat: "help" = soporte de la app (clari-help); "crm" = orquestador
+  // cross-CRM con tools (ai-orchestrator). El modo CRM es solo para staff.
+  const { isAdmin, role } = useUserRole();
+  const isStaff = isAdmin || role === "owner" || role === "manager";
+  const [mode, setMode] = useState<"help" | "crm">("help");
+
+  const switchMode = (m: "help" | "crm") => {
+    if (m === mode) return;
+    setMode(m);
+    // Conversación fresca para el modo nuevo (no mezclar soporte con CRM).
+    setConversationId(null);
+    createConversation
+      .mutateAsync(m === "crm" ? "Clari · CRM" : "Clari · soporte")
+      .then((conv) => setConversationId(conv.id))
+      .catch((e) => console.error("clari: no se pudo crear conversación", e));
+  };
 
   // Posición del FAB (left/top en px). null = default esquina inf. derecha.
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -228,12 +245,29 @@ const ClariAiFab = () => {
             </div>
           </div>
 
-          {/* Body — scroll interno via ClariAiChat con el endpoint
-              clari-help (asistente de soporte global, NO de datos). */}
+          {/* Toggle de modo (solo staff): Soporte (clari-help) vs CRM (orquestador). */}
+          {isStaff && (
+            <div className="flex shrink-0 gap-1 border-b border-border/60 bg-card px-3 py-1.5">
+              {([["help", "Soporte"], ["crm", "Preguntale al CRM"]] as const).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => switchMode(k)}
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${mode === k ? "bg-primary/15 text-primary ring-1 ring-primary/30" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Body — ClariAiChat. endpoint según modo: soporte (clari-help) o CRM
+              (ai-orchestrator, con tools sobre todo el catálogo). */}
           <div className="flex flex-1 min-h-0 overflow-hidden">
             <ClariAiChat
+              key={mode}
               mode="panel"
-              endpoint="clari-help"
+              endpoint={mode === "crm" ? "ai-orchestrator" : "clari-help"}
               conversationId={conversationId ?? undefined}
             />
           </div>
