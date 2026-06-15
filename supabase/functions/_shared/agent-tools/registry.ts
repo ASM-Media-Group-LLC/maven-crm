@@ -28,6 +28,11 @@ export function toAnthropicTools(tools: AgentTool[]) {
   return tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema }));
 }
 
+/** ¿La tool existe en el catálogo? (para distinguir "no existe" de "falló el handler"). */
+export function hasTool(name: string): boolean {
+  return byName.has(name);
+}
+
 /** Ejecuta una tool por nombre. Lanza si no existe. */
 export async function runTool(name: string, args: Record<string, unknown>, ctx: AgentCtx): Promise<unknown> {
   const tool = byName.get(name);

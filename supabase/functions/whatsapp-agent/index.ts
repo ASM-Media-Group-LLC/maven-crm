@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_shared/whatsapp.ts";
 import { logAnthropicUsage } from "../_shared/usage.ts";
+import { hasTool, runTool } from "../_shared/agent-tools/registry.ts";
 
 // whatsapp-agent — el agente IA que responde preguntas en el grupo,
 // hace tracking de casos, genera reportes y puede tomar acciones en
@@ -3178,8 +3179,26 @@ async function executeTool(
       return data as Record<string, unknown>;
     }
 
-    default:
+    default: {
+      // Catálogo de tools compartido (_shared/agent-tools): cualquier tool que NO esté
+      // en este switch inline pero SÍ en el registry (asignada a este bot por su perfil)
+      // se ejecuta acá. Aditivo: hoy las 25 tools inline nunca caen al default, así que
+      // es cero cambio de comportamiento para el bot de closers actual.
+      if (hasTool(name)) {
+        try {
+          const result = await runTool(name, (input ?? {}) as Record<string, unknown>, {
+            sb,
+            tenantId: ctx.tenantId,
+            userId: ctx.senderUserId,
+            groupId: ctx.groupId,
+          });
+          return { result };
+        } catch (e) {
+          return { error: `${name}: ${(e as Error).message}` };
+        }
+      }
       return { error: `unknown_tool:${name}` };
+    }
   }
 }
 
