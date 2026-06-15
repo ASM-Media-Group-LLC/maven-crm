@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { adminClient, authorizeCronOrJwt, logEvent, whatsappCors } from "../_shared/whatsapp.ts";
 import { logAnthropicUsage } from "../_shared/usage.ts";
-import { hasTool, runTool } from "../_shared/agent-tools/registry.ts";
+import { hasTool, runTool, toAnthropicTools, TOOL_REGISTRY } from "../_shared/agent-tools/registry.ts";
 
 // whatsapp-agent — el agente IA que responde preguntas en el grupo,
 // hace tracking de casos, genera reportes y puede tomar acciones en
@@ -3820,9 +3820,14 @@ async function runAgent(req: AgentRequest): Promise<{
   // garantía estructural de acceso. Sin bot o sin allowlist, van todas; la
   // denylist (si hay) se resta al final.
   const activeTools = (() => {
+    // Sin bot asignado (closers/legacy): SOLO las inline, idéntico a siempre — el
+    // catálogo NO entra (evita darle tools off-domain al bot de closers).
     if (!botCfg) return TOOLS;
     const { allow, deny } = botCfg;
-    let t = TOOLS;
+    // Con bot: las inline + las del catálogo compartido (get_promolog_action_feed, etc.),
+    // todas filtradas por el MISMO llavero (allow/deny). Así un perfil (ej. managers)
+    // habilita tools del catálogo por nombre en su tool_allowlist.
+    let t = [...TOOLS, ...toAnthropicTools(TOOL_REGISTRY)];
     if (allow) t = t.filter((tool) => allow.includes((tool as { name: string }).name));
     if (deny) t = t.filter((tool) => !deny.includes((tool as { name: string }).name));
     return t;
