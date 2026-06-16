@@ -23,10 +23,22 @@ export interface ContactoFilters {
   dateFrom: string;
   dateTo: string;
   creadoPor: string;
+  // Canales de venta seleccionados. Valores = wa_channels.id, más las opciones
+  // especiales "__none__" (sin contactar por WhatsApp) y "__multi__" (2+ canales).
+  salesChannels?: string[];
 }
+
+// Opciones especiales del filtro "Canal de venta".
+export const SALES_CHANNEL_NONE = "__none__";
+export const SALES_CHANNEL_MULTI = "__multi__";
 
 interface CreatorOption {
   value: string;
+  label: string;
+}
+
+interface SalesChannelOption {
+  id: string;
   label: string;
 }
 
@@ -39,10 +51,31 @@ interface Props {
   onClear?: () => void;
   creators?: CreatorOption[];
   cities?: string[];
+  // Solo admin: opciones del filtro "Canal de venta" (los 7 canales).
+  salesChannelOptions?: SalesChannelOption[];
 }
 
-const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear, creators = [], cities = [] }: Props) => {
+const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear, creators = [], cities = [], salesChannelOptions = [] }: Props) => {
   const [agentOpen, setAgentOpen] = useState(false);
+  const [channelOpen, setChannelOpen] = useState(false);
+
+  const selectedChannels = filters.salesChannels ?? [];
+  const toggleChannel = (id: string) => {
+    const set = new Set(selectedChannels);
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+    onChange({ salesChannels: Array.from(set) });
+  };
+  const channelButtonLabel = (() => {
+    if (selectedChannels.length === 0) return "Canal de venta";
+    if (selectedChannels.length === 1) {
+      const only = selectedChannels[0];
+      if (only === SALES_CHANNEL_NONE) return "Sin contactar";
+      if (only === SALES_CHANNEL_MULTI) return "2+ canales";
+      return salesChannelOptions.find((o) => o.id === only)?.label ?? "1 canal";
+    }
+    return `${selectedChannels.length} canales`;
+  })();
 
   return (
     <div className="flex items-center gap-3 overflow-x-auto">
@@ -126,6 +159,49 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
           </Command>
         </PopoverContent>
       </Popover>
+
+      {/* Canal de venta — solo admin + cuando hay canales. Multi-select. */}
+      {salesChannelOptions.length > 0 && (
+        <Popover open={channelOpen} onOpenChange={setChannelOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={channelOpen}
+              className="w-[180px] justify-between font-normal shrink-0"
+            >
+              <span className="truncate">{channelButtonLabel}</span>
+              <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[240px] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Buscar canal..." />
+              <CommandList>
+                <CommandEmpty>Sin resultados.</CommandEmpty>
+                <CommandGroup>
+                  {salesChannelOptions.map((o) => (
+                    <CommandItem key={o.id} onSelect={() => toggleChannel(o.id)}>
+                      <Check className={cn("mr-2 h-4 w-4", selectedChannels.includes(o.id) ? "opacity-100" : "opacity-0")} />
+                      {o.label}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+                <CommandGroup heading="Especial">
+                  <CommandItem onSelect={() => toggleChannel(SALES_CHANNEL_MULTI)}>
+                    <Check className={cn("mr-2 h-4 w-4", selectedChannels.includes(SALES_CHANNEL_MULTI) ? "opacity-100" : "opacity-0")} />
+                    Contactado por 2+ canales
+                  </CommandItem>
+                  <CommandItem onSelect={() => toggleChannel(SALES_CHANNEL_NONE)}>
+                    <Check className={cn("mr-2 h-4 w-4", selectedChannels.includes(SALES_CHANNEL_NONE) ? "opacity-100" : "opacity-0")} />
+                    Sin contactar por WhatsApp
+                  </CommandItem>
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      )}
 
       {hasActiveFilters && onClear && (
         <Button variant="ghost" size="sm" onClick={onClear}>

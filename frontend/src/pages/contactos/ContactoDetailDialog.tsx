@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
 import type { Contacto } from "./ContactosContent";
+import type { ContactChannel } from "./useContactSalesChannels";
 
 const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
   "A+": "success-soft",
@@ -26,13 +29,16 @@ interface Props {
   onConvert?: () => void;
   onDelete?: () => void;
   canDelete?: boolean;
+  // Solo admin: canales de venta por los que se contactó a este contacto.
+  salesChannels?: ContactChannel[];
+  showSalesChannels?: boolean;
 }
 
 // Popup focalizado con los campos pedidos: Creación, Registro, Nombre,
 // Instagram, OF URL, Agente, Categoría, Tipo, País, Ciudad, Contacto.
 // Mismo patrón que CreatorDetailDialog (Dashboard 2): foto + título + IG
 // + grid de stats + botones de acción.
-const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert, onDelete, canDelete }: Props) => {
+const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert, onDelete, canDelete, salesChannels = [], showSalesChannels }: Props) => {
   if (!contacto) return null;
   const c = contacto;
   const cleanHandle = c.instagram.replace(/^@/, "");
@@ -127,6 +133,33 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
             </div>
           ))}
         </div>
+
+        {showSalesChannels && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">
+              Canales de venta contactado
+            </p>
+            {salesChannels.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin contacto por WhatsApp todavía.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {salesChannels.map((ch) => (
+                  <div
+                    key={ch.channelId}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2"
+                  >
+                    <Badge variant="secondary" className="font-normal">{ch.label}</Badge>
+                    <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+                      {ch.lastAt
+                        ? format(parseISO(ch.lastAt), "dd MMM yy, HH:mm", { locale: es })
+                        : "—"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
           {igUrl && (

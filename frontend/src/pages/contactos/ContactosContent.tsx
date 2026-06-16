@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,8 @@ import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
 import ContactosCardList from "./ContactosCardList";
 import ContactosAnalyticsModal from "./ContactosAnalyticsModal";
 
+import { SALES_CHANNEL_NONE, SALES_CHANNEL_MULTI } from "./ContactosFilters";
+import { useContactSalesChannels } from "./useContactSalesChannels";
 import ContactoDetailDialog from "./ContactoDetailDialog";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
@@ -76,6 +79,7 @@ const emptyFilters: ContactoFilters = {
   dateFrom: "",
   dateTo: "",
   creadoPor: "",
+  salesChannels: [],
 };
 
 const PAGE_SIZE = 50;
@@ -103,12 +107,52 @@ const ContactosContent = () => {
   const { toast } = useToast();
   const { isAdmin } = useUserRole();
 
+  // Canales de venta por contacto (solo admin; una sola query, react-query dedupea).
+  const salesChannels = useContactSalesChannels(isAdmin);
+
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [filters]);
 
+  // Constraint de canal de venta → set de closers_contacts.id (o "sin contactar").
+  // Se computa desde el hook (admin-only). Reglas:
+  //  - canales específicos seleccionados → unión de sus contact-ids (.in)
+  //  - "2+ canales" → ids con ≥2 canales (.in, OR-union con lo anterior)
+  //  - "sin contactar" → excluir todos los allContactedIds (.not in)
+  // Devuelve { mode, ids } para que el queryKey/queryFn sea estable y refetchee
+  // cuando la data del hook llegue.
+  const salesChannelConstraint = useMemo(() => {
+    const selected = filters.salesChannels ?? [];
+    if (!isAdmin || selected.length === 0) {
+      return { mode: "none" as const, ids: [] as string[] };
+    }
+    const wantsNone = selected.includes(SALES_CHANNEL_NONE);
+    const wantsMulti = selected.includes(SALES_CHANNEL_MULTI);
+    const specificIds = selected.filter(
+      (s) => s !== SALES_CHANNEL_NONE && s !== SALES_CHANNEL_MULTI,
+    );
+
+    // Caso solo "sin contactar" (sin canales específicos ni 2+): EXCLUIR contactados.
+    if (wantsNone && specificIds.length === 0 && !wantsMulti) {
+      return { mode: "exclude" as const, ids: salesChannels.allContactedIds };
+    }
+
+    // Resto: unión (OR) de ids → .in. (Si además se marcó "sin contactar",
+    // lo combinamos de forma simple ignorándolo en favor del include — OR-union.)
+    const union = new Set<string>();
+    if (specificIds.length > 0) {
+      salesChannels.contactIdsForChannels(specificIds).forEach((id) => union.add(id));
+    }
+    if (wantsMulti) {
+      for (const [contactId, list] of salesChannels.byContactId.entries()) {
+        if (list.length >= 2) union.add(contactId);
+      }
+    }
+    return { mode: "include" as const, ids: Array.from(union) };
+  }, [filters.salesChannels, isAdmin, salesChannels]);
+
   // Server-side paginated query
   const { data: queryResult, isLoading } = useQuery({
-    queryKey: ["closers_contacts", page, filters],
+    queryKey: ["closers_contacts", page, filters, salesChannelConstraint],
     queryFn: async () => {
       let q = supabase
         .from("closers_contacts")
@@ -141,6 +185,21 @@ const ContactosContent = () => {
       if (filters.dateTo) {
         const endOfDay = new Date(`${filters.dateTo}T23:59:59.999`);
         q = q.lte("created_at", endOfDay.toISOString());
+      }
+
+      // Canal de venta (admin-only). El set de ids se computa fuera (salesChannelConstraint).
+      if (salesChannelConstraint.mode === "include") {
+        // Si no hay ids → sentinel que no matchea nada (devuelve 0 filas).
+        const ids = salesChannelConstraint.ids;
+        q = q.in("id", ids.length ? ids : ["__none__"]);
+      } else if (salesChannelConstraint.mode === "exclude") {
+        // "Sin contactar por WhatsApp" → excluir todos los contactados.
+        // OJO con la sintaxis de PostgREST `not in`: lista entre paréntesis.
+        // Si la lista está vacía, no aplicamos constraint (todos califican).
+        const ids = salesChannelConstraint.ids;
+        if (ids.length) {
+          q = q.not("id", "in", `(${ids.join(",")})`);
+        }
       }
 
       const from = (page - 1) * PAGE_SIZE;
@@ -353,7 +412,7 @@ const ContactosContent = () => {
     });
   }, [allContactos]);
 
-  const hasActiveFilters = !!(filters.search || filters.pais || filters.ciudad || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor);
+  const hasActiveFilters = !!(filters.search || filters.pais || filters.ciudad || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor || (filters.salesChannels && filters.salesChannels.length > 0));
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -416,6 +475,39 @@ const ContactosContent = () => {
                 Solo admin (igual que la analítica anterior). Auditoría = acceso discreto. */}
             {isAdmin && (
               <div className="space-y-3">
+                <Card>
+                  <CardContent className="pt-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-sm font-semibold">Contactos por canal de venta</h2>
+                      <span className="text-xs text-muted-foreground">
+                        Alcance multi-canal: <span className="font-semibold tabular-nums text-foreground">{salesChannels.multiChannelCount}</span>
+                      </span>
+                    </div>
+                    {salesChannels.isLoading ? (
+                      <p className="text-sm text-muted-foreground">Cargando…</p>
+                    ) : salesChannels.countsByChannel.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Sin datos de canales.</p>
+                    ) : (() => {
+                      const maxCount = Math.max(1, ...salesChannels.countsByChannel.map((c) => c.count));
+                      return (
+                        <div className="space-y-2">
+                          {salesChannels.countsByChannel.map((c) => (
+                            <div key={c.id} className="flex items-center gap-3">
+                              <span className="w-40 shrink-0 text-xs font-medium truncate">{c.label}</span>
+                              <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-primary"
+                                  style={{ width: `${(c.count / maxCount) * 100}%` }}
+                                />
+                              </div>
+                              <span className="w-8 shrink-0 text-right text-xs font-semibold tabular-nums">{c.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
                 <div className="flex items-center justify-between border-t pt-4">
                   <h2 className="text-sm font-semibold text-muted-foreground">Analítica del directorio</h2>
                   <Button
@@ -452,6 +544,7 @@ const ContactosContent = () => {
                 onClear={() => setFilters(emptyFilters)}
                 creators={creatorsList}
                 cities={citiesList}
+                salesChannelOptions={isAdmin ? salesChannels.channels : []}
               />
             </div>
 
@@ -474,6 +567,7 @@ const ContactosContent = () => {
                   onEdit={handleEdit}
                   onConvert={handleConvert}
                   onDelete={isAdmin ? (c) => { setSelectedContacto(c); setDeleteOpen(true); } : undefined}
+                  channelsByContact={isAdmin ? salesChannels.byContactId : undefined}
                 />
               </DataTableShell>
             )}
@@ -489,6 +583,8 @@ const ContactosContent = () => {
         onConvert={selectedContacto ? () => { setViewOpen(false); handleConvert(selectedContacto); } : undefined}
         onDelete={() => { setViewOpen(false); setDeleteOpen(true); }}
         canDelete={isAdmin}
+        showSalesChannels={isAdmin}
+        salesChannels={selectedContacto ? salesChannels.byContactId.get(selectedContacto.id) ?? [] : []}
       />
       <EditContactoModal open={editOpen} onOpenChange={setEditOpen} contacto={selectedContacto} />
       <DeleteContactoDialog open={deleteOpen} onOpenChange={setDeleteOpen} contacto={selectedContacto} />

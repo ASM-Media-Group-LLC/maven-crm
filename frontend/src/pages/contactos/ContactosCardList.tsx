@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import type { Contacto } from "./ContactosContent";
+import type { ContactChannel } from "./useContactSalesChannels";
 
 const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
   "A+": "success-soft",
@@ -23,12 +24,14 @@ interface Props {
   onEdit?: (contacto: Contacto) => void;
   onConvert?: (contacto: Contacto) => void;
   onDelete?: (contacto: Contacto) => void;
+  // Mapa closers_contacts.id → canales de venta (solo admin; provisto por ContactosContent).
+  channelsByContact?: Map<string, ContactChannel[]>;
 }
 
 // Lista de cajones clickeables — mismo patrón que Pareto / Creator Reports
 // en Dashboard 2. Cada card muestra avatar IG, nombre, badge categoría,
 // fecha y links rápidos. Click abre popup detalle.
-const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onDelete }: Props) => {
+const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onDelete, channelsByContact }: Props) => {
   if (contactos.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
@@ -49,6 +52,7 @@ const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onDelete }: P
           .join("")
           .toUpperCase() || "?";
         const recordType = (c as unknown as { record_type?: string }).record_type;
+        const salesChannels = channelsByContact?.get(c.id) ?? [];
         return (
           <button
             key={c.id}
@@ -84,6 +88,19 @@ const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onDelete }: P
                   )}
                   {c.creadoPor && <span className="truncate">· {c.creadoPor}</span>}
                 </div>
+                {salesChannels.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1 mt-1">
+                    {salesChannels.map((ch) => (
+                      <Badge
+                        key={ch.channelId}
+                        variant="secondary"
+                        className="font-normal text-[10px] px-1.5 py-0 shrink-0"
+                      >
+                        {ch.label}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="hidden md:flex items-center gap-4 text-right shrink-0">
