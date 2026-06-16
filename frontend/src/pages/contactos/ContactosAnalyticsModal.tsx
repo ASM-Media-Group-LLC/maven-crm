@@ -16,6 +16,10 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultTab?: string;
+  /** Render inline (sin Dialog), para el Dashboard fusionado de Contactos. */
+  inline?: boolean;
+  /** En modo inline, cuándo activar las queries (ej. el tab dashboard activo). */
+  enabled?: boolean;
 }
 
 const COLORS = [
@@ -71,10 +75,12 @@ function resolveToISO(raw: string | null): string {
   return trimmed.toUpperCase();
 }
 
-const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }: Props) => {
+const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", inline = false, enabled }: Props) => {
+  // Inline (Dashboard fusionado): las queries se activan con `enabled`; como modal, con `open`.
+  const active = inline ? (enabled ?? true) : open;
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["contactos-analytics-full"],
-    enabled: open,
+    enabled: active,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("closers_contacts")
@@ -88,7 +94,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
   // Fetch creator handles to determine conversions
   const { data: creatorHandles = new Set<string>() } = useQuery({
     queryKey: ["creator-handles-for-analytics"],
-    enabled: open,
+    enabled: active,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("creators")
@@ -107,7 +113,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
   // Fetch closer_creators with revenue data
   const { data: closerCreators = [] } = useQuery({
     queryKey: ["contactos-closer-creators-revenue"],
-    enabled: open,
+    enabled: active,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("closer_creators")
@@ -120,7 +126,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
   // Fetch platform sales
   const { data: platformSales = [] } = useQuery({
     queryKey: ["contactos-platform-sales-revenue"],
-    enabled: open,
+    enabled: active,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("closer_platform_sales")
@@ -133,7 +139,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
   // Fetch creator monetization (real monthly revenue tracking)
   const { data: creatorMonetization = [] } = useQuery({
     queryKey: ["contactos-creator-monetization"],
-    enabled: open,
+    enabled: active,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("creator_monetization")
@@ -151,7 +157,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
 
   const { data: profiles = {} } = useQuery({
     queryKey: ["analytics-profiles", agentIds],
-    enabled: agentIds.length > 0 && open,
+    enabled: agentIds.length > 0 && active,
     queryFn: async () => {
       const { data, error } = await supabase
         .rpc("get_agent_names", { _user_ids: agentIds });
@@ -479,22 +485,27 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
 
   const fmtMoney = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+  const inner = (
+    <>
+      {inline ? (
+        <p className="text-sm text-muted-foreground mb-3">
+          Total histórico: <span className="font-semibold text-foreground">{total}</span> contactos
+        </p>
+      ) : (
         <DialogHeader>
           <DialogTitle>Analítica de Contactos</DialogTitle>
           <p className="text-sm text-muted-foreground">
             Total histórico: <span className="font-semibold text-foreground">{total}</span> contactos
           </p>
         </DialogHeader>
+      )}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <p className="text-sm text-muted-foreground">Cargando datos…</p>
           </div>
         ) : (
-          <Tabs defaultValue={defaultTab} key={defaultTab} className="flex-1 min-h-0 flex flex-col">
+          <Tabs defaultValue={defaultTab} key={defaultTab} className={inline ? "flex flex-col" : "flex-1 min-h-0 flex flex-col"}>
             <TabsList className="shrink-0 w-full justify-start flex-wrap h-auto gap-1 p-1">
               <TabsTrigger value="monthly">Por Mes</TabsTrigger>
               <TabsTrigger value="agents">Por Agente</TabsTrigger>
@@ -504,10 +515,10 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
               <TabsTrigger value="city">Por Ciudad</TabsTrigger>
               <TabsTrigger value="category">Categoría</TabsTrigger>
               <TabsTrigger value="status">Estado</TabsTrigger>
-              <TabsTrigger value="audit" className="text-amber-500">⚠ Auditoría</TabsTrigger>
+              {!inline && <TabsTrigger value="audit" className="text-amber-500">⚠ Auditoría</TabsTrigger>}
             </TabsList>
 
-            <div className="flex-1 min-h-0 overflow-auto pt-4">
+            <div className={inline ? "pt-4" : "flex-1 min-h-0 overflow-auto pt-4"}>
               {/* Monthly with KPIs and dual bars */}
               <TabsContent value="monthly" className="mt-0">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -817,13 +828,21 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
                 </ResponsiveContainer>
               </TabsContent>
 
-              <TabsContent value="audit" className="mt-0">
-                <CategoryAuditLog open={open} />
-              </TabsContent>
+              {!inline && (
+                <TabsContent value="audit" className="mt-0">
+                  <CategoryAuditLog open={active} />
+                </TabsContent>
+              )}
             </div>
           </Tabs>
         )}
-      </DialogContent>
+    </>
+  );
+
+  if (inline) return <div>{inner}</div>;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">{inner}</DialogContent>
     </Dialog>
   );
 };

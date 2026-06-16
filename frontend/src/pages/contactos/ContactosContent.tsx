@@ -368,31 +368,8 @@ const ContactosContent = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {activeTab === "contactos" && isAdmin && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Analítica
-                      <ChevronDown className="ml-2 h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={() => { setAnalyticsTab("monthly"); setAnalyticsOpen(true); }}>
-                      <TrendingUp className="mr-2 h-4 w-4" />
-                      Dashboard General
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setAnalyticsTab("revenue"); setAnalyticsOpen(true); }}>
-                      <DollarSign className="mr-2 h-4 w-4" />
-                      Revenue
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setAnalyticsTab("audit"); setAnalyticsOpen(true); }} className="text-amber-500">
-                      <ShieldAlert className="mr-2 h-4 w-4" />
-                      Auditoría
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-            )}
+            {/* La analítica vive ahora FUSIONADA en el subtab Dashboard (no más
+                botón + popup). Auditoría queda como acceso discreto dentro del Dashboard. */}
             {activeTab === "contactos" ? (
               <Button onClick={() => navigate("/contactos/nuevo")}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -425,7 +402,7 @@ const ContactosContent = () => {
         </SubtabNav>
 
         {activeTab === "dashboard" && (
-          <div className="space-y-4 overflow-auto">
+          <div className="space-y-5 overflow-auto px-6 py-5">
             <ContactosKPICards
               total={totalCount}
               nuevos={kpiCounts.nuevos}
@@ -433,6 +410,31 @@ const ContactosContent = () => {
               esteMes={kpiCounts.esteMes}
               onClick={(key) => setKpiPopup(key)}
             />
+            {/* Analítica fusionada al Dashboard (antes vivía en un botón + popup).
+                Solo admin (igual que la analítica anterior). Auditoría = acceso discreto. */}
+            {isAdmin && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-t pt-4">
+                  <h2 className="text-sm font-semibold text-muted-foreground">Analítica del directorio</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-amber-600 hover:text-amber-700"
+                    onClick={() => { setAnalyticsTab("audit"); setAnalyticsOpen(true); }}
+                  >
+                    <ShieldAlert className="mr-2 h-4 w-4" />
+                    Auditoría
+                  </Button>
+                </div>
+                <ContactosAnalyticsModal
+                  inline
+                  enabled={activeTab === "dashboard"}
+                  defaultTab="monthly"
+                  open={false}
+                  onOpenChange={() => {}}
+                />
+              </div>
+            )}
           </div>
         )}
 
