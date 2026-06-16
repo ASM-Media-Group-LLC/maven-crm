@@ -200,7 +200,8 @@
             : `<div class="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold flex-shrink-0">${name ? esc(name[0].toUpperCase()) : "#"}</div>`;
           const action = i.connection === "open"
             ? `<button onclick="logoutLine('${i.instance}')" class="text-xs px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50">Desvincular</button>`
-            : `<button onclick="connectLine('${i.instance}')" class="text-xs px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Conectar (QR)</button>`;
+            : `<button onclick="resetLine('${i.instance}')" title="Borra la sesión caída y genera un QR nuevo para re-escanear" class="text-xs px-3 py-1.5 rounded border border-amber-300 text-amber-700 hover:bg-amber-50">Volver a vincular</button>
+               <button onclick="connectLine('${i.instance}')" class="text-xs px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Conectar (QR)</button>`;
           return `<div class="bg-white rounded-xl border border-slate-200 shadow-sm">
             <div class="p-4 flex items-center gap-4">
               ${avatar}
@@ -283,6 +284,19 @@
       if (!confirm("¿Desvincular la línea " + name + "? Vas a tener que re-escanear el QR para reconectarla.")) return;
       try { await fetch("/instance/logout/" + name, { method: "DELETE", headers: authH() }); } catch (e) {}
       loadLines();
+    }
+
+    // Reset de una línea caída: borra la sesión muerta y re-inicia → QR nuevo.
+    // (Para cuando "Conectar (QR)" se queda en "generando QR…" porque las creds
+    // viejas no sirven y la sesión no reconecta sola.)
+    async function resetLine(name) {
+      if (!needKey()) return;
+      if (!confirm("¿Volver a vincular " + name + "?\n\nEsto BORRA la sesión actual de esta línea y genera un QR NUEVO para re-escanear con el teléfono. Usalo cuando la línea quedó caída y no reconecta.")) return;
+      try {
+        const r = await fetch("/instance/reset/" + name, { method: "POST", headers: authH() });
+        if (!r.ok) { const j = await r.json().catch(() => ({})); alert("No se pudo resetear: " + (j.error || r.status)); return; }
+      } catch (e) { alert("Error: " + e.message); return; }
+      connectLine(name); // abre el modal de QR y poll-ea (la sesión ya re-inició limpia)
     }
     // ── Perfil de la línea ──────────────────────────────────────────────────
     let pfLine = null;

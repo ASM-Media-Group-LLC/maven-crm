@@ -236,6 +236,21 @@ function rolloverDayIfNeeded(s = state) {
 // Baileys boot + reconnect loop
 // ---------------------------------------------------------------------------
 
+// Borra las credenciales en disco de una línea adicional (subdirectorio propio)
+// para poder re-vincularla con un QR nuevo cuando la sesión murió (deslogueada /
+// "Connection Failure" que no reconecta). NUNCA toca las del número default, que
+// viven en la RAÍZ de AUTH_DIR (borrarlas tumbaría al bot). Devuelve true si borró.
+function clearAuth(instanceName) {
+  if (instanceName === INSTANCE_NAME) return false; // default: creds en la raíz, no auto-borrar
+  const dir = `${AUTH_DIR}/${instanceName}`;
+  try {
+    if (fs.existsSync(dir)) { fs.rmSync(dir, { recursive: true, force: true }); return true; }
+  } catch (e) {
+    logger.error({ err: e.message, instance: instanceName }, 'clearAuth failed');
+  }
+  return false;
+}
+
 async function startSocket(instanceName = INSTANCE_NAME) {
   const s = getSession(instanceName);
   loadConfig(s);
@@ -314,8 +329,16 @@ async function startSocket(instanceName = INSTANCE_NAME) {
 
       const loggedOut = statusCode === DisconnectReason.loggedOut;
       if (loggedOut) {
-        logger.error({ instance: instanceName }, 'Logged out by WhatsApp -- clear AUTH_DIR and re-scan QR');
-        // No auto-reconnect on logout: necesita rescanear.
+        logger.error({ instance: instanceName }, 'Logged out by WhatsApp -- clearing creds and re-initializing for fresh QR');
+        // Sesión muerta: para una línea adicional, limpiamos las credenciales y
+        // re-iniciamos → Baileys emite un QR NUEVO (en /instance/connect). Sin esto
+        // la línea quedaba caída sin forma de re-vincularse (reconnect reusaba creds
+        // muertas). El default NO se auto-borra (sus creds viven en la raíz).
+        if (instanceName !== INSTANCE_NAME) {
+          clearAuth(instanceName);
+          s.sock = null; s.qrRaw = null; s.qrDataUrl = null;
+          setTimeout(() => startSocket(instanceName).catch((e) => logger.error({ err: e.message, instance: instanceName }, 'post-logout re-init failed')), 1500);
+        }
       } else {
         // Reconnect con backoff.
         s.reconnectCount += 1;
@@ -1232,6 +1255,29 @@ app.post('/instance/reconnect/:instance', async (req, res) => {
   try {
     startSocket(name).catch((e) => logger.error({ err: e.message, instance: name }, 'manual reconnect failed'));
     return res.json({ message: 'reconnecting', instance: name });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Reset de una línea CAÍDA: cierra el socket, BORRA las credenciales muertas y
+// re-inicia → Baileys emite un QR nuevo (servido en /instance/connect/:instance).
+// Para re-vincular una sesión deslogueada/fallida que no reconecta sola (a
+// diferencia de /reconnect, que reusa las mismas creds). No aplica al default.
+app.post('/instance/reset/:instance', async (req, res) => {
+  const name = (req.params && req.params.instance) || INSTANCE_NAME;
+  if (name === INSTANCE_NAME) return res.status(400).json({ error: 'cannot_reset_default' });
+  try {
+    const s = getSession(name);
+    // Quitamos los listeners del socket viejo ANTES de cerrarlo para que su evento
+    // 'close' no dispare un reconnect que compita con el startSocket de abajo.
+    try { if (s.sock) { s.sock.ev.removeAllListeners(); s.sock.end(new Error('reset')); } } catch (e) { /* socket ya muerto */ }
+    s.sock = null;
+    s.qrRaw = null; s.qrDataUrl = null; s.connection = 'connecting';
+    s.reconnectCount = 0; s.lastError = null;
+    const cleared = clearAuth(name);
+    startSocket(name).catch((e) => logger.error({ err: e.message, instance: name }, 'reset re-init failed'));
+    return res.json({ message: 'reset', cleared, instance: name, connectUrl: `/instance/connect/${name}` });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
