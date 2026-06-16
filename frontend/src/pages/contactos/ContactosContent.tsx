@@ -129,10 +129,19 @@ const ContactosContent = () => {
       }
       if (filters.pais) q = q.eq("country_code", filters.pais);
       if (filters.categoria) q = q.eq("physical_appearance", filters.categoria);
-      if (filters.dateFrom) q = q.gte("created_at", filters.dateFrom);
+      // filters.dateFrom/dateTo son strings solo-fecha ("yyyy-MM-dd"). Hay que
+      // acotar por el DÍA LOCAL del usuario contra created_at (timestamptz UTC).
+      // OJO: `new Date("yyyy-MM-dd")` parsea como medianoche UTC; al hacer
+      // setHours(23,59,59) en hora local el tope quedaba corrido por el offset de
+      // TZ (en GMT-5 → ~05:00 UTC del mismo día) → un rango de un solo día ("Hoy"/
+      // "Ayer") excluía los contactos de la tarde y daba 0. Fix: parsear con hora
+      // explícita SIN "Z" → se interpreta en la TZ local del browser.
+      if (filters.dateFrom) {
+        const startOfDay = new Date(`${filters.dateFrom}T00:00:00`);
+        q = q.gte("created_at", startOfDay.toISOString());
+      }
       if (filters.dateTo) {
-        const endOfDay = new Date(filters.dateTo);
-        endOfDay.setHours(23, 59, 59, 999);
+        const endOfDay = new Date(`${filters.dateTo}T23:59:59.999`);
         q = q.lte("created_at", endOfDay.toISOString());
       }
 
