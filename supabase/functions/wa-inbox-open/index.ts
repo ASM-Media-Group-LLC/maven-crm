@@ -156,10 +156,26 @@ serve(async (req) => {
     .from("wa_conversations").select("id, assigned_to").eq("contact_id", contactId).eq("channel_id", channelId).maybeSingle();
   if (existingConv) {
     convId = existingConv.id;
-    // Si está SIN asignar, la tomamos para el dueño del lead (p.ej. un inbound que
-    // entró antes de que el closer la abriera). No pisamos una asignación ya hecha.
-    if (leadOwner && !existingConv.assigned_to) {
-      await (sb as any).from("wa_conversations").update({ assigned_to: leadOwner }).eq("id", convId);
+    const assignedTo = (existingConv.assigned_to as string | null) ?? null;
+    if (!assignedTo) {
+      // SIN asignar → la tomamos para el dueño del lead, o para QUIEN LA ABRE cuando es
+      // un contacto sin lead. Antes solo se asignaba si había leadOwner → al abrir un
+      // contacto, la conversación (creada por un inbound previo) quedaba sin asignar y la
+      // RLS estricta del closer NO se la mostraba → el deep-link caía en panel vacío.
+      await (sb as any).from("wa_conversations").update({ assigned_to: ownerForConv }).eq("id", convId);
+    } else if (assignedTo !== ownerForConv) {
+      // Asignada a OTRA persona: el closer solo ve lo suyo (RLS), así que mandarlo al
+      // chat sería un panel en blanco. Si no puede ver todo (no es supervisor+/admin),
+      // le avisamos con un rechazo suave (200 + ok:false) en vez de abrir vacío.
+      const { data: canSeeAll } = await sb.rpc("is_in_role_group", {
+        _user_id: userId, _group: "supervisor_or_above",
+      });
+      if (!canSeeAll) {
+        const { data: owner } = await (sb as any)
+          .from("profiles").select("full_name").eq("id", assignedTo).maybeSingle();
+        const who = owner?.full_name || "otra persona";
+        return json({ ok: false, error: `Esta conversación ya está asignada a ${who}. No podés abrirla.` });
+      }
     }
   } else {
     const { data: newConv, error: vErr } = await (sb as any).from("wa_conversations").insert({
