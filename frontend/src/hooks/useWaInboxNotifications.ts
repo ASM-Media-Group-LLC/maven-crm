@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
@@ -27,45 +28,52 @@ function previewOf(body: string | null, msgType: string): string {
 /**
  * Aviso GLOBAL de WhatsApp entrante: suena + (cuando la pestaña está en segundo
  * plano) salta la notificación del navegador, desde cualquier parte de Maven.
+ * Además refresca el badge del sidebar y marca la lista de la bandeja como stale
+ * en cada entrante, para que se actualicen aunque NO estés en la página /inbox.
  *
- * Antes esto solo existía para el Messenger interno; la bandeja de WhatsApp solo
- * actualizaba el badge silencioso del sidebar, así que había que estar mirando el
- * ícono. Este hook (montado en AppShell) cierra esa brecha.
+ * Montado en AppShell (siempre montado en rutas autenticadas).
  *
  * - Solo entrantes (direction='in'): los salientes/bot no avisan.
  * - La RLS de wa_conversation_messages limita el realtime a las conversaciones que
  *   el usuario puede ver (el closer solo oye lo suyo; el admin oye todo lo visible).
  * - Respeta los ajustes del usuario: maestro de notificaciones, No-molestar y sonido.
- * - La notificación del navegador solo aparece con la pestaña oculta (lo maneja
- *   `notify`); el sonido suena igual aunque la pestaña esté visible en otra pantalla.
+ *
+ * IMPORTANTE — nombre de canal ÚNICO (igual que InboxPage). Un nombre FIJO se
+ * dedupea por topic en supabase-js: si el efecto se re-ejecuta (cambio de identidad
+ * del objeto `user` / refresh de token), la 2ª suscripción al mismo nombre queda
+ * muerta y el callback nunca dispara — aunque el realtime SÍ entregue el evento.
+ * Por eso dependemos de `user.id` (string estable, no el objeto) y el topic lleva
+ * sufijo aleatorio.
  */
 export function useWaInboxNotifications() {
   const { user } = useAuth();
   const { settings } = useNotificationSettings();
   const { notify } = useBrowserNotifications();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   useNotificationPermission();
 
-  // Los ajustes cambian, pero la suscripción de realtime se arma una sola vez.
-  // Guardamos la última versión en un ref para que el callback lea el valor
-  // actual sin re-suscribirse en cada cambio de settings.
+  // La suscripción se arma una sola vez; el callback lee siempre el valor actual
+  // de settings/notify vía refs (sin re-suscribir en cada cambio).
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
-
+  const notifyRef = useRef(notify);
+  notifyRef.current = notify;
   // Anti-spam del sonido: en ráfagas no disparamos un beep por cada mensaje.
   const lastSoundRef = useRef(0);
 
+  const userId = user?.id ?? null;
+
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     const channel = supabase
-      .channel("wa-inbox-notify")
+      .channel("wa-inbox-notify-" + Math.random().toString(36).slice(2))
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "wa_conversation_messages",
-          filter: "direction=eq.in",
         },
         async (payload) => {
           const m = payload.new as {
@@ -74,7 +82,14 @@ export function useWaInboxNotifications() {
             msg_type?: string;
             direction?: string;
           };
+          // Solo entrantes nuevos. (Filtramos en JS, como InboxPage; sin filtro
+          // server-side para no depender de su comportamiento al multiplexar.)
           if (!m?.conversation_id || m.direction !== "in") return;
+
+          // Llegó un entrante: refrescá el badge del sidebar y marcá la lista de la
+          // bandeja como stale, aunque el usuario esté en otra página de Maven.
+          qc.invalidateQueries({ queryKey: ["sidebar-badges"] });
+          qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
 
           const s = settingsRef.current;
           // Maestro apagado o No-molestar → no avisar (ni sonido ni popup).
@@ -108,7 +123,7 @@ export function useWaInboxNotifications() {
             s.sound_enabled !== false && now - lastSoundRef.current > 1500;
           if (soundOk) lastSoundRef.current = now;
 
-          notify(
+          notifyRef.current(
             title,
             body,
             () => navigate(`/inbox?c=${m.conversation_id}`),
@@ -121,5 +136,5 @@ export function useWaInboxNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, notify, navigate]);
+  }, [userId, qc, navigate]);
 }
