@@ -343,7 +343,11 @@ export default function TelefonosPage() {
     };
   }, [active, toast]);
 
-  const userName = (id: string) => users.find((u) => u.id === id)?.full_name || id.slice(0, 8);
+  // Id corto null-safe: el uso agregado puede traer filas con user_id null
+  // (sesiones viejas/huérfanas sin usuario) y `null.slice` tumbaba toda la página.
+  const shortId = (s: string | null | undefined) => (s ? s.slice(0, 8) : "—");
+  const userName = (id: string | null | undefined) =>
+    users.find((u) => u.id === id)?.full_name || shortId(id);
 
   const assign = async (p: Phone, userIds: string[]) => {
     const { data, error } = await cp("assign", {
@@ -408,7 +412,7 @@ export default function TelefonosPage() {
                     {(p.assigned_to ?? []).length === 0 ? (
                       <span className="text-xs italic text-muted-foreground">Sin asignar</span>
                     ) : (
-                      (p.assigned_to ?? []).map((aid) => (
+                      (p.assigned_to ?? []).filter(Boolean).map((aid) => (
                         <Badge key={aid} variant="secondary" className="gap-1 pr-1">
                           {userName(aid)}
                           <button
@@ -435,7 +439,7 @@ export default function TelefonosPage() {
                           .filter((u) => !(p.assigned_to ?? []).includes(u.id))
                           .map((u) => (
                             <SelectItem key={u.id} value={u.id}>
-                              {u.full_name || u.id.slice(0, 8)}
+                              {u.full_name || shortId(u.id)}
                             </SelectItem>
                           ))
                       )}
@@ -469,9 +473,9 @@ export default function TelefonosPage() {
             <p className="text-sm text-muted-foreground">Todavía no hay uso registrado.</p>
           ) : (
             <div className="space-y-1.5">
-              {usage.byUser.map((u) => (
-                <div key={u.user_id} className="flex items-center justify-between text-sm">
-                  <span className="truncate">{u.full_name || u.user_id.slice(0, 8)}</span>
+              {usage.byUser.map((u, i) => (
+                <div key={u.user_id || i} className="flex items-center justify-between text-sm">
+                  <span className="truncate">{u.full_name || shortId(u.user_id)}</span>
                   <span className="text-muted-foreground tabular-nums">{u.minutes} min · {u.sessions} ses.</span>
                 </div>
               ))}
