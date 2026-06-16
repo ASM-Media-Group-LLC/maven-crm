@@ -20,6 +20,9 @@ interface Props {
   inline?: boolean;
   /** En modo inline, cuándo activar las queries (ej. el tab dashboard activo). */
   enabled?: boolean;
+  /** Rango global (calendario de movimiento) que acota TODA la analítica. "yyyy-MM-dd". */
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 const COLORS = [
@@ -75,17 +78,23 @@ function resolveToISO(raw: string | null): string {
   return trimmed.toUpperCase();
 }
 
-const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", inline = false, enabled }: Props) => {
+const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", inline = false, enabled, dateFrom, dateTo }: Props) => {
   // Inline (Dashboard fusionado): las queries se activan con `enabled`; como modal, con `open`.
   const active = inline ? (enabled ?? true) : open;
   const { data: contacts = [], isLoading } = useQuery({
-    queryKey: ["contactos-analytics-full"],
+    queryKey: ["contactos-analytics-full", dateFrom ?? null, dateTo ?? null],
     enabled: active,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("closers_contacts")
-        .select("created_at, created_by, country_code, physical_appearance, status, city, handle")
-        .order("created_at", { ascending: true });
+        .select("created_at, created_by, country_code, physical_appearance, status, city, handle");
+      // Calendario de movimiento global: acota por DÍA LOCAL contra created_at
+      // (timestamptz UTC). `new Date("yyyy-MM-dd")` parsea como medianoche UTC,
+      // así que usamos hora explícita SIN "Z" para interpretarla en la TZ local
+      // del browser — mismo criterio que el filtro de la lista de contactos.
+      if (dateFrom) q = q.gte("created_at", new Date(`${dateFrom}T00:00:00`).toISOString());
+      if (dateTo) q = q.lte("created_at", new Date(`${dateTo}T23:59:59.999`).toISOString());
+      const { data, error } = await q.order("created_at", { ascending: true });
       if (error) throw error;
       return data ?? [];
     },

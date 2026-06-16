@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Users, Building2, BarChart3, ShieldAlert, ChevronDown, DollarSign, TrendingUp, LayoutDashboard, ArrowRight } from "lucide-react";
+import { Plus, Users, BarChart3, ShieldAlert, ChevronDown, DollarSign, TrendingUp, LayoutDashboard, ArrowRight } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import { Button } from "@/components/ui/button";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,8 +31,7 @@ import ContactoDetailDialog from "./ContactoDetailDialog";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
 import ConvertContactoModal from "./ConvertContactoModal";
-import AgenciasContent from "./AgenciasContent";
-import AddAgenciaModal from "./AddAgenciaModal";
+import CategoryAuditLog from "./CategoryAuditLog";
 import DataTableShell from "@/components/ui/data-table-shell";
 
 export interface Contacto {
@@ -83,7 +84,7 @@ const normalizeHandleKey = (value: string | null | undefined) =>
   (value ?? "").trim().replace(/^@+/, "").toLowerCase();
 
 const ContactosContent = () => {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "contactos" | "agencias">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "contactos">("dashboard");
   const [filters, setFilters] = useState<ContactoFilters>(emptyFilters);
   const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
   type KpiKey = "total" | "nuevos" | "convertidos" | "esteMes";
@@ -96,9 +97,6 @@ const ContactosContent = () => {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
   const [convertRawContacto, setConvertRawContacto] = useState<any>(null);
-  const [addAgenciaOpen, setAddAgenciaOpen] = useState(false);
-  const [analyticsOpen, setAnalyticsOpen] = useState(false);
-  const [analyticsTab, setAnalyticsTab] = useState("monthly");
   const [auditOpen, setAuditOpen] = useState(false);
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
@@ -369,16 +367,25 @@ const ContactosContent = () => {
           </div>
           <div className="flex items-center gap-2">
             {/* La analítica vive ahora FUSIONADA en el subtab Dashboard (no más
-                botón + popup). Auditoría queda como acceso discreto dentro del Dashboard. */}
-            {activeTab === "contactos" ? (
+                botón + popup). Auditoría queda como acceso discreto dentro del Dashboard.
+                El "calendario de movimiento" (rango de fechas) es GLOBAL: aplica a
+                todos los subtabs y también acota la analítica del Dashboard. */}
+            <DateRangePicker
+              from={filters.dateFrom ? parseISO(filters.dateFrom) : undefined}
+              to={filters.dateTo ? parseISO(filters.dateTo) : undefined}
+              onApply={(from, to) =>
+                updateFilters({
+                  dateFrom: from ? format(from, "yyyy-MM-dd") : "",
+                  dateTo: to ? format(to, "yyyy-MM-dd") : "",
+                })
+              }
+              placeholder="Fecha creación"
+              className="w-auto"
+            />
+            {activeTab === "contactos" && (
               <Button onClick={() => navigate("/contactos/nuevo")}>
                 <Plus className="mr-2 h-4 w-4" />
                 Agregar Contacto
-              </Button>
-            ) : (
-              <Button variant="outline" onClick={() => setAddAgenciaOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Agregar Agencia
               </Button>
             )}
           </div>
@@ -394,10 +401,6 @@ const ContactosContent = () => {
           <SubtabNavItem active={activeTab === "contactos"} onClick={() => setActiveTab("contactos")}>
             <Users className="mr-1.5 h-4 w-4" />
             Contactos
-          </SubtabNavItem>
-          <SubtabNavItem active={activeTab === "agencias"} onClick={() => setActiveTab("agencias")}>
-            <Building2 className="mr-1.5 h-4 w-4" />
-            Agencias
           </SubtabNavItem>
         </SubtabNav>
 
@@ -420,7 +423,7 @@ const ContactosContent = () => {
                     variant="ghost"
                     size="sm"
                     className="text-amber-600 hover:text-amber-700"
-                    onClick={() => { setAnalyticsTab("audit"); setAnalyticsOpen(true); }}
+                    onClick={() => setAuditOpen(true)}
                   >
                     <ShieldAlert className="mr-2 h-4 w-4" />
                     Auditoría
@@ -430,6 +433,8 @@ const ContactosContent = () => {
                   inline
                   enabled={activeTab === "dashboard"}
                   defaultTab="monthly"
+                  dateFrom={filters.dateFrom}
+                  dateTo={filters.dateTo}
                   open={false}
                   onOpenChange={() => {}}
                 />
@@ -475,8 +480,6 @@ const ContactosContent = () => {
             )}
           </>
         )}
-
-        {activeTab === "agencias" && <AgenciasContent />}
       </div>
 
       <ContactoDetailDialog
@@ -490,14 +493,23 @@ const ContactosContent = () => {
       />
       <EditContactoModal open={editOpen} onOpenChange={setEditOpen} contacto={selectedContacto} />
       <DeleteContactoDialog open={deleteOpen} onOpenChange={setDeleteOpen} contacto={selectedContacto} />
-      <AddAgenciaModal open={addAgenciaOpen} onOpenChange={setAddAgenciaOpen} />
       <ConvertContactoModal
         open={convertOpen}
         onOpenChange={setConvertOpen}
         contacto={convertRawContacto}
         onConverted={() => setConvertOpen(false)}
       />
-      <ContactosAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} defaultTab={analyticsTab} />
+
+      {/* Auditoría — dialog liviano con SOLO el log de cambios de categoría
+          (antes abría la analítica completa como popup, redundante con el Dashboard inline). */}
+      <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Auditoría de cambios</DialogTitle>
+          </DialogHeader>
+          <CategoryAuditLog open={auditOpen} />
+        </DialogContent>
+      </Dialog>
 
       {/* KPI POPUP — al clickar un cuadro del Dashboard de Contactos */}
       <Dialog

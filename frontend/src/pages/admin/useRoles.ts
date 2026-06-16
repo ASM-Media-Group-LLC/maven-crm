@@ -52,7 +52,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   { group: "Menú",          module: "Messenger",     submodules: ["Eliminar Conversación"] },
   { group: "Menú",          module: "Cowork",        submodules: [] },
   // Contactos: tabs internos + acciones críticas de eliminar.
-  { group: "Menú",          module: "Contactos",     submodules: ["Dashboard", "Contactos", "Agencias", "Crear Contacto", "Editar Contacto", "Eliminar Contacto", "Crear Agencia", "Eliminar Agencia"] },
+  { group: "Menú",          module: "Contactos",     submodules: ["Dashboard", "Contactos", "Crear Contacto", "Editar Contacto", "Eliminar Contacto"] },
   // Tareas: vistas + delete actions.
   { group: "Menú",          module: "Tareas",        submodules: ["List", "Kanban", "Analytics", "Docs", "Crear Proyecto", "Eliminar Proyecto", "Crear Tarea", "Eliminar Tarea"] },
   // Eventos: tabs del detalle del evento + delete.

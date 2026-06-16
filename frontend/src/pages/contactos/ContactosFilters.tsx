@@ -10,8 +10,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { format, parseISO } from "date-fns";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -128,19 +126,6 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
           </Command>
         </PopoverContent>
       </Popover>
-
-      <DateRangePicker
-        from={filters.dateFrom ? parseISO(filters.dateFrom) : undefined}
-        to={filters.dateTo ? parseISO(filters.dateTo) : undefined}
-        onApply={(from, to) =>
-          onChange({
-            dateFrom: from ? format(from, "yyyy-MM-dd") : "",
-            dateTo: to ? format(to, "yyyy-MM-dd") : "",
-          })
-        }
-        placeholder="Fecha creación"
-        className="w-auto"
-      />
 
       {hasActiveFilters && onClear && (
         <Button variant="ghost" size="sm" onClick={onClear}>
