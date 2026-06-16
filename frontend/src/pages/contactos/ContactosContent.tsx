@@ -382,12 +382,11 @@ const ContactosContent = () => {
               placeholder="Fecha creación"
               className="w-auto"
             />
-            {activeTab === "contactos" && (
-              <Button onClick={() => navigate("/contactos/nuevo")}>
-                <Plus className="mr-2 h-4 w-4" />
-                Agregar Contacto
-              </Button>
-            )}
+            {/* Global en el header, como el calendario: visible en todos los subtabs. */}
+            <Button onClick={() => navigate("/contactos/nuevo")}>
+              <Plus className="mr-2 h-4 w-4" />
+              Agregar Contacto
+            </Button>
           </div>
         </div>
       </header>
