@@ -524,6 +524,7 @@ export default function TelefonosPage() {
           {canDevices && (
             <TabsTrigger value="dispositivos">
               <Smartphone className="h-4 w-4 mr-1.5" /> Dispositivos
+              {!loading ? ` (${phones.length})` : ""}
             </TabsTrigger>
           )}
         </TabsList>
