@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
@@ -82,11 +82,8 @@ function resolveToISO(raw: string | null): string {
 const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", inline = false, enabled, dateFrom, dateTo }: Props) => {
   // Inline (Dashboard fusionado): las queries se activan con `enabled`; como modal, con `open`.
   const active = inline ? (enabled ?? true) : open;
-  // Toggle: sacar los importados (source='import_kash_sheet') de las tendencias/
-  // distribuciones, para ver captación real y no el backfill histórico 2024-25.
-  const [excludeImported, setExcludeImported] = useState(false);
   const { data: contacts = [], isLoading } = useQuery({
-    queryKey: ["contactos-analytics-full", dateFrom ?? null, dateTo ?? null, excludeImported],
+    queryKey: ["contactos-analytics-full", dateFrom ?? null, dateTo ?? null],
     enabled: active,
     queryFn: async () => {
       // Paginado: PostgREST corta en 1000 filas; con >1000 contactos la
@@ -102,7 +99,6 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
         // del browser — mismo criterio que el filtro de la lista de contactos.
         if (dateFrom) q = q.gte("created_at", new Date(`${dateFrom}T00:00:00`).toISOString());
         if (dateTo) q = q.lte("created_at", new Date(`${dateTo}T23:59:59.999`).toISOString());
-        if (excludeImported) q = q.neq("source", "import_kash_sheet");
         return q.order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to);
       });
     },
@@ -516,16 +512,6 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
           </p>
         </DialogHeader>
       )}
-
-      <label className="flex items-center gap-2 mb-3 text-xs text-muted-foreground cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={excludeImported}
-          onChange={(e) => setExcludeImported(e.target.checked)}
-          className="h-3.5 w-3.5 rounded border-border accent-primary"
-        />
-        Excluir contactos importados (KASH) de tendencias y distribuciones
-      </label>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
