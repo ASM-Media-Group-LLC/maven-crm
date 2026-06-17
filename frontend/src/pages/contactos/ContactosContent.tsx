@@ -223,12 +223,19 @@ const ContactosContent = () => {
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
+      // "Nuevos" = ingresados al CRM hace menos de un mes (created_at en los
+      // últimos 30 días). OJO: contactos importados con fecha histórica
+      // backdateada (p.ej. import KASH) NO cuentan acá a propósito: no son
+      // ingresos recientes para trabajar, aunque la fila se haya creado hoy.
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      thirtyDaysAgo.setHours(0, 0, 0, 0);
       // "Convertido" = lead GANADO en el pipeline de closers (closer_creators en stage
       // Confirmada/Completada), por source_contact_id. NO el flag status='converted'
       // (que en realidad = "pasó a closers"; la mayoría terminaban "No interesada").
       const WON_STAGES = ["Confirmada", "Completada", "confirmada", "completada"];
       const [nuevosRes, wonRes, esteMesRes] = await Promise.all([
-        supabase.from("closers_contacts").select("id", { count: "exact", head: true }).eq("status", "new"),
+        supabase.from("closers_contacts").select("id", { count: "exact", head: true }).gte("created_at", thirtyDaysAgo.toISOString()),
         (supabase as any).from("closer_creators").select("source_contact_id").in("stage", WON_STAGES),
         supabase.from("closers_contacts").select("id", { count: "exact", head: true }).gte("created_at", startOfMonth.toISOString()),
       ]);
@@ -256,7 +263,12 @@ const ContactosContent = () => {
         .select("id, name, handle, city, country_code, physical_appearance, status, created_at, profile_picture_url")
         .order("created_at", { ascending: false })
         .limit(100);
-      if (kpiPopup === "nuevos") q = q.eq("status", "new");
+      if (kpiPopup === "nuevos") {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        thirtyDaysAgo.setHours(0, 0, 0, 0);
+        q = q.gte("created_at", thirtyDaysAgo.toISOString());
+      }
       else if (kpiPopup === "convertidos") q = q.in("id", kpiCounts.wonIds.length ? kpiCounts.wonIds : ["__none__"]);
       else if (kpiPopup === "esteMes") {
         const start = new Date();
@@ -628,13 +640,13 @@ const ContactosContent = () => {
           <DialogHeader>
             <DialogTitle>
               {kpiPopup === "total" && `Todos los Contactos (${totalCount})`}
-              {kpiPopup === "nuevos" && `Contactos Nuevos (${kpiCounts.nuevos})`}
+              {kpiPopup === "nuevos" && `Nuevos · últimos 30 días (${kpiCounts.nuevos})`}
               {kpiPopup === "convertidos" && `Contactos Convertidos (${kpiCounts.convertidos})`}
               {kpiPopup === "esteMes" && `Contactos de Este Mes (${kpiCounts.esteMes})`}
             </DialogTitle>
             <p className="text-xs text-muted-foreground">
               {kpiPopup === "total" && "Mostrando los 100 más recientes"}
-              {kpiPopup === "nuevos" && "Contactos sin interacción aún · 100 más recientes"}
+              {kpiPopup === "nuevos" && "Ingresados al CRM en los últimos 30 días · 100 más recientes"}
               {kpiPopup === "convertidos" && "Pasaron a creadores · 100 más recientes"}
               {kpiPopup === "esteMes" && "Agregados desde el inicio del mes · 100 más recientes"}
             </p>

@@ -28,7 +28,7 @@ const ContactosKPICards = ({ total, nuevos, convertidos, esteMes, onClick }: Pro
       key: "nuevos" as const,
       label: "Nuevos",
       value: nuevos,
-      subtitle: "Sin contactar todavía",
+      subtitle: "Ingresados últimos 30 días",
       icon: UserPlus,
       color: "bg-emerald-500",
     },
