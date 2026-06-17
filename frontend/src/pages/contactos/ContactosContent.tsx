@@ -95,7 +95,11 @@ const ContactosContent = () => {
   const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   // Estado del collapsed por categoría — mismo patrón que panel/
   // dashboard v2: default top expandida, resto colapsadas.
-  const [kpiPopupCollapsed, setKpiPopupCollapsed] = useState<Set<string>>(new Set());
+  // null = sin tocar (aplica default: solo la 1ª categoría abierta). Un Set (aunque
+  // vacío) = el usuario ya interactuó → respetar su elección. OJO: usar "size===0"
+  // como sentinel rompía expandir la última categoría colapsada (al vaciarse el set
+  // volvía al default y la re-colapsaba).
+  const [kpiPopupCollapsed, setKpiPopupCollapsed] = useState<Set<string> | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -633,7 +637,7 @@ const ContactosContent = () => {
         onOpenChange={(o) => {
           if (!o) {
             setKpiPopup(null);
-            setKpiPopupCollapsed(new Set());
+            setKpiPopupCollapsed(null);
           }
         }}
       >
@@ -693,11 +697,11 @@ const ContactosContent = () => {
               if (sa !== sb) return sa - sb;
               return a.localeCompare(b);
             });
-            const effectiveCollapsed = kpiPopupCollapsed.size === 0
+            const effectiveCollapsed = kpiPopupCollapsed === null
               ? new Set(sortedCats.slice(1))
               : kpiPopupCollapsed;
             const toggleCat = (cat: string) => {
-              const base = kpiPopupCollapsed.size === 0
+              const base = kpiPopupCollapsed === null
                 ? new Set(sortedCats.slice(1))
                 : new Set(kpiPopupCollapsed);
               if (base.has(cat)) base.delete(cat);
@@ -723,7 +727,7 @@ const ContactosContent = () => {
                     const fullContacto = allContactos.find((x) => x.id === c.id);
                     if (fullContacto) {
                       setKpiPopup(null);
-                      setKpiPopupCollapsed(new Set());
+                      setKpiPopupCollapsed(null);
                       handleView(fullContacto);
                     } else {
                       const minimal: Contacto = {
@@ -752,7 +756,7 @@ const ContactosContent = () => {
                         onlyfans_url: "",
                       };
                       setKpiPopup(null);
-                      setKpiPopupCollapsed(new Set());
+                      setKpiPopupCollapsed(null);
                       handleView(minimal);
                     }
                   }}
