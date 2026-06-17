@@ -194,8 +194,8 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         if (cancelled || !full) return;
         const q = (full as { quality?: string | null }).quality;
         const src = (full as { source_link?: string | null }).source_link;
-        // Categoría: leadgen guarda "A+/A/B+/B/C" (mayúsc) → el select usa minúsc.
-        if (q) form.setValue("categoriaFisica", String(q).toLowerCase());
+        // Categoría canónica en MAYÚSCULA (A+/A/B+/B/C), igual que los demás forms.
+        if (q) form.setValue("categoriaFisica", String(q).toUpperCase());
         // Mejorar el IG reconstruido por el link real que cargó el LLG.
         if (src && /instagram\.com/i.test(src)) {
           form.setValue("instagram", src);
@@ -600,12 +600,12 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="a+">A+ (Premium)</SelectItem>
-                        <SelectItem value="a">A (Alta)</SelectItem>
-                        <SelectItem value="b+">B+ (Media Alta)</SelectItem>
-                        <SelectItem value="b">B (Media)</SelectItem>
-                        <SelectItem value="c">C (Básica)</SelectItem>
-                        <SelectItem value="potencial">Potencial</SelectItem>
+                        <SelectItem value="A+">A+ (Premium)</SelectItem>
+                        <SelectItem value="A">A (Alta)</SelectItem>
+                        <SelectItem value="B+">B+ (Media Alta)</SelectItem>
+                        <SelectItem value="B">B (Media)</SelectItem>
+                        <SelectItem value="C">C (Básica)</SelectItem>
+                        <SelectItem value="Potencial">Potencial</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

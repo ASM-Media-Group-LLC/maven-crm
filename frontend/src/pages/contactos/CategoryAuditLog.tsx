@@ -24,7 +24,11 @@ const CategoryAuditLog = ({ open }: Props) => {
         .order("changed_at", { ascending: false })
         .limit(100);
       if (error) throw error;
-      return data ?? [];
+      // Ignorar cambios solo-mayúscula/minúscula (ruido de data legacy, ej. b→B):
+      // no son re-calificaciones reales. La categoría canónica es MAYÚSCULA.
+      return (data ?? []).filter(
+        (c: any) => (c.old_category || "").toUpperCase() !== (c.new_category || "").toUpperCase(),
+      );
     },
   });
 
