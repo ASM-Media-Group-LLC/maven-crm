@@ -87,7 +87,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
     queryFn: async () => {
       let q = supabase
         .from("closers_contacts")
-        .select("created_at, created_by, country_code, physical_appearance, status, city, handle");
+        .select("id, created_at, created_by, country_code, physical_appearance, status, city, handle");
       // Calendario de movimiento global: acota por DÍA LOCAL contra created_at
       // (timestamptz UTC). `new Date("yyyy-MM-dd")` parsea como medianoche UTC,
       // así que usamos hora explícita SIN "Z" para interpretarla en la TZ local
@@ -183,11 +183,17 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
     return `${parts[0]} ${parts[1]?.[0] || ""}.`;
   };
 
-  const isConverted = (handle: string) => {
-    if (!handle) return false;
-    const normalized = handle.toLowerCase().replace(/^@+/, "").trim();
-    return creatorHandles instanceof Set && creatorHandles.has(normalized);
-  };
+  // Convertido = lead GANADO en el pipeline de closers (closer_creators en stage
+  // Confirmada/Completada), por source_contact_id. (Antes: match por handle contra
+  // la tabla `creators` → medía otra cosa y no cuadraba con la card de Convertidos.)
+  const wonContactIds = useMemo(() => {
+    const won = new Set(["Confirmada", "Completada", "confirmada", "completada"]);
+    const s = new Set<string>();
+    (closerCreators as any[]).forEach((cc) => {
+      if (won.has(cc.stage) && cc.source_contact_id) s.add(cc.source_contact_id);
+    });
+    return s;
+  }, [closerCreators]);
 
   // 1. Monthly trend with conversions
   const monthlyData = useMemo(() => {
@@ -198,7 +204,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
       const key = format(parseISO(c.created_at), "yyyy-MM");
       if (!months[key]) months[key] = { count: 0, converted: 0 };
       months[key].count += 1;
-      if (isConverted(c.handle)) months[key].converted += 1;
+      if (wonContactIds.has((c as any).id)) months[key].converted += 1;
     });
     const keys = Object.keys(months).sort();
     if (!keys.length) return [];
@@ -217,7 +223,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
       current.setMonth(current.getMonth() + 1);
     }
     return result;
-  }, [contacts, creatorHandles]);
+  }, [contacts, wonContactIds]);
 
   // KPIs
   const kpis = useMemo(() => {

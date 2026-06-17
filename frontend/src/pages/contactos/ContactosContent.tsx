@@ -217,21 +217,29 @@ const ContactosContent = () => {
 
   // KPI counts — separados del query paginado para que reflejen el total
   // global, no solo la página actual. count head queries baratas.
-  const { data: kpiCounts = { nuevos: 0, convertidos: 0, esteMes: 0 } } = useQuery({
+  const { data: kpiCounts = { nuevos: 0, convertidos: 0, esteMes: 0, wonIds: [] as string[] } } = useQuery({
     queryKey: ["closers_contacts_kpi"],
     queryFn: async () => {
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
-      const [nuevosRes, convertidosRes, esteMesRes] = await Promise.all([
+      // "Convertido" = lead GANADO en el pipeline de closers (closer_creators en stage
+      // Confirmada/Completada), por source_contact_id. NO el flag status='converted'
+      // (que en realidad = "pasó a closers"; la mayoría terminaban "No interesada").
+      const WON_STAGES = ["Confirmada", "Completada", "confirmada", "completada"];
+      const [nuevosRes, wonRes, esteMesRes] = await Promise.all([
         supabase.from("closers_contacts").select("id", { count: "exact", head: true }).eq("status", "new"),
-        supabase.from("closers_contacts").select("id", { count: "exact", head: true }).eq("status", "converted"),
+        (supabase as any).from("closer_creators").select("source_contact_id").in("stage", WON_STAGES),
         supabase.from("closers_contacts").select("id", { count: "exact", head: true }).gte("created_at", startOfMonth.toISOString()),
       ]);
+      const wonIds = Array.from(
+        new Set(((wonRes.data ?? []) as any[]).map((r) => r.source_contact_id).filter(Boolean)),
+      ) as string[];
       return {
         nuevos: nuevosRes.count ?? 0,
-        convertidos: convertidosRes.count ?? 0,
+        convertidos: wonIds.length,
         esteMes: esteMesRes.count ?? 0,
+        wonIds,
       };
     },
   });
@@ -240,7 +248,7 @@ const ContactosContent = () => {
   // cuando el usuario abre uno de los 4 cards. Limitado a 100 filas para
   // no saturar el dialog (los conteos siguen siendo globales).
   const { data: kpiPopupContacts = [], isLoading: kpiPopupLoading } = useQuery({
-    queryKey: ["closers_contacts_kpi_popup", kpiPopup],
+    queryKey: ["closers_contacts_kpi_popup", kpiPopup, kpiCounts.convertidos],
     enabled: kpiPopup !== null,
     queryFn: async () => {
       let q = supabase
@@ -249,7 +257,7 @@ const ContactosContent = () => {
         .order("created_at", { ascending: false })
         .limit(100);
       if (kpiPopup === "nuevos") q = q.eq("status", "new");
-      else if (kpiPopup === "convertidos") q = q.eq("status", "converted");
+      else if (kpiPopup === "convertidos") q = q.in("id", kpiCounts.wonIds.length ? kpiCounts.wonIds : ["__none__"]);
       else if (kpiPopup === "esteMes") {
         const start = new Date();
         start.setDate(1);
