@@ -367,7 +367,9 @@ const ContactosContent = () => {
       return {
         id: c.id,
         rawCreatedAt: c.created_at || "",
-        creacion: new Date(c.created_at || "").toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
+        creacion: c.created_at
+          ? new Date(c.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+          : "—",
         ticket: c.ticket_number || "",
         nombre: c.name,
         estado: statusMap[c.status || ""] || c.status || "Nuevo",
