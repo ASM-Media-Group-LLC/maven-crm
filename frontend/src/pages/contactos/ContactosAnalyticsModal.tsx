@@ -215,7 +215,8 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
       const count = months[key]?.count || 0;
       const converted = months[key]?.converted || 0;
       cumulative += count;
-      const convRate = count > 0 ? `${Math.round((converted / count) * 100)}%` : "0%";
+      // 1 decimal (parseFloat tira el ".0": 50.0→50, pero 0.3 no se pierde como con Math.round)
+      const convRate = count > 0 ? `${parseFloat(((converted / count) * 100).toFixed(1))}%` : "0%";
       result.push({ label: format(current, "MMM yy", { locale: es }), count, converted, cumulative, convRate });
       current.setMonth(current.getMonth() + 1);
     }
@@ -231,7 +232,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
     let bestMonth = "";
     let bestCount = 0;
     monthlyData.forEach((m) => { if (m.count > bestCount) { bestCount = m.count; bestMonth = m.label; } });
-    const convRate = total > 0 ? `${Math.round((totalConverted / total) * 100)}%` : "0%";
+    const convRate = total > 0 ? `${parseFloat(((totalConverted / total) * 100).toFixed(1))}%` : "0%";
     return { total, totalConverted, avg, bestMonth, bestCount, convRate };
   }, [monthlyData]);
 
@@ -422,7 +423,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
         name: shortName((id !== "sin_asignar" && profiles[id]) || "Sin asignar"),
         fullName: (id !== "sin_asignar" && profiles[id]) || "Sin asignar",
         ...data,
-        convRate: data.contacts > 0 ? Math.round((data.converted / data.contacts) * 100) : 0,
+        convRate: data.contacts > 0 ? parseFloat(((data.converted / data.contacts) * 100).toFixed(1)) : 0,
       }))
       .filter((a) => a.revenue > 0 || a.converted > 0)
       .sort((a, b) => b.revenue - a.revenue)
