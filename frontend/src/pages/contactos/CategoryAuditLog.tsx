@@ -22,7 +22,10 @@ const CategoryAuditLog = ({ open }: Props) => {
         .from("contact_category_changes")
         .select("*")
         .order("changed_at", { ascending: false })
-        .limit(100);
+        // Límite alto + filtro de case en cliente: la normalización masiva de
+        // categorías (minúscula→mayúscula) generó muchas filas solo-case que
+        // hay que atravesar para encontrar los cambios reales.
+        .limit(2000);
       if (error) throw error;
       // Ignorar cambios solo-mayúscula/minúscula (ruido de data legacy, ej. b→B):
       // no son re-calificaciones reales. La categoría canónica es MAYÚSCULA.
