@@ -91,7 +91,7 @@ const ContactosContent = () => {
   const [activeTab, setActiveTab] = useState<"dashboard" | "contactos">("dashboard");
   const [filters, setFilters] = useState<ContactoFilters>(emptyFilters);
   const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
-  type KpiKey = "total" | "nuevos" | "convertidos" | "esteMes";
+  type KpiKey = "total" | "nuevos" | "convertidos" | "sinContactar";
   const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
   // Estado del collapsed por categoría — mismo patrón que panel/
   // dashboard v2: default top expandida, resto colapsadas.
@@ -217,12 +217,9 @@ const ContactosContent = () => {
 
   // KPI counts — separados del query paginado para que reflejen el total
   // global, no solo la página actual. count head queries baratas.
-  const { data: kpiCounts = { nuevos: 0, convertidos: 0, esteMes: 0, wonIds: [] as string[] } } = useQuery({
+  const { data: kpiCounts = { nuevos: 0, convertidos: 0, sinContactar: 0, wonIds: [] as string[] } } = useQuery({
     queryKey: ["closers_contacts_kpi"],
     queryFn: async () => {
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
       // "Nuevos" = ingresados al CRM hace menos de un mes (created_at en los
       // últimos 30 días). OJO: contactos importados con fecha histórica
       // backdateada (p.ej. import KASH) NO cuentan acá a propósito: no son
@@ -234,10 +231,11 @@ const ContactosContent = () => {
       // Confirmada/Completada), por source_contact_id. NO el flag status='converted'
       // (que en realidad = "pasó a closers"; la mayoría terminaban "No interesada").
       const WON_STAGES = ["Confirmada", "Completada", "confirmada", "completada"];
-      const [nuevosRes, wonRes, esteMesRes] = await Promise.all([
+      const [nuevosRes, wonRes, sinContactarRes] = await Promise.all([
         supabase.from("closers_contacts").select("id", { count: "exact", head: true }).gte("created_at", thirtyDaysAgo.toISOString()),
         (supabase as any).from("closer_creators").select("source_contact_id").in("stage", WON_STAGES),
-        supabase.from("closers_contacts").select("id", { count: "exact", head: true }).gte("created_at", startOfMonth.toISOString()),
+        // "Sin contactar" = leads sin tocar todavía (status='new').
+        supabase.from("closers_contacts").select("id", { count: "exact", head: true }).eq("status", "new"),
       ]);
       const wonIds = Array.from(
         new Set(((wonRes.data ?? []) as any[]).map((r) => r.source_contact_id).filter(Boolean)),
@@ -245,7 +243,7 @@ const ContactosContent = () => {
       return {
         nuevos: nuevosRes.count ?? 0,
         convertidos: wonIds.length,
-        esteMes: esteMesRes.count ?? 0,
+        sinContactar: sinContactarRes.count ?? 0,
         wonIds,
       };
     },
@@ -270,12 +268,7 @@ const ContactosContent = () => {
         q = q.gte("created_at", thirtyDaysAgo.toISOString());
       }
       else if (kpiPopup === "convertidos") q = q.in("id", kpiCounts.wonIds.length ? kpiCounts.wonIds : ["__none__"]);
-      else if (kpiPopup === "esteMes") {
-        const start = new Date();
-        start.setDate(1);
-        start.setHours(0, 0, 0, 0);
-        q = q.gte("created_at", start.toISOString());
-      }
+      else if (kpiPopup === "sinContactar") q = q.eq("status", "new");
       const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
@@ -488,7 +481,7 @@ const ContactosContent = () => {
               total={totalCount}
               nuevos={kpiCounts.nuevos}
               convertidos={kpiCounts.convertidos}
-              esteMes={kpiCounts.esteMes}
+              sinContactar={kpiCounts.sinContactar}
               onClick={(key) => setKpiPopup(key)}
             />
             {/* Analítica fusionada al Dashboard (antes vivía en un botón + popup).
@@ -642,13 +635,13 @@ const ContactosContent = () => {
               {kpiPopup === "total" && `Todos los Contactos (${totalCount})`}
               {kpiPopup === "nuevos" && `Nuevos · últimos 30 días (${kpiCounts.nuevos})`}
               {kpiPopup === "convertidos" && `Contactos Convertidos (${kpiCounts.convertidos})`}
-              {kpiPopup === "esteMes" && `Contactos de Este Mes (${kpiCounts.esteMes})`}
+              {kpiPopup === "sinContactar" && `Sin contactar (${kpiCounts.sinContactar})`}
             </DialogTitle>
             <p className="text-xs text-muted-foreground">
               {kpiPopup === "total" && "Mostrando los 100 más recientes"}
               {kpiPopup === "nuevos" && "Ingresados al CRM en los últimos 30 días · 100 más recientes"}
               {kpiPopup === "convertidos" && "Pasaron a creadores · 100 más recientes"}
-              {kpiPopup === "esteMes" && "Agregados desde el inicio del mes · 100 más recientes"}
+              {kpiPopup === "sinContactar" && "Leads sin contactar todavía (status nuevo) · 100 más recientes"}
             </p>
           </DialogHeader>
 

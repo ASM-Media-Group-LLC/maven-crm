@@ -1,12 +1,12 @@
-import { Users, UserPlus, CheckSquare, CalendarDays } from "lucide-react";
+import { Users, UserPlus, CheckSquare, Inbox } from "lucide-react";
 import KpiCard from "@/components/dashboard/KpiCard";
 
 interface Props {
   total: number;
   nuevos: number;
   convertidos: number;
-  esteMes: number;
-  onClick?: (key: "total" | "nuevos" | "convertidos" | "esteMes") => void;
+  sinContactar: number;
+  onClick?: (key: "total" | "nuevos" | "convertidos" | "sinContactar") => void;
 }
 
 // KPI cards usando el componente shared <KpiCard>. Antes había JSX
@@ -14,7 +14,7 @@ interface Props {
 // desbordaba sobre las cards hermanas y al hover sus glows tocaban
 // los bordes vecinos creando un jitter visual molesto. El KpiCard
 // shared no tiene ese glow extra y centraliza el estilo.
-const ContactosKPICards = ({ total, nuevos, convertidos, esteMes, onClick }: Props) => {
+const ContactosKPICards = ({ total, nuevos, convertidos, sinContactar, onClick }: Props) => {
   const cards = [
     {
       key: "total" as const,
@@ -41,11 +41,11 @@ const ContactosKPICards = ({ total, nuevos, convertidos, esteMes, onClick }: Pro
       color: "bg-violet-500",
     },
     {
-      key: "esteMes" as const,
-      label: "Este Mes",
-      value: esteMes,
-      subtitle: "Agregados en este mes",
-      icon: CalendarDays,
+      key: "sinContactar" as const,
+      label: "Sin contactar",
+      value: sinContactar,
+      subtitle: "Leads sin tocar todavía",
+      icon: Inbox,
       color: "bg-amber-500",
     },
   ];
