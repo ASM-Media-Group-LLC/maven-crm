@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
@@ -459,26 +460,30 @@ export const useCloserLeads = () => {
 
   // Status counts for KPIs — client-side count para soportar date filter.
   // La RPC get_closer_stage_counts no acepta fechas, así que contamos
-  // acá. 661 rows totales = trivial.
+  // acá, PAGINADO (closer_creators ya pasa las 1000 filas del cap PostgREST).
   const { data: statusCounts = {} } = useQuery({
     queryKey: ["closer-creators-counts", "v2", user?.id, role, applyCreatorDate ? dateFromStr : null, applyCreatorDate ? dateToStr : null, viewAsCloserId],
     queryFn: async () => {
       // (A) Conteos por stage "real" — respeta el rol (closer = solo sus
       // asignadas) y el rango de fecha sobre passed_date, igual que el
       // listado de Operaciones.
-      let q = supabase.from("closer_creators").select("stage");
-      if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
-        q = q.eq("assigned_to", effectiveUserId);
-      }
-      if (applyCreatorDate) {
-        const fromStr = dateFrom!.toISOString().split("T")[0];
-        const toStr = dateTo!.toISOString().split("T")[0];
-        q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
-      }
-      const { data, error } = await q;
-      if (error) throw error;
+      // Paginado: PostgREST corta en 1000 filas. closer_creators ya supera ese
+      // techo (>2500), así que sin paginar los conteos por stage (No interesada,
+      // etc.) quedaban truncados a ~1000. fetchAllRows trae TODAS con .range().
+      const rows = await fetchAllRows((from, to) => {
+        let q = supabase.from("closer_creators").select("stage");
+        if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
+          q = q.eq("assigned_to", effectiveUserId);
+        }
+        if (applyCreatorDate) {
+          const fromStr = dateFrom!.toISOString().split("T")[0];
+          const toStr = dateTo!.toISOString().split("T")[0];
+          q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
+        }
+        return q.order("id", { ascending: true }).range(from, to);
+      });
       const counts: Record<string, number> = {};
-      for (const row of (data || []) as Array<{ stage: string | null }>) {
+      for (const row of rows as Array<{ stage: string | null }>) {
         const s = row.stage || "Sin stage";
         counts[s] = (counts[s] || 0) + 1;
       }

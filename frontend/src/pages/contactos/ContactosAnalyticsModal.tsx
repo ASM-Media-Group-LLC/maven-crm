@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -85,18 +86,21 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
     queryKey: ["contactos-analytics-full", dateFrom ?? null, dateTo ?? null],
     enabled: active,
     queryFn: async () => {
-      let q = supabase
-        .from("closers_contacts")
-        .select("id, created_at, created_by, country_code, physical_appearance, status, city, handle");
-      // Calendario de movimiento global: acota por DÍA LOCAL contra created_at
-      // (timestamptz UTC). `new Date("yyyy-MM-dd")` parsea como medianoche UTC,
-      // así que usamos hora explícita SIN "Z" para interpretarla en la TZ local
-      // del browser — mismo criterio que el filtro de la lista de contactos.
-      if (dateFrom) q = q.gte("created_at", new Date(`${dateFrom}T00:00:00`).toISOString());
-      if (dateTo) q = q.lte("created_at", new Date(`${dateTo}T23:59:59.999`).toISOString());
-      const { data, error } = await q.order("created_at", { ascending: true });
-      if (error) throw error;
-      return data ?? [];
+      // Paginado: PostgREST corta en 1000 filas; con >1000 contactos la
+      // analítica quedaba calculada sobre un subset truncado (las 1000 más
+      // viejas por created_at). fetchAllRows trae TODAS con .range() en bucle.
+      return await fetchAllRows((from, to) => {
+        let q = supabase
+          .from("closers_contacts")
+          .select("id, created_at, created_by, country_code, physical_appearance, status, city, handle");
+        // Calendario de movimiento global: acota por DÍA LOCAL contra created_at
+        // (timestamptz UTC). `new Date("yyyy-MM-dd")` parsea como medianoche UTC,
+        // así que usamos hora explícita SIN "Z" para interpretarla en la TZ local
+        // del browser — mismo criterio que el filtro de la lista de contactos.
+        if (dateFrom) q = q.gte("created_at", new Date(`${dateFrom}T00:00:00`).toISOString());
+        if (dateTo) q = q.lte("created_at", new Date(`${dateTo}T23:59:59.999`).toISOString());
+        return q.order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to);
+      });
     },
   });
 
@@ -105,12 +109,10 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
     queryKey: ["creator-handles-for-analytics"],
     enabled: active,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("creators")
-        .select("instagram_handle");
-      if (error) throw error;
+      const data = await fetchAllRows((from, to) =>
+        supabase.from("creators").select("instagram_handle").order("id", { ascending: true }).range(from, to));
       const set = new Set<string>();
-      (data ?? []).forEach((c) => {
+      data.forEach((c: any) => {
         if (c.instagram_handle) {
           set.add(c.instagram_handle.toLowerCase().replace(/^@+/, "").trim());
         }
@@ -124,11 +126,12 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
     queryKey: ["contactos-closer-creators-revenue"],
     enabled: active,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("closer_creators")
-        .select("id, source_contact_id, estimated_monetization, stage, created_at, assigned_to");
-      if (error) throw error;
-      return data ?? [];
+      return await fetchAllRows((from, to) =>
+        supabase
+          .from("closer_creators")
+          .select("id, source_contact_id, estimated_monetization, stage, created_at, assigned_to")
+          .order("id", { ascending: true })
+          .range(from, to));
     },
   });
 
@@ -137,11 +140,8 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
     queryKey: ["contactos-platform-sales-revenue"],
     enabled: active,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("closer_platform_sales")
-        .select("creator_id, price, platform");
-      if (error) throw error;
-      return data ?? [];
+      return await fetchAllRows((from, to) =>
+        supabase.from("closer_platform_sales").select("creator_id, price, platform").order("id", { ascending: true }).range(from, to));
     },
   });
 
@@ -150,11 +150,8 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
     queryKey: ["contactos-creator-monetization"],
     enabled: active,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("creator_monetization")
-        .select("creator_id, month_year, amount");
-      if (error) throw error;
-      return data ?? [];
+      return await fetchAllRows((from, to) =>
+        supabase.from("creator_monetization").select("creator_id, month_year, amount").order("id", { ascending: true }).range(from, to));
     },
   });
 
