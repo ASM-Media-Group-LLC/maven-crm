@@ -218,7 +218,8 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
       twitter_handle: creator.twitter_handle ?? "",
       youtube_handle: creator.youtube_handle ?? "",
       onlyfans_url: creator.onlyfans_url ?? "",
-      whatsapp_number: creator.whatsapp_number ?? "",
+      // No-admin: el número actual NO se precarga (no se muestra) — solo pueden CARGAR uno nuevo.
+      whatsapp_number: isAdmin ? (creator.whatsapp_number ?? "") : "",
       linkedin_handle: creator.linkedin_handle ?? "",
       piclink_url: creator.piclink_url ?? "",
       facebook_handle: creator.facebook_handle ?? "",
@@ -237,30 +238,71 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from("creators")
-        .update({
+      let savedAny = false;
+      let permBlocked = false;
+
+      // WhatsApp: los NO-admin lo cargan write-only vía RPC set_creator_whatsapp
+      // (no ven el número y no necesitan permiso de editar la creadora). Solo si
+      // escribieron algo — vacío = "no tocar", para no pisar/borrar lo que no ven.
+      // El admin lo maneja dentro del update normal de abajo (lo ve y puede limpiarlo).
+      if (!isAdmin) {
+        const wa = editData.whatsapp_number.trim();
+        if (wa) {
+          const { error: waErr } = await supabase.rpc("set_creator_whatsapp", {
+            p_creator_id: creatorId,
+            p_whatsapp: wa,
+          });
+          if (waErr) permBlocked = true;
+          else savedAny = true;
+        }
+      }
+
+      // Resto de campos (+ whatsapp si es admin): editar la creadora es manager/admin
+      // por RLS. Para closers no se intenta (evita el UPDATE que matchea 0 filas y
+      // antes devolvía "éxito" en falso).
+      if (canManage) {
+        const payload: Record<string, unknown> = {
           instagram_handle: editData.instagram_handle || null,
           instagram_followers: editData.instagram_followers ? parseInt(editData.instagram_followers, 10) : null,
           tiktok_handle: editData.tiktok_handle || null,
           twitter_handle: editData.twitter_handle || null,
           youtube_handle: editData.youtube_handle || null,
           onlyfans_url: editData.onlyfans_url || null,
-          whatsapp_number: editData.whatsapp_number || null,
           linkedin_handle: editData.linkedin_handle || null,
           piclink_url: editData.piclink_url || null,
           facebook_handle: editData.facebook_handle || null,
           reddit_handle: editData.reddit_handle || null,
           other_url: editData.other_url || null,
           telegram_handle: editData.telegram_handle || null,
-        })
-        .eq("id", creatorId);
+        };
+        // Solo el admin escribe whatsapp_number directo (lo ve). El manager no-admin
+        // NO lo toca acá (lo cargó por RPC arriba) para no pisar el número que no ve.
+        if (isAdmin) payload.whatsapp_number = editData.whatsapp_number || null;
 
-      if (error) throw error;
+        const { data, error } = await supabase
+          .from("creators")
+          .update(payload)
+          .eq("id", creatorId)
+          .select("id");
+        if (error) throw error;
+        // RLS puede no actualizar ninguna fila SIN tirar error → detectarlo y no mentir.
+        if (!data || data.length === 0) permBlocked = true;
+        else savedAny = true;
+      }
 
       await queryClient.invalidateQueries({ queryKey: ["creator", creatorId] });
-      setIsEditing(false);
-      toast.success("Redes actualizadas");
+
+      if (savedAny && !permBlocked) {
+        toast.success(canManage ? "Redes actualizadas" : "WhatsApp cargado");
+        setIsEditing(false);
+      } else if (savedAny && permBlocked) {
+        toast.success("WhatsApp cargado · el resto de los campos solo los edita un manager/admin");
+        setIsEditing(false);
+      } else if (permBlocked) {
+        toast.error("No se pudo guardar: no tenés permiso para editar esta creadora.");
+      } else {
+        toast("Sin cambios para guardar.");
+      }
     } catch {
       toast.error("Error al guardar redes");
     } finally {
@@ -305,7 +347,8 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
                 type={platform.inputType || "text"}
                 value={editData[platform.key]}
                 onChange={(e) => updateField(platform.key, e.target.value)}
-                placeholder={platform.placeholder}
+                placeholder={platform.key === "whatsapp_number" && !isAdmin ? "Cargar número (no se muestra el actual)" : platform.placeholder}
+                disabled={!canManage && platform.key !== "whatsapp_number"}
               />
               {MULTI_NET[platform.key] && (
                 <ExtraAccountsInline
