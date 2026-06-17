@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 
@@ -92,28 +93,27 @@ export function useClosersKpiPopup(
       // ── PIPELINE ──
       if (state.kind === "pipeline") {
         const stages = STAGE_BY_KEY[state.key];
-        let q = supabase
-          .from("closer_creators")
-          .select("id, instagram_handle, stage, assigned_to, estimated_monetization, created_at, passed_date")
-          .order("created_at", { ascending: false });
-
-        if (stages && stages.length > 0) {
-          q = stages.length === 1 ? q.eq("stage", stages[0]) : q.in("stage", stages);
-        }
-
-        if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
-          q = q.eq("assigned_to", effectiveUserId);
-        }
-
-        if (applyCreatorDate) {
-          const fromStr = dateFrom!.toISOString().split("T")[0];
-          const toStr = dateTo!.toISOString().split("T")[0];
-          q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
-        }
-
-        const { data, error } = await q;
-        if (error) throw error;
-        const rows = (data || []) as CreatorRow[];
+        // Paginado: closer_creators ya pasa las 1000 filas (cap PostgREST). Sin
+        // paginar, el popup de 'No interesadas' (1838) salía truncado a ~1000.
+        const rows = (await fetchAllRows((from, to) => {
+          let q = supabase
+            .from("closer_creators")
+            .select("id, instagram_handle, stage, assigned_to, estimated_monetization, created_at, passed_date")
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: true });
+          if (stages && stages.length > 0) {
+            q = stages.length === 1 ? q.eq("stage", stages[0]) : q.in("stage", stages);
+          }
+          if (!effectiveIsAdmin && !effectiveIsManager && effectiveUserId) {
+            q = q.eq("assigned_to", effectiveUserId);
+          }
+          if (applyCreatorDate) {
+            const fromStr = dateFrom!.toISOString().split("T")[0];
+            const toStr = dateTo!.toISOString().split("T")[0];
+            q = q.gte("passed_date", fromStr).lte("passed_date", toStr);
+          }
+          return q.range(from, to);
+        })) as CreatorRow[];
 
         // Resolver nombres de agentes.
         const agentIds = [...new Set(rows.map((r) => r.assigned_to).filter(Boolean))] as string[];

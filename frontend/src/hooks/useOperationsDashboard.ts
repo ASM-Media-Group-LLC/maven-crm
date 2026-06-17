@@ -218,9 +218,9 @@ export const useMetricDetails = (
             .not("category", "is", null);
           const closerCreatorsQ = sb
             .from("closer_creators")
-            .select("model_handle, category_code")
-            .not("model_handle", "is", null)
-            .not("category_code", "is", null);
+            .select("instagram_handle, category")
+            .not("instagram_handle", "is", null)
+            .not("category", "is", null);
           const [countRes, dataRes, creatorsRes, closerRes] = await Promise.all([
             dateLte(dateGte(countQ, "created_at"), "created_at"),
             dateLte(dateGte(dataQ, "created_at"), "created_at"),
@@ -236,10 +236,10 @@ export const useMetricDetails = (
           }
           // closer_creators tiene prioridad menor que creators (que
           // es categoría finalizada), pero mayor que el row source.
-          for (const c of (closerRes.data ?? []) as Array<{ model_handle: string; category_code: string | null }>) {
-            if (!c.category_code) continue;
-            const norm = c.model_handle.replace(/^@/, "").toLowerCase().trim();
-            if (norm && !creatorCat.has(norm)) creatorCat.set(norm, c.category_code);
+          for (const c of (closerRes.data ?? []) as Array<{ instagram_handle: string; category: string | null }>) {
+            if (!c.category) continue;
+            const norm = c.instagram_handle.replace(/^@/, "").toLowerCase().trim();
+            if (norm && !creatorCat.has(norm)) creatorCat.set(norm, c.category);
           }
           return {
             totalCount: countRes.count ?? 0,
@@ -291,9 +291,9 @@ export const useMetricDetails = (
             .not("category", "is", null);
           const closerCreatorsQ = sb
             .from("closer_creators")
-            .select("model_handle, category_code")
-            .not("model_handle", "is", null)
-            .not("category_code", "is", null);
+            .select("instagram_handle, category")
+            .not("instagram_handle", "is", null)
+            .not("category", "is", null);
           const [c1, c2, a, b, creatorsRes, closerRes] = await Promise.all([
             dateLte(dateGte(countQ1, "created_at"), "created_at"),
             dateLte(dateGte(countQ2, "first_scouter_contact_at"), "first_scouter_contact_at"),
@@ -308,10 +308,10 @@ export const useMetricDetails = (
             const norm = c.instagram_handle.replace(/^@/, "").toLowerCase().trim();
             if (norm && !creatorCat.has(norm)) creatorCat.set(norm, c.category);
           }
-          for (const c of (closerRes.data ?? []) as Array<{ model_handle: string; category_code: string | null }>) {
-            if (!c.category_code) continue;
-            const norm = c.model_handle.replace(/^@/, "").toLowerCase().trim();
-            if (norm && !creatorCat.has(norm)) creatorCat.set(norm, c.category_code);
+          for (const c of (closerRes.data ?? []) as Array<{ instagram_handle: string; category: string | null }>) {
+            if (!c.category) continue;
+            const norm = c.instagram_handle.replace(/^@/, "").toLowerCase().trim();
+            if (norm && !creatorCat.has(norm)) creatorCat.set(norm, c.category);
           }
           const aRows = (a.data ?? []).map((r: any) => {
             const handleNorm = (r.model_handle ?? "").toLowerCase().trim();
@@ -511,9 +511,9 @@ export const useMetricDetails = (
             .not("category", "is", null);
           const closerCreatorsQ = sb
             .from("closer_creators")
-            .select("model_handle, category_code")
-            .not("model_handle", "is", null)
-            .not("category_code", "is", null);
+            .select("instagram_handle, category")
+            .not("instagram_handle", "is", null)
+            .not("category", "is", null);
           const [c1, c2, a, b, creatorsRes] = await Promise.all([
             dateLte(dateGte(countQ1, "created_at"), "created_at"),
             dateLte(dateGte(countQ2, "created_at"), "created_at"),
