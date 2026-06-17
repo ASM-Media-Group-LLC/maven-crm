@@ -187,7 +187,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 } />
                 <InfoField icon={Building2} label="Agencia" value={c.creator_business?.company?.name ?? c.creator_business?.assigned_agency} />
                 <InfoField icon={Mail} label="Email" value={c.email} />
-                <InfoField icon={Phone} label="WhatsApp" value={<WaChatButton phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} />} />
+                <InfoField icon={Phone} label="WhatsApp" value={<WaChatButton phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} />} />
                 <InfoField icon={UserCog} label="Tipo de Manager" value={c.creator_business?.manager_type} />
                 <InfoField icon={CalendarDays} label="Fecha de Registro" value={regDate} />
               </div>
@@ -221,7 +221,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                     <PlatformIcon><Phone className="h-4 w-4" /></PlatformIcon>
                     <span className="text-sm font-medium">WhatsApp</span>
                   </div>
-                  <WaChatButton phone={toE164({ whatsapp: c.whatsapp_number })} />
+                  <WaChatButton phone={toE164({ whatsapp: c.whatsapp_number })} name={c.name} />
                 </div>
               )}
             </TabsContent>

@@ -338,7 +338,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
                     <p className="text-sm font-medium">{platform.label}</p>
                     <ExtraAccountsInline creatorId={creatorId} network="whatsapp" canManage={false} />
                   </div>
-                  <WaChatButton phone={toE164({ whatsapp: creator.whatsapp_number })} />
+                  <WaChatButton phone={toE164({ whatsapp: creator.whatsapp_number })} name={creator.name} />
                 </Card>
               );
             }

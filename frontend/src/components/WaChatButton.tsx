@@ -24,10 +24,14 @@ import { MessageCircle, Loader2, ChevronDown } from "lucide-react";
 export function WaChatButton({
   phone,
   closerCreatorId = null,
+  name = null,
   className,
 }: {
   phone: string | null | undefined;
   closerCreatorId?: string | null;
+  /** Nombre a usar como display_name del contacto si aún no lo tiene (ej. el
+   *  nombre de la creadora/contacto), para que la conversación no salga "sin nombre". */
+  name?: string | null;
   className?: string;
 }) {
   const { data: channels = [] } = useMyWaChannels();
@@ -39,7 +43,7 @@ export function WaChatButton({
   const open = async (channelId: string) => {
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("wa-inbox-open", {
-      body: { channel_id: channelId, closer_creator_id: closerCreatorId, phone: phone ?? null },
+      body: { channel_id: channelId, closer_creator_id: closerCreatorId, phone: phone ?? null, name: name ?? null },
     });
     setBusy(false);
     const res = data as { ok?: boolean; error?: string; conversation_id?: string } | null;

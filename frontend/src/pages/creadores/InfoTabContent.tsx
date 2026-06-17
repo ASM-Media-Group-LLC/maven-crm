@@ -320,7 +320,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
         )}
 
         {/* WhatsApp: abre el chat en la bandeja de Maven (sin exponer el número) */}
-        <InfoField label="WhatsApp" value={<WaChatButton phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} />} />
+        <InfoField label="WhatsApp" value={<WaChatButton phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} />} />
 
         {/* Notas Internas */}
         {isEditing ? (

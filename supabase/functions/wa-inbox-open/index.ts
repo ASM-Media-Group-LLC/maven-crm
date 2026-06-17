@@ -131,12 +131,17 @@ serve(async (req) => {
   // ── find-or-create wa_contact (por tenant + jid) ───────────────────────────
   let contactId: string;
   const { data: existingContact } = await (sb as any)
-    .from("wa_contacts").select("id, closer_creator_id")
+    .from("wa_contacts").select("id, closer_creator_id, display_name")
     .eq("tenant_id", channel.tenant_id).eq("wa_jid", jid).maybeSingle();
   if (existingContact) {
     contactId = existingContact.id;
-    if (!existingContact.closer_creator_id && leadIdForContact) {
-      await (sb as any).from("wa_contacts").update({ closer_creator_id: leadIdForContact, display_name: displayName }).eq("id", contactId);
+    // Backfill: linkear el lead si falta, y completar el nombre si el contacto
+    // estaba "sin nombre" (p.ej. se creó antes por teléfono desde Creadoras/Contactos).
+    const patch: Record<string, unknown> = {};
+    if (!existingContact.closer_creator_id && leadIdForContact) patch.closer_creator_id = leadIdForContact;
+    if (!existingContact.display_name && displayName) patch.display_name = displayName;
+    if (Object.keys(patch).length > 0) {
+      await (sb as any).from("wa_contacts").update(patch).eq("id", contactId);
     }
   } else {
     const { data: newContact, error: cErr } = await (sb as any).from("wa_contacts").insert({

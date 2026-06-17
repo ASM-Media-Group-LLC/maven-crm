@@ -201,7 +201,7 @@ const CreadorProfileContent = () => {
 
             <div className="flex flex-wrap items-center gap-2 mt-3">
               {c.whatsapp_number && (
-                <WaChatButton phone={toE164({ whatsapp: c.whatsapp_number })} className="h-7 gap-1.5 px-2 text-xs text-emerald-600 hover:text-emerald-700" />
+                <WaChatButton phone={toE164({ whatsapp: c.whatsapp_number })} name={c.name} className="h-7 gap-1.5 px-2 text-xs text-emerald-600 hover:text-emerald-700" />
               )}
               {c.instagram_handle && (
                 <a href={buildSocialUrl("instagram", c.instagram_handle)} target="_blank" rel="noopener noreferrer">
