@@ -124,6 +124,7 @@ function createSession(instanceName) {
     bootedAt: Date.now(),
     connectedAt: null,          // timestamp del ultimo 'open'
     reconnectCount: 0,          // cuántas veces reconectó (salud)
+    reconnectTimer: null,       // timer del reconnect pendiente (para no apilar)
     lastDisconnectAt: null,     // timestamp de la última caída
     baileysVersion: null,       // versión de WhatsApp Web que negoció Baileys
     msgsIn: 0,
@@ -253,6 +254,18 @@ function clearAuth(instanceName) {
 
 async function startSocket(instanceName = INSTANCE_NAME) {
   const s = getSession(instanceName);
+  // Teardown LIMPIO del socket anterior ANTES de abrir uno nuevo. Sin esto, un
+  // reconnect dejaba el WebSocket viejo a medio cerrar (listeners vivos) y
+  // WhatsApp veía DOS conexiones para el mismo número → stream:error "conflict"
+  // (401) que el gateway confundía con un logout y terminaba borrando creds
+  // buenas. Cerrar + quitar listeners evita ese auto-conflicto. (Mismo patrón
+  // que el endpoint /reset.)
+  if (s.reconnectTimer) { clearTimeout(s.reconnectTimer); s.reconnectTimer = null; }
+  if (s.sock) {
+    try { s.sock.ev.removeAllListeners(); s.sock.end(undefined); }
+    catch (e) { /* socket ya muerto */ }
+    s.sock = null;
+  }
   loadConfig(s);
   loadMetrics(s);
   s.connection = 'connecting';
@@ -315,6 +328,7 @@ async function startSocket(instanceName = INSTANCE_NAME) {
       s.qrRaw = null;
       s.qrDataUrl = null;
       s.lastError = null;
+      s.reconnectCount = 0; // conexión sana → reseteamos el backoff
       s.connectedAt = Date.now();
       // Carga profile info en background -- no bloqueante.
       loadProfileInfo(s).catch((e) => logger.warn({ err: e.message }, 'profile load failed'));
@@ -327,24 +341,38 @@ async function startSocket(instanceName = INSTANCE_NAME) {
       s.lastError = lastDisconnect?.error?.message || 'unknown';
       logger.warn({ instance: instanceName, statusCode, err: s.lastError }, 'Connection closed');
 
-      const loggedOut = statusCode === DisconnectReason.loggedOut;
-      if (loggedOut) {
+      // Distinguir un LOGOUT real (sesión muerta → re-vincular con QR) de un
+      // CONFLICT/REPLACED transitorio (otro socket tomó la cuenta un instante; las
+      // credenciales SIGUEN válidas). Baileys reporta el conflict TAMBIÉN como
+      // statusCode 401 → si lo tratábamos como logout, borrábamos creds buenas y
+      // caíamos en un loop de QR eterno que ni re-escaneando se sostenía.
+      const errMsg = String(s.lastError || '');
+      const isConflict = statusCode === DisconnectReason.connectionReplaced ||
+        /conflict|replaced/i.test(errMsg);
+      const reallyLoggedOut = statusCode === DisconnectReason.loggedOut && !isConflict;
+
+      if (reallyLoggedOut) {
         logger.error({ instance: instanceName }, 'Logged out by WhatsApp -- clearing creds and re-initializing for fresh QR');
-        // Sesión muerta: para una línea adicional, limpiamos las credenciales y
-        // re-iniciamos → Baileys emite un QR NUEVO (en /instance/connect). Sin esto
-        // la línea quedaba caída sin forma de re-vincularse (reconnect reusaba creds
-        // muertas). El default NO se auto-borra (sus creds viven en la raíz).
+        // Sesión muerta de verdad: para una línea adicional limpiamos las
+        // credenciales y re-iniciamos → Baileys emite un QR NUEVO (en
+        // /instance/connect). El default NO se auto-borra (creds en la raíz).
         if (instanceName !== INSTANCE_NAME) {
           clearAuth(instanceName);
-          s.sock = null; s.qrRaw = null; s.qrDataUrl = null;
-          setTimeout(() => startSocket(instanceName).catch((e) => logger.error({ err: e.message, instance: instanceName }, 'post-logout re-init failed')), 1500);
+          s.qrRaw = null; s.qrDataUrl = null;
+          s.reconnectTimer = setTimeout(() => startSocket(instanceName).catch((e) => logger.error({ err: e.message, instance: instanceName }, 'post-logout re-init failed')), 1500);
         }
       } else {
-        // Reconnect con backoff.
+        // Reconnect CONSERVANDO credenciales, con backoff exponencial + jitter. Un
+        // conflict espera más (deja que WhatsApp asiente la sesión vieja antes de
+        // re-abrir; si no, se vuelve a chocar al instante). Reemplaza el delay fijo
+        // de 3s que, ante un hipo de red simultáneo en todas las líneas, cascadeaba
+        // reconexiones en paralelo y disparaba los conflicts.
         s.reconnectCount += 1;
-        const delay = 3000;
-        logger.info({ instance: instanceName, delay }, 'Reconnecting');
-        setTimeout(() => startSocket(instanceName).catch((e) => logger.error({ err: e.message }, 'reconnect failed')), delay);
+        const floor = isConflict ? 15000 : 2000;
+        const backoff = Math.min(60000, floor * Math.pow(2, Math.min(s.reconnectCount - 1, 5)));
+        const delay = backoff + Math.floor(Math.random() * 2000);
+        logger.info({ instance: instanceName, delay, attempt: s.reconnectCount, isConflict }, 'Reconnecting');
+        s.reconnectTimer = setTimeout(() => startSocket(instanceName).catch((e) => logger.error({ err: e.message }, 'reconnect failed')), delay);
       }
     } else if (connection === 'connecting') {
       s.connection = 'connecting';
