@@ -105,10 +105,12 @@ const ContactosContent = () => {
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isManager } = useUserRole();
+  // Canales de venta: visibles para admin Y managers (vía RPC server-side).
+  const canSeeChannels = isAdmin || isManager;
 
-  // Canales de venta por contacto (solo admin; una sola query, react-query dedupea).
-  const salesChannels = useContactSalesChannels(isAdmin);
+  // Canales de venta por contacto (admin+manager vía RPC; react-query dedupea).
+  const salesChannels = useContactSalesChannels(canSeeChannels);
 
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [filters]);
@@ -122,7 +124,7 @@ const ContactosContent = () => {
   // cuando la data del hook llegue.
   const salesChannelConstraint = useMemo(() => {
     const selected = filters.salesChannels ?? [];
-    if (!isAdmin || selected.length === 0) {
+    if (!canSeeChannels || selected.length === 0) {
       return { mode: "none" as const, ids: [] as string[] };
     }
     const wantsNone = selected.includes(SALES_CHANNEL_NONE);
@@ -148,7 +150,7 @@ const ContactosContent = () => {
       }
     }
     return { mode: "include" as const, ids: Array.from(union) };
-  }, [filters.salesChannels, isAdmin, salesChannels]);
+  }, [filters.salesChannels, canSeeChannels, salesChannels]);
 
   // Server-side paginated query
   const { data: queryResult, isLoading } = useQuery({
@@ -486,9 +488,9 @@ const ContactosContent = () => {
               sinContactar={kpiCounts.sinContactar}
               onClick={(key) => setKpiPopup(key)}
             />
-            {/* Analítica fusionada al Dashboard (antes vivía en un botón + popup).
-                Solo admin (igual que la analítica anterior). Auditoría = acceso discreto. */}
-            {isAdmin && (
+            {/* Card "por canal de venta" → admin+manager. La analítica completa
+                (tendencias) + Auditoría siguen siendo SOLO admin (anidado abajo). */}
+            {canSeeChannels && (
               <div className="space-y-3">
                 <Card>
                   <CardContent className="pt-5">
@@ -523,6 +525,8 @@ const ContactosContent = () => {
                     })()}
                   </CardContent>
                 </Card>
+                {isAdmin && (
+                  <>
                 <div className="flex items-center justify-between border-t pt-4">
                   <h2 className="text-sm font-semibold text-muted-foreground">Analítica del directorio</h2>
                   <Button
@@ -544,6 +548,8 @@ const ContactosContent = () => {
                   open={false}
                   onOpenChange={() => {}}
                 />
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -559,7 +565,7 @@ const ContactosContent = () => {
                 onClear={() => setFilters(emptyFilters)}
                 creators={creatorsList}
                 cities={citiesList}
-                salesChannelOptions={isAdmin ? salesChannels.channels : []}
+                salesChannelOptions={canSeeChannels ? salesChannels.channels : []}
               />
             </div>
 
@@ -582,7 +588,7 @@ const ContactosContent = () => {
                   onEdit={handleEdit}
                   onConvert={handleConvert}
                   onDelete={isAdmin ? (c) => { setSelectedContacto(c); setDeleteOpen(true); } : undefined}
-                  channelsByContact={isAdmin ? salesChannels.byContactId : undefined}
+                  channelsByContact={canSeeChannels ? salesChannels.byContactId : undefined}
                 />
               </DataTableShell>
             )}
@@ -598,7 +604,7 @@ const ContactosContent = () => {
         onConvert={selectedContacto ? () => { setViewOpen(false); handleConvert(selectedContacto); } : undefined}
         onDelete={() => { setViewOpen(false); setDeleteOpen(true); }}
         canDelete={isAdmin}
-        showSalesChannels={isAdmin}
+        showSalesChannels={canSeeChannels}
         salesChannels={selectedContacto ? salesChannels.byContactId.get(selectedContacto.id) ?? [] : []}
       />
       <EditContactoModal open={editOpen} onOpenChange={setEditOpen} contacto={selectedContacto} />

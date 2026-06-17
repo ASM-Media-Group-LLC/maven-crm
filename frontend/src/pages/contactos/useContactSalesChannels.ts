@@ -6,13 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
 // "Contactado por un canal" = existe al menos UN mensaje OUTBOUND (direction='out')
 // en una wa_conversation de ese canal.
 //
-// Cadena de datos (todo read-only):
-//   closers_contacts.id  ←(source_contact_id)←  closer_creators.id
-//     ←(closer_creator_id)←  wa_contacts.id  ←(contact_id)←  wa_conversations (channel_id)
-//     →  wa_channels (id, label)
-// y "outbound existe" sale de wa_conversation_messages (conversation_id, direction='out').
-//
-// Gateado a ADMIN (las RLS de wa_* darían data incompleta a no-admins) → `enabled`.
+// La lógica corre server-side en la RPC `get_contact_sales_channels` (SECURITY
+// DEFINER, gateada a admin/manager): así los managers también la ven completa
+// (las RLS de wa_* recortarían la data a no-admins si se leyera directo). La RPC
+// devuelve { channels:[{id,label}], rows:[{contact_id,channel_id,last_at}] }.
 
 export interface ContactChannel {
   channelId: string;
@@ -52,94 +49,26 @@ export function useContactSalesChannels(enabled: boolean) {
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const sb = supabase as any;
+      const { data: rpc, error } = await sb.rpc("get_contact_sales_channels");
+      if (error) throw error;
 
-      // 1) Canales (≈7 filas)
-      const { data: channelsRaw, error: chErr } = await sb
-        .from("wa_channels")
-        .select("id, label, evolution_instance");
-      if (chErr) throw chErr;
-      const channelLabel = (row: any): string =>
-        (row?.label || row?.evolution_instance || "Canal").toString();
+      const channelsRaw = (rpc?.channels ?? []) as Array<{ id: string; label: string }>;
+      const rows = (rpc?.rows ?? []) as Array<{ contact_id: string; channel_id: string; last_at: string | null }>;
+
       const channelLabelById = new Map<string, string>();
-      const channels: SalesChannelOption[] = (channelsRaw ?? []).map((r: any) => {
-        const label = channelLabel(r);
-        channelLabelById.set(r.id, label);
-        return { id: r.id as string, label };
+      const channels: SalesChannelOption[] = channelsRaw.map((r) => {
+        channelLabelById.set(r.id, r.label);
+        return { id: r.id, label: r.label };
       });
       channels.sort((a, b) => a.label.localeCompare(b.label));
 
-      // 2) Conversaciones (≈89 filas)
-      const { data: convsRaw, error: convErr } = await sb
-        .from("wa_conversations")
-        .select("id, contact_id, channel_id, last_message_at");
-      if (convErr) throw convErr;
-      const convs = convsRaw ?? [];
-
-      // 3) Conjunto de conversaciones con outbound (dedupe client-side)
-      const { data: outRaw, error: outErr } = await sb
-        .from("wa_conversation_messages")
-        .select("conversation_id")
-        .eq("direction", "out");
-      if (outErr) throw outErr;
-      const outboundConvIds = new Set<string>();
-      (outRaw ?? []).forEach((m: any) => {
-        if (m.conversation_id) outboundConvIds.add(m.conversation_id);
-      });
-
-      // 4) wa_contacts con closer_creator_id (≈67 filas)
-      const { data: waContactsRaw, error: wcErr } = await sb
-        .from("wa_contacts")
-        .select("id, closer_creator_id")
-        .not("closer_creator_id", "is", null);
-      if (wcErr) throw wcErr;
-      const waContacts = waContactsRaw ?? [];
-      // wa_contact.id → closer_creator_id
-      const waContactToCloserCreator = new Map<string, string>();
-      const closerCreatorIds = new Set<string>();
-      waContacts.forEach((w: any) => {
-        if (w.id && w.closer_creator_id) {
-          waContactToCloserCreator.set(w.id, w.closer_creator_id);
-          closerCreatorIds.add(w.closer_creator_id);
-        }
-      });
-
-      // 5) closer_creators referenciados → source_contact_id (= closers_contacts.id)
-      const closerCreatorToContact = new Map<string, string>();
-      if (closerCreatorIds.size > 0) {
-        const { data: ccRaw, error: ccErr } = await sb
-          .from("closer_creators")
-          .select("id, source_contact_id")
-          .in("id", Array.from(closerCreatorIds));
-        if (ccErr) throw ccErr;
-        (ccRaw ?? []).forEach((cc: any) => {
-          if (cc.id && cc.source_contact_id) {
-            closerCreatorToContact.set(cc.id, cc.source_contact_id);
-          }
-        });
-      }
-
-      // Ensamblar: por cada conversación con outbound → resolver contacto →
-      // closer_creator → source_contact_id → agregar canal (dedupe, última fecha).
-      // Mapa intermedio: contactId → (channelId → lastAt más reciente)
+      // contactId → (channelId → lastAt). La RPC ya hizo max() por contacto+canal.
       const acc = new Map<string, Map<string, string | null>>();
-      for (const conv of convs) {
-        if (!outboundConvIds.has(conv.id)) continue;
-        if (!conv.channel_id) continue;
-        const closerCreatorId = waContactToCloserCreator.get(conv.contact_id);
-        if (!closerCreatorId) continue;
-        const contactId = closerCreatorToContact.get(closerCreatorId);
-        if (!contactId) continue;
-
-        const channelMap = acc.get(contactId) ?? new Map<string, string | null>();
-        const prev = channelMap.get(conv.channel_id);
-        const cur = conv.last_message_at ?? null;
-        // Quedarse con la fecha más reciente
-        if (prev === undefined) {
-          channelMap.set(conv.channel_id, cur);
-        } else if (cur && (!prev || new Date(cur) > new Date(prev))) {
-          channelMap.set(conv.channel_id, cur);
-        }
-        acc.set(contactId, channelMap);
+      for (const row of rows) {
+        if (!row.contact_id || !row.channel_id) continue;
+        const channelMap = acc.get(row.contact_id) ?? new Map<string, string | null>();
+        channelMap.set(row.channel_id, row.last_at ?? null);
+        acc.set(row.contact_id, channelMap);
       }
 
       const byContactId = new Map<string, ContactChannel[]>();
