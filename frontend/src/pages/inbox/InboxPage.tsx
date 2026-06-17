@@ -501,18 +501,26 @@ const InboxPage = () => {
     setSending(false);
     const res = data as { ok?: boolean; error?: string; reason?: string } | null;
     if (error || !res?.ok) {
-      if (res?.reason === "not_on_whatsapp") {
-        // El edge ya dejó el intento como FALLIDO (rojo) en el chat. Quitamos
-        // la burbuja optimista y refrescamos para mostrar el fallido real.
+      // El edge persiste el intento como FALLIDO (rojo) y devuelve 200+reason tanto si
+      // el número no tiene WhatsApp como si la LÍNEA falló al enviar (gateway caído).
+      if (res?.reason === "not_on_whatsapp" || res?.reason === "send_failed") {
         qc.setQueryData<MsgRow[]>(["wa-inbox-messages", convId], (old = []) =>
           old.filter((m) => m.id !== optimisticId));
         qc.invalidateQueries({ queryKey: ["wa-inbox-messages", convId] });
         qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
-        toast({
-          title: "⚠ Número no registrado en WhatsApp",
-          description: "El mensaje no se entregó: este número no tiene WhatsApp.",
-          variant: "destructive",
-        });
+        toast(
+          res.reason === "not_on_whatsapp"
+            ? {
+                title: "⚠ Número no registrado en WhatsApp",
+                description: "El mensaje no se entregó: este número no tiene WhatsApp.",
+                variant: "destructive",
+              }
+            : {
+                title: "No se pudo enviar por esta línea",
+                description: `La línea de WhatsApp puede estar desconectada — revisá su conexión (panel del gateway) o probá desde otra línea. Detalle: ${res.error ?? "error del gateway"}`,
+                variant: "destructive",
+              },
+        );
         return;
       }
       // Rollback de la burbuja optimista + restaurar el texto para reintentar.

@@ -143,21 +143,28 @@ serve(async (req) => {
   // ── Enviar por Evolution (por la instancia del canal de la conversación) ────
   const sent = await sendViaEvolution(toNumber, text, instance, quoted);
   if (!sent.ok) {
-    // Número no registrado en WhatsApp: registramos el intento como FALLIDO
-    // (queda en rojo en el chat) y avisamos al front con reason.
-    if ((sent.error ?? "").includes("not_on_whatsapp")) {
-      const nowIso = new Date().toISOString();
-      await sb.from("wa_conversation_messages").insert({
-        tenant_id: TENANT_ID, conversation_id: conversationId, direction: "out",
-        sender_user_id: userId, external_id: null, body: text, msg_type: "text",
-        status: "failed", sent_at: nowIso, reply_to_message_id: replyToId ?? null,
-      });
-      await sb.from("wa_conversations")
-        .update({ last_message_at: nowIso, last_message_preview: text.slice(0, 120) })
-        .eq("id", conversationId);
-      return json({ ok: false, reason: "not_on_whatsapp", target: toNumber }, 200);
-    }
-    return json({ ok: false, error: sent.error, target: toNumber }, 502);
+    // Falla de envío: el número no tiene WhatsApp, O la LÍNEA del canal no está
+    // conectada / el gateway devolvió error. En ambos casos registramos el intento
+    // como FALLIDO (queda en rojo en el chat) y devolvemos 200 + reason + error para
+    // que el front muestre un aviso CLARO. (Antes el caso "línea caída" devolvía 502,
+    // que el front solo veía como "Edge Function returned a non-2xx status code".)
+    const notOnWa = (sent.error ?? "").includes("not_on_whatsapp");
+    const nowIso = new Date().toISOString();
+    await sb.from("wa_conversation_messages").insert({
+      tenant_id: TENANT_ID, conversation_id: conversationId, direction: "out",
+      sender_user_id: userId, external_id: null, body: text, msg_type: "text",
+      status: "failed", sent_at: nowIso, reply_to_message_id: replyToId ?? null,
+    });
+    await sb.from("wa_conversations")
+      .update({ last_message_at: nowIso, last_message_preview: text.slice(0, 120) })
+      .eq("id", conversationId);
+    return json({
+      ok: false,
+      reason: notOnWa ? "not_on_whatsapp" : "send_failed",
+      error: sent.error,
+      instance,
+      target: toNumber,
+    }, 200);
   }
 
   // ── Persistir el saliente + actualizar metadata ─────────────────────────────

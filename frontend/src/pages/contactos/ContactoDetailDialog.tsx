@@ -89,7 +89,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
     { label: "Ciudad", value: c.city || "—" },
     {
       label: "Contacto",
-      value: <WaChatButton phone={toE164({ whatsapp: c.whatsapp, countryCode: c.country_code, phone: c.phone })} />,
+      value: <WaChatButton phone={toE164({ whatsapp: c.whatsapp, countryCode: c.country_code, phone: c.phone })} name={c.nombre} />,
     },
   ];
 
