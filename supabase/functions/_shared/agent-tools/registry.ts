@@ -10,6 +10,7 @@ import { monetizacionTools } from "./monetizacion.ts";
 import { creadorasTools } from "./creadoras.ts";
 import { equipoTools } from "./equipo.ts";
 import { qaTools } from "./qa.ts";
+import { inboxTools } from "./inbox.ts";
 
 export const TOOL_REGISTRY: AgentTool[] = [
   ...promologTools,
@@ -17,6 +18,7 @@ export const TOOL_REGISTRY: AgentTool[] = [
   ...creadorasTools,
   ...equipoTools,
   ...qaTools,
+  ...inboxTools,
   // Próximos dominios: ventas (esperar fresh de of_gross_earnings) + migrar las 25
   // tools inline del whatsapp-agent.
 ];
