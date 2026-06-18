@@ -52,5 +52,11 @@ verify_jwt = false  # envía saliente con media (imagen/audio/video/doc) desde l
 [functions.wa-inbox-action]
 verify_jwt = false  # reaccionar/eliminar un mensaje del inbox (auth propia). Rutea por la instancia del canal.
 
+[functions.wa-inbox-transcribe]
+verify_jwt = false  # invocada por pg_cron; check interno de X-Cron-Token. Transcribe audios de la bandeja (Whisper).
+
+[functions.wa-inbox-analyze-image]
+verify_jwt = false  # invocada por pg_cron; check interno de X-Cron-Token. Analiza imágenes de la bandeja (Gemini/OpenRouter).
+
 [functions.wa-contact-avatar]
 verify_jwt = false  # foto de perfil del contacto (proxy al gateway /profile/picture, auth propia).

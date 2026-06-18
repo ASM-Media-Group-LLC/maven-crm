@@ -11,9 +11,10 @@
 // pipeline (closer_creators.instagram_handle) o por nombre/handle del contacto
 // (closers_contacts), y de ahí a sus closer_creator_id.
 //
-// SOLO TEXTO por ahora: los audios/imágenes de la bandeja todavía no se transcriben
-// (Slice 2, forward-only). Se marcan como "[audio/imagen — sin transcribir]" para que
-// el bot sepa que hay media que aún no puede leer.
+// MULTIMODAL: el texto, los audios (Whisper, vía wa-inbox-transcribe) y las imágenes
+// (visión Gemini/OpenRouter, vía wa-inbox-analyze-image) de la bandeja se leen desde
+// `body`. La media que todavía no se procesó (o que es irrecuperable) se marca como
+// "[tipo — sin transcribir]" para que el bot sepa que hay algo que aún no puede leer.
 import type { AgentTool } from "./types.ts";
 
 const MAX_MESSAGES = 30;
@@ -29,8 +30,9 @@ export const inboxTools: AgentTool[] = [
     description:
       "Lee la conversación de WhatsApp (bandeja) que el equipo tiene con una modelo/lead, por " +
       "nombre o @handle. Úsala cuando necesites contexto o estrategia sobre una modelo: trae los " +
-      "últimos mensajes (texto) y el canal/marca por el que se la contactó (Kash, BLU, CP, etc.). " +
-      "Si no hay conversación registrada, lo dice. Audios e imágenes todavía no se transcriben.",
+      "últimos mensajes y el canal/marca por el que se la contactó (Kash, BLU, CP, etc.). Incluye el " +
+      "texto, la transcripción de los audios y la descripción/OCR de las imágenes (comprobantes, " +
+      "screenshots, etc.). Si no hay conversación registrada, lo dice.",
     input_schema: {
       type: "object",
       properties: {
@@ -138,7 +140,8 @@ export const inboxTools: AgentTool[] = [
         estado_conversacion: conv.status,
         mensajes_traidos: mensajes.length,
         mensajes,
-        nota: "Solo texto: los audios e imágenes de la bandeja todavía no se transcriben.",
+        nota: "Incluye texto, transcripción de audios (Whisper) y descripción/OCR de imágenes (visión). " +
+          "Lo que aparezca como '[tipo — sin transcribir]' es media que aún no se procesó.",
       };
     },
   },
