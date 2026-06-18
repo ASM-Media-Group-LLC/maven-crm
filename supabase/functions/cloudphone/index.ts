@@ -88,6 +88,12 @@ serve(async (req) => {
 
     const { data: roleRows } = await sb.from("user_roles").select("role").eq("user_id", uid);
     const isAdmin = (roleRows ?? []).some((r: { role: string }) => r.role === "admin");
+    // data_scope='all' en Telefonos (o admin) ⇒ ve y opera TODOS los dispositivos,
+    // no solo los asignados. Antes el gate era binario admin-o-asignado e ignoraba
+    // role_permissions.data_scope (por eso un "Team Leader" con scope 'all' solo
+    // veía sus asignados). canSeeAll NO habilita asignar gente (eso sigue admin-only).
+    const { data: globalScope } = await sb.rpc("has_telefonos_global_scope", { _user_id: uid });
+    const canSeeAll = isAdmin || globalScope === true;
 
     const payload = await req.json().catch(() => ({}));
     const action: string = payload?.action ?? "";
@@ -99,7 +105,7 @@ serve(async (req) => {
       return new Set((data ?? []).map((r: { profile_id: string }) => r.profile_id));
     };
     const canUse = async (pid: string): Promise<boolean> => {
-      if (isAdmin) return true;
+      if (canSeeAll) return true;
       return (await myAssignedIds()).has(pid);
     };
 
@@ -161,8 +167,8 @@ serve(async (req) => {
         assigned_to: byPhone.get(String(p.id)) ?? [],
         session: activeByProfile.get(String(p.id)) ?? null,
       }));
-      if (!isAdmin) phones = phones.filter((p) => (p.assigned_to as string[]).includes(uid));
-      return json({ ok: true, isAdmin, phones });
+      if (!canSeeAll) phones = phones.filter((p) => (p.assigned_to as string[]).includes(uid));
+      return json({ ok: true, isAdmin, canSeeAll, phones });
     }
 
     if (action === "start") {
@@ -226,7 +232,7 @@ serve(async (req) => {
     }
 
     if (action === "status") {
-      if (!isAdmin) {
+      if (!canSeeAll) {
         const allowed = await myAssignedIds();
         for (const id of profileIds) if (!allowed.has(id)) return json({ ok: false, error: "forbidden" }, 403);
       }
@@ -266,7 +272,7 @@ serve(async (req) => {
       return json({ ok: true, users: data ?? [] });
     }
     if (action === "usage") {
-      if (!isAdmin) return json({ ok: false, error: "forbidden" }, 403);
+      if (!canSeeAll) return json({ ok: false, error: "forbidden" }, 403);
       const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
       const { data: rows } = await sb
         .from("cloudphone_sessions")
