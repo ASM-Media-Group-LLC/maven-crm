@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Pencil, Trash2, Settings2, MoreVertical, Users, UserCog } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import type { RoleConfig } from "./useRoles";
+import { ROLE_TIER_SHORT, type RoleConfig } from "./useRoles";
 
 interface RolesGridProps {
   roles: RoleConfig[];
@@ -57,7 +57,8 @@ const RolesGrid = ({ roles, onEdit, onDelete, onSetPermissions, onToggleActive, 
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              <Badge variant="secondary" className="text-xs">{ROLE_TIER_SHORT[role.tier]}</Badge>
               {role.is_system && (
                 <Badge variant="outline" className="text-xs">Sistema</Badge>
               )}

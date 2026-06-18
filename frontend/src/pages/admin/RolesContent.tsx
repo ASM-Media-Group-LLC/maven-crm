@@ -87,8 +87,8 @@ const RolesContent = ({ search = "", view, createOpen, onCreateOpenChange }: Rol
       <CreateRoleModal
         open={createOpen}
         onOpenChange={onCreateOpenChange}
-        onConfirm={(name, description) => {
-          createRole({ name, description }, { onSuccess: () => onCreateOpenChange(false) });
+        onConfirm={(name, description, tier) => {
+          createRole({ name, description, tier }, { onSuccess: () => onCreateOpenChange(false) });
         }}
         isLoading={isCreating}
       />
@@ -97,8 +97,8 @@ const RolesContent = ({ search = "", view, createOpen, onCreateOpenChange }: Rol
         open={!!editRole}
         onOpenChange={(o) => !o && setEditRole(null)}
         role={editRole}
-        onConfirm={(id, name, description, aiDailyQuota) => {
-          updateRole({ id, name, description, ai_daily_quota: aiDailyQuota }, { onSuccess: () => setEditRole(null) });
+        onConfirm={(id, name, description, aiDailyQuota, tier) => {
+          updateRole({ id, name, description, ai_daily_quota: aiDailyQuota, tier }, { onSuccess: () => setEditRole(null) });
         }}
         isLoading={isUpdating}
       />
