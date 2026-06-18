@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
-export type AppRole = "admin" | "manager" | "employee" | "agent" | "closer" | "supervisor" | "spammer";
+export type AppRole = "admin" | "manager" | "employee" | "agent" | "closer" | "supervisor" | "spammer" | "Team Leader";
 
 export const useUserRole = () => {
   const { user } = useAuth();
@@ -30,7 +30,12 @@ export const useUserRole = () => {
     isManager: role === "manager",
     isEmployee: role === "employee",
     isAgent: role === "agent",
-    isSupervisor: role === "supervisor",
+    // "Team Leader" es nivel supervisor (ve datos de su equipo), igual que en
+    // role_groups (is_supervisor_or_above). Lo incluimos en isSupervisor para que
+    // el gating de UI lo trate como tal, y exponemos isTeamLeader por si se quiere
+    // distinguir.
+    isSupervisor: role === "supervisor" || role === "Team Leader",
+    isTeamLeader: role === "Team Leader",
     isSpammer: role === "spammer",
     isLoading,
   };
