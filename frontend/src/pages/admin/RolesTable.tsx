@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Pencil, Trash2, Settings2 } from "lucide-react";
-import type { RoleConfig } from "./useRoles";
+import { ROLE_TIER_SHORT, type RoleConfig } from "./useRoles";
 
 interface RolesTableProps {
   roles: RoleConfig[];
@@ -32,6 +32,7 @@ const RolesTable = ({ roles, onEdit, onDelete, onSetPermissions, onToggleActive,
             <TableCell>
               <div className="flex items-center gap-2">
                 <span className="font-medium capitalize">{role.name}</span>
+                <Badge variant="secondary" className="text-xs">{ROLE_TIER_SHORT[role.tier]}</Badge>
                 {role.is_system && (
                   <Badge variant="outline" className="text-xs">Sistema</Badge>
                 )}

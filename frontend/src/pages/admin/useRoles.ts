@@ -3,6 +3,47 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 
+// Nivel de capacidad de un rol → flags de role_groups (la capa de RLS). Un rol
+// DEBE tener su fila en role_groups o is_in_role_group() le da false a TODO (sin
+// acceso a nivel DB, aunque tenga permisos de menú en role_permissions). El
+// frontend setea el nivel desde el modal; el trigger tg_roles_config_sync_role_groups
+// garantiza que la fila exista igual (default miembro) para cualquier vía.
+export type RoleTier = "member" | "supervisor" | "manager" | "admin";
+
+export const ROLE_TIER_FLAGS: Record<RoleTier, {
+  is_admin: boolean; is_manager_or_above: boolean; is_supervisor_or_above: boolean; is_member: boolean;
+}> = {
+  member:     { is_admin: false, is_manager_or_above: false, is_supervisor_or_above: false, is_member: true },
+  supervisor: { is_admin: false, is_manager_or_above: false, is_supervisor_or_above: true,  is_member: true },
+  manager:    { is_admin: false, is_manager_or_above: true,  is_supervisor_or_above: true,  is_member: true },
+  admin:      { is_admin: true,  is_manager_or_above: true,  is_supervisor_or_above: true,  is_member: true },
+};
+
+export const ROLE_TIER_LABELS: Record<RoleTier, string> = {
+  member: "Miembro — solo lo suyo",
+  supervisor: "Supervisor — ve a su equipo",
+  manager: "Manager — gestión amplia",
+  admin: "Admin — acceso total",
+};
+
+// Etiqueta corta para badges en la lista/grid.
+export const ROLE_TIER_SHORT: Record<RoleTier, string> = {
+  member: "Miembro",
+  supervisor: "Supervisor",
+  manager: "Manager",
+  admin: "Admin",
+};
+
+function flagsToTier(
+  g?: { is_admin?: boolean; is_manager_or_above?: boolean; is_supervisor_or_above?: boolean } | null,
+): RoleTier {
+  if (!g) return "member";
+  if (g.is_admin) return "admin";
+  if (g.is_manager_or_above) return "manager";
+  if (g.is_supervisor_or_above) return "supervisor";
+  return "member";
+}
+
 export interface RoleMember {
   id: string;
   full_name: string;
@@ -16,6 +57,7 @@ export interface RoleConfig {
   is_active: boolean;
   is_system: boolean;
   ai_daily_quota: number | null; // cuota diaria del copiloto IA del inbox para el rol (null = default 20)
+  tier: RoleTier; // nivel de capacidad RLS (derivado de role_groups)
   created_at: string;
   updated_at: string;
   user_count: number;
@@ -143,6 +185,14 @@ export const useRoles = () => {
         .from("profiles")
         .select("id, full_name, avatar_url");
 
+      // role_groups = capacidades RLS por rol. Lo unimos por nombre para mostrar
+      // (y editar) el nivel de cada rol.
+      const { data: roleGroups } = await supabase
+        .from("role_groups")
+        .select("role_name, is_admin, is_manager_or_above, is_supervisor_or_above, is_member");
+      const groupsMap = new Map<string, { is_admin: boolean; is_manager_or_above: boolean; is_supervisor_or_above: boolean }>();
+      roleGroups?.forEach((g) => groupsMap.set(g.role_name, g));
+
       const profilesMap = new Map<string, { full_name: string; avatar_url: string | null }>();
       profiles?.forEach((p) =>
         profilesMap.set(p.id, { full_name: p.full_name || "Sin nombre", avatar_url: p.avatar_url ?? null })
@@ -160,6 +210,7 @@ export const useRoles = () => {
         });
         return {
           ...r,
+          tier: flagsToTier(groupsMap.get(r.name)),
           user_count: usersWithRole.length,
           user_names: members.map((m) => m.full_name),
           members,
@@ -169,9 +220,18 @@ export const useRoles = () => {
   });
 
   const createRole = useMutation({
-    mutationFn: async ({ name, description }: { name: string; description?: string }) => {
+    mutationFn: async ({ name, description, tier = "member" }: { name: string; description?: string; tier?: RoleTier }) => {
       const { error } = await supabase.from("roles_config").insert({ name, description });
       if (error) throw error;
+      // Cablear role_groups (capacidades RLS) con el nivel elegido. SIN esto el
+      // rol nacía sin acceso a nivel DB (bug histórico). El admin puede escribir
+      // role_groups (policy "Only admins can modify role_groups"). El trigger ya
+      // garantiza una fila default; este upsert fija el nivel real.
+      const { error: rgError } = await supabase
+        .from("role_groups")
+        .upsert({ role_name: name, ...ROLE_TIER_FLAGS[tier], description, updated_at: new Date().toISOString() },
+          { onConflict: "role_name" });
+      if (rgError) throw rgError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-config"] });
@@ -181,11 +241,20 @@ export const useRoles = () => {
   });
 
   const updateRole = useMutation({
-    mutationFn: async ({ id, name, description, ai_daily_quota }: { id: string; name: string; description?: string; ai_daily_quota?: number | null }) => {
+    mutationFn: async ({ id, name, description, ai_daily_quota, tier }: { id: string; name: string; description?: string; ai_daily_quota?: number | null; tier?: RoleTier }) => {
       const patch: Record<string, unknown> = { name, description };
       if (ai_daily_quota !== undefined) patch.ai_daily_quota = ai_daily_quota;
       const { error } = await supabase.from("roles_config").update(patch).eq("id", id);
       if (error) throw error;
+      // Si cambió el nombre, el trigger ya renombró role_groups + user_roles.
+      // Acá fijamos el NIVEL (capacidades RLS) por el nombre actual.
+      if (tier) {
+        const { error: rgError } = await supabase
+          .from("role_groups")
+          .upsert({ role_name: name, ...ROLE_TIER_FLAGS[tier], updated_at: new Date().toISOString() },
+            { onConflict: "role_name" });
+        if (rgError) throw rgError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles-config"] });
