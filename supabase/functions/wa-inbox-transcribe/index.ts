@@ -1,0 +1,112 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { adminClient, authorizeCronOrJwt, resolveMimeType, whatsappCors } from "../_shared/whatsapp.ts";
+
+// wa-inbox-transcribe — transcribe los AUDIOS de la BANDEJA (wa_conversation_messages)
+// con el Whisper self-hosted de Dokploy, y escribe el texto en `body`.
+//
+// A diferencia del bot del grupo (whatsapp_messages, media efímera ~5min), la media
+// de la bandeja se sube a Supabase Storage con URL firmada de 1 año (ver
+// whatsapp-ingest/downloadAndStoreInboundMedia) → es PERSISTENTE, así que esto
+// backfillea audios viejos Y procesa los nuevos. Modo batch (cron) o single (message_id).
+//
+// Idempotente: solo toma audios con body NULL (placeholder). Éxito → body=texto;
+// fallo permanente → body marcado para no reintentar en loop. Whisper self-hosted = $0.
+// El bot lee `body` vía la tool get_model_whatsapp_context (ya no marca "[sin transcribir]").
+
+const WHISPER_URL = Deno.env.get("WHISPER_API_URL") ?? "";
+const WHISPER_KEY = Deno.env.get("WHISPER_API_KEY") ?? "";
+const WHISPER_MODEL = Deno.env.get("WHISPER_API_MODEL") ?? "deepdml/faster-whisper-large-v3-turbo-ct2";
+const TIMEOUT_MS = 90_000;
+const MAX_BYTES = 25 * 1024 * 1024;
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...whatsappCors, "Content-Type": "application/json" } });
+}
+
+async function transcribe(blob: Blob): Promise<{ text: string } | { error: string }> {
+  if (!WHISPER_URL) return { error: "WHISPER_API_URL_not_set" };
+  const ext = (blob.type || "").includes("mp4") || (blob.type || "").includes("m4a") ? "m4a" : "ogg";
+  const form = new FormData();
+  form.append("file", new File([blob], `wa_audio.${ext}`, { type: blob.type || "audio/ogg" }));
+  form.append("model", WHISPER_MODEL);
+  form.append("language", "es");
+  form.append("response_format", "verbose_json");
+  form.append("temperature", "0");
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), TIMEOUT_MS);
+  try {
+    const r = await fetch(WHISPER_URL, {
+      method: "POST",
+      headers: WHISPER_KEY ? { Authorization: `Bearer ${WHISPER_KEY}` } : {},
+      body: form,
+      signal: ac.signal,
+    });
+    clearTimeout(t);
+    if (!r.ok) return { error: `whisper ${r.status}: ${(await r.text().catch(() => "")).slice(0, 150)}` };
+    const d = (await r.json()) as { text?: string };
+    const text = (d.text ?? "").trim();
+    return text ? { text } : { error: "empty_transcript" };
+  } catch (e) {
+    clearTimeout(t);
+    return { error: (e as Error).name === "AbortError" ? "whisper_timeout" : (e as Error).message };
+  }
+}
+
+// deno-lint-ignore no-explicit-any
+async function processOne(sb: any, row: { id: string; media_url: string }): Promise<boolean> {
+  const mark = (txt: string) => sb.from("wa_conversation_messages").update({ body: txt }).eq("id", row.id);
+  try {
+    const resp = await fetch(row.media_url);
+    if (!resp.ok) { await mark(`[audio no transcribible: descarga ${resp.status}]`); return false; }
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    if (!buf.length || buf.length > MAX_BYTES) { await mark("[audio no transcribible: tamaño]"); return false; }
+    const mime = resolveMimeType(resp.headers.get("content-type"), buf, "audio/ogg");
+    const res = await transcribe(new Blob([buf], { type: mime }));
+    if ("error" in res) {
+      console.warn("transcribe failed", row.id, res.error);
+      // Solo marcamos permanente si NO es transitorio (timeout/red) — esos reintentan.
+      if (!/timeout|fetch|network|whisper 5\d\d/i.test(res.error)) await mark("[audio no transcribible]");
+      return false;
+    }
+    await sb.from("wa_conversation_messages").update({ body: res.text }).eq("id", row.id);
+    return true;
+  } catch (e) {
+    console.warn("processOne error", row.id, (e as Error).message);
+    return false;
+  }
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCors });
+  if (!authorizeCronOrJwt(req)) return json({ ok: false, error: "unauthorized" }, 401);
+
+  const body = await req.json().catch(() => ({})) as { message_id?: string; batch_size?: number };
+  const sb = adminClient();
+
+  if (body.message_id) {
+    const { data: row } = await sb
+      .from("wa_conversation_messages").select("id, media_url")
+      .eq("id", body.message_id).maybeSingle();
+    if (!row?.media_url) return json({ ok: false, reason: "no_media" });
+    const ok = await processOne(sb, row as { id: string; media_url: string });
+    return json({ ok, processed: 1, transcribed: ok ? 1 : 0 });
+  }
+
+  // Batch: audios de la bandeja sin transcribir (body null) con media en Storage.
+  const limit = Math.min(body.batch_size ?? 10, 25);
+  const { data: rows } = await sb
+    .from("wa_conversation_messages")
+    .select("id, media_url")
+    .eq("msg_type", "audio")
+    .not("media_url", "is", null)
+    .is("body", null)
+    .is("deleted_at", null)
+    .order("sent_at", { ascending: false })
+    .limit(limit);
+
+  let ok = 0;
+  for (const r of (rows ?? []) as Array<{ id: string; media_url: string }>) {
+    if (await processOne(sb, r)) ok++;
+  }
+  return json({ ok: true, processed: (rows ?? []).length, transcribed: ok });
+});
