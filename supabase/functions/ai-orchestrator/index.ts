@@ -8,6 +8,7 @@
 // Deployar con --no-verify-jwt (hace su propia auth de rol).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { runTool, toAnthropicTools, toolsFor } from "../_shared/agent-tools/registry.ts";
+import { logAnthropicUsage } from "../_shared/usage.ts";
 
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d";
 const SONNET_MODEL = "claude-sonnet-4-6";
@@ -76,6 +77,17 @@ Deno.serve(async (req) => {
   if (!convo.length) return jsonErr("Sin mensajes");
 
   const tools = toAnthropicTools(toolsFor({ scopes: ["read"] }));
+  // PROMPT CACHING (mismo patrón que whatsapp-agent): el system y SOBRE TODO el catálogo
+  // de tools (read de los 5 dominios = el grueso del prefix) son ESTABLES entre llamadas e
+  // iteraciones del tool-loop. Cacheándolos con ttl 1h, la 1ª llamada paga creation y las
+  // siguientes (las 5 iteraciones del mismo turno + preguntas del staff dentro de la hora)
+  // leen el prefix a ~0.1×. Clari se usa en ráfagas espaciadas → 1h, no el default de 5 min.
+  const systemWithCache = [
+    { type: "text", text: SYSTEM, cache_control: { type: "ephemeral", ttl: "1h" } },
+  ];
+  const toolsWithCache = tools.length > 0
+    ? [...tools.slice(0, -1), { ...tools[tools.length - 1], cache_control: { type: "ephemeral", ttl: "1h" } }]
+    : tools;
   const ctx = { sb, tenantId: TENANT_ID, userId: user.id };
   const messages: Array<Record<string, unknown>> = [...convo];
 
@@ -91,13 +103,30 @@ Deno.serve(async (req) => {
         "x-api-key": ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify({ model: SONNET_MODEL, max_tokens: 1500, system: SYSTEM, tools, messages }),
+      body: JSON.stringify({ model: SONNET_MODEL, max_tokens: 1500, system: systemWithCache, tools: toolsWithCache, messages }),
     });
     if (!resp.ok) {
       answer = `No pude consultar la IA (${resp.status}). Probá de nuevo.`;
       break;
     }
-    const data = await resp.json() as { content: Array<Record<string, unknown>> };
+    const data = await resp.json() as { content: Array<Record<string, unknown>>; usage?: Record<string, number> };
+    // Logueo de uso (operation 'ai-orchestrator') — antes Clari NO logueaba, su costo era
+    // invisible en api_usage_log. Esto además deja MEDIR el caching (cache_read vs creation).
+    const u = data.usage;
+    if (u) {
+      void logAnthropicUsage({
+        operation: "ai-orchestrator",
+        model: SONNET_MODEL,
+        usage: {
+          input_tokens: u.input_tokens ?? 0,
+          output_tokens: u.output_tokens ?? 0,
+          cache_read_input_tokens: u.cache_read_input_tokens ?? 0,
+          cache_creation_input_tokens: u.cache_creation_input_tokens ?? 0,
+        },
+        tenantId: TENANT_ID,
+        context: { iter, user_id: user.id },
+      });
+    }
     const blocks = data.content ?? [];
     const toolUses = blocks.filter((b) => b.type === "tool_use");
     const text = blocks
