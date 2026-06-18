@@ -117,13 +117,18 @@ export const inboxTools: AgentTool[] = [
       const mensajes = (rows ?? [])
         .slice()
         .reverse()
-        .map((m: { direction: string; body: string | null; msg_type: string; sent_at: string }) => ({
-          de: m.direction === "out" ? "nosotros" : "modelo",
-          cuando: m.sent_at,
-          texto: m.msg_type === "text"
-            ? String(m.body ?? "").slice(0, MAX_CHARS_PER_MSG)
-            : `[${m.msg_type} — sin transcribir]`,
-        }));
+        .map((m: { direction: string; body: string | null; msg_type: string; sent_at: string }) => {
+          // body trae el texto (text) o la transcripción/descripción (audio/imagen, vía
+          // wa-inbox-transcribe). Si sigue vacío o es placeholder "[tipo...]", la media
+          // todavía no se procesó.
+          const b = (m.body ?? "").trim();
+          const placeholder = !b || /^\[(audio|imagen|image|video|sticker|documento|document)[^\]]*\]$/i.test(b);
+          return {
+            de: m.direction === "out" ? "nosotros" : "modelo",
+            cuando: m.sent_at,
+            texto: placeholder ? `[${m.msg_type} — sin transcribir]` : b.slice(0, MAX_CHARS_PER_MSG),
+          };
+        });
 
       return {
         found: true,
