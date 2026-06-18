@@ -94,7 +94,10 @@ const platforms: PlatformConfig[] = [
     icon: <Phone className="h-5 w-5" />,
     placeholder: "+1234567890 o https://wa.me/...",
     displayValue: (c) => c.whatsapp_number || "—",
-    buildUrl: (c) => c.whatsapp_number ? `https://wa.me/${c.whatsapp_number.replace(/[^0-9]/g, "")}` : "",
+    // WhatsApp se renderiza SIEMPRE vía <WaChatButton> (cero dígitos, abre la bandeja);
+    // nunca como link wa.me crudo. Dejamos buildUrl vacío a propósito para que el patrón
+    // de masking no pueda regresar a exponer el número si alguien quita el caso especial.
+    buildUrl: () => "",
   },
   {
     key: "twitter_handle",

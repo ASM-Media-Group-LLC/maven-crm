@@ -58,5 +58,8 @@ verify_jwt = false  # invocada por pg_cron; check interno de X-Cron-Token. Trans
 [functions.wa-inbox-analyze-image]
 verify_jwt = false  # invocada por pg_cron; check interno de X-Cron-Token. Analiza imágenes de la bandeja (Gemini/OpenRouter).
 
+[functions.wa-conversation-summarize]
+verify_jwt = false  # invocada por pg_cron; check interno de X-Cron-Token. Rolling summary de conversaciones (Haiku).
+
 [functions.wa-contact-avatar]
 verify_jwt = false  # foto de perfil del contacto (proxy al gateway /profile/picture, auth propia).

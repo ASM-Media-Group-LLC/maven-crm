@@ -93,12 +93,12 @@ export const inboxTools: AgentTool[] = [
       // 3) Conversación más reciente de esos contactos + su canal (= marca/compañía).
       const { data: convs } = await ctx.sb
         .from("wa_conversations")
-        .select("id, channel_id, last_message_at, status")
+        .select("id, channel_id, last_message_at, status, summary, summary_updated_at")
         .in("contact_id", waContacts.map((c: { id: string }) => c.id))
         .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(1);
       if (!convs?.length) return { found: false, reason: "sin_conversacion", modelo: displayName ?? q };
-      const conv = convs[0] as { id: string; channel_id: string | null; last_message_at: string | null; status: string | null };
+      const conv = convs[0] as { id: string; channel_id: string | null; last_message_at: string | null; status: string | null; summary: string | null; summary_updated_at: string | null };
 
       let canalMarca: string | null = null;
       if (conv.channel_id) {
@@ -138,6 +138,10 @@ export const inboxTools: AgentTool[] = [
         canal_marca: canalMarca,
         ultimo_mensaje: conv.last_message_at,
         estado_conversacion: conv.status,
+        // Resumen rolling (narrativa de toda la relación, generado por wa-conversation-summarize).
+        // Útil para conversaciones largas donde los últimos 30 mensajes no alcanzan a dar el contexto completo.
+        resumen: conv.summary ?? null,
+        resumen_actualizado: conv.summary_updated_at ?? null,
         mensajes_traidos: mensajes.length,
         mensajes,
         nota: "Incluye texto, transcripción de audios (Whisper) y descripción/OCR de imágenes (visión). " +
