@@ -81,7 +81,6 @@ import PromologPerformanceView from "./PromologPerformanceView";
 import AnalyticsSectionBanner from "@/components/analytics/AnalyticsSectionBanner";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 
 const networkOptions = [
@@ -145,9 +144,12 @@ const getAgentWeekDays = (offset: number): Date[] => {
 
 const PromologContent = () => {
   const { user } = useAuth();
-  const { role } = useUserRole();
-  const { canAccess } = usePermissions();
-  const isManagement = ["admin", "manager", "supervisor"].includes(role ?? "");
+  const { canAccess, dataScope } = usePermissions();
+  // "Ve todo el promolog" = el data_scope del módulo NO es 'self' (all/subordinates).
+  // Antes era una lista hardcodeada de nombres de rol (admin/manager/supervisor) que
+  // ignoraba el data_scope configurado por rol → un rol custom con 'all' no veía nada
+  // y uno con 'self' fuera de la lista igual veía todo. Ahora respeta el toggle.
+  const isManagement = dataScope("Promolog") !== "self";
   // Promobot: gateado por el sistema de permisos (default solo admin, marcable
   // por rol en Settings/admin/roles). Admin siempre true vía usePermissions.
   const canPromobot = canAccess("Promolog", "Promobot");
