@@ -51,7 +51,7 @@ export const useOperationalKPIs = () =>
     queryFn: async () => {
       const today = new Date().toISOString().slice(0, 10);
 
-      const employeesRes = await (supabase.from("employees").select("id", { count: "exact", head: true }) as any).eq("status", "activo");
+      const employeesRes = await (supabase.from("employees_directory").select("id", { count: "exact", head: true }) as any).eq("status", "activo");
       const absencesRes = await (supabase.from("absences").select("id", { count: "exact", head: true }) as any).eq("status", "approved");
       const overdueRes = await (supabase.from("tasks").select("id", { count: "exact", head: true }) as any).neq("status", "done");
       const eventsRes = await (supabase.from("events").select("id", { count: "exact", head: true }) as any).eq("date", today);

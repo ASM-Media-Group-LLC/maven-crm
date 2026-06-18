@@ -45,7 +45,7 @@ export const useAnnouncements = () =>
 
       // Get user's employee profile for department filtering
       const { data: profile } = await (supabase
-        .from("employees")
+        .from("employees_directory")
         .select("id, department_id") as any)
         .eq("profile_id", user.id)
         .maybeSingle();
@@ -215,7 +215,7 @@ export const useUpcomingBirthdays = () =>
     queryKey: ["upcoming-birthdays"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("employees")
+        .from("employees_directory")
         .select("id, first_name, last_name, birth_date")
         .eq("status", "activo")
         .not("birth_date", "is", null);
