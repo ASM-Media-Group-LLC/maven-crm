@@ -12,7 +12,6 @@ import {
   Search,
   Target,
   Plus,
-  FileSpreadsheet,
   Check,
   Minus,
   X,
@@ -50,7 +49,6 @@ import PromobotPanel from "./PromobotPanel";
 import PromologCalendarView from "./PromologCalendarView";
 import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
 import PromologEntryFormDialog from "./PromologEntryFormDialog";
-import ImportBluEarningsModal from "./ImportBluEarningsModal";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { ListRow, ListRowButton } from "@/components/ui/list-row";
 import { useTimezone, formatDateInTz, formatTimeInTz } from "@/hooks/useTimezone";
@@ -152,7 +150,6 @@ const PromologContent = () => {
   // ignoraba el data_scope configurado por rol → un rol custom con 'all' no veía nada
   // y uno con 'self' fuera de la lista igual veía todo. Ahora respeta el toggle.
   const isManagement = dataScope("Promolog") !== "self";
-  const [bluImportOpen, setBluImportOpen] = useState(false);
   // Promobot: gateado por el sistema de permisos (default solo admin, marcable
   // por rol en Settings/admin/roles). Admin siempre true vía usePermissions.
   const canPromobot = canAccess("Promolog", "Promobot");
@@ -937,17 +934,9 @@ const PromologContent = () => {
               <Plus className="mr-1.5 h-4 w-4" />
               Agregar Promo
             </Button>
-            {isManagement && (
-              <Button variant="outline" size="sm" className="h-9" onClick={() => setBluImportOpen(true)}>
-                <FileSpreadsheet className="mr-1.5 h-4 w-4" />
-                Importar ingresos
-              </Button>
-            )}
           </div>
         </div>
       </header>
-
-      <ImportBluEarningsModal open={bluImportOpen} onOpenChange={setBluImportOpen} />
 
       {/* Tabs — SubtabNav (glow azul gradient + ring) para match
           con Closers / LeadGen / Creadores / etc. */}
