@@ -16,9 +16,14 @@ transformar → `import_blu_earnings(rows)` en Maven (service_role).
    - Operación: `LOOKBACK_DAYS` (default 8), `RUN_EVERY_HOURS` (default 24).
 3. Deploy. El micro corre, hace una corrida al arranque y luego cada `RUN_EVERY_HOURS`.
 
-## Falta confirmar (1 request real de BLU)
-- `BLU_EARNINGS_PATH` exacto + sus query params.
-- La forma del JSON de respuesta → ajustar `transform()` en `index.mjs` (hay un TODO).
+## Falta confirmar (1 request real de BLU) — usar el modo PROBE
+En vez de pelear con el DevTools de BLU, seteá `BLU_PROBE=1` (con Cognito + usuario de
+servicio ya cargados) y deployá una vez: el micro se autentica, **tantea los endpoints
+candidatos** (`of-creator-reports`, `gross-earnings`, `net-earnings`, …) y loguea el
+**status + la forma del JSON** de cada uno, luego sale (no ingesta nada). Con eso:
+- confirmás `BLU_EARNINGS_PATH` exacto + sus query params,
+- y la forma del JSON → ajustar `transform()` en `index.mjs`.
+Después quitá `BLU_PROBE` y redeployá: corre normal (1 corrida al arranque + cada `RUN_EVERY_HOURS`).
 
 ## Notas
 - `import_blu_earnings` está gateada (management) pero permite `service_role` (que usa el micro).

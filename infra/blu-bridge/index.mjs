@@ -32,11 +32,11 @@ const {
   LOOKBACK_DAYS = "8",         // cuántos días hacia atrás traer cada corrida
   RUN_EVERY_HOURS = "24",
   RUN_ONCE,
+  BLU_PROBE,                   // si =1: solo autentica + tantea endpoints candidatos y sale (recon)
 } = process.env;
 
-function requireEnv() {
-  const missing = ["BLU_USER_POOL_ID", "BLU_CLIENT_ID", "BLU_USERNAME", "BLU_PASSWORD", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]
-    .filter((k) => !process.env[k]);
+function requireEnv(keys = ["BLU_USER_POOL_ID", "BLU_CLIENT_ID", "BLU_USERNAME", "BLU_PASSWORD", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]) {
+  const missing = keys.filter((k) => !process.env[k]);
   if (missing.length) throw new Error("Faltan env vars: " + missing.join(", "));
 }
 
@@ -78,6 +78,33 @@ async function fetchEarnings(idToken) {
   return resp.json();
 }
 
+// ── Recon (BLU_PROBE=1): tantea endpoints candidatos y loguea status + forma ──
+// No ingesta nada. Sirve para confirmar BLU_EARNINGS_PATH y la forma del JSON SIN
+// pelear con el DevTools de BLU: lee los logs de Dokploy y ajustá transform().
+async function probe(idToken) {
+  const candidates = [
+    BLU_EARNINGS_PATH,
+    "/api/of-creator-reports", "/api/gross-earnings", "/api/net-earnings",
+    "/api/of-statistics", "/api/of-mass-statistics", "/api/avg-earnings",
+  ].filter((p, i, a) => a.indexOf(p) === i);
+  const to = new Date();
+  const from = new Date(Date.now() - Number(LOOKBACK_DAYS) * 86400000);
+  for (const path of candidates) {
+    const url = new URL(BLU_API_BASE.replace(/\/$/, "") + path);
+    url.searchParams.set("from", ymd(from));
+    url.searchParams.set("to", ymd(to));
+    try {
+      const resp = await fetch(url, { headers: { Authorization: `Bearer ${idToken}`, Accept: "application/json" } });
+      const text = await resp.text().catch(() => "");
+      let shape = "";
+      try { const j = JSON.parse(text); shape = " | claves: " + JSON.stringify(Object.keys(Array.isArray(j) ? (j[0] ?? {}) : j)); } catch {}
+      console.log(`[probe] ${resp.status} ${path}${shape}\n   ${text.slice(0, 400)}`);
+    } catch (e) {
+      console.log(`[probe] ERR ${path}: ${e.message}`);
+    }
+  }
+}
+
 // ── 3) Transformar la respuesta de BLU a las filas que espera import_blu_earnings ──
 // TODO: ajustar al JSON REAL de BLU (hoy es la forma esperada del export "Detail":
 //   ingreso por modelo POR DÍA). Cada fila: { blu_name, date, subscription, tips,
@@ -114,6 +141,7 @@ async function runOnce() {
   const { idToken } = await cognitoLogin();
   console.log(`[blu-bridge] fetch earnings (últimos ${LOOKBACK_DAYS}d)…`);
   const payload = await fetchEarnings(idToken);
+  console.log(`[blu-bridge] forma payload:`, Array.isArray(payload) ? `array[${payload.length}]` : JSON.stringify(Object.keys(payload ?? {})));
   const rows = transform(payload);
   console.log(`[blu-bridge] ${rows.length} filas parseadas → ingestando…`);
   const result = await ingest(rows);
@@ -123,6 +151,17 @@ async function runOnce() {
 
 // ── Scheduler ─────────────────────────────────────────────────────────────────
 async function main() {
+  if (BLU_PROBE) {
+    try {
+      requireEnv(["BLU_USER_POOL_ID", "BLU_CLIENT_ID", "BLU_USERNAME", "BLU_PASSWORD"]);
+      console.log(`[blu-bridge] PROBE: login…`);
+      const { idToken } = await cognitoLogin();
+      await probe(idToken);
+      console.log(`[blu-bridge] PROBE listo. Ajustá BLU_EARNINGS_PATH/transform() con lo de arriba y quitá BLU_PROBE.`);
+    } catch (e) { console.error("[blu-bridge] PROBE error:", e.message); }
+    process.exit(0);
+    return;
+  }
   try { await runOnce(); }
   catch (e) { console.error("[blu-bridge] error:", e.message); if (RUN_ONCE) process.exit(1); }
   if (RUN_ONCE) { process.exit(0); return; }
