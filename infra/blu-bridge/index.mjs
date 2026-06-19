@@ -150,9 +150,12 @@ function warnIfExpired(e) {
 
 async function main() {
   if (BLU_PROBE) {
-    try { requireEnv(["BLU_JWT"]); assertNotExpired(); await wsAuth(); await probe(); console.log("[blu-bridge] PROBE listo. Seteá BLU_API_BASE/BLU_EARNINGS_PATH + ajustá transform() y quitá BLU_PROBE."); }
+    // Probe solo-REST (sin WS, que es para realtime): tantea endpoints con el Bearer.
+    try { requireEnv(["BLU_JWT"]); assertNotExpired(); await probe(); console.log("[blu-bridge] PROBE listo. Seteá BLU_API_BASE/BLU_EARNINGS_PATH, ajustá transform() y quitá BLU_PROBE."); }
     catch (e) { warnIfExpired(e); }
-    process.exit(0); return;
+    // Mantener el contenedor vivo para que los logs del probe PERSISTAN (sin flapear).
+    setInterval(() => {}, 1 << 30);
+    return;
   }
   if (RUN_ONCE) {
     try { await runOnce(); process.exit(0); }
