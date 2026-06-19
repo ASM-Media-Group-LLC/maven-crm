@@ -120,7 +120,16 @@ async function runOnce() {
   // Loguear la forma para poder afinar transform() con la estructura real.
   console.log(`[blu-bridge] respuesta keys:`, JSON.stringify(Object.keys(payload)));
   const arr = payload.creators || payload.data || payload.rows || payload.report || payload.results || [];
-  console.log(`[blu-bridge] muestra 1er elemento:`, JSON.stringify(Array.isArray(arr) ? arr[0] : arr).slice(0, 700));
+  const c0 = Array.isArray(arr) && arr.length ? arr[0] : null;
+  if (c0) {
+    console.log(`[blu-bridge] creador[0] keys:`, JSON.stringify(Object.keys(c0)));
+    for (const k of Object.keys(c0)) {
+      const v = c0[k];
+      if (Array.isArray(v)) console.log(`[blu-bridge]   ${k}: array[${v.length}] 1er=`, JSON.stringify(v[0] ?? null).slice(0, 400));
+      else if (v && typeof v === "object") console.log(`[blu-bridge]   ${k}: obj keys=`, JSON.stringify(Object.keys(v)), "::", JSON.stringify(v).slice(0, 250));
+      else console.log(`[blu-bridge]   ${k} =`, JSON.stringify(v));
+    }
+  }
   const rows = transform(payload);
   console.log(`[blu-bridge] ${rows.length} filas parseadas → ingestando…`);
   const result = await ingest(rows);
