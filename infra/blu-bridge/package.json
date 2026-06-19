@@ -1,15 +1,16 @@
 {
   "name": "blu-bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Puente BLU → Maven: autentica contra Cognito, jala el reporte de ingresos de BLU y lo ingesta en Maven (RPC import_blu_earnings).",
+  "description": "Puente BLU → Maven: con el JWT de sesión del owner (env), jala el reporte de ingresos de BLU (REST) y lo ingesta en Maven (RPC import_blu_earnings).",
   "scripts": {
     "start": "node index.mjs",
-    "once": "RUN_ONCE=1 node index.mjs"
+    "once": "RUN_ONCE=1 node index.mjs",
+    "probe": "BLU_PROBE=1 node index.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
-    "amazon-cognito-identity-js": "^6.3.12"
+    "ws": "^8.18.0"
   }
 }

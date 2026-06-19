@@ -1,41 +1,30 @@
-// blu-bridge — micro que corre en Dokploy. Cada día (o on-demand):
-//   1) Autentica contra Cognito (SRP) con un USUARIO DE SERVICIO de BLU (email+pass por env).
-//   2) Jala el reporte de ingresos diario de BLU (app.blu.luxe/api/...).
-//   3) Lo transforma a filas e ingesta en Maven vía la RPC import_blu_earnings.
+// blu-bridge — micro en Dokploy. Cada día (o on-demand):
+//   1) (opcional) handshake WS de auth con el JWT de sesión (si BLU_WS_URL está seteado).
+//   2) GET del reporte de ingresos por modelo/día (REST, Authorization: Bearer <JWT>).
+//   3) Transforma e ingesta en Maven vía RPC import_blu_earnings.
 //
-// NADA de credenciales en el código: todo por env (en Dokploy → Environment / Secrets).
-// El owner provee: la config pública de Cognito (pool/client) + un usuario de servicio
-// de BLU (email+pass) como secreto. Ver README.md.
+// AUTH: BLU_JWT es la SESIÓN del owner (HS256, ~24h). Lo provee el owner como SECRETO en
+// Dokploy y lo ROTA A MANO cada 24h. El micro NO crea sesión ni bypassa el login biométrico:
+// solo reusa el token vigente. Si venció → 401/403 → loguea claro y (en RUN_ONCE) sale != 0.
 //
-// Estado: esqueleto funcional. Lo único por confirmar con un request real de BLU:
-//   - BLU_EARNINGS_PATH (el endpoint exacto) y sus query params.
-//   - La FORMA del JSON de respuesta → mapearla en transform() (hay un TODO marcado).
+// Falta confirmar UNA vez con BLU_PROBE=1: el host/base + BLU_EARNINGS_PATH + la forma del JSON.
 
 import { createClient } from "@supabase/supabase-js";
-import { CognitoUserPool, CognitoUser, AuthenticationDetails } from "amazon-cognito-identity-js";
 
-// ── Config (env) ──────────────────────────────────────────────────────────────
 const {
-  // Cognito (config PÚBLICA — del bundle de BLU)
-  BLU_USER_POOL_ID,            // ej. us-east-1_AbCd1234   (la región sale del prefijo)
-  BLU_CLIENT_ID,               // ej. 7xxxxxxxxxxxxxxxxxxxxxxxxx
-  // Credenciales del usuario de servicio (SECRETOS)
-  BLU_USERNAME,                // email del usuario dedicado de BLU
-  BLU_PASSWORD,                // su password
-  // API de BLU
-  BLU_API_BASE = "https://app.blu.luxe",
-  BLU_EARNINGS_PATH = "/api/of-creator-reports",   // TODO: confirmar con un request real
-  // Maven (service_role → bypassa RLS; la RPC permite service_role)
+  BLU_JWT,
+  BLU_API_BASE = "https://of.unlok.me",
+  BLU_EARNINGS_PATH = "/api/earnings",   // CONFIRMAR con BLU_PROBE
+  BLU_WS_URL,                            // opcional: si está, hace el handshake de auth primero
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
-  // Operación
-  LOOKBACK_DAYS = "8",         // cuántos días hacia atrás traer cada corrida
+  LOOKBACK_DAYS = "8",
   RUN_EVERY_HOURS = "24",
   RUN_ONCE,
-  BLU_PROBE,                   // si =1: solo autentica + tantea endpoints candidatos y sale (recon)
+  BLU_PROBE,
 } = process.env;
 
-function requireEnv(keys = ["BLU_USER_POOL_ID", "BLU_CLIENT_ID", "BLU_USERNAME", "BLU_PASSWORD", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]) {
+function requireEnv(keys = ["BLU_JWT", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]) {
   const missing = keys.filter((k) => !process.env[k]);
   if (missing.length) throw new Error("Faltan env vars: " + missing.join(", "));
 }
@@ -44,87 +33,92 @@ const sb = () => createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-// ── 1) Login Cognito (SRP, no requiere habilitar USER_PASSWORD_AUTH) ──────────
-function cognitoLogin() {
-  const pool = new CognitoUserPool({ UserPoolId: BLU_USER_POOL_ID, ClientId: BLU_CLIENT_ID });
-  const user = new CognitoUser({ Username: BLU_USERNAME, Pool: pool });
-  const details = new AuthenticationDetails({ Username: BLU_USERNAME, Password: BLU_PASSWORD });
-  return new Promise((resolve, reject) => {
-    user.authenticateUser(details, {
-      onSuccess: (session) => resolve({
-        idToken: session.getIdToken().getJwtToken(),
-        accessToken: session.getAccessToken().getJwtToken(),
-      }),
-      onFailure: (err) => reject(new Error("Cognito login falló: " + (err?.message ?? err))),
-      newPasswordRequired: () => reject(new Error("El usuario de BLU requiere cambio de password; logueate una vez en BLU y poné una definitiva.")),
-    });
-  });
+// ── JWT: chequear expiración (claim exp, público) sin verificar firma ──
+function jwtExpMs(token) {
+  try {
+    const p = JSON.parse(Buffer.from(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
+    return p.exp ? p.exp * 1000 : null;
+  } catch { return null; }
 }
-
-// ── 2) Traer el reporte de ingresos de BLU ────────────────────────────────────
-function ymd(d) { return d.toISOString().slice(0, 10); }
-
-async function fetchEarnings(idToken) {
-  const to = new Date();
-  const from = new Date(Date.now() - Number(LOOKBACK_DAYS) * 86400000);
-  const url = new URL(BLU_API_BASE.replace(/\/$/, "") + BLU_EARNINGS_PATH);
-  // TODO: confirmar los nombres de los params con un request real de BLU.
-  url.searchParams.set("from", ymd(from));
-  url.searchParams.set("to", ymd(to));
-  const resp = await fetch(url, {
-    headers: { Authorization: `Bearer ${idToken}`, Accept: "application/json" },
-  });
-  if (!resp.ok) throw new Error(`BLU ${resp.status}: ${(await resp.text().catch(() => "")).slice(0, 300)}`);
-  return resp.json();
-}
-
-// ── Recon (BLU_PROBE=1): tantea endpoints candidatos y loguea status + forma ──
-// No ingesta nada. Sirve para confirmar BLU_EARNINGS_PATH y la forma del JSON SIN
-// pelear con el DevTools de BLU: lee los logs de Dokploy y ajustá transform().
-async function probe(idToken) {
-  const candidates = [
-    BLU_EARNINGS_PATH,
-    "/api/of-creator-reports", "/api/gross-earnings", "/api/net-earnings",
-    "/api/of-statistics", "/api/of-mass-statistics", "/api/avg-earnings",
-  ].filter((p, i, a) => a.indexOf(p) === i);
-  const to = new Date();
-  const from = new Date(Date.now() - Number(LOOKBACK_DAYS) * 86400000);
-  for (const path of candidates) {
-    const url = new URL(BLU_API_BASE.replace(/\/$/, "") + path);
-    url.searchParams.set("from", ymd(from));
-    url.searchParams.set("to", ymd(to));
-    try {
-      const resp = await fetch(url, { headers: { Authorization: `Bearer ${idToken}`, Accept: "application/json" } });
-      const text = await resp.text().catch(() => "");
-      let shape = "";
-      try { const j = JSON.parse(text); shape = " | claves: " + JSON.stringify(Object.keys(Array.isArray(j) ? (j[0] ?? {}) : j)); } catch {}
-      console.log(`[probe] ${resp.status} ${path}${shape}\n   ${text.slice(0, 400)}`);
-    } catch (e) {
-      console.log(`[probe] ERR ${path}: ${e.message}`);
-    }
+function assertNotExpired() {
+  const exp = jwtExpMs(BLU_JWT);
+  if (exp && Date.now() >= exp) {
+    throw Object.assign(new Error("BLU_JWT vencido. Renovalo a mano desde BLU y actualizá el secreto en Dokploy."), { expired: true });
   }
 }
 
-// ── 3) Transformar la respuesta de BLU a las filas que espera import_blu_earnings ──
-// TODO: ajustar al JSON REAL de BLU (hoy es la forma esperada del export "Detail":
-//   ingreso por modelo POR DÍA). Cada fila: { blu_name, date, subscription, tips,
-//   message, post, referral, stream, total }.
+const ymd = (d) => d.toISOString().slice(0, 10);
+
+// ── (opcional) handshake WS: { type:"auth:token", token } → primer mensaje = ack ──
+async function wsAuth() {
+  if (!BLU_WS_URL) return;
+  const { default: WS } = await import("ws");
+  await new Promise((resolve, reject) => {
+    const ws = new WS(BLU_WS_URL);
+    const to = setTimeout(() => { try { ws.close(); } catch {} reject(new Error("WS auth timeout")); }, 10000);
+    ws.on("open", () => ws.send(JSON.stringify({ type: "auth:token", token: BLU_JWT })));
+    ws.on("message", (data) => {
+      const txt = data.toString();
+      clearTimeout(to); try { ws.close(); } catch {}
+      if (/error|unauthorized|401|403|expired|invalid/i.test(txt)) {
+        return reject(Object.assign(new Error("WS auth rechazado (¿token vencido?): " + txt.slice(0, 200)), { expired: true }));
+      }
+      resolve();
+    });
+    ws.on("error", (e) => { clearTimeout(to); reject(new Error("WS error: " + e.message)); });
+  });
+}
+
+async function getJson(base, path, params) {
+  const url = new URL(base.replace(/\/$/, "") + path);
+  if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${BLU_JWT}`, Accept: "application/json" } });
+  if (resp.status === 401 || resp.status === 403) {
+    throw Object.assign(new Error(`BLU ${resp.status}: token inválido/vencido — rotá BLU_JWT`), { expired: true });
+  }
+  return { status: resp.status, text: await resp.text().catch(() => "") };
+}
+
+async function fetchEarnings() {
+  const to = new Date(), from = new Date(Date.now() - Number(LOOKBACK_DAYS) * 86400000);
+  const { status, text } = await getJson(BLU_API_BASE, BLU_EARNINGS_PATH, { from: ymd(from), to: ymd(to) });
+  if (status >= 400) throw new Error(`BLU ${status} en ${BLU_EARNINGS_PATH}: ${text.slice(0, 300)}`);
+  return JSON.parse(text);
+}
+
+// ── PROBE (BLU_PROBE=1): tantea host+endpoints con el JWT y loguea status + forma. No ingesta. ──
+async function probe() {
+  const bases = [...new Set([BLU_API_BASE.replace(/\/$/, ""), "https://of.unlok.me", "https://app.blu.luxe"])];
+  const paths = [...new Set([BLU_EARNINGS_PATH, "/api/earnings", "/api/creator-earnings/daily", "/api/v1/earnings",
+    "/api/gross-earnings", "/api/net-earnings", "/api/creator-reports", "/api/me", "/api/health"])];
+  const to = new Date(), from = new Date(Date.now() - Number(LOOKBACK_DAYS) * 86400000);
+  for (const base of bases) for (const path of paths) {
+    try {
+      const { status, text } = await getJson(base, path, { from: ymd(from), to: ymd(to) });
+      let shape = "";
+      try { const j = JSON.parse(text); shape = " claves:" + JSON.stringify(Object.keys(Array.isArray(j) ? (j[0] ?? {}) : j)); } catch {}
+      console.log(`[probe] ${status} ${base}${path}${shape}\n   ${text.slice(0, 280)}`);
+    } catch (e) { console.log(`[probe] ERR ${base}${path}: ${e.message}`); }
+  }
+}
+
+// ── Transformar la respuesta de BLU a las filas que espera import_blu_earnings ──
+// (defensivo con los nombres de campos — ajustar tras ver el PROBE real)
 function transform(payload) {
-  // Heurística defensiva: aceptar payload.data | payload.rows | payload (array).
   const raw = Array.isArray(payload) ? payload
     : Array.isArray(payload?.data) ? payload.data
     : Array.isArray(payload?.rows) ? payload.rows
-    : [];
+    : Array.isArray(payload?.earnings) ? payload.earnings : [];
   return raw.map((r) => ({
-    blu_name: String(r.creator ?? r.creator_name ?? r.name ?? "").trim(),
+    blu_name: String(r.creator ?? r.creator_name ?? r.model ?? r.name ?? "").trim(),
     date: String(r.date ?? r.day ?? "").slice(0, 10),
-    subscription: Number(r.subscription_gross ?? r.subscription ?? 0) || 0,
-    tips: Number(r.tips_gross ?? r.tips ?? 0) || 0,
-    message: Number(r.message_gross ?? r.message ?? 0) || 0,
-    post: Number(r.post_gross ?? r.post ?? 0) || 0,
-    referral: Number(r.referral_gross ?? r.referral ?? 0) || 0,
+    subscription: Number(r.subscriptions_earnings ?? r.subscription_gross ?? r.subscription ?? 0) || 0,
+    tips: Number(r.tips_earnings ?? r.tips_gross ?? r.tips ?? 0) || 0,
+    message: Number(r.messages_earnings ?? r.message_gross ?? r.message ?? 0) || 0,
+    post: Number(r.posts_earnings ?? r.post_gross ?? r.post ?? 0) || 0,
+    referral: Number(r.referrals_earnings ?? r.referral_gross ?? r.referral ?? 0) || 0,
     stream: Number(r.stream_gross ?? r.stream ?? 0) || 0,
-    total: Number(r.total_gross ?? r.total ?? 0) || 0,
+    total: Number(r.total_earnings ?? r.total_gross ?? r.total ?? 0) || 0,
   })).filter((x) => x.blu_name && /^\d{4}-\d{2}-\d{2}$/.test(x.date));
 }
 
@@ -137,37 +131,40 @@ async function ingest(rows) {
 
 async function runOnce() {
   requireEnv();
-  console.log(`[blu-bridge] login…`);
-  const { idToken } = await cognitoLogin();
+  assertNotExpired();
+  await wsAuth();
   console.log(`[blu-bridge] fetch earnings (últimos ${LOOKBACK_DAYS}d)…`);
-  const payload = await fetchEarnings(idToken);
-  console.log(`[blu-bridge] forma payload:`, Array.isArray(payload) ? `array[${payload.length}]` : JSON.stringify(Object.keys(payload ?? {})));
+  const payload = await fetchEarnings();
+  console.log(`[blu-bridge] forma:`, Array.isArray(payload) ? `array[${payload.length}]` : JSON.stringify(Object.keys(payload ?? {})));
   const rows = transform(payload);
-  console.log(`[blu-bridge] ${rows.length} filas parseadas → ingestando…`);
+  console.log(`[blu-bridge] ${rows.length} filas → ingestando…`);
   const result = await ingest(rows);
-  console.log(`[blu-bridge] ingesta OK:`, JSON.stringify(result));
+  console.log(`[blu-bridge] OK:`, JSON.stringify(result));
   return result;
 }
 
-// ── Scheduler ─────────────────────────────────────────────────────────────────
+function warnIfExpired(e) {
+  console.error("[blu-bridge] error:", e.message);
+  if (e.expired) console.error("[blu-bridge] ⚠ Renová BLU_JWT desde BLU y actualizá el secreto en Dokploy.");
+}
+
 async function main() {
   if (BLU_PROBE) {
-    try {
-      requireEnv(["BLU_USER_POOL_ID", "BLU_CLIENT_ID", "BLU_USERNAME", "BLU_PASSWORD"]);
-      console.log(`[blu-bridge] PROBE: login…`);
-      const { idToken } = await cognitoLogin();
-      await probe(idToken);
-      console.log(`[blu-bridge] PROBE listo. Ajustá BLU_EARNINGS_PATH/transform() con lo de arriba y quitá BLU_PROBE.`);
-    } catch (e) { console.error("[blu-bridge] PROBE error:", e.message); }
-    process.exit(0);
+    try { requireEnv(["BLU_JWT"]); assertNotExpired(); await wsAuth(); await probe(); console.log("[blu-bridge] PROBE listo. Seteá BLU_API_BASE/BLU_EARNINGS_PATH + ajustá transform() y quitá BLU_PROBE."); }
+    catch (e) { warnIfExpired(e); }
+    process.exit(0); return;
+  }
+  if (RUN_ONCE) {
+    try { await runOnce(); process.exit(0); }
+    catch (e) { warnIfExpired(e); process.exit(e.expired ? 2 : 1); }
     return;
   }
-  try { await runOnce(); }
-  catch (e) { console.error("[blu-bridge] error:", e.message); if (RUN_ONCE) process.exit(1); }
-  if (RUN_ONCE) { process.exit(0); return; }
-  const everyMs = Number(RUN_EVERY_HOURS) * 3600000;
+  // long-running (modo Application de Dokploy): corrida al arranque + cada RUN_EVERY_HOURS.
+  // No crashea ante error/token vencido: loguea y espera al próximo tick (para entonces puede estar rotado).
+  const tick = () => runOnce().catch(warnIfExpired);
+  await tick();
   console.log(`[blu-bridge] próxima corrida en ${RUN_EVERY_HOURS}h`);
-  setInterval(() => { runOnce().catch((e) => console.error("[blu-bridge] error:", e.message)); }, everyMs);
+  setInterval(tick, Number(RUN_EVERY_HOURS) * 3600000);
 }
 
 main();

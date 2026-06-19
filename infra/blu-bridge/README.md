@@ -1,31 +1,36 @@
 # blu-bridge
 
-Micro que jala el **ingreso diario por modelo** desde BLU (CRM interno de OnlyFans) y lo
-ingesta en Maven (RPC `import_blu_earnings`). Para Promolog (promo↔ingreso) + tab Ventas.
+Micro que jala el **ingreso diario por modelo** desde BLU y lo ingesta en Maven
+(RPC `import_blu_earnings`). Para Promolog (promo↔ingreso) + tab Ventas.
 
-Flujo: login Cognito (SRP, usuario de servicio) → GET `app.blu.luxe/api/...earnings` →
-transformar → `import_blu_earnings(rows)` en Maven (service_role).
+Flujo: lee `BLU_JWT` (sesión del owner) de env → (opcional) handshake WS de auth →
+GET REST de ingresos con `Authorization: Bearer <JWT>` → transformar → `import_blu_earnings(rows)`.
+
+## Auth (importante)
+- `BLU_JWT` es el **token de sesión del owner** (HS256, ~24h). El micro **reusa** ese token; no
+  crea sesión ni toca el login biométrico de BLU. Va como **secreto** en Dokploy.
+- **Rotación MANUAL:** cuando el JWT vence (~24h), el owner lo renueva desde BLU y actualiza el
+  secreto. El micro detecta 401/403 (o ack WS con error), loguea `⚠ Renová BLU_JWT`, y:
+  - en modo long-running (default): no crashea, espera al próximo tick;
+  - en `RUN_ONCE=1`: sale con código `2` (para alertar/reintentar vía cron de Dokploy).
 
 ## Deploy en Dokploy
-1. Crear una **App** (Docker) apuntando a este repo, path `infra/blu-bridge` (Dockerfile incluido).
-2. En **Environment / Secrets**, setear (ver `.env.example`):
-   - **Config pública de Cognito** (del bundle de BLU): `BLU_USER_POOL_ID`, `BLU_CLIENT_ID`.
-   - **Usuario de servicio de BLU** (SECRETOS, idealmente dedicado): `BLU_USERNAME`, `BLU_PASSWORD`.
-   - **API**: `BLU_API_BASE` (default `https://app.blu.luxe`), `BLU_EARNINGS_PATH` (confirmar con un request real).
-   - **Maven**: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (SECRETO).
-   - Operación: `LOOKBACK_DAYS` (default 8), `RUN_EVERY_HOURS` (default 24).
-3. Deploy. El micro corre, hace una corrida al arranque y luego cada `RUN_EVERY_HOURS`.
+1. App (Docker) apuntando a este repo, path `infra/blu-bridge` (Dockerfile incluido).
+2. En **Environment / Secrets** (ver `.env.example`):
+   - `BLU_JWT` (SECRETO), `BLU_API_BASE`, `BLU_EARNINGS_PATH`, `BLU_WS_URL` (opcional),
+   - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (SECRETO), `LOOKBACK_DAYS`, `RUN_EVERY_HOURS`.
+3. Deploy. Corre al arranque y cada `RUN_EVERY_HOURS`.
 
-## Falta confirmar (1 request real de BLU) — usar el modo PROBE
-En vez de pelear con el DevTools de BLU, seteá `BLU_PROBE=1` (con Cognito + usuario de
-servicio ya cargados) y deployá una vez: el micro se autentica, **tantea los endpoints
-candidatos** (`of-creator-reports`, `gross-earnings`, `net-earnings`, …) y loguea el
-**status + la forma del JSON** de cada uno, luego sale (no ingesta nada). Con eso:
-- confirmás `BLU_EARNINGS_PATH` exacto + sus query params,
-- y la forma del JSON → ajustar `transform()` en `index.mjs`.
-Después quitá `BLU_PROBE` y redeployá: corre normal (1 corrida al arranque + cada `RUN_EVERY_HOURS`).
+## Confirmar el endpoint (una vez, con PROBE)
+Con `BLU_JWT` ya seteado, poné `BLU_PROBE=1` y deployá una vez: el micro tantea host+endpoints
+candidatos (`/api/earnings`, `/api/creator-earnings/daily`, `/api/v1/earnings`, … en `of.unlok.me`
+y `app.blu.luxe`) con tu JWT, y loguea **status + forma del JSON** de cada uno. Con eso:
+- fijás `BLU_API_BASE` + `BLU_EARNINGS_PATH`,
+- ajustás `transform()` a la forma real,
+- quitás `BLU_PROBE` y redeployás.
 
 ## Notas
-- `import_blu_earnings` está gateada (management) pero permite `service_role` (que usa el micro).
-- Cognito vía SRP (`amazon-cognito-identity-js`) → no requiere habilitar USER_PASSWORD_AUTH en el client.
-- Ningún secreto vive en el repo: todo por env en Dokploy.
+- `import_blu_earnings` está gateada (management) pero permite `service_role` (lo usa el micro).
+- Ningún secreto vive en el repo: todo por env en Dokploy. El JWT nunca se hardcodea.
+- La rotación manual del JWT es frágil; el end-state robusto sigue siendo **acceso sancionado de BLU**
+  (token de servicio / API / export a un bucket).
