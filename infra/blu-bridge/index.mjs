@@ -1,30 +1,27 @@
 // blu-bridge — micro en Dokploy. Cada día (o on-demand):
-//   1) (opcional) handshake WS de auth con el JWT de sesión (si BLU_WS_URL está seteado).
-//   2) GET del reporte de ingresos por modelo/día (REST, Authorization: Bearer <JWT>).
-//   3) Transforma e ingesta en Maven vía RPC import_blu_earnings.
+//   1) Conecta WS a BLU (wss://of.unlok.me/) y autentica con el JWT de sesión.
+//   2) Pide el reporte de ingresos por modelo/día por el MISMO WS:
+//        {type:"agency:analytics:creator-reports", startDate, endDate, groupBy:"day", earningsType:"gross"}
+//   3) Recibe la respuesta (type:"agency:analytics:creator-reports" con 'range'), transforma e
+//      ingesta en Maven vía RPC import_blu_earnings.
 //
-// AUTH: BLU_JWT es la SESIÓN del owner (HS256, ~24h). Lo provee el owner como SECRETO en
-// Dokploy y lo ROTA A MANO cada 24h. El micro NO crea sesión ni bypassa el login biométrico:
-// solo reusa el token vigente. Si venció → 401/403 → loguea claro y (en RUN_ONCE) sale != 0.
-//
-// Falta confirmar UNA vez con BLU_PROBE=1: el host/base + BLU_EARNINGS_PATH + la forma del JSON.
+// BLU NO usa REST para esto: la data viaja por el WebSocket (protocolo de mensajes de la app).
+// AUTH: BLU_JWT = sesión del owner (HS256, ~24h), SECRETO en Dokploy, rotación manual.
+//   Vencido → la auth WS se rechaza / no llega respuesta → loguea "renová BLU_JWT".
 
 import { createClient } from "@supabase/supabase-js";
 
 const {
   BLU_JWT,
-  BLU_API_BASE = "https://of.unlok.me",
-  BLU_EARNINGS_PATH = "/api/earnings",   // CONFIRMAR con BLU_PROBE
-  BLU_WS_URL,                            // opcional: si está, hace el handshake de auth primero
+  BLU_WS_URL = "wss://of.unlok.me/",
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
   LOOKBACK_DAYS = "8",
   RUN_EVERY_HOURS = "24",
   RUN_ONCE,
-  BLU_PROBE,
 } = process.env;
 
-function requireEnv(keys = ["BLU_JWT", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]) {
+function requireEnv(keys = ["BLU_JWT", "BLU_WS_URL", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]) {
   const missing = keys.filter((k) => !process.env[k]);
   if (missing.length) throw new Error("Faltan env vars: " + missing.join(", "));
 }
@@ -33,7 +30,6 @@ const sb = () => createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-// ── JWT: chequear expiración (claim exp, público) sin verificar firma ──
 function jwtExpMs(token) {
   try {
     const p = JSON.parse(Buffer.from(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
@@ -49,77 +45,64 @@ function assertNotExpired() {
 
 const ymd = (d) => d.toISOString().slice(0, 10);
 
-// ── (opcional) handshake WS: { type:"auth:token", token } → primer mensaje = ack ──
-async function wsAuth() {
-  if (!BLU_WS_URL) return;
+// ── Traer el reporte de ingresos por el WebSocket ──
+async function fetchEarningsWS() {
   const { default: WS } = await import("ws");
-  await new Promise((resolve, reject) => {
+  const from = ymd(new Date(Date.now() - Number(LOOKBACK_DAYS) * 86400000));
+  const end = ymd(new Date());
+  return await new Promise((resolve, reject) => {
     const ws = new WS(BLU_WS_URL);
-    const to = setTimeout(() => { try { ws.close(); } catch {} reject(new Error("WS auth timeout")); }, 10000);
+    const to = setTimeout(() => { try { ws.close(); } catch {} reject(new Error("WS: sin respuesta de creator-reports (timeout 45s)")); }, 45000);
+    let queried = false, resolved = false;
+    const done = (fn, arg) => { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} fn(arg); };
     ws.on("open", () => ws.send(JSON.stringify({ type: "auth:token", token: BLU_JWT })));
     ws.on("message", (data) => {
-      const txt = data.toString();
-      clearTimeout(to); try { ws.close(); } catch {}
-      if (/error|unauthorized|401|403|expired|invalid/i.test(txt)) {
-        return reject(Object.assign(new Error("WS auth rechazado (¿token vencido?): " + txt.slice(0, 200)), { expired: true }));
+      let msg; try { msg = JSON.parse(data.toString()); } catch { return; }
+      const t = typeof msg.type === "string" ? msg.type : "";
+      if (/unauthorized|auth:error|auth:fail|token.*(invalid|expired)|invalid.*token/i.test(t + " " + (msg.error || ""))) {
+        return done(reject, Object.assign(new Error("WS auth rechazado (¿JWT vencido?): " + t), { expired: true }));
       }
-      resolve();
+      // El primer mensaje entrante confirma que la auth funcionó → pedimos el reporte.
+      if (!queried) {
+        queried = true;
+        ws.send(JSON.stringify({ type: "agency:analytics:creator-reports", startDate: from, endDate: end, groupBy: "day", earningsType: "gross" }));
+        console.log(`[blu-bridge] WS: pedido creator-reports ${from}..${end} (gross)`);
+        return;
+      }
+      // La RESPUESTA a la query trae 'range' (la query saliente usa startDate/endDate).
+      if (t === "agency:analytics:creator-reports" && msg.range) return done(resolve, msg);
     });
-    ws.on("error", (e) => { clearTimeout(to); reject(new Error("WS error: " + e.message)); });
+    ws.on("error", (e) => done(reject, new Error("WS error: " + e.message)));
+    ws.on("close", () => { if (!resolved) done(reject, new Error("WS cerró antes de responder (¿auth?)")); });
   });
 }
 
-async function getJson(base, path, params) {
-  const url = new URL(base.replace(/\/$/, "") + path);
-  if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const resp = await fetch(url, { headers: { Authorization: `Bearer ${BLU_JWT}`, Accept: "application/json" } });
-  if (resp.status === 401 || resp.status === 403) {
-    throw Object.assign(new Error(`BLU ${resp.status}: token inválido/vencido — rotá BLU_JWT`), { expired: true });
-  }
-  return { status: resp.status, text: await resp.text().catch(() => "") };
+// ── Transformar la respuesta a las filas que espera import_blu_earnings ──
+// Defensivo: maneja nested (creators→days) o flat. Ajustar a la forma real (se loguea en runOnce).
+const num = (v) => Number(v) || 0;
+function mapRow(name, d) {
+  return {
+    blu_name: name,
+    date: String(d.date ?? d.day ?? "").slice(0, 10),
+    subscription: num(d.subscriptions ?? d.subscription ?? d.subs),
+    tips: num(d.tips),
+    message: num(d.messages ?? d.message),
+    post: num(d.posts ?? d.post),
+    referral: num(d.referrals ?? d.referral),
+    stream: num(d.streams ?? d.stream),
+    total: num(d.total ?? d.gross ?? d.totalGross ?? d.earnings),
+  };
 }
-
-async function fetchEarnings() {
-  const to = new Date(), from = new Date(Date.now() - Number(LOOKBACK_DAYS) * 86400000);
-  const { status, text } = await getJson(BLU_API_BASE, BLU_EARNINGS_PATH, { from: ymd(from), to: ymd(to) });
-  if (status >= 400) throw new Error(`BLU ${status} en ${BLU_EARNINGS_PATH}: ${text.slice(0, 300)}`);
-  return JSON.parse(text);
-}
-
-// ── PROBE (BLU_PROBE=1): tantea host+endpoints con el JWT y loguea status + forma. No ingesta. ──
-async function probe() {
-  const bases = [...new Set([BLU_API_BASE.replace(/\/$/, ""), "https://of.unlok.me", "https://app.blu.luxe"])];
-  const paths = [...new Set([BLU_EARNINGS_PATH, "/api/earnings", "/api/creator-earnings/daily", "/api/v1/earnings",
-    "/api/gross-earnings", "/api/net-earnings", "/api/creator-reports", "/api/me", "/api/health"])];
-  const to = new Date(), from = new Date(Date.now() - Number(LOOKBACK_DAYS) * 86400000);
-  for (const base of bases) for (const path of paths) {
-    try {
-      const { status, text } = await getJson(base, path, { from: ymd(from), to: ymd(to) });
-      let shape = "";
-      try { const j = JSON.parse(text); shape = " claves:" + JSON.stringify(Object.keys(Array.isArray(j) ? (j[0] ?? {}) : j)); } catch {}
-      console.log(`[probe] ${status} ${base}${path}${shape}\n   ${text.slice(0, 280)}`);
-    } catch (e) { console.log(`[probe] ERR ${base}${path}: ${e.message}`); }
-  }
-}
-
-// ── Transformar la respuesta de BLU a las filas que espera import_blu_earnings ──
-// (defensivo con los nombres de campos — ajustar tras ver el PROBE real)
 function transform(payload) {
-  const raw = Array.isArray(payload) ? payload
-    : Array.isArray(payload?.data) ? payload.data
-    : Array.isArray(payload?.rows) ? payload.rows
-    : Array.isArray(payload?.earnings) ? payload.earnings : [];
-  return raw.map((r) => ({
-    blu_name: String(r.creator ?? r.creator_name ?? r.model ?? r.name ?? "").trim(),
-    date: String(r.date ?? r.day ?? "").slice(0, 10),
-    subscription: Number(r.subscriptions_earnings ?? r.subscription_gross ?? r.subscription ?? 0) || 0,
-    tips: Number(r.tips_earnings ?? r.tips_gross ?? r.tips ?? 0) || 0,
-    message: Number(r.messages_earnings ?? r.message_gross ?? r.message ?? 0) || 0,
-    post: Number(r.posts_earnings ?? r.post_gross ?? r.post ?? 0) || 0,
-    referral: Number(r.referrals_earnings ?? r.referral_gross ?? r.referral ?? 0) || 0,
-    stream: Number(r.stream_gross ?? r.stream ?? 0) || 0,
-    total: Number(r.total_earnings ?? r.total_gross ?? r.total ?? 0) || 0,
-  })).filter((x) => x.blu_name && /^\d{4}-\d{2}-\d{2}$/.test(x.date));
+  const arr = payload.creators || payload.data || payload.rows || payload.report || payload.results || [];
+  const out = [];
+  for (const c of (Array.isArray(arr) ? arr : [])) {
+    const name = String(c.creator ?? c.creatorName ?? c.name ?? c.username ?? c.modelUsername ?? c.modelLabel ?? "").trim();
+    const days = c.days || c.daily || c.breakdown || c.dailyEarnings || c.earnings;
+    if (Array.isArray(days)) { for (const d of days) out.push(mapRow(name, d)); }
+    else if (c.date || c.day) { out.push(mapRow(name, c)); }
+  }
+  return out.filter((x) => x.blu_name && /^\d{4}-\d{2}-\d{2}$/.test(x.date));
 }
 
 async function ingest(rows) {
@@ -132,12 +115,14 @@ async function ingest(rows) {
 async function runOnce() {
   requireEnv();
   assertNotExpired();
-  await wsAuth();
-  console.log(`[blu-bridge] fetch earnings (últimos ${LOOKBACK_DAYS}d)…`);
-  const payload = await fetchEarnings();
-  console.log(`[blu-bridge] forma:`, Array.isArray(payload) ? `array[${payload.length}]` : JSON.stringify(Object.keys(payload ?? {})));
+  console.log(`[blu-bridge] conectando WS ${BLU_WS_URL}…`);
+  const payload = await fetchEarningsWS();
+  // Loguear la forma para poder afinar transform() con la estructura real.
+  console.log(`[blu-bridge] respuesta keys:`, JSON.stringify(Object.keys(payload)));
+  const arr = payload.creators || payload.data || payload.rows || payload.report || payload.results || [];
+  console.log(`[blu-bridge] muestra 1er elemento:`, JSON.stringify(Array.isArray(arr) ? arr[0] : arr).slice(0, 700));
   const rows = transform(payload);
-  console.log(`[blu-bridge] ${rows.length} filas → ingestando…`);
+  console.log(`[blu-bridge] ${rows.length} filas parseadas → ingestando…`);
   const result = await ingest(rows);
   console.log(`[blu-bridge] OK:`, JSON.stringify(result));
   return result;
@@ -149,21 +134,11 @@ function warnIfExpired(e) {
 }
 
 async function main() {
-  if (BLU_PROBE) {
-    // Probe solo-REST (sin WS, que es para realtime): tantea endpoints con el Bearer.
-    try { requireEnv(["BLU_JWT"]); assertNotExpired(); await probe(); console.log("[blu-bridge] PROBE listo. Seteá BLU_API_BASE/BLU_EARNINGS_PATH, ajustá transform() y quitá BLU_PROBE."); }
-    catch (e) { warnIfExpired(e); }
-    // Mantener el contenedor vivo para que los logs del probe PERSISTAN (sin flapear).
-    setInterval(() => {}, 1 << 30);
-    return;
-  }
   if (RUN_ONCE) {
     try { await runOnce(); process.exit(0); }
     catch (e) { warnIfExpired(e); process.exit(e.expired ? 2 : 1); }
     return;
   }
-  // long-running (modo Application de Dokploy): corrida al arranque + cada RUN_EVERY_HOURS.
-  // No crashea ante error/token vencido: loguea y espera al próximo tick (para entonces puede estar rotado).
   const tick = () => runOnce().catch(warnIfExpired);
   await tick();
   console.log(`[blu-bridge] próxima corrida en ${RUN_EVERY_HOURS}h`);
