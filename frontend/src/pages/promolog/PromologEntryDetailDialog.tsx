@@ -96,14 +96,25 @@ const PromologEntryDetailDialog = ({
     },
   });
 
-  // Ingreso (BLU) del día de la promo — el cruce promo↔ingreso, claro y por día.
+  // Ingreso (BLU) alrededor de la promo (día-1 .. día+3), con el día de la promo resaltado.
   const promoDate = (entry?.rawDate || "").slice(0, 10) || null;
-  const { data: promoEarnings = [] } = useCreatorDailyEarnings(entry?.creator_id, promoDate, promoDate, open);
+  const shiftDay = (d: string, days: number) => {
+    const dt = new Date(d + "T00:00:00Z");
+    dt.setUTCDate(dt.getUTCDate() + days);
+    return dt.toISOString().slice(0, 10);
+  };
+  const { data: earnings = [] } = useCreatorDailyEarnings(
+    entry?.creator_id,
+    promoDate ? shiftDay(promoDate, -1) : null,
+    promoDate ? shiftDay(promoDate, 3) : null,
+    open,
+  );
 
   if (!entry) return null;
   const showStoryGallery = dayStories.length > 0;
-  const dayEarning = promoEarnings[0];
   const money0 = (n: number) => "$" + Math.round(n || 0).toLocaleString("en-US");
+  const MESES_ABBR = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const fmtDay = (ymd: string) => { const p = ymd.split("-"); return `${Number(p[2])} ${MESES_ABBR[Number(p[1]) - 1]}`; };
   const earningChannels: Array<[string, string]> = [
     ["Subs", "subscription_gross"], ["Mensajes", "message_gross"], ["Tips", "tips_gross"],
     ["Posts", "post_gross"], ["Ref", "referral_gross"], ["Stream", "stream_gross"],
@@ -208,27 +219,49 @@ const PromologEntryDetailDialog = ({
             </div>
           </div>
 
-          {/* Ingreso (BLU) del día de la promo — cruce promo↔ingreso, claro y por día.
-              Solo con datos (RLS de management + ingreso > 0). */}
-          {dayEarning && dayEarning.total_gross > 0 && (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-1.5">
-              <div className="flex items-baseline justify-between gap-2">
+          {/* Ingreso (BLU) alrededor de la promo — gross diario del día-1 al día+3, con el
+              día de la promo resaltado + desglose por canal de ese día. Solo con datos
+              (RLS de management + días con ingreso > 0). */}
+          {earnings.length > 0 && (() => {
+            const byDate: Record<string, (typeof earnings)[number]> = Object.fromEntries(
+              earnings.map((e) => [e.date, e]),
+            );
+            const promo = promoDate ? byDate[promoDate] : undefined;
+            return (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
                 <p className="text-xs uppercase tracking-wider text-amber-400 font-semibold">
-                  Ingreso (BLU) · {entry.date}
+                  Ingresos (BLU) · alrededor de la promo
                 </p>
-                <span className="text-lg font-bold tabular-nums">{money0(dayEarning.total_gross)}</span>
+                <div className="flex flex-wrap gap-2">
+                  {earnings.map((e) => {
+                    const isPromo = e.date === promoDate;
+                    return (
+                      <div
+                        key={e.date}
+                        className={`rounded-md px-2.5 py-1.5 text-center border ${isPromo ? "border-amber-500/60 bg-amber-500/10" : "border-border bg-muted/30"}`}
+                      >
+                        <div className="text-[10px] text-muted-foreground">
+                          {fmtDay(e.date)}{isPromo ? " · promo" : ""}
+                        </div>
+                        <div className="text-sm font-semibold tabular-nums">{money0(e.total_gross)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {promo && (
+                  <div className="flex flex-wrap gap-1.5 pt-0.5 text-[10px]">
+                    {earningChannels
+                      .filter(([, k]) => Number((promo as any)[k]) > 0)
+                      .map(([label, k]) => (
+                        <span key={k} className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2 py-0.5 tabular-nums">
+                          {label}: {money0(Number((promo as any)[k]))}
+                        </span>
+                      ))}
+                  </div>
+                )}
               </div>
-              <div className="flex flex-wrap gap-1.5 text-[10px]">
-                {earningChannels
-                  .filter(([, k]) => Number((dayEarning as any)[k]) > 0)
-                  .map(([label, k]) => (
-                    <span key={k} className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2 py-0.5 tabular-nums">
-                      {label}: {money0(Number((dayEarning as any)[k]))}
-                    </span>
-                  ))}
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Redes de la modelo — chips clickeables a sus perfiles (IG, Facebook,
               Reddit, X, TikTok, YouTube, Otra), traídos del perfil de la creadora. */}
