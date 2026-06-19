@@ -15,6 +15,7 @@ import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
 import type { PromologEntry } from "./PromologEntryCard";
 import { computeDayScore, type DayScore } from "./promoScore";
 import PromoQualityBar from "./PromoQualityBar";
+import { useCreatorDailyEarnings } from "@/hooks/useCreatorDailyEarnings";
 
 // ── Calendario de promos por creadora ─────────────────────────────────
 // Subtab que muestra, para UNA creadora y un mes/año elegidos, qué días
@@ -134,6 +135,11 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     },
   });
 
+  // Ingreso diario (BLU) de la creadora en el mes mostrado — para marcar 🔥/👑.
+  const monthStart = format(new Date(year, month, 1), "yyyy-MM-dd");
+  const monthEnd = format(new Date(year, month + 1, 0), "yyyy-MM-dd");
+  const { data: earnings = [] } = useCreatorDailyEarnings(creatorId || null, monthStart, monthEnd, !!creatorId);
+
   // Mapea una entry cruda al shape PromologEntry que usa el popup/galería.
   const mapEntry = (e: any): PromologEntry => ({
     id: e.id,
@@ -203,6 +209,37 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     }
     return m;
   }, [dayMap]);
+
+  // Ingreso por día (yyyy-mm-dd → total) + marcadores 🔥/👑.
+  const incomeByDay = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of earnings) m.set(e.date, e.total_gross);
+    return m;
+  }, [earnings]);
+  const earningMarkers = useMemo(() => {
+    const markers = new Map<string, "fire" | "crown">();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const dk = (d: number) => `${year}-${pad(month + 1)}-${pad(d)}`;
+    // 🔥 el mejor día de cada bloque de 5 (1-5, 6-10, …)
+    for (let start = 1; start <= lastDay; start += 5) {
+      const end = Math.min(start + 4, lastDay);
+      let bestDay = 0, bestVal = 0;
+      for (let d = start; d <= end; d++) {
+        const v = incomeByDay.get(dk(d)) || 0;
+        if (v > bestVal) { bestVal = v; bestDay = d; }
+      }
+      if (bestDay > 0) markers.set(dk(bestDay), "fire");
+    }
+    // 👑 el mejor día del mes (pisa el 🔥 de ese día)
+    let crownDay = 0, crownVal = 0;
+    for (let d = 1; d <= lastDay; d++) {
+      const v = incomeByDay.get(dk(d)) || 0;
+      if (v > crownVal) { crownVal = v; crownDay = d; }
+    }
+    if (crownDay > 0) markers.set(dk(crownDay), "crown");
+    return markers;
+  }, [incomeByDay, year, month]);
 
   const statusFor = (bucket?: { total: number; trueCount: number; partialCount: number }): DayStatus => {
     if (!bucket || bucket.total === 0) return "none";
@@ -398,6 +435,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
               <LegendChip status="partial" label="Parcial" />
               <LegendChip status="no" label="No promocionó" />
               <LegendChip status="none" label="Sin análisis" />
+              <span className="text-xs text-muted-foreground">· 🔥 mejor día (cada 5) · 👑 mejor del mes</span>
             </div>
           </div>
 
@@ -434,9 +472,24 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
                       isToday(d) && "ring-2 ring-inset ring-primary/60",
                     )}
                   >
-                    <span className={cn("text-sm font-medium tabular-nums", !inMonth && "opacity-50")}>
-                      {d.getDate()}
-                    </span>
+                    <div className="flex items-start justify-between gap-1">
+                      <span className={cn("text-sm font-medium tabular-nums", !inMonth && "opacity-50")}>
+                        {d.getDate()}
+                      </span>
+                      {inMonth && earningMarkers.get(key) && (
+                        <span
+                          className="text-sm leading-none"
+                          title={earningMarkers.get(key) === "crown" ? "Mejor día de ingresos del mes" : "Mejor día de ingresos de estos 5 días"}
+                        >
+                          {earningMarkers.get(key) === "crown" ? "👑" : "🔥"}
+                        </span>
+                      )}
+                    </div>
+                    {inMonth && (incomeByDay.get(key) || 0) > 0 && (
+                      <span className="text-[10px] font-semibold leading-none tabular-nums text-amber-600 dark:text-amber-400">
+                        ${Math.round(incomeByDay.get(key) || 0).toLocaleString("en-US")}
+                      </span>
+                    )}
                     {inMonth && !future && status !== "none" && (
                       <div className="mt-auto flex flex-col gap-1">
                         <div className="flex items-center justify-between gap-1">
