@@ -104,9 +104,19 @@ serve(async (req) => {
     .order("sent_at", { ascending: false })
     .limit(limit);
 
-  let ok = 0;
+  // Presupuesto de tiempo (wall-clock): la edge function la mata la plataforma a los
+  // ~150s (devuelve 504, desperdicia el lote y congestiona pg_net). El timeout por-audio
+  // es 90s, así que NO arrancamos un audio nuevo si ya pasaron 55s (peor caso 55+90=145s
+  // < 150). Mantenemos el timeout por-audio en 90s para NO abandonar audios largos
+  // legítimos (evita crear "poison"). Lo que no entra en el presupuesto lo toma el
+  // próximo tick del cron. [fix incidente pg_net 2026-06-19]
+  const startedAt = Date.now();
+  const START_BUDGET_MS = 55_000;
+  let ok = 0, attempted = 0;
   for (const r of (rows ?? []) as Array<{ id: string; media_url: string }>) {
+    if (Date.now() - startedAt > START_BUDGET_MS) break;
+    attempted++;
     if (await processOne(sb, r)) ok++;
   }
-  return json({ ok: true, processed: (rows ?? []).length, transcribed: ok });
+  return json({ ok: true, fetched: (rows ?? []).length, attempted, transcribed: ok });
 });
