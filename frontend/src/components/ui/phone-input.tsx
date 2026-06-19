@@ -7,66 +7,15 @@ import {
 } from "@/components/ui/command";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { COUNTRY_DIAL_CODES } from "@/lib/country-codes";
 
-// IMPORTANTE: USA va antes que Canadá. Ambos comparten +1 — y como el parser
-// devuelve el PRIMER match, el orden importa. La agencia trabaja casi
-// exclusivamente con creadoras en USA, así que default a US es correcto.
-// Si el usuario explícitamente elige Canadá, el componente recuerda la
-// selección en state interno (ver `pickedISO` abajo).
-const COUNTRY_CODES = [
-  { code: "+1", country: "US", flag: "🇺🇸", name: "Estados Unidos" },
-  { code: "+1", country: "CA", flag: "🇨🇦", name: "Canadá" },
-  { code: "+54", country: "AR", flag: "🇦🇷", name: "Argentina" },
-  { code: "+61", country: "AU", flag: "🇦🇺", name: "Australia" },
-  { code: "+501", country: "BZ", flag: "🇧🇿", name: "Belice" },
-  { code: "+591", country: "BO", flag: "🇧🇴", name: "Bolivia" },
-  { code: "+55", country: "BR", flag: "🇧🇷", name: "Brasil" },
-  { code: "+56", country: "CL", flag: "🇨🇱", name: "Chile" },
-  { code: "+86", country: "CN", flag: "🇨🇳", name: "China" },
-  { code: "+57", country: "CO", flag: "🇨🇴", name: "Colombia" },
-  { code: "+82", country: "KR", flag: "🇰🇷", name: "Corea del Sur" },
-  { code: "+506", country: "CR", flag: "🇨🇷", name: "Costa Rica" },
-  { code: "+53", country: "CU", flag: "🇨🇺", name: "Cuba" },
-  { code: "+20", country: "EG", flag: "🇪🇬", name: "Egipto" },
-  { code: "+503", country: "SV", flag: "🇸🇻", name: "El Salvador" },
-  { code: "+971", country: "AE", flag: "🇦🇪", name: "Emiratos Árabes" },
-  { code: "+593", country: "EC", flag: "🇪🇨", name: "Ecuador" },
-  { code: "+34", country: "ES", flag: "🇪🇸", name: "España" },
-  { code: "+63", country: "PH", flag: "🇵🇭", name: "Filipinas" },
-  { code: "+33", country: "FR", flag: "🇫🇷", name: "Francia" },
-  { code: "+502", country: "GT", flag: "🇬🇹", name: "Guatemala" },
-  { code: "+594", country: "GF", flag: "🇬🇫", name: "Guyana Francesa" },
-  { code: "+592", country: "GY", flag: "🇬🇾", name: "Guyana" },
-  { code: "+509", country: "HT", flag: "🇭🇹", name: "Haití" },
-  { code: "+504", country: "HN", flag: "🇭🇳", name: "Honduras" },
-  { code: "+91", country: "IN", flag: "🇮🇳", name: "India" },
-  { code: "+972", country: "IL", flag: "🇮🇱", name: "Israel" },
-  { code: "+39", country: "IT", flag: "🇮🇹", name: "Italia" },
-  { code: "+1876", country: "JM", flag: "🇯🇲", name: "Jamaica" },
-  { code: "+81", country: "JP", flag: "🇯🇵", name: "Japón" },
-  { code: "+212", country: "MA", flag: "🇲🇦", name: "Marruecos" },
-  { code: "+52", country: "MX", flag: "🇲🇽", name: "México" },
-  { code: "+505", country: "NI", flag: "🇳🇮", name: "Nicaragua" },
-  { code: "+234", country: "NG", flag: "🇳🇬", name: "Nigeria" },
-  { code: "+31", country: "NL", flag: "🇳🇱", name: "Países Bajos" },
-  { code: "+507", country: "PA", flag: "🇵🇦", name: "Panamá" },
-  { code: "+595", country: "PY", flag: "🇵🇾", name: "Paraguay" },
-  { code: "+51", country: "PE", flag: "🇵🇪", name: "Perú" },
-  { code: "+351", country: "PT", flag: "🇵🇹", name: "Portugal" },
-  { code: "+1787", country: "PR", flag: "🇵🇷", name: "Puerto Rico" },
-  { code: "+44", country: "GB", flag: "🇬🇧", name: "Reino Unido" },
-  { code: "+1809", country: "DO", flag: "🇩🇴", name: "Rep. Dominicana" },
-  { code: "+7", country: "RU", flag: "🇷🇺", name: "Rusia" },
-  { code: "+966", country: "SA", flag: "🇸🇦", name: "Arabia Saudí" },
-  { code: "+27", country: "ZA", flag: "🇿🇦", name: "Sudáfrica" },
-  { code: "+597", country: "SR", flag: "🇸🇷", name: "Surinam" },
-  { code: "+66", country: "TH", flag: "🇹🇭", name: "Tailandia" },
-  { code: "+1868", country: "TT", flag: "🇹🇹", name: "Trinidad y Tobago" },
-  { code: "+90", country: "TR", flag: "🇹🇷", name: "Turquía" },
-  { code: "+598", country: "UY", flag: "🇺🇾", name: "Uruguay" },
-  { code: "+58", country: "VE", flag: "🇻🇪", name: "Venezuela" },
-  { code: "+49", country: "DE", flag: "🇩🇪", name: "Alemania" },
-];
+// Lista COMPLETA de indicativos compartida (lib/country-codes). Mapeamos `iso`→`country`
+// para no tocar el resto del componente. En la fuente USA va antes que Canadá (ambos +1)
+// → el parser (primer match) devuelve USA por defecto, correcto para el negocio; si el
+// usuario elige Canadá explícitamente, se recuerda en `pickedISO`.
+const COUNTRY_CODES = COUNTRY_DIAL_CODES.map((c) => ({
+  code: c.code, country: c.iso, flag: c.flag, name: c.name,
+}));
 
 // Sort by code length descending so longer codes match first
 const SORTED_CODES = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length);

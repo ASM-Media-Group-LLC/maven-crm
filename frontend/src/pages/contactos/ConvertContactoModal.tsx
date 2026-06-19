@@ -22,6 +22,10 @@ interface Props {
 const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Props) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  // OJO: este hook debe ir ANTES de cualquier return condicional. Estaba después del
+  // `if (!contacto) return null` → al abrir el modal (contacto null→set) cambiaba el
+  // número de hooks entre renders → React crasheaba (pantalla en blanco → dashboard).
+  const { isAdmin } = useUserRole();
 
   const convert = useMutation({
     mutationFn: async () => {
@@ -58,8 +62,8 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
       toast({ title: "Contacto convertido", description: "El creador fue creado exitosamente." });
       onConverted();
     },
-    onError: () => {
-      toast({ title: "Error al convertir", variant: "destructive" });
+    onError: (e: unknown) => {
+      toast({ title: "Error al convertir", description: (e as Error)?.message ?? undefined, variant: "destructive" });
     },
   });
 
@@ -71,7 +75,6 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
   // de models como fuente canónica de identidad.
   const missingHandle = !contacto.handle || !contacto.handle.trim();
 
-  const { isAdmin } = useUserRole();
   const items = [
     { label: "Nombre", value: contacto.name },
     { label: "Handle", value: contacto.handle || "—" },

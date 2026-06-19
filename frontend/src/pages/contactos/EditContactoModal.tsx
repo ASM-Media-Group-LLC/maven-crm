@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { CountryCodeSelect } from "@/components/ui/country-code-select";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -34,14 +35,6 @@ const DEFAULT_COMPANIES = [
   "Kash", "Alvaro Letshoot", "Blue App", "PicLink", "Pagomundo", "Exchange", "Unlok", "Trafix",
 ];
 const PLATFORMS = ["Instagram", "TikTok", "Twitter/X", "OnlyFans", "Otra"];
-
-const COUNTRY_CODES = [
-  { code: "+57", label: "🇨🇴 Colombia +57" }, { code: "+52", label: "🇲🇽 México +52" },
-  { code: "+54", label: "🇦🇷 Argentina +54" }, { code: "+34", label: "🇪🇸 España +34" },
-  { code: "+56", label: "🇨🇱 Chile +56" }, { code: "+51", label: "🇵🇪 Perú +51" },
-  { code: "+598", label: "🇺🇾 Uruguay +598" }, { code: "+55", label: "🇧🇷 Brasil +55" },
-  { code: "+1", label: "🇺🇸 Estados Unidos +1" },
-];
 
 interface Props {
   open: boolean;
@@ -201,10 +194,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
                 <div className="space-y-1.5">
                   <Label className="text-sm font-medium">Teléfono</Label>
                   <div className="flex gap-2">
-                    <Select value={countryCode} onValueChange={setCountryCode}>
-                      <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>{COUNTRY_CODES.map((cc) => <SelectItem key={cc.code} value={cc.code}>{cc.label}</SelectItem>)}</SelectContent>
-                    </Select>
+                    <CountryCodeSelect value={countryCode} onChange={setCountryCode} />
                     <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Número de teléfono" className="flex-1" />
                   </div>
                 </div>
