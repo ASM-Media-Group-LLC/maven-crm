@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCreatorDailyEarnings } from "@/hooks/useCreatorDailyEarnings";
+import CreatorEarningsCalendar from "./CreatorEarningsCalendar";
 
 interface Props {
   creatorId: string;
@@ -17,10 +18,13 @@ const money2 = (n: number | null) =>
 const money0 = (n: number) => `$${Math.round(n || 0).toLocaleString("en-US")}`;
 
 const MonetizacionTabContent = ({ creatorId }: Props) => {
-  // ── Ingreso diario desde BLU (creator_daily_earnings), últimos 30 días ──
-  const today = new Date();
-  const toDate = today.toISOString().slice(0, 10);
-  const fromDate = new Date(today.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+  // ── Ingreso diario desde BLU (creator_daily_earnings), MES ACTUAL ──
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-11
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const fromDate = `${year}-${pad(month + 1)}-01`;
+  const toDate = `${year}-${pad(month + 1)}-${pad(new Date(year, month + 1, 0).getDate())}`;
   const { data: daily = [], isLoading: loadingDaily } = useCreatorDailyEarnings(creatorId, fromDate, toDate);
 
   const sum = (k: keyof (typeof daily)[number]) => daily.reduce((a, e) => a + (Number(e[k]) || 0), 0);
@@ -62,7 +66,7 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
             <TrendingUp className="h-5 w-5" />
             Ingresos OnlyFans (BLU)
           </CardTitle>
-          <CardDescription>Gross diario · últimos 30 días</CardDescription>
+          <CardDescription>Gross diario · este mes</CardDescription>
         </CardHeader>
         <CardContent>
           {loadingDaily ? (
@@ -72,7 +76,7 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
               {/* Total del período + desglose por canal */}
               <div className="flex flex-wrap items-end gap-x-6 gap-y-1">
                 <div>
-                  <div className="text-xs text-muted-foreground">Total (30 días)</div>
+                  <div className="text-xs text-muted-foreground">Total del mes</div>
                   <div className="text-2xl font-bold tabular-nums">{money0(totalGross)}</div>
                 </div>
                 <div className="text-xs text-muted-foreground pb-1">{daily.length} días con ingreso</div>
@@ -85,31 +89,8 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
                   </div>
                 ))}
               </div>
-              {/* Detalle diario */}
-              <div className="max-h-[280px] overflow-auto rounded-md border border-border">
-                <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-card">
-                    <TableRow>
-                      <TableHead>Día</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">Subs</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">Mensajes</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">Tips</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[...daily].reverse().map((e) => (
-                      <TableRow key={e.date}>
-                        <TableCell>{e.date}</TableCell>
-                        <TableCell className="text-right font-medium tabular-nums">{money0(e.total_gross)}</TableCell>
-                        <TableCell className="text-right tabular-nums hidden sm:table-cell text-muted-foreground">{money0(e.subscription_gross)}</TableCell>
-                        <TableCell className="text-right tabular-nums hidden sm:table-cell text-muted-foreground">{money0(e.message_gross)}</TableCell>
-                        <TableCell className="text-right tabular-nums hidden sm:table-cell text-muted-foreground">{money0(e.tips_gross)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              {/* Calendario del mes con 🔥 (mejor de cada 5 días) + 👑 (mejor del mes) */}
+              <CreatorEarningsCalendar daily={daily} year={year} month={month} />
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-8">

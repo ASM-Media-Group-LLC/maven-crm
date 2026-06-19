@@ -18,6 +18,7 @@ import TikTokIcon from "@/components/icons/TikTokIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import PromologStoryGallery from "./PromologStoryGallery";
 import type { PromologEntry } from "./PromologEntryCard";
+import { useCreatorDailyEarnings } from "@/hooks/useCreatorDailyEarnings";
 
 const SOCIAL_PLATFORMS = ["instagram", "tiktok", "twitter", "x", "youtube", "linkedin", "facebook", "reddit"];
 
@@ -95,8 +96,18 @@ const PromologEntryDetailDialog = ({
     },
   });
 
+  // Ingreso (BLU) del día de la promo — el cruce promo↔ingreso, claro y por día.
+  const promoDate = (entry?.rawDate || "").slice(0, 10) || null;
+  const { data: promoEarnings = [] } = useCreatorDailyEarnings(entry?.creator_id, promoDate, promoDate, open);
+
   if (!entry) return null;
   const showStoryGallery = dayStories.length > 0;
+  const dayEarning = promoEarnings[0];
+  const money0 = (n: number) => "$" + Math.round(n || 0).toLocaleString("en-US");
+  const earningChannels: Array<[string, string]> = [
+    ["Subs", "subscription_gross"], ["Mensajes", "message_gross"], ["Tips", "tips_gross"],
+    ["Posts", "post_gross"], ["Ref", "referral_gross"], ["Stream", "stream_gross"],
+  ];
 
   // Nombre / @handle → IG de la cuenta escaneada en este entry.
   const igUrl = buildSocialUrl("instagram", entry.handle);
@@ -196,6 +207,28 @@ const PromologEntryDetailDialog = ({
               <span className="font-medium">{entry.time}</span>
             </div>
           </div>
+
+          {/* Ingreso (BLU) del día de la promo — cruce promo↔ingreso, claro y por día.
+              Solo con datos (RLS de management + ingreso > 0). */}
+          {dayEarning && dayEarning.total_gross > 0 && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-1.5">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-xs uppercase tracking-wider text-amber-400 font-semibold">
+                  Ingreso (BLU) · {entry.date}
+                </p>
+                <span className="text-lg font-bold tabular-nums">{money0(dayEarning.total_gross)}</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 text-[10px]">
+                {earningChannels
+                  .filter(([, k]) => Number((dayEarning as any)[k]) > 0)
+                  .map(([label, k]) => (
+                    <span key={k} className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2 py-0.5 tabular-nums">
+                      {label}: {money0(Number((dayEarning as any)[k]))}
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
 
           {/* Redes de la modelo — chips clickeables a sus perfiles (IG, Facebook,
               Reddit, X, TikTok, YouTube, Otra), traídos del perfil de la creadora. */}
