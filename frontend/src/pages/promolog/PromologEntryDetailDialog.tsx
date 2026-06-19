@@ -18,7 +18,6 @@ import TikTokIcon from "@/components/icons/TikTokIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import PromologStoryGallery from "./PromologStoryGallery";
 import type { PromologEntry } from "./PromologEntryCard";
-import { useCreatorDailyEarnings } from "@/hooks/useCreatorDailyEarnings";
 
 const SOCIAL_PLATFORMS = ["instagram", "tiktok", "twitter", "x", "youtube", "linkedin", "facebook", "reddit"];
 
@@ -95,21 +94,6 @@ const PromologEntryDetailDialog = ({
       return data;
     },
   });
-
-  // Ingresos (BLU) de la creadora alrededor de la fecha de la promo (día-1 .. día+3),
-  // para ver el cruce promo↔ingreso. rawDate = timestamp UTC crudo del entry.
-  const promoDate = (entry?.rawDate || "").slice(0, 10) || null;
-  const shiftDay = (d: string, days: number) => {
-    const dt = new Date(d + "T00:00:00Z");
-    dt.setUTCDate(dt.getUTCDate() + days);
-    return dt.toISOString().slice(0, 10);
-  };
-  const { data: earnings = [] } = useCreatorDailyEarnings(
-    entry?.creator_id,
-    promoDate ? shiftDay(promoDate, -1) : null,
-    promoDate ? shiftDay(promoDate, 3) : null,
-    open,
-  );
 
   if (!entry) return null;
   const showStoryGallery = dayStories.length > 0;
@@ -212,58 +196,6 @@ const PromologEntryDetailDialog = ({
               <span className="font-medium">{entry.time}</span>
             </div>
           </div>
-
-          {/* Ingresos (BLU) — cruce promo↔ingreso: el gross de la creadora alrededor
-              de la promo (día-1 al día+3). Solo se ve con datos (RLS de management +
-              días con ingreso > 0). El día de la promo va resaltado. */}
-          {earnings.length > 0 && (() => {
-            const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
-            const byDate: Record<string, (typeof earnings)[number]> = Object.fromEntries(
-              earnings.map((e) => [e.date, e]),
-            );
-            const promo = promoDate ? byDate[promoDate] : undefined;
-            const channels: Array<[string, keyof (typeof earnings)[number]]> = [
-              ["Subs", "subscription_gross"], ["Tips", "tips_gross"], ["Msgs", "message_gross"],
-              ["Posts", "post_gross"], ["Ref", "referral_gross"], ["Stream", "stream_gross"],
-            ];
-            return (
-              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
-                <p className="text-xs uppercase tracking-wider text-amber-400 font-semibold">
-                  Ingresos (BLU) · alrededor de la promo
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {earnings.map((e) => {
-                    const isPromo = e.date === promoDate;
-                    return (
-                      <div
-                        key={e.date}
-                        className={`rounded-md px-2.5 py-1.5 text-center border ${isPromo ? "border-amber-500/60 bg-amber-500/10" : "border-border bg-muted/30"}`}
-                      >
-                        <div className="text-[10px] text-muted-foreground">
-                          {e.date.slice(5)}{isPromo ? " · promo" : ""}
-                        </div>
-                        <div className="text-sm font-semibold tabular-nums">{money(e.total_gross)}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {promo && (
-                  <div className="flex flex-wrap gap-1.5 pt-0.5 text-[10px]">
-                    {channels
-                      .filter(([, k]) => Number(promo[k]) > 0)
-                      .map(([label, k]) => (
-                        <span
-                          key={String(k)}
-                          className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2 py-0.5 tabular-nums"
-                        >
-                          {label}: {money(Number(promo[k]))}
-                        </span>
-                      ))}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
 
           {/* Redes de la modelo — chips clickeables a sus perfiles (IG, Facebook,
               Reddit, X, TikTok, YouTube, Otra), traídos del perfil de la creadora. */}
