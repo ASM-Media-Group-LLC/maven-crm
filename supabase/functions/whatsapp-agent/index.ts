@@ -3828,6 +3828,17 @@ async function runAgent(req: AgentRequest): Promise<{
     // todas filtradas por el MISMO llavero (allow/deny). Así un perfil (ej. managers)
     // habilita tools del catálogo por nombre en su tool_allowlist.
     let t = [...TOOLS, ...toAnthropicTools(TOOL_REGISTRY)];
+    // Dedup por nombre: si un tool del catálogo repite un nombre que ya existe
+    // inline (ej. get_monetization_opportunities), Anthropic rechaza TODO el request
+    // con 400 "Tool names must be unique" → el bot deja de responder. Nos quedamos con
+    // la 1ra aparición: las inline van primero, así ganan las probadas. [incidente 2026-06-19]
+    const seenToolNames = new Set<string>();
+    t = t.filter((tool) => {
+      const n = (tool as { name: string }).name;
+      if (seenToolNames.has(n)) return false;
+      seenToolNames.add(n);
+      return true;
+    });
     if (allow) t = t.filter((tool) => allow.includes((tool as { name: string }).name));
     if (deny) t = t.filter((tool) => !deny.includes((tool as { name: string }).name));
     return t;
