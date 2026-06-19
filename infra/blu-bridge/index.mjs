@@ -59,7 +59,12 @@ const addDay = (d) => ymd(new Date(new Date(d + "T00:00:00.000Z").getTime() + DA
 async function fetchEarningsWS(token) {
   const { default: WS } = await import("ws");
   const days = [];
-  for (let i = Number(LOOKBACK_DAYS); i >= 0; i--) days.push(ymd(new Date(Date.now() - i * DAY)));
+  // Cubrir SIEMPRE el mes actual completo: al menos hasta el día 1 del mes (+1 de
+  // colchón), o LOOKBACK_DAYS si es mayor. Así el calendario del mes no queda con
+  // huecos (días sin ingreso) y se auto-cura cada vez que corre. Re-ingesta días ya
+  // traídos (upsert idempotente), barato porque es 1 sola conexión WS día a día.
+  const lookback = Math.max(Number(LOOKBACK_DAYS), new Date().getUTCDate() + 1);
+  for (let i = lookback; i >= 0; i--) days.push(ymd(new Date(Date.now() - i * DAY)));
   return await new Promise((resolve, reject) => {
     const ws = new WS(BLU_WS_URL);
     const results = [];
