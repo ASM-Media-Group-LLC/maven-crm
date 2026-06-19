@@ -1,13 +1,12 @@
 // blu-bridge — micro en Dokploy. Cada día (o on-demand):
-//   1) Conecta WS a BLU (wss://of.unlok.me/) y autentica con el JWT de sesión.
-//   2) Pide el reporte de ingresos por modelo/día por el MISMO WS:
-//        {type:"agency:analytics:creator-reports", startDate, endDate, groupBy:"day", earningsType:"gross"}
-//   3) Recibe la respuesta (type:"agency:analytics:creator-reports" con 'range'), transforma e
-//      ingesta en Maven vía RPC import_blu_earnings.
+//   1) Conecta WS a BLU (wss://of.unlok.me/) y autentica con el JWT de sesión (auth:token).
+//   2) Por el MISMO WS, pide el reporte de ingresos UN DÍA A LA VEZ (para tener granularidad
+//      diaria): {type:"agency:analytics:creator-reports", startDate:D, endDate:D+1, groupBy:"day", earningsType:"gross"}.
+//   3) De cada creadora toma metrics.{subscriptions,tips,messages,ppv,referrals,streaming,total}.grossAmount
+//      y arma 1 fila por creadora/día → ingesta en Maven vía RPC import_blu_earnings.
 //
-// BLU NO usa REST para esto: la data viaja por el WebSocket (protocolo de mensajes de la app).
-// AUTH: BLU_JWT = sesión del owner (HS256, ~24h), SECRETO en Dokploy, rotación manual.
-//   Vencido → la auth WS se rechaza / no llega respuesta → loguea "renová BLU_JWT".
+// BLU sirve esto por WebSocket (no REST). AUTH: BLU_JWT = sesión del owner (HS256, ~24h),
+// SECRETO en Dokploy, rotación manual. Vencido → auth WS rechazada → loguea "renová BLU_JWT".
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -43,66 +42,68 @@ function assertNotExpired() {
   }
 }
 
+const DAY = 86400000;
 const ymd = (d) => d.toISOString().slice(0, 10);
+const addDay = (d) => ymd(new Date(new Date(d + "T00:00:00.000Z").getTime() + DAY));
 
-// ── Traer el reporte de ingresos por el WebSocket ──
+// ── Pedir el reporte por el WS, UN DÍA A LA VEZ, reusando una sola conexión ──
 async function fetchEarningsWS() {
   const { default: WS } = await import("ws");
-  const from = ymd(new Date(Date.now() - Number(LOOKBACK_DAYS) * 86400000));
-  const end = ymd(new Date());
+  const days = [];
+  for (let i = Number(LOOKBACK_DAYS); i >= 0; i--) days.push(ymd(new Date(Date.now() - i * DAY)));
   return await new Promise((resolve, reject) => {
     const ws = new WS(BLU_WS_URL);
-    const to = setTimeout(() => { try { ws.close(); } catch {} reject(new Error("WS: sin respuesta de creator-reports (timeout 45s)")); }, 45000);
-    let queried = false, resolved = false;
-    const done = (fn, arg) => { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} fn(arg); };
+    const results = [];           // [{ date, payload }]
+    let idx = 0, authed = false, resolved = false;
+    const to = setTimeout(() => done(reject, new Error("WS timeout (90s)")), 90000);
+    function done(fn, arg) { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} fn(arg); }
+    function queryNext() {
+      if (idx >= days.length) return done(resolve, results);
+      const d = days[idx];
+      ws.send(JSON.stringify({ type: "agency:analytics:creator-reports", startDate: d, endDate: addDay(d), groupBy: "day", earningsType: "gross" }));
+    }
     ws.on("open", () => ws.send(JSON.stringify({ type: "auth:token", token: BLU_JWT })));
     ws.on("message", (data) => {
-      let msg; try { msg = JSON.parse(data.toString()); } catch { return; }
-      const t = typeof msg.type === "string" ? msg.type : "";
-      if (/unauthorized|auth:error|auth:fail|token.*(invalid|expired)|invalid.*token/i.test(t + " " + (msg.error || ""))) {
+      let m; try { m = JSON.parse(data.toString()); } catch { return; }
+      const t = typeof m.type === "string" ? m.type : "";
+      if (/unauthorized|auth:error|auth:fail|token.*(invalid|expired)|invalid.*token/i.test(t + " " + (m.error || ""))) {
         return done(reject, Object.assign(new Error("WS auth rechazado (¿JWT vencido?): " + t), { expired: true }));
       }
-      // El primer mensaje entrante confirma que la auth funcionó → pedimos el reporte.
-      if (!queried) {
-        queried = true;
-        ws.send(JSON.stringify({ type: "agency:analytics:creator-reports", startDate: from, endDate: end, groupBy: "day", earningsType: "gross" }));
-        console.log(`[blu-bridge] WS: pedido creator-reports ${from}..${end} (gross)`);
-        return;
+      if (!authed) { authed = true; queryNext(); return; }   // primer mensaje = auth OK
+      if (t === "agency:analytics:creator-reports" && m.range) {
+        results.push({ date: days[idx], payload: m });
+        idx++;
+        queryNext();
       }
-      // La RESPUESTA a la query trae 'range' (la query saliente usa startDate/endDate).
-      if (t === "agency:analytics:creator-reports" && msg.range) return done(resolve, msg);
     });
     ws.on("error", (e) => done(reject, new Error("WS error: " + e.message)));
-    ws.on("close", () => { if (!resolved) done(reject, new Error("WS cerró antes de responder (¿auth?)")); });
+    ws.on("close", () => { if (!resolved) done(reject, new Error("WS cerró antes de terminar (¿auth?)")); });
   });
 }
 
-// ── Transformar la respuesta a las filas que espera import_blu_earnings ──
-// Defensivo: maneja nested (creators→days) o flat. Ajustar a la forma real (se loguea en runOnce).
-const num = (v) => Number(v) || 0;
-function mapRow(name, d) {
-  return {
-    blu_name: name,
-    date: String(d.date ?? d.day ?? "").slice(0, 10),
-    subscription: num(d.subscriptions ?? d.subscription ?? d.subs),
-    tips: num(d.tips),
-    message: num(d.messages ?? d.message),
-    post: num(d.posts ?? d.post),
-    referral: num(d.referrals ?? d.referral),
-    stream: num(d.streams ?? d.stream),
-    total: num(d.total ?? d.gross ?? d.totalGross ?? d.earnings),
-  };
-}
-function transform(payload) {
-  const arr = payload.creators || payload.data || payload.rows || payload.report || payload.results || [];
-  const out = [];
-  for (const c of (Array.isArray(arr) ? arr : [])) {
-    const name = String(c.creator ?? c.creatorName ?? c.name ?? c.username ?? c.modelUsername ?? c.modelLabel ?? "").trim();
-    const days = c.days || c.daily || c.breakdown || c.dailyEarnings || c.earnings;
-    if (Array.isArray(days)) { for (const d of days) out.push(mapRow(name, d)); }
-    else if (c.date || c.day) { out.push(mapRow(name, c)); }
+// ── Transformar a las filas que espera import_blu_earnings (1 por creadora/día) ──
+function transform(results) {
+  const rows = [];
+  for (const { date, payload } of results) {
+    for (const c of (payload.creators || [])) {
+      const name = String(c.creator?.username ?? c.creator?.name ?? c.aboutMe?.username ?? "").trim();
+      const m = c.metrics || {};
+      const g = (k) => Number(m[k]?.grossAmount ?? m[k]?.amount ?? 0) || 0;
+      const row = {
+        blu_name: name, date,
+        subscription: g("subscriptions"),
+        tips: g("tips"),
+        message: g("messages"),
+        post: g("ppv"),            // PPV = posts pagos en OF
+        referral: g("referrals"),
+        stream: g("streaming"),
+        total: g("total"),
+      };
+      // guardar solo días con algún ingreso (evita inundar de ceros; el upsert es idempotente)
+      if (name && /^\d{4}-\d{2}-\d{2}$/.test(date) && row.total > 0) rows.push(row);
+    }
   }
-  return out.filter((x) => x.blu_name && /^\d{4}-\d{2}-\d{2}$/.test(x.date));
+  return rows;
 }
 
 async function ingest(rows) {
@@ -116,22 +117,11 @@ async function runOnce() {
   requireEnv();
   assertNotExpired();
   console.log(`[blu-bridge] conectando WS ${BLU_WS_URL}…`);
-  const payload = await fetchEarningsWS();
-  // Loguear la forma para poder afinar transform() con la estructura real.
-  console.log(`[blu-bridge] respuesta keys:`, JSON.stringify(Object.keys(payload)));
-  const arr = payload.creators || payload.data || payload.rows || payload.report || payload.results || [];
-  const c0 = Array.isArray(arr) && arr.length ? arr[0] : null;
-  if (c0) {
-    console.log(`[blu-bridge] creador[0] keys:`, JSON.stringify(Object.keys(c0)));
-    for (const k of Object.keys(c0)) {
-      const v = c0[k];
-      if (Array.isArray(v)) console.log(`[blu-bridge]   ${k}: array[${v.length}] 1er=`, JSON.stringify(v[0] ?? null).slice(0, 400));
-      else if (v && typeof v === "object") console.log(`[blu-bridge]   ${k}: obj keys=`, JSON.stringify(Object.keys(v)), "::", JSON.stringify(v).slice(0, 250));
-      else console.log(`[blu-bridge]   ${k} =`, JSON.stringify(v));
-    }
-  }
-  const rows = transform(payload);
-  console.log(`[blu-bridge] ${rows.length} filas parseadas → ingestando…`);
+  const results = await fetchEarningsWS();
+  const creators0 = results[0]?.payload?.creators?.length ?? 0;
+  console.log(`[blu-bridge] ${results.length} días traídos (≈${creators0} creadoras/día).`);
+  const rows = transform(results);
+  console.log(`[blu-bridge] ${rows.length} filas con ingreso → ingestando…`);
   const result = await ingest(rows);
   console.log(`[blu-bridge] OK:`, JSON.stringify(result));
   return result;
