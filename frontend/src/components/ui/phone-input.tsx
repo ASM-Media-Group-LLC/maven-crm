@@ -97,7 +97,9 @@ export function PhoneInput({
         <PopoverContent className="w-[260px] p-0" side="bottom" align="start">
           <Command>
             <CommandInput placeholder="Buscar país..." />
-            <CommandList>
+            {/* Wheel: dentro de un <Dialog>, el scroll-lock de Radix bloquea la rueda
+                sobre el Popover portaleado → scrolleamos la lista a mano. */}
+            <CommandList onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}>
               <CommandEmpty>No encontrado</CommandEmpty>
               <CommandGroup>
                 {COUNTRY_CODES.map((c) => (

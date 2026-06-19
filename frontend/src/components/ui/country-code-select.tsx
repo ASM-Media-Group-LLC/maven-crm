@@ -39,7 +39,10 @@ export function CountryCodeSelect({ value, onChange, disabled = false, className
       <PopoverContent className="w-[280px] p-0" side="bottom" align="start">
         <Command>
           <CommandInput placeholder="Buscar país..." />
-          <CommandList>
+          {/* La rueda del mouse: este combobox vive dentro de un <Dialog>, y el
+              scroll-lock de Radix (react-remove-scroll) bloquea el wheel nativo sobre
+              el Popover portaleado. Scrolleamos la lista a mano para que la rueda ande. */}
+          <CommandList onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}>
             <CommandEmpty>No encontrado</CommandEmpty>
             <CommandGroup>
               {COUNTRY_DIAL_CODES.map((c) => (
