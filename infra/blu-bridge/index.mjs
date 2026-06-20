@@ -19,6 +19,7 @@ const {
   SUPABASE_SERVICE_ROLE_KEY,
   LOOKBACK_DAYS = "8",
   BACKFILL_DAYS = "0",   // >0: en el PRIMER run rellena ese nº de días hacia atrás (histórico, 1 sola vez)
+  RESYNC_DAYS = "90",    // cada corrida re-jala los últimos N días → auto-corrige reembolsos/chargebacks
   RUN_EVERY_HOURS = "12",
   RUN_ONCE,
 } = process.env;
@@ -125,11 +126,12 @@ async function runOnce(firstRun = false) {
   const expMs = jwtExpMs(token);
   if (expMs && Date.now() >= expMs) throw Object.assign(new Error("token de sesión vencido"), { expired: true });
 
-  // Días a traer: SIEMPRE el mes actual completo (rolling: hasta el día 1 +1 de
-  // colchón, o LOOKBACK_DAYS). En el PRIMER run, si BACKFILL_DAYS>0, se extiende hacia
-  // atrás para rellenar histórico (una sola vez). Se parte en chunks de 30 días → 1
-  // conexión WS por chunk: resiliente (un chunk que falla no tumba el resto) y sin timeouts.
-  const rolling = Math.max(Number(LOOKBACK_DAYS), new Date().getUTCDate() + 1);
+  // Días a traer: SIEMPRE el mes actual completo + los últimos RESYNC_DAYS (rolling), para
+  // que un reembolso/chargeback que cambia el gross de un día YA pasado se auto-corrija (el
+  // upsert idempotente sobreescribe el valor viejo). En el PRIMER run, si BACKFILL_DAYS>0, se
+  // extiende más atrás para rellenar histórico (una sola vez). Se parte en chunks de 30 días
+  // → 1 conexión WS por chunk: resiliente (un chunk que falla no tumba el resto) y sin timeouts.
+  const rolling = Math.max(Number(LOOKBACK_DAYS), new Date().getUTCDate() + 1, Number(RESYNC_DAYS) || 0);
   const backfill = firstRun ? Number(BACKFILL_DAYS) || 0 : 0;
   const allDays = daysBack(Math.max(rolling, backfill));
   const chunks = chunk(allDays, 30);
