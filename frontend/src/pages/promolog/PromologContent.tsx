@@ -37,6 +37,7 @@ import {
   CheckCircle2,
   XCircle,
   Bot,
+  Link2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ import DateRangePresets, { type RangePreset, rangeForPreset } from "@/components
 import PromologDashboardView from "./PromologDashboardView";
 import PromobotPanel from "./PromobotPanel";
 import PromologCalendarView from "./PromologCalendarView";
+import BluUnmatchedManager from "./BluUnmatchedManager";
 import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
 import PromologEntryFormDialog from "./PromologEntryFormDialog";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
@@ -132,6 +134,7 @@ const tabItems = [
   { id: "calendario" as const, label: "Calendario", icon: CalendarIcon },
   { id: "agentes" as const, label: "Agentes", icon: Users },
   { id: "promobot" as const, label: "Promobot", icon: Bot },
+  { id: "blu" as const, label: "Vincular BLU", icon: Link2 },
 ];
 
 const DAY_LABELS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
@@ -428,7 +431,7 @@ const PromologContent = () => {
   // Default = "dashboard": al abrir Promolog la primera vista es el
   // dashboard con KPIs + podios + insights. El user navega a "Promos"
   // si quiere ver el listado, "Agentes" para el detalle por agente.
-  const [activeTab, setActiveTab] = useState<"dashboard" | "promos" | "calendario" | "agentes" | "promobot">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "promos" | "calendario" | "agentes" | "promobot" | "blu">("dashboard");
   const [agentesView, setAgentesView] = useState<"list" | "grid" | "calendar">("list");
   const [agentWeekOffset, setAgentWeekOffset] = useState(0);
   const [campanasView, setCampanasView] = useState<"list" | "grid">("list");
@@ -945,6 +948,7 @@ const PromologContent = () => {
           {tabItems.filter(tab => {
             if (tab.id === "agentes") return isManagement;
             if (tab.id === "calendario") return isManagement;
+            if (tab.id === "blu") return isManagement;
             if (tab.id === "promobot") return canPromobot;
             return true;
           }).map((tab) => (
@@ -966,6 +970,9 @@ const PromologContent = () => {
 
       {/* Calendario tab — calendario mensual por creadora: días que promocionó / no / sin análisis */}
       {activeTab === "calendario" && isManagement && <PromologCalendarView creators={creators} onEditEntry={handleEditEntry} />}
+
+      {/* Vincular BLU tab — admin: vincular/ignorar ingresos de BLU sin perfil de Maven */}
+      {activeTab === "blu" && isManagement && <BluUnmatchedManager />}
 
       {/* Dashboard tab — KPIs, podios, insights, trend, acción */}
       {activeTab === "dashboard" && (
