@@ -216,30 +216,47 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
     for (const e of earnings) m.set(e.date, e.total_gross);
     return m;
   }, [earnings]);
+  // ¿el mes mostrado ya terminó? (es anterior al mes actual)
+  const isPastMonth = useMemo(() => {
+    const today = new Date();
+    return year < today.getFullYear() || (year === today.getFullYear() && month < today.getMonth());
+  }, [year, month]);
   const earningMarkers = useMemo(() => {
     const markers = new Map<string, "fire" | "crown">();
     const pad = (n: number) => String(n).padStart(2, "0");
     const lastDay = new Date(year, month + 1, 0).getDate();
     const dk = (d: number) => `${year}-${pad(month + 1)}-${pad(d)}`;
-    // 🔥 el mejor día de cada bloque de 5 (1-5, 6-10, …)
-    for (let start = 1; start <= lastDay; start += 5) {
-      const end = Math.min(start + 4, lastDay);
-      let bestDay = 0, bestVal = 0;
-      for (let d = start; d <= end; d++) {
-        const v = incomeByDay.get(dk(d)) || 0;
-        if (v > bestVal) { bestVal = v; bestDay = d; }
-      }
-      if (bestDay > 0) markers.set(dk(bestDay), "fire");
-    }
-    // 👑 el mejor día del mes (pisa el 🔥 de ese día)
+    // 👑 el mejor día del mes (siempre)
     let crownDay = 0, crownVal = 0;
     for (let d = 1; d <= lastDay; d++) {
       const v = incomeByDay.get(dk(d)) || 0;
       if (v > crownVal) { crownVal = v; crownDay = d; }
     }
+    if (isPastMonth) {
+      // Mes ya cerrado: 🔥 a los 5 mejores días del mes (excluyendo el de la 👑).
+      const ranked: Array<[number, number]> = [];
+      for (let d = 1; d <= lastDay; d++) {
+        const v = incomeByDay.get(dk(d)) || 0;
+        if (v > 0 && d !== crownDay) ranked.push([d, v]);
+      }
+      ranked.sort((a, b) => b[1] - a[1]);
+      for (const [d] of ranked.slice(0, 5)) markers.set(dk(d), "fire");
+    } else {
+      // Mes en curso: 🔥 al mejor día de cada bloque de 5 (1-5, 6-10, …).
+      for (let start = 1; start <= lastDay; start += 5) {
+        const end = Math.min(start + 4, lastDay);
+        let bestDay = 0, bestVal = 0;
+        for (let d = start; d <= end; d++) {
+          const v = incomeByDay.get(dk(d)) || 0;
+          if (v > bestVal) { bestVal = v; bestDay = d; }
+        }
+        if (bestDay > 0) markers.set(dk(bestDay), "fire");
+      }
+    }
+    // 👑 pisa cualquier 🔥 de ese día
     if (crownDay > 0) markers.set(dk(crownDay), "crown");
     return markers;
-  }, [incomeByDay, year, month]);
+  }, [incomeByDay, year, month, isPastMonth]);
 
   const statusFor = (bucket?: { total: number; trueCount: number; partialCount: number }): DayStatus => {
     if (!bucket || bucket.total === 0) return "none";
@@ -435,7 +452,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
               <LegendChip status="partial" label="Parcial" />
               <LegendChip status="no" label="No promocionó" />
               <LegendChip status="none" label="Sin análisis" />
-              <span className="text-xs text-muted-foreground">· 🔥 mejor día (cada 5) · 👑 mejor del mes</span>
+              <span className="text-xs text-muted-foreground">· 🔥 {isPastMonth ? "top 5 días del mes" : "mejor día (cada 5)"} · 👑 mejor del mes</span>
             </div>
           </div>
 
@@ -479,7 +496,7 @@ const PromologCalendarView = ({ creators, onEditEntry }: Props) => {
                       {inMonth && earningMarkers.get(key) && (
                         <span
                           className="text-sm leading-none"
-                          title={earningMarkers.get(key) === "crown" ? "Mejor día de ingresos del mes" : "Mejor día de ingresos de estos 5 días"}
+                          title={earningMarkers.get(key) === "crown" ? "Mejor día de ingresos del mes" : (isPastMonth ? "Top 5 días de ingresos del mes" : "Mejor día de ingresos de estos 5 días")}
                         >
                           {earningMarkers.get(key) === "crown" ? "👑" : "🔥"}
                         </span>
