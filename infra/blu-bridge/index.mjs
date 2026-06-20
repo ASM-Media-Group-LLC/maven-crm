@@ -18,6 +18,7 @@ const {
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
   LOOKBACK_DAYS = "8",
+  BACKFILL_DAYS = "0",   // >0: en el PRIMER run rellena ese nº de días hacia atrás (histórico, 1 sola vez)
   RUN_EVERY_HOURS = "12",
   RUN_ONCE,
 } = process.env;
@@ -54,22 +55,18 @@ async function saveToken(token) {
 const DAY = 86400000;
 const ymd = (d) => d.toISOString().slice(0, 10);
 const addDay = (d) => ymd(new Date(new Date(d + "T00:00:00.000Z").getTime() + DAY));
+const daysBack = (n) => { const out = []; for (let i = n; i >= 0; i--) out.push(ymd(new Date(Date.now() - i * DAY))); return out; };
+const chunk = (arr, size) => { const out = []; for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size)); return out; };
 
 // ── WS: auth (captura el token fresco del auth:ok) + pedir reportes día a día ──
-async function fetchEarningsWS(token) {
+async function fetchEarningsWS(token, days) {
   const { default: WS } = await import("ws");
-  const days = [];
-  // Cubrir SIEMPRE el mes actual completo: al menos hasta el día 1 del mes (+1 de
-  // colchón), o LOOKBACK_DAYS si es mayor. Así el calendario del mes no queda con
-  // huecos (días sin ingreso) y se auto-cura cada vez que corre. Re-ingesta días ya
-  // traídos (upsert idempotente), barato porque es 1 sola conexión WS día a día.
-  const lookback = Math.max(Number(LOOKBACK_DAYS), new Date().getUTCDate() + 1);
-  for (let i = lookback; i >= 0; i--) days.push(ymd(new Date(Date.now() - i * DAY)));
   return await new Promise((resolve, reject) => {
     const ws = new WS(BLU_WS_URL);
     const results = [];
     let idx = 0, authed = false, resolved = false, freshToken = null;
-    const to = setTimeout(() => done(reject, new Error("WS timeout (120s)")), 120000);
+    const timeoutMs = Math.max(120000, days.length * 4000);   // escala con el nº de días del chunk
+    const to = setTimeout(() => done(reject, new Error(`WS timeout (${Math.round(timeoutMs / 1000)}s)`)), timeoutMs);
     function done(fn, arg) { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} fn(arg); }
     function queryNext() {
       if (idx >= days.length) return done(resolve, { results, freshToken });
@@ -122,27 +119,40 @@ async function ingest(rows) {
   return data;
 }
 
-async function runOnce() {
+async function runOnce(firstRun = false) {
   requireEnv();
-  const token = await getToken();
+  let token = await getToken();
   const expMs = jwtExpMs(token);
   if (expMs && Date.now() >= expMs) throw Object.assign(new Error("token de sesión vencido"), { expired: true });
-  console.log(`[blu-bridge] conectando WS ${BLU_WS_URL}… (token exp ${expMs ? new Date(expMs).toISOString() : "?"})`);
-  const { results, freshToken } = await fetchEarningsWS(token);
-  if (freshToken && freshToken !== token) {
-    await saveToken(freshToken);
-    const ne = jwtExpMs(freshToken);
-    console.log(`[blu-bridge] 🔄 token refrescado por auth:ok (nuevo exp ${ne ? new Date(ne).toISOString() : "?"}).`);
-  } else {
-    console.log(`[blu-bridge] auth:ok refresh: ${freshToken ? "mismo token (no extiende)" : "sin token"}.`);
+
+  // Días a traer: SIEMPRE el mes actual completo (rolling: hasta el día 1 +1 de
+  // colchón, o LOOKBACK_DAYS). En el PRIMER run, si BACKFILL_DAYS>0, se extiende hacia
+  // atrás para rellenar histórico (una sola vez). Se parte en chunks de 30 días → 1
+  // conexión WS por chunk: resiliente (un chunk que falla no tumba el resto) y sin timeouts.
+  const rolling = Math.max(Number(LOOKBACK_DAYS), new Date().getUTCDate() + 1);
+  const backfill = firstRun ? Number(BACKFILL_DAYS) || 0 : 0;
+  const allDays = daysBack(Math.max(rolling, backfill));
+  const chunks = chunk(allDays, 30);
+  console.log(`[blu-bridge] conectando WS ${BLU_WS_URL}… ${allDays.length} días en ${chunks.length} chunk(s)${backfill ? ` (backfill ${backfill}d)` : ""}. (token exp ${expMs ? new Date(expMs).toISOString() : "?"})`);
+
+  let totalRows = 0, sawCreators = false;
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const c = chunks[ci];
+    try {
+      const { results, freshToken } = await fetchEarningsWS(token, c);
+      if (freshToken && freshToken !== token) { await saveToken(freshToken); token = freshToken; }
+      if (!sawCreators && results[0]) { console.log(`[blu-bridge] ≈${results[0].payload?.creators?.length ?? 0} creadoras/día.`); sawCreators = true; }
+      const rows = transform(results);
+      if (rows.length) await ingest(rows);
+      totalRows += rows.length;
+      console.log(`[blu-bridge] chunk ${ci + 1}/${chunks.length} (${c[c.length - 1]}..${c[0]}): ${rows.length} filas.`);
+    } catch (e) {
+      if (e.expired) throw e;   // token vencido → abortar todo (re-seed)
+      console.error(`[blu-bridge] chunk ${ci + 1}/${chunks.length} falló (sigo con los demás): ${e.message}`);
+    }
   }
-  const creators0 = results[0]?.payload?.creators?.length ?? 0;
-  console.log(`[blu-bridge] ${results.length} días (≈${creators0} creadoras/día).`);
-  const rows = transform(results);
-  console.log(`[blu-bridge] ${rows.length} filas con ingreso → ingestando…`);
-  const result = await ingest(rows);
-  console.log(`[blu-bridge] OK:`, JSON.stringify(result));
-  return result;
+  console.log(`[blu-bridge] OK: ${totalRows} filas ingestadas.`);
+  return { rows: totalRows };
 }
 
 function warnIfExpired(e) {
@@ -152,15 +162,14 @@ function warnIfExpired(e) {
 
 async function main() {
   if (RUN_ONCE) {
-    try { await runOnce(); process.exit(0); }
+    try { await runOnce(true); process.exit(0); }
     catch (e) { warnIfExpired(e); process.exit(e.expired ? 2 : 1); }
     return;
   }
-  const tick = () => runOnce().catch(warnIfExpired);
-  await tick();
+  await runOnce(true).catch(warnIfExpired);   // primer run: rolling + backfill histórico si BACKFILL_DAYS>0
   const hours = Math.min(Number(RUN_EVERY_HOURS) || 12, 12);   // < 24h de vida del token, para refrescar a tiempo
   console.log(`[blu-bridge] próxima corrida en ${hours}h`);
-  setInterval(tick, hours * 3600000);
+  setInterval(() => runOnce(false).catch(warnIfExpired), hours * 3600000);   // siguientes: solo rolling (mes actual)
 }
 
 main();
