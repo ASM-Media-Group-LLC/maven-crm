@@ -868,23 +868,29 @@ app.get('/instance/list', (_req, res) => {
 // (@s.whatsapp.net); @lid y grupos (@g.us) no se pueden chequear. Cachea 1h
 // por sesión para no repegarle a onWhatsApp en cada envío. Devuelve true/false,
 // o null si no se pudo determinar (en ese caso NO bloqueamos el envío).
+// Devuelve { exists, jid }: exists = true/false/null (null = no se pudo determinar →
+// NO bloqueamos), y jid = el que WhatsApp RESUELVE — que puede ser un "<id>@lid" para
+// cuentas migradas al sistema LID. HAY que enviar a ESE jid: mandar al
+// <phone>@s.whatsapp.net a un destinatario LID-only sale con error y nunca se entrega.
 async function checkOnWhatsApp(s, jid) {
-  if (!jid || !jid.endsWith('@s.whatsapp.net') || !s.sock) return null;
+  if (!jid || !jid.endsWith('@s.whatsapp.net') || !s.sock) return { exists: null, jid };
   const phone = jid.split('@')[0];
-  if (!phone) return null;
+  if (!phone) return { exists: null, jid };
   if (!s.onWaCache) s.onWaCache = new Map();
   const hit = s.onWaCache.get(phone);
-  if (hit && (Date.now() - hit.ts) < 3600000) return hit.exists;
+  if (hit && (Date.now() - hit.ts) < 3600000) return { exists: hit.exists, jid: hit.jid || jid };
   try {
     const r = await s.sock.onWhatsApp(phone);
-    if (!Array.isArray(r)) return null;
+    if (!Array.isArray(r)) return { exists: null, jid };
     const item = r.find((x) => x && String(x.jid || '').split('@')[0] === phone) || r[0];
     const exists = item ? item.exists === true : false;
-    s.onWaCache.set(phone, { exists, ts: Date.now() });
-    return exists;
+    // JID autoritativo que devuelve WhatsApp (phone o @lid). Si no existe o no vino, dejamos el original.
+    const resolvedJid = (exists && item && item.jid) ? item.jid : jid;
+    s.onWaCache.set(phone, { exists, jid: resolvedJid, ts: Date.now() });
+    return { exists, jid: resolvedJid };
   } catch (e) {
     logger.warn({ err: e.message }, 'onWhatsApp check failed');
-    return null;
+    return { exists: null, jid };
   }
 }
 
@@ -914,13 +920,15 @@ app.post('/message/sendText/:instance', async (req, res) => {
     return res.status(400).json({ error: 'missing_number_or_text' });
   }
 
-  const jid = resolveJid(number);
+  let jid = resolveJid(number);
   if (!jid) return res.status(400).json({ error: 'invalid_jid' });
 
-  // ¿El número está en WhatsApp? Si NO, no enviamos y avisamos (el edge lo
-  // registra como fallido → queda en rojo en el chat).
+  // ¿El número está en WhatsApp? Si NO, no enviamos (el edge lo registra como fallido
+  // → rojo en el chat). Y enviamos al JID que WhatsApp RESUELVE (puede ser @lid para
+  // cuentas migradas) — no al <phone>@s.whatsapp.net, que a un LID-only sale con error.
   const onWa = await checkOnWhatsApp(s, jid);
-  if (onWa === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
+  if (onWa.exists === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
+  jid = onWa.jid;
 
   try {
     const payload = { text: String(text) };
@@ -1098,13 +1106,15 @@ app.post('/message/sendMedia/:instance', async (req, res) => {
   if (!number || !url || !validTypes.includes(mediatype)) {
     return res.status(400).json({ error: 'missing_or_invalid', valid: validTypes });
   }
-  const jid = resolveJid(number);
+  let jid = resolveJid(number);
   if (!jid) return res.status(400).json({ error: 'invalid_jid' });
 
-  // ¿El número está en WhatsApp? Si NO, no enviamos y avisamos (el edge lo
-  // registra como fallido → queda en rojo en el chat).
+  // ¿El número está en WhatsApp? Si NO, no enviamos (el edge lo registra como fallido
+  // → rojo en el chat). Y enviamos al JID que WhatsApp RESUELVE (puede ser @lid para
+  // cuentas migradas) — no al <phone>@s.whatsapp.net, que a un LID-only sale con error.
   const onWa = await checkOnWhatsApp(s, jid);
-  if (onWa === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
+  if (onWa.exists === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
+  jid = onWa.jid;
 
   try {
     let content;
@@ -1180,13 +1190,15 @@ app.post('/message/react/:instance', async (req, res) => {
   const fromMe = body.fromMe === true;
   const emoji = typeof body.emoji === 'string' ? body.emoji : '';
   if (!number || !messageId) return res.status(400).json({ error: 'missing_number_or_messageId' });
-  const jid = resolveJid(number);
+  let jid = resolveJid(number);
   if (!jid) return res.status(400).json({ error: 'invalid_jid' });
 
-  // ¿El número está en WhatsApp? Si NO, no enviamos y avisamos (el edge lo
-  // registra como fallido → queda en rojo en el chat).
+  // ¿El número está en WhatsApp? Si NO, no enviamos (el edge lo registra como fallido
+  // → rojo en el chat). Y enviamos al JID que WhatsApp RESUELVE (puede ser @lid para
+  // cuentas migradas) — no al <phone>@s.whatsapp.net, que a un LID-only sale con error.
   const onWa = await checkOnWhatsApp(s, jid);
-  if (onWa === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
+  if (onWa.exists === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
+  jid = onWa.jid;
   try {
     const result = await s.sock.sendMessage(jid, {
       react: { text: emoji, key: { remoteJid: jid, fromMe, id: messageId } },
@@ -1210,13 +1222,15 @@ app.post('/message/delete/:instance', async (req, res) => {
   const messageId = body.messageId;
   const fromMe = body.fromMe !== false; // default true (borrar propios)
   if (!number || !messageId) return res.status(400).json({ error: 'missing_number_or_messageId' });
-  const jid = resolveJid(number);
+  let jid = resolveJid(number);
   if (!jid) return res.status(400).json({ error: 'invalid_jid' });
 
-  // ¿El número está en WhatsApp? Si NO, no enviamos y avisamos (el edge lo
-  // registra como fallido → queda en rojo en el chat).
+  // ¿El número está en WhatsApp? Si NO, no enviamos (el edge lo registra como fallido
+  // → rojo en el chat). Y enviamos al JID que WhatsApp RESUELVE (puede ser @lid para
+  // cuentas migradas) — no al <phone>@s.whatsapp.net, que a un LID-only sale con error.
   const onWa = await checkOnWhatsApp(s, jid);
-  if (onWa === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
+  if (onWa.exists === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
+  jid = onWa.jid;
   try {
     await s.sock.sendMessage(jid, { delete: { remoteJid: jid, fromMe, id: messageId } });
     return res.json({ message: 'deleted' });
