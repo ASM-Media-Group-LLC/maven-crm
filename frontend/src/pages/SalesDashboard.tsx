@@ -8,7 +8,7 @@ import CreatorStatsCards from "./sales-dashboard/CreatorStatsCards";
 import ConcentrationChart from "./sales-dashboard/ConcentrationChart";
 import SalesReportSection from "./sales-dashboard/SalesReportSection";
 import CreatorPerformanceView from "./sales-dashboard/CreatorPerformanceView";
-import { useEarningsData } from "./sales-performance/useEarningsData";
+import { useBluEarningsData as useEarningsData } from "./sales-performance/useBluEarningsData";
 import { ALL_COLUMNS } from "./sales-performance/types";
 import { Button } from "@/components/ui/button";
 import type { ViewTab, TimePeriod, EarningsMode } from "./sales-dashboard/DashboardFilters";

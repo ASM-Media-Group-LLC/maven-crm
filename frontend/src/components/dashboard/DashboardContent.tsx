@@ -22,7 +22,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import KpiCard from "./KpiCard";
 import KpiDetailDialog, { type KpiRow } from "./KpiDetailDialog";
-import { useEarningsData } from "@/pages/sales-performance/useEarningsData";
+import { useBluEarningsData as useEarningsData } from "@/pages/sales-performance/useBluEarningsData";
 import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useWeeklyStats, useOperationalKPIs, useRecentActivity, usePendingTasks } from "@/hooks/useDashboardData";

@@ -9,7 +9,7 @@ import EarningsTrendChart from "./sales-dashboard/EarningsTrendChart";
 import EarningsByChannelChart from "./sales-dashboard/EarningsByChannelChart";
 import TopCreatorsTable from "./sales-overview/TopCreatorsTable";
 import { usePeriodComparison } from "./sales-overview/usePeriodComparison";
-import { useEarningsData } from "./sales-performance/useEarningsData";
+import { useBluEarningsData as useEarningsData } from "./sales-performance/useBluEarningsData";
 
 const SalesOverview = () => {
   const today = startOfToday();
