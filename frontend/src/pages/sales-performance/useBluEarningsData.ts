@@ -11,7 +11,11 @@ import type { EarningsRow } from "./types";
 // subs nuevas/recurrentes, chargebacks, contribución% y —desde fan-reports (Slice A)—
 // active_fans/new_fans por día. Ranking de OF sí queda null (BLU no lo da).
 // `creator_daily_earnings` no está en los tipos generados → `as any`.
-const PAGE_SIZE = 5000;
+// OJO: PostgREST corta en 1000 filas por request (max-rows del server). Si PAGE_SIZE>1000,
+// data.length nunca llega a PAGE_SIZE → el loop cree que terminó en la 1ª página y solo trae
+// las ~1000 filas más nuevas (≈ últimos días) → meses anteriores salen vacíos. PAGE_SIZE=1000
+// = el cap, así cada página llena devuelve 1000 y la paginación recorre las 11k+ filas.
+const PAGE_SIZE = 1000;
 
 const fetchBluEarnings = async (): Promise<EarningsRow[]> => {
   let all: any[] = [];
