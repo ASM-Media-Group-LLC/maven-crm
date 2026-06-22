@@ -58,6 +58,15 @@ const EMPTY_FORM = {
   type: "shared" as WaChannelType,
 };
 
+// Salud de envío por línea (RPC wa_line_health): color del puntito según % de fallo 24h.
+const HEALTH_UI: Record<string, { dot: string; text: string; label: string }> = {
+  critico: { dot: "bg-rose-500", text: "font-semibold text-rose-500", label: "Crítico" },
+  alerta: { dot: "bg-amber-500", text: "text-amber-600", label: "Alerta" },
+  ok: { dot: "bg-emerald-500", text: "text-muted-foreground", label: "OK" },
+  sin_datos: { dot: "bg-muted-foreground/40", text: "text-muted-foreground", label: "Sin datos" },
+};
+interface LineHealth { channel_id: string; total: number; ok: number; sent_pend: number; failed: number; pct_fallo: number | null; health: string; }
+
 const ChannelsPage = () => {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -93,6 +102,18 @@ const ChannelsPage = () => {
         member_ids: (c.members ?? []).map((m: { user_id: string }) => m.user_id),
       })) as ChannelRow[];
     },
+  });
+
+  // Salud de envío por línea (últimas 24h) — detecta líneas que empiezan a rebotar
+  // (ej. time-lock de WhatsApp por outreach en frío). Refresca cada minuto.
+  const { data: healthRows = [] } = useQuery({
+    queryKey: ["wa-line-health"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("wa_line_health", { p_hours: 24 });
+      if (error) throw error;
+      return (data ?? []) as LineHealth[];
+    },
+    refetchInterval: 60000,
   });
 
   const { data: users = [] } = useQuery({
@@ -208,6 +229,7 @@ const ChannelsPage = () => {
                 <th className="px-3 py-2 font-medium">Instancia</th>
                 <th className="px-3 py-2 font-medium">Depto</th>
                 <th className="px-3 py-2 font-medium">Tipo</th>
+                <th className="px-3 py-2 font-medium">Salud 24h</th>
                 <th className="px-3 py-2 text-right font-medium">Atienden</th>
                 <th className="px-3 py-2 text-right font-medium">Acciones</th>
               </tr>
@@ -225,6 +247,23 @@ const ChannelsPage = () => {
                   <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{c.evolution_instance}</td>
                   <td className="px-3 py-2"><Badge variant="secondary-soft" className="text-[10px]">{deptLabel(c.department)}</Badge></td>
                   <td className="px-3 py-2 text-xs">{c.type === "dedicated" ? "Dedicado" : "Compartido"}</td>
+                  <td className="px-3 py-2">
+                    {(() => {
+                      const h = healthRows.find((r) => r.channel_id === c.id);
+                      const ui = HEALTH_UI[h?.health ?? "sin_datos"] ?? HEALTH_UI.sin_datos;
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1.5 text-xs"
+                          title={h ? `Últimas 24h · ${h.total} enviados · ${h.ok} entregados · ${h.sent_pend} sin confirmar · ${h.failed} fallidos` : "Sin datos en 24h"}
+                        >
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${ui.dot}`} />
+                          {!h || h.health === "sin_datos"
+                            ? <span className="text-muted-foreground">sin datos</span>
+                            : <span className={ui.text}>{h.pct_fallo ?? 0}% fallo <span className="text-muted-foreground">({h.total})</span></span>}
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td className="px-3 py-2 text-right">
                     <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => setMembersFor(c)}>
                       <Users className="h-3.5 w-3.5" /> {c.member_ids.length}
