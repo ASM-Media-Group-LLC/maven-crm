@@ -94,6 +94,72 @@ async function fetchEarningsWS(token, days) {
   });
 }
 
+// ── WS: fan-reports. auth → agency:models:list → fan-reports:model POR MODELO.
+//    Cada fan-reports:model cubre TODO el rango [startDate,endDate] (trends diarios) en 1 call.
+async function fetchFanReportsWS(token, startDate, endDate) {
+  const { default: WS } = await import("ws");
+  return await new Promise((resolve, reject) => {
+    const ws = new WS(BLU_WS_URL);
+    const results = [];
+    let modelIds = [], idx = 0, authed = false, resolved = false, freshToken = null;
+    const timeoutMs = 300000;   // hasta ~60 modelos × 1 call c/u
+    const to = setTimeout(() => done(reject, new Error("WS timeout fan-reports (300s)")), timeoutMs);
+    function done(fn, arg) { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} fn(arg); }
+    function queryNext() {
+      if (idx >= modelIds.length) return done(resolve, { results, freshToken });
+      ws.send(JSON.stringify({ type: "agency:analytics:fan-reports:model", modelId: modelIds[idx], startDate, endDate }));
+    }
+    ws.on("open", () => ws.send(JSON.stringify({ type: "auth:token", token })));
+    ws.on("message", (data) => {
+      let m; try { m = JSON.parse(data.toString()); } catch { return; }
+      const t = typeof m.type === "string" ? m.type : "";
+      if (/auth:error|unauthorized|token.*(invalid|expired)|invalid.*token/i.test(t + " " + (m.error || ""))) {
+        return done(reject, Object.assign(new Error("WS auth rechazado (¿JWT vencido?): " + t), { expired: true }));
+      }
+      if (t === "auth:ok") { authed = true; if (m.token) freshToken = m.token; ws.send(JSON.stringify({ type: "agency:models:list" })); return; }
+      if (t === "connected") return;
+      if (!authed) return;
+      if (t === "agency:models:list" && Array.isArray(m.models)) {
+        modelIds = m.models.map((x) => x?.id).filter((x) => x != null);
+        return queryNext();
+      }
+      // Avanzar SIEMPRE ante una respuesta de fan-reports:model (aunque venga sin model/errore),
+      // para no quedar trabado si BLU no responde un modelId puntual.
+      if (t === "agency:analytics:fan-reports:model") {
+        if (m.model) results.push(m.model);
+        idx++;
+        return queryNext();
+      }
+    });
+    ws.on("error", (e) => done(reject, new Error("WS error: " + e.message)));
+    ws.on("close", () => { if (!resolved) done(reject, new Error("WS cerró antes de terminar (¿auth?)")); });
+  });
+}
+
+// fan-reports:model → filas {blu_name, date, active_fans, new_fans}. Mismo blu_name que earnings
+// (creator.username) → upsert sobre la MISMA fila (blu_creator_name+date).
+function transformFans(models) {
+  const rows = [];
+  for (const md of (models || [])) {
+    const name = String(md.creator?.username ?? md.creator?.name ?? md.aboutMe?.username ?? "").trim();
+    if (!name) continue;
+    const fr = md.fanReport || {};
+    const byDate = {};
+    for (const p of (fr.totalFansTrend || [])) {
+      const d = String(p?.date ?? "").slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) (byDate[d] ||= {}).active_fans = Number(p.activeFans) || 0;
+    }
+    for (const p of (fr.newFansTrend || [])) {
+      const d = String(p?.date ?? "").slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d)) (byDate[d] ||= {}).new_fans = Number(p.all) || 0;
+    }
+    for (const [date, v] of Object.entries(byDate)) {
+      rows.push({ blu_name: name, date, active_fans: v.active_fans ?? null, new_fans: v.new_fans ?? null });
+    }
+  }
+  return rows;
+}
+
 // ── Transformar a filas por creadora/día (gross) ──
 function transform(results) {
   const rows = [];
@@ -157,8 +223,29 @@ async function runOnce(firstRun = false) {
       console.error(`[blu-bridge] chunk ${ci + 1}/${chunks.length} falló (sigo con los demás): ${e.message}`);
     }
   }
-  console.log(`[blu-bridge] OK: ${totalRows} filas ingestadas.`);
-  return { rows: totalRows };
+  console.log(`[blu-bridge] OK: ${totalRows} filas de ingresos ingestadas.`);
+
+  // ── Fans (fan-reports:model): activeFans/newFans por creadora/día sobre TODO el rango.
+  //    1 conexión WS, 1 call por modelo. Aislado: si falla, NO afecta los ingresos ya guardados.
+  let fanRows = 0;
+  try {
+    const fanStart = allDays[0];                       // más viejo
+    const fanEnd = allDays[allDays.length - 1];        // hoy
+    const { results: fanModels, freshToken } = await fetchFanReportsWS(token, fanStart, fanEnd);
+    if (freshToken && freshToken !== token) { await saveToken(freshToken); token = freshToken; }
+    const rows = transformFans(fanModels);
+    for (const batch of chunk(rows, 2000)) {
+      const { error } = await sb().rpc("import_blu_fans", { p_rows: batch });
+      if (error) throw new Error("import_blu_fans: " + error.message);
+    }
+    fanRows = rows.length;
+    console.log(`[blu-bridge] fans: ${fanModels.length} modelos → ${fanRows} filas (active_fans/new_fans).`);
+  } catch (e) {
+    if (e.expired) throw e;
+    console.error(`[blu-bridge] fan-reports falló (no afecta ingresos): ${e.message}`);
+  }
+
+  return { rows: totalRows, fanRows };
 }
 
 function warnIfExpired(e) {

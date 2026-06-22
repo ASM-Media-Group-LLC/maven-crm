@@ -650,7 +650,7 @@ const Dashboard2 = () => {
                       </TooltipTrigger>
                       <TooltipContent side="bottom" className="max-w-xs text-xs">
                         <strong>Bruto</strong> = lo que reporta OF (100%). <strong>Neto</strong> = agencia (80%).
-                        Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_daily_earnings</code> (BLU, en vivo). Conteo de fans/ranking no disponible desde BLU.
+                        Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_daily_earnings</code> (BLU, en vivo, incl. fan-reports). Ranking de OF no disponible desde BLU.
                       </TooltipContent>
                     </UITooltip>
                   </TooltipProvider>
@@ -783,7 +783,7 @@ const Dashboard2 = () => {
                       <div>
                         <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">$/Fan</p>
                         <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.totalFansAll > 0 ? `$${hlKpis.avgPerFanGlobal.toFixed(2)}` : "—"}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">{hlKpis.totalFansAll > 0 ? `${hlKpis.totalFansAll.toLocaleString()} fans` : "BLU no trae conteo de fans"}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">{hlKpis.totalFansAll > 0 ? `${hlKpis.totalFansAll.toLocaleString()} fans` : "Sincronizando fans…"}</p>
                       </div>
                     </div>
                   </div>

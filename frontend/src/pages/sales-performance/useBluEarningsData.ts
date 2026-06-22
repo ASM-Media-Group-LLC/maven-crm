@@ -8,9 +8,9 @@ import type { EarningsRow } from "./types";
 // EarningsRow, así toda la lógica del dashboard funciona sin reescribirla.
 //
 // BLU expone: ingreso total + desglose (subs, tips, mensajes, PPV, referidos, streams),
-// subs nuevas/recurrentes, chargebacks y contribución%. NO expone conteo de fans ni
-// ranking → esos campos quedan null (las tarjetas que dependen de fans se ocultan en
-// Dashboard2). `creator_daily_earnings` no está en los tipos generados → `as any`.
+// subs nuevas/recurrentes, chargebacks, contribución% y —desde fan-reports (Slice A)—
+// active_fans/new_fans por día. Ranking de OF sí queda null (BLU no lo da).
+// `creator_daily_earnings` no está en los tipos generados → `as any`.
 const PAGE_SIZE = 5000;
 
 const fetchBluEarnings = async (): Promise<EarningsRow[]> => {
@@ -21,7 +21,7 @@ const fetchBluEarnings = async (): Promise<EarningsRow[]> => {
     const { data, error } = await (supabase as any)
       .from("creator_daily_earnings")
       .select(
-        "id, date, total_gross, subscription_gross, new_sub_gross, recurring_sub_gross, message_gross, tips_gross, contribution_pct, creator_id, blu_creator_name",
+        "id, date, total_gross, subscription_gross, new_sub_gross, recurring_sub_gross, message_gross, tips_gross, contribution_pct, active_fans, new_fans, creator_id, blu_creator_name",
       )
       .order("date", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
@@ -54,9 +54,9 @@ const fetchBluEarnings = async (): Promise<EarningsRow[]> => {
     message_gross: e.message_gross ?? 0,
     tips_gross: e.tips_gross ?? 0,
     contribution: e.contribution_pct ?? null,
-    // BLU no expone audiencia → null (Dashboard2 oculta las tarjetas de fans).
-    active_fans: null,
-    new_fans: null,
+    // Fans desde fan-reports de BLU (Slice A): activeFans/newFans por creadora/día.
+    active_fans: e.active_fans ?? null,
+    new_fans: e.new_fans ?? null,
     following: null,
     of_ranking: null,
     fans_renew_on: null,
