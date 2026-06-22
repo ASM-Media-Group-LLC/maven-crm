@@ -106,6 +106,10 @@ function transform(results) {
         blu_name: name, date,
         subscription: g("subscriptions"), tips: g("tips"), message: g("messages"),
         post: g("ppv"), referral: g("referrals"), stream: g("streaming"), total: g("total"),
+        // Fase 1 (para Dashboard 2): métricas extra que BLU expone. g() devuelve 0 si falta.
+        new_sub: g("newSubscriptions"), recurring_sub: g("recurringSubscriptions"),
+        chargebacks: g("chargebacks"),
+        contribution_pct: Number(m.contributionPercent ?? c.contributionPercent ?? 0) || 0,
       };
       if (name && /^\d{4}-\d{2}-\d{2}$/.test(date) && row.total > 0) rows.push(row);
     }
