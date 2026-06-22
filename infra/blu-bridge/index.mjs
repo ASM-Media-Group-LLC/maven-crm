@@ -101,38 +101,54 @@ async function fetchFanReportsWS(token, startDate, endDate) {
   return await new Promise((resolve, reject) => {
     const ws = new WS(BLU_WS_URL);
     const results = [];
-    let modelIds = [], idx = 0, authed = false, resolved = false, freshToken = null;
-    const timeoutMs = 300000;   // hasta ~60 modelos × 1 call c/u
-    const to = setTimeout(() => done(reject, new Error("WS timeout fan-reports (300s)")), timeoutMs);
-    function done(fn, arg) { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} fn(arg); }
-    function queryNext() {
-      if (idx >= modelIds.length) return done(resolve, { results, freshToken });
-      ws.send(JSON.stringify({ type: "agency:analytics:fan-reports:model", modelId: modelIds[idx], startDate, endDate }));
+    let modelIds = [], idx = 0, authed = false, gotModels = false, resolved = false, freshToken = null, seenTypes = 0;
+    const hardTo = setTimeout(() => finish("timeout-hard"), 600000);   // tope absoluto
+    let idleTo = null;
+    function bumpIdle() {
+      if (idleTo) clearTimeout(idleTo);
+      idleTo = setTimeout(() => {
+        // Sin actividad: si estábamos consultando modelos, saltar el atascado; si no, cerrar con lo que haya.
+        if (gotModels && idx < modelIds.length) { console.error(`[blu-bridge] fan-reports: sin respuesta para modelId ${modelIds[idx]}, salto.`); idx++; queryNext(); }
+        else finish("idle");
+      }, 25000);
     }
-    ws.on("open", () => ws.send(JSON.stringify({ type: "auth:token", token })));
+    function clearTimers() { clearTimeout(hardTo); if (idleTo) clearTimeout(idleTo); }
+    function finish(why) {   // SIEMPRE resuelve (parcial si hace falta) — no perder lo recolectado
+      if (resolved) return; resolved = true; clearTimers();
+      console.log(`[blu-bridge] fan-reports cierre (${why}): ${results.length}/${modelIds.length} modelos con data.`);
+      try { ws.close(); } catch {}
+      resolve({ results, freshToken });
+    }
+    function fail(err) { if (resolved) return; resolved = true; clearTimers(); try { ws.close(); } catch {} reject(err); }
+    function queryNext() {
+      if (idx >= modelIds.length) return finish("completo");
+      ws.send(JSON.stringify({ type: "agency:analytics:fan-reports:model", modelId: modelIds[idx], startDate, endDate }));
+      bumpIdle();
+    }
+    ws.on("open", () => { ws.send(JSON.stringify({ type: "auth:token", token })); bumpIdle(); });
     ws.on("message", (data) => {
+      bumpIdle();
       let m; try { m = JSON.parse(data.toString()); } catch { return; }
       const t = typeof m.type === "string" ? m.type : "";
+      if (t === "ping") { try { ws.send(JSON.stringify({ type: "pong" })); } catch {} return; }   // heartbeat app-level
       if (/auth:error|unauthorized|token.*(invalid|expired)|invalid.*token/i.test(t + " " + (m.error || ""))) {
-        return done(reject, Object.assign(new Error("WS auth rechazado (¿JWT vencido?): " + t), { expired: true }));
+        return fail(Object.assign(new Error("WS auth rechazado (¿JWT vencido?): " + t), { expired: true }));
       }
-      if (t === "auth:ok") { authed = true; if (m.token) freshToken = m.token; ws.send(JSON.stringify({ type: "agency:models:list" })); return; }
-      if (t === "connected") return;
+      if (t === "auth:ok") { authed = true; if (m.token) freshToken = m.token; console.log("[blu-bridge] fan-reports: auth ok → pido models:list"); ws.send(JSON.stringify({ type: "agency:models:list" })); return; }
+      if (t === "connected" || t === "pong") return;
       if (!authed) return;
       if (t === "agency:models:list" && Array.isArray(m.models)) {
+        if (gotModels) return;   // el server puede empujarla más de una vez
         modelIds = m.models.map((x) => x?.id).filter((x) => x != null);
+        gotModels = true;
+        console.log(`[blu-bridge] fan-reports: ${modelIds.length} modelos a consultar.`);
         return queryNext();
       }
-      // Avanzar SIEMPRE ante una respuesta de fan-reports:model (aunque venga sin model/errore),
-      // para no quedar trabado si BLU no responde un modelId puntual.
-      if (t === "agency:analytics:fan-reports:model") {
-        if (m.model) results.push(m.model);
-        idx++;
-        return queryNext();
-      }
+      if (t === "agency:analytics:fan-reports:model") { if (m.model) results.push(m.model); idx++; return queryNext(); }
+      if (seenTypes < 15) { seenTypes++; console.log(`[blu-bridge] fan-reports: msg '${t}' (ignorado)`); }   // diagnóstico
     });
-    ws.on("error", (e) => done(reject, new Error("WS error: " + e.message)));
-    ws.on("close", () => { if (!resolved) done(reject, new Error("WS cerró antes de terminar (¿auth?)")); });
+    ws.on("error", (e) => fail(new Error("WS error: " + e.message)));
+    ws.on("close", (code) => { if (!resolved) { console.error(`[blu-bridge] fan-reports: WS cerró (code ${code}) con ${results.length} modelos → resuelvo parcial.`); finish("cerró-server"); } });
   });
 }
 
