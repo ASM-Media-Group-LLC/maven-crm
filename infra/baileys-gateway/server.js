@@ -536,8 +536,12 @@ function resolveJid(numberOrJid) {
   if (!s) return null;
   if (s.includes('@')) return s; // ya viene con sufijo
   // Heuristica: grupos legacy tienen guion (creator-timestamp), DMs solo digitos.
-  if (s.includes('-')) return `${s}@g.us`;
-  return `${s}@s.whatsapp.net`;
+  if (s.includes('-')) return `${s.replace(/[^0-9-]/g, '')}@g.us`;
+  // DM phone: dejar SOLO dígitos. Saca '+', espacios, NBSP (U+00A0) y marcas bidi
+  // invisibles (U+202A/U+202C) que se cuelan al pegar números desde iOS/contactos —
+  // .trim() no las saca y el JID saldría corrupto → el mensaje no se entrega.
+  const digits = s.replace(/[^0-9]/g, '');
+  return digits ? `${digits}@s.whatsapp.net` : null;
 }
 
 // ---------------------------------------------------------------------------

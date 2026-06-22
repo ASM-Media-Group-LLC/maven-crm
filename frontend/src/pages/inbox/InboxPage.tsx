@@ -1084,8 +1084,11 @@ const InboxPage = () => {
                               {isOut && !isDeleted && <StatusTick status={m.status} />}
                             </p>
                             {isOut && !isDeleted && m.status === "failed" && (
-                              <p className="mt-0.5 flex items-center justify-end gap-1 text-[10px] font-medium text-red-400">
-                                <AlertCircle className="h-3 w-3" /> No entregado
+                              <p
+                                className="mt-0.5 flex items-center justify-end gap-1 text-[10px] font-medium text-red-400"
+                                title="WhatsApp rechazó la entrega. Causa más común: el número no tiene WhatsApp o no es el correcto. Verificá el número del contacto."
+                              >
+                                <AlertCircle className="h-3 w-3" /> No entregado · revisá el número
                               </p>
                             )}
                             {m.agent_reaction && (
