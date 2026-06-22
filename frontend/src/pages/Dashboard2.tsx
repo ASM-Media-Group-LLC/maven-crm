@@ -3,7 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { subMonths, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
-import { useEarningsData } from "./sales-performance/useEarningsData";
+// Dashboard 2 ahora se alimenta de la data VIVA de BLU (creator_daily_earnings).
+// La fuente vieja (of_gross_earnings, vía useEarningsData) dejó de actualizarse el 9-may.
+import { useBluEarningsData } from "./sales-performance/useBluEarningsData";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -93,7 +95,7 @@ const PIE_COLORS = ["hsl(221,83%,53%)","hsl(142,71%,45%)","hsl(25,95%,53%)","hsl
 const Dashboard2 = () => {
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
-  const { data: allRows = [], isLoading } = useEarningsData();
+  const { data: allRows = [], isLoading } = useBluEarningsData();
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [ddSort, setDdSort] = useState<Record<string, { key: string; dir: "asc" | "desc" }>>({
@@ -648,7 +650,7 @@ const Dashboard2 = () => {
                       </TooltipTrigger>
                       <TooltipContent side="bottom" className="max-w-xs text-xs">
                         <strong>Bruto</strong> = lo que reporta OF (100%). <strong>Neto</strong> = agencia (80%).
-                        Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">of_gross_earnings</code>. Excluye Unlok/IG.
+                        Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_daily_earnings</code> (BLU, en vivo). Conteo de fans/ranking no disponible desde BLU.
                       </TooltipContent>
                     </UITooltip>
                   </TooltipProvider>
@@ -780,8 +782,8 @@ const Dashboard2 = () => {
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">$/Fan</p>
-                        <p className="text-3xl font-bold tabular-nums leading-tight">${hlKpis.avgPerFanGlobal.toFixed(2)}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">{hlKpis.totalFansAll.toLocaleString()} fans</p>
+                        <p className="text-3xl font-bold tabular-nums leading-tight">{hlKpis.totalFansAll > 0 ? `$${hlKpis.avgPerFanGlobal.toFixed(2)}` : "—"}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">{hlKpis.totalFansAll > 0 ? `${hlKpis.totalFansAll.toLocaleString()} fans` : "BLU no trae conteo de fans"}</p>
                       </div>
                     </div>
                   </div>
