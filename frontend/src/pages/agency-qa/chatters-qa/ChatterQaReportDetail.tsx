@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Plus, Trash2, Sparkles, Save, Loader2, AlertTriangle, Pencil, X,
   ThumbsUp, Wrench, MessageSquareText, Lightbulb, Flag, FileText, Users, Quote, ExternalLink, ChevronDown, Mail,
+  MailCheck, CheckCircle2, XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,23 +66,51 @@ function StringList({ label, items, onChange, placeholder }: { label: string; it
   );
 }
 
-// ── Card de sección. En lectura puede ser colapsable (chevron); en edición siempre abierta. ──
+// Avatar de iniciales con gradiente por hash del nombre (mismo patrón que CallDetailPage).
+function HeroAvatar({ name, size = 60 }: { name: string; size?: number }) {
+  const initial = (name?.trim().charAt(0) || "?").toUpperCase();
+  let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  const bg = `linear-gradient(135deg, hsl(${h},62%,56%) 0%, hsl(${(h + 60) % 360},70%,38%) 100%)`;
+  return <span className="inline-flex shrink-0 items-center justify-center rounded-full text-xl font-bold text-white shadow-md ring-2 ring-white/15" style={{ width: size, height: size, background: bg }}>{initial}</span>;
+}
+
+// "Gauge" del veredicto: anillo coloreado por tono (sin score numérico) con un ícono al centro.
+const VERED_LEVEL: Record<string, number> = { excelente: 100, bueno: 75, requiere_mejora: 45, critico: 22 };
+const TONE_HSL: Record<string, string> = { good: "hsl(152 60% 45%)", warn: "hsl(38 92% 50%)", bad: "hsl(0 72% 56%)" };
+function VeredictoGauge({ veredicto, size = 104 }: { veredicto: string; size?: number }) {
+  const tone = veredictoTone(veredicto);
+  const level = VERED_LEVEL[veredicto] ?? 50;
+  const sw = 9, r = (size - sw) / 2, c = 2 * Math.PI * r, offset = c * (1 - level / 100);
+  const color = TONE_HSL[tone];
+  const Icon = tone === "good" ? CheckCircle2 : tone === "bad" ? XCircle : AlertTriangle;
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(var(--border))" strokeWidth={sw} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={offset} style={{ transition: "stroke-dashoffset 700ms ease" }} />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center"><Icon className="h-8 w-8" style={{ color }} /></div>
+    </div>
+  );
+}
+
+// ── Card de sección. Glass + gradiente sutil. En lectura colapsable (chevron); en edición siempre abierta. ──
 function Section({ icon: Icon, title, accent, collapsible, defaultOpen = true, count, children }:
   { icon: any; title: string; accent?: string; collapsible?: boolean; defaultOpen?: boolean; count?: number; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   const head = (
     <>
-      <span className={`flex h-6 w-6 items-center justify-center rounded-md ${accent ?? "bg-muted text-muted-foreground"}`}><Icon className="h-3.5 w-3.5" /></span>
+      <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${accent ?? "bg-muted text-muted-foreground"}`}><Icon className="h-4 w-4" /></span>
       <h4 className="text-sm font-semibold tracking-tight">{title}</h4>
-      {typeof count === "number" && <span className="rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground">{count}</span>}
+      {typeof count === "number" && <span className="rounded-full bg-white/10 px-1.5 text-[11px] text-muted-foreground">{count}</span>}
       {collapsible && <ChevronDown className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />}
     </>
   );
   return (
-    <div className="rounded-xl border border-border bg-card/40 p-4">
+    <div className="rounded-2xl border border-white/[0.07] bg-gradient-to-br from-white/[0.04] to-transparent p-4 backdrop-blur-md transition-colors hover:border-white/10">
       {collapsible
-        ? <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 text-left">{head}</button>
-        : <div className="mb-2.5 flex items-center gap-2">{head}</div>}
+        ? <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2.5 text-left">{head}</button>
+        : <div className="mb-2.5 flex items-center gap-2.5">{head}</div>}
       {(!collapsible || open) && <div className={collapsible ? "mt-3" : ""}>{children}</div>}
     </div>
   );
@@ -139,18 +168,17 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      {/* ── Hero ── */}
-      <div className="rounded-xl border border-border bg-gradient-to-br from-card to-card/30 p-5">
+      {/* ── Hero (gradiente + avatar + gauge de veredicto) ── */}
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 p-5"
+        style={{ background: "linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--accent) / 0.07) 45%, hsl(var(--card)) 100%)", boxShadow: "0 0 90px -28px hsl(var(--accent) / 0.4)" }}>
         <div className="flex items-start justify-between gap-3">
-          <button onClick={onBack} className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Volver</button>
+          <button onClick={onBack} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Volver</button>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {row.status === "processing" && <Badge variant="outline" className="gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> generando…</Badge>}
-            {row.status === "failed" && <Badge variant="outline" className="gap-1.5 border-destructive/40 text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> falló</Badge>}
-            <Button variant="outline" size="sm" className="h-8 gap-1.5" disabled={draft.isPending || evModels.length === 0}
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 border-white/15 bg-background/40 backdrop-blur" disabled={draft.isPending || evModels.length === 0}
               onClick={() => draft.mutate({ id }, { onError: (e) => toast.error((e as Error).message), onSuccess: () => toast.success("Borrador IA en curso…") })}>
               <Sparkles className="h-4 w-4" /> {row.source === "manual" && !hasContent(row) ? "Generar con IA" : "Regenerar IA"}
             </Button>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5" disabled={sendEmail.isPending || row.status !== "ready" || !hasContent(row)}
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 border-white/15 bg-background/40 backdrop-blur" disabled={sendEmail.isPending || row.status !== "ready" || !hasContent(row)}
               onClick={() => sendEmail.mutate(row, { onSuccess: () => toast.success("Email enviado"), onError: (e) => toast.error((e as Error).message) })}
               title={row.email_sent_at ? `Ya se envió ${new Date(row.email_sent_at).toLocaleString()}` : "Enviar el QA por email"}>
               {sendEmail.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} {row.email_sent_at ? "Reenviar email" : "Enviar email"}
@@ -163,15 +191,31 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
                 </>}
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h2 className="text-2xl font-bold tracking-tight">{row.chatter_name}</h2>
-          {veredicto && !editing && <span className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-semibold ${toneBadge[tone]}`}>{veredictoLabel(veredicto)}</span>}
+        <div className="mt-3 flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <HeroAvatar name={row.chatter_name} />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-2xl font-bold tracking-tight">{row.chatter_name}</h2>
+                {veredicto && <span className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-semibold ${toneBadge[tone]}`}>{veredictoLabel(veredicto)}</span>}
+                {row.status === "processing" && <Badge variant="outline" className="gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> generando…</Badge>}
+                {row.status === "failed" && <Badge variant="outline" className="gap-1.5 border-destructive/40 text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> falló</Badge>}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {companyLabel(row.company)} ({row.company}) · {periodLabel(row.period)} · {row.evaluator_name}
+                {sampling?.threads_sampled ? <> · <Sparkles className="inline h-3 w-3" /> {sampling.models} modelo(s) · {sampling.threads_sampled} hilos · {sampling.messages_read} mensajes</> : null}
+                {row.email_sent_at ? <> · <MailCheck className="inline h-3 w-3 text-success" /> enviado</> : null}
+              </p>
+            </div>
+          </div>
+          {veredicto && (
+            <div className="hidden shrink-0 flex-col items-center sm:flex">
+              <VeredictoGauge veredicto={veredicto} />
+              <span className="-mt-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">Veredicto</span>
+            </div>
+          )}
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {companyLabel(row.company)} ({row.company}) · {periodLabel(row.period)} · {row.evaluator_name}
-          {sampling?.threads_sampled ? <> · <Sparkles className="inline h-3 w-3" /> {sampling.models} modelo(s) · {sampling.threads_sampled} hilos · {sampling.messages_read} mensajes</> : null}
-        </p>
-        {row.status === "failed" && row.error_message && <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">{row.error_message}</p>}
+        {row.status === "failed" && row.error_message && <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">{row.error_message}</p>}
       </div>
 
       {editing ? (
