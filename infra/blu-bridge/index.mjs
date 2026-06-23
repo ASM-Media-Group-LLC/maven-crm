@@ -19,8 +19,9 @@ const {
   SUPABASE_SERVICE_ROLE_KEY,
   LOOKBACK_DAYS = "8",
   BACKFILL_DAYS = "0",   // >0: en el PRIMER run rellena ese nº de días hacia atrás (histórico, 1 sola vez)
-  RESYNC_DAYS = "90",    // cada corrida re-jala los últimos N días → auto-corrige reembolsos/chargebacks
-  RUN_EVERY_HOURS = "12",
+  RESYNC_DAYS = "90",    // resync PESADO: re-jala los últimos N días → auto-corrige reembolsos/chargebacks
+  RUN_EVERY_HOURS = "3", // cadencia LIVIANA: corre seguido y solo refresca el mes en curso (barato)
+  RESYNC_EVERY_HOURS = "12", // cadencia del resync PESADO (90 días). Las corridas intermedias son livianas.
   RUN_ONCE,
 } = process.env;
 
@@ -58,6 +59,10 @@ const ymd = (d) => d.toISOString().slice(0, 10);
 const addDay = (d) => ymd(new Date(new Date(d + "T00:00:00.000Z").getTime() + DAY));
 const daysBack = (n) => { const out = []; for (let i = n; i >= 0; i--) out.push(ymd(new Date(Date.now() - i * DAY))); return out; };
 const chunk = (arr, size) => { const out = []; for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size)); return out; };
+
+// Marca de tiempo del último resync PESADO (90 días). Las corridas livianas intermedias solo
+// refrescan el mes en curso; cada RESYNC_EVERY_HOURS se hace uno pesado para corregir reembolsos.
+let lastFullResyncMs = 0;
 
 // ── WS: auth (captura el token fresco del auth:ok) + pedir reportes día a día ──
 async function fetchEarningsWS(token, days) {
@@ -212,16 +217,20 @@ async function runOnce(firstRun = false) {
   const expMs = jwtExpMs(token);
   if (expMs && Date.now() >= expMs) throw Object.assign(new Error("token de sesión vencido"), { expired: true });
 
-  // Días a traer: SIEMPRE el mes actual completo + los últimos RESYNC_DAYS (rolling), para
-  // que un reembolso/chargeback que cambia el gross de un día YA pasado se auto-corrija (el
-  // upsert idempotente sobreescribe el valor viejo). En el PRIMER run, si BACKFILL_DAYS>0, se
-  // extiende más atrás para rellenar histórico (una sola vez). Se parte en chunks de 30 días
-  // → 1 conexión WS por chunk: resiliente (un chunk que falla no tumba el resto) y sin timeouts.
-  const rolling = Math.max(Number(LOOKBACK_DAYS), new Date().getUTCDate() + 1, Number(RESYNC_DAYS) || 0);
+  // DOS NIVELES (para correr seguido sin gastar): corrida LIVIANA = solo el mes en curso
+  // (barata). RESYNC PESADO = los últimos RESYNC_DAYS, para que un reembolso/chargeback en un
+  // día YA pasado se auto-corrija (el upsert idempotente sobreescribe). El pesado corre en el
+  // PRIMER run y luego cada RESYNC_EVERY_HOURS; las corridas intermedias son livianas. En el
+  // PRIMER run, si BACKFILL_DAYS>0, se extiende más atrás (histórico, 1 sola vez). Chunks de
+  // 30 días → 1 conexión WS por chunk: resiliente (un chunk que falla no tumba el resto).
+  const baseDays = Math.max(Number(LOOKBACK_DAYS), new Date().getUTCDate() + 1);   // mes en curso
+  const doFull = firstRun || (Date.now() - lastFullResyncMs >= (Number(RESYNC_EVERY_HOURS) || 12) * 3600000);
+  if (doFull) lastFullResyncMs = Date.now();
+  const rolling = doFull ? Math.max(baseDays, Number(RESYNC_DAYS) || 0) : baseDays;
   const backfill = firstRun ? Number(BACKFILL_DAYS) || 0 : 0;
   const allDays = daysBack(Math.max(rolling, backfill));
   const chunks = chunk(allDays, 30);
-  console.log(`[blu-bridge] conectando WS ${BLU_WS_URL}… ${allDays.length} días en ${chunks.length} chunk(s)${backfill ? ` (backfill ${backfill}d)` : ""}. (token exp ${expMs ? new Date(expMs).toISOString() : "?"})`);
+  console.log(`[blu-bridge] conectando WS ${BLU_WS_URL}… ${doFull ? "RESYNC pesado" : "liviano"}: ${allDays.length} días en ${chunks.length} chunk(s)${backfill ? ` (backfill ${backfill}d)` : ""}. (token exp ${expMs ? new Date(expMs).toISOString() : "?"})`);
 
   let totalRows = 0, sawCreators = false;
   for (let ci = 0; ci < chunks.length; ci++) {
@@ -275,10 +284,10 @@ async function main() {
     catch (e) { warnIfExpired(e); process.exit(e.expired ? 2 : 1); }
     return;
   }
-  await runOnce(true).catch(warnIfExpired);   // primer run: rolling + backfill histórico si BACKFILL_DAYS>0
-  const hours = Math.min(Number(RUN_EVERY_HOURS) || 12, 12);   // < 24h de vida del token, para refrescar a tiempo
-  console.log(`[blu-bridge] próxima corrida en ${hours}h`);
-  setInterval(() => runOnce(false).catch(warnIfExpired), hours * 3600000);   // siguientes: solo rolling (mes actual)
+  await runOnce(true).catch(warnIfExpired);   // primer run: pesado (90d) + backfill histórico si BACKFILL_DAYS>0
+  const hours = Math.max(1, Math.min(Number(RUN_EVERY_HOURS) || 3, 12));   // 1–12h; < 24h para refrescar el token
+  console.log(`[blu-bridge] próxima corrida en ${hours}h (livianas; resync pesado cada ${Math.max(1, Number(RESYNC_EVERY_HOURS) || 12)}h)`);
+  setInterval(() => runOnce(false).catch(warnIfExpired), hours * 3600000);   // livianas (mes actual) + pesado periódico
 }
 
 main();

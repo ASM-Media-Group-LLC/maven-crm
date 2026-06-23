@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, startOfMonth, endOfMonth, subDays, differenceInCalendarDays } from "date-fns";
+import { format, startOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subDays, endOfDay, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 // Dashboard 2 ahora se alimenta de la data VIVA de BLU (creator_daily_earnings).
 // La fuente vieja (of_gross_earnings, vía useEarningsData) dejó de actualizarse el 9-may.
@@ -76,6 +77,25 @@ type SortDir = "asc" | "desc";
 
 // Capitaliza la 1ª letra (labels de mes).
 const cap = (s: string) => s.replace(/^\w/, (c) => c.toUpperCase());
+
+// Presets de rango rápido — mismos pills que Panel de Control.
+type RangePreset = "yesterday" | "today" | "this_week" | "this_month";
+const PRESET_CONFIG: Array<{ key: RangePreset; label: string }> = [
+  { key: "yesterday", label: "Ayer" },
+  { key: "today", label: "Hoy" },
+  { key: "this_week", label: "Esta semana" },
+  { key: "this_month", label: "Este mes" },
+];
+function rangeForPreset(preset: RangePreset, ref: Date): { from: Date; to: Date } {
+  const today = startOfDay(ref);
+  switch (preset) {
+    case "yesterday": { const y = subDays(today, 1); return { from: y, to: endOfDay(y) }; }
+    case "this_week": return { from: startOfWeek(today, { weekStartsOn: 1 }), to: endOfWeek(today, { weekStartsOn: 1 }) };
+    case "this_month": return { from: startOfMonth(today), to: endOfMonth(today) };
+    case "today":
+    default: return { from: today, to: endOfDay(today) };
+  }
+}
 
 const PIE_COLORS = ["hsl(221,83%,53%)","hsl(142,71%,45%)","hsl(25,95%,53%)","hsl(280,67%,55%)","hsl(350,80%,55%)","hsl(190,80%,45%)","hsl(45,93%,47%)","hsl(160,60%,45%)","hsl(320,70%,50%)","hsl(200,70%,50%)","hsl(100,60%,45%)","hsl(0,70%,55%)","hsl(260,50%,55%)","hsl(30,80%,50%)","hsl(170,70%,40%)","hsl(220,50%,60%)","hsl(60,70%,50%)","hsl(310,60%,55%)","hsl(140,50%,50%)","hsl(10,70%,50%)"];
 
@@ -224,12 +244,12 @@ const Dashboard2 = () => {
   };
   const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
 
-  // Filtro por RANGO de fechas (mismo DateRangePicker que Panel de Control), en vez del
-  // dropdown de meses. Default: el mes en curso completo.
-  const [range, setRange] = useState<{ from: Date | undefined; to: Date | undefined }>(() => {
-    const now = new Date();
-    return { from: startOfMonth(now), to: endOfMonth(now) };
-  });
+  // Filtro por RANGO de fechas (mismo DateRangePicker + pills que Panel de Control), en
+  // vez del dropdown de meses. Default: el mes en curso.
+  const [range, setRange] = useState<{ from: Date | undefined; to: Date | undefined }>(
+    () => rangeForPreset("this_month", new Date()),
+  );
+  const [activePreset, setActivePreset] = useState<RangePreset | null>("this_month");
 
   const selectedPeriod = useMemo(() => {
     const f = range.from, t = range.to;
@@ -637,17 +657,11 @@ const Dashboard2 = () => {
           <main className="flex-1 overflow-auto">
             {/* ══════ COMPACT HEADER ══════ */}
             <div className="sticky top-0 z-20 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
                   <h1 className="text-lg font-bold text-foreground tracking-tight">
                     Ventas OF
                   </h1>
-                  <DateRangePicker
-                    from={range.from}
-                    to={range.to}
-                    onApply={(from, to) => setRange({ from, to })}
-                    placeholder="Seleccionar rango"
-                  />
                   <TooltipProvider delayDuration={200}>
                     <UITooltip>
                       <TooltipTrigger asChild>
@@ -662,7 +676,37 @@ const Dashboard2 = () => {
                     </UITooltip>
                   </TooltipProvider>
                 </div>
-                <div className="flex items-center gap-1.5">
+                {/* Calendario arriba a la derecha + pills de presets al costado — igual que Panel de Control. */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="inline-flex items-center rounded-lg border border-border bg-card/40 p-0.5">
+                    {PRESET_CONFIG.map((p) => {
+                      const isActive = activePreset === p.key;
+                      return (
+                        <button
+                          key={p.key}
+                          type="button"
+                          onClick={() => {
+                            setRange(rangeForPreset(p.key, new Date()));
+                            setActivePreset(p.key);
+                          }}
+                          className={cn(
+                            "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                            isActive
+                              ? "bg-primary/15 text-primary ring-1 ring-primary/30"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                          )}
+                        >
+                          {p.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <DateRangePicker
+                    from={range.from}
+                    to={range.to}
+                    onApply={(from, to) => { setRange({ from, to }); setActivePreset(null); }}
+                    placeholder="Seleccionar rango"
+                  />
                   {isAdmin && (
                     <Button
                       variant="ghost"
@@ -1820,7 +1864,7 @@ const Dashboard2 = () => {
                        <DateRangePicker
                          from={range.from}
                          to={range.to}
-                         onApply={(from, to) => setRange({ from, to })}
+                         onApply={(from, to) => { setRange({ from, to }); setActivePreset(null); }}
                          placeholder="Seleccionar rango"
                        />
                      </h2>
