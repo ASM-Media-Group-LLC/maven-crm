@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { subMonths, format } from "date-fns";
+import { format, startOfMonth, endOfMonth, subDays, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { supabase } from "@/integrations/supabase/client";
 // Dashboard 2 ahora se alimenta de la data VIVA de BLU (creator_daily_earnings).
 // La fuente vieja (of_gross_earnings, vía useEarningsData) dejó de actualizarse el 9-may.
@@ -73,21 +74,8 @@ interface CreatorSummary {
 type SortKey = "name" | "total" | "net" | "subs" | "newSubs" | "recurringSubs" | "tips" | "messages" | "activeFans" | "newFans" | "daysWithData" | "lastDate" | "avgPerDay" | "avgPerFan";
 type SortDir = "asc" | "desc";
 
-const getMonthOptions = () => {
-  const months: { value: string; label: string; startStr: string; endStr: string }[] = [];
-  const now = new Date();
-  for (let i = 0; i <= 4; i++) {
-    const m = subMonths(now, i);
-    const y = m.getFullYear();
-    const mo = m.getMonth();
-    const startStr = `${y}-${String(mo + 1).padStart(2, "0")}-01`;
-    const lastDay = new Date(y, mo + 1, 0).getDate();
-    const endStr = `${y}-${String(mo + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-    const label = format(m, "MMMM yyyy", { locale: es }).replace(/^\w/, (c) => c.toUpperCase());
-    months.push({ value: `${y}-${String(mo + 1).padStart(2, "0")}`, label, startStr, endStr });
-  }
-  return months;
-};
+// Capitaliza la 1ª letra (labels de mes).
+const cap = (s: string) => s.replace(/^\w/, (c) => c.toUpperCase());
 
 const PIE_COLORS = ["hsl(221,83%,53%)","hsl(142,71%,45%)","hsl(25,95%,53%)","hsl(280,67%,55%)","hsl(350,80%,55%)","hsl(190,80%,45%)","hsl(45,93%,47%)","hsl(160,60%,45%)","hsl(320,70%,50%)","hsl(200,70%,50%)","hsl(100,60%,45%)","hsl(0,70%,55%)","hsl(260,50%,55%)","hsl(30,80%,50%)","hsl(170,70%,40%)","hsl(220,50%,60%)","hsl(60,70%,50%)","hsl(310,60%,55%)","hsl(140,50%,50%)","hsl(10,70%,50%)"];
 
@@ -236,12 +224,38 @@ const Dashboard2 = () => {
   };
   const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
 
-  const monthOptions = useMemo(getMonthOptions, []);
-  const [selectedMonth, setSelectedMonth] = useState(monthOptions[0]?.value || "");
+  // Filtro por RANGO de fechas (mismo DateRangePicker que Panel de Control), en vez del
+  // dropdown de meses. Default: el mes en curso completo.
+  const [range, setRange] = useState<{ from: Date | undefined; to: Date | undefined }>(() => {
+    const now = new Date();
+    return { from: startOfMonth(now), to: endOfMonth(now) };
+  });
 
   const selectedPeriod = useMemo(() => {
-    return monthOptions.find((m) => m.value === selectedMonth) || monthOptions[0];
-  }, [selectedMonth, monthOptions]);
+    const f = range.from, t = range.to;
+    if (!f || !t) {
+      // "Todo" → todo el histórico hasta hoy.
+      return { startStr: "2000-01-01", endStr: format(new Date(), "yyyy-MM-dd"), label: "Todo el histórico", value: "all" };
+    }
+    const startStr = format(f, "yyyy-MM-dd");
+    const endStr = format(t, "yyyy-MM-dd");
+    const sameMonth = f.getFullYear() === t.getFullYear() && f.getMonth() === t.getMonth();
+    const isFullMonth = sameMonth && f.getDate() === 1 && t.getDate() === endOfMonth(f).getDate();
+    const label = isFullMonth
+      ? cap(format(f, "MMMM yyyy", { locale: es }))
+      : `${format(f, "d MMM", { locale: es })} – ${format(t, "d MMM yyyy", { locale: es })}`;
+    return { startStr, endStr, label, value: `${startStr}_${endStr}` };
+  }, [range]);
+
+  // Período anterior (= mismo largo, justo antes del rango) para los deltas MoM.
+  const prevPeriod = useMemo(() => {
+    const f = range.from, t = range.to;
+    if (!f || !t) return null;
+    const lenDays = differenceInCalendarDays(t, f);
+    const prevTo = subDays(f, 1);
+    const prevFrom = subDays(prevTo, lenDays);
+    return { startStr: format(prevFrom, "yyyy-MM-dd"), endStr: format(prevTo, "yyyy-MM-dd") };
+  }, [range]);
 
   const { data: creatorInfoMap = {} } = useQuery({
     queryKey: ["creator-info-dashboard2"],
@@ -382,9 +396,6 @@ const Dashboard2 = () => {
 
   // Previous month for comparison
   const prevMonthMap = useMemo(() => {
-    if (!selectedPeriod || monthOptions.length < 2) return new Map<string, number>();
-    const currentIdx = monthOptions.findIndex((m) => m.value === selectedMonth);
-    const prevPeriod = monthOptions[currentIdx + 1];
     if (!prevPeriod) return new Map<string, number>();
     const map = new Map<string, number>();
     for (const r of allRows) {
@@ -397,7 +408,7 @@ const Dashboard2 = () => {
       map.set(key, (map.get(key) || 0) + (r.total_earnings_gross ?? 0));
     }
     return map;
-  }, [allRows, selectedMonth, selectedPeriod, monthOptions, creatorInfoMap]);
+  }, [allRows, prevPeriod, creatorInfoMap]);
 
   // Growth vs decline counts
   const growthStats = useMemo(() => {
@@ -631,16 +642,12 @@ const Dashboard2 = () => {
                   <h1 className="text-lg font-bold text-foreground tracking-tight">
                     Ventas OF
                   </h1>
-                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger className="w-[160px] h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {monthOptions.map((m) => (
-                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <DateRangePicker
+                    from={range.from}
+                    to={range.to}
+                    onApply={(from, to) => setRange({ from, to })}
+                    placeholder="Seleccionar rango"
+                  />
                   <TooltipProvider delayDuration={200}>
                     <UITooltip>
                       <TooltipTrigger asChild>
@@ -923,7 +930,7 @@ const Dashboard2 = () => {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-foreground">Velocidad de Crecimiento</p>
-                        <p className="text-[11px] text-muted-foreground">vs mes anterior</p>
+                        <p className="text-[11px] text-muted-foreground">vs período anterior</p>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-center">
@@ -1810,16 +1817,12 @@ const Dashboard2 = () => {
                        <Telescope className="h-5 w-5 text-primary" />
                        Deep Dive
                        <span className="text-muted-foreground">—</span>
-                       <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                         <SelectTrigger className="h-8 w-[160px] text-sm font-medium">
-                           <SelectValue />
-                         </SelectTrigger>
-                         <SelectContent>
-                           {monthOptions.map((m) => (
-                             <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                           ))}
-                         </SelectContent>
-                       </Select>
+                       <DateRangePicker
+                         from={range.from}
+                         to={range.to}
+                         onApply={(from, to) => setRange({ from, to })}
+                         placeholder="Seleccionar rango"
+                       />
                      </h2>
                   <div className="flex flex-wrap items-center gap-1 mt-3 bg-muted rounded-lg p-1">
                     {([
@@ -1872,8 +1875,6 @@ const Dashboard2 = () => {
                 <div className="flex-1 overflow-y-auto p-6">
                   {/* ── MoM Comparison ── */}
                   {deepDiveTab === "mom" && (() => {
-                     const currentIdx = monthOptions.findIndex((m) => m.value === selectedMonth);
-                     const prevPeriod = monthOptions[currentIdx + 1];
                      const momBase = rawCreators
                        .filter((c) => c.total > 0 || prevMonthMap.has(c.creatorId))
                        .map((c) => {
@@ -1888,7 +1889,7 @@ const Dashboard2 = () => {
                        <div className="space-y-5">
                          <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
                            <p className="text-xs font-semibold text-foreground">📊 Comparativa Mes vs Mes (MoM)</p>
-                           <p className="text-[10px] text-muted-foreground mt-0.5">Compara el revenue de cada creadora entre el mes seleccionado y el mes anterior. Identifica quién creció, quién cayó y en cuánto.</p>
+                           <p className="text-[10px] text-muted-foreground mt-0.5">Compara el revenue de cada creadora entre el período seleccionado y el anterior. Identifica quién creció, quién cayó y en cuánto.</p>
                          </div>
                         <div className="grid grid-cols-4 gap-3">
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
@@ -2266,7 +2267,7 @@ const Dashboard2 = () => {
                           <div className="flex items-center gap-2">
                             <span className="text-lg">🚀</span>
                             <h3 className="text-sm font-bold text-foreground">Alto Crecimiento</h3>
-                            <span className="text-[10px] text-muted-foreground">Crecieron &gt;20% vs mes anterior — mantener impulso</span>
+                            <span className="text-[10px] text-muted-foreground">Crecieron &gt;20% vs período anterior — mantener impulso</span>
                           </div>
                           {highGrowth.length === 0 ? <p className="text-sm text-muted-foreground">Sin creadoras en esta categoría</p> : (
                             <div className="space-y-1.5">
