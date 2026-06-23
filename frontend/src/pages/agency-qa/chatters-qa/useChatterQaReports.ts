@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { companyLabel, periodLabel, type CompanyCode } from "./useChatterScorecards";
 import { buildChatterQaEmailSubject, buildChatterQaEmailHtml, type ChatterQaEmailPayload } from "./chatterQaEmailTemplate";
@@ -74,6 +76,9 @@ export const useQaReports = (period: string | null) =>
       if (error) throw error;
       return (data ?? []) as ChatterQaReport[];
     },
+    // Mientras haya algún reporte 'processing' (borrador IA en curso), refrescamos solos cada 4s
+    // → la UI pasa de "Analizando…" a listo/falló sin que el usuario recargue ni dependa del request.
+    refetchInterval: (query) => ((query.state.data as ChatterQaReport[] | undefined)?.some((r) => r.status === "processing") ? 4000 : false),
   });
 
 export const useQaReport = (id: string | null) =>
@@ -85,6 +90,8 @@ export const useQaReport = (id: string | null) =>
       return (data ?? null) as ChatterQaReport | null;
     },
     enabled: !!id,
+    // Poll mientras este reporte esté 'processing' → la pantalla "Analizando…" se actualiza sola al terminar.
+    refetchInterval: (query) => ((query.state.data as ChatterQaReport | null | undefined)?.status === "processing" ? 4000 : false),
   });
 
 // ── Roster de chatters de BLU → para elegir a quién se evalúa.
@@ -214,16 +221,50 @@ export const useGenerateQaDraft = () => {
   return useMutation({
     mutationFn: async ({ id, withFeedback }: { id: string; withFeedback?: boolean }) => {
       await (supabase as any).from("chatter_qa_reports").update({ status: "processing", error_message: null }).eq("id", id);
-      const { data, error } = await supabase.functions.invoke("chatter-qa-analyze", {
-        body: { report_id: id, with_feedback: !!withFeedback },
-      });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(String(data.error));
-      return data;
+      try {
+        const { data, error } = await supabase.functions.invoke("chatter-qa-analyze", { body: { report_id: id, with_feedback: !!withFeedback } });
+        if (error) throw new Error(error.message);
+        // Si data.error (p.ej. no_chats), el edge YA dejó status='failed'+error_message → lo reporta el watcher.
+        return data;
+      } catch (e) {
+        // Falla dura (edge no respondió/timeout) → no dejar el reporte colgado en 'processing'.
+        await (supabase as any).from("chatter_qa_reports").update({ status: "failed", error_message: "No se pudo completar el análisis: " + (e as Error).message }).eq("id", id);
+        throw e;
+      }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-qa"] }),
+    // onSettled (no onSuccess): invalidamos siempre — los toasts de resultado los da useQaProcessingWatcher
+    // (verde/rojo), que funciona aunque el usuario haya navegado a otra parte de Chatters QA.
+    onSettled: () => qc.invalidateQueries({ queryKey: ["chatter-qa"] }),
   });
 };
+
+// Watcher: detecta la transición processing→ready/failed de cualquier reporte y avisa con toast
+// (verde si OK, rojo si error; + warnings de modelos sin chats / fuera del cap). Montar UNA vez
+// en un componente que viva mientras el usuario esté en Chatters QA (ChattersQaSection).
+export function useQaProcessingWatcher() {
+  const { data: reports = [] } = useQaReports(null);
+  const prev = useRef<Map<string, string> | null>(null);
+  useEffect(() => {
+    const cur = new Map(reports.map((r) => [r.id, r.status]));
+    if (prev.current) {
+      for (const r of reports) {
+        if (prev.current.get(r.id) === "processing" && r.status !== "processing") {
+          if (r.status === "ready") {
+            const s = (r.sampling ?? {}) as any;
+            const skipped = (s.models_skipped ?? []) as string[];
+            const empties = (s.empty_models ?? []) as string[];
+            toast.success(`QA de ${r.chatter_name} listo`);
+            if (skipped.length) toast.warning(`${r.chatter_name}: se analizaron las primeras 4 modelos; quedaron afuera: ${skipped.join(", ")}.`, { duration: 8000 });
+            if (empties.length) toast.warning(`${r.chatter_name} no tomó chats 1-a-1 en: ${empties.join(", ")}.`, { duration: 7000 });
+          } else if (r.status === "failed") {
+            toast.error(r.error_message || `Falló el análisis de ${r.chatter_name}`, { duration: 8000 });
+          }
+        }
+      }
+    }
+    prev.current = cur;
+  }, [reports]);
+}
 
 // ── Config de notificaciones (singleton id=1) ──
 export interface ChatterQaConfig {

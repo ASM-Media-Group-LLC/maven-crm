@@ -7,6 +7,7 @@ import ChattersQaScorecard from "./ChattersQaScorecard";
 import ChattersQaQualitative from "./ChattersQaQualitative";
 import ChatterQaNotifications from "./ChatterQaNotifications";
 import ChattersQaMasivos from "./ChattersQaMasivos";
+import { useQaProcessingWatcher } from "./useChatterQaReports";
 
 // Chatters QA — antes era un placeholder "soon" en el rail de Agency QA.
 // Ahora alberga el sistema de medición de chatters que reemplaza el sheet
@@ -31,6 +32,7 @@ const ComingSoon = ({ title, desc, slice }: { title: string; desc: string; slice
 );
 
 export default function ChattersQaSection() {
+  useQaProcessingWatcher(); // avisa (toast verde/rojo) cuando un borrador IA termina, aunque cambies de subtab
   const [sp] = useSearchParams();
   const [tab, setTab] = useState(() => {
     const t = sp.get("tab") ?? "";

@@ -147,6 +147,37 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
 
   if (isLoading || !row || editing === null) return <div className="p-6 text-sm text-muted-foreground">Cargando reporte…</div>;
 
+  // Mientras el borrador IA corre (status en DB = 'processing', o la mutación recién disparada),
+  // reemplazamos el formulario por una pantalla linda. El análisis sigue server-side: el usuario
+  // puede Volver / navegar y le avisamos con un toast al terminar (useQaProcessingWatcher).
+  if (row.status === "processing" || draft.isPending) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-4">
+        <button onClick={onBack} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Volver</button>
+        <div className="relative overflow-hidden rounded-2xl border border-white/10 p-10 text-center"
+          style={{ background: "linear-gradient(135deg, hsl(var(--primary) / 0.20), hsl(var(--accent) / 0.08) 45%, hsl(var(--card)) 100%)", boxShadow: "0 0 90px -28px hsl(var(--accent) / 0.45)" }}>
+          <div className="relative mx-auto mb-5 inline-flex h-20 w-20 items-center justify-center">
+            <span className="absolute inset-0 animate-ping rounded-full bg-primary/30" />
+            <span className="absolute inset-0 rounded-full bg-primary/15" />
+            <Sparkles className="relative h-9 w-9 animate-pulse text-primary" />
+          </div>
+          <h2 className="text-xl font-bold tracking-tight">Analizando con IA…</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+            Leyendo las conversaciones de <strong className="text-foreground">{row.chatter_name}</strong> en Mensajes Pro y evaluando la ejecución comercial. Suele tardar ~20-40s.
+          </p>
+          {!!row.evaluated_models?.length && (
+            <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+              {row.evaluated_models.map((m) => <Badge key={m.model_id} variant="secondary" className="text-[11px]">{m.model_name}</Badge>)}
+            </div>
+          )}
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Podés seguir navegando — te avisamos cuando termine.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const patch = (p: Partial<QaReportBody>) => { setReport((r) => ({ ...r, ...p })); setDirty(true); };
   const patchVm = (p: Record<string, unknown>) => patch({ venta_masiva: { ...(report.venta_masiva ?? {}), ...p } });
   const mejoras = report.aspectos_mejora ?? [];
@@ -176,17 +207,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
           <button onClick={onBack} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Volver</button>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button variant="outline" size="sm" className="h-8 gap-1.5 border-white/15 bg-background/40 backdrop-blur" disabled={draft.isPending || evModels.length === 0}
-              onClick={() => draft.mutate({ id }, {
-                // no_chats → la edge devuelve {error} y el hook lo lanza → toast (popup estilo Maven) + banner "falló".
-                onError: (e) => toast.error((e as Error).message, { duration: 7000 }),
-                onSuccess: (data: any) => {
-                  const skipped = (data?.models_skipped ?? []) as string[];
-                  const empties = (data?.empty_models ?? []) as string[];
-                  if (skipped.length) toast.warning(`Se analizaron las primeras 4 modelos; quedaron afuera: ${skipped.join(", ")}. Hacé otro reporte para esas.`, { duration: 8000 });
-                  if (empties.length) toast.warning(`${row.chatter_name} no tomó chats 1-a-1 en: ${empties.join(", ")}. Se analizó el resto.`, { duration: 7000 });
-                  if (!skipped.length && !empties.length) toast.success("Borrador IA listo");
-                },
-              })}>
+              onClick={() => draft.mutate({ id })}>{/* status→'processing' → pantalla "Analizando…"; el resultado (verde/rojo + warnings) lo avisa useQaProcessingWatcher */}
               <Sparkles className="h-4 w-4" /> {row.source === "manual" && !hasContent(row) ? "Generar con IA" : "Regenerar IA"}
             </Button>
             <Button variant="outline" size="sm" className="h-8 gap-1.5 border-white/15 bg-background/40 backdrop-blur" disabled={sendEmail.isPending || row.status !== "ready" || !hasContent(row)}
