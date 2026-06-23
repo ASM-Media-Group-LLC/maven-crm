@@ -24,6 +24,7 @@ import AgencyQaChat from "./AgencyQaChat";
 import AgencyQaHistory from "./AgencyQaHistory";
 import AgencyQaNotifications from "./AgencyQaNotifications";
 import CallDetailPage from "./CallDetailPage";
+import ChattersQaSection from "./chatters-qa/ChattersQaSection";
 
 // Agency QA — 2 niveles:
 //
@@ -138,11 +139,10 @@ const ROLE_SECTIONS: RoleSection[] = [
   {
     key: "chatters-qa",
     label: "Chatters QA",
-    description: "Conversaciones de chatters con fans en OF.",
+    description: "Medición y auditoría de chatters (reemplaza el sheet).",
     icon: MessageCircle,
-    ready: false,
-    comingSoon:
-      "Auditorías de conversaciones de chatters con fans en OF — detección de tono, upsell, manejo de objeciones.",
+    ready: true,
+    comingSoon: "",
   },
   {
     key: "managers-qa",
@@ -382,6 +382,8 @@ const AgencyQA = () => {
       <section className="min-w-0 flex-1 overflow-y-auto p-6 lg:p-8">
         {!activeIsAllowed ? null : activeRole === "closers-qa" ? (
           <ClosersQaSection />
+        ) : activeRole === "chatters-qa" ? (
+          <ChattersQaSection />
         ) : activeSection ? (
           <ComingSoonSection section={activeSection} />
         ) : null}
