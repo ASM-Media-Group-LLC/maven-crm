@@ -11,6 +11,7 @@ import { useBluEarningsData } from "./sales-performance/useBluEarningsData";
 import { useTopFans } from "./sales-performance/useTopFans";
 import { useFanRetention } from "./sales-performance/useFanRetention";
 import { useChatters } from "./sales-performance/useChatters";
+import { usePromoDays } from "./sales-performance/usePromoDays";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -250,6 +251,7 @@ const Dashboard2 = () => {
   const { data: topFans = [], isLoading: topFansLoading } = useTopFans(deepDiveTab === "ballenas");
   const { data: retentionRows = [], isLoading: retLoading } = useFanRetention(deepDiveTab === "retencion");
   const { data: chatters = [], isLoading: chattersLoading } = useChatters(deepDiveTab === "chatter");
+  const { data: promoDays, isLoading: promoLoading } = usePromoDays(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "content_roi");
 
   // Filtro por RANGO de fechas (mismo DateRangePicker + pills que Panel de Control), en
   // vez del dropdown de meses. Default: el mes en curso.
@@ -1910,6 +1912,7 @@ const Dashboard2 = () => {
                       { key: "ballenas" as const, icon: <Crown className="h-3.5 w-3.5" />, label: "Ballenas", desc: "Top spenders por creadora" },
                       { key: "retencion" as const, icon: <Repeat className="h-3.5 w-3.5" />, label: "Retención", desc: "Retención de fans por cohorte" },
                       { key: "chatter" as const, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Chatters", desc: "Rendimiento por chatter" },
+                      { key: "content_roi" as const, icon: <Layers className="h-3.5 w-3.5" />, label: "Content ROI", desc: "Promo (Promolog) → ingreso" },
                       { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Ranking", desc: "Posición por revenue" },
                       { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: "Escalabilidad", desc: "Potencial de crecimiento" },
                       { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Canales", desc: "Msgs vs Tips vs Subs" },
@@ -1935,7 +1938,6 @@ const Dashboard2 = () => {
                     <span className="text-[9px] text-muted-foreground px-2 shrink-0 uppercase tracking-widest font-semibold">Roadmap</span>
                     {([
                       { key: "ltv" as const, icon: <UserCheck className="h-3.5 w-3.5" />, label: "LTV", desc: "Valor de vida del cliente (próximamente)" },
-                      { key: "content_roi" as const, icon: <Layers className="h-3.5 w-3.5" />, label: "Content ROI", desc: "Retorno por tipo de contenido (próximamente)" },
                       { key: "cohort" as const, icon: <Brain className="h-3.5 w-3.5" />, label: "Cohortes", desc: "Retención por grupo de fans (próximamente)" },
                     ]).map((tab) => (
                       <UITooltip key={tab.key}>
@@ -2678,29 +2680,88 @@ const Dashboard2 = () => {
                     </div>
                   )}
 
-                  {/* ── Content ROI (Placeholder) ── */}
-                  {deepDiveTab === "content_roi" && (
-                    <div className="space-y-5">
-                      <div className="rounded-xl border-2 border-dashed border-purple-400/40 bg-purple-500/5 p-8 text-center space-y-4">
-                        <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-purple-500/10 mx-auto">
-                          <Layers className="h-8 w-8 text-purple-400" />
+                  {/* ── Content ROI — Promolog (promo) × ingreso BLU ── */}
+                  {deepDiveTab === "content_roi" && (() => {
+                    const pd = promoDays ?? new Map<string, Set<string>>();
+                    const byC = new Map<string, { name: string; promoInc: number; promoDays: number; nonInc: number; nonDays: number }>();
+                    let aPromoInc = 0, aPromoDays = 0, aNonInc = 0, aNonDays = 0;
+                    for (const r of allRows) {
+                      if (!r.creator_id) continue;
+                      const d = r.effective_date;
+                      if (d < selectedPeriod.startStr || d > selectedPeriod.endStr) continue;
+                      const isPromo = pd.get(r.creator_id)?.has(d) ?? false;
+                      const inc = r.total_earnings_gross ?? 0;
+                      const e = byC.get(r.creator_id) || { name: r.artistic_name || r.pending_creator || "Sin nombre", promoInc: 0, promoDays: 0, nonInc: 0, nonDays: 0 };
+                      if (isPromo) { e.promoInc += inc; e.promoDays++; aPromoInc += inc; aPromoDays++; }
+                      else { e.nonInc += inc; e.nonDays++; aNonInc += inc; aNonDays++; }
+                      byC.set(r.creator_id, e);
+                    }
+                    const list = [...byC.values()].filter((e) => e.promoDays > 0).map((e) => {
+                      const avgP = e.promoDays > 0 ? e.promoInc / e.promoDays : null;
+                      const avgN = e.nonDays > 0 ? e.nonInc / e.nonDays : null;
+                      const lift = (avgP != null && avgN != null && avgN > 0) ? (avgP / avgN - 1) * 100 : null;
+                      return { name: e.name, promoDays: e.promoDays, avgP, avgN, lift };
+                    }).sort((a, b) => (b.lift ?? -1e9) - (a.lift ?? -1e9));
+                    const agAvgP = aPromoDays > 0 ? aPromoInc / aPromoDays : null;
+                    const agAvgN = aNonDays > 0 ? aNonInc / aNonDays : null;
+                    const agLift = (agAvgP != null && agAvgN != null && agAvgN > 0) ? (agAvgP / agAvgN - 1) * 100 : null;
+                    const liftColor = (v: number | null) => v == null ? "text-muted-foreground" : v > 0 ? "text-success" : "text-destructive";
+                    const fmtPct = (v: number | null) => v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(0)}%`;
+                    return (
+                      <div className="space-y-5">
+                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                          <p className="text-xs font-semibold text-foreground">📣 Content ROI — ¿promocionar mueve la aguja?</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Ingreso/día en días que la creadora promocionó (Promolog) vs días que no, en {selectedPeriod?.label}. "Lift" = cuánto más rinde un día con promo. Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">promolog_entries</code> × <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_daily_earnings</code>.</p>
                         </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-foreground">Content ROI</h3>
-                          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">Retorno de inversión por tipo de contenido: qué formatos generan más revenue, engagement y conversión.</p>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
-                          {["Revenue/Post", "Engagement Rate", "Conversión Contenido", "Top Formato"].map(m => (
-                            <div key={m} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                              <p className="text-[10px] text-muted-foreground">{m}</p>
-                              <p className="text-lg font-bold text-muted-foreground/40 mt-1">—</p>
+                        {promoLoading ? (
+                          <div className="p-8 text-center text-sm text-muted-foreground">Cargando promos…</div>
+                        ) : list.length === 0 ? (
+                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin días de promo en {selectedPeriod?.label}.</div>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="rounded-xl border border-border bg-card p-3 text-center">
+                                <p className="text-[10px] text-muted-foreground uppercase">$/día CON promo</p>
+                                <p className="text-lg font-bold tabular-nums">{agAvgP != null ? fmtK(agAvgP) : "—"}</p>
+                              </div>
+                              <div className="rounded-xl border border-border bg-card p-3 text-center">
+                                <p className="text-[10px] text-muted-foreground uppercase">$/día SIN promo</p>
+                                <p className="text-lg font-bold tabular-nums">{agAvgN != null ? fmtK(agAvgN) : "—"}</p>
+                              </div>
+                              <div className="rounded-xl border border-border bg-card p-3 text-center">
+                                <p className="text-[10px] text-muted-foreground uppercase">Promo lift</p>
+                                <p className={`text-lg font-bold tabular-nums ${liftColor(agLift)}`}>{fmtPct(agLift)}</p>
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                        <Badge variant="outline" className="text-xs border-dashed"><Lock className="h-3 w-3 mr-1" />Requiere tracking de contenido publicado</Badge>
+                            <div className="rounded-xl border border-border overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Creadora</TableHead>
+                                    <TableHead className="text-right">Días promo</TableHead>
+                                    <TableHead className="text-right">$/día c/promo</TableHead>
+                                    <TableHead className="text-right">$/día s/promo</TableHead>
+                                    <TableHead className="text-right">Lift</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {list.map((c) => (
+                                    <TableRow key={c.name}>
+                                      <TableCell className="font-medium text-sm whitespace-nowrap">{c.name}</TableCell>
+                                      <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.promoDays}</TableCell>
+                                      <TableCell className="text-right tabular-nums text-sm">{c.avgP != null ? fmtK(c.avgP) : "—"}</TableCell>
+                                      <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.avgN != null ? fmtK(c.avgN) : "—"}</TableCell>
+                                      <TableCell className={`text-right tabular-nums text-sm font-semibold ${liftColor(c.lift)}`}>{fmtPct(c.lift)}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* ── Cohort Analysis (Placeholder) ── */}
                   {deepDiveTab === "cohort" && (
