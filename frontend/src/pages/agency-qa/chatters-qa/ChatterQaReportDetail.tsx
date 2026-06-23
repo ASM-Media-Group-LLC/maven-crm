@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ArrowLeft, Plus, Trash2, Sparkles, Save, Loader2, AlertTriangle, Pencil, X,
-  ThumbsUp, Wrench, MessageSquareText, Lightbulb, Flag, FileText, Users, Quote, ExternalLink,
+  ThumbsUp, Wrench, MessageSquareText, Lightbulb, Flag, FileText, Users, Quote, ExternalLink, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ import {
   type ChatterQaReport, type QaReportBody, type EvaluatedModel,
 } from "./useChatterQaReports";
 
-type FanIndex = Record<string, { m: number; c: number }>;
+type FanIndex = Record<string, { m: number; c: number; n?: string }>;
 const toneBadge: Record<string, string> = {
   good: "border-success/40 bg-success/10 text-success",
   warn: "border-amber-500/40 bg-amber-500/10 text-amber-600",
@@ -31,9 +31,10 @@ function FanLink({ handle, fanIndex }: { handle: string; fanIndex: FanIndex }) {
   if (!hit) return <span className="font-mono text-[0.95em] text-muted-foreground">{handle}</span>;
   return (
     <Link to={`/conversaciones?model=${hit.m}&chat=${hit.c}`}
-      className="inline-flex items-center gap-0.5 font-mono text-[0.95em] font-medium text-primary hover:underline"
+      className="inline-flex items-center gap-1 text-[0.95em] font-medium text-primary hover:underline"
       title="Abrir la conversación en Mensajes Pro">
-      {handle}<ExternalLink className="h-3 w-3 opacity-70" />
+      {hit.n ? <>{hit.n} <span className="font-mono opacity-80">{handle}</span></> : <span className="font-mono">{handle}</span>}
+      <ExternalLink className="h-3 w-3 opacity-70" />
     </Link>
   );
 }
@@ -64,15 +65,24 @@ function StringList({ label, items, onChange, placeholder }: { label: string; it
   );
 }
 
-// ── Card de sección (modo lectura) ──
-function Section({ icon: Icon, title, accent, children }: { icon: any; title: string; accent?: string; children: React.ReactNode }) {
+// ── Card de sección. En lectura puede ser colapsable (chevron); en edición siempre abierta. ──
+function Section({ icon: Icon, title, accent, collapsible, defaultOpen = true, count, children }:
+  { icon: any; title: string; accent?: string; collapsible?: boolean; defaultOpen?: boolean; count?: number; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const head = (
+    <>
+      <span className={`flex h-6 w-6 items-center justify-center rounded-md ${accent ?? "bg-muted text-muted-foreground"}`}><Icon className="h-3.5 w-3.5" /></span>
+      <h4 className="text-sm font-semibold tracking-tight">{title}</h4>
+      {typeof count === "number" && <span className="rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground">{count}</span>}
+      {collapsible && <ChevronDown className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />}
+    </>
+  );
   return (
     <div className="rounded-xl border border-border bg-card/40 p-4">
-      <div className="mb-2.5 flex items-center gap-2">
-        <span className={`flex h-6 w-6 items-center justify-center rounded-md ${accent ?? "bg-muted text-muted-foreground"}`}><Icon className="h-3.5 w-3.5" /></span>
-        <h4 className="text-sm font-semibold tracking-tight">{title}</h4>
-      </div>
-      {children}
+      {collapsible
+        ? <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 text-left">{head}</button>
+        : <div className="mb-2.5 flex items-center gap-2">{head}</div>}
+      {(!collapsible || open) && <div className={collapsible ? "mt-3" : ""}>{children}</div>}
     </div>
   );
 }
@@ -224,15 +234,15 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
           )}
           {report.intro && <p className="text-sm text-muted-foreground">{report.intro}</p>}
           {report.resumen && (
-            <Section icon={MessageSquareText} title="Resumen"><p className="text-sm leading-relaxed text-foreground/90"><Linkified text={report.resumen} fanIndex={fanIndex} /></p></Section>
+            <Section icon={MessageSquareText} title="Resumen" collapsible defaultOpen><p className="text-sm leading-relaxed text-foreground/90"><Linkified text={report.resumen} fanIndex={fanIndex} /></p></Section>
           )}
           {!!report.aspectos_positivos?.length && (
-            <Section icon={ThumbsUp} title="Aspectos positivos" accent="bg-success/15 text-success">
+            <Section icon={ThumbsUp} title="Aspectos positivos" accent="bg-success/15 text-success" collapsible defaultOpen={false} count={report.aspectos_positivos?.length}>
               <ul className="space-y-1.5">{report.aspectos_positivos.map((p, i) => <li key={i} className="flex gap-2 text-sm"><ThumbsUp className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" /><span><Linkified text={p} fanIndex={fanIndex} /></span></li>)}</ul>
             </Section>
           )}
           {!!report.aspectos_mejora?.length && (
-            <Section icon={Wrench} title="Aspectos de mejora" accent="bg-amber-500/15 text-amber-600">
+            <Section icon={Wrench} title="Aspectos de mejora" accent="bg-amber-500/15 text-amber-600" collapsible defaultOpen={false} count={report.aspectos_mejora?.length}>
               <div className="space-y-2.5">{report.aspectos_mejora.map((m, i) => (
                 <div key={i} className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5">
                   <p className="text-sm font-semibold text-amber-600">{m.categoria}</p>
@@ -242,7 +252,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             </Section>
           )}
           {!!report.observaciones_por_modelo?.length && (
-            <Section icon={Users} title="Observaciones por modelo">
+            <Section icon={Users} title="Observaciones por modelo" collapsible defaultOpen={false} count={report.observaciones_por_modelo?.length}>
               <div className="space-y-3">{report.observaciones_por_modelo.map((o, i) => (
                 <div key={i} className="rounded-lg border border-border/60 p-3">
                   <p className="mb-1.5 text-sm font-semibold">{o.model_name}</p>
@@ -261,11 +271,11 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             </Section>
           )}
           {!!report.recomendaciones?.length && (
-            <Section icon={Lightbulb} title="Recomendaciones" accent="bg-primary/15 text-primary">
+            <Section icon={Lightbulb} title="Recomendaciones" accent="bg-primary/15 text-primary" collapsible defaultOpen={false} count={report.recomendaciones?.length}>
               <ul className="space-y-1.5">{report.recomendaciones.map((r, i) => <li key={i} className="flex gap-2 text-sm"><Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /><span><Linkified text={r} fanIndex={fanIndex} /></span></li>)}</ul>
             </Section>
           )}
-          {report.conclusion && <Section icon={Flag} title="Conclusión"><p className="text-sm leading-relaxed text-foreground/90"><Linkified text={report.conclusion} fanIndex={fanIndex} /></p></Section>}
+          {report.conclusion && <Section icon={Flag} title="Conclusión" collapsible defaultOpen={false}><p className="text-sm leading-relaxed text-foreground/90"><Linkified text={report.conclusion} fanIndex={fanIndex} /></p></Section>}
           {report.hallazgo_principal && (
             <div className={`rounded-xl border p-4 ${toneBadge[tone]}`}>
               <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider opacity-80"><Flag className="h-3.5 w-3.5" /> Hallazgo principal</p>

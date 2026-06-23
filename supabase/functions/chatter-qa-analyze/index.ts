@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
   const blocks: string[] = [];
   // Mapa @username → {modelId, chatId} de los fans muestreados → el frontend linkea
   // las citas del QA a la conversación real en Mensajes Pro (/conversaciones?model=&chat=).
-  const fanIndex: Record<string, { m: number; c: number }> = {};
+  const fanIndex: Record<string, { m: number; c: number; n?: string }> = {};
   try {
     for (const mdl of evModels) {
       const modelId = Number(mdl.model_id);
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
         const fanName = u?.name ?? u?.displayName ?? "";
         const fanHandle = u?.username ? `@${u.username}` : "";
         const fan = [fanName, fanHandle].filter(Boolean).join(" ").trim() || `fan ${chatId}`;
-        if (u?.username) fanIndex[`@${u.username}`] = { m: modelId, c: chatId };
+        if (u?.username) fanIndex[`@${u.username}`] = { m: modelId, c: chatId, n: fanName || undefined };
         try {
           const msgMsg = await conn.query(
             { type: "messages-pro-get-messages", modelId, chatId, limit: MAX_MSGS, order: "desc", requestId: rid(`qa-msg:${modelId}:${chatId}`) },
