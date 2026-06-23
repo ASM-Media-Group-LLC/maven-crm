@@ -78,7 +78,7 @@ export default function BluConversations() {
       <div className="flex items-center gap-3 border-b border-border px-4 py-3">
         <MessageSquare className="h-5 w-5 text-primary" />
         <div className="flex-1">
-          <h1 className="text-base font-bold text-foreground">Conversaciones</h1>
+          <h1 className="text-base font-bold text-foreground">Mensajes Pro</h1>
           <p className="text-[11px] text-muted-foreground">Messages Pro de BLU, en vivo · no se almacena nada (solo lectura, management).</p>
         </div>
         <Select value={modelId ? String(modelId) : ""} onValueChange={(v) => { setModelId(Number(v)); setChatId(null); }}>
