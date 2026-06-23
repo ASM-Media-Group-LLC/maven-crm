@@ -25,11 +25,14 @@ export interface ChatterQaEmailPayload {
   appUrl: string;
 }
 
+// Tema CLARO (igual que el email de Closers QA — los clientes de correo rompen los fondos oscuros).
 const C = {
-  bg: "#0b0d12", card: "#141821", border: "#262b36", text: "#e6e9ef", muted: "#9aa3b2",
-  primary: "#7c5cff", good: "#2bb673", warn: "#e0a32e", bad: "#e5484d",
+  bg: "#f4f4f7", card: "#ffffff", cardSoft: "#fafafd", border: "#e2e8f0", text: "#0f172a", muted: "#64748b",
+  primary: "#6d28d9", primaryDark: "#4338ca",
+  good: "#16a34a", goodSoft: "#ecfdf5", warn: "#d97706", warnSoft: "#fffbeb", bad: "#dc2626", badSoft: "#fef2f2",
 };
 const toneColor = (t: string) => (t === "good" ? C.good : t === "bad" ? C.bad : C.warn);
+const toneSoft = (t: string) => (t === "good" ? C.goodSoft : t === "bad" ? C.badSoft : C.warnSoft);
 
 const escape = (s: unknown) => String(s ?? "")
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -58,7 +61,7 @@ export function buildChatterQaEmailHtml(p: ChatterQaEmailPayload): string {
       `<li style="margin:0 0 6px;color:${C.text};font-size:14px;line-height:1.5">${color ? `<span style="color:${color}">▸ </span>` : ""}${richText(x, fi)}</li>`).join("");
 
   const mejoras = (r.aspectos_mejora ?? []).map((m) =>
-    `<div style="border:1px solid ${C.warn}33;background:${C.warn}14;border-radius:8px;padding:10px 12px;margin:0 0 8px">
+    `<div style="border:1px solid ${C.warn}55;background:${C.warnSoft};border-radius:8px;padding:10px 12px;margin:0 0 8px">
       <div style="color:${C.warn};font-weight:700;font-size:14px">${escape(m.categoria)}</div>
       <div style="color:${C.text};font-size:14px;line-height:1.5;margin-top:2px">${richText(m.detalle, fi)}</div>
     </div>`).join("");
@@ -85,7 +88,7 @@ export function buildChatterQaEmailHtml(p: ChatterQaEmailPayload): string {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg};padding:24px 0">
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
-        <tr><td style="background:linear-gradient(135deg,${C.primary},#5a3fd6);border-radius:14px 14px 0 0;padding:22px 24px">
+        <tr><td style="background:linear-gradient(135deg,${C.primary},${C.primaryDark});border-radius:14px 14px 0 0;padding:22px 24px">
           <div style="color:#fff;font-size:20px;font-weight:800">${escape(p.chatterName)}</div>
           <div style="color:#ffffffcc;font-size:12px;margin-top:3px">${escape(p.companyLabel)} · ${escape(p.periodLabel)} · ${escape(p.evaluatorName)}${models ? ` · ${models}` : ""}</div>
           <div style="display:inline-block;margin-top:10px;background:${toneColor(p.tone)};color:#fff;font-weight:700;font-size:13px;border-radius:999px;padding:4px 14px">${escape(p.veredictoLabel)}</div>
@@ -98,7 +101,7 @@ export function buildChatterQaEmailHtml(p: ChatterQaEmailPayload): string {
           ${r.observaciones_por_modelo?.length ? `${sectionTitle("Observaciones por modelo")}${obs}` : ""}
           ${r.recomendaciones?.length ? `${sectionTitle("Recomendaciones")}<ul style="margin:0;padding-left:18px">${li(r.recomendaciones, C.primary)}</ul>` : ""}
           ${r.conclusion ? `${sectionTitle("Conclusión")}<p style="color:${C.text};font-size:14px;line-height:1.55;margin:0">${richText(r.conclusion, fi)}</p>` : ""}
-          ${r.hallazgo_principal ? `<div style="border:1px solid ${toneColor(p.tone)}55;background:${toneColor(p.tone)}1a;border-radius:10px;padding:12px 14px;margin:18px 0 0">
+          ${r.hallazgo_principal ? `<div style="border:1px solid ${toneColor(p.tone)}66;background:${toneSoft(p.tone)};border-radius:10px;padding:12px 14px;margin:18px 0 0">
             <div style="color:${toneColor(p.tone)};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Hallazgo principal</div>
             <div style="color:${C.text};font-size:14px;font-weight:600;line-height:1.5;margin-top:3px">${richText(r.hallazgo_principal, fi)}</div>
           </div>` : ""}

@@ -197,7 +197,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-2xl font-bold tracking-tight">{row.chatter_name}</h2>
-                {veredicto && <span className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-semibold ${toneBadge[tone]}`}>{veredictoLabel(veredicto)}</span>}
+                {veredicto && <span className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-semibold sm:hidden ${toneBadge[tone]}`}>{veredictoLabel(veredicto)}</span>}
                 {row.status === "processing" && <Badge variant="outline" className="gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> generando…</Badge>}
                 {row.status === "failed" && <Badge variant="outline" className="gap-1.5 border-destructive/40 text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> falló</Badge>}
               </div>
@@ -209,9 +209,9 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             </div>
           </div>
           {veredicto && (
-            <div className="hidden shrink-0 flex-col items-center sm:flex">
+            <div className="hidden shrink-0 flex-col items-center gap-2 sm:flex">
               <VeredictoGauge veredicto={veredicto} />
-              <span className="-mt-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">Veredicto</span>
+              <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${toneBadge[tone]}`}>{veredictoLabel(veredicto)}</span>
             </div>
           )}
         </div>
