@@ -908,13 +908,19 @@ const Dashboard2 = () => {
                             <span className="text-xs text-muted-foreground w-28 shrink-0 font-medium">{item.label}</span>
                             <div className="flex-1 h-7 rounded-md bg-muted/60 overflow-hidden relative">
                               <div
-                                className={`h-full ${item.color} transition-all flex items-center justify-end pr-2`}
-                                style={{ width: `${Math.max(item.pct, 6)}%` }}
+                                className={`h-full ${item.color} transition-all`}
+                                style={{ width: `${Math.max(item.pct, 2)}%` }}
+                              />
+                              {/* % adentro si la barra es ancha (blanco); si es angosta, justo a la
+                                  derecha sobre el track (foreground) para que NO se corte el número. */}
+                              <span
+                                className={`absolute top-1/2 -translate-y-1/2 text-[11px] font-bold tabular-nums whitespace-nowrap ${item.pct >= 15 ? "text-white drop-shadow-sm" : "text-foreground/80"}`}
+                                style={item.pct >= 15
+                                  ? { right: `calc(${100 - Math.max(item.pct, 2)}% + 8px)` }
+                                  : { left: `calc(${Math.max(item.pct, 2)}% + 6px)` }}
                               >
-                                <span className="text-[11px] font-bold text-white tabular-nums drop-shadow-sm">
-                                  {item.pct.toFixed(1)}%
-                                </span>
-                              </div>
+                                {item.pct.toFixed(1)}%
+                              </span>
                             </div>
                             <span className="text-sm font-bold tabular-nums w-20 text-right">{fmtK(item.value)}</span>
                           </div>
