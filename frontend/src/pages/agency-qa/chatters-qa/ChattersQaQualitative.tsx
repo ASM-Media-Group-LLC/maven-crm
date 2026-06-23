@@ -73,12 +73,20 @@ export default function ChattersQaQualitative() {
                 const c = bluChatters.find((x) => String(x.blu_employee_id) === v);
                 setBluId(c ? c.blu_employee_id : null);
                 setName(c ? c.name : "");
-                // Autosugerir las modelos a las que el chatter está asignado en BLU (editable).
+                // Autosugerir hasta 4 modelos a las que el chatter está asignado en BLU (editable).
+                // Tope = el análisis procesa máx 4 modelos; sugerir 17 reventaba el tiempo del edge.
                 if (c?.assignedCreators?.length && models.length) {
-                  const suggested = models
-                    .filter((m) => c.assignedCreators.includes(m.id))
-                    .map((m) => ({ model_id: m.id, model_name: bluModelLabel(m) }));
-                  if (suggested.length) setNewModels(suggested);
+                  const matched = models.filter((m) => c.assignedCreators.includes(m.id));
+                  const suggested = matched.slice(0, 4).map((m) => ({ model_id: m.id, model_name: bluModelLabel(m) }));
+                  if (suggested.length) {
+                    setNewModels(suggested);
+                    if (matched.length > suggested.length)
+                      toast.info(`${c.name} está asignado a ${matched.length} modelos; sugerí ${suggested.length} (el análisis admite hasta 4). Ajustá si querés.`);
+                  } else {
+                    setNewModels([]);
+                  }
+                } else {
+                  setNewModels([]);
                 }
               }}
               options={bluChatters.map((c) => ({

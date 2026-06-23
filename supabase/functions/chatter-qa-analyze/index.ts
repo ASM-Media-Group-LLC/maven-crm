@@ -120,11 +120,16 @@ Deno.serve(async (req) => {
 
   const { data: report, error: rErr } = await sb.from("chatter_qa_reports").select("*").eq("id", reportId).maybeSingle();
   if (rErr || !report) return json({ error: "reporte no encontrado" }, 404);
-  const evModels = (report.evaluated_models ?? []) as Array<{ model_id: number; model_name: string }>;
-  if (evModels.length === 0) {
+  const allModels = (report.evaluated_models ?? []) as Array<{ model_id: number; model_name: string }>;
+  if (allModels.length === 0) {
     await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "Agregá al menos una modelo evaluada antes de generar el borrador IA." }).eq("id", reportId);
     return json({ error: "sin modelos evaluadas" }, 400);
   }
+  // Cap de modelos: cada modelo = ~15 lecturas WS de hilos + 2 de masivos. Con muchas (un chatter
+  // puede estar asignado a 17) el edge se pasaba del presupuesto de ~150s y nunca devolvía.
+  const MAX_MODELS = 4;
+  const evModels = allModels.slice(0, MAX_MODELS);
+  const modelsSkipped = allModels.slice(MAX_MODELS).map((m) => m.model_name);
 
   const { data: sess } = await sb.from("blu_session").select("token").eq("id", 1).maybeSingle();
   const token = (sess?.token as string | undefined) ?? Deno.env.get("BLU_JWT") ?? "";
@@ -230,7 +235,7 @@ Deno.serve(async (req) => {
     await sb.from("chatter_qa_reports").update({ status: "failed", error_message: msg }).eq("id", reportId);
     // 200 a propósito: condición de negocio (no error HTTP) → supabase-js deja el body en `data`
     // y el frontend muestra el mensaje amable (un 4xx daría data=null + error genérico "non-2xx").
-    return json({ error: msg, code: "no_chats", empty_models: emptyModels });
+    return json({ error: msg, code: "no_chats", empty_models: emptyModels, models_skipped: modelsSkipped });
   }
 
   // Feedback humano previo (re-análisis con correcciones).
@@ -316,7 +321,7 @@ Deno.serve(async (req) => {
       stats: masStats,
     } : null,
   };
-  const sampling = { models: evModels.length, threads_sampled: threadsSampled, messages_read: messagesRead, model: OR_MODEL, fan_index: fanIndex, coverage, empty_models: emptyModels, masivos_stats: masStats };
+  const sampling = { models: evModels.length, threads_sampled: threadsSampled, messages_read: messagesRead, model: OR_MODEL, fan_index: fanIndex, coverage, empty_models: emptyModels, models_skipped: modelsSkipped, masivos_stats: masStats };
 
   const { error: uErr } = await sb.from("chatter_qa_reports").update({
     report: reportBody, veredicto: parsed.veredicto, sampling, status: "ready", source: "ai_draft", error_message: null, evaluator_name: "Claude AI",
@@ -325,5 +330,5 @@ Deno.serve(async (req) => {
 
   await logGeminiUsage({ operation: "chatter-qa-analyze", model: OR_MODEL, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, context: { reportId, chatter: report.chatter_name, provider: "openrouter" } });
 
-  return json({ ok: true, report_id: reportId, veredicto: parsed.veredicto, sampling, empty_models: emptyModels });
+  return json({ ok: true, report_id: reportId, veredicto: parsed.veredicto, sampling, empty_models: emptyModels, models_skipped: modelsSkipped });
 });

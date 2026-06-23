@@ -179,9 +179,11 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
                 // no_chats → la edge devuelve {error} y el hook lo lanza → toast (popup estilo Maven) + banner "falló".
                 onError: (e) => toast.error((e as Error).message, { duration: 7000 }),
                 onSuccess: (data: any) => {
+                  const skipped = (data?.models_skipped ?? []) as string[];
                   const empties = (data?.empty_models ?? []) as string[];
+                  if (skipped.length) toast.warning(`Se analizaron las primeras 4 modelos; quedaron afuera: ${skipped.join(", ")}. Hacé otro reporte para esas.`, { duration: 8000 });
                   if (empties.length) toast.warning(`${row.chatter_name} no tomó chats 1-a-1 en: ${empties.join(", ")}. Se analizó el resto.`, { duration: 7000 });
-                  else toast.success("Borrador IA listo");
+                  if (!skipped.length && !empties.length) toast.success("Borrador IA listo");
                 },
               })}>
               <Sparkles className="h-4 w-4" /> {row.source === "manual" && !hasContent(row) ? "Generar con IA" : "Regenerar IA"}
