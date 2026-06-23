@@ -19,12 +19,16 @@ export const veredictoTone = (v?: string | null) => VEREDICTOS.find((x) => x.val
 export interface EvaluatedModel { model_id: number; model_name: string }
 export interface MejoraItem { categoria: string; detalle: string }
 export interface ModelObs { model_id?: number; model_name?: string; observaciones?: string[]; ejemplos?: { quote: string; por_que: string; fan?: string }[] }
+export interface VentaMasivaItem { copy?: string; metricas?: string; por_que?: string }
+export interface VentaMasivaStats { count: number; sent: number; viewed: number; purchased: number; earnings: number }
+export interface VentaMasiva { resumen?: string; mejores?: VentaMasivaItem[]; peores?: VentaMasivaItem[]; patrones?: string[]; recomendaciones?: string[]; stats?: VentaMasivaStats }
 export interface QaReportBody {
   intro?: string;
   resumen?: string;
   aspectos_positivos?: string[];
   aspectos_mejora?: MejoraItem[];
   observaciones_por_modelo?: ModelObs[];
+  venta_masiva?: VentaMasiva;
   recomendaciones?: string[];
   conclusion?: string;
   hallazgo_principal?: string;

@@ -8,6 +8,14 @@ export interface EmailReportBody {
   aspectos_positivos?: string[];
   aspectos_mejora?: { categoria: string; detalle: string }[];
   observaciones_por_modelo?: { model_name?: string; observaciones?: string[]; ejemplos?: { quote: string; por_que: string; fan?: string }[] }[];
+  venta_masiva?: {
+    resumen?: string;
+    mejores?: { copy?: string; metricas?: string; por_que?: string }[];
+    peores?: { copy?: string; metricas?: string; por_que?: string }[];
+    patrones?: string[];
+    recomendaciones?: string[];
+    stats?: { count: number; sent: number; viewed: number; purchased: number; earnings: number };
+  };
   recomendaciones?: string[];
   conclusion?: string;
   hallazgo_principal?: string;
@@ -84,6 +92,23 @@ export function buildChatterQaEmailHtml(p: ChatterQaEmailPayload): string {
 
   const models = (p.evaluatedModels ?? []).map((m) => escape(m.model_name)).join(" · ");
 
+  // Sección "Venta masiva" (masivos enviados por el chatter): mejores vs peores + patrones.
+  const vm = r.venta_masiva;
+  const vmHas = vm && (vm.resumen || vm.mejores?.length || vm.peores?.length || vm.patrones?.length || vm.recomendaciones?.length || (vm.stats?.count ?? 0) > 0);
+  const vmItem = (it: { copy?: string; metricas?: string; por_que?: string }, color: string) =>
+    `<div style="border:1px solid ${color}55;background:${C.cardSoft};border-radius:6px;padding:8px 10px;margin:6px 0;font-size:13px">
+      ${it.copy ? `<div style="color:${C.muted};font-style:italic">“${escape(it.copy)}”</div>` : ""}
+      ${it.metricas ? `<div style="color:${C.text};font-weight:600;margin-top:2px">${escape(it.metricas)}</div>` : ""}
+      ${it.por_que ? `<div style="color:${C.muted};margin-top:2px">→ ${escape(it.por_que)}</div>` : ""}
+    </div>`;
+  const vmHtml = !vmHas ? "" : `${sectionTitle("Venta masiva")}
+    ${vm!.resumen ? `<p style="color:${C.text};font-size:14px;line-height:1.55;margin:0 0 8px">${escape(vm!.resumen)}</p>` : ""}
+    ${vm!.stats && vm!.stats.count > 0 ? `<div style="font-size:13px;color:${C.muted};margin:0 0 8px">${vm!.stats.count} masivos · ${vm!.stats.sent.toLocaleString()} enviados · ${vm!.stats.viewed.toLocaleString()} vistos · ${vm!.stats.purchased.toLocaleString()} ventas · <strong style="color:${C.good}">$${vm!.stats.earnings.toLocaleString()}</strong></div>` : ""}
+    ${vm!.mejores?.length ? `<div style="font-size:12px;font-weight:700;color:${C.good};margin:6px 0 2px">Más efectivos</div>${vm!.mejores.map((it) => vmItem(it, C.good)).join("")}` : ""}
+    ${vm!.peores?.length ? `<div style="font-size:12px;font-weight:700;color:${C.bad};margin:6px 0 2px">Menos efectivos</div>${vm!.peores.map((it) => vmItem(it, C.bad)).join("")}` : ""}
+    ${vm!.patrones?.length ? `<div style="font-size:12px;font-weight:700;color:${C.text};margin:8px 0 2px">Patrones</div><ul style="margin:0;padding-left:18px">${li(vm!.patrones)}</ul>` : ""}
+    ${vm!.recomendaciones?.length ? `<div style="font-size:12px;font-weight:700;color:${C.text};margin:8px 0 2px">Recomendaciones</div><ul style="margin:0;padding-left:18px">${li(vm!.recomendaciones, C.primary)}</ul>` : ""}`;
+
   return `<!doctype html><html><body style="margin:0;background:${C.bg};font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg};padding:24px 0">
     <tr><td align="center">
@@ -99,6 +124,7 @@ export function buildChatterQaEmailHtml(p: ChatterQaEmailPayload): string {
           ${r.aspectos_positivos?.length ? `${sectionTitle("Aspectos positivos")}<ul style="margin:0;padding-left:18px">${li(r.aspectos_positivos, C.good)}</ul>` : ""}
           ${r.aspectos_mejora?.length ? `${sectionTitle("Aspectos de mejora")}${mejoras}` : ""}
           ${r.observaciones_por_modelo?.length ? `${sectionTitle("Observaciones por modelo")}${obs}` : ""}
+          ${vmHtml}
           ${r.recomendaciones?.length ? `${sectionTitle("Recomendaciones")}<ul style="margin:0;padding-left:18px">${li(r.recomendaciones, C.primary)}</ul>` : ""}
           ${r.conclusion ? `${sectionTitle("Conclusión")}<p style="color:${C.text};font-size:14px;line-height:1.55;margin:0">${richText(r.conclusion, fi)}</p>` : ""}
           ${r.hallazgo_principal ? `<div style="border:1px solid ${toneColor(p.tone)}66;background:${toneSoft(p.tone)};border-radius:10px;padding:12px 14px;margin:18px 0 0">

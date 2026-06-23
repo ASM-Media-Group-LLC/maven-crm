@@ -25,6 +25,10 @@ const cors = {
 };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 const stripHtml = (h: string) => String(h || "").replace(/<\/p>/gi, " ").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+const num = (x: unknown) => { const n = Number(x); return Number.isFinite(n) ? n : 0; };
+// Atribución de masivos al chatter por NOMBRE (of-mass/smart-messages traen senderName, no id).
+const norm = (s: unknown) => String(s ?? "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const nameMatches = (a: unknown, b: unknown) => { const x = norm(a), y = norm(b); return !!x && !!y && (x === y || x.includes(y) || y.includes(x)); };
 
 type Msg = Record<string, unknown>;
 // Un WS por llamada: auth una vez, varias queries secuenciales (matcher único activo).
@@ -82,9 +86,10 @@ Devolvé EXCLUSIVAMENTE un JSON válido (sin markdown, sin backticks, sin texto 
   "recomendaciones": ["bullet accionable", "..."],
   "conclusion": "párrafo de cierre",
   "hallazgo_principal": "la observación más importante en 1 frase",
+  "venta_masiva": {"resumen": "diagnóstico de los masivos del chatter en 2-3 frases", "mejores": [{"copy": "copy textual breve", "metricas": "enviados X · vistos Y · ventas Z · $W", "por_que": "qué lo hizo efectivo"}], "peores": [{"copy": "...", "metricas": "...", "por_que": "por qué rindió poco"}], "patrones": ["patrón que separa lo que funciona de lo que no"], "recomendaciones": ["mejora accionable para los masivos"]},
   "veredicto": "uno de: excelente | bueno | requiere_mejora | critico"
 }
-Reglas: en español neutro, profesional y constructivo. Usá SOLO evidencia de los extractos (no inventes). Las citas en "ejemplos" deben ser textuales y breves. SIEMPRE que menciones a un fan (en observaciones o ejemplos) referencialo por su **@username exacto** (cada extracto trae al fan como "<nombre> @username") — NO solo por el nombre, porque el supervisor necesita el @ para ubicar la conversación. "veredicto" DEBE ser uno de los 4 valores exactos. Si la evidencia es escasa, decilo en el resumen y usá veredicto conservador.`;
+Reglas: en español neutro, profesional y constructivo. Usá SOLO evidencia de los extractos (no inventes). Las citas en "ejemplos" deben ser textuales y breves. SIEMPRE que menciones a un fan (en observaciones o ejemplos) referencialo por su **@username exacto** (cada extracto trae al fan como "<nombre> @username") — NO solo por el nombre, porque el supervisor necesita el @ para ubicar la conversación. "veredicto" DEBE ser uno de los 4 valores exactos. Si la evidencia es escasa, decilo en el resumen y usá veredicto conservador. Si te paso un bloque "MASIVOS ENVIADOS POR EL CHATTER", llená "venta_masiva": compará los más efectivos (más ventas/ingresos y mejor conversión vistos→compras) con los menos, detectá PATRONES (gancho de apertura, longitud, precio, explícito vs teaser, con/sin media) y dá recomendaciones concretas. Si NO te paso ese bloque, devolvé "venta_masiva" con arrays vacíos y resumen "El chatter no envió masivos propios en las modelos evaluadas.". NO mezcles los masivos con la evaluación 1-a-1.`;
 
 const VEREDICTOS = ["excelente", "bueno", "requiere_mejora", "critico"];
 
@@ -141,6 +146,8 @@ Deno.serve(async (req) => {
   const bluId = (report as any).blu_employee_id ? Number((report as any).blu_employee_id) : null;
   const coverage: Record<string, number> = {};
   let emptyModels: string[] = [];
+  // Masivos (PPV/blasts) ENVIADOS POR ESTE CHATTER en las modelos evaluadas → sección "venta masiva".
+  const chatterMasivos: Array<{ model: string; type: string; copy: string; price: number; sent: number; viewed: number; purchased: number; earnings: number }> = [];
   try {
     for (const mdl of evModels) {
       const modelId = Number(mdl.model_id);
@@ -194,6 +201,20 @@ Deno.serve(async (req) => {
         } catch { /* hilo fallido no aborta */ }
       }
       coverage[mdl.model_name] = modelChatterMsgs;
+      // Masivos ENVIADOS POR ESTE CHATTER en el modelo (of-mass + smart-messages), atribuidos por senderName.
+      try {
+        const ofm = await conn.query({ type: "agency:messages-pro:of-mass:list", modelId, requestId: rid(`of-mass:${modelId}`) }, (m) => m.type === "agency:messages-pro:of-mass:list");
+        for (const r of ((((ofm as any)?.data?.rows) ?? []) as any[])) {
+          const sn = r?.senderName && r.senderName !== "Sent on OnlyFans" ? r.senderName : null; // null = otro CRM
+          if (!nameMatches(sn, report.chatter_name)) continue;
+          chatterMasivos.push({ model: mdl.model_name, type: "OF mass", copy: stripHtml(r?.message ?? "").slice(0, 220), price: num(r?.price), sent: num(r?.sent), viewed: num(r?.viewed), purchased: num(r?.purchased), earnings: num(r?.earnings) });
+        }
+        const sm = await conn.query({ type: "agency:messages-pro:smart-messages:list", modelId, requestId: rid(`smart:${modelId}`) }, (m) => m.type === "agency:messages-pro:smart-messages:list");
+        for (const x of ((((sm as any)?.data?.messages) ?? []) as any[])) {
+          if (!nameMatches(x?.senderName, report.chatter_name)) continue;
+          chatterMasivos.push({ model: mdl.model_name, type: "Priority", copy: stripHtml(x?.name ?? x?.textPreview ?? "").slice(0, 220), price: num(x?.price), sent: num(x?.sent ?? x?.sentCount), viewed: num(x?.viewed ?? x?.viewedCount), purchased: num(x?.purchased ?? x?.purchasedCount), earnings: num(x?.earnings) });
+        }
+      } catch { /* masivos no aborta el QA 1-a-1 */ }
     }
     emptyModels = evModels.filter((m) => (coverage[m.model_name] ?? 0) === 0).map((m) => m.model_name);
     const fresh = conn.freshToken(); conn.close();
@@ -220,11 +241,20 @@ Deno.serve(async (req) => {
     if (notes.length) feedbackBlock = `\n\n[CORRECCIONES DEL SUPERVISOR — tenelas en cuenta]\n${notes.join("\n")}`;
   }
 
+  // Bloque de masivos del chatter (rankeado por ingresos) → la IA llena "venta_masiva".
+  const masStats = chatterMasivos.reduce((a, m) => ({ count: a.count + 1, sent: a.sent + m.sent, viewed: a.viewed + m.viewed, purchased: a.purchased + m.purchased, earnings: a.earnings + m.earnings }), { count: 0, sent: 0, viewed: 0, purchased: 0, earnings: 0 });
+  const masivosBlock = chatterMasivos.length
+    ? `\n\nMASIVOS ENVIADOS POR EL CHATTER (copy + performance; analizá esto SOLO en "venta_masiva"):\n` +
+      chatterMasivos.slice().sort((a, b) => b.earnings - a.earnings)
+        .map((m) => `[${m.type} · ${m.model}] enviados:${m.sent} vistos:${m.viewed} ventas:${m.purchased} $${m.earnings}${m.price > 0 ? ` (PPV $${m.price})` : ""} — "${m.copy}"`)
+        .join("\n").slice(0, 14000)
+    : "";
+
   const userMessage =
     `Chatter evaluado: ${report.chatter_name} (compañía ${report.company}).\n` +
     `Modelos: ${evModels.map((m) => m.model_name).join(", ")}.\n\n` +
     `EXTRACTOS DE CONVERSACIONES (CHATTER = mensajes del chatter, FAN = mensajes del fan):\n\n` +
-    blocks.join("\n\n").slice(0, 60000) + feedbackBlock +
+    blocks.join("\n\n").slice(0, 60000) + feedbackBlock + masivosBlock +
     `\n\nDevolvé SOLO el JSON con el shape pedido. "model_id" en observaciones_por_modelo debe coincidir con: ${JSON.stringify(evModels)}.`;
 
   // ── Una sola llamada a Gemini 2.5 Flash vía OpenRouter (ruta paga → sin 503) ──
@@ -240,7 +270,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: OR_MODEL,
-        max_tokens: 5000,   // headroom: el reporte completo (mejoras+observaciones+ejemplos con @fan) truncaba a 3000 → JSON inválido
+        max_tokens: 6000,   // headroom: reporte completo + sección venta_masiva (mejores/peores/patrones)
         temperature: 0.4,
         messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: userMessage }],
         response_format: { type: "json_object" },
@@ -277,8 +307,16 @@ Deno.serve(async (req) => {
     recomendaciones: arr(parsed.recomendaciones),
     conclusion: typeof parsed.conclusion === "string" ? parsed.conclusion : "",
     hallazgo_principal: typeof parsed.hallazgo_principal === "string" ? parsed.hallazgo_principal : "",
+    venta_masiva: (parsed.venta_masiva && typeof parsed.venta_masiva === "object") ? {
+      resumen: typeof parsed.venta_masiva.resumen === "string" ? parsed.venta_masiva.resumen : "",
+      mejores: arr(parsed.venta_masiva.mejores),
+      peores: arr(parsed.venta_masiva.peores),
+      patrones: arr(parsed.venta_masiva.patrones),
+      recomendaciones: arr(parsed.venta_masiva.recomendaciones),
+      stats: masStats,
+    } : null,
   };
-  const sampling = { models: evModels.length, threads_sampled: threadsSampled, messages_read: messagesRead, model: OR_MODEL, fan_index: fanIndex, coverage, empty_models: emptyModels };
+  const sampling = { models: evModels.length, threads_sampled: threadsSampled, messages_read: messagesRead, model: OR_MODEL, fan_index: fanIndex, coverage, empty_models: emptyModels, masivos_stats: masStats };
 
   const { error: uErr } = await sb.from("chatter_qa_reports").update({
     report: reportBody, veredicto: parsed.veredicto, sampling, status: "ready", source: "ai_draft", error_message: null, evaluator_name: "Claude AI",

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Plus, Trash2, Sparkles, Save, Loader2, AlertTriangle, Pencil, X,
   ThumbsUp, Wrench, MessageSquareText, Lightbulb, Flag, FileText, Users, Quote, ExternalLink, ChevronDown, Mail,
-  MailCheck, CheckCircle2, XCircle,
+  MailCheck, CheckCircle2, XCircle, Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -328,6 +328,45 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
               ))}</div>
             </Section>
           )}
+          {(() => {
+            const vm = report.venta_masiva;
+            const has = vm && (vm.resumen || vm.mejores?.length || vm.peores?.length || vm.patrones?.length || vm.recomendaciones?.length || (vm.stats?.count ?? 0) > 0);
+            if (!has) return null;
+            const s = vm!.stats;
+            const conv = s && s.viewed ? `${((s.purchased / s.viewed) * 100).toFixed(1)}%` : "—";
+            const ItemCard = ({ it, tone }: { it: { copy?: string; metricas?: string; por_que?: string }; tone: "good" | "bad" }) => (
+              <div className={`rounded-md border p-2.5 text-xs ${tone === "good" ? "border-success/40 bg-success/5" : "border-destructive/40 bg-destructive/5"}`}>
+                {it.copy && <p className="flex gap-1.5 italic text-foreground/85"><Quote className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />"{it.copy}"</p>}
+                {it.metricas && <p className="mt-1 font-medium text-muted-foreground">{it.metricas}</p>}
+                {it.por_que && <p className="mt-0.5 text-muted-foreground">→ {it.por_que}</p>}
+              </div>
+            );
+            return (
+              <Section icon={Megaphone} title="Venta masiva" accent="bg-fuchsia-500/15 text-fuchsia-500" collapsible defaultOpen={false}
+                count={(vm!.mejores?.length ?? 0) + (vm!.peores?.length ?? 0)}>
+                {vm!.resumen && <p className="mb-3 text-sm leading-relaxed text-foreground/90">{vm!.resumen}</p>}
+                {s && s.count > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs tabular-nums">
+                    <span><b>{s.count}</b> masivos</span><span><b>{s.sent.toLocaleString()}</b> enviados</span>
+                    <span><b>{s.viewed.toLocaleString()}</b> vistos</span><span><b>{s.purchased.toLocaleString()}</b> ventas ({conv})</span>
+                    <span className="text-success"><b>${s.earnings.toLocaleString()}</b></span>
+                  </div>
+                )}
+                <div className="grid gap-3 md:grid-cols-2">
+                  {!!vm!.mejores?.length && <div className="space-y-1.5"><p className="text-xs font-semibold text-success">Más efectivos</p>{vm!.mejores.map((it, i) => <ItemCard key={i} it={it} tone="good" />)}</div>}
+                  {!!vm!.peores?.length && <div className="space-y-1.5"><p className="text-xs font-semibold text-destructive">Menos efectivos</p>{vm!.peores.map((it, i) => <ItemCard key={i} it={it} tone="bad" />)}</div>}
+                </div>
+                {!!vm!.patrones?.length && (
+                  <div className="mt-3"><p className="mb-1 text-xs font-semibold text-foreground/80">Patrones</p>
+                    <ul className="space-y-1">{vm!.patrones.map((p, i) => <li key={i} className="flex gap-2 text-sm text-foreground/85"><span className="text-fuchsia-500">·</span><span>{p}</span></li>)}</ul></div>
+                )}
+                {!!vm!.recomendaciones?.length && (
+                  <div className="mt-3"><p className="mb-1 text-xs font-semibold text-foreground/80">Recomendaciones</p>
+                    <ul className="space-y-1.5">{vm!.recomendaciones.map((r, i) => <li key={i} className="flex gap-2 text-sm"><Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /><span>{r}</span></li>)}</ul></div>
+                )}
+              </Section>
+            );
+          })()}
           {!!report.recomendaciones?.length && (
             <Section icon={Lightbulb} title="Recomendaciones" accent="bg-primary/15 text-primary" collapsible defaultOpen={false} count={report.recomendaciones?.length}>
               <ul className="space-y-1.5">{report.recomendaciones.map((r, i) => <li key={i} className="flex gap-2 text-sm"><Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /><span><Linkified text={r} fanIndex={fanIndex} /></span></li>)}</ul>
