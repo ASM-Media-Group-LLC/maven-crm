@@ -251,7 +251,6 @@ const Dashboard2 = () => {
   const { data: topFans = [], isLoading: topFansLoading } = useTopFans(deepDiveTab === "ballenas");
   const { data: retentionRows = [], isLoading: retLoading } = useFanRetention(deepDiveTab === "retencion");
   const { data: chatters = [], isLoading: chattersLoading } = useChatters(deepDiveTab === "chatter");
-  const { data: promoDays, isLoading: promoLoading } = usePromoDays(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "content_roi");
 
   // Filtro por RANGO de fechas (mismo DateRangePicker + pills que Panel de Control), en
   // vez del dropdown de meses. Default: el mes en curso.
@@ -275,6 +274,11 @@ const Dashboard2 = () => {
       : `${format(f, "d MMM", { locale: es })} – ${format(t, "d MMM yyyy", { locale: es })}`;
     return { startStr, endStr, label, value: `${startStr}_${endStr}` };
   }, [range]);
+
+  // Content ROI (Promolog × ingreso): depende de selectedPeriod, así que DEBE ir
+  // después de su declaración. Estaba antes → ReferenceError TDZ "Cannot access
+  // 'selectedPeriod' before initialization" que tiraba /dashboard2 en blanco.
+  const { data: promoDays, isLoading: promoLoading } = usePromoDays(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "content_roi");
 
   // Período anterior (= mismo largo, justo antes del rango) para los deltas MoM.
   const prevPeriod = useMemo(() => {
