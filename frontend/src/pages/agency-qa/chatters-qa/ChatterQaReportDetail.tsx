@@ -175,7 +175,15 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
           <button onClick={onBack} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Volver</button>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button variant="outline" size="sm" className="h-8 gap-1.5 border-white/15 bg-background/40 backdrop-blur" disabled={draft.isPending || evModels.length === 0}
-              onClick={() => draft.mutate({ id }, { onError: (e) => toast.error((e as Error).message), onSuccess: () => toast.success("Borrador IA en curso…") })}>
+              onClick={() => draft.mutate({ id }, {
+                // no_chats → la edge devuelve {error} y el hook lo lanza → toast (popup estilo Maven) + banner "falló".
+                onError: (e) => toast.error((e as Error).message, { duration: 7000 }),
+                onSuccess: (data: any) => {
+                  const empties = (data?.empty_models ?? []) as string[];
+                  if (empties.length) toast.warning(`${row.chatter_name} no tomó chats 1-a-1 en: ${empties.join(", ")}. Se analizó el resto.`, { duration: 7000 });
+                  else toast.success("Borrador IA listo");
+                },
+              })}>
               <Sparkles className="h-4 w-4" /> {row.source === "manual" && !hasContent(row) ? "Generar con IA" : "Regenerar IA"}
             </Button>
             <Button variant="outline" size="sm" className="h-8 gap-1.5 border-white/15 bg-background/40 backdrop-blur" disabled={sendEmail.isPending || row.status !== "ready" || !hasContent(row)}

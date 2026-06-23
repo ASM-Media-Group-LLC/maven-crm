@@ -83,12 +83,38 @@ export const useQaReport = (id: string | null) =>
     enabled: !!id,
   });
 
+// ── Roster de chatters de BLU (chatter_performance) → para elegir a quién se evalúa.
+// blu_employee_id (= sentByManager.id en los mensajes) es lo que ata sus conversaciones.
+export interface BluChatter { blu_employee_id: number; name: string; group_name: string | null; fans_chatted: number | null }
+export const useBluChatters = () =>
+  useQuery({
+    queryKey: ["chatter-qa", "blu-chatters"],
+    queryFn: async (): Promise<BluChatter[]> => {
+      const { data, error } = await (supabase as any)
+        .from("chatter_performance")
+        .select("blu_employee_id, name, group_name, fans_chatted, snapshot_to")
+        .eq("is_chatter", true)
+        .order("snapshot_to", { ascending: false });
+      if (error) throw error;
+      // Puede haber varias fotos por chatter → dejamos la más reciente (orden snapshot_to desc).
+      const seen = new Set<number>();
+      const out: BluChatter[] = [];
+      for (const r of (data ?? []) as any[]) {
+        if (r.blu_employee_id == null || seen.has(r.blu_employee_id)) continue;
+        seen.add(r.blu_employee_id);
+        out.push({ blu_employee_id: r.blu_employee_id, name: r.name, group_name: r.group_name, fans_chatted: r.fans_chatted });
+      }
+      return out.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    },
+    staleTime: 5 * 60_000,
+  });
+
 // Crea un reporte. Manual → status 'ready' (lo escribe el supervisor); ai_draft → 'processing' (lo llena la edge).
 export const useCreateQaReport = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
-      chatter_name: string; company: CompanyCode; period: string;
+      chatter_name: string; company: CompanyCode; period: string; blu_employee_id?: number | null;
       evaluated_models?: EvaluatedModel[]; source?: "manual" | "ai_draft"; evaluator_name?: string;
     }): Promise<ChatterQaReport> => {
       const source = input.source ?? "manual";
@@ -97,6 +123,7 @@ export const useCreateQaReport = () => {
         chatter_name: input.chatter_name.trim(),
         company: input.company,
         period: input.period,
+        blu_employee_id: input.blu_employee_id ?? null,
         evaluated_models: input.evaluated_models ?? [],
         source,
         status: source === "manual" ? "ready" : "processing",

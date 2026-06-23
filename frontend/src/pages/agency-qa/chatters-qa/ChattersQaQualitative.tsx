@@ -2,13 +2,13 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, FileText, Trash2, Loader2, AlertTriangle, ChevronRight, X, Mail, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useBluModels, bluModelLabel } from "../../sales-performance/useBluMp";
 import { COMPANIES, companyLabel, periodLabel, type CompanyCode } from "./useChatterScorecards";
 import {
-  veredictoLabel, veredictoTone, useQaReports, useCreateQaReport, useDeleteQaReport, useSendChatterQaEmail, type EvaluatedModel,
+  veredictoLabel, veredictoTone, useQaReports, useCreateQaReport, useDeleteQaReport, useSendChatterQaEmail, useBluChatters, type EvaluatedModel,
 } from "./useChatterQaReports";
 import ChatterQaReportDetail from "./ChatterQaReportDetail";
 
@@ -25,9 +25,11 @@ export default function ChattersQaQualitative() {
   const del = useDeleteQaReport();
   const sendEmail = useSendChatterQaEmail();
   const { data: models = [] } = useBluModels();
+  const { data: bluChatters = [] } = useBluChatters();
 
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
+  const [bluId, setBluId] = useState<number | null>(null);
   const [company, setCompany] = useState<CompanyCode>("CP");
   const [month, setMonth] = useState(currentMonth());
   const [newModels, setNewModels] = useState<EvaluatedModel[]>([]);
@@ -42,9 +44,9 @@ export default function ChattersQaQualitative() {
   const submit = () => {
     if (!name.trim()) return;
     create.mutate(
-      { chatter_name: name, company, period: `${month}-01`, source: "manual", evaluated_models: newModels },
+      { chatter_name: name, company, period: `${month}-01`, blu_employee_id: bluId, source: "manual", evaluated_models: newModels },
       {
-        onSuccess: (row) => { toast.success("Reporte creado"); setCreating(false); setName(""); setNewModels([]); setSelectedId(row.id); },
+        onSuccess: (row) => { toast.success("Reporte creado"); setCreating(false); setName(""); setBluId(null); setNewModels([]); setSelectedId(row.id); },
         onError: (e) => toast.error((e as Error).message),
       },
     );
@@ -64,9 +66,24 @@ export default function ChattersQaQualitative() {
       {creating && (
         <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-border p-3">
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-medium text-muted-foreground">Chatter</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre completo" className="h-9 w-56"
-              onKeyDown={(e) => { if (e.key === "Enter") submit(); }} />
+            <label className="text-[11px] font-medium text-muted-foreground">Chatter (de BLU)</label>
+            <SearchableSelect
+              value={bluId != null ? String(bluId) : ""}
+              onValueChange={(v) => {
+                const c = bluChatters.find((x) => String(x.blu_employee_id) === v);
+                setBluId(c ? c.blu_employee_id : null);
+                setName(c ? c.name : "");
+              }}
+              options={bluChatters.map((c) => ({
+                value: String(c.blu_employee_id),
+                label: c.group_name ? `${c.name} · ${c.group_name}` : c.name,
+                searchAdditional: String(c.blu_employee_id),
+              }))}
+              placeholder={bluChatters.length ? "Buscar chatter…" : "Cargando chatters…"}
+              searchPlaceholder="Nombre del chatter…"
+              triggerClassName="h-9 w-56"
+              popoverWidth="w-72"
+            />
           </div>
           <Select value={company} onValueChange={(v) => setCompany(v as CompanyCode)}>
             <SelectTrigger className="h-9 w-40"><SelectValue /></SelectTrigger>
@@ -91,7 +108,7 @@ export default function ChattersQaQualitative() {
             </div>
           </div>
           <Button size="sm" onClick={submit} disabled={!name.trim() || create.isPending}>Crear</Button>
-          <Button size="sm" variant="ghost" onClick={() => setCreating(false)}>Cancelar</Button>
+          <Button size="sm" variant="ghost" onClick={() => { setCreating(false); setName(""); setBluId(null); setNewModels([]); }}>Cancelar</Button>
         </div>
       )}
 

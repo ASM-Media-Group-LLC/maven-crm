@@ -15,7 +15,8 @@ const BLU_WS_URL = Deno.env.get("BLU_WS_URL") ?? "wss://of.unlok.me/";
 // Gemini 2.5 Flash vía OpenRouter (ruta paga, OpenAI-compatible) → sin los 503 del
 // free tier de Gemini directo, y response_format json_object fuerza JSON limpio.
 const OR_MODEL = "google/gemini-2.5-flash";
-const MAX_THREADS = 6;          // hilos muestreados por modelo
+const MAX_THREADS = 6;          // hilos (del chatter elegido) a INCLUIR por modelo
+const SCAN_LIMIT = 15;          // fans a escanear por modelo buscando los hilos del chatter
 const MAX_MSGS = 40;            // ventana por hilo (query del owner)
 const MSG_CHARS = 240;          // truncado por mensaje
 const cors = {
@@ -134,57 +135,81 @@ Deno.serve(async (req) => {
   // Mapa @username → {modelId, chatId} de los fans muestreados → el frontend linkea
   // las citas del QA a la conversación real en Mensajes Pro (/conversaciones?model=&chat=).
   const fanIndex: Record<string, { m: number; c: number; n?: string }> = {};
+  // Filtramos al chatter ELEGIDO por su blu_employee_id (= sentByManager.id en los mensajes).
+  // Un fan lo chatean VARIOS chatters; sin esto el QA los mezclaba. coverage = nº de mensajes
+  // genuinos (1-a-1) del chatter por modelo; emptyModels = modelos donde no tomó chats.
+  const bluId = (report as any).blu_employee_id ? Number((report as any).blu_employee_id) : null;
+  const coverage: Record<string, number> = {};
+  let emptyModels: string[] = [];
   try {
     for (const mdl of evModels) {
       const modelId = Number(mdl.model_id);
-      if (!modelId) continue;
+      if (!modelId) { coverage[mdl.model_name] = 0; continue; }
       const partMsg = await conn.query(
-        { type: "messages-pro-get-participants", modelId, offset: 0, limit: 30, requestId: rid(`qa-part:${modelId}`) },
+        { type: "messages-pro-get-participants", modelId, offset: 0, limit: 40, requestId: rid(`qa-part:${modelId}`) },
         (m) => m.type === "messages-pro-get-participants" && !!m.data,
       );
-      const parts = ((((partMsg as any)?.data?.list) ?? []) as Array<{ withUser?: any }>).slice(0, MAX_THREADS);
+      // Escaneamos hasta SCAN_LIMIT fans (los más recientes) buscando los hilos donde participó
+      // EL chatter elegido — puede no estar en los primeros — e incluimos hasta MAX_THREADS.
+      const parts = ((((partMsg as any)?.data?.list) ?? []) as Array<{ withUser?: any }>).slice(0, SCAN_LIMIT);
+      let included = 0, modelChatterMsgs = 0;
       for (const p of parts) {
+        if (included >= MAX_THREADS) break;
         const u = p?.withUser; const chatId = Number(u?.id);
         if (!chatId) continue;
-        // Etiquetamos el hilo con el @username exacto (no solo el nombre) para que el
-        // supervisor pueda ubicar la conversación; la IA debe citar a los fans por su @.
-        const fanName = u?.name ?? u?.displayName ?? "";
-        const fanHandle = u?.username ? `@${u.username}` : "";
-        const fan = [fanName, fanHandle].filter(Boolean).join(" ").trim() || `fan ${chatId}`;
-        if (u?.username) fanIndex[`@${u.username}`] = { m: modelId, c: chatId, n: fanName || undefined };
         try {
           const msgMsg = await conn.query(
             { type: "messages-pro-get-messages", modelId, chatId, limit: MAX_MSGS, order: "desc", requestId: rid(`qa-msg:${modelId}:${chatId}`) },
             (m) => m.type === "messages-pro-get-messages" && !!m.data,
           );
           const msgs = ((((msgMsg as any)?.data?.list) ?? []) as any[]).slice().reverse(); // cronológico
+          let threadChatterMsgs = 0;
           const lines = msgs.map((m) => {
             const sm = m?.sentByManager;
-            const senderName = sm && typeof sm === "object" ? (sm.name ?? null) : (typeof sm === "number" ? `#${sm}` : null);
-            // Sacar MASIVOS del análisis 1-a-1: mensaje del chatter que salió por COLA (isFromQueue →
-            // of-mass / smart-messages PRIORITY_MASS) o SIN nombre de quien lo envió (masivo de otro CRM,
-            // PD del owner). El 1-a-1 genuino es isFromQueue=false + sentByManager. (Fan = contexto, queda.)
-            if (m?.fromMe && (m?.isFromQueue || !senderName)) return "";
+            const smId = sm && typeof sm === "object" ? Number(sm.id) : (typeof sm === "number" ? sm : null);
+            const senderName = sm && typeof sm === "object" ? (sm.name ?? null) : (smId ? `#${smId}` : null);
+            if (m?.fromMe) {
+              // Sacar MASIVOS del análisis 1-a-1: salió por COLA (isFromQueue → of-mass /
+              // smart-messages PRIORITY_MASS) o SIN nombre de quien lo envió (otro CRM, PD del owner).
+              if (m?.isFromQueue || !senderName) return "";
+              // Filtrar al chatter ELEGIDO: mensajes de OTRO chatter en el mismo hilo NO entran.
+              if (bluId && smId !== bluId) return "";
+              threadChatterMsgs++;
+            }
             const who = m?.fromMe ? "CHATTER" : "FAN";
             const tags = [m?.isTip ? "[TIP]" : "", (!m?.isFree && Number(m?.price) > 0) ? `[PPV $${m.price}]` : ""].filter(Boolean).join(" ");
             const txt = stripHtml(m?.text ?? "").slice(0, MSG_CHARS);
             return (txt || tags) ? `${who}: ${tags} ${txt}`.trim() : "";
           }).filter(Boolean);
-          if (lines.length) {
+          // Solo incluimos el hilo si el chatter ELEGIDO participó (≥1 mensaje genuino suyo);
+          // de lo contrario es la conversación de otro chatter y no aporta a SU QA.
+          if (threadChatterMsgs > 0 && lines.length) {
+            const fanName = u?.name ?? u?.displayName ?? "";
+            const fanHandle = u?.username ? `@${u.username}` : "";
+            const fan = [fanName, fanHandle].filter(Boolean).join(" ").trim() || `fan ${chatId}`;
+            if (u?.username) fanIndex[`@${u.username}`] = { m: modelId, c: chatId, n: fanName || undefined };
             blocks.push(`### Modelo: ${mdl.model_name} — Fan: ${fan}\n${lines.join("\n")}`);
-            messagesRead += lines.length;
+            messagesRead += lines.length; modelChatterMsgs += threadChatterMsgs; included++; threadsSampled++;
           }
-          threadsSampled++;
         } catch { /* hilo fallido no aborta */ }
       }
+      coverage[mdl.model_name] = modelChatterMsgs;
     }
+    emptyModels = evModels.filter((m) => (coverage[m.model_name] ?? 0) === 0).map((m) => m.model_name);
     const fresh = conn.freshToken(); conn.close();
     if (fresh && fresh !== token) await sb.from("blu_session").upsert({ id: 1, token: fresh, refreshed_at: new Date().toISOString() });
   } catch (e) { try { conn.close(); } catch { /* */ } await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "Sampler: " + (e as Error).message }).eq("id", reportId); return json({ error: (e as Error).message }, 502); }
 
   if (blocks.length === 0) {
-    await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "No se encontraron conversaciones para muestrear en las modelos evaluadas." }).eq("id", reportId);
-    return json({ error: "sin conversaciones" }, 422);
+    // El chatter elegido no tomó chats 1-a-1 en NINGUNA de las modelos evaluadas
+    // (solo masivos, o no atendió a nadie) → no hay nada genuino que evaluar.
+    const msg = bluId
+      ? `${report.chatter_name} no tiene chats 1-a-1 en ${evModels.map((m) => m.model_name).join(", ")} (solo masivos o sin actividad reciente). No hay conversaciones para analizar.`
+      : "No se encontraron conversaciones 1-a-1 para muestrear en las modelos evaluadas.";
+    await sb.from("chatter_qa_reports").update({ status: "failed", error_message: msg }).eq("id", reportId);
+    // 200 a propósito: condición de negocio (no error HTTP) → supabase-js deja el body en `data`
+    // y el frontend muestra el mensaje amable (un 4xx daría data=null + error genérico "non-2xx").
+    return json({ error: msg, code: "no_chats", empty_models: emptyModels });
   }
 
   // Feedback humano previo (re-análisis con correcciones).
@@ -253,7 +278,7 @@ Deno.serve(async (req) => {
     conclusion: typeof parsed.conclusion === "string" ? parsed.conclusion : "",
     hallazgo_principal: typeof parsed.hallazgo_principal === "string" ? parsed.hallazgo_principal : "",
   };
-  const sampling = { models: evModels.length, threads_sampled: threadsSampled, messages_read: messagesRead, model: OR_MODEL, fan_index: fanIndex };
+  const sampling = { models: evModels.length, threads_sampled: threadsSampled, messages_read: messagesRead, model: OR_MODEL, fan_index: fanIndex, coverage, empty_models: emptyModels };
 
   const { error: uErr } = await sb.from("chatter_qa_reports").update({
     report: reportBody, veredicto: parsed.veredicto, sampling, status: "ready", source: "ai_draft", error_message: null, evaluator_name: "Claude AI",
@@ -262,5 +287,5 @@ Deno.serve(async (req) => {
 
   await logGeminiUsage({ operation: "chatter-qa-analyze", model: OR_MODEL, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, context: { reportId, chatter: report.chatter_name, provider: "openrouter" } });
 
-  return json({ ok: true, report_id: reportId, veredicto: parsed.veredicto, sampling });
+  return json({ ok: true, report_id: reportId, veredicto: parsed.veredicto, sampling, empty_models: emptyModels });
 });
