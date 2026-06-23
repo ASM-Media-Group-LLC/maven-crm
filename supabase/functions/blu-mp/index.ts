@@ -127,8 +127,24 @@ Deno.serve(async (req) => {
       accept = (m) => m.type === "fan:summary" && Number(m.fanId) === fanId;
       break;
     }
+    // Masivos (queries capturadas por el owner). of-mass = OF mass (incl. externos de otro CRM,
+    // source:'external', con `queued`=queueId); smart-messages = PRIORITY_MASS de BLU.
+    case "of-mass": {
+      const modelId = Number(body.modelId);
+      if (!modelId) return json({ error: "modelId requerido" }, 400);
+      query = { type: "agency:messages-pro:of-mass:list", modelId, requestId: rid(`of-mass:${modelId}`) };
+      accept = (m) => m.type === "agency:messages-pro:of-mass:list";
+      break;
+    }
+    case "smart-messages": {
+      const modelId = Number(body.modelId);
+      if (!modelId) return json({ error: "modelId requerido" }, 400);
+      query = { type: "agency:messages-pro:smart-messages:list", modelId, requestId: rid(`smart:${modelId}`) };
+      accept = (m) => m.type === "agency:messages-pro:smart-messages:list";
+      break;
+    }
     default:
-      return json({ error: "action inválida (models|participants|messages|fan-summary)" }, 400);
+      return json({ error: "action inválida (models|participants|messages|fan-summary|of-mass|smart-messages)" }, 400);
   }
 
   try {

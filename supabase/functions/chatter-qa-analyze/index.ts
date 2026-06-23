@@ -63,7 +63,7 @@ function openConn(token: string, authTimeoutMs = 22000): Promise<{ query: (q: Ms
 }
 const rid = (p: string) => `${p}:${Date.now()}:${Math.floor(performance.now())}`;
 
-const SYSTEM_PROMPT = `Sos un evaluador de calidad (QA) de chatters de una agencia de OnlyFans, con el mismo criterio que usa el capacitador de chatters de la empresa. Te paso EXTRACTOS REALES de conversaciones entre un chatter y los fans de una o más modelos. Evaluá la EJECUCIÓN COMERCIAL del chatter con este lente:
+const SYSTEM_PROMPT = `Sos un evaluador de calidad (QA) de chatters de una agencia de OnlyFans, con el mismo criterio que usa el capacitador de chatters de la empresa. Te paso EXTRACTOS REALES de conversaciones entre un chatter y los fans de una o más modelos. IMPORTANTE: los extractos ya EXCLUYEN los mensajes MASIVOS/de cola (PPVs y blasts enviados a muchos fans a la vez) — evaluás SOLO las respuestas 1-a-1 GENUINAS que el chatter escribió de forma personal. Si hay poco 1-a-1 real, decilo en el resumen (suele indicar dependencia excesiva de masivos). Evaluá la EJECUCIÓN COMERCIAL del chatter con este lente:
 - Calentamiento previo (¿desarrolla conversación antes de ofrecer/vender, o manda PPV en frío?)
 - Desarrollo de la conversación (¿genera interés/conexión/curiosidad, o solo vende?)
 - Personalización (¿aprovecha historial/preferencias del fan?)
@@ -159,6 +159,12 @@ Deno.serve(async (req) => {
           );
           const msgs = ((((msgMsg as any)?.data?.list) ?? []) as any[]).slice().reverse(); // cronológico
           const lines = msgs.map((m) => {
+            const sm = m?.sentByManager;
+            const senderName = sm && typeof sm === "object" ? (sm.name ?? null) : (typeof sm === "number" ? `#${sm}` : null);
+            // Sacar MASIVOS del análisis 1-a-1: mensaje del chatter que salió por COLA (isFromQueue →
+            // of-mass / smart-messages PRIORITY_MASS) o SIN nombre de quien lo envió (masivo de otro CRM,
+            // PD del owner). El 1-a-1 genuino es isFromQueue=false + sentByManager. (Fan = contexto, queda.)
+            if (m?.fromMe && (m?.isFromQueue || !senderName)) return "";
             const who = m?.fromMe ? "CHATTER" : "FAN";
             const tags = [m?.isTip ? "[TIP]" : "", (!m?.isFree && Number(m?.price) > 0) ? `[PPV $${m.price}]` : ""].filter(Boolean).join(" ");
             const txt = stripHtml(m?.text ?? "").slice(0, MSG_CHARS);
