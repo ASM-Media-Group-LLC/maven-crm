@@ -1,8 +1,6 @@
-import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { TrendingUp, TrendingDown, Users, FileBarChart, Sparkles } from "lucide-react";
+import { TrendingUp, TrendingDown, Users } from "lucide-react";
 
 interface Props {
   totalEarnings: number;
@@ -17,7 +15,6 @@ const fmt = (n: number) =>
   n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${n.toFixed(0)}`;
 
 const SalesOverviewHeader = ({ totalEarnings, changePercent, activeCreators, from, to, onDateChange }: Props) => {
-  const navigate = useNavigate();
   const isPositive = changePercent >= 0;
 
   return (
@@ -45,15 +42,8 @@ const SalesOverviewHeader = ({ totalEarnings, changePercent, activeCreators, fro
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {/* Reporte / IA Ventas vivían acá como botones, pero ya son subtabs (VentasSubtabs) → redundantes, removidos. */}
         <DateRangePicker from={from} to={to} onApply={onDateChange} />
-        <Button variant="outline" size="sm" onClick={() => navigate("/salesdashboard")}>
-          <FileBarChart className="h-4 w-4" />
-          Reporte
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => navigate("/aisales")}>
-          <Sparkles className="h-4 w-4" />
-          IA Ventas
-        </Button>
       </div>
     </div>
   );
