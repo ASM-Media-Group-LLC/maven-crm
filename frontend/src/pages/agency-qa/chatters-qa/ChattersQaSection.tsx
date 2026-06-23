@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ClipboardCheck, MessageSquare, FileText, Clock, Wrench, ExternalLink } from "lucide-react";
+import { ClipboardCheck, MessageSquare, FileText, Clock, Wrench, ExternalLink, Bell } from "lucide-react";
 import ChattersQaScorecard from "./ChattersQaScorecard";
 import ChattersQaQualitative from "./ChattersQaQualitative";
+import ChatterQaNotifications from "./ChatterQaNotifications";
 
 // Chatters QA — antes era un placeholder "soon" en el rail de Agency QA.
 // Ahora alberga el sistema de medición de chatters que reemplaza el sheet
@@ -44,6 +45,7 @@ export default function ChattersQaSection() {
           <TabsTrigger value="mensajes-pro" className="gap-1.5"><MessageSquare className="h-3.5 w-3.5" />Mensajes Pro</TabsTrigger>
           <TabsTrigger value="qa" className="gap-1.5"><FileText className="h-3.5 w-3.5" />QA cualitativo</TabsTrigger>
           <TabsTrigger value="hubstaff" className="gap-1.5"><Clock className="h-3.5 w-3.5" />Hubstaff</TabsTrigger>
+          <TabsTrigger value="notificaciones" className="gap-1.5"><Bell className="h-3.5 w-3.5" />Notificaciones</TabsTrigger>
         </TabsList>
 
         <TabsContent value="scorecard" className="mt-4">
@@ -67,6 +69,10 @@ export default function ChattersQaSection() {
         <TabsContent value="hubstaff" className="mt-4">
           <ComingSoon slice="Fase 2" title="Hubstaff"
             desc="Conexión a la API de Hubstaff para auto-completar 2 de los 8 criterios del scorecard: Puntualidad y Cumplimiento + Productividad Hubstaff, por chatter y por mes." />
+        </TabsContent>
+
+        <TabsContent value="notificaciones" className="mt-4">
+          <ChatterQaNotifications />
         </TabsContent>
       </Tabs>
     </div>

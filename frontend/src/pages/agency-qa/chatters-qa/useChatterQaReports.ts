@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { CompanyCode } from "./useChatterScorecards";
+import { companyLabel, periodLabel, type CompanyCode } from "./useChatterScorecards";
+import { buildChatterQaEmailSubject, buildChatterQaEmailHtml, type ChatterQaEmailPayload } from "./chatterQaEmailTemplate";
 
 // QA cualitativo de chatters (QA-B): reporte estructurado que reemplaza el correo del supervisor.
 // Tabla chatter_qa_reports. Tabla nueva → (supabase as any), igual que el resto de hooks BLU.
@@ -42,6 +43,7 @@ export interface ChatterQaReport {
   source: string;          // ai_draft | manual | ai_edited
   status: string;          // processing | ready | failed
   error_message: string | null;
+  email_sent_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -144,6 +146,73 @@ export const useGenerateQaDraft = () => {
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(String(data.error));
       return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-qa"] }),
+  });
+};
+
+// ── Config de notificaciones (singleton id=1) ──
+export interface ChatterQaConfig {
+  id: number;
+  notification_emails: string[];
+  notify_user_ids: string[];
+  notify_on_analyzed: boolean;
+  notify_on_low_score: boolean;
+  notify_on_failed: boolean;
+  updated_at: string;
+}
+export const useChatterQaConfig = () =>
+  useQuery({
+    queryKey: ["chatter-qa", "config"],
+    queryFn: async (): Promise<ChatterQaConfig | null> => {
+      const { data, error } = await (supabase as any).from("chatter_qa_config").select("*").eq("id", 1).maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as ChatterQaConfig | null;
+    },
+  });
+export const useUpdateChatterQaConfig = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: Partial<ChatterQaConfig>) => {
+      const { error } = await (supabase as any).from("chatter_qa_config").update(patch).eq("id", 1);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-qa", "config"] }),
+  });
+};
+
+// ── Enviar / reenviar el reporte por email (client-side). Manual = manda siempre que haya
+// destinatarios; arma el HTML con el template, llama a send-notification-email, marca email_sent_at.
+const buildPayload = (row: ChatterQaReport): ChatterQaEmailPayload => ({
+  chatterName: row.chatter_name,
+  companyLabel: `${companyLabel(row.company)} (${row.company})`,
+  periodLabel: periodLabel(row.period),
+  evaluatorName: row.evaluator_name,
+  veredictoLabel: veredictoLabel(row.veredicto),
+  tone: veredictoTone(row.veredicto) as "good" | "warn" | "bad",
+  report: (row.report ?? {}) as ChatterQaEmailPayload["report"],
+  evaluatedModels: row.evaluated_models ?? [],
+  fanIndex: ((row.sampling as any)?.fan_index ?? {}) as ChatterQaEmailPayload["fanIndex"],
+  appUrl: typeof window !== "undefined" ? window.location.origin : "",
+});
+export const useSendChatterQaEmail = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (row: ChatterQaReport) => {
+      const { data: cfg } = await (supabase as any).from("chatter_qa_config")
+        .select("notification_emails, notify_user_ids").eq("id", 1).maybeSingle();
+      const to: string[] = cfg?.notification_emails ?? [];
+      const alsoIds: string[] = [...(cfg?.notify_user_ids ?? [])];
+      if (row.created_by && !alsoIds.includes(row.created_by)) alsoIds.push(row.created_by);
+      if (to.length === 0 && alsoIds.length === 0)
+        throw new Error("No hay destinatarios. Configurá emails en el tab Notificaciones.");
+      const p = buildPayload(row);
+      const { data, error } = await supabase.functions.invoke("send-notification-email", {
+        body: { to, subject: buildChatterQaEmailSubject(p), html: buildChatterQaEmailHtml(p), tag: "chatter-qa", also_include_user_ids: alsoIds.length ? alsoIds : undefined },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(String(data.error));
+      await (supabase as any).from("chatter_qa_reports").update({ email_sent_at: new Date().toISOString() }).eq("id", row.id);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-qa"] }),
   });

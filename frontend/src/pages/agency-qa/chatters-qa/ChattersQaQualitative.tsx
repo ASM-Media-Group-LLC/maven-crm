@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, FileText, Trash2, Loader2, AlertTriangle, ChevronRight, X } from "lucide-react";
+import { Plus, FileText, Trash2, Loader2, AlertTriangle, ChevronRight, X, Mail, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useBluModels, bluModelLabel } from "../../sales-performance/useBluMp";
 import { COMPANIES, companyLabel, periodLabel, type CompanyCode } from "./useChatterScorecards";
 import {
-  veredictoLabel, veredictoTone, useQaReports, useCreateQaReport, useDeleteQaReport, type EvaluatedModel,
+  veredictoLabel, veredictoTone, useQaReports, useCreateQaReport, useDeleteQaReport, useSendChatterQaEmail, type EvaluatedModel,
 } from "./useChatterQaReports";
 import ChatterQaReportDetail from "./ChatterQaReportDetail";
 
@@ -23,6 +23,7 @@ export default function ChattersQaQualitative() {
   const { data: reports = [], isLoading } = useQaReports(null); // todos; filtramos en UI
   const create = useCreateQaReport();
   const del = useDeleteQaReport();
+  const sendEmail = useSendChatterQaEmail();
   const { data: models = [] } = useBluModels();
 
   const [creating, setCreating] = useState(false);
@@ -116,6 +117,18 @@ export default function ChattersQaQualitative() {
             {r.status === "failed" && <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive"><AlertTriangle className="h-3 w-3" /> falló</Badge>}
             {r.veredicto && <Badge variant="outline" className={toneBadge[veredictoTone(r.veredicto)]}>{veredictoLabel(r.veredicto)}</Badge>}
             <span className="text-[10px] uppercase text-muted-foreground">{r.source === "manual" ? "manual" : "IA"}</span>
+            {r.status === "ready" && (
+              <button type="button" disabled={sendEmail.isPending}
+                title={r.email_sent_at ? `Enviado ${new Date(r.email_sent_at).toLocaleString()} · reenviar` : "Enviar QA por email"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (r.email_sent_at && !confirm(`Ya se envió el ${new Date(r.email_sent_at).toLocaleString()}. ¿Reenviar?`)) return;
+                  sendEmail.mutate(r, { onSuccess: () => toast.success("QA enviada por email"), onError: (err) => toast.error((err as Error).message) });
+                }}
+                className={r.email_sent_at ? "text-success/70 hover:text-success" : "text-muted-foreground/50 hover:text-primary"}>
+                {r.email_sent_at ? <MailCheck className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+              </button>
+            )}
             <button type="button" onClick={(e) => { e.stopPropagation(); if (confirm(`¿Eliminar el reporte de ${r.chatter_name}?`)) del.mutate(r.id, { onError: (err) => toast.error((err as Error).message) }); }}
               className="text-muted-foreground/40 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ArrowLeft, Plus, Trash2, Sparkles, Save, Loader2, AlertTriangle, Pencil, X,
-  ThumbsUp, Wrench, MessageSquareText, Lightbulb, Flag, FileText, Users, Quote, ExternalLink, ChevronDown,
+  ThumbsUp, Wrench, MessageSquareText, Lightbulb, Flag, FileText, Users, Quote, ExternalLink, ChevronDown, Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import { useBluModels, bluModelLabel } from "../../sales-performance/useBluMp";
 import { companyLabel, periodLabel } from "./useChatterScorecards";
 import {
   VEREDICTOS, veredictoLabel, veredictoTone,
-  useQaReport, useUpdateQaReport, useGenerateQaDraft,
+  useQaReport, useUpdateQaReport, useGenerateQaDraft, useSendChatterQaEmail,
   type ChatterQaReport, type QaReportBody, type EvaluatedModel,
 } from "./useChatterQaReports";
 
@@ -91,6 +91,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
   const { data: row, isLoading } = useQaReport(id);
   const update = useUpdateQaReport();
   const draft = useGenerateQaDraft();
+  const sendEmail = useSendChatterQaEmail();
   const { data: models = [] } = useBluModels();
 
   const [report, setReport] = useState<QaReportBody>({});
@@ -148,6 +149,11 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             <Button variant="outline" size="sm" className="h-8 gap-1.5" disabled={draft.isPending || evModels.length === 0}
               onClick={() => draft.mutate({ id }, { onError: (e) => toast.error((e as Error).message), onSuccess: () => toast.success("Borrador IA en curso…") })}>
               <Sparkles className="h-4 w-4" /> {row.source === "manual" && !hasContent(row) ? "Generar con IA" : "Regenerar IA"}
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5" disabled={sendEmail.isPending || row.status !== "ready" || !hasContent(row)}
+              onClick={() => sendEmail.mutate(row, { onSuccess: () => toast.success("Email enviado"), onError: (e) => toast.error((e as Error).message) })}
+              title={row.email_sent_at ? `Ya se envió ${new Date(row.email_sent_at).toLocaleString()}` : "Enviar el QA por email"}>
+              {sendEmail.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} {row.email_sent_at ? "Reenviar email" : "Enviar email"}
             </Button>
             {!editing
               ? <Button size="sm" className="h-8 gap-1.5" onClick={() => setEditing(true)}><Pencil className="h-4 w-4" /> Editar</Button>
