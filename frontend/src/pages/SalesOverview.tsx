@@ -35,7 +35,7 @@ const SalesOverview = () => {
     const from = dateFrom ?? today;
     const to = dateTo ?? today;
     return allRows.filter((r) => {
-      const d = new Date(r.effective_date);
+      const d = new Date(r.effective_date + "T12:00:00");
       return d >= from && d <= endOfDay(to);
     });
   }, [allRows, dateFrom, dateTo, today]);
@@ -48,7 +48,7 @@ const SalesOverview = () => {
       const mEnd = endOfDay(new Date(mStart.getFullYear(), mStart.getMonth() + 1, 0));
       const total = allRows
         .filter((r) => {
-          const d = new Date(r.effective_date);
+          const d = new Date(r.effective_date + "T12:00:00");
           return d >= mStart && d <= mEnd;
         })
         .reduce((s, r) => s + (r.total_earnings_gross ?? 0), 0);

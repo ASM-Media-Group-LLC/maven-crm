@@ -551,8 +551,8 @@ const Dashboard2 = () => {
   };
 
   const fmt = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const fmtShort = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmt(n);
-  const fmtK = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
+  const fmtShort = (n: number) => Math.abs(n) >= 1000 ? `${n < 0 ? "-" : ""}$${(Math.abs(n) / 1000).toFixed(1)}k` : fmt(n);
+  const fmtK = (n: number) => Math.abs(n) >= 1000 ? `${n < 0 ? "-" : ""}$${(Math.abs(n) / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
 
   const dataStoppedEarly = (lastDate: string) => {
     const day = parseInt(lastDate.split("-")[2], 10);
@@ -1786,7 +1786,7 @@ const Dashboard2 = () => {
                                   {c.profilePhotoUrl && <AvatarImage src={c.profilePhotoUrl} alt={c.name} />}
                                   <AvatarFallback className="text-xs">{initials || "?"}</AvatarFallback>
                                 </Avatar>
-                                <div className="min-w-[140px]">
+                                <div className="min-w-0 flex-1">
                                   <p className="font-medium text-sm truncate">{c.name}</p>
                                   {c.instagramHandle && (
                                     <p className="text-[10px] text-muted-foreground flex items-center gap-1">
@@ -1830,7 +1830,7 @@ const Dashboard2 = () => {
                                     {c.profilePhotoUrl && <AvatarImage src={c.profilePhotoUrl} alt={c.name} />}
                                     <AvatarFallback className="text-xs">{initials || "?"}</AvatarFallback>
                                   </Avatar>
-                                  <div className="min-w-[140px]">
+                                  <div className="min-w-0 flex-1">
                                     <p className="text-sm text-muted-foreground truncate">{c.name}</p>
                                     {c.instagramHandle && (
                                       <p className="text-[10px] text-muted-foreground/70 flex items-center gap-1">

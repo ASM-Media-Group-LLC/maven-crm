@@ -52,11 +52,11 @@ export const usePeriodComparison = (
     const prevTo = endOfDay(subDays(from, 1));
 
     const currentRows = allRows.filter((r) => {
-      const d = new Date(r.effective_date);
+      const d = new Date(r.effective_date + "T12:00:00");
       return d >= from && d <= to;
     });
     const prevRows = allRows.filter((r) => {
-      const d = new Date(r.effective_date);
+      const d = new Date(r.effective_date + "T12:00:00");
       return d >= prevFrom && d <= prevTo;
     });
 
