@@ -71,6 +71,24 @@ export const useScorecardPeriods = () =>
     staleTime: 60_000,
   });
 
+// Último mes con notas REALES (algún total > 0) → para abrir ahí por defecto en vez de un mes
+// recién clonado/vacío (todos en 0). Si ninguno tiene notas, devuelve null (cae al más reciente).
+export const useLatestScoredPeriod = () =>
+  useQuery({
+    queryKey: ["chatter-scorecards", "latest-scored"],
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await (supabase as any)
+        .from("chatter_scorecards")
+        .select("period")
+        .gt("total", 0)
+        .order("period", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return ((data?.[0]?.period as string | undefined) ?? null);
+    },
+    staleTime: 60_000,
+  });
+
 // Filas de un periodo (un mes).
 export const useScorecards = (period: string | null) =>
   useQuery({

@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  Plus, Trash2, TrendingUp, TrendingDown, Minus, CalendarPlus, Info, Users, Gauge, AlertTriangle, Loader2,
+  Plus, Trash2, TrendingUp, TrendingDown, Minus, CalendarPlus, Info, Users, Gauge, AlertTriangle, Loader2, ClipboardCheck,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -17,7 +16,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import {
   COMPANIES, CRITERIA, MAX_TOTAL, companyLabel, periodLabel, pct, pctTone,
-  useScorecardPeriods, useScorecards, useUpdateScorecardCell, useAddChatter, useDeleteScorecard,
+  useScorecardPeriods, useScorecards, useUpdateScorecardCell, useAddChatter, useDeleteScorecard, useLatestScoredPeriod,
   type CompanyCode, type CriterionKey, type Scorecard,
 } from "./useChatterScorecards";
 
@@ -82,15 +81,22 @@ function CompanyTable({ company, rows, prevByName }: {
   const del = useDeleteScorecard();
   const [toDelete, setToDelete] = useState<Scorecard | null>(null);
   if (rows.length === 0) return null;
+  const avg = Math.round(rows.reduce((s, r) => s + pct(r.total), 0) / rows.length);
   return (
     <>
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-br from-white/[0.04] to-transparent backdrop-blur-md">
+      <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">{companyLabel(company)}</span>
+          <span className="text-[11px] font-normal text-muted-foreground">({company}) · {rows.length}</span>
+        </div>
+        <span className={`inline-flex h-6 items-center rounded-md border px-2 text-xs font-semibold tabular-nums ${toneClass[pctTone(avg)]}`}>prom. {avg}%</span>
+      </div>
+      <div className="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-border bg-muted/40">
-            <th className="sticky left-0 z-10 bg-muted/40 px-3 py-2 text-left font-semibold">
-              {companyLabel(company)} <span className="text-xs font-normal text-muted-foreground">({company})</span>
-            </th>
+          <tr className="border-b border-white/[0.06] text-xs text-muted-foreground">
+            <th className="sticky left-0 z-10 bg-card/70 px-3 py-2 text-left font-medium backdrop-blur">Chatter</th>
             {CRITERIA.map((c) => (
               <th key={c.key} className="px-1 py-2 text-center font-medium">
                 <TooltipProvider><Tooltip>
@@ -109,8 +115,8 @@ function CompanyTable({ company, rows, prevByName }: {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id} className="border-b border-border/60 last:border-0 hover:bg-muted/20">
-              <td className="sticky left-0 z-10 bg-background px-3 py-1.5 font-medium hover:bg-muted/20">{r.chatter_name}</td>
+            <tr key={r.id} className="border-b border-white/[0.05] last:border-0 hover:bg-white/[0.03]">
+              <td className="sticky left-0 z-10 bg-card/80 px-3 py-1.5 font-medium backdrop-blur">{r.chatter_name}</td>
               {CRITERIA.map((c) => (
                 <td key={c.key} className="px-1 py-1.5 text-center"><ScoreCell row={r} field={c.key} /></td>
               ))}
@@ -128,6 +134,7 @@ function CompanyTable({ company, rows, prevByName }: {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
 
       {/* Confirmar borrado de chatter del mes — popup estilo Maven */}
@@ -163,11 +170,26 @@ function CompanyTable({ company, rows, prevByName }: {
   );
 }
 
+// Stat-card del header (glass).
+function Stat({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string | number; tone?: string }) {
+  return (
+    <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] p-3 backdrop-blur">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground"><Icon className="h-3.5 w-3.5" />{label}</div>
+      <div className={`mt-0.5 text-2xl font-bold tabular-nums ${tone ?? ""}`}>{value}</div>
+    </div>
+  );
+}
+
 // ── Pantalla principal ──────────────────────────────────────────────────────
 export default function ChattersQaScorecard() {
   const { data: periods = [], isLoading: periodsLoading } = useScorecardPeriods();
+  const { data: latestScored, isLoading: scoredLoading } = useLatestScoredPeriod();
   const [period, setPeriod] = useState<string | null>(null);
-  useEffect(() => { if (!period && periods.length) setPeriod(periods[0]); }, [periods, period]);
+  // Default: abrir en el ÚLTIMO mes con notas reales; si ninguno tiene notas, el más reciente.
+  useEffect(() => {
+    if (period || !periods.length || scoredLoading) return;
+    setPeriod(latestScored ?? periods[0]);
+  }, [periods, latestScored, scoredLoading, period]);
 
   const prevPeriod = useMemo(() => {
     const i = periods.indexOf(period ?? "");
@@ -234,43 +256,45 @@ export default function ChattersQaScorecard() {
 
   return (
     <div className="space-y-5">
-      {/* Header: selector de mes + resumen */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Select value={period ?? ""} onValueChange={setPeriod}>
-            <SelectTrigger className="w-48"><SelectValue placeholder={periodsLoading ? "Cargando…" : "Mes"} /></SelectTrigger>
-            <SelectContent>
-              {periods.map((p) => <SelectItem key={p} value={p}>{periodLabel(p)}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {!creatingMonth ? (
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setCreatingMonth(true)}>
-              <CalendarPlus className="h-4 w-4" /> Nuevo mes
-            </Button>
-          ) : (
-            <div className="flex items-center gap-1.5">
-              <input type="month" value={newMonth} onChange={(e) => setNewMonth(e.target.value)}
-                className="h-9 rounded-md border border-border bg-background px-2 text-sm" />
-              <Button size="sm" onClick={createMonth} disabled={!newMonth}>Crear</Button>
-              <Button size="sm" variant="ghost" onClick={() => setCreatingMonth(false)}>Cancelar</Button>
-            </div>
-          )}
+      {/* Header card: título + selector de mes + stats */}
+      <div className="rounded-2xl border border-white/10 p-5"
+        style={{ background: "linear-gradient(135deg, hsl(var(--primary) / 0.16), hsl(var(--accent) / 0.06) 45%, hsl(var(--card)) 100%)", boxShadow: "0 0 80px -30px hsl(var(--accent) / 0.35)" }}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="flex items-center gap-2 text-lg font-bold tracking-tight"><ClipboardCheck className="h-5 w-5 text-primary" /> Scorecard</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">{period ? periodLabel(period) : "—"} · medición mensual · 8 criterios /40</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={period ?? ""} onValueChange={setPeriod}>
+              <SelectTrigger className="w-44 border-white/15 bg-background/40 backdrop-blur"><SelectValue placeholder={periodsLoading ? "Cargando…" : "Mes"} /></SelectTrigger>
+              <SelectContent>{periods.map((p) => <SelectItem key={p} value={p}>{periodLabel(p)}</SelectItem>)}</SelectContent>
+            </Select>
+            {!creatingMonth ? (
+              <Button variant="outline" size="sm" className="gap-1.5 border-white/15 bg-background/40 backdrop-blur" onClick={() => setCreatingMonth(true)}>
+                <CalendarPlus className="h-4 w-4" /> Nuevo mes
+              </Button>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <input type="month" value={newMonth} onChange={(e) => setNewMonth(e.target.value)}
+                  className="h-9 rounded-md border border-border bg-background px-2 text-sm" />
+                <Button size="sm" onClick={createMonth} disabled={!newMonth}>Crear</Button>
+                <Button size="sm" variant="ghost" onClick={() => setCreatingMonth(false)}>Cancelar</Button>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-sm">
-          <Badge variant="outline" className="gap-1.5"><Users className="h-3.5 w-3.5" />{summary.n} chatters</Badge>
-          <Badge variant="outline" className="gap-1.5"><Gauge className="h-3.5 w-3.5" />promedio {summary.avg}%</Badge>
-          {summary.comparables > 0 && (
-            <>
-              <Badge variant="outline" className="gap-1.5 border-success/30 text-success"><TrendingUp className="h-3.5 w-3.5" />{summary.up} subieron</Badge>
-              <Badge variant="outline" className="gap-1.5 border-destructive/30 text-destructive"><TrendingDown className="h-3.5 w-3.5" />{summary.down} bajaron</Badge>
-            </>
-          )}
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat icon={Users} label="Chatters" value={summary.n} />
+          <Stat icon={Gauge} label="Promedio" value={`${summary.avg}%`}
+            tone={summary.n ? (summary.avg >= 80 ? "text-success" : summary.avg >= 70 ? "text-amber-500" : "text-destructive") : undefined} />
+          <Stat icon={TrendingUp} label="Subieron" value={summary.comparables ? summary.up : "—"} tone={summary.up ? "text-success" : undefined} />
+          <Stat icon={TrendingDown} label="Bajaron" value={summary.comparables ? summary.down : "—"} tone={summary.down ? "text-destructive" : undefined} />
         </div>
       </div>
 
       <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        8 criterios 0-5 → total /40 → %. Editá una celda y se guarda solo. Los criterios en <span className="text-primary">azul</span> se auto-completarán cuando conectemos Hubstaff (Fase 2).
+        Editá una celda y se guarda solo (0-5 por criterio). Los criterios en <span className="text-primary">azul</span> se auto-completarán cuando conectemos Hubstaff (Fase 2). Abre en el último mes con notas.
       </p>
 
       {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
