@@ -34,7 +34,9 @@ Deno.serve(async (req) => {
     const { data: { user }, error } = await sb.auth.getUser(bearer);
     if (error || !user) return json({ error: "unauthorized" }, 401);
     const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", user.id);
-    if (!(roles ?? []).some((r: { role: string }) => ["admin", "owner", "manager"].includes(r.role))) return json({ error: "forbidden" }, 403);
+    let ok = (roles ?? []).some((r: { role: string }) => ["admin", "owner", "manager"].includes(r.role));
+    if (!ok) { const { data: can } = await sb.rpc("can_access_chatters_qa", { p_uid: user.id }); ok = can === true; }
+    if (!ok) return json({ error: "forbidden" }, 403);
   }
 
   const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");

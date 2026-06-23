@@ -76,14 +76,16 @@ Deno.serve(async (req) => {
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  // Auth: service_role (tests internos) o JWT de staff (admin/owner/manager).
+  // Auth: service_role (tests internos) o JWT de staff. Permitido: management O rol con permiso
+  // a "Mensajes Pro"/"Chatters QA" (can_use_blu_mp) — p.ej. Chatter Supervisor.
   const bearer = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!bearer) return json({ error: "unauthorized" }, 401);
   if (bearer !== SERVICE_KEY) {
     const { data: { user }, error } = await sb.auth.getUser(bearer);
     if (error || !user) return json({ error: "unauthorized" }, 401);
     const { data: roles } = await sb.from("user_roles").select("role").eq("user_id", user.id);
-    const ok = (roles ?? []).some((r: { role: string }) => ["admin", "owner", "manager"].includes(r.role));
+    let ok = (roles ?? []).some((r: { role: string }) => ["admin", "owner", "manager"].includes(r.role));
+    if (!ok) { const { data: can } = await sb.rpc("can_use_blu_mp", { p_uid: user.id }); ok = can === true; }
     if (!ok) return json({ error: "forbidden" }, 403);
   }
 
