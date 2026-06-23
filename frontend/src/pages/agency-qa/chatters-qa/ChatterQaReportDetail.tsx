@@ -66,6 +66,33 @@ function StringList({ label, items, onChange, placeholder }: { label: string; it
   );
 }
 
+// ── Editor de masivos (mejores/peores): cada item = copy + métricas + por qué ──
+type VmItem = { copy?: string; metricas?: string; por_que?: string };
+function VmItemList({ label, items, onChange }: { label: string; items: VmItem[]; onChange: (v: VmItem[]) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm font-semibold">{label}</p>
+      {items.map((it, i) => (
+        <div key={i} className="mb-2 flex items-start gap-2">
+          <div className="flex-1 space-y-1.5">
+            <Textarea rows={2} value={it.copy ?? ""} placeholder="Copy del masivo" className="min-h-0 text-sm"
+              onChange={(e) => { const n = [...items]; n[i] = { ...it, copy: e.target.value }; onChange(n); }} />
+            <Input value={it.metricas ?? ""} placeholder="Métricas (enviados · vistos · ventas · $)" className="h-8 text-sm"
+              onChange={(e) => { const n = [...items]; n[i] = { ...it, metricas: e.target.value }; onChange(n); }} />
+            <Input value={it.por_que ?? ""} placeholder="Por qué funciona / no funciona" className="h-8 text-sm"
+              onChange={(e) => { const n = [...items]; n[i] = { ...it, por_que: e.target.value }; onChange(n); }} />
+          </div>
+          <button type="button" onClick={() => onChange(items.filter((_, j) => j !== i))}
+            className="mt-2 text-muted-foreground/50 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+        </div>
+      ))}
+      <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => onChange([...items, { copy: "", metricas: "", por_que: "" }])}>
+        <Plus className="h-3.5 w-3.5" /> Agregar
+      </Button>
+    </div>
+  );
+}
+
 // Avatar de iniciales con gradiente por hash del nombre (mismo patrón que CallDetailPage).
 function HeroAvatar({ name, size = 60 }: { name: string; size?: number }) {
   const initial = (name?.trim().charAt(0) || "?").toUpperCase();
@@ -148,6 +175,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
   if (isLoading || !row || editing === null) return <div className="p-6 text-sm text-muted-foreground">Cargando reporte…</div>;
 
   const patch = (p: Partial<QaReportBody>) => { setReport((r) => ({ ...r, ...p })); setDirty(true); };
+  const patchVm = (p: Record<string, unknown>) => patch({ venta_masiva: { ...(report.venta_masiva ?? {}), ...p } });
   const mejoras = report.aspectos_mejora ?? [];
   const obs = report.observaciones_por_modelo ?? [];
 
@@ -277,6 +305,17 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             ))}
             <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => patch({ observaciones_por_modelo: [...obs, { model_name: "", observaciones: [""] }] })}><Plus className="h-3.5 w-3.5" /> Agregar modelo</Button>
           </Section>
+          <Section icon={Megaphone} title="Venta masiva" accent="bg-fuchsia-500/15 text-fuchsia-500">
+            <p className="mb-2 text-xs text-muted-foreground">Feedback de los masivos del chatter. Dejá todo vacío si no aplica (la sección no se muestra). El borrador IA la completa sola cuando detecta masivos suyos.</p>
+            <Textarea rows={2} value={report.venta_masiva?.resumen ?? ""} placeholder="Diagnóstico de los masivos…" className="mb-2"
+              onChange={(e) => patchVm({ resumen: e.target.value })} />
+            <div className="grid gap-3 md:grid-cols-2">
+              <VmItemList label="Más efectivos" items={report.venta_masiva?.mejores ?? []} onChange={(v) => patchVm({ mejores: v })} />
+              <VmItemList label="Menos efectivos" items={report.venta_masiva?.peores ?? []} onChange={(v) => patchVm({ peores: v })} />
+            </div>
+            <div className="mt-3"><StringList label="Patrones" items={report.venta_masiva?.patrones ?? []} onChange={(v) => patchVm({ patrones: v })} /></div>
+            <div className="mt-3"><StringList label="Recomendaciones (masivos)" items={report.venta_masiva?.recomendaciones ?? []} onChange={(v) => patchVm({ recomendaciones: v })} /></div>
+          </Section>
           <Section icon={Lightbulb} title="Recomendaciones" accent="bg-primary/15 text-primary"><StringList label="" items={report.recomendaciones ?? []} onChange={(v) => patch({ recomendaciones: v })} /></Section>
           <Section icon={Flag} title="Conclusión y hallazgo">
             <Textarea rows={3} value={report.conclusion ?? ""} onChange={(e) => patch({ conclusion: e.target.value })} placeholder="Conclusión" className="mb-2" />
@@ -332,9 +371,10 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
           )}
           {(() => {
             const vm = report.venta_masiva;
-            // El edge siempre setea venta_masiva en reportes con IA → con que exista el objeto, mostramos
-            // la sección (aunque esté vacía: el resumen explica que no hubo masivos propios).
-            if (!vm) return null;
+            // Solo mostramos si hay contenido (IA con masivos atribuidos, o cargada a mano en el editor).
+            // Sin masivos del chatter → la IA deja venta_masiva en null → no aparece nada.
+            const has = vm && (vm.resumen || vm.mejores?.length || vm.peores?.length || vm.patrones?.length || vm.recomendaciones?.length || (vm.stats?.count ?? 0) > 0);
+            if (!has) return null;
             const s = vm!.stats;
             const conv = s && s.viewed ? `${((s.purchased / s.viewed) * 100).toFixed(1)}%` : "—";
             const ItemCard = ({ it, tone }: { it: { copy?: string; metricas?: string; por_que?: string }; tone: "good" | "bad" }) => (
