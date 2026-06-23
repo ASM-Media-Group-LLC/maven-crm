@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ClipboardCheck, MessageSquare, FileText, Clock, Wrench, ExternalLink } from "lucide-react";
 import ChattersQaScorecard from "./ChattersQaScorecard";
+import ChattersQaQualitative from "./ChattersQaQualitative";
 
 // Chatters QA — antes era un placeholder "soon" en el rail de Agency QA.
 // Ahora alberga el sistema de medición de chatters que reemplaza el sheet
@@ -60,8 +61,7 @@ export default function ChattersQaSection() {
         </TabsContent>
 
         <TabsContent value="qa" className="mt-4">
-          <ComingSoon slice="Fase 3" title="QA cualitativo"
-            desc="Reemplaza el correo del supervisor: reporte estructurado (positivos, mejoras, observaciones por modelo, recomendaciones, veredicto) por chatter/periodo, con borrador asistido por IA desde las conversaciones de Mensajes Pro, y notificación al chatter/equipo." />
+          <ChattersQaQualitative />
         </TabsContent>
 
         <TabsContent value="hubstaff" className="mt-4">
