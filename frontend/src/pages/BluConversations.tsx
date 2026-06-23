@@ -63,7 +63,11 @@ export default function BluConversations() {
   const [chatId, setChatId] = useState<number | null>(null);
 
   const { data: models = [], isLoading: modelsLoading, error: modelsErr } = useBluModels();
-  const { data: participants = [], isLoading: partsLoading, error: partsErr } = useBluParticipants(modelId);
+  const {
+    data: partsData, isLoading: partsLoading, error: partsErr,
+    fetchNextPage, hasNextPage, isFetchingNextPage,
+  } = useBluParticipants(modelId);
+  const participants = partsData?.pages.flat() ?? [];
   const { data: messages = [], isLoading: msgsLoading, error: msgsErr } = useBluThread(modelId, chatId);
   const { data: fan } = useBluFan(modelId, chatId);
   const st = fan?.statistics;
@@ -97,6 +101,12 @@ export default function BluConversations() {
             {participants.map((p) => (
               <ParticipantRow key={p.id} p={p} active={p.id === chatId} onClick={() => setChatId(p.id)} />
             ))}
+            {hasNextPage && (
+              <button type="button" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}
+                className="w-full px-3 py-2 text-xs font-medium text-primary hover:bg-muted/50 disabled:opacity-50">
+                {isFetchingNextPage ? "Cargando…" : "Cargar más"}
+              </button>
+            )}
           </div>
         </div>
 

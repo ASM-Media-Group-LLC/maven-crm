@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 // Hooks del viewer on-demand de Messages Pro (edge function `blu-mp`, que proxa el WS de BLU).
@@ -47,16 +47,21 @@ export interface BluParticipant {
   listsStates?: Array<{ id: string; type: string; name: string; hasUser: boolean }>;
 }
 
-// messages-pro-get-participants → data.data.list[].withUser
+// messages-pro-get-participants → data.data.list[].withUser. Paginado (offset/limit): la lista
+// de fans por modelo puede ser larga → useInfiniteQuery + "Cargar más" (antes traía solo 1 página).
+const PARTICIPANTS_PAGE = 40;
 export const useBluParticipants = (modelId: number | null, enabled = true) =>
-  useQuery({
+  useInfiniteQuery({
     queryKey: ["blu-mp", "participants", modelId],
-    queryFn: async () => {
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
       const d = await callBluMp<{ data?: { list?: Array<{ withUser?: BluParticipant }> } }>({
-        action: "participants", modelId, offset: 0, limit: 50,
+        action: "participants", modelId, offset: pageParam, limit: PARTICIPANTS_PAGE,
       });
       return (d?.data?.list ?? []).map((p) => p.withUser).filter((u): u is BluParticipant => !!u);
     },
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length < PARTICIPANTS_PAGE ? undefined : allPages.length * PARTICIPANTS_PAGE,
     enabled: enabled && !!modelId,
   });
 
