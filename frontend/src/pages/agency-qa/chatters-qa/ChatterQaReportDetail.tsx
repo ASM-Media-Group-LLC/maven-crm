@@ -66,33 +66,6 @@ function StringList({ label, items, onChange, placeholder }: { label: string; it
   );
 }
 
-// ── Editor de masivos (mejores/peores): cada item = copy + métricas + por qué ──
-type VmItem = { copy?: string; metricas?: string; por_que?: string };
-function VmItemList({ label, items, onChange }: { label: string; items: VmItem[]; onChange: (v: VmItem[]) => void }) {
-  return (
-    <div className="space-y-1.5">
-      <p className="text-sm font-semibold">{label}</p>
-      {items.map((it, i) => (
-        <div key={i} className="mb-2 flex items-start gap-2">
-          <div className="flex-1 space-y-1.5">
-            <Textarea rows={2} value={it.copy ?? ""} placeholder="Copy del masivo" className="min-h-0 text-sm"
-              onChange={(e) => { const n = [...items]; n[i] = { ...it, copy: e.target.value }; onChange(n); }} />
-            <Input value={it.metricas ?? ""} placeholder="Métricas (enviados · vistos · ventas · $)" className="h-8 text-sm"
-              onChange={(e) => { const n = [...items]; n[i] = { ...it, metricas: e.target.value }; onChange(n); }} />
-            <Input value={it.por_que ?? ""} placeholder="Por qué funciona / no funciona" className="h-8 text-sm"
-              onChange={(e) => { const n = [...items]; n[i] = { ...it, por_que: e.target.value }; onChange(n); }} />
-          </div>
-          <button type="button" onClick={() => onChange(items.filter((_, j) => j !== i))}
-            className="mt-2 text-muted-foreground/50 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
-        </div>
-      ))}
-      <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => onChange([...items, { copy: "", metricas: "", por_que: "" }])}>
-        <Plus className="h-3.5 w-3.5" /> Agregar
-      </Button>
-    </div>
-  );
-}
-
 // Avatar de iniciales con gradiente por hash del nombre (mismo patrón que CallDetailPage).
 function HeroAvatar({ name, size = 60 }: { name: string; size?: number }) {
   const initial = (name?.trim().charAt(0) || "?").toUpperCase();
@@ -306,15 +279,9 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => patch({ observaciones_por_modelo: [...obs, { model_name: "", observaciones: [""] }] })}><Plus className="h-3.5 w-3.5" /> Agregar modelo</Button>
           </Section>
           <Section icon={Megaphone} title="Venta masiva" accent="bg-fuchsia-500/15 text-fuchsia-500">
-            <p className="mb-2 text-xs text-muted-foreground">Feedback de los masivos del chatter. Dejá todo vacío si no aplica (la sección no se muestra). El borrador IA la completa sola cuando detecta masivos suyos.</p>
-            <Textarea rows={2} value={report.venta_masiva?.resumen ?? ""} placeholder="Diagnóstico de los masivos…" className="mb-2"
+            <p className="mb-2 text-xs text-muted-foreground">Diagnóstico manual de los masivos del chatter (dejalo vacío si no aplica). El detalle —mejores/peores · patrones · recomendaciones— lo completa el borrador IA cuando detecta masivos suyos.</p>
+            <Textarea rows={3} value={report.venta_masiva?.resumen ?? ""} placeholder="Diagnóstico de los masivos…"
               onChange={(e) => patchVm({ resumen: e.target.value })} />
-            <div className="grid gap-3 md:grid-cols-2">
-              <VmItemList label="Más efectivos" items={report.venta_masiva?.mejores ?? []} onChange={(v) => patchVm({ mejores: v })} />
-              <VmItemList label="Menos efectivos" items={report.venta_masiva?.peores ?? []} onChange={(v) => patchVm({ peores: v })} />
-            </div>
-            <div className="mt-3"><StringList label="Patrones" items={report.venta_masiva?.patrones ?? []} onChange={(v) => patchVm({ patrones: v })} /></div>
-            <div className="mt-3"><StringList label="Recomendaciones (masivos)" items={report.venta_masiva?.recomendaciones ?? []} onChange={(v) => patchVm({ recomendaciones: v })} /></div>
           </Section>
           <Section icon={Lightbulb} title="Recomendaciones" accent="bg-primary/15 text-primary"><StringList label="" items={report.recomendaciones ?? []} onChange={(v) => patch({ recomendaciones: v })} /></Section>
           <Section icon={Flag} title="Conclusión y hallazgo">
