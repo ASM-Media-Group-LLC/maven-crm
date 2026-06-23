@@ -209,6 +209,26 @@ function transformTopFans(models) {
   return rows;
 }
 
+// fan-reports:model → retención por cohorte: md.fanReport.fanRetention[] (date, newFans, observedDays, afterDays[12]).
+function transformRetention(models) {
+  const rows = [];
+  for (const md of (models || [])) {
+    const modelId = md?.modelId;
+    const name = String(md.creator?.username ?? md.creator?.name ?? md.aboutMe?.username ?? "").trim();
+    if (modelId == null || !name) continue;
+    for (const c of (md.fanReport?.fanRetention || [])) {
+      const d = String(c?.date ?? "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+      rows.push({
+        blu_model_id: modelId, blu_name: name, cohort_date: d,
+        new_fans: Number(c.newFans) || 0, observed_days: Number(c.observedDays) || 0,
+        after_days: Array.isArray(c.afterDays) ? c.afterDays : null,
+      });
+    }
+  }
+  return rows;
+}
+
 // ── Transformar a filas por creadora/día (gross) ──
 function transform(results) {
   const rows = [];
@@ -300,6 +320,17 @@ async function runOnce(firstRun = false) {
       if (tfErr) throw new Error("import_blu_top_fans: " + tfErr.message);
     }
     console.log(`[blu-bridge] ballenas: ${topRows.length} top-fans ingestados.`);
+    // Retención por cohorte — misma respuesta. Ingesta POR MODELO (muchas cohortes; respeta delete-por-modelo).
+    const retRows = transformRetention(fanModels);
+    const byModel = {};
+    for (const rr of retRows) (byModel[rr.blu_model_id] ||= []).push(rr);
+    let retCount = 0;
+    for (const modelRows of Object.values(byModel)) {
+      const { error: rErr } = await sb().rpc("import_blu_fan_retention", { p_rows: modelRows, p_from: fanStart, p_to: fanEnd });
+      if (rErr) throw new Error("import_blu_fan_retention: " + rErr.message);
+      retCount += modelRows.length;
+    }
+    console.log(`[blu-bridge] retención: ${retCount} cohortes (${Object.keys(byModel).length} modelos).`);
   } catch (e) {
     if (e.expired) throw e;
     console.error(`[blu-bridge] fan-reports falló (no afecta ingresos): ${e.message}`);
