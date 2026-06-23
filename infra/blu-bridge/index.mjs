@@ -157,59 +157,60 @@ async function fetchFanReportsWS(token, startDate, endDate) {
   });
 }
 
-// DIAGNÓSTICO one-shot (Slice C): descubrir la FORMA de la respuesta de chatters
-// (agency:analytics:employee-reports) + employees:list + groups:list. Loguea SOLO claves+tipos
-// (no valores → sin PII de chatters). Se elimina al construir la ingesta real.
-async function debugEmployeeReports(token) {
+// employee-reports (chatters): auth → query exacta (la que dio el owner) → devuelve m.employees[]
+// (cada uno con metrics + deltas). Maneja ping/pong app-level.
+async function fetchEmployeeReports(token, startDate, endDate) {
   const { default: WS } = await import("ws");
-  const shape = (obj) => {
-    if (Array.isArray(obj)) return `Array[${obj.length}]${obj[0] != null ? " of " + shape(obj[0]) : ""}`;
-    if (obj && typeof obj === "object") {
-      return "{" + Object.entries(obj).slice(0, 50)
-        .map(([k, v]) => `${k}: ${Array.isArray(v) ? `Array[${v.length}]` : (v && typeof v === "object" ? "object" : typeof v)}`)
-        .join(", ") + "}";
-    }
-    return typeof obj;
-  };
-  await new Promise((resolve) => {
+  return await new Promise((resolve, reject) => {
     const ws = new WS(BLU_WS_URL);
-    let authed = false, resolved = false; const got = {};
-    const to = setTimeout(finish, 60000);
-    function finish() { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} resolve(); }
+    let authed = false, resolved = false, freshToken = null;
+    const to = setTimeout(() => done(reject, new Error("WS timeout employee-reports (120s)")), 120000);
+    function done(fn, arg) { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} fn(arg); }
     ws.on("open", () => ws.send(JSON.stringify({ type: "auth:token", token })));
     ws.on("message", (data) => {
       let m; try { m = JSON.parse(data.toString()); } catch { return; }
-      const t = m.type;
+      const t = typeof m.type === "string" ? m.type : "";
       if (t === "ping") { try { ws.send(JSON.stringify({ type: "pong" })); } catch {} return; }
+      if (/auth:error|unauthorized|token.*(invalid|expired)|invalid.*token/i.test(t + " " + (m.error || ""))) {
+        return done(reject, Object.assign(new Error("WS auth rechazado (¿JWT vencido?): " + t), { expired: true }));
+      }
       if (t === "auth:ok") {
-        authed = true;
-        ws.send(JSON.stringify({ type: "agency:employees:list" }));
-        ws.send(JSON.stringify({ type: "agency:groups:list" }));
-        ws.send(JSON.stringify({ type: "agency:analytics:employee-reports", startDate: ymd(new Date(Date.now() - 6 * DAY)), endDate: ymd(new Date()), groupBy: "day", ranking: "descending", chatterOnly: false, creatorIds: [], employeeIds: [], groupIds: [], employeeFilterMode: "or", assignment: "all", recordsLimit: 5000 }));
+        authed = true; if (m.token) freshToken = m.token;
+        ws.send(JSON.stringify({ type: "agency:analytics:employee-reports", startDate, endDate, groupBy: "day", ranking: "descending", chatterOnly: false, creatorIds: [], employeeIds: [], groupIds: [], employeeFilterMode: "or", assignment: "all", recordsLimit: 5000 }));
         return;
       }
       if (!authed) return;
-      if (t === "agency:employees:list" && !got.e) { got.e = 1; console.log(`[DEBUG] employees:list = ${shape(m)}`); if (m.employees?.[0]) console.log(`[DEBUG] employee[0] = ${shape(m.employees[0])}`); }
-      if (t === "agency:groups:list" && !got.g) { got.g = 1; console.log(`[DEBUG] groups:list = ${shape(m)}`); if (m.groups?.[0]) console.log(`[DEBUG] group[0] = ${shape(m.groups[0])}`); }
-      if (t === "agency:analytics:employee-reports" && !got.r) {
-        got.r = 1;
-        console.log(`[DEBUG] employee-reports TOP = ${shape(m)}`);
-        for (const [k, v] of Object.entries(m)) {
-          if (Array.isArray(v) && v.length && typeof v[0] === "object") {
-            console.log(`[DEBUG] employee-reports.${k}[0] = ${shape(v[0])}`);
-            for (const [k2, v2] of Object.entries(v[0])) {
-              if (v2 && typeof v2 === "object") console.log(`[DEBUG]   .${k}[0].${k2} = ${shape(v2)}`);
-            }
-          } else if (v && typeof v === "object" && !Array.isArray(v)) {
-            console.log(`[DEBUG] employee-reports.${k} = ${shape(v)}`);
-          }
-        }
+      if (t === "agency:analytics:employee-reports" && Array.isArray(m.employees)) {
+        return done(resolve, { employees: m.employees, freshToken });
       }
-      if (got.e && got.g && got.r) finish();
     });
-    ws.on("error", finish);
-    ws.on("close", finish);
+    ws.on("error", (e) => done(reject, new Error("WS error: " + e.message)));
+    ws.on("close", () => { if (!resolved) done(reject, new Error("WS cerró antes de terminar (¿auth?)")); });
   });
+}
+
+// employee-reports.employees[] → filas de chatter_performance (metrics + deltas).
+function transformChatters(employees) {
+  const rows = [];
+  for (const e of (employees || [])) {
+    if (e?.id == null) continue;
+    const m = e.metrics || {};
+    rows.push({
+      blu_employee_id: e.id, name: e.name ?? null, email: e.email ?? null,
+      group_name: e.group?.name ?? null,
+      is_chatter: typeof e.isChatter === "boolean" ? e.isChatter : null,
+      total_sales: Number(m.totalSales) || 0, sold_messages: Number(m.soldMessages) || 0,
+      direct_messages: Number(m.directMessages) || 0, fans_chatted: Number(m.fansChatted) || 0,
+      fans_spent_money: Number(m.fansSpentMoney) || 0, fans_who_didnt_spend: Number(m.fansWhoDidntSpendMoney) || 0,
+      fan_conversion_rate: m.fanConversionRate ?? null, avg_earnings_per_paying_fan: m.avgEarningsPerFanWhoSpentMoney ?? null,
+      unlock_rate: m.unlockRate ?? null, avg_response_seconds: m.averageResponseSeconds ?? null,
+      scheduled_hours: m.scheduledHours ?? null, clocked_hours: m.clockedHours ?? null,
+      characters_sent: m.charactersSent ?? null, creators_count: m.creatorsCount ?? null,
+      delta_total_sales: e.deltas?.totalSales ?? null,
+      metrics: m, deltas: e.deltas ?? null,
+    });
+  }
+  return rows;
 }
 
 // fan-reports:model → filas {blu_name, date, active_fans, new_fans}. Mismo blu_name que earnings
@@ -391,8 +392,23 @@ async function runOnce(firstRun = false) {
     console.error(`[blu-bridge] fan-reports falló (no afecta ingresos): ${e.message}`);
   }
 
-  // DIAGNÓSTICO one-shot Slice C: loguear la forma de employee-reports/employees/groups. Se quita al armar la ingesta.
-  if (firstRun) { try { await debugEmployeeReports(token); } catch (e) { console.error("[DEBUG] employee-reports falló: " + e.message); } }
+  // Chatters (employee-reports): snapshot del MES EN CURSO. Aislado: si falla, no afecta el resto.
+  try {
+    const now2 = new Date();
+    const chFrom = ymd(new Date(Date.UTC(now2.getUTCFullYear(), now2.getUTCMonth(), 1)));
+    const chTo = ymd(now2);
+    const { employees, freshToken } = await fetchEmployeeReports(token, chFrom, chTo);
+    if (freshToken && freshToken !== token) { await saveToken(freshToken); token = freshToken; }
+    const chRows = transformChatters(employees);
+    if (chRows.length) {
+      const { error } = await sb().rpc("import_blu_chatters", { p_rows: chRows, p_from: chFrom, p_to: chTo });
+      if (error) throw new Error("import_blu_chatters: " + error.message);
+    }
+    console.log(`[blu-bridge] chatters: ${chRows.length} ingestados (${chFrom}..${chTo}).`);
+  } catch (e) {
+    if (e.expired) throw e;
+    console.error(`[blu-bridge] employee-reports falló (no afecta el resto): ${e.message}`);
+  }
 
   return { rows: totalRows, fanRows };
 }
