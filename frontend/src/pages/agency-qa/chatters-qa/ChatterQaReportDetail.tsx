@@ -332,8 +332,9 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
           )}
           {(() => {
             const vm = report.venta_masiva;
-            const has = vm && (vm.resumen || vm.mejores?.length || vm.peores?.length || vm.patrones?.length || vm.recomendaciones?.length || (vm.stats?.count ?? 0) > 0);
-            if (!has) return null;
+            // El edge siempre setea venta_masiva en reportes con IA → con que exista el objeto, mostramos
+            // la sección (aunque esté vacía: el resumen explica que no hubo masivos propios).
+            if (!vm) return null;
             const s = vm!.stats;
             const conv = s && s.viewed ? `${((s.purchased / s.viewed) * 100).toFixed(1)}%` : "—";
             const ItemCard = ({ it, tone }: { it: { copy?: string; metricas?: string; por_que?: string }; tone: "good" | "bad" }) => (

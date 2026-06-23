@@ -312,14 +312,18 @@ Deno.serve(async (req) => {
     recomendaciones: arr(parsed.recomendaciones),
     conclusion: typeof parsed.conclusion === "string" ? parsed.conclusion : "",
     hallazgo_principal: typeof parsed.hallazgo_principal === "string" ? parsed.hallazgo_principal : "",
-    venta_masiva: (parsed.venta_masiva && typeof parsed.venta_masiva === "object") ? {
-      resumen: typeof parsed.venta_masiva.resumen === "string" ? parsed.venta_masiva.resumen : "",
-      mejores: arr(parsed.venta_masiva.mejores),
-      peores: arr(parsed.venta_masiva.peores),
-      patrones: arr(parsed.venta_masiva.patrones),
-      recomendaciones: arr(parsed.venta_masiva.recomendaciones),
+    // SIEMPRE seteamos venta_masiva en reportes con IA (aunque la IA omita la clave o no haya
+    // masivos) → la sección no desaparece; muestra stats + un resumen claro del estado.
+    venta_masiva: {
+      resumen: (parsed.venta_masiva && typeof parsed.venta_masiva.resumen === "string" && parsed.venta_masiva.resumen)
+        ? parsed.venta_masiva.resumen
+        : (masStats.count > 0 ? "" : `${report.chatter_name} no envió masivos propios en las modelas evaluadas (puede que los masivos los encole un manager, no el chatter).`),
+      mejores: arr(parsed.venta_masiva?.mejores),
+      peores: arr(parsed.venta_masiva?.peores),
+      patrones: arr(parsed.venta_masiva?.patrones),
+      recomendaciones: arr(parsed.venta_masiva?.recomendaciones),
       stats: masStats,
-    } : null,
+    },
   };
   const sampling = { models: evModels.length, threads_sampled: threadsSampled, messages_read: messagesRead, model: OR_MODEL, fan_index: fanIndex, coverage, empty_models: emptyModels, models_skipped: modelsSkipped, masivos_stats: masStats };
 
