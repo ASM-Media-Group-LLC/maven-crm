@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 // La fuente vieja (of_gross_earnings, vía useEarningsData) dejó de actualizarse el 9-may.
 import { useBluEarningsData } from "./sales-performance/useBluEarningsData";
 import { useTopFans } from "./sales-performance/useTopFans";
+import { useFanRetention } from "./sales-performance/useFanRetention";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -243,9 +244,10 @@ const Dashboard2 = () => {
       setPhotoUploading(false);
     }
   };
-  const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "ballenas" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
-  // Ballenas (top fans): solo se jala cuando el usuario abre ese tab.
+  const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "ballenas" | "retencion" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
+  // Ballenas / Retención: solo se jalan cuando el usuario abre el tab respectivo.
   const { data: topFans = [], isLoading: topFansLoading } = useTopFans(deepDiveTab === "ballenas");
+  const { data: retentionRows = [], isLoading: retLoading } = useFanRetention(deepDiveTab === "retencion");
 
   // Filtro por RANGO de fechas (mismo DateRangePicker + pills que Panel de Control), en
   // vez del dropdown de meses. Default: el mes en curso.
@@ -1904,6 +1906,7 @@ const Dashboard2 = () => {
                     {([
                       { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM", desc: "Mes vs Mes" },
                       { key: "ballenas" as const, icon: <Crown className="h-3.5 w-3.5" />, label: "Ballenas", desc: "Top spenders por creadora" },
+                      { key: "retencion" as const, icon: <Repeat className="h-3.5 w-3.5" />, label: "Retención", desc: "Retención de fans por cohorte" },
                       { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Ranking", desc: "Posición por revenue" },
                       { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: "Escalabilidad", desc: "Potencial de crecimiento" },
                       { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Canales", desc: "Msgs vs Tips vs Subs" },
@@ -2482,6 +2485,89 @@ const Dashboard2 = () => {
                               </TableBody>
                             </Table>
                           </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Retención por cohorte ── */}
+                  {deepDiveTab === "retencion" && (() => {
+                    const rows = retentionRows;
+                    const curve = Array.from({ length: 12 }, (_, d) => {
+                      let w = 0, sum = 0;
+                      for (const r of rows) {
+                        const v = r.after_days?.[d];
+                        if (typeof v === "number" && r.new_fans > 0) { w += r.new_fans; sum += r.new_fans * v; }
+                      }
+                      return w > 0 ? sum / w : null;
+                    });
+                    const byC = new Map<string, { name: string; newFans: number; d1w: number; d1s: number; d7w: number; d7s: number }>();
+                    for (const r of rows) {
+                      const key = r.creator_id || r.blu_name;
+                      const e = byC.get(key) || { name: r.artistic_name || r.blu_name, newFans: 0, d1w: 0, d1s: 0, d7w: 0, d7s: 0 };
+                      e.newFans += r.new_fans;
+                      const v1 = r.after_days?.[1]; if (typeof v1 === "number" && r.new_fans > 0) { e.d1w += r.new_fans; e.d1s += r.new_fans * v1; }
+                      const v7 = r.after_days?.[7]; if (typeof v7 === "number" && r.new_fans > 0) { e.d7w += r.new_fans; e.d7s += r.new_fans * v7; }
+                      byC.set(key, e);
+                    }
+                    const perCreator = [...byC.values()]
+                      .map((e) => ({ name: e.name, newFans: e.newFans, d1: e.d1w > 0 ? e.d1s / e.d1w : null, d7: e.d7w > 0 ? e.d7s / e.d7w : null }))
+                      .filter((c) => c.d7 != null && c.newFans >= 10)
+                      .sort((a, b) => (a.d7 ?? 0) - (b.d7 ?? 0));
+                    const snap = rows.length ? `${rows[rows.length - 1]?.cohort_date} → ${rows[0]?.cohort_date}` : "—";
+                    const retColor = (v: number | null) => v == null ? "text-muted-foreground" : v < 40 ? "text-destructive" : v < 60 ? "text-orange-400" : "text-success";
+                    return (
+                      <div className="space-y-5">
+                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                          <p className="text-xs font-semibold text-foreground">🔁 Retención de fans por cohorte</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">De cada grupo de fans nuevos, qué % sigue suscripto a los días 0–11 (cohortes últimos 60d: {snap}). Caída fuerte = problema de retención. Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_fan_retention</code> (BLU).</p>
+                        </div>
+                        {retLoading ? (
+                          <div className="p-8 text-center text-sm text-muted-foreground">Cargando retención…</div>
+                        ) : rows.length === 0 ? (
+                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin datos de retención todavía — esperá la próxima sincronización de BLU.</div>
+                        ) : (
+                          <>
+                            <div className="rounded-xl border border-border bg-card p-4">
+                              <p className="text-xs font-semibold text-foreground mb-3">Curva de retención (todas las creadoras, ponderada por fans)</p>
+                              <div className="flex items-end gap-1.5 h-36">
+                                {curve.map((v, d) => (
+                                  <div key={d} className="flex-1 flex flex-col items-center gap-1 h-full">
+                                    <span className="text-[9px] text-muted-foreground tabular-nums">{v != null ? `${Math.round(v)}%` : "—"}</span>
+                                    <div className="w-full bg-muted/40 rounded-sm relative flex-1">
+                                      <div className="absolute bottom-0 w-full bg-primary rounded-sm transition-all" style={{ height: `${v ?? 0}%` }} />
+                                    </div>
+                                    <span className="text-[9px] text-muted-foreground">D{d}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="rounded-xl border border-border overflow-hidden">
+                              <div className="px-4 py-2.5 border-b border-border bg-muted/20">
+                                <p className="text-xs font-semibold text-foreground">Retención por creadora — peores primero (a afinar)</p>
+                              </div>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Creadora</TableHead>
+                                    <TableHead className="text-right">Fans nuevos (60d)</TableHead>
+                                    <TableHead className="text-right">Ret. día 1</TableHead>
+                                    <TableHead className="text-right">Ret. día 7</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {perCreator.slice(0, 40).map((c) => (
+                                    <TableRow key={c.name}>
+                                      <TableCell className="font-medium text-sm">{c.name}</TableCell>
+                                      <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.newFans.toLocaleString()}</TableCell>
+                                      <TableCell className={`text-right tabular-nums text-sm ${retColor(c.d1)}`}>{c.d1 != null ? `${c.d1.toFixed(0)}%` : "—"}</TableCell>
+                                      <TableCell className={`text-right tabular-nums text-sm font-semibold ${retColor(c.d7)}`}>{c.d7 != null ? `${c.d7.toFixed(0)}%` : "—"}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </>
                         )}
                       </div>
                     );
