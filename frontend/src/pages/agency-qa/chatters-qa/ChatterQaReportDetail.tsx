@@ -234,7 +234,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
                 {row.status === "failed" && <Badge variant="outline" className="gap-1.5 border-destructive/40 text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> falló</Badge>}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {companyLabel(row.company)} ({row.company}) · {periodLabel(row.period)} · {row.evaluator_name}
+                {companyLabel(row.company)} ({row.company}) · {periodLabel(row.period)} · Evaluó: {row.evaluator_name}
                 {sampling?.threads_sampled ? <> · <Sparkles className="inline h-3 w-3" /> {sampling.models} modelo(s) · {sampling.threads_sampled} hilos · {sampling.messages_read} mensajes</> : null}
                 {row.email_sent_at ? <> · <MailCheck className="inline h-3 w-3 text-success" /> enviado</> : null}
               </p>
