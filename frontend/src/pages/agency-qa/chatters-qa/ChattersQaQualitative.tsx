@@ -73,6 +73,13 @@ export default function ChattersQaQualitative() {
                 const c = bluChatters.find((x) => String(x.blu_employee_id) === v);
                 setBluId(c ? c.blu_employee_id : null);
                 setName(c ? c.name : "");
+                // Autosugerir las modelos a las que el chatter está asignado en BLU (editable).
+                if (c?.assignedCreators?.length && models.length) {
+                  const suggested = models
+                    .filter((m) => c.assignedCreators.includes(m.id))
+                    .map((m) => ({ model_id: m.id, model_name: bluModelLabel(m) }));
+                  if (suggested.length) setNewModels(suggested);
+                }
               }}
               options={bluChatters.map((c) => ({
                 value: String(c.blu_employee_id),

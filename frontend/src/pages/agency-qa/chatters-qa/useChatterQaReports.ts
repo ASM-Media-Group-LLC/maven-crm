@@ -83,26 +83,69 @@ export const useQaReport = (id: string | null) =>
     enabled: !!id,
   });
 
-// ── Roster de chatters de BLU (chatter_performance) → para elegir a quién se evalúa.
-// blu_employee_id (= sentByManager.id en los mensajes) es lo que ata sus conversaciones.
-export interface BluChatter { blu_employee_id: number; name: string; group_name: string | null; fans_chatted: number | null }
+// ── Roster de chatters de BLU → para elegir a quién se evalúa.
+// FUENTE DE VERDAD = el ROL "Chatter" de BLU (agency:roles:list + agency:employees:list vía blu-mp),
+// NO el is_chatter de employee-reports (ese marcaba también a los "Supervisor Chatters" como John
+// Idrobo). blu_employee_id (= employee.id = sentByManager.id en los mensajes) ata sus conversaciones;
+// assignedCreators = los modelos a los que está asignado (para autosugerir al crear el QA).
+export interface BluChatter { blu_employee_id: number; name: string; group_name: string | null; email?: string | null; assignedCreators: number[] }
+
+async function bluMp(action: string): Promise<any> {
+  const { data, error } = await supabase.functions.invoke("blu-mp", { body: { action } });
+  if (error) throw new Error(error.message);
+  if (data?.error) throw new Error(String(data.error));
+  return data?.data; // blu-mp devuelve { ok, data: <mensaje WS> }
+}
+
 export const useBluChatters = () =>
   useQuery({
     queryKey: ["chatter-qa", "blu-chatters"],
     queryFn: async (): Promise<BluChatter[]> => {
+      // 1) Ruta autoritativa: empleados cuyo `roles` incluye el id del rol "Chatter".
+      try {
+        const [rolesMsg, empMsg] = await Promise.all([bluMp("roles"), bluMp("employees")]);
+        const roles = (rolesMsg?.roles ?? []) as Array<{ id: number; name: string }>;
+        const employees = (empMsg?.employees ?? []) as any[];
+        // "Chatter" exacto (NO "Supervisor Chatters", NO "Coordinador", etc.).
+        const chatterRole = roles.find((r) => String(r?.name ?? "").trim().toLowerCase() === "chatter");
+        if (chatterRole && employees.length) {
+          const rid = Number(chatterRole.id);
+          const out: BluChatter[] = [];
+          for (const e of employees) {
+            const roleIds = [
+              ...(Array.isArray(e?.roles) ? e.roles.map(Number) : []),
+              ...(e?.roleId != null ? [Number(e.roleId)] : []),
+            ];
+            if (!roleIds.includes(rid)) continue;
+            if (String(e?.status).toLowerCase() === "inactive") continue; // chatters dados de baja fuera
+            const id = Number(e?.id);
+            if (!Number.isFinite(id)) continue;
+            out.push({
+              blu_employee_id: id,
+              name: e?.fullName || e?.name || e?.email || `#${id}`,
+              group_name: e?.group ?? null,
+              email: e?.email ?? null,
+              assignedCreators: Array.isArray(e?.assignedCreators) ? e.assignedCreators.map(Number).filter((n: number) => Number.isFinite(n)) : [],
+            });
+          }
+          if (out.length) return out.sort((a, b) => a.name.localeCompare(b.name));
+        }
+      } catch { /* si la ruta de roles falla, caemos al roster cacheado */ }
+
+      // 2) Fallback: roster cacheado (is_chatter de employee-reports). Menos preciso (incluye
+      // supervisores) pero asegura que el picker nunca quede vacío si BLU no responde.
       const { data, error } = await (supabase as any)
         .from("chatter_performance")
-        .select("blu_employee_id, name, group_name, fans_chatted, snapshot_to")
+        .select("blu_employee_id, name, group_name, snapshot_to")
         .eq("is_chatter", true)
         .order("snapshot_to", { ascending: false });
       if (error) throw error;
-      // Puede haber varias fotos por chatter → dejamos la más reciente (orden snapshot_to desc).
       const seen = new Set<number>();
       const out: BluChatter[] = [];
       for (const r of (data ?? []) as any[]) {
         if (r.blu_employee_id == null || seen.has(r.blu_employee_id)) continue;
         seen.add(r.blu_employee_id);
-        out.push({ blu_employee_id: r.blu_employee_id, name: r.name, group_name: r.group_name, fans_chatted: r.fans_chatted });
+        out.push({ blu_employee_id: r.blu_employee_id, name: r.name, group_name: r.group_name, email: null, assignedCreators: [] });
       }
       return out.sort((a, b) => String(a.name).localeCompare(String(b.name)));
     },

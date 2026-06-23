@@ -143,8 +143,19 @@ Deno.serve(async (req) => {
       accept = (m) => m.type === "agency:messages-pro:smart-messages:list";
       break;
     }
+    // Roster por ROL (queries capturadas por el owner). roles = catálogo de roles de la agencia
+    // ({id,name,description,status,permissions}); employees = empleados ({id,fullName,email,group,
+    // assignedCreators[]}) → fuente de verdad de quién es chatter (por rol, no por actividad).
+    case "roles":
+      query = { type: "agency:roles:list" };
+      accept = (m) => m.type === "agency:roles:list" && Array.isArray(m.roles);
+      break;
+    case "employees":
+      query = { type: "agency:employees:list" };
+      accept = (m) => m.type === "agency:employees:list" && Array.isArray(m.employees);
+      break;
     default:
-      return json({ error: "action inválida (models|participants|messages|fan-summary|of-mass|smart-messages)" }, 400);
+      return json({ error: "action inválida (models|participants|messages|fan-summary|of-mass|smart-messages|roles|employees)" }, 400);
   }
 
   try {
