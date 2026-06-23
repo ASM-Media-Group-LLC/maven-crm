@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -59,8 +60,19 @@ function ParticipantRow({ p, active, onClick }: { p: BluParticipant; active: boo
 }
 
 export default function BluConversations() {
-  const [modelId, setModelId] = useState<number | null>(null);
-  const [chatId, setChatId] = useState<number | null>(null);
+  // Deep-link: el QA cualitativo abre /conversaciones?model=<id>&chat=<fanId> para
+  // saltar directo a la conversación citada. Inicializamos del URL + sincronizamos.
+  const [sp, setSp] = useSearchParams();
+  const [modelId, setModelId] = useState<number | null>(() => Number(sp.get("model")) || null);
+  const [chatId, setChatId] = useState<number | null>(() => Number(sp.get("chat")) || null);
+  const selectModel = (id: number | null) => {
+    setModelId(id); setChatId(null);
+    const n = new URLSearchParams(sp); id ? n.set("model", String(id)) : n.delete("model"); n.delete("chat"); setSp(n, { replace: true });
+  };
+  const selectChat = (id: number | null) => {
+    setChatId(id);
+    const n = new URLSearchParams(sp); id ? n.set("chat", String(id)) : n.delete("chat"); setSp(n, { replace: true });
+  };
 
   const { data: models = [], isLoading: modelsLoading, error: modelsErr } = useBluModels();
   const {
@@ -81,7 +93,7 @@ export default function BluConversations() {
           <h1 className="text-base font-bold text-foreground">Mensajes Pro</h1>
           <p className="text-[11px] text-muted-foreground">Messages Pro de BLU, en vivo · no se almacena nada (solo lectura, management).</p>
         </div>
-        <Select value={modelId ? String(modelId) : ""} onValueChange={(v) => { setModelId(Number(v)); setChatId(null); }}>
+        <Select value={modelId ? String(modelId) : ""} onValueChange={(v) => selectModel(Number(v))}>
           <SelectTrigger className="w-64"><SelectValue placeholder={modelsLoading ? "Cargando modelos…" : "Elegí un modelo"} /></SelectTrigger>
           <SelectContent className="max-h-80">
             {models.map((m) => <SelectItem key={m.id} value={String(m.id)}>{bluModelLabel(m)}</SelectItem>)}
@@ -99,7 +111,7 @@ export default function BluConversations() {
             {partsErr && <p className="p-4 text-sm text-destructive">{(partsErr as Error).message}</p>}
             {modelId && !partsLoading && participants.length === 0 && !partsErr && <p className="p-4 text-sm text-muted-foreground">Sin conversaciones.</p>}
             {participants.map((p) => (
-              <ParticipantRow key={p.id} p={p} active={p.id === chatId} onClick={() => setChatId(p.id)} />
+              <ParticipantRow key={p.id} p={p} active={p.id === chatId} onClick={() => selectChat(p.id)} />
             ))}
             {hasNextPage && (
               <button type="button" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}
