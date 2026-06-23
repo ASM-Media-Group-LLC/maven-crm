@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 // Dashboard 2 ahora se alimenta de la data VIVA de BLU (creator_daily_earnings).
 // La fuente vieja (of_gross_earnings, vía useEarningsData) dejó de actualizarse el 9-may.
 import { useBluEarningsData } from "./sales-performance/useBluEarningsData";
+import { useTopFans } from "./sales-performance/useTopFans";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -242,7 +243,9 @@ const Dashboard2 = () => {
       setPhotoUploading(false);
     }
   };
-  const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
+  const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "ballenas" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
+  // Ballenas (top fans): solo se jala cuando el usuario abre ese tab.
+  const { data: topFans = [], isLoading: topFansLoading } = useTopFans(deepDiveTab === "ballenas");
 
   // Filtro por RANGO de fechas (mismo DateRangePicker + pills que Panel de Control), en
   // vez del dropdown de meses. Default: el mes en curso.
@@ -1900,6 +1903,7 @@ const Dashboard2 = () => {
                   <div className="flex flex-wrap items-center gap-1 mt-3 bg-muted rounded-lg p-1">
                     {([
                       { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM", desc: "Mes vs Mes" },
+                      { key: "ballenas" as const, icon: <Crown className="h-3.5 w-3.5" />, label: "Ballenas", desc: "Top spenders por creadora" },
                       { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Ranking", desc: "Posición por revenue" },
                       { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: "Escalabilidad", desc: "Potencial de crecimiento" },
                       { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Canales", desc: "Msgs vs Tips vs Subs" },
@@ -2401,6 +2405,84 @@ const Dashboard2 = () => {
                             </div>
                           )}
                         </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Ballenas (top fans / spenders) ── */}
+                  {deepDiveTab === "ballenas" && (() => {
+                    const now = new Date();
+                    const soonMs = now.getTime() + 7 * 86400000;
+                    const isSoon = (f: typeof topFans[number]) => !!(f.is_active && f.expires_at && new Date(f.expires_at).getTime() <= soonMs);
+                    const top = topFans.slice(0, 100);
+                    const totalSpend = topFans.reduce((s, f) => s + (f.spent_gross ?? 0), 0);
+                    const soon = topFans.filter(isSoon).length;
+                    const snap = topFans[0]?.snapshot_from && topFans[0]?.snapshot_to
+                      ? `${topFans[0].snapshot_from} → ${topFans[0].snapshot_to}` : "—";
+                    return (
+                      <div className="space-y-5">
+                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                          <p className="text-xs font-semibold text-foreground">🐋 Ballenas — Top spenders por creadora</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Los fans que más gastaron (snapshot {snap}). Para retención/upsell: priorizá a los que están por expirar. Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">creator_top_fans</code> (BLU fan-reports).</p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="rounded-xl border border-border bg-card p-3 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase">Ballenas</p>
+                            <p className="text-lg font-bold tabular-nums">{topFans.length.toLocaleString()}</p>
+                          </div>
+                          <div className="rounded-xl border border-border bg-card p-3 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase">Gasto total (top)</p>
+                            <p className="text-lg font-bold tabular-nums">{fmtK(totalSpend)}</p>
+                          </div>
+                          <div className="rounded-xl border border-border bg-card p-3 text-center">
+                            <p className="text-[10px] text-muted-foreground uppercase">Expiran ≤7d</p>
+                            <p className="text-lg font-bold tabular-nums text-orange-400">{soon}</p>
+                          </div>
+                        </div>
+                        {topFansLoading ? (
+                          <div className="p-8 text-center text-sm text-muted-foreground">Cargando ballenas…</div>
+                        ) : topFans.length === 0 ? (
+                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin ballenas todavía — esperá la próxima sincronización de BLU.</div>
+                        ) : (
+                          <div className="rounded-xl border border-border overflow-hidden">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-10">#</TableHead>
+                                  <TableHead>Fan</TableHead>
+                                  <TableHead>Creadora</TableHead>
+                                  <TableHead className="text-right">Gasto</TableHead>
+                                  <TableHead className="text-right">Mensajes</TableHead>
+                                  <TableHead>Estado</TableHead>
+                                  <TableHead>Expira</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {top.map((f, i) => {
+                                  const exp = f.expires_at ? new Date(f.expires_at) : null;
+                                  const expSoon = isSoon(f);
+                                  return (
+                                    <TableRow key={f.id}>
+                                      <TableCell className="text-muted-foreground tabular-nums text-sm">{i + 1}</TableCell>
+                                      <TableCell className="font-medium text-sm">{f.fan_name || f.fan_username || `u${f.fan_user_id}`}</TableCell>
+                                      <TableCell className="text-sm">{f.artistic_name || f.blu_name}</TableCell>
+                                      <TableCell className="text-right tabular-nums font-semibold">{fmtK(f.spent_gross)}</TableCell>
+                                      <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtK(f.messages_gross)}</TableCell>
+                                      <TableCell>
+                                        {f.is_active === false
+                                          ? <Badge variant="outline" className="text-muted-foreground">Inactivo</Badge>
+                                          : <Badge variant="outline" className="text-success border-success/30">Activo</Badge>}
+                                      </TableCell>
+                                      <TableCell className={`text-sm tabular-nums whitespace-nowrap ${expSoon ? "text-orange-400 font-medium" : "text-muted-foreground"}`}>
+                                        {exp ? format(exp, "dd MMM yy", { locale: es }) : "—"}{expSoon && " ⚠"}
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
