@@ -147,7 +147,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // Si un rol no tiene un toggle on para "Closers QA", todo el grupo
   // izquierdo desaparece para él aunque tenga acceso a "Calls".
   { group: "Operaciones",   module: "Agency QA",     submodules: [
-    "Closers QA", "Chatters QA", "Managers QA", "Spammers QA",
+    "Closers QA", "Chatters QA", "Managers QA", "Spammers QA", "Mensajes Pro",
     "Calls", "New QA", "QA History", "QA Chat", "Models", "Analytics", "Notifications", "Borrar Calls",
   ] },
 

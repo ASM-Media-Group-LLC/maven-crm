@@ -108,7 +108,7 @@ const DashboardSidebar = () => {
     { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: MessageSquare, module: "Chatters", submodule: "Evaluator" as string | undefined },
     { title: "Scouter Assist", url: "/scouter-assist", icon: Search, module: "Scouter Assist", submodule: undefined },
     { title: "Company QA", url: "/agency-qa", icon: Headphones, module: "Agency QA", submodule: undefined },
-    { title: "Mensajes Pro", url: "/conversaciones", icon: MessageSquare, module: "Agency QA", submodule: undefined },
+    { title: "Mensajes Pro", url: "/conversaciones", icon: MessageSquare, module: "Agency QA", submodule: "Mensajes Pro" },
   ];
   const operationsMenu = operationsMenuAll.filter((item) => canAccess(item.module, item.submodule));
 
