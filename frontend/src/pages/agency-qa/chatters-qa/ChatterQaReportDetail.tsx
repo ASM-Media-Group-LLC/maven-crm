@@ -189,6 +189,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
                 <p className="text-xs font-semibold text-muted-foreground">Ejemplos (de la conversación)</p>
                 {(o.ejemplos ?? []).map((ej, k) => (
                   <div key={k} className="rounded border border-border/50 bg-muted/30 p-2 text-xs">
+                    {ej.fan && <p className="mb-0.5 font-mono text-[11px] font-semibold text-primary">{ej.fan}</p>}
                     <p className="italic">"{ej.quote}"</p>
                     <p className="mt-0.5 text-muted-foreground">→ {ej.por_que}</p>
                     <button type="button" className="mt-1 text-[10px] text-destructive/70 hover:text-destructive"

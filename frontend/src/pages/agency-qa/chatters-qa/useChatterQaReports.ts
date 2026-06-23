@@ -17,7 +17,7 @@ export const veredictoTone = (v?: string | null) => VEREDICTOS.find((x) => x.val
 
 export interface EvaluatedModel { model_id: number; model_name: string }
 export interface MejoraItem { categoria: string; detalle: string }
-export interface ModelObs { model_id?: number; model_name?: string; observaciones?: string[]; ejemplos?: { quote: string; por_que: string }[] }
+export interface ModelObs { model_id?: number; model_name?: string; observaciones?: string[]; ejemplos?: { quote: string; por_que: string; fan?: string }[] }
 export interface QaReportBody {
   intro?: string;
   resumen?: string;

@@ -77,13 +77,13 @@ Devolvé EXCLUSIVAMENTE un JSON válido (sin markdown, sin backticks, sin texto 
   "resumen": "diagnóstico general en 2-4 frases",
   "aspectos_positivos": ["bullet", "..."],
   "aspectos_mejora": [{"categoria": "Falta de calentamiento previo", "detalle": "..."}],
-  "observaciones_por_modelo": [{"model_id": 0, "model_name": "...", "observaciones": ["..."], "ejemplos": [{"quote": "cita textual breve del chat", "por_que": "por qué ilustra el punto"}]}],
+  "observaciones_por_modelo": [{"model_id": 0, "model_name": "...", "observaciones": ["..."], "ejemplos": [{"quote": "cita textual breve del chat", "por_que": "por qué ilustra el punto", "fan": "@username exacto del fan de esa cita"}]}],
   "recomendaciones": ["bullet accionable", "..."],
   "conclusion": "párrafo de cierre",
   "hallazgo_principal": "la observación más importante en 1 frase",
   "veredicto": "uno de: excelente | bueno | requiere_mejora | critico"
 }
-Reglas: en español neutro, profesional y constructivo. Usá SOLO evidencia de los extractos (no inventes). Las citas en "ejemplos" deben ser textuales y breves. "veredicto" DEBE ser uno de los 4 valores exactos. Si la evidencia es escasa, decilo en el resumen y usá veredicto conservador.`;
+Reglas: en español neutro, profesional y constructivo. Usá SOLO evidencia de los extractos (no inventes). Las citas en "ejemplos" deben ser textuales y breves. SIEMPRE que menciones a un fan (en observaciones o ejemplos) referencialo por su **@username exacto** (cada extracto trae al fan como "<nombre> @username") — NO solo por el nombre, porque el supervisor necesita el @ para ubicar la conversación. "veredicto" DEBE ser uno de los 4 valores exactos. Si la evidencia es escasa, decilo en el resumen y usá veredicto conservador.`;
 
 const VEREDICTOS = ["excelente", "bueno", "requiere_mejora", "critico"];
 
@@ -143,7 +143,11 @@ Deno.serve(async (req) => {
       for (const p of parts) {
         const u = p?.withUser; const chatId = Number(u?.id);
         if (!chatId) continue;
-        const fan = u?.name ?? u?.username ?? `fan ${chatId}`;
+        // Etiquetamos el hilo con el @username exacto (no solo el nombre) para que el
+        // supervisor pueda ubicar la conversación; la IA debe citar a los fans por su @.
+        const fanName = u?.name ?? u?.displayName ?? "";
+        const fanHandle = u?.username ? `@${u.username}` : "";
+        const fan = [fanName, fanHandle].filter(Boolean).join(" ").trim() || `fan ${chatId}`;
         try {
           const msgMsg = await conn.query(
             { type: "messages-pro-get-messages", modelId, chatId, limit: MAX_MSGS, order: "desc", requestId: rid(`qa-msg:${modelId}:${chatId}`) },
@@ -201,7 +205,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: OR_MODEL,
-        max_tokens: 3000,
+        max_tokens: 5000,   // headroom: el reporte completo (mejoras+observaciones+ejemplos con @fan) truncaba a 3000 → JSON inválido
         temperature: 0.4,
         messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: userMessage }],
         response_format: { type: "json_object" },
