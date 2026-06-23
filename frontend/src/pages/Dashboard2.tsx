@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useBluEarningsData } from "./sales-performance/useBluEarningsData";
 import { useTopFans } from "./sales-performance/useTopFans";
 import { useFanRetention } from "./sales-performance/useFanRetention";
+import { useChatters } from "./sales-performance/useChatters";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -248,6 +249,7 @@ const Dashboard2 = () => {
   // Ballenas / Retención: solo se jalan cuando el usuario abre el tab respectivo.
   const { data: topFans = [], isLoading: topFansLoading } = useTopFans(deepDiveTab === "ballenas");
   const { data: retentionRows = [], isLoading: retLoading } = useFanRetention(deepDiveTab === "retencion");
+  const { data: chatters = [], isLoading: chattersLoading } = useChatters(deepDiveTab === "chatter");
 
   // Filtro por RANGO de fechas (mismo DateRangePicker + pills que Panel de Control), en
   // vez del dropdown de meses. Default: el mes en curso.
@@ -1907,6 +1909,7 @@ const Dashboard2 = () => {
                       { key: "mom" as const, icon: <GitCompare className="h-3.5 w-3.5" />, label: "MoM", desc: "Mes vs Mes" },
                       { key: "ballenas" as const, icon: <Crown className="h-3.5 w-3.5" />, label: "Ballenas", desc: "Top spenders por creadora" },
                       { key: "retencion" as const, icon: <Repeat className="h-3.5 w-3.5" />, label: "Retención", desc: "Retención de fans por cohorte" },
+                      { key: "chatter" as const, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Chatters", desc: "Rendimiento por chatter" },
                       { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Ranking", desc: "Posición por revenue" },
                       { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: "Escalabilidad", desc: "Potencial de crecimiento" },
                       { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Canales", desc: "Msgs vs Tips vs Subs" },
@@ -1931,7 +1934,6 @@ const Dashboard2 = () => {
                   <div className="flex flex-wrap items-center gap-1 mt-1 bg-muted/50 rounded-lg p-1">
                     <span className="text-[9px] text-muted-foreground px-2 shrink-0 uppercase tracking-widest font-semibold">Roadmap</span>
                     {([
-                      { key: "chatter" as const, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Chatters", desc: "Rendimiento por chatter (próximamente)" },
                       { key: "ltv" as const, icon: <UserCheck className="h-3.5 w-3.5" />, label: "LTV", desc: "Valor de vida del cliente (próximamente)" },
                       { key: "content_roi" as const, icon: <Layers className="h-3.5 w-3.5" />, label: "Content ROI", desc: "Retorno por tipo de contenido (próximamente)" },
                       { key: "cohort" as const, icon: <Brain className="h-3.5 w-3.5" />, label: "Cohortes", desc: "Retención por grupo de fans (próximamente)" },
@@ -2573,29 +2575,84 @@ const Dashboard2 = () => {
                     );
                   })()}
 
-                  {/* ── Chatter Performance (Placeholder) ── */}
-                  {deepDiveTab === "chatter" && (
-                    <div className="space-y-5">
-                      <div className="rounded-xl border-2 border-dashed border-blue-400/40 bg-blue-500/5 p-8 text-center space-y-4">
-                        <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-blue-500/10 mx-auto">
-                          <MessageSquare className="h-8 w-8 text-blue-400" />
+                  {/* ── Chatter Performance ── */}
+                  {deepDiveTab === "chatter" && (() => {
+                    const list = chatters;
+                    const totalSales = list.reduce((s, c) => s + (c.total_sales ?? 0), 0);
+                    const avgConv = (() => {
+                      let w = 0, sum = 0;
+                      for (const c of list) { if (c.fan_conversion_rate != null && c.fans_chatted > 0) { w += c.fans_chatted; sum += c.fans_chatted * c.fan_conversion_rate; } }
+                      return w > 0 ? sum / w : null;
+                    })();
+                    const snap = list[0]?.snapshot_from && list[0]?.snapshot_to ? `${list[0].snapshot_from} → ${list[0].snapshot_to}` : "—";
+                    const fmtHrs = (h: number | null) => h == null ? "—" : `${h.toFixed(0)}h`;
+                    const fmtResp = (s: number | null) => s == null ? "—" : s >= 3600 ? `${(s / 3600).toFixed(1)}h` : s >= 60 ? `${Math.round(s / 60)}m` : `${Math.round(s)}s`;
+                    return (
+                      <div className="space-y-5">
+                        <div className="rounded-lg bg-muted/40 px-4 py-2.5 border border-border">
+                          <p className="text-xs font-semibold text-foreground">🧑‍💻 Rendimiento por chatter</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Ventas, conversión y tiempos por chatter (mes en curso: {snap}). Δ = vs período anterior. Fuente: <code className="bg-muted px-1 rounded font-mono text-[10px]">chatter_performance</code> (BLU employee-reports).</p>
                         </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-foreground">Chatter Performance</h3>
-                          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">Análisis de rendimiento por chatter: revenue generado, msgs/hora, tasa de conversión, y ranking comparativo.</p>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
-                          {["Revenue por Chatter", "Msgs/Hora", "Conversión Fan→Pago", "Ranking Chatters"].map(m => (
-                            <div key={m} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                              <p className="text-[10px] text-muted-foreground">{m}</p>
-                              <p className="text-lg font-bold text-muted-foreground/40 mt-1">—</p>
+                        {chattersLoading ? (
+                          <div className="p-8 text-center text-sm text-muted-foreground">Cargando chatters…</div>
+                        ) : list.length === 0 ? (
+                          <div className="rounded-lg border border-border bg-card text-center py-12 text-sm text-muted-foreground">Sin datos de chatters todavía — esperá la próxima sincronización de BLU.</div>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="rounded-xl border border-border bg-card p-3 text-center">
+                                <p className="text-[10px] text-muted-foreground uppercase">Chatters</p>
+                                <p className="text-lg font-bold tabular-nums">{list.length}</p>
+                              </div>
+                              <div className="rounded-xl border border-border bg-card p-3 text-center">
+                                <p className="text-[10px] text-muted-foreground uppercase">Ventas (total)</p>
+                                <p className="text-lg font-bold tabular-nums">{fmtK(totalSales)}</p>
+                              </div>
+                              <div className="rounded-xl border border-border bg-card p-3 text-center">
+                                <p className="text-[10px] text-muted-foreground uppercase">Conversión prom</p>
+                                <p className="text-lg font-bold tabular-nums">{avgConv != null ? `${avgConv.toFixed(1)}%` : "—"}</p>
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                        <Badge variant="outline" className="text-xs border-dashed"><Lock className="h-3 w-3 mr-1" />Requiere integración de datos de chatters</Badge>
+                            <div className="rounded-xl border border-border overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Chatter</TableHead>
+                                    <TableHead>Grupo</TableHead>
+                                    <TableHead className="text-right">Ventas</TableHead>
+                                    <TableHead className="text-right">Δ</TableHead>
+                                    <TableHead className="text-right">Fans chat.</TableHead>
+                                    <TableHead className="text-right">Conv.</TableHead>
+                                    <TableHead className="text-right">$/fan pago</TableHead>
+                                    <TableHead className="text-right">Resp.</TableHead>
+                                    <TableHead className="text-right">Hrs (real/prog)</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {list.map((c) => {
+                                    const d = c.delta_total_sales;
+                                    return (
+                                      <TableRow key={c.id}>
+                                        <TableCell className="font-medium text-sm whitespace-nowrap">{c.name || `#${c.blu_employee_id}`}</TableCell>
+                                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{c.group_name || "—"}</TableCell>
+                                        <TableCell className="text-right tabular-nums font-semibold">{fmtK(c.total_sales)}</TableCell>
+                                        <TableCell className={`text-right tabular-nums text-sm ${d == null ? "text-muted-foreground" : d >= 0 ? "text-success" : "text-destructive"}`}>{d == null ? "—" : `${d >= 0 ? "+" : ""}${fmtK(d)}`}</TableCell>
+                                        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{(c.fans_chatted ?? 0).toLocaleString()}</TableCell>
+                                        <TableCell className="text-right tabular-nums text-sm">{c.fan_conversion_rate != null ? `${c.fan_conversion_rate.toFixed(0)}%` : "—"}</TableCell>
+                                        <TableCell className="text-right tabular-nums text-sm">{c.avg_earnings_per_paying_fan != null ? fmtK(c.avg_earnings_per_paying_fan) : "—"}</TableCell>
+                                        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtResp(c.avg_response_seconds)}</TableCell>
+                                        <TableCell className="text-right tabular-nums text-sm text-muted-foreground whitespace-nowrap">{fmtHrs(c.clocked_hours)}/{fmtHrs(c.scheduled_hours)}</TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* ── Customer LTV (Placeholder) ── */}
                   {deepDiveTab === "ltv" && (
