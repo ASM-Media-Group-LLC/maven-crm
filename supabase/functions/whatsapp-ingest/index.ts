@@ -365,26 +365,52 @@ async function downloadAndStoreInboundMedia(
   }
 }
 
+// MX (+52) y AR (+54) tienen un dígito "legacy" (1 móvil / 9 móvil) que WhatsApp a veces incluye en
+// el JID entrante ("521...") pero no en el marcado al enviar ("52...") → el MISMO contacto caía en
+// dos wa_jid distintos y el chatter no veía las respuestas (caso Dayana). Solución SIN regresión: al
+// ingerir, buscamos el contacto por CUALQUIERA de las dos formas y usamos el que YA exista (prefiriendo
+// el que coincide exacto con la forma entrante); si no existe ninguno, creamos en la forma canónica
+// (sin el dígito). Así no forzamos una forma sobre hilos ya consolidados en la otra (caso Joselyn=521).
+function jidVariants(jid: string): string[] {
+  if (!jid.endsWith("@s.whatsapp.net")) return [jid];
+  const d = jid.replace(/@.*/, "");
+  const set = new Set<string>([d]);
+  if (/^521\d{10}$/.test(d)) set.add("52" + d.slice(3)); else if (/^52\d{10}$/.test(d)) set.add("521" + d.slice(2));
+  if (/^549\d{10}$/.test(d)) set.add("54" + d.slice(3)); else if (/^54\d{10}$/.test(d)) set.add("549" + d.slice(2));
+  return [...set].map((x) => x + "@s.whatsapp.net");
+}
+function canonicalJid(jid: string): string {
+  if (!jid.endsWith("@s.whatsapp.net")) return jid;
+  const d = jid.replace(/@.*/, "");
+  if (/^521\d{10}$/.test(d)) return "52" + d.slice(3) + "@s.whatsapp.net";
+  if (/^549\d{10}$/.test(d)) return "54" + d.slice(3) + "@s.whatsapp.net";
+  return jid;
+}
+
 async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Promise<void> {
   if (!msg.isDirect || msg.isFromBot) return;
-  const jid = msg.senderExternalId;
-  if (!jid) return;
+  const rawJid = msg.senderExternalId;
+  if (!rawJid) return;
+
+  const rawObj = (msg.raw && typeof msg.raw === "object") ? (msg.raw as Record<string, unknown>) : {};
+  const channelJid = typeof rawObj.instance === "string" ? rawObj.instance : null;
+
+  // 1) Contacto: buscar por cualquiera de las variantes (con/sin "1" MX / "9" AR). Si hay varias
+  //    (split previo), preferimos la que coincide EXACTO con la forma entrante; si no existe ninguna,
+  //    creamos en la forma canónica (sin el dígito). NO upsert (no pisar phone/display con null).
+  let contactId: string | null = null;
+  let jid = canonicalJid(rawJid);
+  const { data: cands } = await sb
+    .from("wa_contacts").select("id, wa_jid")
+    .eq("tenant_id", TENANT_ID).in("wa_jid", jidVariants(rawJid));
+  const picked = (cands ?? []).find((c: { wa_jid: string }) => c.wa_jid === rawJid) ?? (cands ?? [])[0] ?? null;
+  if (picked) { contactId = picked.id; jid = picked.wa_jid; }
 
   const digits = jid.replace(/@.*/, "").replace(/[^0-9]/g, "");
   const phone = jid.endsWith("@s.whatsapp.net") && digits ? "+" + digits : null;
   const displayName = msg.senderDisplayName ?? (phone ? null : (jid.replace(/@.*/, "") || null));
-  const rawObj = (msg.raw && typeof msg.raw === "object") ? (msg.raw as Record<string, unknown>) : {};
-  const channelJid = typeof rawObj.instance === "string" ? rawObj.instance : null;
 
-  // 1) Contacto: find-or-insert por (tenant, wa_jid). NO upsert, para no pisar
-  //    phone/display_name con null en mensajes posteriores.
-  let contactId: string | null = null;
-  const { data: existing } = await sb
-    .from("wa_contacts").select("id")
-    .eq("tenant_id", TENANT_ID).eq("wa_jid", jid).maybeSingle();
-  if (existing) {
-    contactId = existing.id;
-  } else {
+  if (!contactId) {
     const { data: created, error } = await sb
       .from("wa_contacts")
       .insert({ tenant_id: TENANT_ID, wa_jid: jid, phone_e164: phone, display_name: displayName })
