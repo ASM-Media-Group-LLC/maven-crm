@@ -9,11 +9,12 @@
 //
 // Auth: service_role o JWT de staff. Deployar con --no-verify-jwt.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { callGeminiOnce } from "../_shared/gemini.ts";
 import { logGeminiUsage } from "../_shared/usage.ts";
 
 const BLU_WS_URL = Deno.env.get("BLU_WS_URL") ?? "wss://of.unlok.me/";
-const GEMINI_MODEL = "gemini-2.5-flash";
+// Gemini 2.5 Flash vía OpenRouter (ruta paga, OpenAI-compatible) → sin los 503 del
+// free tier de Gemini directo, y response_format json_object fuerza JSON limpio.
+const OR_MODEL = "google/gemini-2.5-flash";
 const MAX_THREADS = 6;          // hilos muestreados por modelo
 const MAX_MSGS = 40;            // ventana por hilo (query del owner)
 const MSG_CHARS = 240;          // truncado por mensaje
@@ -108,8 +109,8 @@ Deno.serve(async (req) => {
   const withFeedback = !!body.with_feedback;
   if (!reportId) return json({ error: "report_id requerido" }, 400);
 
-  const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-  if (!GEMINI_API_KEY) return json({ error: "GEMINI_API_KEY no configurada" }, 500);
+  const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+  if (!OPENROUTER_API_KEY) return json({ error: "OPENROUTER_API_KEY no configurada" }, 500);
 
   const { data: report, error: rErr } = await sb.from("chatter_qa_reports").select("*").eq("id", reportId).maybeSingle();
   if (rErr || !report) return json({ error: "reporte no encontrado" }, 404);
@@ -187,20 +188,38 @@ Deno.serve(async (req) => {
     blocks.join("\n\n").slice(0, 60000) + feedbackBlock +
     `\n\nDevolvé SOLO el JSON con el shape pedido. "model_id" en observaciones_por_modelo debe coincidir con: ${JSON.stringify(evModels)}.`;
 
-  // ── Una sola llamada a Gemini Flash ──
-  let result;
+  // ── Una sola llamada a Gemini 2.5 Flash vía OpenRouter (ruta paga → sin 503) ──
+  let text = "", usage = { prompt_tokens: 0, completion_tokens: 0 };
   try {
-    result = await callGeminiOnce({ apiKey: GEMINI_API_KEY, model: GEMINI_MODEL, systemPrompt: SYSTEM_PROMPT, messages: [{ role: "user", content: userMessage }], temperature: 0.4, maxOutputTokens: 3000 });
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "HTTP-Referer": "https://maven.asmtech.me",
+        "X-Title": "Maven Chatter QA",
+      },
+      body: JSON.stringify({
+        model: OR_MODEL,
+        max_tokens: 3000,
+        temperature: 0.4,
+        messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: userMessage }],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!resp.ok) throw new Error(`openrouter ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
+    const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+    text = data.choices?.[0]?.message?.content ?? "";
+    usage = { prompt_tokens: data.usage?.prompt_tokens ?? 0, completion_tokens: data.usage?.completion_tokens ?? 0 };
   } catch (e) {
-    await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "Gemini: " + (e as Error).message }).eq("id", reportId);
+    await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "IA: " + (e as Error).message }).eq("id", reportId);
     return json({ error: (e as Error).message }, 502);
   }
 
-  // Parse + validación de shape.
+  // Parse + validación de shape (json_object ya devuelve JSON; limpiamos backticks por las dudas).
   let parsed: any;
   try {
-    const t = result.text.replace(/^[^{]*/, "").replace(/[^}]*$/, "");
-    parsed = JSON.parse(t);
+    parsed = JSON.parse(text.trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim());
   } catch {
     await sb.from("chatter_qa_reports").update({ status: "failed", error_message: "La IA no devolvió JSON válido. Reintentá." }).eq("id", reportId);
     return json({ error: "JSON inválido de la IA" }, 502);
@@ -220,14 +239,14 @@ Deno.serve(async (req) => {
     conclusion: typeof parsed.conclusion === "string" ? parsed.conclusion : "",
     hallazgo_principal: typeof parsed.hallazgo_principal === "string" ? parsed.hallazgo_principal : "",
   };
-  const sampling = { models: evModels.length, threads_sampled: threadsSampled, messages_read: messagesRead, model: GEMINI_MODEL };
+  const sampling = { models: evModels.length, threads_sampled: threadsSampled, messages_read: messagesRead, model: OR_MODEL };
 
   const { error: uErr } = await sb.from("chatter_qa_reports").update({
     report: reportBody, veredicto: parsed.veredicto, sampling, status: "ready", source: "ai_draft", error_message: null, evaluator_name: "Claude AI",
   }).eq("id", reportId);
   if (uErr) return json({ error: "update: " + uErr.message }, 502);
 
-  await logGeminiUsage({ operation: "chatter-qa-analyze", model: GEMINI_MODEL, inputTokens: result.usage.prompt_tokens ?? 0, outputTokens: result.usage.completion_tokens ?? 0, context: { reportId, chatter: report.chatter_name } });
+  await logGeminiUsage({ operation: "chatter-qa-analyze", model: OR_MODEL, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, context: { reportId, chatter: report.chatter_name, provider: "openrouter" } });
 
   return json({ ok: true, report_id: reportId, veredicto: parsed.veredicto, sampling });
 });
