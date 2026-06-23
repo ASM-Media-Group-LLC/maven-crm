@@ -113,3 +113,47 @@ export const useBluFan = (modelId: number | null, fanId: number | null, enabled 
     queryFn: () => callBluMp<BluFanSummary>({ action: "fan-summary", modelId, fanId }),
     enabled: enabled && !!modelId && !!fanId,
   });
+
+// ── Masivos del modelo (of-mass + smart-messages PRIORITY_MASS), normalizados a una fila común ──
+export interface BluMasivo {
+  id: string;
+  type: "of-mass" | "priority";
+  copy: string;
+  senderName: string | null;   // quién lo envió (null = otro CRM / "Sent on OnlyFans")
+  source: string | null;       // external | priority | ...
+  isExternal: boolean;
+  price: number;
+  sent: number;
+  viewed: number;              // veces visto
+  purchased: number;           // ventas
+  earnings: number;            // dinero recaudado
+  sentAt: string | null;
+}
+const num = (v: unknown) => Number(v) || 0;
+export const useBluMasivos = (modelId: number | null, enabled = true) =>
+  useQuery({
+    queryKey: ["blu-mp", "masivos", modelId],
+    queryFn: async (): Promise<BluMasivo[]> => {
+      const [ofm, sm] = await Promise.all([
+        callBluMp<{ rows?: any[] }>({ action: "of-mass", modelId }),
+        callBluMp<{ messages?: any[] }>({ action: "smart-messages", modelId }),
+      ]);
+      const ofRows: BluMasivo[] = (ofm?.rows ?? []).map((r) => ({
+        id: String(r.id ?? r.queueId), type: "of-mass", copy: r.message ?? "",
+        senderName: r.senderName && r.senderName !== "Sent on OnlyFans" ? r.senderName : null,
+        source: r.source ?? null, isExternal: !!r.isExternal,
+        price: num(r.price), sent: num(r.sent), viewed: num(r.viewed), purchased: num(r.purchased), earnings: num(r.earnings),
+        sentAt: r.sentAt ?? null,
+      }));
+      const smRows: BluMasivo[] = (sm?.messages ?? []).map((m) => ({
+        id: String(m.id), type: "priority", copy: m.name ?? m.textPreview ?? "",
+        senderName: m.senderName ?? null, source: "priority", isExternal: false,
+        price: num(m.price), sent: num(m.sent ?? m.sentCount), viewed: num(m.viewed ?? m.viewedCount),
+        purchased: num(m.purchased ?? m.purchasedCount), earnings: num(m.earnings),
+        sentAt: m.sentAt ?? m.publishedAt ?? null,
+      }));
+      return [...ofRows, ...smRows];
+    },
+    enabled: enabled && !!modelId,
+    staleTime: 5 * 60_000,
+  });

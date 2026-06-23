@@ -3,10 +3,11 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ClipboardCheck, MessageSquare, FileText, Clock, Wrench, ExternalLink, Bell } from "lucide-react";
+import { ClipboardCheck, MessageSquare, FileText, Clock, Wrench, ExternalLink, Bell, Megaphone } from "lucide-react";
 import ChattersQaScorecard from "./ChattersQaScorecard";
 import ChattersQaQualitative from "./ChattersQaQualitative";
 import ChatterQaNotifications from "./ChatterQaNotifications";
+import ChattersQaMasivos from "./ChattersQaMasivos";
 
 // Chatters QA — antes era un placeholder "soon" en el rail de Agency QA.
 // Ahora alberga el sistema de medición de chatters que reemplaza el sheet
@@ -33,7 +34,7 @@ export default function ChattersQaSection() {
   const [sp] = useSearchParams();
   const [tab, setTab] = useState(() => {
     const t = sp.get("tab") ?? "";
-    return ["scorecard", "mensajes-pro", "qa", "hubstaff", "notificaciones"].includes(t) ? t : "scorecard";
+    return ["scorecard", "mensajes-pro", "qa", "masivos", "hubstaff", "notificaciones"].includes(t) ? t : "scorecard";
   });
   return (
     <div className="space-y-4">
@@ -48,6 +49,7 @@ export default function ChattersQaSection() {
           <TabsTrigger value="scorecard" className="gap-1.5"><ClipboardCheck className="h-3.5 w-3.5" />Scorecard</TabsTrigger>
           <TabsTrigger value="mensajes-pro" className="gap-1.5"><MessageSquare className="h-3.5 w-3.5" />Mensajes Pro</TabsTrigger>
           <TabsTrigger value="qa" className="gap-1.5"><FileText className="h-3.5 w-3.5" />QA cualitativo</TabsTrigger>
+          <TabsTrigger value="masivos" className="gap-1.5"><Megaphone className="h-3.5 w-3.5" />Masivos</TabsTrigger>
           <TabsTrigger value="hubstaff" className="gap-1.5"><Clock className="h-3.5 w-3.5" />Hubstaff</TabsTrigger>
           <TabsTrigger value="notificaciones" className="gap-1.5"><Bell className="h-3.5 w-3.5" />Notificaciones</TabsTrigger>
         </TabsList>
@@ -68,6 +70,10 @@ export default function ChattersQaSection() {
 
         <TabsContent value="qa" className="mt-4">
           <ChattersQaQualitative />
+        </TabsContent>
+
+        <TabsContent value="masivos" className="mt-4">
+          <ChattersQaMasivos />
         </TabsContent>
 
         <TabsContent value="hubstaff" className="mt-4">
