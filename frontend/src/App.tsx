@@ -100,6 +100,7 @@ import Promolog from "./pages/Promolog";
 import ChatterEvaluator from "./pages/ChatterEvaluator";
 import ScouterAssist from "./pages/scouter/ScouterAssist";
 import AgencyQA from "./pages/agency-qa/AgencyQA";
+import BluConversations from "./pages/BluConversations";
 import ChatterProfileDetail from "./pages/ChatterProfileDetail";
 import ChatterProfileEdit from "./pages/ChatterProfileEdit";
 import ChatterAdmin from "./pages/ChatterAdmin";
@@ -289,6 +290,8 @@ const App = () => (
                 {/* Migrated areas from kash-call-qa — placeholders for now */}
                 <Route path="/scouter-assist" element={<PermissionRoute module="Scouter Assist"><ScouterAssist /></PermissionRoute>} />
                 <Route path="/agency-qa" element={<PermissionRoute module="Agency QA"><AgencyQA /></PermissionRoute>} />
+                {/* Conversaciones BLU (Messages Pro on-demand) — mismo gate que Company QA */}
+                <Route path="/conversaciones" element={<PermissionRoute module="Agency QA"><BluConversations /></PermissionRoute>} />
                 {/* Sales Overview — sub-rutas eliminadas; ahora vive todo en modales */}
                 <Route path="/sales-overview" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><SalesOverview /></PermissionRoute>} />
                 <Route path="/salesdashboard" element={<PermissionRoute module="Creator Sales" submodule="Reportes"><SalesDashboard /></PermissionRoute>} />
