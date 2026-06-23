@@ -394,8 +394,18 @@ const InboxPage = () => {
           mimetype: (file as File).type || undefined, filename, ptt,
         },
       });
-      const res = data as { ok?: boolean; error?: string } | null;
-      if (error || !res?.ok) throw new Error(error?.message ?? res?.error ?? "error");
+      // supabase-js, ante un non-2xx, esconde el body del edge y deja un mensaje genérico.
+      // Lo sacamos del context (la Response) para ver el motivo REAL (send_failed, not_connected…).
+      if (error) {
+        let detail = error.message;
+        try {
+          const body = await (error as { context?: Response }).context?.json?.();
+          if (body?.error || body?.reason) detail = body.error ?? body.reason;
+        } catch { /* sin body parseable, queda el genérico */ }
+        throw new Error(detail);
+      }
+      const res = data as { ok?: boolean; error?: string; reason?: string } | null;
+      if (!res?.ok) throw new Error(res?.error ?? res?.reason ?? "error");
       qc.invalidateQueries({ queryKey: ["wa-inbox-messages", convId] });
       qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
     } catch (e) {
