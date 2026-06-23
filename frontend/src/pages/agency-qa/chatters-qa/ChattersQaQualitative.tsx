@@ -38,6 +38,7 @@ export default function ChattersQaQualitative() {
   const [month, setMonth] = useState(currentMonth());
   const [newModels, setNewModels] = useState<EvaluatedModel[]>([]);
   const [toDelete, setToDelete] = useState<ChatterQaReport | null>(null);
+  const [toResend, setToResend] = useState<ChatterQaReport | null>(null);
 
   if (selectedId) return <ChatterQaReportDetail id={selectedId} onBack={() => setSelectedId(null)} />;
 
@@ -159,7 +160,7 @@ export default function ChattersQaQualitative() {
                 title={r.email_sent_at ? `Enviado ${new Date(r.email_sent_at).toLocaleString()} · reenviar` : "Enviar QA por email"}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (r.email_sent_at && !confirm(`Ya se envió el ${new Date(r.email_sent_at).toLocaleString()}. ¿Reenviar?`)) return;
+                  if (r.email_sent_at) { setToResend(r); return; } // ya enviado → confirmar reenvío con popup
                   sendEmail.mutate(r, { onSuccess: () => toast.success("QA enviada por email"), onError: (err) => toast.error((err as Error).message) });
                 }}
                 className={r.email_sent_at ? "text-success/70 hover:text-success" : "text-muted-foreground/50 hover:text-primary"}>
@@ -199,6 +200,36 @@ export default function ChattersQaQualitative() {
                 });
               }}>
               {del.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Eliminando…</> : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmar REENVÍO de email (cuando ya se mandó) — popup estilo Maven */}
+      <AlertDialog open={!!toResend} onOpenChange={(open) => !open && setToResend(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" /> Reenviar QA por email
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              El QA de <strong>{toResend?.chatter_name}</strong> ya se envió
+              {toResend?.email_sent_at ? ` el ${new Date(toResend.email_sent_at).toLocaleString()}` : ""}. ¿Reenviarlo a los destinatarios configurados?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={sendEmail.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={sendEmail.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!toResend) return;
+                sendEmail.mutate(toResend, {
+                  onSuccess: () => { toast.success("QA reenviada por email"); setToResend(null); },
+                  onError: (err) => toast.error((err as Error).message),
+                });
+              }}>
+              {sendEmail.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Enviando…</> : "Reenviar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

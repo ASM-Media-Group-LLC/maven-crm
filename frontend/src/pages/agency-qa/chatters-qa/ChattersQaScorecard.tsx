@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  Plus, Trash2, TrendingUp, TrendingDown, Minus, CalendarPlus, Info, Users, Gauge,
+  Plus, Trash2, TrendingUp, TrendingDown, Minus, CalendarPlus, Info, Users, Gauge, AlertTriangle, Loader2,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
@@ -76,8 +80,10 @@ function CompanyTable({ company, rows, prevByName }: {
   company: CompanyCode; rows: Scorecard[]; prevByName: Map<string, number>;
 }) {
   const del = useDeleteScorecard();
+  const [toDelete, setToDelete] = useState<Scorecard | null>(null);
   if (rows.length === 0) return null;
   return (
+    <>
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full border-collapse text-sm">
         <thead>
@@ -114,7 +120,7 @@ function CompanyTable({ company, rows, prevByName }: {
               <td className="px-1 py-1.5 text-center">
                 <button
                   type="button"
-                  onClick={() => { if (confirm(`¿Eliminar a ${r.chatter_name} de este mes?`)) del.mutate(r.id, { onError: (e) => toast.error((e as Error).message) }); }}
+                  onClick={() => setToDelete(r)}
                   className="text-muted-foreground/50 hover:text-destructive"
                 ><Trash2 className="h-4 w-4" /></button>
               </td>
@@ -123,6 +129,37 @@ function CompanyTable({ company, rows, prevByName }: {
         </tbody>
       </table>
     </div>
+
+      {/* Confirmar borrado de chatter del mes — popup estilo Maven */}
+      <AlertDialog open={!!toDelete} onOpenChange={(open) => !open && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" /> Eliminar del scorecard
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Sacar a <strong>{toDelete?.chatter_name}</strong> del scorecard de este mes ({companyLabel(company)})? Se pierden sus notas del mes. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={del.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={del.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                if (!toDelete) return;
+                del.mutate(toDelete.id, {
+                  onSuccess: () => { toast.success("Chatter eliminado del mes"); setToDelete(null); },
+                  onError: (err) => toast.error((err as Error).message),
+                });
+              }}>
+              {del.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Eliminando…</> : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
