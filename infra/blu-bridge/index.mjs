@@ -181,6 +181,34 @@ function transformFans(models) {
   return rows;
 }
 
+// fan-reports:model → ballenas (top fans) por modelo: md.modelId + md.fanReport.topFans[].
+function transformTopFans(models) {
+  const rows = [];
+  for (const md of (models || [])) {
+    const modelId = md?.modelId;
+    const name = String(md.creator?.username ?? md.creator?.name ?? md.aboutMe?.username ?? "").trim();
+    if (modelId == null || !name) continue;
+    for (const f of (md.fanReport?.topFans || [])) {
+      if (f?.userId == null) continue;
+      rows.push({
+        blu_model_id: modelId, blu_name: name,
+        fan_user_id: f.userId, rank: f.rank ?? null,
+        fan_name: f.name ?? null, fan_username: f.username ?? null,
+        spent_gross: Number(f.spentGross ?? f.spent ?? 0) || 0,
+        transactions: Number(f.transactions ?? 0) || 0,
+        messages_gross: Number(f.messagesSpentGross ?? f.messagesSpent ?? 0) || 0,
+        tips_gross: Number(f.tipsSpentGross ?? f.tipsSpent ?? 0) || 0,
+        subscriptions_gross: Number(f.subscriptionsSpentGross ?? f.subscriptionsSpent ?? 0) || 0,
+        ppv_gross: Number(f.ppvSpentGross ?? f.ppvSpent ?? 0) || 0,
+        subscribed_at: f.subscribedAt ?? null, expires_at: f.expiresAt ?? null,
+        is_active: typeof f.isActive === "boolean" ? f.isActive : null,
+        subscription_length_days: f.subscriptionLengthDays ?? null,
+      });
+    }
+  }
+  return rows;
+}
+
 // ── Transformar a filas por creadora/día (gross) ──
 function transform(results) {
   const rows = [];
@@ -265,6 +293,13 @@ async function runOnce(firstRun = false) {
     }
     fanRows = rows.length;
     console.log(`[blu-bridge] fans: ${fanModels.length} modelos → ${fanRows} filas (active_fans/new_fans).`);
+    // Ballenas (top fans) — misma respuesta. Un solo call (el RPC reemplaza por modelo: delete+insert).
+    const topRows = transformTopFans(fanModels);
+    if (topRows.length) {
+      const { error: tfErr } = await sb().rpc("import_blu_top_fans", { p_rows: topRows, p_from: fanStart, p_to: fanEnd });
+      if (tfErr) throw new Error("import_blu_top_fans: " + tfErr.message);
+    }
+    console.log(`[blu-bridge] ballenas: ${topRows.length} top-fans ingestados.`);
   } catch (e) {
     if (e.expired) throw e;
     console.error(`[blu-bridge] fan-reports falló (no afecta ingresos): ${e.message}`);
