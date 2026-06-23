@@ -157,6 +157,61 @@ async function fetchFanReportsWS(token, startDate, endDate) {
   });
 }
 
+// DIAGNÓSTICO one-shot (Slice C): descubrir la FORMA de la respuesta de chatters
+// (agency:analytics:employee-reports) + employees:list + groups:list. Loguea SOLO claves+tipos
+// (no valores → sin PII de chatters). Se elimina al construir la ingesta real.
+async function debugEmployeeReports(token) {
+  const { default: WS } = await import("ws");
+  const shape = (obj) => {
+    if (Array.isArray(obj)) return `Array[${obj.length}]${obj[0] != null ? " of " + shape(obj[0]) : ""}`;
+    if (obj && typeof obj === "object") {
+      return "{" + Object.entries(obj).slice(0, 50)
+        .map(([k, v]) => `${k}: ${Array.isArray(v) ? `Array[${v.length}]` : (v && typeof v === "object" ? "object" : typeof v)}`)
+        .join(", ") + "}";
+    }
+    return typeof obj;
+  };
+  await new Promise((resolve) => {
+    const ws = new WS(BLU_WS_URL);
+    let authed = false, resolved = false; const got = {};
+    const to = setTimeout(finish, 60000);
+    function finish() { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} resolve(); }
+    ws.on("open", () => ws.send(JSON.stringify({ type: "auth:token", token })));
+    ws.on("message", (data) => {
+      let m; try { m = JSON.parse(data.toString()); } catch { return; }
+      const t = m.type;
+      if (t === "ping") { try { ws.send(JSON.stringify({ type: "pong" })); } catch {} return; }
+      if (t === "auth:ok") {
+        authed = true;
+        ws.send(JSON.stringify({ type: "agency:employees:list" }));
+        ws.send(JSON.stringify({ type: "agency:groups:list" }));
+        ws.send(JSON.stringify({ type: "agency:analytics:employee-reports", startDate: ymd(new Date(Date.now() - 6 * DAY)), endDate: ymd(new Date()), groupBy: "day", ranking: "descending", chatterOnly: false, creatorIds: [], employeeIds: [], groupIds: [], employeeFilterMode: "or", assignment: "all", recordsLimit: 5000 }));
+        return;
+      }
+      if (!authed) return;
+      if (t === "agency:employees:list" && !got.e) { got.e = 1; console.log(`[DEBUG] employees:list = ${shape(m)}`); if (m.employees?.[0]) console.log(`[DEBUG] employee[0] = ${shape(m.employees[0])}`); }
+      if (t === "agency:groups:list" && !got.g) { got.g = 1; console.log(`[DEBUG] groups:list = ${shape(m)}`); if (m.groups?.[0]) console.log(`[DEBUG] group[0] = ${shape(m.groups[0])}`); }
+      if (t === "agency:analytics:employee-reports" && !got.r) {
+        got.r = 1;
+        console.log(`[DEBUG] employee-reports TOP = ${shape(m)}`);
+        for (const [k, v] of Object.entries(m)) {
+          if (Array.isArray(v) && v.length && typeof v[0] === "object") {
+            console.log(`[DEBUG] employee-reports.${k}[0] = ${shape(v[0])}`);
+            for (const [k2, v2] of Object.entries(v[0])) {
+              if (v2 && typeof v2 === "object") console.log(`[DEBUG]   .${k}[0].${k2} = ${shape(v2)}`);
+            }
+          } else if (v && typeof v === "object" && !Array.isArray(v)) {
+            console.log(`[DEBUG] employee-reports.${k} = ${shape(v)}`);
+          }
+        }
+      }
+      if (got.e && got.g && got.r) finish();
+    });
+    ws.on("error", finish);
+    ws.on("close", finish);
+  });
+}
+
 // fan-reports:model → filas {blu_name, date, active_fans, new_fans}. Mismo blu_name que earnings
 // (creator.username) → upsert sobre la MISMA fila (blu_creator_name+date).
 function transformFans(models) {
@@ -335,6 +390,9 @@ async function runOnce(firstRun = false) {
     if (e.expired) throw e;
     console.error(`[blu-bridge] fan-reports falló (no afecta ingresos): ${e.message}`);
   }
+
+  // DIAGNÓSTICO one-shot Slice C: loguear la forma de employee-reports/employees/groups. Se quita al armar la ingesta.
+  if (firstRun) { try { await debugEmployeeReports(token); } catch (e) { console.error("[DEBUG] employee-reports falló: " + e.message); } }
 
   return { rows: totalRows, fanRows };
 }
