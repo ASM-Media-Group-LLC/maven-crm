@@ -5,10 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useBluModels, bluModelLabel } from "../../sales-performance/useBluMp";
 import { COMPANIES, companyLabel, periodLabel, type CompanyCode } from "./useChatterScorecards";
 import {
-  veredictoLabel, veredictoTone, useQaReports, useCreateQaReport, useDeleteQaReport, useSendChatterQaEmail, useBluChatters, type EvaluatedModel,
+  veredictoLabel, veredictoTone, useQaReports, useCreateQaReport, useDeleteQaReport, useSendChatterQaEmail, useBluChatters, type EvaluatedModel, type ChatterQaReport,
 } from "./useChatterQaReports";
 import ChatterQaReportDetail from "./ChatterQaReportDetail";
 
@@ -33,6 +37,7 @@ export default function ChattersQaQualitative() {
   const [company, setCompany] = useState<CompanyCode>("CP");
   const [month, setMonth] = useState(currentMonth());
   const [newModels, setNewModels] = useState<EvaluatedModel[]>([]);
+  const [toDelete, setToDelete] = useState<ChatterQaReport | null>(null);
 
   if (selectedId) return <ChatterQaReportDetail id={selectedId} onBack={() => setSelectedId(null)} />;
 
@@ -161,12 +166,43 @@ export default function ChattersQaQualitative() {
                 {r.email_sent_at ? <MailCheck className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
               </button>
             )}
-            <button type="button" onClick={(e) => { e.stopPropagation(); if (confirm(`¿Eliminar el reporte de ${r.chatter_name}?`)) del.mutate(r.id, { onError: (err) => toast.error((err as Error).message) }); }}
+            <button type="button" onClick={(e) => { e.stopPropagation(); setToDelete(r); }}
               className="text-muted-foreground/40 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
         ))}
       </div>
+
+      {/* Confirmar borrado — popup estilo Maven (shadcn AlertDialog), reemplaza al confirm() del navegador */}
+      <AlertDialog open={!!toDelete} onOpenChange={(open) => !open && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" /> Eliminar reporte
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Seguro que querés eliminar el QA de <strong>{toDelete?.chatter_name}</strong>
+              {toDelete ? ` (${companyLabel(toDelete.company)} · ${periodLabel(toDelete.period)})` : ""}? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={del.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={del.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                if (!toDelete) return;
+                del.mutate(toDelete.id, {
+                  onSuccess: () => { toast.success("Reporte eliminado"); setToDelete(null); },
+                  onError: (err) => toast.error((err as Error).message),
+                });
+              }}>
+              {del.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Eliminando…</> : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
