@@ -322,9 +322,14 @@ const AgencyQA = () => {
   // Default al primer rol al que tenga acceso. Si no tiene acceso a
   // ninguno, mostramos un mensaje en blanco; eso indica que el admin
   // debería habilitarle al menos uno desde Settings.
-  const [activeRole, setActiveRole] = useState<RoleKey>(() =>
-    (visibleRoleSections[0]?.key ?? "closers-qa") as RoleKey,
-  );
+  // Deep-link: el CTA del email del QA de chatters abre /agency-qa?role=chatters-qa para
+  // caer en la sección correcta (antes caía en Closers QA, la primera del rail).
+  const [agencySp] = useSearchParams();
+  const [activeRole, setActiveRole] = useState<RoleKey>(() => {
+    const r = agencySp.get("role") as RoleKey | null;
+    if (r && ROLE_SECTIONS.some((s) => s.key === r)) return r;
+    return (visibleRoleSections[0]?.key ?? "closers-qa") as RoleKey;
+  });
   const activeSection = ROLE_SECTIONS.find((s) => s.key === activeRole);
   const activeIsAllowed = visibleRoleSections.some((s) => s.key === activeRole);
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,11 @@ const ComingSoon = ({ title, desc, slice }: { title: string; desc: string; slice
 );
 
 export default function ChattersQaSection() {
-  const [tab, setTab] = useState("scorecard");
+  const [sp] = useSearchParams();
+  const [tab, setTab] = useState(() => {
+    const t = sp.get("tab") ?? "";
+    return ["scorecard", "mensajes-pro", "qa", "hubstaff", "notificaciones"].includes(t) ? t : "scorecard";
+  });
   return (
     <div className="space-y-4">
       <div>

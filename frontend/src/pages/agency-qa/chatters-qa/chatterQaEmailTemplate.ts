@@ -103,7 +103,7 @@ export function buildChatterQaEmailHtml(p: ChatterQaEmailPayload): string {
             <div style="color:${C.text};font-size:14px;font-weight:600;line-height:1.5;margin-top:3px">${richText(r.hallazgo_principal, fi)}</div>
           </div>` : ""}
           <div style="margin-top:22px;text-align:center">
-            <a href="${escape(p.appUrl)}/agency-qa" style="display:inline-block;background:${C.primary};color:#fff;text-decoration:none;font-weight:700;font-size:14px;border-radius:8px;padding:10px 22px">Ver reporte completo en Maven →</a>
+            <a href="${escape(p.appUrl)}/agency-qa?role=chatters-qa&tab=qa" style="display:inline-block;background:${C.primary};color:#fff;text-decoration:none;font-weight:700;font-size:14px;border-radius:8px;padding:10px 22px">Ver reporte completo en Maven →</a>
           </div>
         </td></tr>
         <tr><td style="padding:14px 24px;text-align:center;color:${C.muted};font-size:11px">Maven CRM · QA de Chatters</td></tr>
