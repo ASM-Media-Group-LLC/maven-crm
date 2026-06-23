@@ -1,6 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { TrendingUp, TrendingDown, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { PRESET_CONFIG, type RangePreset } from "@/lib/range-presets";
 
 interface Props {
   totalEarnings: number;
@@ -9,16 +11,18 @@ interface Props {
   from: Date | undefined;
   to: Date | undefined;
   onDateChange: (from: Date | undefined, to: Date | undefined) => void;
+  activePreset: RangePreset | null;
+  onPreset: (key: RangePreset) => void;
 }
 
 const fmt = (n: number) =>
   n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${n.toFixed(0)}`;
 
-const SalesOverviewHeader = ({ totalEarnings, changePercent, activeCreators, from, to, onDateChange }: Props) => {
+const SalesOverviewHeader = ({ totalEarnings, changePercent, activeCreators, from, to, onDateChange, activePreset, onPreset }: Props) => {
   const isPositive = changePercent >= 0;
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
       <div className="flex items-center gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Creator Sales Overview</h1>
@@ -41,9 +45,30 @@ const SalesOverviewHeader = ({ totalEarnings, changePercent, activeCreators, fro
           </Badge>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {/* Reporte / IA Ventas vivían acá como botones, pero ya son subtabs (VentasSubtabs) → redundantes, removidos. */}
-        <DateRangePicker from={from} to={to} onApply={onDateChange} />
+      {/* Pills de presets + calendario (mismo patrón que Dashboard 2 / Panel de Control) — así
+          siempre se ve de qué fecha son los números. */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="inline-flex items-center rounded-lg border border-border bg-card/40 p-0.5">
+          {PRESET_CONFIG.map((p) => {
+            const isActive = activePreset === p.key;
+            return (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => onPreset(p.key)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                  isActive
+                    ? "bg-primary/15 text-primary ring-1 ring-primary/30"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                )}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+        <DateRangePicker from={from} to={to} onApply={onDateChange} placeholder="Seleccionar fechas" />
       </div>
     </div>
   );

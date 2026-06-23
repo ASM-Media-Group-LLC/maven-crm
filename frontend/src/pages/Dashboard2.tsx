@@ -103,7 +103,7 @@ const PIE_COLORS = ["hsl(221,83%,53%)","hsl(142,71%,45%)","hsl(25,95%,53%)","hsl
 const Dashboard2 = () => {
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
-  const { data: allRows = [], isLoading } = useBluEarningsData();
+  const { data: allRows = [], isLoading, isError, refetch } = useBluEarningsData();
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [ddSort, setDdSort] = useState<Record<string, { key: string; dir: "asc" | "desc" }>>({
@@ -358,6 +358,9 @@ const Dashboard2 = () => {
     return Array.from(map.values());
   }, [allRows, selectedPeriod, creatorInfoMap]);
 
+  // ¿Hay data para el período? (para distinguir "sin datos" de un $0 real, y de un error de fetch)
+  const hasData = rawCreators.length > 0;
+
   // Pareto analysis
   const paretoAnalysis = useMemo(() => {
     const sorted = [...rawCreators].filter((c) => c.total > 0).sort((a, b) => b.total - a.total);
@@ -505,6 +508,8 @@ const Dashboard2 = () => {
   }, [allRows, creatorInfoMap]);
 
   const projectionTotal = useMemo(() => projection.reduce((s, c) => s + c.projected, 0), [projection]);
+  // El día 1 del mes no hay suficientes días para proyectar (la useMemo devuelve []).
+  const projectionTooEarly = new Date().getDate() <= 1;
 
   // Filters
   const filteredCreators = useMemo(() => {
@@ -765,7 +770,21 @@ const Dashboard2 = () => {
                   Row 2: Retención (1/3) + Revenue Mix (2/3) — Mix tiene
                   bar chart con 3 legends, antes quedaba apretado al
                   competir con 5 stats en una sola fila. */}
-              {!isLoading && (
+              {/* Estado de error/sin-datos: NO mostrar KPIs en $0 cuando la consulta falló o el período está vacío. */}
+              {!isLoading && (isError || !hasData) && (
+                <div className="rounded-lg border border-border bg-card text-center py-12 px-6 text-sm">
+                  {isError ? (
+                    <div className="space-y-2">
+                      <p className="font-medium text-destructive">No se pudieron cargar los ingresos</p>
+                      <p className="text-xs text-muted-foreground">La consulta a BLU falló — no es que las ventas sean $0.</p>
+                      <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">Sin datos para {selectedPeriod?.label}</p>
+                  )}
+                </div>
+              )}
+              {!isLoading && !isError && hasData && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* Revenue Bruto — clickable */}
                   <button
@@ -847,7 +866,7 @@ const Dashboard2 = () => {
                   ahora usa flex internamente para llenar la altura sin
                   dejar espacio negro al fondo cuando se estira para
                   emparejar la card más alta. */}
-              {!isLoading && (
+              {!isLoading && !isError && hasData && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                   {/* Revenue Bruto — hero card grande, ahora en Row 2
                       donde antes vivía Retención. Más espacio + número
@@ -938,7 +957,7 @@ const Dashboard2 = () => {
               {/* ══════ STRATEGIC INSIGHTS — 2 cards (Concentración +
                   Velocidad) ahora que Eficiencia se movió arriba al
                   KPI strip. Cada card ocupa la mitad del row. ══════ */}
-              {!isLoading && (
+              {!isLoading && !isError && hasData && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Revenue Concentration */}
                   <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -1102,13 +1121,17 @@ const Dashboard2 = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">Proyección bruto</p>
-                      <p className="text-2xl font-bold tabular-nums">{fmt(projectionTotal)}</p>
+                      <p className="text-2xl font-bold tabular-nums">{projectionTooEarly ? "—" : fmt(projectionTotal)}</p>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Basado en {new Date().getDate() - 1} días. Fórmula: (acumulado / días) × días del mes.
+                    {projectionTooEarly
+                      ? "La proyección estará disponible a partir del día 2 del mes."
+                      : `Basado en ${new Date().getDate() - 1} días. Fórmula: (acumulado / días) × días del mes.`}
                   </p>
-                  {projection.length === 0 ? (
+                  {projectionTooEarly ? (
+                    <p className="text-sm text-muted-foreground">Aún no hay suficientes días del mes para proyectar.</p>
+                  ) : projection.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Sin datos del mes actual.</p>
                   ) : (
                     <div className="space-y-2">
@@ -1607,7 +1630,7 @@ const Dashboard2 = () => {
             </Dialog>
 
             {/* ══════ METRICS — inline tab section ══════ */}
-            {dashTab === "metrics" && !isLoading && (
+            {dashTab === "metrics" && !isLoading && !isError && hasData && (
               <div className="px-6 pb-6 -mt-1 space-y-6">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-primary" />
@@ -1704,7 +1727,7 @@ const Dashboard2 = () => {
             )}
 
             {/* ══════ PARETO — inline tab section ══════ */}
-            {dashTab === "pareto" && !isLoading && (
+            {dashTab === "pareto" && !isLoading && !isError && hasData && (
               <div className="px-6 pb-6 -mt-1 space-y-6">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                   <PieChart className="h-5 w-5 text-primary" />

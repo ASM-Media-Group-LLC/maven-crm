@@ -10,11 +10,14 @@ import EarningsByChannelChart from "./sales-dashboard/EarningsByChannelChart";
 import TopCreatorsTable from "./sales-overview/TopCreatorsTable";
 import { usePeriodComparison } from "./sales-overview/usePeriodComparison";
 import { useBluEarningsData as useEarningsData } from "./sales-performance/useBluEarningsData";
+import { rangeForPreset, type RangePreset } from "@/lib/range-presets";
 
 const SalesOverview = () => {
   const today = startOfToday();
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  // Default "Este mes" (rango explícito) para que SIEMPRE se vea de qué fecha son los números.
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => rangeForPreset("this_month", new Date()).from);
+  const [dateTo, setDateTo] = useState<Date | undefined>(() => rangeForPreset("this_month", new Date()).to);
+  const [activePreset, setActivePreset] = useState<RangePreset | null>("this_month");
   const [modalType, setModalType] = useState<string | null>(null);
   const { data: allRows = [], isLoading } = useEarningsData();
 
@@ -28,6 +31,13 @@ const SalesOverview = () => {
   const handleDateChange = (from: Date | undefined, to: Date | undefined) => {
     setDateFrom(from);
     setDateTo(to);
+    setActivePreset(null); // selección manual en el calendario → sin pill activo
+  };
+  const handlePreset = (key: RangePreset) => {
+    const r = rangeForPreset(key, new Date());
+    setDateFrom(r.from);
+    setDateTo(r.to);
+    setActivePreset(key);
   };
 
   // Filtered rows for charts
@@ -88,6 +98,8 @@ const SalesOverview = () => {
                 from={dateFrom}
                 to={dateTo}
                 onDateChange={handleDateChange}
+                activePreset={activePreset}
+                onPreset={handlePreset}
               />
             </div>
            )}
