@@ -304,6 +304,9 @@ Deno.serve(async (req: Request) => {
     }
 
     let inserted = 0, promotedCount = 0, skipped = 0;
+    // Detalle del path de VISIÓN (solo dry-run): para verificar a mano que un link
+    // opaco ya no se marca promo. Cada item = un tweet donde corrió la visión.
+    const visionTweets: Array<{ promoted: boolean; reason: string; text: string }> = [];
     for (let i = 0; i < tweets.length; i++) {
       const it = tweets[i];
       let { promoted, reason } = classifyX(it, ofNicksByCreator.get(c.id) ?? []);
@@ -315,6 +318,7 @@ Deno.serve(async (req: Request) => {
       if (!promoted && OPENROUTER_API_KEY && firstImage && visionUsed < MAX_VISION_PER_RUN) {
         visionUsed++;
         const v = await visionIsOfPromo(firstImage, OPENROUTER_API_KEY, it?.text || it?.fullText || "");
+        if (dryRun) visionTweets.push({ promoted: v.promoted, reason: v.reason.slice(0, 140), text: ((it?.text || it?.fullText || "") as string).slice(0, 80) });
         if (v.promoted) { promoted = true; reason = `vision-of:${v.reason}`; }
       }
       if (promoted) promotedCount++;
@@ -347,7 +351,7 @@ Deno.serve(async (req: Request) => {
       if (insErr) results.push({ creator: c.name, insertError: insErr.message });
       else inserted++;
     }
-    results.push({ creator: c.name, tweets: tweets.length, promoted: promotedCount, inserted, skipped, ...(dryRun ? { dry_run: true } : {}) });
+    results.push({ creator: c.name, tweets: tweets.length, promoted: promotedCount, inserted, skipped, ...(dryRun ? { dry_run: true, visionTweets } : {}) });
   }
 
   return json({ ok: true, start, hours, creators: list.length, runStats, results });

@@ -165,6 +165,10 @@ const selectedLocalDayKeys = (from?: Date, to?: Date): Set<string> | null => {
 
 const PromologContent = () => {
   const { user } = useAuth();
+  // Timezone preferido del user — afecta cómo se agrupan/renderizan TODAS las
+  // fechas de Promolog (el "día" es el día EN TU ZONA, no en UTC). Se lee acá arriba
+  // para que las queries (entries, período anterior) puedan acotar por día-local.
+  const { timezone: userTz } = useTimezone();
   const { canAccess, dataScope } = usePermissions();
   // "Ve todo el promolog" = el data_scope del módulo NO es 'self' (all/subordinates).
   // Antes era una lista hardcodeada de nombres de rol (admin/manager/supervisor) que
@@ -281,26 +285,34 @@ const PromologContent = () => {
   // dedup por creador+día con la misma semántica que el Dashboard (un creador-día cuenta
   // como promo si tuvo ≥1 entry promocionada).
   const { data: prevMetrics = null } = useQuery({
-    queryKey: ["promolog-prev-metrics", user?.id, dateFrom?.toISOString(), dateTo?.toISOString(), isManagement],
+    queryKey: ["promolog-prev-metrics", user?.id, dateFrom?.toISOString(), dateTo?.toISOString(), userTz, isManagement],
     enabled: !!dateFrom && !!dateTo,
     queryFn: async () => {
       const lenDays = Math.max(1, Math.round((dateTo!.getTime() - dateFrom!.getTime()) / 86_400_000) + 1);
-      const prevToStr = dateFrom!.toISOString().split("T")[0]; // exclusivo: arranca el rango actual
-      const prevFromStr = new Date(dateFrom!.getTime() - lenDays * 86_400_000).toISOString().split("T")[0];
+      // Período anterior equivalente, EN TU ZONA: [dateFrom - lenDays, dateFrom).
+      const prevFrom = new Date(dateFrom!.getTime() - lenDays * 86_400_000);
+      const prevTo = new Date(dateFrom!.getTime() - 86_400_000); // último día del período anterior
+      const prevDayKeys = selectedLocalDayKeys(prevFrom, prevTo);
+      // Fetch con ±1 día de margen UTC (col `date` naive-UTC); el recorte fino al
+      // día-en-tu-zona se hace abajo con dayKeyInTz, igual que el período actual.
+      const fetchFrom = new Date(prevFrom.getTime() - 86_400_000).toISOString().split("T")[0];
+      const fetchTo = new Date(dateFrom!.getTime() + 86_400_000).toISOString().split("T")[0];
       let q = supabase
         .from("promolog_entries")
         .select("creator_id, date, promoted")
-        .gte("date", prevFromStr)
-        .lt("date", prevToStr)
+        .gte("date", fetchFrom)
+        .lt("date", fetchTo)
         .limit(10000);
       if (!isManagement && user?.id) q = q.or(`reviewed_by.eq.${user.id},created_by.eq.${user.id}`);
       const { data, error } = await q;
       if (error) throw error;
       const groups = new Map<string, boolean>();
       for (const r of (data ?? []) as Array<{ creator_id: string | null; date: string; promoted: string | null }>) {
-        // Agrupar por creador+DÍA (no por timestamp): el campo `date` es un timestamp con
-        // hora, así que recortamos a YYYY-MM-DD para contar creador-días como el Dashboard.
-        const key = `${r.creator_id || ""}|${(r.date || "").slice(0, 10)}`;
+        // Mismo criterio que el período actual: agrupar por creador + DÍA EN TU ZONA
+        // (no UTC), y contar solo los días que caen en el período anterior.
+        const day = dayKeyInTz(r.date, userTz);
+        if (prevDayKeys && !prevDayKeys.has(day)) continue;
+        const key = `${r.creator_id || ""}|${day}`;
         const isPromo = r.promoted === "true" || r.promoted === "yes";
         groups.set(key, (groups.get(key) || false) || isPromo);
       }
@@ -309,12 +321,6 @@ const PromologContent = () => {
       return { promos, successRate: creatorDays > 0 ? Math.round((promos / creatorDays) * 100) : 0 };
     },
   });
-
-  // Timezone preferido del user — afecta cómo se renderizan TODAS las
-  // fechas/horas en Promolog. Cuando el user cambia el TZ en el topbar,
-  // este memo recalcula y todas las entries se re-renderean con la nueva
-  // zona. Default: TZ guardado en localStorage / fallback Miami.
-  const { timezone: userTz } = useTimezone();
 
   // Map DB entries to PromologEntry interface
   const entries: PromologEntry[] = useMemo(() => {
@@ -351,6 +357,7 @@ const PromologContent = () => {
         action_taken: pe.action_taken ?? null,
         evidence_url: pe.evidence_url ?? null,
         story_media_url: pe.story_media_url ?? null,
+        story_link_url: pe.story_link_url ?? null,
         error_reason: pe.error_reason ?? null,
         buy_link_type: pe.buy_link_type ?? null,
         has_buy_link: pe.has_buy_link === true,

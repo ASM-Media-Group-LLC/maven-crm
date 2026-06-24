@@ -61,6 +61,9 @@ export interface PromologEntry {
   story_media_url?: string | null;
   // Plataforma de destino del link (onlyfans / piclink / linktree / fansly / other).
   buy_link_type?: string | null;
+  // Destino REAL decodificado del sticker de link de la story (ej "piclink.me/leona"),
+  // para mostrar a dónde apuntaba en el popup de evidencia. NULL si no había link.
+  story_link_url?: string | null;
   // Si la promo tiene link visible (sticker, URL en caption, etc.).
   has_buy_link?: boolean;
   // Razonamiento de la AI cuando analyzed_by_ai = true.

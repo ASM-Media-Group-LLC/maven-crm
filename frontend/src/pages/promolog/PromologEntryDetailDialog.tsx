@@ -299,6 +299,12 @@ const PromologEntryDetailDialog = ({
                   {entry.buy_link_type || "no especificado"}
                 </Badge>
               </p>
+              {entry.story_link_url && (
+                <p className="text-xs text-muted-foreground break-all">
+                  Destino:{" "}
+                  <span className="font-mono text-foreground/80">{entry.story_link_url}</span>
+                </p>
+              )}
             </div>
           )}
 
