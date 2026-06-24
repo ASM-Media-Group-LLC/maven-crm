@@ -293,21 +293,14 @@ const InboxPage = () => {
     requestAnimationFrame(() => scrollThreadToBottom(false));
   }, [messages]);
 
-  // Realtime: nuevos mensajes / cambios de conversación → refrescar en vivo.
+  // Realtime: cambios de CONVERSACIÓN (asignación, archivar, no-leídos) → refrescar la
+  // lista. Los mensajes nuevos y el refresh del HILO ABIERTO los maneja la suscripción
+  // global única de useWaInboxNotifications (AppShell): tener acá un 2º canal sobre
+  // wa_conversation_messages competía con el global por el routing de postgres_changes y
+  // quedaba mudo → el aviso sonaba pero el mensaje no aparecía hasta refrescar.
   useEffect(() => {
     const channel = supabase
-      .channel("wa-inbox-rt-" + Math.random().toString(36).slice(2))
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "wa_conversation_messages" },
-        (payload) => {
-          qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
-          const row = payload.new as { conversation_id?: string } | null;
-          if (row?.conversation_id && row.conversation_id === selectedId) {
-            qc.invalidateQueries({ queryKey: ["wa-inbox-messages", selectedId] });
-          }
-        },
-      )
+      .channel("wa-inbox-conv-rt-" + Math.random().toString(36).slice(2))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "wa_conversations" },
@@ -317,7 +310,7 @@ const InboxPage = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [qc, selectedId]);
+  }, [qc]);
 
   const isUnread = (c: ConvRow) => (c.unread_count ?? 0) > 0 || c.manually_unread;
 

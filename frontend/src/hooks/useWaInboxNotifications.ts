@@ -82,14 +82,20 @@ export function useWaInboxNotifications() {
             msg_type?: string;
             direction?: string;
           };
-          // Solo entrantes nuevos. (Filtramos en JS, como InboxPage; sin filtro
-          // server-side para no depender de su comportamiento al multiplexar.)
-          if (!m?.conversation_id || m.direction !== "in") return;
+          if (!m?.conversation_id) return;
 
-          // Llegó un entrante: refrescá el badge del sidebar y marcá la lista de la
-          // bandeja como stale, aunque el usuario esté en otra página de Maven.
-          qc.invalidateQueries({ queryKey: ["sidebar-badges"] });
+          // Cualquier mensaje nuevo → refrescá la lista de la bandeja Y el hilo abierto.
+          // Si la conversación abierta es ésta, su query se refetchea y el mensaje aparece
+          // EN VIVO, sin refresh manual. Este canal global es la ÚNICA suscripción a
+          // wa_conversation_messages: antes InboxPage tenía un 2º canal que competía por el
+          // routing de postgres_changes de supabase-js y quedaba mudo (sonaba el aviso pero
+          // el hilo no se actualizaba hasta refrescar).
           qc.invalidateQueries({ queryKey: ["wa-inbox-conversations"] });
+          qc.invalidateQueries({ queryKey: ["wa-inbox-messages", m.conversation_id] });
+
+          // De acá para abajo: SOLO entrantes (badge de no-leídos, sonido, popup).
+          if (m.direction !== "in") return;
+          qc.invalidateQueries({ queryKey: ["sidebar-badges"] });
 
           const s = settingsRef.current;
           // Maestro apagado o No-molestar → no avisar (ni sonido ni popup).
