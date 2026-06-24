@@ -200,7 +200,7 @@ Deno.serve(async (req: Request) => {
   const creatorIds: string[] = run.payload?.creator_ids ?? [];
   const { data: creatorsData } = await (sb as any)
     .from("creators")
-    .select("id, instagram_handle, onlyfans_url")
+    .select("id, instagram_handle, onlyfans_url, piclink_url")
     .in("id", creatorIds);
 
   const handleToCreator = new Map<string, string>();
@@ -208,11 +208,18 @@ Deno.serve(async (req: Request) => {
   // secundarias). Se pasan al prompt de Gemini para que cuente un watermark/overlay/
   // mención del nick (aunque no haya link clickeable) como promoción directa.
   const ofNicksByCreator = new Map<string, string[]>();
+  // Plataforma de pago CONOCIDA por creadora (su contenido pago principal). Se usa
+  // para INFERIR el destino cuando la IA decidió que promocionó pero no pudo atar la
+  // story a una plataforma nombrada (embudo IG → "respondo en mi privado" → OF). OF
+  // tiene prioridad sobre Piclink.
+  const knownPlatformByCreator = new Map<string, string>();
   for (const c of (creatorsData ?? []) as any[]) {
     const h = normalizeHandle(c.instagram_handle ?? "");
     if (h) handleToCreator.set(h, c.id);
     const nick = ofNickFromUrl(c.onlyfans_url ?? "");
     ofNicksByCreator.set(c.id, nick ? [nick] : []);
+    if (String(c.onlyfans_url ?? "").trim()) knownPlatformByCreator.set(c.id, "onlyfans");
+    else if (String(c.piclink_url ?? "").trim()) knownPlatformByCreator.set(c.id, "piclink");
   }
 
   // Multi-cuenta: sumar las cuentas IG EXTRA al mapa de handles (así una story de
@@ -297,6 +304,7 @@ Deno.serve(async (req: Request) => {
               openrouterKey: OPENROUTER_API_KEY,
               sourceHandle: handle,
               ofNicks: ofNicksByCreator.get(creatorId) ?? [],
+              knownPlatform: knownPlatformByCreator.get(creatorId) ?? null,
             }).catch((e) => ({ error: (e as Error).message })),
           ),
         );
@@ -427,6 +435,7 @@ async function processStory(args: {
   openrouterKey: string;
   sourceHandle: string;
   ofNicks: string[];
+  knownPlatform: string | null;
 }): Promise<{ inserted: boolean } | { error: string }> {
   const { story, openrouterKey } = args;
   // mediaType: viejo actor usa `type` ("video"); nuevo (automation-lab) usa
@@ -536,6 +545,7 @@ async function processStory(args: {
     needs_review: needsReview,
     is_video: isVideo,
     source_handle: args.sourceHandle,
+    known_platform: args.knownPlatform,
   });
 
   return { inserted };
@@ -718,6 +728,7 @@ async function insertAnalyzedEntry(
     needs_review?: boolean;        // true si confidence final < NEEDS_REVIEW_THRESHOLD
     is_video?: boolean;
     source_handle?: string;        // cuenta IG de la que vino la story (multi-cuenta)
+    known_platform?: string | null; // plataforma de pago conocida de la creadora (OF/piclink) → para inferir destino
   },
 ): Promise<boolean> {
   // Normalizar platform al vocabulario que la UI espera
@@ -728,7 +739,21 @@ async function insertAnalyzedEntry(
     linktree: "linktree",
     ninguna: "Ninguna",
   };
-  const platform = platformMap[args.analysis.platform_mentioned] ?? "Ninguna";
+  let platform = platformMap[args.analysis.platform_mentioned] ?? "Ninguna";
+
+  // ── Inferencia de plataforma destino ──────────────────────────────────────
+  // Si la IA decidió que SÍ promocionó pero NO pudo atar la story a una plataforma
+  // nombrada (platform="Ninguna"), el destino es —casi siempre— el contenido pago
+  // conocido de la creadora. Una creadora que redirige a su "privado"/"exclusivo"
+  // está promocionando su OnlyFans aunque la story no escriba "OnlyFans". En vez de
+  // dejar "Ninguna" (que se ve como "promovió pero no sé a dónde"), completamos el
+  // destino con su plataforma conocida (OF, o Piclink). NO toca si es promo o no
+  // (eso ya lo decidió la IA), solo completa el destino.
+  let platformInferred = false;
+  if (args.analysis.promoted && platform === "Ninguna" && args.known_platform) {
+    platform = args.known_platform;
+    platformInferred = true;
+  }
 
   // notes carga la razón del análisis + marcadores de auditoría que un
   // operator puede usar para entender por qué la AI dijo lo que dijo y
@@ -736,7 +761,8 @@ async function insertAnalyzedEntry(
   const notesPrefix = args.needs_review ? "[REVISAR MANUAL] " : "[AUTO] ";
   const levelTag = args.analysis_level ? ` · ${args.analysis_level}` : "";
   const videoTag = args.is_video ? " · video" : "";
-  const notes = `${notesPrefix}${args.analysis.reasoning} (confidence: ${args.analysis.confidence.toFixed(2)}${levelTag}${videoTag})`;
+  const inferredTag = platformInferred ? ` · plataforma inferida (${platform})` : "";
+  const notes = `${notesPrefix}${args.analysis.reasoning} (confidence: ${args.analysis.confidence.toFixed(2)}${levelTag}${videoTag}${inferredTag})`;
 
   const { error } = await sb.from("promolog_entries").insert({
     tenant_id: TENANT_ID,

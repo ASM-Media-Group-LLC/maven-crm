@@ -17,6 +17,7 @@ import XIcon from "@/components/icons/XIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import PromologStoryGallery from "./PromologStoryGallery";
+import { displayPlatform } from "./promoScore";
 import type { PromologEntry } from "./PromologEntryCard";
 import { useCreatorDailyEarnings } from "@/hooks/useCreatorDailyEarnings";
 
@@ -197,7 +198,7 @@ const PromologEntryDetailDialog = ({
             </div>
             <div>
               <span className="text-muted-foreground">Plataforma destino:</span>{" "}
-              <span className="font-medium">{entry.platform || "—"}</span>
+              <span className="font-medium">{displayPlatform(entry) || entry.platform || "—"}</span>
             </div>
             <div>
               <span className="text-muted-foreground">Resultado:</span>{" "}
