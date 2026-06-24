@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { useTimezone, formatDateInTz, formatTimeInTz } from "@/hooks/useTimezone";
+import { useTimezone, formatDateInTz, formatTimeInTz, dayKeyInTz } from "@/hooks/useTimezone";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -49,17 +49,6 @@ const MONTHS_ES = [
 ];
 
 type DayStatus = "promo" | "partial" | "no" | "none";
-
-// Igual que parseAsUtcIfNaive de useTimezone: la columna `date` es un
-// timestamp sin zona (UTC). Devolvemos la fecha-calendario YYYY-MM-DD en el
-// TZ del user para agrupar las stories por día correctamente.
-function dayKeyInTz(input: string, tz: string): string {
-  const s = String(input);
-  const hasZone = /Z$|[+-]\d{2}:?\d{2}$/.test(s);
-  const d = new Date(hasZone ? s : s + "Z");
-  if (isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
-}
 
 const promotedToResult = (promoted: string | null): string => {
   switch (promoted) {

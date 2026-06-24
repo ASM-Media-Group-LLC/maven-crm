@@ -53,7 +53,7 @@ import PromologEntryDetailDialog from "./PromologEntryDetailDialog";
 import PromologEntryFormDialog from "./PromologEntryFormDialog";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import { ListRow, ListRowButton } from "@/components/ui/list-row";
-import { useTimezone, formatDateInTz, formatTimeInTz } from "@/hooks/useTimezone";
+import { useTimezone, formatDateInTz, formatTimeInTz, dayKeyInTz } from "@/hooks/useTimezone";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -143,6 +143,24 @@ const getAgentWeekDays = (offset: number): Date[] => {
   const now = new Date();
   const monday = startOfWeek(addDays(now, offset * 7), { weekStartsOn: 1 });
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+};
+
+// Set de fechas-calendario "YYYY-MM-DD" del rango [from..to] (la fecha que el user
+// VE en el picker, sin convertir de zona). Se usa para recortar las entries al día
+// seleccionado comparando contra dayKeyInTz(entry, userTz) → así una promo nocturna
+// (horas UTC tempranas) cae en el día correcto del user y Dashboard+lista coinciden.
+const selectedLocalDayKeys = (from?: Date, to?: Date): Set<string> | null => {
+  if (!from || !to) return null;
+  const keys = new Set<string>();
+  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  while (d <= end) {
+    keys.add(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+    );
+    d.setDate(d.getDate() + 1);
+  }
+  return keys;
 };
 
 const PromologContent = () => {
@@ -236,15 +254,19 @@ const PromologContent = () => {
         query = query.or(`reviewed_by.eq.${user.id},created_by.eq.${user.id}`);
       }
 
+      // Margen de ±1 día en UTC: la columna `date` es naive-UTC y el recorte FINO
+      // al día-en-tu-zona se hace en `entries` (selectedLocalDayKeys). Sin el margen
+      // superior, una promo de la noche (ej 23:45 Bogotá = 04:45 UTC del día sig.)
+      // se perdía; sin el inferior, idem para zonas con offset positivo.
       if (dateFrom) {
-        const fromStr = dateFrom.toISOString().split("T")[0];
-        query = query.gte("date", fromStr);
+        const from = new Date(dateFrom);
+        from.setDate(from.getDate() - 1);
+        query = query.gte("date", from.toISOString().split("T")[0]);
       }
       if (dateTo) {
         const toDate = new Date(dateTo);
-        toDate.setDate(toDate.getDate() + 1);
-        const toStr = toDate.toISOString().split("T")[0];
-        query = query.lt("date", toStr);
+        toDate.setDate(toDate.getDate() + 2);
+        query = query.lt("date", toDate.toISOString().split("T")[0]);
       }
 
       const { data, error } = await query;
@@ -296,7 +318,12 @@ const PromologContent = () => {
 
   // Map DB entries to PromologEntry interface
   const entries: PromologEntry[] = useMemo(() => {
-    return promologEntries.map((pe: any) => {
+    // Recorte FINO al día seleccionado EN TU ZONA: la query trae ±1 día de margen UTC;
+    // acá nos quedamos solo con las entries cuyo día-en-tu-zona cae en el rango que ves.
+    // Es la fuente única → lista, Dashboard y popup quedan consistentes (antes el
+    // Dashboard agrupaba por día-UTC y la lista por día-local → discrepaban en el borde).
+    const dayKeys = selectedLocalDayKeys(dateFrom, dateTo);
+    const mapped = promologEntries.map((pe: any) => {
       const creator = pe.creators as any;
       return {
         id: pe.id,
@@ -338,7 +365,9 @@ const PromologContent = () => {
         needs_review: pe.needs_review === true,
       };
     });
-  }, [promologEntries, profilesMap, userTz]);
+    if (!dayKeys) return mapped;
+    return mapped.filter((e) => e.rawDate && dayKeys.has(dayKeyInTz(e.rawDate, userTz)));
+  }, [promologEntries, profilesMap, userTz, dateFrom, dateTo]);
 
   // 1 fila por MODELO + DÍA (no por resultado). El bot crea 1 entry por story; acá
   // las colapsamos: si la modelo promocionó en ALGUNA story ese día, la fila la

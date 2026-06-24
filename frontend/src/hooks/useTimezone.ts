@@ -104,6 +104,21 @@ export function formatDateInTz(input: Date | string, tz: string, opts?: FormatOp
   }).format(date);
 }
 
+/** Devuelve la fecha-calendario "YYYY-MM-DD" en el TZ dado. Para AGRUPAR/COMPARAR
+ *  por día (la columna `date` es timestamp naive-UTC): una promo de las 23:45 en
+ *  Bogotá vive en UTC como 04:45 del día siguiente — agrupar por slice(0,10) la
+ *  mandaría al día equivocado. en-CA da el formato YYYY-MM-DD. */
+export function dayKeyInTz(input: Date | string, tz: string): string {
+  const date = parseAsUtcIfNaive(input);
+  if (isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 /** Devuelve "06:12 PM" en el TZ dado. */
 export function formatTimeInTz(input: Date | string, tz: string, opts?: FormatOptions): string {
   const date = parseAsUtcIfNaive(input);

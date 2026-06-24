@@ -103,10 +103,11 @@ function classifyX(it: any, ofHandles: string[]): { promoted: boolean; reason: s
 // el link en el texto, así que la visión es un repesca acotada).
 const VISION_MODEL = "google/gemini-2.5-flash";
 const MAX_VISION_PER_RUN = 30;
-const X_VISION_PROMPT = `Sos analista de una agencia de OnlyFans. Mirá esta imagen de un post de X (Twitter) de una creadora y decí si el POST PROMOCIONA su OnlyFans.
-Marcá promoted=true SOLO si hay una señal CLARA de promo a contenido pago EN la imagen o el texto: link a onlyfans/fansly/linktr.ee/beacons/allmylinks/piclink (escrito o visible), la palabra "OnlyFans"/"OF", logo/branding de OF, o un CTA explícito ("link in bio", "suscríbete", "mi contenido exclusivo", precio/descuento).
-NO marques promoted=true por ser una foto sugerente, un meme, fútbol, una marca/sponsor o contenido personal sin esas señales.
-Respondé SOLO JSON: {"promoted": true|false, "reason": "breve"}`;
+const X_VISION_PROMPT = `Sos analista de una agencia de OnlyFans. Mirá esta imagen de un post de X (Twitter) de una creadora y decí si el POST PROMOCIONA su contenido pago (OnlyFans/Fansly/etc).
+Marcá promoted=true SOLO si hay una señal CLARA Y VISIBLE de promo a contenido pago: el nombre/logo de OnlyFans/Fansly/etc, un link a onlyfans/fansly/linktr.ee/beacons/allmylinks/piclink ESCRITO o visible, el @handle de su OnlyFans, o un CTA explícito sobreimpreso ("link in bio", "suscríbete", "mi contenido exclusivo", precio/descuento).
+NO marques promoted=true por: una foto sugerente, un meme, fútbol, una marca/sponsor, contenido personal, NI por el solo hecho de que el post tenga UN LINK.
+⚠️ Un link ACORTADO u OPACO (t.co, bit.ly y similares) NO es señal: su destino NO se ve, así que ignoralo — NO asumas que "lleva a contenido pago". Si la única razón para marcar promo sería "hay un link" (sin ver a dónde apunta), la respuesta es promoted=false.
+Respondé SOLO JSON: {"promoted": true|false, "reason": "breve — citá la señal VISIBLE concreta"}`;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let bin = "";
