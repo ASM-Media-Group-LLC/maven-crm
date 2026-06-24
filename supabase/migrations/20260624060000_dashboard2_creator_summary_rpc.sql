@@ -3,8 +3,10 @@
 -- (14 round-trips, sin caché) y agregaba en JS. Ahora el browser recibe ~56 filas
 -- (1 por creadora) en 1 request. Mismos cálculos que hacía el front (sum de montos,
 -- MAX de active_fans, count de días, last_date) + af_sum/af_days para el ARPU del LTV.
--- SECURITY DEFINER (saltea RLS) → gateado con blu_is_management() para preservar el
--- mismo control de acceso que la policy cde_management de la tabla.
+-- SECURITY DEFINER (saltea RLS) → gateado con blu_is_management(auth.uid()) para
+-- preservar el mismo control de acceso que la policy cde_management de la tabla.
+-- OJO: uuid no tiene agregado max() → min(creator_id::text)::uuid (constante por grupo);
+-- y los campos de fans (int) se castean a numeric para matchear el tipo de retorno.
 create or replace function public.get_dashboard2_creator_summary(p_from date, p_to date)
 returns table (
   group_key text,
@@ -30,27 +32,27 @@ security definer
 set search_path = public
 as $$
 begin
-  if not coalesce(public.blu_is_management(), false) then
+  if not coalesce(public.blu_is_management(auth.uid()), false) then
     raise exception 'forbidden: management only' using errcode = '42501';
   end if;
   return query
   select
-    coalesce(e.creator_id::text, e.blu_creator_name, e.id::text) as group_key,
-    max(e.creator_id)                                            as creator_id,
-    max(e.blu_creator_name)                                      as blu_creator_name,
-    max(c.artistic_name)                                         as artistic_name,
-    coalesce(sum(e.total_gross), 0)                              as total,
-    coalesce(sum(e.subscription_gross), 0)                       as subs,
-    coalesce(sum(e.new_sub_gross), 0)                            as new_sub,
-    coalesce(sum(e.recurring_sub_gross), 0)                      as recurring_sub,
-    coalesce(sum(e.tips_gross), 0)                               as tips,
-    coalesce(sum(e.message_gross), 0)                            as messages,
-    coalesce(max(e.active_fans), 0)                              as max_active_fans,
-    coalesce(sum(e.new_fans), 0)                                 as new_fans,
-    count(*)::integer                                            as days_with_data,
-    max(e.date)                                                  as last_date,
-    coalesce(sum(e.active_fans) filter (where e.active_fans > 0), 0) as af_sum,
-    count(*) filter (where e.active_fans > 0)::integer           as af_days
+    coalesce(e.creator_id::text, e.blu_creator_name, e.id::text)        as group_key,
+    min(e.creator_id::text)::uuid                                       as creator_id,
+    max(e.blu_creator_name)                                             as blu_creator_name,
+    max(c.artistic_name)                                               as artistic_name,
+    coalesce(sum(e.total_gross), 0)::numeric                           as total,
+    coalesce(sum(e.subscription_gross), 0)::numeric                    as subs,
+    coalesce(sum(e.new_sub_gross), 0)::numeric                         as new_sub,
+    coalesce(sum(e.recurring_sub_gross), 0)::numeric                   as recurring_sub,
+    coalesce(sum(e.tips_gross), 0)::numeric                            as tips,
+    coalesce(sum(e.message_gross), 0)::numeric                         as messages,
+    coalesce(max(e.active_fans), 0)::numeric                           as max_active_fans,
+    coalesce(sum(e.new_fans), 0)::numeric                              as new_fans,
+    count(*)::integer                                                  as days_with_data,
+    max(e.date)                                                        as last_date,
+    coalesce(sum(e.active_fans) filter (where e.active_fans > 0), 0)::numeric as af_sum,
+    (count(*) filter (where e.active_fans > 0))::integer               as af_days
   from public.creator_daily_earnings e
   left join public.creators c on c.id = e.creator_id
   where e.date >= p_from and e.date <= p_to
@@ -60,3 +62,5 @@ $$;
 
 revoke all on function public.get_dashboard2_creator_summary(date, date) from public, anon;
 grant execute on function public.get_dashboard2_creator_summary(date, date) to authenticated;
+
+notify pgrst, 'reload schema';
