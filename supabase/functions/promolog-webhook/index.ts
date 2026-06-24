@@ -170,23 +170,25 @@ Deno.serve(async (req: Request) => {
   // Se captura igual para runs fallidos: un run que falló igual consumió cómputo.
   const costUsd = await fetchRunCost(apifyRunId, APIFY_TOKEN);
 
-  // ── Handle non-SUCCEEDED outcomes ───────────────────────────────────────
-  if (status !== "SUCCEEDED") {
+  // ── Outcome del run (SUCCEEDED o no) ─────────────────────────────────────
+  // isPartial = el run NO terminó OK (timeout/failed/aborted). Antes salíamos acá sin
+  // bajar el dataset → se PERDÍAN las stories que Apify SÍ alcanzó a scrapear antes del
+  // corte, y NO corría nada → las creadoras del lote quedaban SIN ninguna entry (se
+  // "caían" del scan del día). Ahora: si quedó un dataset (parcial), igual lo ingerimos
+  // (recupera lo ya scrapeado) y marcamos el run 'timeout' para que el poll reintente
+  // SOLO las que faltaron. Sin dataset = nada que recuperar → marcamos y salimos.
+  const isPartial = status !== "SUCCEEDED";
+  if (!datasetId) {
     await (sb as any)
       .from("promolog_dispatch_runs")
       .update({
-        status: status === "TIMED-OUT" ? "timeout" : "failed",
-        error: `Apify run ended with status=${status}`,
+        status: isPartial ? (status === "TIMED-OUT" ? "timeout" : "failed") : "failed",
+        error: isPartial ? `Apify run status=${status} (sin dataset)` : "SUCCEEDED pero sin defaultDatasetId",
         cost_usd: costUsd,
         finished_at: new Date().toISOString(),
       })
       .eq("id", dispatchRunId);
-    return json({ ok: true, status });
-  }
-
-  if (!datasetId) {
-    await markFailed(sb, dispatchRunId, "SUCCEEDED but missing defaultDatasetId");
-    return json({ error: "Missing defaultDatasetId" }, 400);
+    return json({ ok: true, status, no_dataset: true });
   }
 
   // ── Bajar dataset ───────────────────────────────────────────────────────
@@ -328,16 +330,22 @@ Deno.serve(async (req: Request) => {
   // historia (Apify devolvió "no_story_media" o ni las incluyó). Se les crea
   // UNA entry "No promocionó / sin historia" con la nota, para que el dashboard
   // cuente el total real de escaneadas y queden marcadas "No" (no "sin análisis").
-  for (const cid of creatorIds) {
-    if (creatorsWithEntries.has(cid)) continue;
-    await insertEmptyEntry(sb, {
-      creator_id: cid,
-      dispatch_run_id: dispatchRunId,
-      apify_run_id: apifyRunId,
-      scan_date: scanDate,
-    });
-    creatorsWithEntries.add(cid);
-    entriesCreated++;
+  // SOLO en runs COMPLETOS: en un run SUCCEEDED, Apify intentó todas las despachadas,
+  // así que "sin items" = "no subió historia" = "No" legítimo. En un PARCIAL/timeout,
+  // las que faltan NO fueron escaneadas (Apify se cortó) → NO las marcamos "No"
+  // (sería falso); quedan sin entry y el poll las reintenta (retryFallen).
+  if (!isPartial) {
+    for (const cid of creatorIds) {
+      if (creatorsWithEntries.has(cid)) continue;
+      await insertEmptyEntry(sb, {
+        creator_id: cid,
+        dispatch_run_id: dispatchRunId,
+        apify_run_id: apifyRunId,
+        scan_date: scanDate,
+      });
+      creatorsWithEntries.add(cid);
+      entriesCreated++;
+    }
   }
 
   // creators_succeeded = COBERTURA real (creadoras distintas con al menos una entry),
@@ -350,7 +358,9 @@ Deno.serve(async (req: Request) => {
   await (sb as any)
     .from("promolog_dispatch_runs")
     .update({
-      status: creatorsFailed > 0 && creatorsSucceeded > 0 ? "partial" : (creatorsFailed > 0 ? "failed" : "succeeded"),
+      // Parcial (Apify timeout/aborted con dataset): ingerimos lo scrapeado pero dejamos
+      // el run 'timeout' para que el poll reintente las que faltaron (retryFallen).
+      status: isPartial ? "timeout" : (creatorsFailed > 0 && creatorsSucceeded > 0 ? "partial" : (creatorsFailed > 0 ? "failed" : "succeeded")),
       creators_succeeded: creatorsSucceeded,
       creators_failed: creatorsFailed,
       entries_created: entriesCreated,
