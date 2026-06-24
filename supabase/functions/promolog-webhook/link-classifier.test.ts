@@ -25,6 +25,13 @@ Deno.test("casos reales", () => {
   );
   assertEquals(leona.tier, "aggregator");
   assertEquals(leona.platform, "piclink");
+  // unlok.me = funnel propio de la agencia (marca Unlok) → aggregator, plataforma resuelta
+  assertEquals(
+    classifyLinkDestination("https://l.instagram.com/?u=https%3A%2F%2Funlok.me%2Fleonaoficial&e=AT").platform,
+    "unlok",
+  );
+  // casino/afiliado → unknown (NO es contenido pago de la creadora → no auto-promo)
+  assertEquals(tier("https://l.instagram.com/?u=https%3A%2F%2Ftucasinoencasa.com%2Fr_adriana&e=AT"), "unknown");
 });
 
 Deno.test("red-team: parsing del wrapper", () => {

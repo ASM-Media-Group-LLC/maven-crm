@@ -103,11 +103,14 @@ function classifyX(it: any, ofHandles: string[]): { promoted: boolean; reason: s
 // el link en el texto, así que la visión es un repesca acotada).
 const VISION_MODEL = "google/gemini-2.5-flash";
 const MAX_VISION_PER_RUN = 30;
-const X_VISION_PROMPT = `Sos analista de una agencia de OnlyFans. Mirá esta imagen de un post de X (Twitter) de una creadora y decí si el POST PROMOCIONA su contenido pago (OnlyFans/Fansly/etc).
-Marcá promoted=true SOLO si hay una señal CLARA Y VISIBLE de promo a contenido pago: el nombre/logo de OnlyFans/Fansly/etc, un link a onlyfans/fansly/linktr.ee/beacons/allmylinks/piclink ESCRITO o visible, el @handle de su OnlyFans, o un CTA explícito sobreimpreso ("link in bio", "suscríbete", "mi contenido exclusivo", precio/descuento).
-NO marques promoted=true por: una foto sugerente, un meme, fútbol, una marca/sponsor, contenido personal, NI por el solo hecho de que el post tenga UN LINK.
-⚠️ Un link ACORTADO u OPACO (t.co, bit.ly y similares) NO es señal: su destino NO se ve, así que ignoralo — NO asumas que "lleva a contenido pago". Si la única razón para marcar promo sería "hay un link" (sin ver a dónde apunta), la respuesta es promoted=false.
-Respondé SOLO JSON: {"promoted": true|false, "reason": "breve — citá la señal VISIBLE concreta"}`;
+const X_VISION_PROMPT = `Sos analista de una agencia de OnlyFans. CÓMO SE PROMOCIONA EN X (Twitter): el link a su OnlyFans/funnel vive en la BIO del perfil, y los posts (selfies, fotos sugerentes, frases coquetas o personales acompañadas de un link) son el ANZUELO para mandar al fan a ese link. Por eso, en X, casi TODO post de la creadora con un link o una invitación APUNTA a su contenido pago — el link suele ser un acortado t.co que redirige a su bio/funnel.
+Mirá la imagen + el texto de este post de X de una creadora y decidí si promociona su contenido pago.
+promoted=true si se cumple CUALQUIERA:
+- se ve a la creadora o una foto sugerente/personal Y el post trae un link (aunque sea acortado t.co) o una invitación a verla/seguirla;
+- menciona OnlyFans / su contenido / "link in bio" / suscríbete / precio / descuento;
+- se ve un link/handle/logo de una plataforma de pago.
+promoted=false SOLO si claramente NO es promo de SU contenido: comentario de fútbol/deportes/noticias SIN foto de ella, un meme genérico, o publicidad de una MARCA/sponsor ajeno. OJO: un casino/apuestas/"gana dinero"/negocio/referido NO es su contenido pago (aunque tenga link) → promoted=false.
+Respondé SOLO JSON: {"promoted": true|false, "reason": "breve"}`;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let bin = "";

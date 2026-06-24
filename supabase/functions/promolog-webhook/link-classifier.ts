@@ -72,6 +72,8 @@ const AGGREGATOR: Record<string, string> = {
   "stan.store": "stanstore",
   "piclink.me": "piclink",
   "link.me": "linkme",
+  "unlok.me": "unlok", // funnel propio de la agencia (marca Unlok) → embuda a OF
+  "unlok.com": "unlok",
   "withkoji.com": "withkoji",
   "koji.to": "withkoji",
   "direct.me": "directme",
