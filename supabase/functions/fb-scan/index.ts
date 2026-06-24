@@ -184,11 +184,19 @@ function fbUrl(handle: string): string {
 
 async function runApify(token: string, url: string, since: string, limit: number): Promise<any[]> {
   const input = { startUrls: [{ url }], resultsLimit: limit, onlyPostsNewerThan: since };
-  const r = await fetch(`https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${token}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
-  });
-  if (!r.ok) throw new Error(`apify ${r.status}: ${(await r.text()).slice(0, 300)}`);
-  return await r.json();
+  // Timeout explícito: una llamada colgada de Apify no debe comerse el presupuesto de la
+  // edge ni bloquear a las demás creadoras (antes sin timeout → se colgaba el run entero).
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 90_000);
+  try {
+    const r = await fetch(`https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${token}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input), signal: ac.signal,
+    });
+    if (!r.ok) throw new Error(`apify ${r.status}: ${(await r.text()).slice(0, 300)}`);
+    return await r.json();
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -271,31 +279,35 @@ Deno.serve(async (req: Request) => {
   const results: unknown[] = [];
   let rawSample: unknown = null;
   let visionUsed = 0; // cap de costo: total de llamadas de visión en la corrida
-  for (const t of targets) {
+
+  // Procesa UN target (creadora/cuenta FB). Antes el loop era SECUENCIAL (await por
+  // creadora ~30s) → la edge se quedaba sin presupuesto y dejaba 5-9 de 10 sin escanear
+  // ni marker (se "caían" del scan del día). Ahora corre en olas concurrentes (las MISMAS
+  // llamadas a Apify, sin costo extra) para terminar TODAS dentro del budget de la edge.
+  const processTarget = async (t: { c: (typeof list)[number]; handle: string }) => {
     const c = t.c;
     const handle = t.handle;
-    try {
-      const items = await runApify(APIFY_TOKEN, fbUrl(handle), since, 15);
-      if (dryRun && !rawSample && items[0]) rawSample = { keys: Object.keys(items[0]).slice(0, 40), first: items[0] };
+    const items = await runApify(APIFY_TOKEN, fbUrl(handle), since, 15);
+    if (dryRun && !rawSample && items[0]) rawSample = { keys: Object.keys(items[0]).slice(0, 40), first: items[0] };
 
-      if (!items.length) {
-        if (!dryRun) {
-          const { data: ex } = await sb.from("promolog_entries")
-            .select("id").eq("creator_id", c.id).eq("network", "facebook").gte("date", today).limit(1);
-          if (!ex || !ex.length) {
-            await sb.from("promolog_entries").insert({
-              tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
-              promoted: "false", network: "facebook", platform: "Ninguna",
-              notes: null, evidence_url: null,
-              analyzed_by_ai: true, ai_model: "regla-texto-fb", ai_reasoning: "sin-actividad",
-              scraped_at: new Date().toISOString(),
-            });
-          }
+    if (!items.length) {
+      if (!dryRun) {
+        const { data: ex } = await sb.from("promolog_entries")
+          .select("id").eq("creator_id", c.id).eq("network", "facebook").gte("date", today).limit(1);
+        if (!ex || !ex.length) {
+          await sb.from("promolog_entries").insert({
+            tenant_id: TENANT_ID, creator_id: c.id, date: new Date().toISOString(),
+            promoted: "false", network: "facebook", platform: "Ninguna",
+            notes: null, evidence_url: null,
+            analyzed_by_ai: true, ai_model: "regla-texto-fb", ai_reasoning: "sin-actividad",
+            scraped_at: new Date().toISOString(),
+          });
         }
-        results.push({ creator: c.name, posts: 0, marker: true });
-        continue;
       }
+      return { creator: c.name, posts: 0, marker: true };
+    }
 
+    {
       let inserted = 0, promotedCount = 0, skipped = 0;
       for (let i = 0; i < items.length; i++) {
         const it = items[i];
@@ -357,10 +369,18 @@ Deno.serve(async (req: Request) => {
         if (insErr) results.push({ creator: c.name, insertError: insErr.message });
         else inserted++;
       }
-      results.push({ creator: c.name, posts: items.length, promoted: promotedCount, inserted, skipped, ...(dryRun ? { dry_run: true } : {}) });
-    } catch (e) {
-      results.push({ creator: c.name, error: String((e as Error)?.message || e) });
+      return { creator: c.name, posts: items.length, promoted: promotedCount, inserted, skipped, ...(dryRun ? { dry_run: true } : {}) };
     }
+  };
+
+  // Concurrencia acotada: 5 targets en paralelo por ola → termina TODOS dentro del budget
+  // de la edge (vs el loop secuencial que se cortaba a las 1-4 creadoras).
+  const FB_CONCURRENCY = 5;
+  for (let i = 0; i < targets.length; i += FB_CONCURRENCY) {
+    const part = targets.slice(i, i + FB_CONCURRENCY);
+    const settled = await Promise.all(part.map((t) =>
+      processTarget(t).catch((e) => ({ creator: t.c.name, error: String((e as Error)?.message || e) }))));
+    results.push(...settled);
   }
 
   return json({ ok: true, since, hours, creators: list.length, capped, results, ...(dryRun ? { rawSample } : {}) });

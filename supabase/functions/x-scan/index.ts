@@ -162,11 +162,20 @@ function parseTweetDate(s: string): Date | null {
 
 async function runApify(token: string, handles: string[], start: string, maxItems: number): Promise<any[]> {
   const input = { twitterHandles: handles, sort: "Latest", start, maxItems, includeSearchTerms: false };
-  const r = await fetch(`https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${token}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
-  });
-  if (!r.ok) throw new Error(`apify ${r.status}: ${(await r.text()).slice(0, 300)}`);
-  return await r.json();
+  // Timeout explícito: un lote colgado de Apify no debe comerse el presupuesto de la edge
+  // (sin esto, un lote lento mataba la corrida ENTERA y se perdían los lotes siguientes →
+  // cobertura 8-25/día). Con timeout, el lote falla rápido y los demás siguen.
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 120_000);
+  try {
+    const r = await fetch(`https://api.apify.com/v2/acts/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${token}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input), signal: ac.signal,
+    });
+    if (!r.ok) throw new Error(`apify ${r.status}: ${(await r.text()).slice(0, 300)}`);
+    return await r.json();
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 Deno.serve(async (req: Request) => {
