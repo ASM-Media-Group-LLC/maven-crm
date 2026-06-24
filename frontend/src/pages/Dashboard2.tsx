@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 // Dashboard 2 ahora se alimenta de la data VIVA de BLU (creator_daily_earnings).
 // La fuente vieja (of_gross_earnings, vía useEarningsData) dejó de actualizarse el 9-may.
-import { useBluEarningsData } from "./sales-performance/useBluEarningsData";
+import { useDashboard2Summary } from "./sales-performance/useDashboard2Summary";
+import { useDashboard2Daily } from "./sales-performance/useDashboard2Daily";
 import { useTopFans } from "./sales-performance/useTopFans";
 import { useFanRetention } from "./sales-performance/useFanRetention";
 import { useChatters } from "./sales-performance/useChatters";
@@ -110,7 +111,9 @@ const PIE_COLORS = ["hsl(221,83%,53%)","hsl(142,71%,45%)","hsl(25,95%,53%)","hsl
 const Dashboard2 = () => {
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
-  const { data: allRows = [], isLoading, isError, refetch } = useBluEarningsData();
+  // La data de ingresos ya NO se baja cruda (13k+ filas, 14 requests, sin caché): se
+  // agrega SERVER-SIDE por el RPC get_dashboard2_creator_summary. Las llamadas (período
+  // seleccionado / anterior / mes en curso) viven más abajo, tras definir los períodos.
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [ddSort, setDdSort] = useState<Record<string, { key: string; dir: "asc" | "desc" }>>({
@@ -278,11 +281,22 @@ const Dashboard2 = () => {
     return { startStr, endStr, label, value: `${startStr}_${endStr}` };
   }, [range]);
 
+  // Resumen por creadora del período seleccionado (agregado server-side, 1 request,
+  // cacheado). Reemplaza el `allRows` crudo. isLoading/isError/refetch del dashboard
+  // cuelgan de acá (es la data principal que alimenta rawCreators → KPIs/pareto/lista).
+  const { data: selSummary = [], isLoading, isError, refetch } = useDashboard2Summary(
+    selectedPeriod.startStr,
+    selectedPeriod.endStr,
+  );
+
   // Content ROI (Promolog × ingreso): depende de selectedPeriod, así que DEBE ir
   // después de su declaración. Estaba antes → ReferenceError TDZ "Cannot access
   // 'selectedPeriod' before initialization" que tiraba /dashboard2 en blanco.
   const { data: promoDays, isLoading: promoLoading } = usePromoDays(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "content_roi");
   const { data: cohortData, isLoading: cohortLoading } = useCohortRetention(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "cohort");
+  // Filas diarias SOLO para Content ROI (lazy + acotado al período): necesita granularidad
+  // por-día para cruzar con días de promo. El resto del dashboard usa el resumen agregado.
+  const { data: contentRoiDaily = [] } = useDashboard2Daily(selectedPeriod.startStr, selectedPeriod.endStr, deepDiveTab === "content_roi");
 
   // LTV estimado (interim): ARPU mensual × vida media. ARPU = ingreso del período /
   // fans activos prom / meses; vida media = subscription_length_days prom (top fans) / 30.
@@ -294,32 +308,25 @@ const Dashboard2 = () => {
     const startMs = new Date(selectedPeriod.startStr + "T00:00:00Z").getTime();
     const endMs = new Date(selectedPeriod.endStr + "T00:00:00Z").getTime();
     const months = Math.max(1, Math.round((endMs - startMs) / 86400000) + 1) / 30;
-    const byC = new Map<string, { name: string; gross: number; afSum: number; afDays: number }>();
-    for (const r of allRows) {
-      if (!r.creator_id) continue;
-      const d = r.effective_date;
-      if (d < selectedPeriod.startStr || d > selectedPeriod.endStr) continue;
-      const e = byC.get(r.creator_id) || { name: r.artistic_name || r.pending_creator || "Sin nombre", gross: 0, afSum: 0, afDays: 0 };
-      e.gross += r.total_earnings_gross ?? 0;
-      if (r.active_fans != null && r.active_fans > 0) { e.afSum += r.active_fans; e.afDays++; }
-      byC.set(r.creator_id, e);
-    }
+    // selSummary ya viene agregado por creadora y filtrado al período (server-side):
+    // gross = total, y activeFans = promedio de active_fans sobre los días con fans (af_sum/af_days).
     const perCreator: LtvCreator[] = [];
     let aggGross = 0, aggActive = 0;
-    for (const [creator_id, e] of byC) {
-      const activeFans = e.afDays > 0 ? e.afSum / e.afDays : 0;
+    for (const r of selSummary) {
+      if (!r.creator_id) continue;
+      const activeFans = r.af_days > 0 ? r.af_sum / r.af_days : 0;
       if (activeFans <= 0) continue;
-      const arpuMonthly = e.gross / activeFans / months;
+      const arpuMonthly = r.total / activeFans / months;
       const ltv = avgLifespanMonths != null ? arpuMonthly * avgLifespanMonths : 0;
-      perCreator.push({ creator_id, name: e.name, activeFans, arpuMonthly, ltv, gross: e.gross });
-      aggGross += e.gross;
+      perCreator.push({ creator_id: r.creator_id, name: r.artistic_name || r.blu_creator_name || "Sin nombre", activeFans, arpuMonthly, ltv, gross: r.total });
+      aggGross += r.total;
       aggActive += activeFans;
     }
     perCreator.sort((a, b) => b.ltv - a.ltv);
     const aggArpuMonthly = aggActive > 0 ? aggGross / aggActive / months : null;
     const aggLtv = aggArpuMonthly != null && avgLifespanMonths != null ? aggArpuMonthly * avgLifespanMonths : null;
     return { avgLifespanMonths, aggArpuMonthly, aggLtv, totalActiveFans: Math.round(aggActive), perCreator };
-  }, [deepDiveTab, allRows, selectedPeriod, topFans]);
+  }, [deepDiveTab, selSummary, selectedPeriod, topFans]);
 
   // Período anterior (= mismo largo, justo antes del rango) para los deltas MoM.
   const prevPeriod = useMemo(() => {
@@ -330,6 +337,19 @@ const Dashboard2 = () => {
     const prevFrom = subDays(prevTo, lenDays);
     return { startStr: format(prevFrom, "yyyy-MM-dd"), endStr: format(prevTo, "yyyy-MM-dd") };
   }, [range]);
+
+  // Resumen del período ANTERIOR (deltas MoM) y del MES EN CURSO (proyección), también
+  // agregados server-side. React Query dedupe si alguna ventana coincide con otra.
+  const { data: prevSummary = [] } = useDashboard2Summary(prevPeriod?.startStr, prevPeriod?.endStr, !!prevPeriod);
+  const projWindow = useMemo(() => {
+    const now = new Date();
+    return {
+      from: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`,
+      to: format(now, "yyyy-MM-dd"),
+      dayOfMonth: now.getDate(),
+    };
+  }, []);
+  const { data: projSummary = [] } = useDashboard2Summary(projWindow.from, projWindow.to, projWindow.dayOfMonth > 1);
 
   const { data: creatorInfoMap = {} } = useQuery({
     queryKey: ["creator-info-dashboard2"],
@@ -358,59 +378,41 @@ const Dashboard2 = () => {
 
   // Build creator summaries — OnlyFans only
   const rawCreators = useMemo(() => {
-    if (!selectedPeriod) return [];
-    const map = new Map<string, CreatorSummary>();
-    for (const r of allRows) {
-      const d = r.effective_date;
-      if (d < selectedPeriod.startStr || d > selectedPeriod.endStr) continue;
-      const key = r.creator_id || r.pending_creator || r.id;
+    // selSummary ya viene agregado por creadora (server-side) para el período. Acá solo
+    // aplicamos la exclusión de plataforma (unlok/instagram, vía creatorInfoMap), el join
+    // de info (foto/categoría/ig) y los derivados (net, avgPerDay, avgPerFan).
+    const out: CreatorSummary[] = [];
+    for (const r of selSummary) {
       const info = r.creator_id ? creatorInfoMap[r.creator_id] : null;
       const plat = info?.platform || null;
       const normPlat = (plat || "").toLowerCase();
       if (normPlat === "unlok" || normPlat === "instagram") continue;
-      const existing = map.get(key);
-      if (existing) {
-        existing.total += r.total_earnings_gross ?? 0;
-        existing.net += (r.total_earnings_gross ?? 0) * 0.8;
-        existing.subs += r.subscription_gross ?? 0;
-        existing.newSubs += r.new_subscriptions_sub_gross ?? 0;
-        existing.recurringSubs += r.recurring_sub_gross ?? 0;
-        existing.tips += r.tips_gross ?? 0;
-        existing.messages += r.message_gross ?? 0;
-        existing.activeFans = Math.max(existing.activeFans, r.active_fans ?? 0);
-        existing.newFans += r.new_fans ?? 0;
-        existing.daysWithData++;
-        if (d > existing.lastDate) existing.lastDate = d;
-      } else {
-        map.set(key, {
-          creatorId: key,
-          name: r.artistic_name || r.pending_creator || "Sin nombre",
-          instagramHandle: info?.ig || null,
-          profilePhotoUrl: info?.photo || null,
-          platform: plat || "OnlyFans",
-          category: info?.category || null,
-          total: r.total_earnings_gross ?? 0,
-          net: (r.total_earnings_gross ?? 0) * 0.8,
-          subs: r.subscription_gross ?? 0,
-          newSubs: r.new_subscriptions_sub_gross ?? 0,
-          recurringSubs: r.recurring_sub_gross ?? 0,
-          tips: r.tips_gross ?? 0,
-          messages: r.message_gross ?? 0,
-          activeFans: r.active_fans ?? 0,
-          newFans: r.new_fans ?? 0,
-          daysWithData: 1,
-          lastDate: d,
-          avgPerDay: 0,
-          avgPerFan: 0,
-        });
-      }
+      const total = r.total;
+      const activeFans = r.max_active_fans;
+      out.push({
+        creatorId: r.group_key,
+        name: r.artistic_name || r.blu_creator_name || "Sin nombre",
+        instagramHandle: info?.ig || null,
+        profilePhotoUrl: info?.photo || null,
+        platform: plat || "OnlyFans",
+        category: info?.category || null,
+        total,
+        net: total * 0.8,
+        subs: r.subs,
+        newSubs: r.new_sub,
+        recurringSubs: r.recurring_sub,
+        tips: r.tips,
+        messages: r.messages,
+        activeFans,
+        newFans: r.new_fans,
+        daysWithData: r.days_with_data,
+        lastDate: r.last_date || "",
+        avgPerDay: r.days_with_data > 0 ? total / r.days_with_data : 0,
+        avgPerFan: activeFans > 0 ? total / activeFans : 0,
+      });
     }
-    for (const c of map.values()) {
-      c.avgPerDay = c.daysWithData > 0 ? c.total / c.daysWithData : 0;
-      c.avgPerFan = c.activeFans > 0 ? c.total / c.activeFans : 0;
-    }
-    return Array.from(map.values());
-  }, [allRows, selectedPeriod, creatorInfoMap]);
+    return out;
+  }, [selSummary, creatorInfoMap]);
 
   // ¿Hay data para el período? (para distinguir "sin datos" de un $0 real, y de un error de fetch)
   const hasData = rawCreators.length > 0;
@@ -473,19 +475,15 @@ const Dashboard2 = () => {
 
   // Previous month for comparison
   const prevMonthMap = useMemo(() => {
-    if (!prevPeriod) return new Map<string, number>();
     const map = new Map<string, number>();
-    for (const r of allRows) {
-      const d = r.effective_date;
-      if (d < prevPeriod.startStr || d > prevPeriod.endStr) continue;
-      const key = r.creator_id || r.pending_creator || r.id;
+    for (const r of prevSummary) {
       const info = r.creator_id ? creatorInfoMap[r.creator_id] : null;
       const normPlat = (info?.platform || "").toLowerCase();
       if (normPlat === "unlok" || normPlat === "instagram") continue;
-      map.set(key, (map.get(key) || 0) + (r.total_earnings_gross ?? 0));
+      map.set(r.group_key, r.total);
     }
     return map;
-  }, [allRows, prevPeriod, creatorInfoMap]);
+  }, [prevSummary, creatorInfoMap]);
 
   // Growth vs decline counts
   const growthStats = useMemo(() => {
@@ -539,27 +537,32 @@ const Dashboard2 = () => {
   // Projection
   const projection = useMemo(() => {
     const now = new Date();
-    const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const dayOfMonth = now.getDate();
     if (dayOfMonth <= 1) return [];
-    const map = new Map<string, { name: string; ig: string | null; photo: string | null; total: number; days: number; creatorId: string }>();
-    for (const r of allRows) {
-      const d = r.effective_date;
-      if (d < currentMonthStart) continue;
-      const key = r.creator_id || r.pending_creator || r.id;
-      const info = r.creator_id ? creatorInfoMap[r.creator_id] : null;
-      const normPlat = (info?.platform || "").toLowerCase();
-      if (normPlat === "unlok" || normPlat === "instagram") continue;
-      const ex = map.get(key);
-      if (ex) { ex.total += r.total_earnings_gross ?? 0; ex.days++; }
-      else { map.set(key, { name: r.artistic_name || r.pending_creator || "Sin nombre", ig: info?.ig || null, photo: info?.photo || null, total: r.total_earnings_gross ?? 0, days: 1, creatorId: key }); }
-    }
-    return Array.from(map.values())
-      .filter((c) => c.total > 0)
-      .map((c) => ({ ...c, projected: c.days > 0 ? (c.total / c.days) * daysInMonth : 0, dailyAvg: c.days > 0 ? c.total / c.days : 0 }))
+    // projSummary ya está agregado por creadora para el MES EN CURSO (server-side):
+    // total + days_with_data (días con data) → proyección = promedio diario × días del mes.
+    return projSummary
+      .map((r) => {
+        const info = r.creator_id ? creatorInfoMap[r.creator_id] : null;
+        const normPlat = (info?.platform || "").toLowerCase();
+        if (normPlat === "unlok" || normPlat === "instagram") return null;
+        if (r.total <= 0) return null;
+        const days = r.days_with_data;
+        return {
+          name: r.artistic_name || r.blu_creator_name || "Sin nombre",
+          ig: info?.ig || null,
+          photo: info?.photo || null,
+          total: r.total,
+          days,
+          creatorId: r.group_key,
+          projected: days > 0 ? (r.total / days) * daysInMonth : 0,
+          dailyAvg: days > 0 ? r.total / days : 0,
+        };
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null)
       .sort((a, b) => b.projected - a.projected);
-  }, [allRows, creatorInfoMap]);
+  }, [projSummary, creatorInfoMap]);
 
   const projectionTotal = useMemo(() => projection.reduce((s, c) => s + c.projected, 0), [projection]);
   // El día 1 del mes no hay suficientes días para proyectar (la useMemo devuelve []).
@@ -2692,13 +2695,11 @@ const Dashboard2 = () => {
                     const pd = promoDays ?? new Map<string, Set<string>>();
                     const byC = new Map<string, { name: string; promoInc: number; promoDays: number; nonInc: number; nonDays: number }>();
                     let aPromoInc = 0, aPromoDays = 0, aNonInc = 0, aNonDays = 0;
-                    for (const r of allRows) {
-                      if (!r.creator_id) continue;
-                      const d = r.effective_date;
-                      if (d < selectedPeriod.startStr || d > selectedPeriod.endStr) continue;
+                    for (const r of contentRoiDaily) {
+                      const d = r.date;
                       const isPromo = pd.get(r.creator_id)?.has(d) ?? false;
-                      const inc = r.total_earnings_gross ?? 0;
-                      const e = byC.get(r.creator_id) || { name: r.artistic_name || r.pending_creator || "Sin nombre", promoInc: 0, promoDays: 0, nonInc: 0, nonDays: 0 };
+                      const inc = r.total_gross;
+                      const e = byC.get(r.creator_id) || { name: r.artistic_name || "Sin nombre", promoInc: 0, promoDays: 0, nonInc: 0, nonDays: 0 };
                       if (isPromo) { e.promoInc += inc; e.promoDays++; aPromoInc += inc; aPromoDays++; }
                       else { e.nonInc += inc; e.nonDays++; aNonInc += inc; aNonDays++; }
                       byC.set(r.creator_id, e);
