@@ -14,6 +14,7 @@ import { useChatters } from "./sales-performance/useChatters";
 import { usePromoDays } from "./sales-performance/usePromoDays";
 import { useCohortRetention } from "./sales-performance/useCohortRetention";
 import CohortRetentionTab from "./sales-performance/CohortRetentionTab";
+import LtvTab, { type LtvData, type LtvCreator } from "./sales-performance/LtvTab";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -30,7 +31,7 @@ import {
   Info, TrendingUp, TrendingDown, Users, DollarSign, Calendar,
   ArrowUpDown, ArrowUp, ArrowDown, Search, Filter, Instagram, PieChart,
   BarChart3, MessageSquare, Repeat, Heart, Eye, AlertTriangle, Target, Crown, X,
-  Download, Zap, Activity, Lock, Brain, Layers, BarChart, Sparkles, UserCheck, ShieldAlert,
+  Download, Zap, Activity, Brain, Layers, BarChart, Sparkles, UserCheck, ShieldAlert,
   Telescope, ArrowRight, ChevronRight, Scale, GitCompare, CheckCircle2, Camera, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -250,7 +251,7 @@ const Dashboard2 = () => {
   };
   const [deepDiveTab, setDeepDiveTab] = useState<"mom" | "compare" | "scalability" | "alerts" | "channels" | "opportunities" | "ballenas" | "retencion" | "chatter" | "ltv" | "content_roi" | "cohort">("mom");
   // Ballenas / Retención: solo se jalan cuando el usuario abre el tab respectivo.
-  const { data: topFans = [], isLoading: topFansLoading } = useTopFans(deepDiveTab === "ballenas");
+  const { data: topFans = [], isLoading: topFansLoading } = useTopFans(deepDiveTab === "ballenas" || deepDiveTab === "ltv");
   const { data: retentionRows = [], isLoading: retLoading } = useFanRetention(deepDiveTab === "retencion");
   const { data: chatters = [], isLoading: chattersLoading } = useChatters(deepDiveTab === "chatter");
 
@@ -282,6 +283,43 @@ const Dashboard2 = () => {
   // 'selectedPeriod' before initialization" que tiraba /dashboard2 en blanco.
   const { data: promoDays, isLoading: promoLoading } = usePromoDays(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "content_roi");
   const { data: cohortData, isLoading: cohortLoading } = useCohortRetention(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "cohort");
+
+  // LTV estimado (interim): ARPU mensual × vida media. ARPU = ingreso del período /
+  // fans activos prom / meses; vida media = subscription_length_days prom (top fans) / 30.
+  // Estimación sobre toda la base (el LTV medido por fan llega con la ingesta B1).
+  const ltvData = useMemo<LtvData | null>(() => {
+    if (deepDiveTab !== "ltv") return null;
+    const subDays = topFans.map((f) => f.subscription_length_days).filter((d): d is number => d != null && d > 0);
+    const avgLifespanMonths = subDays.length ? subDays.reduce((a, b) => a + b, 0) / subDays.length / 30 : null;
+    const startMs = new Date(selectedPeriod.startStr + "T00:00:00Z").getTime();
+    const endMs = new Date(selectedPeriod.endStr + "T00:00:00Z").getTime();
+    const months = Math.max(1, Math.round((endMs - startMs) / 86400000) + 1) / 30;
+    const byC = new Map<string, { name: string; gross: number; afSum: number; afDays: number }>();
+    for (const r of allRows) {
+      if (!r.creator_id) continue;
+      const d = r.effective_date;
+      if (d < selectedPeriod.startStr || d > selectedPeriod.endStr) continue;
+      const e = byC.get(r.creator_id) || { name: r.artistic_name || r.pending_creator || "Sin nombre", gross: 0, afSum: 0, afDays: 0 };
+      e.gross += r.total_earnings_gross ?? 0;
+      if (r.active_fans != null && r.active_fans > 0) { e.afSum += r.active_fans; e.afDays++; }
+      byC.set(r.creator_id, e);
+    }
+    const perCreator: LtvCreator[] = [];
+    let aggGross = 0, aggActive = 0;
+    for (const [creator_id, e] of byC) {
+      const activeFans = e.afDays > 0 ? e.afSum / e.afDays : 0;
+      if (activeFans <= 0) continue;
+      const arpuMonthly = e.gross / activeFans / months;
+      const ltv = avgLifespanMonths != null ? arpuMonthly * avgLifespanMonths : 0;
+      perCreator.push({ creator_id, name: e.name, activeFans, arpuMonthly, ltv, gross: e.gross });
+      aggGross += e.gross;
+      aggActive += activeFans;
+    }
+    perCreator.sort((a, b) => b.ltv - a.ltv);
+    const aggArpuMonthly = aggActive > 0 ? aggGross / aggActive / months : null;
+    const aggLtv = aggArpuMonthly != null && avgLifespanMonths != null ? aggArpuMonthly * avgLifespanMonths : null;
+    return { avgLifespanMonths, aggArpuMonthly, aggLtv, totalActiveFans: Math.round(aggActive), perCreator };
+  }, [deepDiveTab, allRows, selectedPeriod, topFans]);
 
   // Período anterior (= mismo largo, justo antes del rango) para los deltas MoM.
   const prevPeriod = useMemo(() => {
@@ -1921,6 +1959,7 @@ const Dashboard2 = () => {
                       { key: "chatter" as const, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Chatters", desc: "Rendimiento por chatter" },
                       { key: "content_roi" as const, icon: <Layers className="h-3.5 w-3.5" />, label: "Content ROI", desc: "Promo (Promolog) → ingreso" },
                       { key: "cohort" as const, icon: <Brain className="h-3.5 w-3.5" />, label: "Cohortes", desc: "Retención por cohorte de fans" },
+                      { key: "ltv" as const, icon: <UserCheck className="h-3.5 w-3.5" />, label: "LTV", desc: "Valor de vida del fan (estimado)" },
                       { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Ranking", desc: "Posición por revenue" },
                       { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: "Escalabilidad", desc: "Potencial de crecimiento" },
                       { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Canales", desc: "Msgs vs Tips vs Subs" },
@@ -1933,26 +1972,6 @@ const Dashboard2 = () => {
                             variant={deepDiveTab === tab.key ? "default" : "ghost"}
                             size="sm"
                             className="h-7 text-xs px-2.5 gap-1 flex-1 min-w-0"
-                            onClick={() => setDeepDiveTab(tab.key)}
-                          >
-                            {tab.icon} <span className="truncate">{tab.label}</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="text-xs">{tab.desc}</TooltipContent>
-                      </UITooltip>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1 mt-1 bg-muted/50 rounded-lg p-1">
-                    <span className="text-[9px] text-muted-foreground px-2 shrink-0 uppercase tracking-widest font-semibold">Roadmap</span>
-                    {([
-                      { key: "ltv" as const, icon: <UserCheck className="h-3.5 w-3.5" />, label: "LTV", desc: "Valor de vida del cliente (próximamente)" },
-                    ]).map((tab) => (
-                      <UITooltip key={tab.key}>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant={deepDiveTab === tab.key ? "secondary" : "ghost"}
-                            size="sm"
-                            className="h-7 text-xs px-2.5 gap-1 flex-1 min-w-0 opacity-70"
                             onClick={() => setDeepDiveTab(tab.key)}
                           >
                             {tab.icon} <span className="truncate">{tab.label}</span>
@@ -2665,26 +2684,7 @@ const Dashboard2 = () => {
 
                   {/* ── Customer LTV (Placeholder) ── */}
                   {deepDiveTab === "ltv" && (
-                    <div className="space-y-5">
-                      <div className="rounded-xl border-2 border-dashed border-emerald-400/40 bg-emerald-500/5 p-8 text-center space-y-4">
-                        <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-emerald-500/10 mx-auto">
-                          <UserCheck className="h-8 w-8 text-emerald-400" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-foreground">Customer Lifetime Value</h3>
-                          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">Valor del ciclo de vida del fan: cuánto gasta en promedio, cuánto tiempo se queda, y tasa de reactivación.</p>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
-                          {["LTV Promedio", "Churn Rate", "Tiempo Promedio", "Reactivación %"].map(m => (
-                            <div key={m} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                              <p className="text-[10px] text-muted-foreground">{m}</p>
-                              <p className="text-lg font-bold text-muted-foreground/40 mt-1">—</p>
-                            </div>
-                          ))}
-                        </div>
-                        <Badge variant="outline" className="text-xs border-dashed"><Lock className="h-3 w-3 mr-1" />Requiere tracking de fans individuales</Badge>
-                      </div>
-                    </div>
+                    <LtvTab data={ltvData} loading={topFansLoading} periodLabel={selectedPeriod?.label} />
                   )}
 
                   {/* ── Content ROI — Promolog (promo) × ingreso BLU ── */}
