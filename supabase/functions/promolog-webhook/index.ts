@@ -521,6 +521,28 @@ async function processStory(args: {
     }
   }
 
+  // ── Sticker de LINK de la story (señal DURA, independiente de la visión) ──
+  // El scraper devuelve `linkUrl` cuando la creadora puso un sticker de link (l.instagram.com
+  // → su OF/linktree). Es una CTA a contenido pago que la IA NO ve en el thumbnail (es un
+  // overlay interactivo, no está "quemado" en la foto). Si hay link y la visión dijo que NO
+  // promocionó, lo corregimos a promo DIRECTA. Caso real: ennidwong, story de playa con
+  // sticker de link que la IA marcaba "no promociona".
+  const linkSticker = String((story as { linkUrl?: string }).linkUrl ?? "").trim();
+  if (/^https?:\/\//i.test(linkSticker) && !final.promoted) {
+    final = {
+      ...final,
+      promoted: true,
+      promotion_type: "direct",
+      has_buy_link: true,
+      // si conocemos su plataforma → buy_link_type real (no "other", que marcaría "revisar")
+      buy_link_type: final.buy_link_type ?? args.knownPlatform ?? "other",
+      platform_mentioned: final.platform_mentioned && final.platform_mentioned !== "ninguna"
+        ? final.platform_mentioned : (args.knownPlatform ?? "ninguna"),
+      reasoning: `Sticker de link en la story (${linkSticker.replace(/^https?:\/\//i, "").slice(0, 40)}…) → CTA a contenido pago. ${final.reasoning ?? ""}`.slice(0, 240),
+    };
+    analysisLevel += "+link_sticker";
+  }
+
   // ── Flag para review manual ─────────────────────────────────────────────
   // (1) confianza baja, o (2) promo con link "other": Gemini detectó un link/CTA
   // pero NO lo pudo atar a una plataforma de pago conocida (OnlyFans/Piclink/…).
