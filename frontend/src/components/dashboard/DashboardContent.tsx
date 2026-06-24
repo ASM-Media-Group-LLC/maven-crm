@@ -22,7 +22,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import KpiCard from "./KpiCard";
 import KpiDetailDialog, { type KpiRow } from "./KpiDetailDialog";
-import { useBluEarningsData as useEarningsData } from "@/pages/sales-performance/useBluEarningsData";
+import { useDashboard2Summary } from "@/pages/sales-performance/useDashboard2Summary";
 import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useWeeklyStats, useOperationalKPIs, useRecentActivity, usePendingTasks } from "@/hooks/useDashboardData";
@@ -186,7 +186,8 @@ const DashboardContent = () => {
   const { data: creatorsData, isLoading: creatorsLoading } = useCreatorsCount();
   const { data: ticketsData, isLoading: ticketsLoading } = useTicketsData();
   const { data: leadsData, isLoading: leadsLoading } = useLeadsData();
-  const { data: earningsRows = [], isLoading: earningsLoading } = useEarningsData();
+  // Top creadoras all-time (agregado server-side, 1 request) — antes bajaba 13k filas crudas.
+  const { data: earningsSummary = [], isLoading: earningsLoading } = useDashboard2Summary("2000-01-01", "2100-01-01");
   const { data: weeklyData = [] } = useWeeklyStats();
   const { data: opKPIs } = useOperationalKPIs();
   const { data: recentActivity = [], isLoading: activityLoading } = useRecentActivity();
@@ -211,21 +212,12 @@ const DashboardContent = () => {
   }, [recordOpen]);
 
   const top5 = useMemo(() => {
-    const map = new Map<string, { name: string; total: number }>();
-    for (const r of earningsRows) {
-      const key = r.creator_id || r.pending_creator || r.id;
-      const name = r.artistic_name || r.pending_creator || "Sin nombre";
-      const existing = map.get(key);
-      if (existing) {
-        existing.total += r.total_earnings_gross ?? 0;
-      } else {
-        map.set(key, { name, total: r.total_earnings_gross ?? 0 });
-      }
-    }
-    return Array.from(map.values())
+    // earningsSummary ya viene agregado por creadora (server-side); solo ordenamos.
+    return earningsSummary
+      .map((r) => ({ name: r.artistic_name || r.blu_creator_name || "Sin nombre", total: r.total }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
-  }, [earningsRows]);
+  }, [earningsSummary]);
 
   const pipelineData = useMemo(() => {
     if (!leadsData?.pipeline) return [];

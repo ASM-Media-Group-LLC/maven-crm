@@ -33,7 +33,12 @@ const fetchSummary = async (from: string, to: string): Promise<Dash2Summary[]> =
     p_from: from,
     p_to: to,
   });
-  if (error) throw error;
+  // El RPC es management-only (blu_is_management). Un usuario sin permiso recibe 42501
+  // (insufficient_privilege) → devolvemos [] como hacía la RLS antes (sin romper la UI).
+  if (error) {
+    if (error.code === "42501" || /forbidden/i.test(error.message ?? "")) return [];
+    throw error;
+  }
   // numeric de Postgres puede llegar como string vía PostgREST → normalizamos a number.
   return ((data ?? []) as any[]).map((r): Dash2Summary => ({
     group_key: r.group_key,
