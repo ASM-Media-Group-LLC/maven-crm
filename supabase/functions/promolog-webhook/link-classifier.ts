@@ -13,7 +13,7 @@
 // Objetivo declarado: CERO falsos positivos. Ante destino no reconocido → "unknown"
 // (no se asume promo). Listas curadas + red-team de casos borde (2026-06-24).
 
-export type LinkTier = "paid" | "aggregator" | "nonpaid" | "unknown" | "none";
+export type LinkTier = "paid" | "aggregator" | "casino" | "nonpaid" | "unknown" | "none";
 
 export interface LinkClass {
   tier: LinkTier;
@@ -127,6 +127,16 @@ const SHORTENERS = new Set<string>([
   "rb.gy", "is.gd", "ow.ly", "buff.ly", "shorturl.at", "rebrand.ly",
 ]);
 
+// Casino / apuestas / "gana dinero" — links de AFILIADO que las creadoras postean
+// por pago; NO son su contenido pago. Se descartan como NO promo (no "a revisar"),
+// aunque la visión los haya marcado. Lista explícita + patrón conservador en el host.
+const CASINO = new Set<string>([
+  "tucasinoencasa.com",
+  "betplay.com.co", "wplay.co", "rushbet.co", "codere.com", "stake.com",
+  "1xbet.com", "betano.com", "betwinner.com", "bet365.com", "rivalry.com",
+]);
+const CASINO_HOST_RE = /casino|apuestas?|tragamonedas|ruleta|jackpot|ganadinero|ganardinero|hazdinero/i;
+
 // match por SUFIJO DE LABEL (no substring): así "m.onlyfans.com" matchea
 // "onlyfans.com" pero "evilonlyfans.com" NO.
 function matchSuffix(host: string, domains: Iterable<string>): string | null {
@@ -236,7 +246,13 @@ export function classifyLinkDestination(
     return { tier: "aggregator", platform: pathPlatform ?? AGGREGATOR[agg], host, decoded };
   }
 
-  // 4) NO-pago (red social, música, tienda, noticias, contacto…)
+  // 4) Casino / apuestas / "gana dinero" → afiliado, NO su contenido pago → se
+  //    descarta como NO promo (el webhook lo fuerza a "No", no a "a revisar").
+  if (matchSuffix(host, CASINO) || CASINO_HOST_RE.test(host)) {
+    return { tier: "casino", platform: null, host, decoded };
+  }
+
+  // 5) NO-pago (red social, música, tienda, noticias, contacto…)
   if (matchSuffix(host, NONPAID)) {
     return { tier: "nonpaid", platform: "none", host, decoded };
   }

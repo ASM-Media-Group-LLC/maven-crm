@@ -555,13 +555,27 @@ async function processStory(args: {
     args.knownFunnelHosts,
   );
   const storyLinkUrl = linkClass.decoded || null;
+  const linkIsCasino = linkClass.tier === "casino";
   const linkIsPromo = linkClass.tier === "paid" || linkClass.tier === "aggregator";
   // plataforma para buy_link_type: la específica del link, o la conocida de la creadora.
   const linkPlatform = (linkClass.platform && linkClass.platform !== "none" && linkClass.platform !== "other")
     ? linkClass.platform
     : (args.knownPlatform ?? "other");
 
-  if (linkIsPromo && !final.promoted) {
+  if (linkIsCasino) {
+    // Link a casino/apuestas/"gana dinero" → afiliado pago, NO el contenido de la
+    // creadora. Se descarta como NO directamente (no "a revisar"), aunque la visión
+    // lo haya marcado promo (pedido del owner 2026-06-24).
+    final = {
+      ...final,
+      promoted: false,
+      promotion_type: "none",
+      has_buy_link: false,
+      buy_link_type: null,
+      reasoning: `Link a casino/apuestas (${linkClass.host}) — afiliado, no es contenido pago de la creadora → No. ${final.reasoning ?? ""}`.slice(0, 240),
+    };
+    analysisLevel += "+casino_discard";
+  } else if (linkIsPromo && !final.promoted) {
     // la visión dijo NO, pero el link va a contenido pago/funnel → promo directa
     final = {
       ...final,
@@ -590,9 +604,11 @@ async function processStory(args: {
   // Y el link va a un destino NO-pago/desconocido (los ambiguos "gana aquí"/afiliado,
   // o un acortador opaco). Una promo cuyo destino es OF/funnel conocido NO se marca
   // a revisar — eso era el ruido que confundía (leona/michelle eran promos claras).
-  const needsReview = final.confidence < NEEDS_REVIEW_THRESHOLD ||
+  // Un link de casino ya se descartó como No arriba → nunca "a revisar".
+  const needsReview = !linkIsCasino && (
+    final.confidence < NEEDS_REVIEW_THRESHOLD ||
     (final.promoted && (final.buy_link_type === "other" || !final.buy_link_type) &&
-      (linkClass.tier === "nonpaid" || linkClass.tier === "unknown"));
+      (linkClass.tier === "nonpaid" || linkClass.tier === "unknown")));
 
   // ── Evidencia durable: subimos el thumbnail (bytes del nivel 1, ya en
   //    memoria) a Storage. La URL de IG/Apify (mediaUrl) expira en horas;

@@ -30,8 +30,10 @@ Deno.test("casos reales", () => {
     classifyLinkDestination("https://l.instagram.com/?u=https%3A%2F%2Funlok.me%2Fleonaoficial&e=AT").platform,
     "unlok",
   );
-  // casino/afiliado → unknown (NO es contenido pago de la creadora → no auto-promo)
-  assertEquals(tier("https://l.instagram.com/?u=https%3A%2F%2Ftucasinoencasa.com%2Fr_adriana&e=AT"), "unknown");
+  // casino/afiliado → tier "casino" (el webhook lo fuerza a No, no a "a revisar")
+  assertEquals(tier("https://l.instagram.com/?u=https%3A%2F%2Ftucasinoencasa.com%2Fr_adriana&e=AT"), "casino");
+  assertEquals(tier("https://l.instagram.com/?u=https%3A%2F%2Fwww.megacasino-online.com%2Fx&e=AT"), "casino");
+  assertEquals(tier("https://l.instagram.com/?u=https%3A%2F%2Fbetplay.com.co%2Fx&e=AT"), "casino");
 });
 
 Deno.test("red-team: parsing del wrapper", () => {
