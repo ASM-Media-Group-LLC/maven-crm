@@ -17,6 +17,19 @@
 // custom en webhooks así que esto es la mejor opción.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { classifyLinkDestination } from "./link-classifier.ts";
+
+// hostname (lowercase, sin www) de una URL de funnel; "" si no parsea.
+function funnelHost(u: string | null | undefined): string {
+  const s = String(u ?? "").trim();
+  if (!s) return "";
+  try {
+    return new URL(s.match(/^https?:\/\//i) ? s : "https://" + s)
+      .hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -215,6 +228,10 @@ Deno.serve(async (req: Request) => {
   // story a una plataforma nombrada (embudo IG → "respondo en mi privado" → OF). OF
   // tiene prioridad sobre Piclink.
   const knownPlatformByCreator = new Map<string, string>();
+  // Hostnames del funnel PROPIO de la creadora (su onlyfans_url/piclink_url). Sirve
+  // para reconocer como promo un sticker de link que apunte a SU embudo aunque el
+  // dominio no esté en las listas genéricas del clasificador.
+  const funnelHostsByCreator = new Map<string, string[]>();
   for (const c of (creatorsData ?? []) as any[]) {
     const h = normalizeHandle(c.instagram_handle ?? "");
     if (h) handleToCreator.set(h, c.id);
@@ -222,6 +239,8 @@ Deno.serve(async (req: Request) => {
     ofNicksByCreator.set(c.id, nick ? [nick] : []);
     if (String(c.onlyfans_url ?? "").trim()) knownPlatformByCreator.set(c.id, "onlyfans");
     else if (String(c.piclink_url ?? "").trim()) knownPlatformByCreator.set(c.id, "piclink");
+    const hosts = [funnelHost(c.onlyfans_url), funnelHost(c.piclink_url)].filter(Boolean);
+    funnelHostsByCreator.set(c.id, [...new Set(hosts)]);
   }
 
   // Multi-cuenta: sumar las cuentas IG EXTRA al mapa de handles (así una story de
@@ -307,6 +326,7 @@ Deno.serve(async (req: Request) => {
               sourceHandle: handle,
               ofNicks: ofNicksByCreator.get(creatorId) ?? [],
               knownPlatform: knownPlatformByCreator.get(creatorId) ?? null,
+              knownFunnelHosts: funnelHostsByCreator.get(creatorId) ?? [],
             }).catch((e) => ({ error: (e as Error).message })),
           ),
         );
@@ -446,6 +466,7 @@ async function processStory(args: {
   sourceHandle: string;
   ofNicks: string[];
   knownPlatform: string | null;
+  knownFunnelHosts: string[];
 }): Promise<{ inserted: boolean } | { error: string }> {
   const { story, openrouterKey } = args;
   // mediaType: viejo actor usa `type` ("video"); nuevo (automation-lab) usa
@@ -521,35 +542,57 @@ async function processStory(args: {
     }
   }
 
-  // ── Sticker de LINK de la story (señal DURA, independiente de la visión) ──
-  // El scraper devuelve `linkUrl` cuando la creadora puso un sticker de link (l.instagram.com
-  // → su OF/linktree). Es una CTA a contenido pago que la IA NO ve en el thumbnail (es un
-  // overlay interactivo, no está "quemado" en la foto). Si hay link y la visión dijo que NO
-  // promocionó, lo corregimos a promo DIRECTA. Caso real: ennidwong, story de playa con
-  // sticker de link que la IA marcaba "no promociona".
-  const linkSticker = String((story as { linkUrl?: string }).linkUrl ?? "").trim();
-  if (/^https?:\/\//i.test(linkSticker) && !final.promoted) {
+  // ── Destino del sticker de LINK (señal independiente de la visión) ──────────
+  // El scraper devuelve `linkUrl` (a veces envuelto en l.instagram.com/?u=...). NO
+  // todo link es promo: clasificamos a DÓNDE va. OF/funnel = promo; YouTube/Spotify/
+  // otra red = no. Tres casos reales que esto resuelve:
+  //  • ennidwong (link.me → OF): la IA no ve el sticker en la foto → el link lo corrige a promo.
+  //  • elizabeth (link a YouTube): la IA dijo "no" y NO lo pisamos (antes #649 lo marcaba promo).
+  //  • leona/michelle (IA dijo "sí" pero buy_link_type="other"): el destino (su piclink)
+  //    resuelve la plataforma y apaga el falso "a revisar".
+  const linkClass = classifyLinkDestination(
+    (story as { linkUrl?: string }).linkUrl,
+    args.knownFunnelHosts,
+  );
+  const storyLinkUrl = linkClass.decoded || null;
+  const linkIsPromo = linkClass.tier === "paid" || linkClass.tier === "aggregator";
+  // plataforma para buy_link_type: la específica del link, o la conocida de la creadora.
+  const linkPlatform = (linkClass.platform && linkClass.platform !== "none" && linkClass.platform !== "other")
+    ? linkClass.platform
+    : (args.knownPlatform ?? "other");
+
+  if (linkIsPromo && !final.promoted) {
+    // la visión dijo NO, pero el link va a contenido pago/funnel → promo directa
     final = {
       ...final,
       promoted: true,
       promotion_type: "direct",
       has_buy_link: true,
-      // si conocemos su plataforma → buy_link_type real (no "other", que marcaría "revisar")
-      buy_link_type: final.buy_link_type ?? args.knownPlatform ?? "other",
+      buy_link_type: linkPlatform,
       platform_mentioned: final.platform_mentioned && final.platform_mentioned !== "ninguna"
         ? final.platform_mentioned : (args.knownPlatform ?? "ninguna"),
-      reasoning: `Sticker de link en la story (${linkSticker.replace(/^https?:\/\//i, "").slice(0, 40)}…) → CTA a contenido pago. ${final.reasoning ?? ""}`.slice(0, 240),
+      reasoning: `Sticker de link → ${linkClass.host} (CTA a contenido pago). ${final.reasoning ?? ""}`.slice(0, 240),
     };
     analysisLevel += "+link_sticker";
+  } else if (final.promoted && (final.buy_link_type === "other" || !final.buy_link_type)) {
+    // la visión ya dijo SÍ pero no pudo nombrar la plataforma → la resolvemos por el
+    // destino del link (paid/aggregator), o si no se capturó link, por su funnel
+    // conocido. Esto apaga el "a revisar" falso de promos claras (leona/michelle).
+    if (linkIsPromo) {
+      final = { ...final, buy_link_type: linkPlatform };
+    } else if (linkClass.tier === "none" && args.knownPlatform) {
+      final = { ...final, buy_link_type: args.knownPlatform };
+    }
   }
 
   // ── Flag para review manual ─────────────────────────────────────────────
-  // (1) confianza baja, o (2) promo con link "other": Gemini detectó un link/CTA
-  // pero NO lo pudo atar a una plataforma de pago conocida (OnlyFans/Piclink/…).
-  // Esos son los ambiguos tipo "gana aquí / ganancias diarias" (referido/afiliado)
-  // que parecen promo pero no son de su contenido → que un humano confirme.
+  // (1) confianza baja, o (2) la visión dice promo pero NO pudimos atar la plataforma
+  // Y el link va a un destino NO-pago/desconocido (los ambiguos "gana aquí"/afiliado,
+  // o un acortador opaco). Una promo cuyo destino es OF/funnel conocido NO se marca
+  // a revisar — eso era el ruido que confundía (leona/michelle eran promos claras).
   const needsReview = final.confidence < NEEDS_REVIEW_THRESHOLD ||
-    (final.promoted && final.buy_link_type === "other");
+    (final.promoted && (final.buy_link_type === "other" || !final.buy_link_type) &&
+      (linkClass.tier === "nonpaid" || linkClass.tier === "unknown"));
 
   // ── Evidencia durable: subimos el thumbnail (bytes del nivel 1, ya en
   //    memoria) a Storage. La URL de IG/Apify (mediaUrl) expira en horas;
@@ -575,6 +618,7 @@ async function processStory(args: {
     analysis: final,
     analysis_level: analysisLevel,
     needs_review: needsReview,
+    story_link_url: storyLinkUrl,
     is_video: isVideo,
     source_handle: args.sourceHandle,
     known_platform: args.knownPlatform,
@@ -758,6 +802,7 @@ async function insertAnalyzedEntry(
     // Metadata nueva — para auditar el flow de 2 niveles
     analysis_level?: string;       // "thumbnail_only" | "video_full" | "video_tried_lower_conf" | "video_failed:..."
     needs_review?: boolean;        // true si confidence final < NEEDS_REVIEW_THRESHOLD
+    story_link_url?: string | null; // destino decodificado del sticker de link (auditoría)
     is_video?: boolean;
     source_handle?: string;        // cuenta IG de la que vino la story (multi-cuenta)
     known_platform?: string | null; // plataforma de pago conocida de la creadora (OF/piclink) → para inferir destino
@@ -816,6 +861,7 @@ async function insertAnalyzedEntry(
     story_index: args.story_index,
     story_count: args.story_count,
     story_media_url: args.media_url,
+    story_link_url: args.story_link_url ?? null,
     scraped_at: args.scraped_at,
     source_handle: args.source_handle ?? null,
     needs_review: args.needs_review ?? false,
