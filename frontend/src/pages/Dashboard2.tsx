@@ -12,6 +12,8 @@ import { useTopFans } from "./sales-performance/useTopFans";
 import { useFanRetention } from "./sales-performance/useFanRetention";
 import { useChatters } from "./sales-performance/useChatters";
 import { usePromoDays } from "./sales-performance/usePromoDays";
+import { useCohortRetention } from "./sales-performance/useCohortRetention";
+import CohortRetentionTab from "./sales-performance/CohortRetentionTab";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -279,6 +281,7 @@ const Dashboard2 = () => {
   // después de su declaración. Estaba antes → ReferenceError TDZ "Cannot access
   // 'selectedPeriod' before initialization" que tiraba /dashboard2 en blanco.
   const { data: promoDays, isLoading: promoLoading } = usePromoDays(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "content_roi");
+  const { data: cohortData, isLoading: cohortLoading } = useCohortRetention(selectedPeriod?.startStr ?? "", selectedPeriod?.endStr ?? "", deepDiveTab === "cohort");
 
   // Período anterior (= mismo largo, justo antes del rango) para los deltas MoM.
   const prevPeriod = useMemo(() => {
@@ -1917,6 +1920,7 @@ const Dashboard2 = () => {
                       { key: "retencion" as const, icon: <Repeat className="h-3.5 w-3.5" />, label: "Retención", desc: "Retención de fans por cohorte" },
                       { key: "chatter" as const, icon: <MessageSquare className="h-3.5 w-3.5" />, label: "Chatters", desc: "Rendimiento por chatter" },
                       { key: "content_roi" as const, icon: <Layers className="h-3.5 w-3.5" />, label: "Content ROI", desc: "Promo (Promolog) → ingreso" },
+                      { key: "cohort" as const, icon: <Brain className="h-3.5 w-3.5" />, label: "Cohortes", desc: "Retención por cohorte de fans" },
                       { key: "compare" as const, icon: <Scale className="h-3.5 w-3.5" />, label: "Ranking", desc: "Posición por revenue" },
                       { key: "scalability" as const, icon: <Target className="h-3.5 w-3.5" />, label: "Escalabilidad", desc: "Potencial de crecimiento" },
                       { key: "channels" as const, icon: <BarChart3 className="h-3.5 w-3.5" />, label: "Canales", desc: "Msgs vs Tips vs Subs" },
@@ -1942,7 +1946,6 @@ const Dashboard2 = () => {
                     <span className="text-[9px] text-muted-foreground px-2 shrink-0 uppercase tracking-widest font-semibold">Roadmap</span>
                     {([
                       { key: "ltv" as const, icon: <UserCheck className="h-3.5 w-3.5" />, label: "LTV", desc: "Valor de vida del cliente (próximamente)" },
-                      { key: "cohort" as const, icon: <Brain className="h-3.5 w-3.5" />, label: "Cohortes", desc: "Retención por grupo de fans (próximamente)" },
                     ]).map((tab) => (
                       <UITooltip key={tab.key}>
                         <TooltipTrigger asChild>
@@ -2767,28 +2770,14 @@ const Dashboard2 = () => {
                     );
                   })()}
 
-                  {/* ── Cohort Analysis (Placeholder) ── */}
+                  {/* ── Cohortes de retención (creator_fan_retention vía RPC) ── */}
                   {deepDiveTab === "cohort" && (
-                    <div className="space-y-5">
-                      <div className="rounded-xl border-2 border-dashed border-amber-400/40 bg-amber-500/5 p-8 text-center space-y-4">
-                        <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-amber-500/10 mx-auto">
-                          <Brain className="h-8 w-8 text-amber-400" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-foreground">Cohort Analysis</h3>
-                          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">Retención por cohorte de fans: qué mes de adquisición retiene mejor, patrones de comportamiento y churn por grupo.</p>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
-                          {["Retención M1", "Retención M3", "Mejor Cohorte", "Churn Rate/Cohorte"].map(m => (
-                            <div key={m} className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                              <p className="text-[10px] text-muted-foreground">{m}</p>
-                              <p className="text-lg font-bold text-muted-foreground/40 mt-1">—</p>
-                            </div>
-                          ))}
-                        </div>
-                        <Badge variant="outline" className="text-xs border-dashed"><Lock className="h-3 w-3 mr-1" />Requiere datos históricos de fans por cohorte</Badge>
-                      </div>
-                    </div>
+                    <CohortRetentionTab
+                      rows={cohortData?.rows ?? []}
+                      maxOffset={cohortData?.maxOffset ?? 11}
+                      loading={cohortLoading}
+                      periodLabel={selectedPeriod?.label}
+                    />
                   )}
                 </div>
               </div>
