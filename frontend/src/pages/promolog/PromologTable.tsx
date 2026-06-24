@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Facebook, MoreHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Eye, Facebook, MoreHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -100,6 +100,17 @@ const resultVariant: Record<string, "success-soft" | "destructive-soft" | "warni
   "No": "destructive-soft",
   "Parcial": "warning-soft",
   "Pendiente": "secondary-soft",
+};
+
+// Motivo legible del fallo de scan (para el tooltip de la fila "A revisar").
+const errorReasonLabel = (r?: string | null): string => {
+  const map: Record<string, string> = {
+    json_parse: "La IA devolvió un veredicto ilegible — revisá la evidencia a mano.",
+    openrouter_timeout: "La IA tardó demasiado (timeout) — revisá la evidencia a mano.",
+    refusal: "La IA no analizó la imagen — revisá la evidencia a mano.",
+  };
+  if (r && map[r]) return map[r];
+  return r ? `Necesita revisión manual (${r}).` : "Necesita revisión manual: la IA no pudo leer la evidencia.";
 };
 
 const InlineNotes = ({ value, onSave }: { value: string; onSave: (v: string | null) => void }) => {
@@ -277,9 +288,15 @@ const PromologTable = ({
               )}
             </TableCell>
             <TableCell>
-              <Badge variant={resultVariant[entry.result] || "secondary-soft"} className="text-xs">
-                {entry.result}
-              </Badge>
+              {entry.needs_review ? (
+                <Badge variant="warning-soft" className="gap-1 text-xs" title={errorReasonLabel(entry.error_reason)}>
+                  <AlertTriangle className="h-3 w-3" /> A revisar
+                </Badge>
+              ) : (
+                <Badge variant={resultVariant[entry.result] || "secondary-soft"} className="text-xs">
+                  {entry.result}
+                </Badge>
+              )}
             </TableCell>
             <TableCell className="min-w-[150px]">
               {entry.networkScores?.length ? (

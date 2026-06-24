@@ -855,6 +855,7 @@ async function insertUnreadableEntry(
     story_media_url: args.media_url,
     scraped_at: args.scraped_at,
     needs_review: true,
+    error_reason: reason,
   });
 
   if (error) {

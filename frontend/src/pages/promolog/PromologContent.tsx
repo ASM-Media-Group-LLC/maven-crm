@@ -324,6 +324,7 @@ const PromologContent = () => {
         action_taken: pe.action_taken ?? null,
         evidence_url: pe.evidence_url ?? null,
         story_media_url: pe.story_media_url ?? null,
+        error_reason: pe.error_reason ?? null,
         buy_link_type: pe.buy_link_type ?? null,
         has_buy_link: pe.has_buy_link === true,
         ai_reasoning: pe.ai_reasoning ?? null,
@@ -394,7 +395,9 @@ const PromologContent = () => {
         })),
       );
       // needs_review del día = true si CUALQUIER entry del grupo lo tiene (no solo la "best").
-      result.push({ ...best, networks, promotedNetworks, dayScore, networkScores, needs_review: group.some((e) => e.needs_review === true) });
+      result.push({ ...best, networks, promotedNetworks, dayScore, networkScores,
+        needs_review: group.some((e) => e.needs_review === true),
+        error_reason: (group.find((e) => e.error_reason)?.error_reason) ?? best.error_reason ?? null });
     }
     return result;
   }, [entries]);
