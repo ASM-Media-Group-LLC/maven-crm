@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, X as XMark, ExternalLink, ImageOff, ChevronLeft, ChevronRight, X as CloseIcon, Maximize2, Loader2, Lock, Facebook, Globe, ThumbsUp, MessageCircle, Share2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { PromologEntry } from "./PromologEntryCard";
@@ -315,9 +316,11 @@ const TelegramScreenshots = ({
         })}
       </div>
 
-      {/* Lightbox: la captura en grande, con veredicto editable por post */}
-      {openIdx != null && shots[openIdx] && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4" onClick={() => setOpenIdx(null)} role="dialog" aria-modal="true">
+      {/* Lightbox: la captura en grande, con veredicto editable por post.
+          Portaleado a document.body: el DialogContent de Radix usa transform, lo
+          que rompería el position:fixed (quedaría relativo al popup, no al viewport). */}
+      {openIdx != null && shots[openIdx] && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 pointer-events-auto" onClick={() => setOpenIdx(null)} role="dialog" aria-modal="true">
           <button type="button" onClick={() => setOpenIdx(null)} className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20" aria-label="Cerrar"><CloseIcon className="h-5 w-5" /></button>
           {shots.length > 1 && (
             <>
@@ -331,7 +334,8 @@ const TelegramScreenshots = ({
             </div>
             <span className="shrink-0 text-xs text-white/60">Captura {openIdx + 1}/{shots.length}</span>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -563,10 +567,13 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
         })}
       </div>
 
-      {/* ── Lightbox ─────────────────────────────────────────────────────── */}
-      {active && (
+      {/* ── Lightbox ─────────────────────────────────────────────────────────
+          Portaleado a document.body: el DialogContent de Radix usa transform, que
+          rompería el position:fixed (quedaría anclado a la caja del popup, no al
+          viewport → el zoom aparecía "hacia arriba" al estar scrolleado). */}
+      {active && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 pointer-events-auto"
           onClick={() => setLightboxId(null)}
           role="dialog"
           aria-modal="true"
@@ -630,7 +637,8 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
