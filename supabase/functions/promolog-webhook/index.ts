@@ -862,6 +862,29 @@ async function insertUnreadableEntry(
     console.error("insert unreadable entry failed:", error.message);
     return false;
   }
+
+  // Aviso (campana) a managers: el scan de esta creadora cayó en falla técnica y necesita
+  // revisión. 1 por creadora/día (automation_key UNIQUE + upsert ignoreDuplicates → no
+  // spamea aunque fallen varias stories de la misma). Best-effort: nunca bloquea la entry.
+  try {
+    const { data: cr } = await sb.from("creators").select("artistic_name, name").eq("id", args.creator_id).maybeSingle();
+    const cname = cr?.artistic_name || cr?.name || "una creadora";
+    await sb.from("notifications").upsert({
+      user_id: null,
+      role_target: "manager",
+      visibility_scope: "team",
+      type: "promolog_scan_error",
+      title: "Scan de Promolog a revisar",
+      message: `El scan de Instagram de ${cname} necesita revisión manual (la IA no pudo leer la evidencia).`,
+      module_origin: "promolog",
+      priority: "medium",
+      reference_id: args.creator_id,
+      reference_type: "creator",
+      deep_link_url: "/promolog",
+      automation_key: `promolog_scan_error:${args.creator_id}:${args.scan_date.slice(0, 10)}`,
+    }, { onConflict: "automation_key", ignoreDuplicates: true });
+  } catch (_) { /* best-effort: el aviso nunca bloquea la entry */ }
+
   return true;
 }
 
