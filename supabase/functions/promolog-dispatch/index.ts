@@ -294,7 +294,11 @@ async function launchChunk(
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
-  const apifyUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR_ID}/runs?token=${env.APIFY_TOKEN}&webhooks=${webhooksB64}`;
+  // timeout=900 (15min): el default del actor (~5min) cortaba runs bajo carga (varios runs
+  // concurrentes compiten por RAM) → timeouts y stragglers. El actor es pay-per-event
+  // (cobra por resultado, no por segundo), así que más tiempo NO cuesta más; solo evita
+  // que un run lento muera y deje creadoras sin escanear.
+  const apifyUrl = `https://api.apify.com/v2/acts/${APIFY_ACTOR_ID}/runs?token=${env.APIFY_TOKEN}&timeout=900&webhooks=${webhooksB64}`;
 
   let apifyRunId: string | null = null;
   let apifyErr: string | null = null;
