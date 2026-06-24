@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, X as XMark, ExternalLink, ImageOff, ChevronLeft, ChevronRight, X as CloseIcon, Maximize2, Loader2, Lock, Facebook } from "lucide-react";
+import { Check, X as XMark, ExternalLink, ImageOff, ChevronLeft, ChevronRight, X as CloseIcon, Maximize2, Loader2, Lock, Facebook, Globe, ThumbsUp, MessageCircle, Share2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { PromologEntry } from "./PromologEntryCard";
 import { summarizeStories } from "./storyEvidence";
@@ -296,12 +296,20 @@ const TelegramScreenshots = ({
                   <Maximize2 className="h-3 w-3" />
                 </span>
               </button>
-              <div className="flex items-center justify-between gap-1 p-1.5">
-                <span className="truncate text-[10px] text-muted-foreground">{bubbles.length} {bubbles.length === 1 ? "post" : "posts"}</span>
-                <Badge variant={anyPromo ? "success-soft" : "destructive-soft"} className="gap-0.5 text-[10px]">
-                  {anyPromo ? <><Check className="h-3 w-3" /> Sí</> : <><XMark className="h-3 w-3" /> No</>}
-                </Badge>
-              </div>
+              {/* Captura de 1 post: toggle editable Sí/No idéntico al de IG/Facebook.
+                  Varios posts: contador + badge del agregado (editás cada uno en grande). */}
+              {bubbles.length === 1 ? (
+                <div className="p-1.5">
+                  <VerdictToggle story={bubbles[0]} onSetVerdict={onSetVerdict} saving={savingId === bubbles[0].id} />
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-1 p-1.5">
+                  <span className="truncate text-[10px] text-muted-foreground">{bubbles.length} posts</span>
+                  <Badge variant={anyPromo ? "success-soft" : "destructive-soft"} className="gap-0.5 text-[10px]">
+                    {anyPromo ? <><Check className="h-3 w-3" /> Sí</> : <><XMark className="h-3 w-3" /> No</>}
+                  </Badge>
+                </div>
+              )}
             </div>
           );
         })}
@@ -343,39 +351,108 @@ const TelegramLightbox = ({ story }: { story: PromologEntry }) => (
 );
 
 // ── Facebook ────────────────────────────────────────────────────────────────────
-// Los posts NUEVOS de FB suben la foto al bucket promolog-evidence → evidence_url es
-// una URL de storage y cae al <img> normal (StoryThumb). Pero las filas viejas y los
-// posts sin foto guardan el PERMALINK (facebook.com) en evidence_url: en vez de un
-// <img> roto ("Sin imagen"), mostramos un card "Ver en Facebook" clickeable.
-const isFbLink = (s: PromologEntry) =>
-  (s.network || "").toLowerCase() === "facebook" &&
-  /^https?:\/\/([\w-]+\.)*facebook\.com/i.test(s.evidence_url || "");
+// La media de FB suele estar protegida o el permalink expira como vista. En vez de
+// una imagen rota o un placeholder "tocá para abrir", RECREAMOS el post como una
+// tarjeta estilo Facebook (header con foto+nombre+hora, texto del post, imagen si
+// la tenemos en el bucket, barra de reacciones) — análogo a las capturas de Telegram.
+// Datos: name = nombre de la creadora · notes = texto del post · time = hora ·
+// profile_photo_url = foto · evidence_url = foto del bucket O permalink · result.
+const isFb = (s: PromologEntry) => (s.network || "").toLowerCase() === "facebook";
+const isFbUrl = (u?: string | null) => /^https?:\/\/([\w-]+\.)*facebook\.com/i.test(u || "");
+const fbName = (s: PromologEntry) => s.name?.trim() || s.source_handle?.replace(/^@/, "").trim() || "Página de Facebook";
+// La FOTO del post: evidence_url solo si NO es un permalink (entonces es la del bucket).
+const fbImage = (s: PromologEntry) => (s.evidence_url && !isFbUrl(s.evidence_url) ? s.evidence_url : null);
+// El permalink para "Abrir en Facebook": evidence_url si es facebook.com, sino story_media_url.
+const fbLink = (s: PromologEntry) =>
+  isFbUrl(s.evidence_url) ? s.evidence_url! : isFbUrl(s.story_media_url) ? s.story_media_url! : null;
+
+// Avatar del header: foto de la creadora con fallback a la inicial sobre azul FB.
+const FbAvatar = ({ s, big }: { s: PromologEntry; big?: boolean }) => {
+  const [failed, setFailed] = useState(false);
+  const size = big ? "h-9 w-9 text-sm" : "h-5 w-5 text-[8px]";
+  if (s.profile_photo_url && !failed) {
+    return <img src={s.profile_photo_url} alt="" className={`${size} shrink-0 rounded-full object-cover`} onError={() => setFailed(true)} />;
+  }
+  return (
+    <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-[#1877F2] font-bold text-white`}>
+      {(fbName(s)[0] || "F").toUpperCase()}
+    </span>
+  );
+};
+
+// Recreación del post de Facebook. `fill` = llena un tile 9:16 (grilla); `big` =
+// versión legible del lightbox.
+const FbPost = ({ s, big, fill }: { s: PromologEntry; big?: boolean; fill?: boolean }) => {
+  const name = fbName(s);
+  const img = fbImage(s);
+  const promo = s.result === "Sí";
+  return (
+    <div className={`flex w-full flex-col bg-white ${fill ? "h-full" : ""}`}>
+      {/* Header: foto · nombre · hora + público */}
+      <div className={`flex shrink-0 items-center ${big ? "gap-2 px-3 py-2.5" : "gap-1 px-1.5 py-1.5"}`}>
+        <FbAvatar s={s} big={big} />
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className={`truncate font-semibold text-slate-900 ${big ? "text-sm" : "text-[8.5px]"}`}>{name}</p>
+          <p className={`flex items-center gap-1 text-slate-500 ${big ? "text-[11px]" : "text-[6px]"}`}>
+            <span className="truncate">{s.time || "Facebook"}</span>
+            <Globe className={big ? "h-3 w-3" : "h-2 w-2"} />
+          </p>
+        </div>
+        {promo
+          ? <span className={`flex shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white ${big ? "h-5 w-5" : "h-3.5 w-3.5"}`}><Check className={big ? "h-3 w-3" : "h-2 w-2"} /></span>
+          : <span className={`shrink-0 text-slate-400 ${big ? "text-base" : "text-[9px]"}`}>⋯</span>}
+      </div>
+
+      {/* Cuerpo: texto + foto (o "contenido protegido" si no hay ninguno) */}
+      <div className={`flex min-h-0 flex-col ${fill ? "flex-1 overflow-hidden" : ""}`}>
+        {s.notes && (
+          <p className={`shrink-0 whitespace-pre-wrap break-words text-slate-900 ${big ? "px-3 pb-2 text-[13.5px] leading-snug" : "px-1.5 pb-1 text-[8.5px] leading-tight"} ${fill && img ? "line-clamp-3" : fill ? "line-clamp-6" : ""}`}>
+            {big ? renderTgText(s.notes) : s.notes}
+          </p>
+        )}
+        {img ? (
+          <img src={img} alt="" loading="lazy" className={`w-full ${fill ? "min-h-0 flex-1 object-cover" : big ? "max-h-[55vh] object-contain" : "object-cover"}`} />
+        ) : !s.notes ? (
+          <div className={`flex flex-col items-center justify-center gap-1 bg-[#1877F2]/5 text-center ${fill ? "flex-1" : "py-6"}`}>
+            <Facebook className={big ? "h-10 w-10" : "h-6 w-6"} style={{ color: "#1877F2" }} />
+            <span className={`text-slate-500 ${big ? "text-xs" : "text-[8px]"}`}>Contenido de Facebook</span>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Barra de reacciones (decorativa, para dar el look de FB) */}
+      <div className={`flex shrink-0 items-center justify-around border-t border-slate-100 text-slate-500 ${big ? "px-3 py-2 text-[12px]" : "px-1 py-1 text-[6px]"}`}>
+        <span className="flex items-center gap-1"><ThumbsUp className={big ? "h-3.5 w-3.5" : "h-2 w-2"} /> Me gusta</span>
+        <span className="flex items-center gap-1"><MessageCircle className={big ? "h-3.5 w-3.5" : "h-2 w-2"} /> Comentar</span>
+        <span className="flex items-center gap-1"><Share2 className={big ? "h-3.5 w-3.5" : "h-2 w-2"} /> Compartir</span>
+      </div>
+    </div>
+  );
+};
 
 // Tile full-bleed para la grilla (el wrapper ya abre el lightbox al clickear).
-const FbLinkTile = () => (
-  <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[#1877F2]/10 p-3 text-center">
-    <Facebook className="h-7 w-7 text-[#1877F2]" />
-    <span className="text-[11px] font-medium leading-tight text-foreground">Post de Facebook</span>
-    <span className="text-[10px] leading-tight text-muted-foreground">Tocá para abrir</span>
-  </div>
-);
+const FbTile = ({ story }: { story: PromologEntry }) => <FbPost s={story} fill />;
 
-// Versión grande del lightbox: card branded que abre el post en una pestaña nueva.
-const FbLinkLightbox = ({ story }: { story: PromologEntry }) => (
-  <a
-    href={story.evidence_url || "#"}
-    target="_blank"
-    rel="noopener noreferrer"
-    onClick={(e) => e.stopPropagation()}
-    className="flex aspect-[9/16] max-h-[72vh] w-full max-w-[420px] flex-col items-center justify-center gap-3 rounded-lg bg-[#1877F2]/15 text-center transition-colors hover:bg-[#1877F2]/25"
-  >
-    <Facebook className="h-14 w-14 text-[#1877F2]" />
-    <span className="text-sm font-medium text-white">Post de Facebook</span>
-    <span className="inline-flex items-center gap-1 text-xs text-white/70">
-      Abrir en Facebook <ExternalLink className="h-3 w-3" />
-    </span>
-  </a>
-);
+// Versión grande del lightbox: la tarjeta + link "Abrir en Facebook" si hay permalink.
+const FacebookLightbox = ({ story }: { story: PromologEntry }) => {
+  const link = fbLink(story);
+  return (
+    <div className="max-h-[82vh] w-full max-w-[380px] overflow-y-auto rounded-xl bg-white shadow-2xl ring-1 ring-white/10">
+      <FbPost s={story} big />
+      {link && (
+        <a
+          href={link}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center justify-center gap-1 border-t border-slate-100 py-2.5 text-xs font-medium text-[#1877F2] transition-colors hover:bg-[#1877F2]/5"
+        >
+          Abrir en Facebook <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
+    </div>
+  );
+};
 
 interface Props {
   stories: PromologEntry[];
@@ -455,7 +532,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
             >
               {/* Imagen — al clickear abre el lightbox (verla en grande) */}
               <button type="button" onClick={() => setLightboxId(s.id)} className="relative block aspect-[9/16] w-full">
-                {isTgEvidence(s) ? <TelegramTile story={s} /> : isFbLink(s) ? <FbLinkTile /> : <StoryThumb url={s.evidence_url} />}
+                {isTgEvidence(s) ? <TelegramTile story={s} /> : isFb(s) ? <FbTile story={s} /> : <StoryThumb url={s.evidence_url} />}
                 {slide > 0 && (
                   <span className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
                     #{slide}
@@ -525,7 +602,7 @@ const PromologStoryGallery = ({ stories, selectedId, onSetVerdict, savingId }: P
           )}
 
           <div className="flex max-h-[90vh] w-full max-w-md flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
-            {isTgEvidence(active) ? <TelegramLightbox story={active} /> : isFbLink(active) ? <FbLinkLightbox story={active} /> : <LightboxImage url={active.evidence_url} />}
+            {isTgEvidence(active) ? <TelegramLightbox story={active} /> : isFb(active) ? <FacebookLightbox story={active} /> : <LightboxImage url={active.evidence_url} />}
             <div className="w-full space-y-2 text-center">
               <div className="flex items-center justify-center gap-2">
                 <span className="text-xs tabular-nums text-white/70">

@@ -323,6 +323,7 @@ const PromologContent = () => {
         // viene null — pero el `ai_reasoning` cubre la explicación.
         action_taken: pe.action_taken ?? null,
         evidence_url: pe.evidence_url ?? null,
+        story_media_url: pe.story_media_url ?? null,
         buy_link_type: pe.buy_link_type ?? null,
         has_buy_link: pe.has_buy_link === true,
         ai_reasoning: pe.ai_reasoning ?? null,

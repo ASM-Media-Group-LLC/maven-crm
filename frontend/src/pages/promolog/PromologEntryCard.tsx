@@ -55,6 +55,10 @@ export interface PromologEntry {
   // URL del pantallazo/imagen de evidencia (storage o CDN externo).
   // El bot Promolog lo guarda con la URL del thumbnail/story de Apify.
   evidence_url?: string | null;
+  // URL/permalink original del post (efímero en IG; en Facebook es el permalink
+  // estable cuando evidence_url quedó con la foto del bucket). Lo usa la tarjeta
+  // de Facebook para el link "Abrir en Facebook".
+  story_media_url?: string | null;
   // Plataforma de destino del link (onlyfans / piclink / linktree / fansly / other).
   buy_link_type?: string | null;
   // Si la promo tiene link visible (sticker, URL en caption, etc.).
