@@ -1316,7 +1316,11 @@ export const ChatPanel = ({ session }: Props) => {
       {session.status !== "ended" && (
         <EmojiBar
           emojis={examinerEmojis}
-          onPick={(e) => setInput((v) => v + e)}
+          onPick={(e) => {
+            setInput((v) => v + e);
+            // Devolver el foco al textarea: así Enter ENVÍA (no re-inserta el emoji).
+            textareaRef.current?.focus();
+          }}
           onAdd={(e) => persistEmojis([...examinerEmojis, e])}
           onRemove={(e) =>
             persistEmojis(examinerEmojis.filter((x) => x !== e))

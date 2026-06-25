@@ -10,6 +10,7 @@ import {
   useEndChatterSession,
 } from "@/hooks/useChatterEvaluator";
 import { playSoundFile } from "./VolumeControl";
+import { loadDismissedFromStorage, dismissSession, DISMISSED_EVENT } from "./dismissedSessions";
 import { NewSessionDialog } from "../NewSessionDialog";
 import {
   AlertDialog,
@@ -165,27 +166,9 @@ const TYPING_TIMEOUT_MS = 3500;
 // El concepto de "dismiss del workspace" es local al usuario: cuando
 // hace click en la X del SessionRow, la sesión deja de aparecer en su
 // rail. Eso NO toca el status de la DB (la sesión queda exactamente
-// como estaba). Persistido en localStorage para que sobreviva refreshes.
-const DISMISSED_STORAGE_KEY = "chatter:dismissed-sessions";
-
-const loadDismissedFromStorage = (): Set<string> => {
-  try {
-    const raw = window.localStorage.getItem(DISMISSED_STORAGE_KEY);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw);
-    return new Set(Array.isArray(parsed) ? parsed : []);
-  } catch {
-    return new Set();
-  }
-};
-
-const persistDismissed = (set: Set<string>) => {
-  try {
-    window.localStorage.setItem(DISMISSED_STORAGE_KEY, JSON.stringify([...set]));
-  } catch {
-    // best effort
-  }
-};
+// como estaba). Persistido en localStorage para que sobreviva refreshes. La lógica de
+// load/persist/dismiss vive en ./dismissedSessions (compartida con WorkspaceContent, que
+// auto-dismissea al enviar la evaluación).
 
 export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   const sessionsQ = useChatterSessions("all");
@@ -206,6 +189,18 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
+  }, []);
+
+  // Re-sincroniza el set de dismissed cuando cambia desde OTRA vista (WorkspaceContent
+  // auto-dismissea al enviar la evaluación) o desde otra pestaña (evento storage).
+  useEffect(() => {
+    const resync = () => setDismissed(loadDismissedFromStorage());
+    window.addEventListener(DISMISSED_EVENT, resync);
+    window.addEventListener("storage", resync);
+    return () => {
+      window.removeEventListener(DISMISSED_EVENT, resync);
+      window.removeEventListener("storage", resync);
+    };
   }, []);
 
   // Unread counts por sesión — el RPC filtra por examiner_user_id =
@@ -333,12 +328,9 @@ export const SessionsPanel = ({ selectedId, onSelect }: Props) => {
   // Si era la sesión activa, también la des-seleccionamos para que el
   // ChatPanel se vacíe.
   const dismissFromWorkspace = (sessionId: string) => {
-    setDismissed((prev) => {
-      const next = new Set(prev);
-      next.add(sessionId);
-      persistDismissed(next);
-      return next;
-    });
+    // Escribe localStorage + dispara DISMISSED_EVENT → el listener de abajo re-sincroniza
+    // `dismissed` (mismo path que el auto-dismiss al enviar la evaluación en WorkspaceContent).
+    dismissSession(sessionId);
     if (selectedId === sessionId) onSelect(null);
   };
 

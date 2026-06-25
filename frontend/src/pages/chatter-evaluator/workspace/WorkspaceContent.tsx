@@ -10,6 +10,7 @@ import {
 } from "@/hooks/useChatterEvaluator";
 import { CriteriaPanel, readScoresFromStorage, type CriteriaScores } from "./CriteriaPanel";
 import { SessionsPanel } from "./SessionsPanel";
+import { dismissSession } from "./dismissedSessions";
 import { ChatPanel } from "./ChatPanel";
 import { EvaluationVerdictDialog } from "./EvaluationVerdictDialog";
 import { CharacterInfoPanel } from "./CharacterInfoPanel";
@@ -211,6 +212,9 @@ const WorkspaceContent = () => {
       return next;
     });
     window.localStorage.removeItem(`maven.chatter.scores.${selectedId}`);
+    // Al enviar la evaluación, la sesión sale del workspace (rail SessionsPanel) — queda
+    // en History. Mismo mecanismo que la X manual, pero automático tras evaluar.
+    dismissSession(selectedId);
     setSelectedId(null);
   };
 

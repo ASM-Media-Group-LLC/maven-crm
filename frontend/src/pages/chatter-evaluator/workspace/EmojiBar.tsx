@@ -93,6 +93,11 @@ export const EmojiBar = ({
           <button
             key={e}
             type="button"
+            // preventDefault en mousedown: el botón NO roba el foco al hacer click,
+            // así el textarea de chat conserva el foco. Sin esto, tras insertar un
+            // emoji el foco quedaba en este botón y un Enter lo re-disparaba (metía
+            // OTRO emoji) en vez de enviar el mensaje.
+            onMouseDown={(ev) => ev.preventDefault()}
             onClick={() => handleClickEmoji(e)}
             className={`relative rounded p-0.5 text-xl leading-none transition-colors hover:bg-muted ${
               editMode ? "ring-1 ring-rose-500/40 hover:ring-rose-500" : ""
