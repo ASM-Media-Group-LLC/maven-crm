@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square, X as XIcon, Mic, MicOff, SmilePlus, MoreVertical, History, Trash2, Play, Reply } from "lucide-react";
 import { GifPicker } from "@/pages/inbox/GifPicker";
 import { StickerPicker } from "@/pages/inbox/StickerPicker";
+import { ChatComposer } from "@/components/chat/ChatComposer";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1128,6 +1129,52 @@ export const ChatPanel = ({ session }: Props) => {
     }
   };
 
+  // Envío unificado del ChatComposer: sube los adjuntos (staged: pegados o elegidos) al
+  // bucket público chatter-vault y manda UN mensaje con todas las imágenes + el caption + la
+  // cita. Throwea ante error → el composer conserva texto+adjuntos para reintentar.
+  const composerSend = async (text: string, files: File[]) => {
+    if (!session) return;
+    const replyId = replyTo?.id ?? null;
+    try {
+      const images: string[] = [];
+      if (files.length > 0) {
+        setUploading(true);
+        for (const file of files) {
+          if (file.size > 50 * 1024 * 1024) throw new Error(`${file.name || "archivo"}: máximo 50 MB`);
+          const sanitized =
+            (file.name || "upload").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) ||
+            `upload-${Date.now()}`;
+          const path = `_chat_uploads/${session.id}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${sanitized}`;
+          const { error: upErr } = await supabase.storage
+            .from("chatter-vault")
+            .upload(path, file, { upsert: false, contentType: file.type || undefined });
+          if (upErr) throw upErr;
+          images.push(supabase.storage.from("chatter-vault").getPublicUrl(path).data.publicUrl);
+        }
+      }
+      if (!text && images.length === 0) return;
+      await sendMut.mutateAsync({
+        sessionId: session.id,
+        role: "fan",
+        msgType: "message",
+        content: text || null,
+        images,
+        fromExaminer: true,
+        replyToId: replyId,
+      });
+      setReplyTo(null);
+      void supabase
+        .from("chatter_sessions" as never)
+        .update({ typing_fan: false, typing_fan_at: null } as never)
+        .eq("id", session.id as never);
+    } catch (e) {
+      toast.error("No se pudo enviar", { description: (e as Error).message });
+      throw e; // el composer mantiene texto + adjuntos
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSendTip = async (amountArg?: number) => {
     if (!session) return;
     let amount = amountArg;
@@ -1412,148 +1459,88 @@ export const ChatPanel = ({ session }: Props) => {
         ))}
       </div>
 
-      {/* Emoji bar (always visible, examiner emojis are persisted globally) */}
+      {/* Composer unificado (<ChatComposer>): emojis ARRIBA · texto AL MEDIO (auto-crece) ·
+          acciones ABAJO. Pegar imagen/video del portapapeles → preview + se manda al enviar.
+          Solo se muestra con la sesión abierta (ended = solo lectura). */}
       {session.status !== "ended" && (
-        <EmojiBar
+        <ChatComposer
+          value={input}
+          onChange={handleInputChange}
+          onSend={composerSend}
+          placeholder={`Mensaje como ${fanName}…`}
+          busy={uploading}
           emojis={examinerEmojis}
-          onPick={(e) => {
-            setInput((v) => v + e);
-            // Devolver el foco al textarea: así Enter ENVÍA (no re-inserta el emoji).
-            textareaRef.current?.focus();
-          }}
-          onAdd={(e) => persistEmojis([...examinerEmojis, e])}
-          onRemove={(e) =>
-            persistEmojis(examinerEmojis.filter((x) => x !== e))
+          onAddEmoji={(e) => persistEmojis([...examinerEmojis, e])}
+          onRemoveEmoji={(e) => persistEmojis(examinerEmojis.filter((x) => x !== e))}
+          emojiTrailing={<FontZoom />}
+          replyBar={
+            replyTo ? (
+              <div className="flex items-center gap-2 rounded-md border-l-2 border-primary bg-muted/50 px-2 py-1.5">
+                <Reply className="h-4 w-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold text-primary">
+                    Respondiendo a {replyTo.role === "fan" ? fanName : profile?.name ?? "chatter"}
+                  </div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {replyTo.content?.trim() || (replyTo.images && replyTo.images.length > 0 ? "📷 Foto" : "mensaje")}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyTo(null)}
+                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="Cancelar respuesta"
+                  aria-label="Cancelar respuesta"
+                >
+                  <XIcon className="h-4 w-4" />
+                </button>
+              </div>
+            ) : null
           }
-          trailing={<FontZoom />}
+          toolbarExtra={
+            <>
+              <GifPicker onPick={sendGifUrl} disabled={uploading} />
+              <StickerPicker onPick={sendStickerUrl} disabled={uploading} />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Enviar tip"
+                    className="h-9 w-9 text-amber-500 hover:bg-amber-500/10 hover:text-amber-400"
+                  >
+                    <DollarSign className="h-4 w-4" strokeWidth={3} />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2" align="start" side="top">
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">Tip rápido</div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[5, 10, 20, 50, 100, 200].map((amt) => (
+                      <Button key={amt} size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleSendTip(amt)}>
+                        ${amt}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button size="sm" variant="ghost" className="mt-1 w-full text-xs" onClick={() => handleSendTip()}>
+                    Otro monto…
+                  </Button>
+                </PopoverContent>
+              </Popover>
+              {speechSupported && (
+                <Button
+                  onClick={toggleDictation}
+                  size="icon"
+                  variant={listening ? "default" : "ghost"}
+                  title={listening ? "Detener dictado" : "Dictar (Web Speech)"}
+                  className={listening ? "h-9 w-9 bg-rose-500 text-white hover:bg-rose-500/90" : "h-9 w-9 text-muted-foreground"}
+                >
+                  {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
+              )}
+            </>
+          }
         />
       )}
-
-      {/* Input */}
-      <div className="p-2">
-        {/* Barra de cita (reply) — se muestra cuando hay un mensaje seleccionado para responder. */}
-        {replyTo && session.status !== "ended" && (
-          <div className="mb-2 flex items-center gap-2 rounded-md border-l-2 border-primary bg-muted/50 px-2 py-1.5">
-            <Reply className="h-4 w-4 shrink-0 text-primary" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-semibold text-primary">
-                Respondiendo a {replyTo.role === "fan" ? fanName : profile?.name ?? "chatter"}
-              </div>
-              <div className="truncate text-xs text-muted-foreground">
-                {replyTo.content?.trim() || (replyTo.images && replyTo.images.length > 0 ? "📷 Foto" : "mensaje")}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setReplyTo(null)}
-              className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              title="Cancelar respuesta"
-              aria-label="Cancelar respuesta"
-            >
-              <XIcon className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void handleFileUpload(f);
-          }}
-        />
-        <div className="flex items-end gap-2">
-          <Button
-            onClick={() => fileInputRef.current?.click()}
-            size="icon"
-            variant="outline"
-            disabled={session.status === "ended" || uploading}
-            title="Subir foto / video"
-          >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-          </Button>
-          {/* GIF (Giphy) + Stickers — reusa los pickers de la bandeja de WhatsApp. */}
-          <GifPicker onPick={sendGifUrl} disabled={session.status === "ended" || uploading} />
-          <StickerPicker onPick={sendStickerUrl} disabled={session.status === "ended" || uploading} />
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => handleInputChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void handleSend();
-              }
-            }}
-            placeholder={`Mensaje como ${fanName}…`}
-            disabled={session.status === "ended"}
-            rows={2}
-            className="min-h-[2.25rem] flex-1 resize-none rounded-md border bg-transparent px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
-          />
-          <Popover>
-            <PopoverTrigger asChild>
-              {/* Gold-accent tip button — matches the original
-                  btn-content with the gold border/text override
-                  (index.html line 3420). */}
-              <Button
-                size="icon"
-                variant="outline"
-                disabled={session.status === "ended"}
-                title="Enviar tip"
-                className="border-amber-500 text-amber-500 hover:bg-amber-500/10 hover:text-amber-400"
-              >
-                <DollarSign className="h-4 w-4" strokeWidth={3} />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-2" align="end">
-              <div className="mb-1 text-xs font-medium text-muted-foreground">Tip rápido</div>
-              <div className="grid grid-cols-3 gap-1">
-                {[5, 10, 20, 50, 100, 200].map((amt) => (
-                  <Button
-                    key={amt}
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs"
-                    onClick={() => handleSendTip(amt)}
-                  >
-                    ${amt}
-                  </Button>
-                ))}
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="mt-1 w-full text-xs"
-                onClick={() => handleSendTip()}
-              >
-                Otro monto…
-              </Button>
-            </PopoverContent>
-          </Popover>
-          {speechSupported && (
-            <Button
-              onClick={toggleDictation}
-              disabled={session.status === "ended"}
-              size="icon"
-              variant={listening ? "default" : "outline"}
-              title={listening ? "Detener dictado" : "Dictar (Web Speech)"}
-              className={listening ? "bg-rose-500 text-white hover:bg-rose-500/90" : ""}
-            >
-              {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            </Button>
-          )}
-          <Button
-            onClick={handleSend}
-            disabled={session.status === "ended" || !input.trim() || sendMut.isPending}
-            size="icon"
-            title="Enviar"
-          >
-            {sendMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
-        </div>
-      </div>
 
       <MediaViewer url={mediaUrl} onClose={() => setMediaUrl(null)} />
       <TipPopup amount={tipAmount} onDone={() => setTipAmount(null)} />
