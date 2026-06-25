@@ -1502,13 +1502,6 @@ export const ChatPanel = ({ session }: Props) => {
             <>
               <GifPicker onPick={sendGifUrl} disabled={uploading} />
               <StickerPicker onPick={sendStickerUrl} disabled={uploading} />
-              <ScriptsButton
-                disabled={uploading}
-                onUse={(s) => {
-                  if (s.send_on_click) void composerSend(s.text, []);
-                  else setInput((v) => (v.trim() ? v.trimEnd() + " " : "") + s.text);
-                }}
-              />
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -1545,6 +1538,14 @@ export const ChatPanel = ({ session }: Props) => {
                   {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
               )}
+              {/* Scripts en último lugar (antes de Enviar), pedido del owner. */}
+              <ScriptsButton
+                disabled={uploading}
+                onUse={(s) => {
+                  if (s.send_on_click) void composerSend(s.text, []);
+                  else setInput((v) => (v.trim() ? v.trimEnd() + " " : "") + s.text);
+                }}
+              />
             </>
           }
         />
