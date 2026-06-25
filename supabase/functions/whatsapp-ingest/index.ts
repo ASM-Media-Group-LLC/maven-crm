@@ -431,11 +431,13 @@ async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Pr
   // De ahí deriva la visibilidad por membresía; si la instancia no está
   // registrada todavía, queda null (solo admin lo ve, hasta que se mapee).
   let channelId: string | null = null;
+  let channelDefaults: string[] = []; // usuarios auto-asignados a conversaciones nuevas de esta línea
   if (channelJid) {
     const { data: ch } = await sb
-      .from("wa_channels").select("id")
+      .from("wa_channels").select("id, default_assignees")
       .eq("tenant_id", TENANT_ID).eq("evolution_instance", channelJid).maybeSingle();
     channelId = ch?.id ?? null;
+    channelDefaults = Array.isArray(ch?.default_assignees) ? (ch!.default_assignees as string[]) : [];
   }
 
   // 2) Conversación: la del contacto EN ESTA LÍNEA (canal). Antes buscaba por
@@ -455,10 +457,19 @@ async function persistInboxMessage(sb: SupabaseClient, msg: IncomingMessage): Pr
   } else {
     const { data: created, error } = await sb
       .from("wa_conversations")
-      .insert({ tenant_id: TENANT_ID, contact_id: contactId, channel_jid: channelJid, channel_id: channelId, department: "closer", status: "open" })
+      .insert({ tenant_id: TENANT_ID, contact_id: contactId, channel_jid: channelJid, channel_id: channelId, department: "closer", status: "open",
+                // Auto-asignación por LÍNEA: el "principal" es el 1° de la lista (null si no hay).
+                assigned_to: channelDefaults[0] ?? null })
       .select("id").single();
     if (!created) { console.warn("inbox conversation insert:", error?.message); return; }
     conversationId = created.id;
+    // Multi-asignado: toda persona configurada en la línea queda asignada a la conversación NUEVA.
+    if (channelDefaults.length > 0) {
+      await sb.from("wa_conversation_assignees").upsert(
+        channelDefaults.map((uid) => ({ conversation_id: conversationId, user_id: uid })),
+        { onConflict: "conversation_id,user_id", ignoreDuplicates: true },
+      );
+    }
   }
 
   // 3) Mensaje: insert idempotente por (conversation_id, external_id).

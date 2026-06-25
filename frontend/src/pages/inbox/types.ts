@@ -94,6 +94,8 @@ export interface WaChannel {
   department: WaChannelDepartment;
   type: WaChannelType;
   active: boolean;
+  /** Auto-asignar las conversaciones NUEVAS de esta línea a estos usuarios (multi). */
+  default_assignees: string[] | null;
   created_at: string;
   updated_at: string;
 }

@@ -75,7 +75,7 @@ const ChannelsPage = () => {
   const [membersFor, setMembersFor] = useState<ChannelRow | null>(null);
   // Editar / eliminar un canal (admin). editForm suma `active` (activar/desactivar).
   const [editing, setEditing] = useState<ChannelRow | null>(null);
-  const [editForm, setEditForm] = useState({ ...EMPTY_FORM, active: true });
+  const [editForm, setEditForm] = useState({ ...EMPTY_FORM, active: true, default_assignees: [] as string[] });
   const [deleting, setDeleting] = useState<ChannelRow | null>(null);
   const openEdit = (c: ChannelRow) => {
     setEditForm({
@@ -85,6 +85,7 @@ const ChannelsPage = () => {
       department: c.department,
       type: c.type,
       active: c.active,
+      default_assignees: c.default_assignees ?? [],
     });
     setEditing(c);
   };
@@ -161,6 +162,7 @@ const ChannelsPage = () => {
         department: editForm.department,
         type: editForm.type,
         active: editForm.active,
+        default_assignees: editForm.default_assignees,
       }).eq("id", editing.id);
       if (error) throw error;
     },
@@ -390,6 +392,36 @@ const ChannelsPage = () => {
               <Checkbox checked={editForm.active} onCheckedChange={(v) => setEditForm({ ...editForm, active: v === true })} />
               <span className="text-sm">Activo <span className="text-muted-foreground">(si lo desactivás, deja de aparecer en los selectores)</span></span>
             </label>
+            {/* Auto-asignación por línea: las conversaciones NUEVAS de esta línea se asignan
+                a quien marques (uno o varios). Las existentes no se tocan. */}
+            <div className="space-y-1.5 pt-1">
+              <Label>Auto-asignar conversaciones nuevas a</Label>
+              <p className="text-[11px] text-muted-foreground">Cada conversación NUEVA de esta línea se asigna automáticamente a quien marques (podés elegir varias personas). Las existentes no se tocan.</p>
+              <div className="max-h-40 overflow-y-auto rounded-md border border-border p-2 space-y-1">
+                {users.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Sin usuarios</p>
+                ) : users.map((u) => {
+                  const on = editForm.default_assignees.includes(u.id);
+                  return (
+                    <label key={u.id} className="flex cursor-pointer items-center gap-2">
+                      <Checkbox
+                        checked={on}
+                        onCheckedChange={(v) => setEditForm((f) => ({
+                          ...f,
+                          default_assignees: v === true
+                            ? [...f.default_assignees, u.id]
+                            : f.default_assignees.filter((x) => x !== u.id),
+                        }))}
+                      />
+                      <span className="text-sm">{u.full_name ?? u.id.slice(0, 8)}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {editForm.default_assignees.length > 0 && (
+                <p className="text-[11px] text-muted-foreground">{editForm.default_assignees.length} persona(s) — auto-asignación activa en esta línea</p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
