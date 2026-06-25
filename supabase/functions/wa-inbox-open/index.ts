@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { whatsappCors } from "../_shared/whatsapp.ts";
 
@@ -24,7 +23,33 @@ function toJid(e164: string): string | null {
   return digits.length >= 7 ? `${digits}@s.whatsapp.net` : null;
 }
 
-serve(async (req) => {
+const onlyDigits = (s: unknown) => String(s ?? "").replace(/[^0-9]/g, "");
+
+// Normaliza a +E.164 limpiando los errores de formato que rompían el envío
+// (espejo de la función SQL public.normalize_wa_e164). Quita basura, deshace el
+// doble código de país y el "0" troncal de Venezuela. NO inventa país (10 dígitos
+// sin código quedan sin tocar → fallan visiblemente, no le pegan a otra persona).
+function cleanE164(raw: unknown): string | null {
+  let d = onlyDigits(raw);
+  if (d.length < 8) return null;
+  if (/^521[0-9]{10}$/.test(d)) d = "52" + d.slice(3);                       // MX legacy 521+10 → 52+10
+  if (d.length >= 13 && d.slice(0, 2) === d.slice(2, 4)
+      && ["52", "57", "58", "51", "56", "54", "55", "34"].includes(d.slice(0, 2))) d = d.slice(2); // doble CC pegado
+  if (d.length >= 13 && d.slice(0, 2) === "57" && /^(593|595|591|58|54|52|51|56)/.test(d.slice(2))) d = d.slice(2); // 57 mal prepended
+  if (/^580/.test(d)) d = "58" + d.slice(3);                                 // VE troncal 0
+  return "+" + d;
+}
+
+// Une código de país + teléfono SIN duplicar: si el teléfono ya trae el código
+// (o un "+"), no se vuelve a anteponer. Esto evita el "+57(+57 …)" / "+57+593…".
+function joinCc(cc: unknown, phone: unknown): string | null {
+  const c = onlyDigits(cc), p = onlyDigits(phone);
+  if (!p) return null;
+  const merged = (c && !p.startsWith(c)) ? c + p : p;
+  return cleanE164(merged);
+}
+
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: whatsappCors });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -84,13 +109,13 @@ serve(async (req) => {
       leadExists = true;
       leadOwner = lead.assigned_to ?? null;
       leadIdForContact = leadId;
-      e164 = (lead.phone && String(lead.phone).startsWith("+")) ? String(lead.phone) : null;
+      e164 = lead.phone ? cleanE164(lead.phone) : null;
       if (!e164 && lead.source_contact_id) {
         const { data: sc } = await (sb as any)
           .from("closers_contacts").select("country_code, phone").eq("id", lead.source_contact_id).maybeSingle();
         if (sc) {
-          if (sc.country_code && sc.phone) e164 = `${sc.country_code}${sc.phone}`;
-          else if (sc.phone && String(sc.phone).startsWith("+")) e164 = String(sc.phone);
+          if (sc.country_code && sc.phone) e164 = joinCc(sc.country_code, sc.phone);
+          else if (sc.phone) e164 = cleanE164(sc.phone);
         }
       }
       displayName = lead.name || lead.full_name || lead.creator_name || lead.display_name || lead.instagram_handle || lead.handle || null;
@@ -129,14 +154,14 @@ serve(async (req) => {
     const { data: sc } = await (sb as any)
       .from("closers_contacts").select("country_code, phone, name, handle").eq("id", payload.contact_id).maybeSingle();
     if (sc) {
-      if (sc.country_code && sc.phone) e164 = `${sc.country_code}${sc.phone}`;
-      else if (sc.phone && String(sc.phone).startsWith("+")) e164 = String(sc.phone);
+      if (sc.country_code && sc.phone) e164 = joinCc(sc.country_code, sc.phone);
+      else if (sc.phone) e164 = cleanE164(sc.phone);
       displayName = displayName || sc.name || sc.handle || null;
     }
   }
 
-  if (!e164 && payload.phone && String(payload.phone).startsWith("+")) {
-    e164 = String(payload.phone);                 // fallback leadgen / sin fila de closer
+  if (!e164 && payload.phone) {
+    e164 = cleanE164(payload.phone);              // fallback leadgen / sin fila de closer
     displayName = displayName || payload.name || null;
   }
   const jid = e164 ? toJid(e164) : null;
