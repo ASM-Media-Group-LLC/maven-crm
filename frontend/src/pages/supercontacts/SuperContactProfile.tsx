@@ -334,7 +334,8 @@ const SuperContactProfile = () => {
   const saveEdit = async () => {
     const payload: any = { id: contact.id };
     Object.entries(form).forEach(([k, v]) => {
-      if (!isAdmin && (k === "phone" || k === "email")) return;  // no-admin no toca PII (no la ve ni la pisa)
+      // phone/email enmascarados (••••): solo se escriben si el user puso uno NUEVO (sin •).
+      if ((k === "phone" || k === "email") && typeof v === "string" && v.includes("•")) return;
       if (k === "followers_count") payload[k] = v ? Number(v) : null;
       else if (k === "city" && v === "__other__") payload[k] = form._customCity || null;
       else payload[k] = v || null;
@@ -952,14 +953,9 @@ const SuperContactProfile = () => {
           ) : <Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />}
           {form.city === "__other__" && <Input value={form._customCity || ""} onChange={e => setForm({ ...form, _customCity: e.target.value })} placeholder="Ciudad" className="mt-1" />}
         </div>
-        {isAdmin ? (
-          <>
-            <div><Label className="text-xs">Teléfono</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
-            <div><Label className="text-xs">Email</Label><Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
-          </>
-        ) : (
-          <div className="sm:col-span-2 text-[11px] text-muted-foreground self-end pb-2">📞 Teléfono y email solo admin</div>
-        )}
+        <div><Label className="text-xs">Teléfono</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
+        <div><Label className="text-xs">Email</Label><Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+        {!isAdmin && <div className="sm:col-span-3 text-[11px] text-muted-foreground -mt-1">📞 Teléfono/email enmascarados (••••); escribí uno nuevo para cambiarlos.</div>}
         <div>
           <Label className="text-xs">Estado</Label>
           <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>

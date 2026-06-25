@@ -138,11 +138,15 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
         profile_picture_url: profilePhoto?.url || null,
         ticket_number: ticket || null,
       };
-      // Solo admin puede ver/editar teléfono y email; para no-admin NO los tocamos.
-      if (isAdmin) {
-        updatePayload.email = email || null;
-        updatePayload.country_code = countryCode;
+      // Teléfono/email: el no-admin los ve ENMASCARADOS (••••). Solo se escriben si el
+      // valor NO trae asteriscos (= el usuario escribió uno NUEVO). Si no lo tocó (sigue
+      // enmascarado), no se pisa el valor real. El admin ve el real (sin •) y escribe normal.
+      if (!(phone || "").includes("•")) {
         updatePayload.phone = phone || null;
+        updatePayload.country_code = countryCode;
+      }
+      if (!(email || "").includes("•")) {
+        updatePayload.email = email || null;
       }
 
       const { error } = await supabase
@@ -196,23 +200,22 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
                 <CompanySelector value={compania} onChange={setCompania} companies={companies} onAddCompany={(name) => setCompanies((prev) => [...prev, name])} />
               </div>
 
-              {isAdmin ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Email</Label>
-                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@ejemplo.com" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Teléfono</Label>
-                    <div className="flex gap-2">
-                      <CountryCodeSelect value={countryCode} onChange={setCountryCode} />
-                      <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Número de teléfono" className="flex-1" />
-                    </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Email</Label>
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@ejemplo.com" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Teléfono</Label>
+                  <div className="flex gap-2">
+                    <CountryCodeSelect value={countryCode} onChange={setCountryCode} />
+                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Número de teléfono" className="flex-1" />
                   </div>
                 </div>
-              ) : (
-                <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border px-3 py-2">
-                  📞 Teléfono y email solo son visibles/editables para administradores. Para escribirle, usá el botón de WhatsApp del contacto.
+              </div>
+              {!isAdmin && (
+                <p className="text-[11px] text-muted-foreground -mt-2">
+                  📞 Ves el teléfono/email enmascarados (••••). Para cambiarlos, escribí uno nuevo; si los dejás así, no se modifican.
                 </p>
               )}
 
