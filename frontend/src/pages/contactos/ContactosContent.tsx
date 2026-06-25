@@ -30,6 +30,7 @@ import ContactosAnalyticsModal from "./ContactosAnalyticsModal";
 
 import { SALES_CHANNEL_NONE, SALES_CHANNEL_MULTI } from "./ContactosFilters";
 import { useContactSalesChannels } from "./useContactSalesChannels";
+import { useContactStatuses } from "./useContactStatuses";
 import ContactoDetailDialog from "./ContactoDetailDialog";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
@@ -110,11 +111,15 @@ const ContactosContent = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isAdmin, isManager } = useUserRole();
-  // Canales de venta: visibles para admin Y managers (vía RPC server-side).
-  const canSeeChannels = isAdmin || isManager;
+  // Canales de venta: visibles para TODOS los que pueden abrir Contactos (la ruta ya
+  // gatea por permiso). Antes era solo admin/manager; ahora todo el equipo ve si una
+  // creadora ya fue contactada y por qué línea. El RPC expone label de canal, no PII.
+  const canSeeChannels = true;
 
-  // Canales de venta por contacto (admin+manager vía RPC; react-query dedupea).
+  // Canales de venta por contacto (server-side vía RPC; react-query dedupea).
   const salesChannels = useContactSalesChannels(canSeeChannels);
+  // Estado de cada contacto (creadora activa / ex-creadora / en proceso) para el color de fila.
+  const contactStatuses = useContactStatuses();
 
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [filters]);
@@ -593,6 +598,7 @@ const ContactosContent = () => {
                   onConvert={handleConvert}
                   onDelete={isAdmin ? (c) => { setSelectedContacto(c); setDeleteOpen(true); } : undefined}
                   channelsByContact={canSeeChannels ? salesChannels.byContactId : undefined}
+                  statuses={contactStatuses}
                 />
               </DataTableShell>
             )}

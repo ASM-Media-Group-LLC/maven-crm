@@ -9,6 +9,7 @@ import {
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import type { Contacto } from "./ContactosContent";
 import type { ContactChannel } from "./useContactSalesChannels";
+import type { ContactStatus } from "./useContactStatuses";
 
 const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
   "A+": "success-soft",
@@ -24,14 +25,23 @@ interface Props {
   onEdit?: (contacto: Contacto) => void;
   onConvert?: (contacto: Contacto) => void;
   onDelete?: (contacto: Contacto) => void;
-  // Mapa closers_contacts.id → canales de venta (solo admin; provisto por ContactosContent).
+  // Mapa closers_contacts.id → canales de venta (provisto por ContactosContent).
   channelsByContact?: Map<string, ContactChannel[]>;
+  // Mapa closers_contacts.id → estado, para el color de la fila (verde/amarillo/rojo).
+  statuses?: Map<string, ContactStatus>;
 }
+
+// Tinte de la fila según el estado del contacto (degradado glass sutil).
+const ROW_BG: Record<ContactStatus, string> = {
+  creator_active: "border-emerald-500/30 bg-gradient-to-r from-emerald-500/[0.16] to-emerald-500/[0.04] hover:from-emerald-500/25",
+  in_progress: "border-amber-500/30 bg-gradient-to-r from-amber-500/[0.16] to-amber-500/[0.04] hover:from-amber-500/25",
+  ex_creator: "border-rose-500/30 bg-gradient-to-r from-rose-500/[0.16] to-rose-500/[0.04] hover:from-rose-500/25",
+};
 
 // Lista de cajones clickeables — mismo patrón que Pareto / Creator Reports
 // en Dashboard 2. Cada card muestra avatar IG, nombre, badge categoría,
 // fecha y links rápidos. Click abre popup detalle.
-const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onDelete, channelsByContact }: Props) => {
+const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onDelete, channelsByContact, statuses }: Props) => {
   if (contactos.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
@@ -53,12 +63,16 @@ const ContactosCardList = ({ contactos, onView, onEdit, onConvert, onDelete, cha
           .toUpperCase() || "?";
         const recordType = (c as unknown as { record_type?: string }).record_type;
         const salesChannels = channelsByContact?.get(c.id) ?? [];
+        // Color de fila: el estado del RPC, o "en proceso" (amarillo) si solo tiene
+        // conversación de wpp (= fue contactada). Sin nada → sin color.
+        const effStatus = statuses?.get(c.id) ?? (salesChannels.length > 0 ? "in_progress" : undefined);
+        const rowBg = effStatus ? ROW_BG[effStatus] : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-primary/40";
         return (
           <button
             key={c.id}
             type="button"
             onClick={() => onView?.(c)}
-            className="group w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left transition-colors hover:bg-white/10 hover:border-primary/40"
+            className={`group w-full rounded-xl border p-3 text-left transition-colors ${rowBg}`}
           >
             <div className="flex items-center gap-3">
               <Avatar className="h-12 w-12 shrink-0">
