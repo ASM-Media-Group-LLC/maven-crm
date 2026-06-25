@@ -52,7 +52,8 @@ export const useSuperContacts = () => {
     queryKey: ["super-contacts"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("super_contacts")
+        // vista enmascarada: phone/email solo reales para admin (revocados en la tabla base)
+        .from("v_super_contacts")
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -67,7 +68,7 @@ export const useSuperContact = (id: string | undefined) => {
     enabled: !!id,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("super_contacts")
+        .from("v_super_contacts")
         .select("*")
         .eq("id", id!)
         .single();
@@ -153,7 +154,7 @@ export const useCreateSuperContact = () => {
       const { data, error } = await supabase
         .from("super_contacts")
         .insert({ ...contact, created_by: user?.id || null } as any)
-        .select()
+        .select("id")
         .single();
       if (error) throw error;
       return data;
@@ -176,7 +177,7 @@ export const useImportSuperContacts = () => {
       const { data, error } = await supabase
         .from("super_contacts")
         .upsert(rows as any, { onConflict: "instagram_handle", ignoreDuplicates: true })
-        .select();
+        .select("id");
       if (error) throw error;
       return data;
     },
@@ -195,7 +196,7 @@ export const useUpdateSuperContact = () => {
         .from("super_contacts")
         .update(updates as any)
         .eq("id", id)
-        .select()
+        .select("id")
         .single();
       if (error) throw error;
       return data;

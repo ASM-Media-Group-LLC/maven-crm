@@ -20,6 +20,7 @@ import {
   type SuperContactOutreach,
 } from "./useSuperContacts";
 import { toast } from "@/hooks/use-toast";
+import { useUserRole } from "@/hooks/useUserRole";
 import { getCountryOptions, getCountryDisplay } from "@/lib/country-utils";
 import { WhatsAppLink } from "@/components/MaskedPhone";
 import { getCitiesByCountryCode } from "@/lib/city-data";
@@ -92,6 +93,7 @@ const SuperContactProfile = () => {
   const { data: interactions = [] } = useSuperContactInteractions(id);
   const { data: outreach = [] } = useSuperContactOutreach(id);
   const updateMutation = useUpdateSuperContact();
+  const { isAdmin } = useUserRole();  // teléfono/email solo admin (vista enmascarada)
   const createInteraction = useCreateInteraction();
   const createOutreach = useCreateOutreach();
 
@@ -332,6 +334,7 @@ const SuperContactProfile = () => {
   const saveEdit = async () => {
     const payload: any = { id: contact.id };
     Object.entries(form).forEach(([k, v]) => {
+      if (!isAdmin && (k === "phone" || k === "email")) return;  // no-admin no toca PII (no la ve ni la pisa)
       if (k === "followers_count") payload[k] = v ? Number(v) : null;
       else if (k === "city" && v === "__other__") payload[k] = form._customCity || null;
       else payload[k] = v || null;
@@ -949,8 +952,14 @@ const SuperContactProfile = () => {
           ) : <Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />}
           {form.city === "__other__" && <Input value={form._customCity || ""} onChange={e => setForm({ ...form, _customCity: e.target.value })} placeholder="Ciudad" className="mt-1" />}
         </div>
-        <div><Label className="text-xs">Teléfono</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
-        <div><Label className="text-xs">Email</Label><Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+        {isAdmin ? (
+          <>
+            <div><Label className="text-xs">Teléfono</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
+            <div><Label className="text-xs">Email</Label><Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+          </>
+        ) : (
+          <div className="sm:col-span-2 text-[11px] text-muted-foreground self-end pb-2">📞 Teléfono y email solo admin</div>
+        )}
         <div>
           <Label className="text-xs">Estado</Label>
           <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>

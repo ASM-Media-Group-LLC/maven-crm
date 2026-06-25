@@ -236,7 +236,7 @@ export function useEventGuests(eventId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("event_guests")
-        .select("*, creators(name, artistic_name, profile_photo_url)")
+        .select("id, event_id, creator_id, guest_name, guest_type, status, created_at, cancellation_reason, status_updated_at, status_changed_by, creators(name, artistic_name, profile_photo_url)")
         .eq("event_id", eventId);
       if (error) throw error;
       return data ?? [];

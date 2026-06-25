@@ -25,7 +25,8 @@ export function useEventGuestsExtended(eventId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("event_guests")
-        .select("*, creators(name, artistic_name, profile_photo_url)")
+        // columnas explícitas SIN phone/email (PII admin-only; revocadas en la tabla)
+        .select("id, event_id, creator_id, guest_name, guest_type, status, created_at, cancellation_reason, status_updated_at, status_changed_by, creators(name, artistic_name, profile_photo_url)")
         .eq("event_id", eventId)
         .order("created_at", { ascending: true });
       if (error) throw error;
