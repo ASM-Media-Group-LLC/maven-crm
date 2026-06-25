@@ -290,8 +290,8 @@ const App = () => (
                 {/* Migrated areas from kash-call-qa — placeholders for now */}
                 <Route path="/scouter-assist" element={<PermissionRoute module="Scouter Assist"><ScouterAssist /></PermissionRoute>} />
                 <Route path="/agency-qa" element={<PermissionRoute module="Agency QA"><AgencyQA /></PermissionRoute>} />
-                {/* Conversaciones BLU (Messages Pro on-demand) — mismo gate que Company QA */}
-                <Route path="/conversaciones" element={<PermissionRoute module="Agency QA" submodule="Mensajes Pro"><BluConversations /></PermissionRoute>} />
+                {/* Conversaciones BLU (Mensajes Pro on-demand) — módulo propio en Operaciones */}
+                <Route path="/conversaciones" element={<PermissionRoute module="Mensajes Pro"><BluConversations /></PermissionRoute>} />
                 {/* Sales Overview — sub-rutas eliminadas; ahora vive todo en modales */}
                 <Route path="/sales-overview" element={<PermissionRoute module="Creator Sales" submodule="Dashboard"><SalesOverview /></PermissionRoute>} />
                 <Route path="/salesdashboard" element={<PermissionRoute module="Creator Sales" submodule="Reportes"><SalesDashboard /></PermissionRoute>} />

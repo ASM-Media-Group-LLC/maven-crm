@@ -147,9 +147,14 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // Si un rol no tiene un toggle on para "Closers QA", todo el grupo
   // izquierdo desaparece para él aunque tenga acceso a "Calls".
   { group: "Operaciones",   module: "Agency QA",     submodules: [
-    "Closers QA", "Chatters QA", "Managers QA", "Spammers QA", "Mensajes Pro",
+    "Closers QA", "Chatters QA", "Managers QA", "Spammers QA",
     "Calls", "New QA", "QA History", "QA Chat", "Models", "Analytics", "Notifications", "Borrar Calls",
   ] },
+  // Mensajes Pro = visor on-demand de conversaciones (BLU). Era submódulo de Agency QA,
+  // pero es un tab propio del sidebar (/conversaciones) → se promovió a módulo top-level para
+  // que se pueda asignar por rol sin tener que dar todo Agency QA. El gate de BLU
+  // (can_use_blu_mp) honra este módulo + Chatters QA.
+  { group: "Operaciones",   module: "Mensajes Pro",  submodules: [] },
 
   // === Finanzas ===
   { group: "Finanzas",      module: "Finanzas",      submodules: ["Dashboard", "Collections", "Nómina", "Horas Variables", "Invoices", "Templates", "Control Financiero", "Reportes", "Configuración"] },
