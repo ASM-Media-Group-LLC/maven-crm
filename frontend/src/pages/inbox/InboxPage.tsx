@@ -35,6 +35,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { WaConversationStatus, WaMessageDirection } from "./types";
 import { EmojiBar, usePersistedEmojis } from "@/pages/chatter-evaluator/workspace/EmojiBar";
+import { ScriptsButton } from "@/components/chat/ScriptsButton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import { AudioRecorderBar } from "./AudioRecorder";
@@ -485,8 +486,8 @@ const InboxPage = () => {
     qc.invalidateQueries({ queryKey: ["wa-inbox-messages", convId] });
   };
 
-  const sendMessage = async () => {
-    const text = draft.trim();
+  const sendMessage = async (textOverride?: string) => {
+    const text = (textOverride ?? draft).trim();
     if (!text || !selectedId || sending) return;
     const convId = selectedId;
     const replyTo = replyingTo; // capturado para reintento + persistencia
@@ -1289,27 +1290,7 @@ const InboxPage = () => {
               </DialogContent>
             </Dialog>
 
-            {/* Barra de "respondiendo a" (Slice 1 responder/citar) */}
-            {replyingTo && (
-              <div className="mx-4 mt-2 flex items-start gap-2 rounded-md border-l-4 border-primary bg-muted/50 px-3 py-1.5 text-xs">
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-primary">
-                    {replyingTo.direction === "out" ? "Respondiendo a vos" : `Respondiendo a ${contactLabel(selected?.contact ?? null)}`}
-                  </p>
-                  <p className="truncate text-muted-foreground">{replyingTo.body || `[${replyingTo.msg_type}]`}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setReplyingTo(null)}
-                  className="shrink-0 text-muted-foreground hover:text-foreground"
-                  aria-label="Cancelar respuesta"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-
-            {/* Barra de emojis — misma config/catálogo que Chatter Evaluator */}
+            {/* Barra de emojis — ARRIBA (misma config/catálogo que Chatter Evaluator) */}
             {!recording && (
               <EmojiBar
                 emojis={inboxEmojis}
@@ -1327,35 +1308,29 @@ const InboxPage = () => {
               <AudioRecorderBar onSend={handleRecorderSend} onCancel={() => setRecording(false)} />
             )}
 
-            {/* Cuadro de envío (Slice 3) + Copiloto menú (6a) */}
+            {/* Cuadro de envío — layout unificado: cita + texto AL MEDIO, acciones ABAJO
+                (Copiloto · adjuntar · mic · GIF · sticker · Scripts) + Enviar a la derecha.
+                NO se tocó la lógica de envío (sendMessage/sendMedia/optimista/errores). */}
             {!recording && (
-            <div className="flex items-center gap-2 border-t border-border px-4 py-3">
-              {canAccess("WhatsApp", "IA") && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    disabled={!!copilotBusy || sending}
-                    variant="outline"
-                    size="icon"
-                    className="h-10 w-10 shrink-0"
-                    title="Copiloto IA"
+            <div className="space-y-2 border-t border-border px-4 py-3">
+              {/* Barra de "respondiendo a" (responder/citar) — arriba del cajón */}
+              {replyingTo && (
+                <div className="flex items-start gap-2 rounded-md border-l-4 border-primary bg-muted/50 px-3 py-1.5 text-xs">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-primary">
+                      {replyingTo.direction === "out" ? "Respondiendo a vos" : `Respondiendo a ${contactLabel(selected?.contact ?? null)}`}
+                    </p>
+                    <p className="truncate text-muted-foreground">{replyingTo.body || `[${replyingTo.msg_type}]`}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReplyingTo(null)}
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    aria-label="Cancelar respuesta"
                   >
-                    {copilotBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" side="top" className="w-52">
-                  <DropdownMenuLabel className="text-xs">Copiloto IA</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => runCopilot("suggest")}>
-                    <PenLine className="mr-2 h-4 w-4" /> Sugerir respuesta
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => runCopilot("summarize")}>
-                    <FileText className="mr-2 h-4 w-4" /> Resumir el hilo
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => runCopilot("signals")}>
-                    <Gauge className="mr-2 h-4 w-4" /> Detectar señales
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               )}
               <input
                 ref={fileInputRef}
@@ -1364,24 +1339,8 @@ const InboxPage = () => {
                 className="hidden"
                 onChange={onFilePicked}
               />
-              <Button
-                variant="outline" size="icon" className="h-10 w-10 shrink-0"
-                title="Adjuntar archivo"
-                disabled={mediaBusy || sending || recording}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-              </Button>
-              <Button
-                variant="outline" size="icon" className="h-10 w-10 shrink-0"
-                title="Grabar nota de voz"
-                disabled={mediaBusy || sending}
-                onClick={startRecording}
-              >
-                <Mic className="h-4 w-4" />
-              </Button>
-              <GifPicker onPick={sendGifUrl} disabled={mediaBusy || sending} />
-              <StickerPicker onPick={sendStickerUrl} disabled={mediaBusy || sending} />
+              {/* Cajón de texto al medio. Pegar imagen/video del portapapeles → se manda (mismo
+                  flujo de media inmediata que el adjuntar de la bandeja). */}
               <Input
                 ref={draftInputRef}
                 value={draft}
@@ -1392,18 +1351,87 @@ const InboxPage = () => {
                     sendMessage();
                   }
                 }}
+                onPaste={(e) => {
+                  const items = Array.from(e.clipboardData?.items ?? []);
+                  for (const it of items) {
+                    if (it.kind === "file" && (it.type.startsWith("image/") || it.type.startsWith("video/"))) {
+                      const f = it.getAsFile();
+                      if (f) {
+                        e.preventDefault();
+                        sendMedia(f, f.type.startsWith("image/") ? "image" : "video", f.name || `pegado-${Date.now()}`);
+                        return;
+                      }
+                    }
+                  }
+                }}
                 placeholder="Escribí un mensaje…"
                 className="h-10"
               />
-              <Button
-                onClick={sendMessage}
-                disabled={sending || !draft.trim()}
-                size="icon"
-                className="h-10 w-10 shrink-0"
-                title="Enviar"
-              >
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
+              {/* Acciones abajo */}
+              <div className="flex items-center gap-1">
+                {canAccess("WhatsApp", "IA") && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      disabled={!!copilotBusy || sending}
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 text-muted-foreground"
+                      title="Copiloto IA"
+                    >
+                      {copilotBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" side="top" className="w-52">
+                    <DropdownMenuLabel className="text-xs">Copiloto IA</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => runCopilot("suggest")}>
+                      <PenLine className="mr-2 h-4 w-4" /> Sugerir respuesta
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => runCopilot("summarize")}>
+                      <FileText className="mr-2 h-4 w-4" /> Resumir el hilo
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => runCopilot("signals")}>
+                      <Gauge className="mr-2 h-4 w-4" /> Detectar señales
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                )}
+                <Button
+                  variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-muted-foreground"
+                  title="Adjuntar archivo"
+                  disabled={mediaBusy || sending || recording}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                </Button>
+                <Button
+                  variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-muted-foreground"
+                  title="Grabar nota de voz"
+                  disabled={mediaBusy || sending}
+                  onClick={startRecording}
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+                <GifPicker onPick={sendGifUrl} disabled={mediaBusy || sending} />
+                <StickerPicker onPick={sendStickerUrl} disabled={mediaBusy || sending} />
+                {/* Scripts en último lugar (antes de Enviar). */}
+                <ScriptsButton
+                  disabled={mediaBusy || sending}
+                  onUse={(s) => {
+                    if (s.send_on_click) void sendMessage(s.text);
+                    else { setDraft((v) => (v.trim() ? v.trimEnd() + " " : "") + s.text); draftInputRef.current?.focus(); }
+                  }}
+                />
+                <Button
+                  onClick={() => sendMessage()}
+                  disabled={sending || !draft.trim()}
+                  size="icon"
+                  className="ml-auto h-9 w-9 shrink-0"
+                  title="Enviar"
+                >
+                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
             )}
           </>
