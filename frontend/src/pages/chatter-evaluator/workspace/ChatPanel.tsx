@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square, X as XIcon, Mic, MicOff, SmilePlus, MoreVertical, History, Trash2, Play } from "lucide-react";
+import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip, Clock, Pencil, Link2, Square, X as XIcon, Mic, MicOff, SmilePlus, MoreVertical, History, Trash2, Play, Reply } from "lucide-react";
+import { GifPicker } from "@/pages/inbox/GifPicker";
+import { StickerPicker } from "@/pages/inbox/StickerPicker";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -279,6 +281,8 @@ const MessageBubble = ({
   onShowHistory,
   currentUserId,
   onToggleReaction,
+  onReply,
+  repliedTo,
 }: {
   msg: ChatterMessage;
   fanName: string;
@@ -303,8 +307,18 @@ const MessageBubble = ({
   currentUserId: string | null;
   /** Toggle de reacción para este mensaje en particular. */
   onToggleReaction: (msg: ChatterMessage, emoji: string) => void;
+  /** Citar este mensaje (reply) — setea el replyTo del composer. */
+  onReply: (msg: ChatterMessage) => void;
+  /** El mensaje al que ESTE responde (resuelto por el parent), o null. */
+  repliedTo: ChatterMessage | null;
 }) => {
   if (msg.deleted === "full") return null;
+
+  // Texto corto del mensaje citado para la previsualización (reply).
+  const quotePreview = (m: ChatterMessage): string =>
+    (m.content?.trim() || (m.images && m.images.length > 0 ? "📷 Foto" : "mensaje"));
+  const quoteAuthor = (m: ChatterMessage): string =>
+    m.role === "fan" ? fanName : profile?.name ?? "chatter";
 
   if (msg.role === "system") {
     // Tip / purchase pill (matches .msg-tip / purchase variant in the
@@ -381,6 +395,13 @@ const MessageBubble = ({
       </div>
       <div className={`flex max-w-[70%] flex-col ${isFan ? "items-end" : "items-start"}`}>
         <span className="text-xs font-semibold text-foreground/80">{name}</span>
+        {/* Cita del mensaje al que ESTE responde (reply) — como WhatsApp. */}
+        {repliedTo && (
+          <div className={`mb-1 max-w-full overflow-hidden rounded-md border-l-2 border-primary/60 bg-muted/60 px-2 py-1 ${isFan ? "self-end" : "self-start"}`}>
+            <div className="text-[10px] font-semibold text-primary/80">{quoteAuthor(repliedTo)}</div>
+            <div className="max-w-[240px] truncate text-[11px] text-muted-foreground">{quotePreview(repliedTo)}</div>
+          </div>
+        )}
         {(msg.content || msg.deleted === "chatter") && (
           <div
             className={`group/bubble relative rounded-2xl px-3 py-1.5 ${
@@ -457,6 +478,17 @@ const MessageBubble = ({
               align={isFan ? "right" : "left"}
               onToggle={(emoji) => onToggleReaction(msg, emoji)}
             />
+            {/* Botón de responder (citar) — aparece al hover, en la esquina superior
+                del lado OPUESTO al avatar (no choca con el menú 3-puntos ni el picker). */}
+            <button
+              type="button"
+              onClick={() => onReply(msg)}
+              className={`absolute -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground group-hover/bubble:opacity-100 ${isFan ? "-left-2" : "-right-2"}`}
+              title="Responder (citar)"
+              aria-label="Responder"
+            >
+              <Reply className="h-3 w-3" />
+            </button>
           </div>
         )}
         {msg.images && msg.images.length > 0 && (
@@ -573,6 +605,8 @@ export const ChatPanel = ({ session }: Props) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
+  // Reply/cita: mensaje al que el examinador está respondiendo (null = ninguno).
+  const [replyTo, setReplyTo] = useState<ChatterMessage | null>(null);
 
   // Dictado por voz nativo del navegador (Web Speech API) — sin LLMs ni
   // APIs externas. Toggleable: click → empieza a escuchar y mete los
@@ -861,7 +895,9 @@ export const ChatPanel = ({ session }: Props) => {
   const handleSend = async () => {
     if (!session || !input.trim()) return;
     const content = input.trim();
+    const replyId = replyTo?.id ?? null;
     setInput("");
+    setReplyTo(null);
     try {
       await sendMut.mutateAsync({
         sessionId: session.id,
@@ -869,6 +905,7 @@ export const ChatPanel = ({ session }: Props) => {
         msgType: "message",
         content,
         fromExaminer: true,
+        replyToId: replyId,
       });
       // Clear typing indicator after send
       void supabase
@@ -1015,7 +1052,9 @@ export const ChatPanel = ({ session }: Props) => {
         .getPublicUrl(path);
 
       const caption = input.trim();
+      const replyId = replyTo?.id ?? null;
       setInput("");
+      setReplyTo(null);
       await sendMut.mutateAsync({
         sessionId: session.id,
         role: "fan",
@@ -1023,6 +1062,7 @@ export const ChatPanel = ({ session }: Props) => {
         content: caption || null,
         images: [pub.publicUrl],
         fromExaminer: true,
+        replyToId: replyId,
       });
       toast.success("Imagen enviada");
     } catch (e) {
@@ -1030,6 +1070,61 @@ export const ChatPanel = ({ session }: Props) => {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // Enviar un GIF (Giphy mp4, URL externa estable). Se manda como media; la burbuja
+  // renderea las URLs de video con <video> (isVideoUrl) → se ve el GIF.
+  const sendGifUrl = async (mp4Url: string) => {
+    if (!session) return;
+    const replyId = replyTo?.id ?? null;
+    setReplyTo(null);
+    try {
+      await sendMut.mutateAsync({
+        sessionId: session.id,
+        role: "fan",
+        msgType: "message",
+        images: [mp4Url],
+        fromExaminer: true,
+        replyToId: replyId,
+      });
+    } catch (e) {
+      toast.error("No se pudo enviar el GIF", { description: (e as Error).message });
+    }
+  };
+
+  // Enviar un sticker. El picker (StickerPicker de la bandeja) devuelve una URL FIRMADA del
+  // bucket privado creator-files que EXPIRA a 7 días → en un chat persistente la imagen se
+  // rompería. Lo descargamos y re-subimos al bucket PÚBLICO chatter-vault para una URL
+  // permanente, y mandamos esa.
+  const sendStickerUrl = async (signedUrl: string) => {
+    if (!session) return;
+    const replyId = replyTo?.id ?? null;
+    setUploading(true);
+    try {
+      const resp = await fetch(signedUrl);
+      if (!resp.ok) throw new Error("no se pudo leer el sticker");
+      const blob = await resp.blob();
+      const ext = blob.type.includes("gif") ? "gif" : "webp";
+      const path = `_chat_uploads/${session.id}/sticker-${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("chatter-vault")
+        .upload(path, blob, { contentType: blob.type || "image/webp", upsert: false });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("chatter-vault").getPublicUrl(path);
+      setReplyTo(null);
+      await sendMut.mutateAsync({
+        sessionId: session.id,
+        role: "fan",
+        msgType: "message",
+        images: [pub.publicUrl],
+        fromExaminer: true,
+        replyToId: replyId,
+      });
+    } catch (e) {
+      toast.error("No se pudo enviar el sticker", { description: (e as Error).message });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -1308,6 +1403,11 @@ export const ChatPanel = ({ session }: Props) => {
             purchasing={purchaseMut.isPending}
             currentUserId={currentUserId}
             onToggleReaction={handleToggleReaction}
+            onReply={(target) => {
+              setReplyTo(target);
+              textareaRef.current?.focus();
+            }}
+            repliedTo={m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) ?? null : null}
           />
         ))}
       </div>
@@ -1331,6 +1431,29 @@ export const ChatPanel = ({ session }: Props) => {
 
       {/* Input */}
       <div className="p-2">
+        {/* Barra de cita (reply) — se muestra cuando hay un mensaje seleccionado para responder. */}
+        {replyTo && session.status !== "ended" && (
+          <div className="mb-2 flex items-center gap-2 rounded-md border-l-2 border-primary bg-muted/50 px-2 py-1.5">
+            <Reply className="h-4 w-4 shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-semibold text-primary">
+                Respondiendo a {replyTo.role === "fan" ? fanName : profile?.name ?? "chatter"}
+              </div>
+              <div className="truncate text-xs text-muted-foreground">
+                {replyTo.content?.trim() || (replyTo.images && replyTo.images.length > 0 ? "📷 Foto" : "mensaje")}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyTo(null)}
+              className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              title="Cancelar respuesta"
+              aria-label="Cancelar respuesta"
+            >
+              <XIcon className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -1351,6 +1474,9 @@ export const ChatPanel = ({ session }: Props) => {
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
           </Button>
+          {/* GIF (Giphy) + Stickers — reusa los pickers de la bandeja de WhatsApp. */}
+          <GifPicker onPick={sendGifUrl} disabled={session.status === "ended" || uploading} />
+          <StickerPicker onPick={sendStickerUrl} disabled={session.status === "ended" || uploading} />
           <textarea
             ref={textareaRef}
             value={input}

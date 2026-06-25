@@ -350,10 +350,18 @@ interface BubbleProps {
    *  here but the examiner still sees the "(mensaje eliminado por el
    *  chatter)" placeholder. Only invoked from the chatter's own bubbles. */
   onDelete: (msg: ChatterMessage) => void;
+  /** El mensaje al que ESTE responde (reply/cita), resuelto por el parent, o null.
+   *  Solo se muestra (el chatter no inicia replies; los manda el examinador). */
+  repliedTo: ChatterMessage | null;
 }
 
-const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMedia, onDelete, onEdit, myReactionId, onReact }: BubbleProps) => {
+const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMedia, onDelete, onEdit, myReactionId, onReact, repliedTo }: BubbleProps) => {
   if (msg.deleted === "full") return null;
+
+  const quoteAuthor = (m: ChatterMessage): string =>
+    m.role === "fan" ? fanName : profile?.name ?? "chatter";
+  const quotePreview = (m: ChatterMessage): string =>
+    (m.content?.trim() || (m.images && m.images.length > 0 ? "📷 Foto" : "mensaje"));
 
   if (msg.role === "system") {
     const isTip = msg.msg_type === "tip";
@@ -422,6 +430,13 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
       </div>
       <div className={`flex max-w-[75%] flex-col ${isMine ? "items-end" : "items-start"}`}>
         <span className="text-xs font-semibold text-foreground/80">{name}</span>
+        {/* Cita del mensaje al que ESTE responde (reply) — como WhatsApp. */}
+        {repliedTo && (
+          <div className={`mb-1 max-w-full overflow-hidden rounded-md border-l-2 border-primary/60 bg-muted/60 px-2 py-1 ${isMine ? "self-end" : "self-start"}`}>
+            <div className="text-[10px] font-semibold text-primary/80">{quoteAuthor(repliedTo)}</div>
+            <div className="max-w-[240px] truncate text-[11px] text-muted-foreground">{quotePreview(repliedTo)}</div>
+          </div>
+        )}
         {(msg.content || msg.deleted === "chatter") && (
           <div
             className={`group/bubble relative rounded-2xl px-3.5 py-2 ${
@@ -1274,6 +1289,7 @@ const ChatterPublicView = () => {
               <Bubble
                 key={m.id}
                 msg={m}
+                repliedTo={m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) ?? null : null}
                 fanName={fanName}
                 fanAvatar={fanAvatar}
                 profile={profile}

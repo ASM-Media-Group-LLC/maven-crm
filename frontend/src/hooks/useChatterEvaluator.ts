@@ -1226,6 +1226,8 @@ export type SendMessageInput = {
   price?: number | null;
   images?: string[];
   fromExaminer?: boolean;
+  /** id del mensaje al que este responde (reply/cita). */
+  replyToId?: string | null;
 };
 
 /** Toggle de reacción con emoji sobre un mensaje. Si el usuario actual
@@ -1312,6 +1314,7 @@ export const useSendChatterMessage = () => {
         price: input.price ?? null,
         images: input.images ?? [],
         from_examiner: input.fromExaminer ?? false,
+        reply_to_id: input.replyToId ?? null,
       };
       const { data, error } = await sb
         .from("chatter_messages")

@@ -118,6 +118,8 @@ export interface ChatterMessage {
   // puede abrir el historial.
   edited_at: string | null;
   content_history: Array<{ content: string | null; edited_at: string | null }>;
+  // Reply/cita: id del mensaje al que este responde (como WhatsApp). null = no es respuesta.
+  reply_to_id: string | null;
   created_at: string;
 }
 
