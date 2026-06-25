@@ -5,6 +5,7 @@ import { Send, DollarSign, Loader2, MessageCircle, Check, CheckCheck, Paperclip,
 import { GifPicker } from "@/pages/inbox/GifPicker";
 import { StickerPicker } from "@/pages/inbox/StickerPicker";
 import { ChatComposer } from "@/components/chat/ChatComposer";
+import { ScriptsButton } from "@/components/chat/ScriptsButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1501,6 +1502,13 @@ export const ChatPanel = ({ session }: Props) => {
             <>
               <GifPicker onPick={sendGifUrl} disabled={uploading} />
               <StickerPicker onPick={sendStickerUrl} disabled={uploading} />
+              <ScriptsButton
+                disabled={uploading}
+                onUse={(s) => {
+                  if (s.send_on_click) void composerSend(s.text, []);
+                  else setInput((v) => (v.trim() ? v.trimEnd() + " " : "") + s.text);
+                }}
+              />
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
