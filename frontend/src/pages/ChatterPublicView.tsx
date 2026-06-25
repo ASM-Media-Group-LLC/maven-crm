@@ -18,6 +18,9 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { EmojiBar, DEFAULT_EMOJIS } from "@/pages/chatter-evaluator/workspace/EmojiBar";
+import { ChatComposer } from "@/components/chat/ChatComposer";
+import { GifPicker } from "@/pages/inbox/GifPicker";
+import { StickerPicker } from "@/pages/inbox/StickerPicker";
 import { VolumeControl, playSoundFile } from "@/pages/chatter-evaluator/workspace/VolumeControl";
 import { MediaViewer } from "@/pages/chatter-evaluator/workspace/MediaViewer";
 import { TipPopup, playTipSound } from "@/pages/chatter-evaluator/workspace/TipPopup";
@@ -1051,6 +1054,73 @@ const ChatterPublicView = () => {
     }
   };
 
+  // Envío unificado del <ChatComposer>: sube los adjuntos (pegados/elegidos) vía el edge
+  // (upload-image → bucket público) y manda UN mensaje con todas las imágenes + caption + cita.
+  // Throwea ante error → el composer conserva texto+adjuntos.
+  const composerSend = async (text: string, files: File[]) => {
+    if (!sessionId) return;
+    const replyId = replyTo?.id ?? null;
+    try {
+      const images: string[] = [];
+      if (files.length > 0) {
+        setUploading(true);
+        for (const file of files) {
+          if (file.size > 8 * 1024 * 1024) throw new Error(`${file.name || "archivo"}: máximo 8 MB`);
+          const base64 = await fileToBase64(file);
+          const up = await callChatterApi("upload-image", { sessionId, fileName: file.name, contentType: file.type, base64 });
+          images.push(up.url);
+        }
+      }
+      if (!text && images.length === 0) return;
+      await callChatterApi("send", { sessionId, content: text || null, images, replyToId: replyId });
+      setReplyTo(null);
+      callChatterApi("set-typing", { sessionId, typing: false }).catch(() => {});
+      qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] });
+    } catch (e) {
+      if (!isSessionEndedError(e)) toast.error("No se pudo enviar", { description: (e as Error).message });
+      throw e;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // GIF (Giphy mp4, URL externa estable) → se manda directo vía edge, sin subir.
+  const sendGifUrl = async (mp4Url: string) => {
+    if (!sessionId) return;
+    const replyId = replyTo?.id ?? null;
+    setReplyTo(null);
+    try {
+      await callChatterApi("send", { sessionId, images: [mp4Url], replyToId: replyId });
+      qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] });
+    } catch (e) {
+      if (!isSessionEndedError(e)) toast.error("No se pudo enviar el GIF", { description: (e as Error).message });
+    }
+  };
+
+  // Sticker: el picker da URL FIRMADA (bucket privado, expira) → la bajamos, la subimos vía el
+  // edge (upload-image → bucket público persistente) y mandamos esa URL.
+  const sendStickerUrl = async (signedUrl: string) => {
+    if (!sessionId) return;
+    const replyId = replyTo?.id ?? null;
+    setUploading(true);
+    try {
+      const resp = await fetch(signedUrl);
+      if (!resp.ok) throw new Error("no se pudo leer el sticker");
+      const blob = await resp.blob();
+      const ext = blob.type.includes("gif") ? "gif" : "webp";
+      const ctype = blob.type || "image/webp";
+      const base64 = await fileToBase64(new File([blob], `sticker.${ext}`, { type: ctype }));
+      const up = await callChatterApi("upload-image", { sessionId, fileName: `sticker.${ext}`, contentType: ctype, base64 });
+      setReplyTo(null);
+      await callChatterApi("send", { sessionId, images: [up.url], replyToId: replyId });
+      qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] });
+    } catch (e) {
+      if (!isSessionEndedError(e)) toast.error("No se pudo enviar el sticker", { description: (e as Error).message });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   // Typing indicator — port of the original Roleplaychatters pattern
   // (index.html line 2017). Sender stamps `typing_chatter_at = now()`
   // throttled to 1 write per 1.5 s on input change. Receiver subscribes
@@ -1338,98 +1408,60 @@ const ChatterPublicView = () => {
           </div>
         </div>
 
-        {/* Emoji bar (in-memory). The original places it just above the
-            composer row with the A−/A+ font-zoom buttons pushed to the
-            right edge via .chat-zoom { margin-left: auto }. */}
-        <EmojiBar
+        {/* Composer unificado (<ChatComposer>): emojis ARRIBA · texto AL MEDIO (auto-crece) ·
+            acciones ABAJO (adjuntar + GIF + sticker + vault + Enviar). Pegar imagen/video del
+            portapapeles → preview + se manda al enviar. */}
+        <ChatComposer
+          value={input}
+          onChange={handleInputChange}
+          onSend={composerSend}
+          placeholder={`Responder como ${personaName}…`}
+          busy={uploading}
           emojis={chatterEmojis}
-          onPick={(e) => {
-            setInput((v) => v + e);
-            // Devolver foco al textarea: Enter ENVÍA (no re-inserta el emoji).
-            textareaRef.current?.focus();
-          }}
-          onAdd={(e) => setChatterEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
-          onRemove={(e) => setChatterEmojis((curr) => curr.filter((x) => x !== e))}
-          trailing={<FontZoom />}
-        />
-
-        {/* Composer row */}
-        <div className="border-t bg-card p-3">
-          {/* Barra de cita (reply) — el chatter también puede citar mensajes. */}
-          {replyTo && (
-            <div className="mb-2 flex items-center gap-2 rounded-md border-l-2 border-primary bg-muted/50 px-2 py-1.5">
-              <Reply className="h-4 w-4 shrink-0 text-primary" />
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-semibold text-primary">
-                  Respondiendo a {replyTo.role === "fan" ? fanName : personaName}
+          onAddEmoji={(e) => setChatterEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
+          onRemoveEmoji={(e) => setChatterEmojis((curr) => curr.filter((x) => x !== e))}
+          emojiTrailing={<FontZoom />}
+          replyBar={
+            replyTo ? (
+              <div className="flex items-center gap-2 rounded-md border-l-2 border-primary bg-muted/50 px-2 py-1.5">
+                <Reply className="h-4 w-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold text-primary">
+                    Respondiendo a {replyTo.role === "fan" ? fanName : personaName}
+                  </div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {replyTo.content?.trim() || (replyTo.images && replyTo.images.length > 0 ? "📷 Foto" : "mensaje")}
+                  </div>
                 </div>
-                <div className="truncate text-xs text-muted-foreground">
-                  {replyTo.content?.trim() || (replyTo.images && replyTo.images.length > 0 ? "📷 Foto" : "mensaje")}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyTo(null)}
+                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="Cancelar respuesta"
+                  aria-label="Cancelar respuesta"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setReplyTo(null)}
-                className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                title="Cancelar respuesta"
-                aria-label="Cancelar respuesta"
+            ) : null
+          }
+          toolbarExtra={
+            <>
+              <GifPicker onPick={sendGifUrl} disabled={uploading} />
+              <StickerPicker onPick={sendStickerUrl} disabled={uploading} />
+              <Button
+                onClick={() => setVaultOpen(true)}
+                size="icon"
+                variant="ghost"
+                className="h-9 w-9 text-muted-foreground"
+                title="Vault del personaje"
+                disabled={!profile}
               >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-          <div className="flex items-end gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,video/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleFileUpload(f);
-              }}
-            />
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              size="icon"
-              variant="outline"
-              title="Subir foto / video"
-              disabled={uploading}
-            >
-              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-            </Button>
-            <Button
-              onClick={() => setVaultOpen(true)}
-              size="icon"
-              variant="outline"
-              title="Vault del personaje"
-              disabled={!profile}
-            >
-              <FolderOpen className="h-4 w-4" />
-            </Button>
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => handleInputChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void handleSend();
-                }
-              }}
-              placeholder={`Responder como ${personaName}…`}
-              rows={2}
-              className="min-h-[2.5rem] flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || sendMut.isPending}
-              size="icon"
-            >
-              {sendMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
-          </div>
-        </div>
+                <FolderOpen className="h-4 w-4" />
+              </Button>
+            </>
+          }
+        />
 
         {/* TipPopup contenido dentro del CENTER (section relative) — sólo
             cubre el chat, no la viewport entera. */}
