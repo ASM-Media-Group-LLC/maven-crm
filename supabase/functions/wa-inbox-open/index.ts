@@ -110,12 +110,16 @@ Deno.serve(async (req) => {
       leadOwner = lead.assigned_to ?? null;
       leadIdForContact = leadId;
       e164 = lead.phone ? cleanE164(lead.phone) : null;
-      if (!e164 && lead.source_contact_id) {
+      // Si el teléfono del lead viene SIN país (≤10 díg) o falta, preferimos el del
+      // contacto origen (closers_contacts.country_code es la fuente confiable). Evita
+      // que un closer_creators.phone "5540495945" mande a +57<10díg> en vez de +52…
+      if (lead.source_contact_id && (!e164 || onlyDigits(e164).length <= 10)) {
         const { data: sc } = await (sb as any)
           .from("closers_contacts").select("country_code, phone").eq("id", lead.source_contact_id).maybeSingle();
         if (sc) {
-          if (sc.country_code && sc.phone) e164 = joinCc(sc.country_code, sc.phone);
-          else if (sc.phone) e164 = cleanE164(sc.phone);
+          const fromContact = (sc.country_code && sc.phone) ? joinCc(sc.country_code, sc.phone)
+                            : (sc.phone ? cleanE164(sc.phone) : null);
+          if (fromContact && onlyDigits(fromContact).length > 10) e164 = fromContact;
         }
       }
       displayName = lead.name || lead.full_name || lead.creator_name || lead.display_name || lead.instagram_handle || lead.handle || null;
