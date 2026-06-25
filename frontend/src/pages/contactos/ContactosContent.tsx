@@ -89,9 +89,17 @@ const PAGE_SIZE = 50;
 const normalizeHandleKey = (value: string | null | undefined) =>
   (value ?? "").trim().replace(/^@+/, "").toLowerCase();
 
+// Persistimos tab + filtros + página en sessionStorage para que al ir a WhatsApp
+// (o a cualquier lado) y VOLVER, el directorio quede exactamente como estaba.
+const VIEWSTATE_KEY = "contactos.viewstate";
+const loadViewState = (): { activeTab?: "dashboard" | "contactos"; filters?: ContactoFilters; page?: number } => {
+  try { return JSON.parse(sessionStorage.getItem(VIEWSTATE_KEY) || "{}") || {}; } catch { return {}; }
+};
+
 const ContactosContent = () => {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "contactos">("dashboard");
-  const [filters, setFilters] = useState<ContactoFilters>(emptyFilters);
+  const restored = loadViewState();
+  const [activeTab, setActiveTab] = useState<"dashboard" | "contactos">(restored.activeTab ?? "dashboard");
+  const [filters, setFilters] = useState<ContactoFilters>(restored.filters ?? emptyFilters);
   const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
   const [kpiPopup, setKpiPopup] = useState<ContactKpiKey | null>(null);
   // Estado del collapsed por categoría — mismo patrón que panel/
@@ -107,7 +115,7 @@ const ContactosContent = () => {
   const [convertOpen, setConvertOpen] = useState(false);
   const [convertRawContacto, setConvertRawContacto] = useState<any>(null);
   const [auditOpen, setAuditOpen] = useState(false);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(restored.page ?? 1);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isAdmin, isManager } = useUserRole();
@@ -115,6 +123,11 @@ const ContactosContent = () => {
   // gatea por permiso). Antes era solo admin/manager; ahora todo el equipo ve si una
   // creadora ya fue contactada y por qué línea. El RPC expone label de canal, no PII.
   const canSeeChannels = true;
+
+  // Guardar el estado de la vista para restaurarlo al volver (p.ej. desde WhatsApp).
+  useEffect(() => {
+    sessionStorage.setItem(VIEWSTATE_KEY, JSON.stringify({ activeTab, filters, page }));
+  }, [activeTab, filters, page]);
 
   // Canales de venta por contacto (server-side vía RPC; react-query dedupea).
   const salesChannels = useContactSalesChannels(canSeeChannels);

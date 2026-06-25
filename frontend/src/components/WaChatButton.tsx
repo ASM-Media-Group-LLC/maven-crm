@@ -7,7 +7,7 @@
 // closers). Si no hay teléfono ni lead → muestra "—". Si el usuario no tiene
 // canales de WhatsApp asignados → "WhatsApp" deshabilitado.
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMyWaChannels } from "@/hooks/useMyWaChannels";
@@ -40,6 +40,7 @@ export function WaChatButton({
 }) {
   const { data: channels = [] } = useMyWaChannels();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [gateMsg, setGateMsg] = useState<string | null>(null);
@@ -61,7 +62,13 @@ export function WaChatButton({
       toast({ title: "No se pudo abrir el chat", description: error?.message || "Error", variant: "destructive" });
       return;
     }
-    navigate(`/inbox?c=${res.conversation_id}`);
+    // Recordamos de dónde venimos para mostrar "← Volver" en la bandeja y no perder
+    // la pantalla/filtros del usuario (Contactos restaura su estado desde sessionStorage).
+    const labels: Record<string, string> = { contactos: "Contactos", creadores: "Creadoras", closers: "Closers" };
+    const seg = location.pathname.split("/").filter(Boolean)[0] || "";
+    navigate(`/inbox?c=${res.conversation_id}`, {
+      state: { backTo: location.pathname + location.search, backLabel: labels[seg] || "atrás" },
+    });
   };
 
   if (!phone && !closerCreatorId && !contactId) return <span className="text-xs text-muted-foreground">—</span>;

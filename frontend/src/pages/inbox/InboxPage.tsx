@@ -12,7 +12,7 @@
 // tipos generados de Supabase.
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, CheckCheck, AlertCircle, Sticker, Maximize2, Pin, Star, Archive, MailOpen, Eraser, Tags, Plus } from "lucide-react";
+import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, CheckCheck, AlertCircle, Sticker, Maximize2, Pin, Star, Archive, MailOpen, Eraser, Tags, Plus, ArrowLeft } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
@@ -129,6 +129,11 @@ const InboxPage = () => {
   // Enter ENVÍE (no re-inserte el emoji). Mismo fix que en Chatter Evaluator.
   const draftInputRef = useRef<HTMLInputElement>(null);
   const [searchParams] = useSearchParams();
+  // "← Volver" cuando se llegó desde otra pantalla (Contactos/Creadoras/Closers) vía el
+  // botón de WhatsApp. Esa pantalla restaura sus filtros sola (sessionStorage).
+  const location = useLocation();
+  const navigate = useNavigate();
+  const backNav = (location.state as { backTo?: string; backLabel?: string } | null) ?? null;
   // Deep-link: /inbox?c=<conversationId> (ej. desde el botón WhatsApp de Closers) abre directo esa conversación.
   useEffect(() => {
     const c = searchParams.get("c");
@@ -688,6 +693,14 @@ const InboxPage = () => {
     <div className="flex h-full min-h-0">
       {/* ── Lista de conversaciones ─────────────────────────────────────── */}
       <aside className="flex w-80 shrink-0 flex-col border-r border-border">
+        {backNav?.backTo && (
+          <button
+            onClick={() => navigate(backNav.backTo!)}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-primary hover:bg-muted/50 border-b border-border"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Volver a {backNav.backLabel || "atrás"}
+          </button>
+        )}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
           <MessageSquare className="h-5 w-5 text-primary" />
           <h1 className="text-base font-semibold">Bandeja</h1>
