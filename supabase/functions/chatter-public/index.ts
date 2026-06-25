@@ -34,6 +34,7 @@ type Body = {
   images?: string[];
   price?: number;                        // when set, msg_type defaults to "purchase"
   msgType?: "message" | "purchase";      // explicit override
+  replyToId?: string | null;             // reply/cita: id del mensaje citado
   // claim-device
   deviceId?: string;
   // set-typing
@@ -126,6 +127,7 @@ Deno.serve(async (req) => {
           images,
           price,
           from_examiner: false,
+          reply_to_id: body.replyToId ?? null,
         })
         .select("*")
         .single();

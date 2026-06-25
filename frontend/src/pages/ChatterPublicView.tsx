@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Clock, Check, CheckCheck, SmilePlus as Smile, MoreVertical, Trash2, Pencil } from "lucide-react";
+import { Send, Loader2, Lock, AlertTriangle, FolderOpen, X, Image as ImageIcon, Play, Paperclip, Clock, Check, CheckCheck, SmilePlus as Smile, MoreVertical, Trash2, Pencil, Reply } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -350,12 +350,13 @@ interface BubbleProps {
    *  here but the examiner still sees the "(mensaje eliminado por el
    *  chatter)" placeholder. Only invoked from the chatter's own bubbles. */
   onDelete: (msg: ChatterMessage) => void;
-  /** El mensaje al que ESTE responde (reply/cita), resuelto por el parent, o null.
-   *  Solo se muestra (el chatter no inicia replies; los manda el examinador). */
+  /** El mensaje al que ESTE responde (reply/cita), resuelto por el parent, o null. */
   repliedTo: ChatterMessage | null;
+  /** Citar este mensaje (reply) — setea el replyTo del composer del chatter. */
+  onReply: (msg: ChatterMessage) => void;
 }
 
-const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMedia, onDelete, onEdit, myReactionId, onReact, repliedTo }: BubbleProps) => {
+const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMedia, onDelete, onEdit, myReactionId, onReact, repliedTo, onReply }: BubbleProps) => {
   if (msg.deleted === "full") return null;
 
   const quoteAuthor = (m: ChatterMessage): string =>
@@ -485,6 +486,16 @@ const Bubble = ({ msg, fanName, fanAvatar, profile, side, readByOther, onOpenMed
               align={isMine ? "right" : "left"}
               onPick={(emoji) => onReact(msg, emoji)}
             />
+            {/* Botón de responder (citar) — esquina superior del lado opuesto a la cola. */}
+            <button
+              type="button"
+              onClick={() => onReply(msg)}
+              className={`absolute -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:bg-muted hover:text-foreground group-hover/bubble:opacity-100 ${isMine ? "-left-2" : "-right-2"}`}
+              title="Responder (citar)"
+              aria-label="Responder"
+            >
+              <Reply className="h-3 w-3" />
+            </button>
           </div>
         )}
         <ReactionsRowChatter
@@ -620,6 +631,8 @@ const ChatterPublicView = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const qc = useQueryClient();
   const [input, setInput] = useState("");
+  // Reply/cita: mensaje al que el chatter está respondiendo (null = ninguno).
+  const [replyTo, setReplyTo] = useState<ChatterMessage | null>(null);
   const [locked, setLocked] = useState(false);
   const [claimed, setClaimed] = useState(false);
   // Tab-lock state. "checking" while we read localStorage, "prompt" if a
@@ -955,7 +968,8 @@ const ChatterPublicView = () => {
   }, [messagesQ.data, sessionId, claimed]);
 
   const sendMut = useMutation({
-    mutationFn: async (content: string) => callChatterApi("send", { sessionId, content }),
+    mutationFn: async (vars: { content: string; replyToId?: string | null }) =>
+      callChatterApi("send", { sessionId, content: vars.content, replyToId: vars.replyToId ?? null }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["chatter-public-messages", sessionId] });
     },
@@ -985,9 +999,11 @@ const ChatterPublicView = () => {
   const handleSend = async () => {
     const text = input.trim();
     if (!text) return;
+    const replyId = replyTo?.id ?? null;
     setInput("");
+    setReplyTo(null);
     try {
-      await sendMut.mutateAsync(text);
+      await sendMut.mutateAsync({ content: text, replyToId: replyId });
       callChatterApi("set-typing", { sessionId, typing: false }).catch(() => {});
     } catch (e) {
       if (!isSessionEndedError(e)) {
@@ -1290,6 +1306,7 @@ const ChatterPublicView = () => {
                 key={m.id}
                 msg={m}
                 repliedTo={m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) ?? null : null}
+                onReply={(target) => setReplyTo(target)}
                 fanName={fanName}
                 fanAvatar={fanAvatar}
                 profile={profile}
@@ -1333,6 +1350,29 @@ const ChatterPublicView = () => {
 
         {/* Composer row */}
         <div className="border-t bg-card p-3">
+          {/* Barra de cita (reply) — el chatter también puede citar mensajes. */}
+          {replyTo && (
+            <div className="mb-2 flex items-center gap-2 rounded-md border-l-2 border-primary bg-muted/50 px-2 py-1.5">
+              <Reply className="h-4 w-4 shrink-0 text-primary" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-semibold text-primary">
+                  Respondiendo a {replyTo.role === "fan" ? fanName : personaName}
+                </div>
+                <div className="truncate text-xs text-muted-foreground">
+                  {replyTo.content?.trim() || (replyTo.images && replyTo.images.length > 0 ? "📷 Foto" : "mensaje")}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyTo(null)}
+                className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                title="Cancelar respuesta"
+                aria-label="Cancelar respuesta"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
           <div className="flex items-end gap-2">
             <input
               ref={fileInputRef}
