@@ -124,6 +124,9 @@ const InboxPage = () => {
   // (localStorage): lo que el usuario agrega/quita sobrevive al refrescar.
   const { user } = useAuth();
   const [inboxEmojis, setInboxEmojis] = usePersistedEmojis("inbox", user?.id);
+  // Ref del input de redacción: tras insertar un emoji, devolvemos el foco acá para que
+  // Enter ENVÍE (no re-inserte el emoji). Mismo fix que en Chatter Evaluator.
+  const draftInputRef = useRef<HTMLInputElement>(null);
   const [searchParams] = useSearchParams();
   // Deep-link: /inbox?c=<conversationId> (ej. desde el botón WhatsApp de Closers) abre directo esa conversación.
   useEffect(() => {
@@ -1310,7 +1313,10 @@ const InboxPage = () => {
             {!recording && (
               <EmojiBar
                 emojis={inboxEmojis}
-                onPick={(e) => setDraft((v) => v + e)}
+                onPick={(e) => {
+                  setDraft((v) => v + e);
+                  draftInputRef.current?.focus();
+                }}
                 onAdd={(e) => setInboxEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
                 onRemove={(e) => setInboxEmojis((curr) => curr.filter((x) => x !== e))}
               />
@@ -1377,6 +1383,7 @@ const InboxPage = () => {
               <GifPicker onPick={sendGifUrl} disabled={mediaBusy || sending} />
               <StickerPicker onPick={sendStickerUrl} disabled={mediaBusy || sending} />
               <Input
+                ref={draftInputRef}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
