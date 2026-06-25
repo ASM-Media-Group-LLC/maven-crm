@@ -181,7 +181,8 @@ export async function checkExistingContact(
   if (!normalizedHandle) return { exists: false };
 
   const { data } = await supabase
-    .from("closers_contacts")
+    // Vista enmascarada: phone/email vienen NULL para no-admin (dedup es por handle).
+    .from("v_closers_contacts")
     .select("id, name, phone, email, created_at, created_by")
     .ilike("handle", normalizedHandle)
     .limit(1)

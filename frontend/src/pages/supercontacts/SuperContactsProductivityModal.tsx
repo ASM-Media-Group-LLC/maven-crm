@@ -43,7 +43,9 @@ const SuperContactsProductivityModal = ({ open, onOpenChange }: Props) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("closers_contacts")
-        .select("id, handle, phone, created_by, created_at, name")
+        // phone es admin-only (revocado): para CONTAR cuántos tienen número usamos el
+        // proxy no-PII phone_first_set_at (1:1 con "tiene phone").
+        .select("id, handle, phone_first_set_at, created_by, created_at, name")
         .gte("created_at", from.toISOString())
         .lte("created_at", to.toISOString())
         .order("created_at", { ascending: true });
@@ -80,7 +82,7 @@ const SuperContactsProductivityModal = ({ open, onOpenChange }: Props) => {
       const day = format(parseISO(c.created_at!), "yyyy-MM-dd");
       if (!map[day]) map[day] = { links: 0, numbers: 0 };
       map[day].links += 1; // each contact = 1 link/handle
-      if (c.phone && c.phone.trim()) map[day].numbers += 1;
+      if (c.phone_first_set_at) map[day].numbers += 1;
     });
     return Object.entries(map)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -99,7 +101,7 @@ const SuperContactsProductivityModal = ({ open, onOpenChange }: Props) => {
       const agent = c.created_by || "unknown";
       if (!map[agent]) map[agent] = { links: 0, numbers: 0 };
       map[agent].links += 1;
-      if (c.phone && c.phone.trim()) map[agent].numbers += 1;
+      if (c.phone_first_set_at) map[agent].numbers += 1;
     });
     return Object.entries(map)
       .map(([id, vals]) => ({
@@ -121,7 +123,7 @@ const SuperContactsProductivityModal = ({ open, onOpenChange }: Props) => {
       if (!map[agent]) map[agent] = {};
       if (!map[agent][day]) map[agent][day] = { links: 0, numbers: 0 };
       map[agent][day].links += 1;
-      if (c.phone && c.phone.trim()) map[agent][day].numbers += 1;
+      if (c.phone_first_set_at) map[agent][day].numbers += 1;
     });
     const days = Array.from(daySet).sort();
     const agents = Object.keys(map).sort();
@@ -131,7 +133,7 @@ const SuperContactsProductivityModal = ({ open, onOpenChange }: Props) => {
   // KPIs
   const kpis = useMemo(() => {
     const totalLinks = contacts.length;
-    const totalNumbers = contacts.filter((c) => c.phone?.trim()).length;
+    const totalNumbers = contacts.filter((c) => c.phone_first_set_at).length;
     const convRate = totalLinks ? Math.round((totalNumbers / totalLinks) * 100) : 0;
     const avgLinksDay = dailyData.length ? Math.round(totalLinks / dailyData.length) : 0;
     return { totalLinks, totalNumbers, convRate, avgLinksDay };

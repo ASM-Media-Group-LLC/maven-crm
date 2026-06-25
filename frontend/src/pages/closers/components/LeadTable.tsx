@@ -396,7 +396,10 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
     navigate(`/inbox?c=${data.conversation_id}`);
   };
 
-  if (!resolvedPhone) return <span className="text-muted-foreground text-xs">—</span>;
+  // Closer leads: el edge resuelve el teléfono server-side por closer_creator_id, así
+  // que mostramos el botón aunque el número no haya viajado al cliente (admin-only).
+  // Leadgen (sin fila de closer): sí necesita el teléfono resuelto en el cliente.
+  if (source !== "closer" && !resolvedPhone) return <span className="text-muted-foreground text-xs">—</span>;
   if (channels.length === 0) {
     return <span className="text-muted-foreground text-xs" title="No tenés canales de WhatsApp asignados">WhatsApp</span>;
   }

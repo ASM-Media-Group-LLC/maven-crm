@@ -144,7 +144,9 @@ export const useLeadGenPhonesDaily = (dateFrom?: string, dateTo?: string) =>
       const { data, error } = await supabase
         .from("closers_contacts")
         .select("created_at")
-        .not("phone", "is", null)
+        // phone es admin-only (revocado): usamos el proxy no-PII phone_first_set_at,
+        // que es 1:1 con "tiene teléfono".
+        .not("phone_first_set_at", "is", null)
         .gte("created_at", fromIso)
         .lte("created_at", toIso);
       if (error) throw error;

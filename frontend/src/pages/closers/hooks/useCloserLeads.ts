@@ -234,7 +234,7 @@ export const useCloserLeads = () => {
             ? supabase.from("profiles").select("id, full_name").in("id", createdByIds)
             : Promise.resolve({ data: [] }),
           sourceContactIds.length > 0
-            ? supabase.from("closers_contacts").select("id, country_code, phone").in("id", sourceContactIds)
+            ? supabase.from("v_closers_contacts").select("id, country_code, phone").in("id", sourceContactIds)
             : Promise.resolve({ data: [] }),
         ]);
 
@@ -329,7 +329,7 @@ export const useCloserLeads = () => {
           ? supabase.from("closer_contact_history").select("creator_id").in("creator_id", creatorIds)
           : Promise.resolve({ data: [] }),
         sourceContactIds.length > 0
-          ? supabase.from("closers_contacts").select("id, country_code, phone").in("id", sourceContactIds)
+          ? supabase.from("v_closers_contacts").select("id, country_code, phone").in("id", sourceContactIds)
           : Promise.resolve({ data: [] }),
       ]);
 

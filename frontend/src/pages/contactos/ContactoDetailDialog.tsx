@@ -9,7 +9,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
-import { WaChatButton, toE164 } from "@/components/WaChatButton";
+import { WaChatButton } from "@/components/WaChatButton";
 import type { Contacto } from "./ContactosContent";
 import type { ContactChannel } from "./useContactSalesChannels";
 
@@ -89,7 +89,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
     { label: "Ciudad", value: c.city || "—" },
     {
       label: "Contacto",
-      value: <WaChatButton phone={toE164({ whatsapp: c.whatsapp, countryCode: c.country_code, phone: c.phone })} name={c.nombre} />,
+      value: <WaChatButton contactId={c.id} name={c.nombre} />,
     },
   ];
 

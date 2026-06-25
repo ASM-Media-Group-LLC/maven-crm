@@ -18,6 +18,7 @@ import { CountryCodeSelect } from "@/components/ui/country-code-select";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import FileUploadModal, { type UploadCategory, type UploadedFile } from "@/components/FileUploadModal";
@@ -45,6 +46,10 @@ interface Props {
 const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  // Teléfono y email son admin-only (la vista enmascarada los devuelve NULL a no-admin).
+  // Para no-admin: ocultamos los campos y NO los mandamos en el update (si no, el NULL
+  // enmascarado pisaría el valor real en la DB).
+  const { isAdmin } = useUserRole();
   const [nombre, setNombre] = useState("");
   const [categoria, setCategoria] = useState("");
   const [compania, setCompania] = useState("");
@@ -122,22 +127,27 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
 
     setIsSaving(true);
     try {
+      const updatePayload: Record<string, unknown> = {
+        name: nombre.trim(),
+        handle: extractedHandle,
+        platform: plataforma,
+        physical_appearance: categoria || null,
+        company: compania || null,
+        city: city.trim() || null,
+        notes: notas || null,
+        profile_picture_url: profilePhoto?.url || null,
+        ticket_number: ticket || null,
+      };
+      // Solo admin puede ver/editar teléfono y email; para no-admin NO los tocamos.
+      if (isAdmin) {
+        updatePayload.email = email || null;
+        updatePayload.country_code = countryCode;
+        updatePayload.phone = phone || null;
+      }
+
       const { error } = await supabase
         .from("closers_contacts")
-        .update({
-          name: nombre.trim(),
-          handle: extractedHandle,
-          platform: plataforma,
-          physical_appearance: categoria || null,
-          company: compania || null,
-          email: email || null,
-          country_code: countryCode,
-          phone: phone || null,
-          city: city.trim() || null,
-          notes: notas || null,
-          profile_picture_url: profilePhoto?.url || null,
-          ticket_number: ticket || null,
-        })
+        .update(updatePayload)
         .eq("id", contacto.id);
 
       if (error) throw error;
@@ -186,19 +196,25 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
                 <CompanySelector value={compania} onChange={setCompania} companies={companies} onAddCompany={(name) => setCompanies((prev) => [...prev, name])} />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Email</Label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@ejemplo.com" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Teléfono</Label>
-                  <div className="flex gap-2">
-                    <CountryCodeSelect value={countryCode} onChange={setCountryCode} />
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Número de teléfono" className="flex-1" />
+              {isAdmin ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">Email</Label>
+                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@ejemplo.com" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">Teléfono</Label>
+                    <div className="flex gap-2">
+                      <CountryCodeSelect value={countryCode} onChange={setCountryCode} />
+                      <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Número de teléfono" className="flex-1" />
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border px-3 py-2">
+                  📞 Teléfono y email solo son visibles/editables para administradores. Para escribirle, usá el botón de WhatsApp del contacto.
+                </p>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">

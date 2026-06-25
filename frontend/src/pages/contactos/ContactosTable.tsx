@@ -2,7 +2,7 @@ import { useState } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ArrowUpDown, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Phone, Trash2 } from "lucide-react";
 import { getCountryFlag, getCountryShortDisplay, maskPhone } from "@/lib/country-utils";
-import { WaChatButton, toE164 } from "@/components/WaChatButton";
+import { WaChatButton } from "@/components/WaChatButton";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import {
   Table,
@@ -182,7 +182,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onDelete }: Prop
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{c.city || "No aplicable"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  <WaChatButton phone={toE164({ whatsapp: c.whatsapp, countryCode: c.country_code, phone: c.phone })} />
+                  <WaChatButton contactId={c.id} />
                 </TableCell>
 
                 <TableCell className="sticky right-0 z-10 bg-card">

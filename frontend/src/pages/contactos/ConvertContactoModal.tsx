@@ -30,29 +30,13 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
   const convert = useMutation({
     mutationFn: async () => {
       if (!contacto) throw new Error("No contacto");
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No se pudo obtener el usuario autenticado");
-      const { error: insertError } = await supabase.from("creators").insert({
-        name: contacto.name,
-        instagram_handle: contacto.handle,
-        country: contacto.country_code,
-        category: contacto.physical_appearance,
-        phone: contacto.phone,
-        country_code: contacto.country_code,
-        email: contacto.email,
-        profile_photo_url: contacto.profile_picture_url,
-        source: "contacto",
-        status: "pendiente",
-        internal_notes: contacto.company ? `Compañía: ${contacto.company}` : null,
-        created_by: user.id,
-      });
-      if (insertError) throw insertError;
-
-      const { error: updateError } = await supabase
-        .from("closers_contacts")
-        .update({ status: "converted" })
-        .eq("id", contacto.id);
-      if (updateError) throw updateError;
+      // Server-side: el RPC lee el teléfono/email REALES del contacto (que el cliente
+      // ya no puede ver: están enmascarados/revocados) y crea la creadora + marca el
+      // contacto como convertido en una sola transacción.
+      const { error } = await supabase.rpc("convert_contact_to_creator", {
+        p_contact_id: contacto.id,
+      } as never);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closers_contacts"] });

@@ -168,7 +168,9 @@ const ContactosContent = () => {
     queryKey: ["closers_contacts", page, filters, salesChannelConstraint],
     queryFn: async () => {
       let q = supabase
-        .from("closers_contacts")
+        // Vista enmascarada: phone/email solo vienen reales para admin; el resto NULL.
+        // (closers_contacts.phone/email están revocados para no-admin.)
+        .from("v_closers_contacts")
         .select("*", { count: "exact" })
         .order("created_at", { ascending: false });
 

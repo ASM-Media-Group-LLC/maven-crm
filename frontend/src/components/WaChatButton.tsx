@@ -24,11 +24,15 @@ import { MessageCircle, Loader2, ChevronDown } from "lucide-react";
 export function WaChatButton({
   phone,
   closerCreatorId = null,
+  contactId = null,
   name = null,
   className,
 }: {
   phone: string | null | undefined;
   closerCreatorId?: string | null;
+  /** id de closers_contacts: el edge resuelve el teléfono SERVER-SIDE (el número
+   *  nunca viaja al browser; closers_contacts.phone está revocado para no-admin). */
+  contactId?: string | null;
   /** Nombre a usar como display_name del contacto si aún no lo tiene (ej. el
    *  nombre de la creadora/contacto), para que la conversación no salga "sin nombre". */
   name?: string | null;
@@ -43,7 +47,7 @@ export function WaChatButton({
   const open = async (channelId: string) => {
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("wa-inbox-open", {
-      body: { channel_id: channelId, closer_creator_id: closerCreatorId, phone: phone ?? null, name: name ?? null },
+      body: { channel_id: channelId, closer_creator_id: closerCreatorId, contact_id: contactId ?? null, phone: phone ?? null, name: name ?? null },
     });
     setBusy(false);
     const res = data as { ok?: boolean; error?: string; conversation_id?: string } | null;
@@ -60,7 +64,7 @@ export function WaChatButton({
     navigate(`/inbox?c=${res.conversation_id}`);
   };
 
-  if (!phone && !closerCreatorId) return <span className="text-xs text-muted-foreground">—</span>;
+  if (!phone && !closerCreatorId && !contactId) return <span className="text-xs text-muted-foreground">—</span>;
   if (channels.length === 0) {
     return <span className="text-xs text-muted-foreground" title="No tenés canales de WhatsApp asignados">WhatsApp</span>;
   }

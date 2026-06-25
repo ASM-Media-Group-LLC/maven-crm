@@ -48,11 +48,11 @@ serve(async (req) => {
   if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
 
   // ── Input ────────────────────────────────────────────────────────────────
-  let payload: { channel_id?: string; closer_creator_id?: string; phone?: string; name?: string } = {};
+  let payload: { channel_id?: string; closer_creator_id?: string; contact_id?: string; phone?: string; name?: string } = {};
   try { payload = await req.json(); } catch { /* */ }
   const channelId = payload.channel_id;
   const leadId = payload.closer_creator_id || null;
-  if (!channelId || (!leadId && !payload.phone)) return json({ ok: false, error: "missing_channel_or_target" }, 400);
+  if (!channelId || (!leadId && !payload.contact_id && !payload.phone)) return json({ ok: false, error: "missing_channel_or_target" }, 400);
 
   // ── Canal + verificar membresía del usuario ───────────────────────────────
   const { data: channel } = await (sb as any)
@@ -118,6 +118,20 @@ serve(async (req) => {
         const who = owner?.full_name || "otra persona";
         return json({ ok: false, error: `Este lead ya está asignado a ${who}. No podés abrir su chat.` });
       }
+    }
+  }
+
+  // Contacto directo (módulo Contactos): resolvemos el teléfono SERVER-SIDE desde
+  // closers_contacts por contact_id, sin gating de dueño (paridad con el botón actual
+  // de Contactos, que no gateaba). Así el closer mensajea sin que el número viaje al
+  // browser (closers_contacts.phone está revocado para authenticated).
+  if (!e164 && payload.contact_id) {
+    const { data: sc } = await (sb as any)
+      .from("closers_contacts").select("country_code, phone, name, handle").eq("id", payload.contact_id).maybeSingle();
+    if (sc) {
+      if (sc.country_code && sc.phone) e164 = `${sc.country_code}${sc.phone}`;
+      else if (sc.phone && String(sc.phone).startsWith("+")) e164 = String(sc.phone);
+      displayName = displayName || sc.name || sc.handle || null;
     }
   }
 
