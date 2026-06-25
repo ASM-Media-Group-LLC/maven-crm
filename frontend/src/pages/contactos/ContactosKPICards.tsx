@@ -33,7 +33,7 @@ const ContactosKPICards = ({ stats, onClick }: Props) => {
       key: "creadoras" as const,
       label: "Creadoras (vía pipeline)",
       value: stats.creadoras.toLocaleString("es"),
-      subtitle: `${stats.activasHoy} activas hoy en el roster`,
+      subtitle: `de ${stats.activasHoy} activas en el roster total`,
       icon: Sparkles,
       color: "bg-emerald-500",
     },

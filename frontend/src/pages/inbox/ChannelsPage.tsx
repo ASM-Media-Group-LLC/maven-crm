@@ -77,6 +77,8 @@ const ChannelsPage = () => {
   const [editing, setEditing] = useState<ChannelRow | null>(null);
   const [editForm, setEditForm] = useState({ ...EMPTY_FORM, active: true, default_assignees: [] as string[] });
   const [deleting, setDeleting] = useState<ChannelRow | null>(null);
+  // Buscador del listado de auto-asignar (la lista de usuarios puede ser larga → scrollear era molesto).
+  const [assigneeSearch, setAssigneeSearch] = useState("");
   const openEdit = (c: ChannelRow) => {
     setEditForm({
       label: c.label ?? "",
@@ -87,6 +89,7 @@ const ChannelsPage = () => {
       active: c.active,
       default_assignees: c.default_assignees ?? [],
     });
+    setAssigneeSearch("");
     setEditing(c);
   };
 
@@ -397,27 +400,43 @@ const ChannelsPage = () => {
             <div className="space-y-1.5 pt-1">
               <Label>Auto-asignar conversaciones nuevas a</Label>
               <p className="text-[11px] text-muted-foreground">Cada conversación NUEVA de esta línea se asigna automáticamente a quien marques (podés elegir varias personas). Las existentes no se tocan.</p>
-              <div className="max-h-40 overflow-y-auto rounded-md border border-border p-2 space-y-1">
-                {users.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Sin usuarios</p>
-                ) : users.map((u) => {
-                  const on = editForm.default_assignees.includes(u.id);
-                  return (
-                    <label key={u.id} className="flex cursor-pointer items-center gap-2">
-                      <Checkbox
-                        checked={on}
-                        onCheckedChange={(v) => setEditForm((f) => ({
-                          ...f,
-                          default_assignees: v === true
-                            ? [...f.default_assignees, u.id]
-                            : f.default_assignees.filter((x) => x !== u.id),
-                        }))}
-                      />
-                      <span className="text-sm">{u.full_name ?? u.id.slice(0, 8)}</span>
-                    </label>
-                  );
-                })}
-              </div>
+              <Input
+                value={assigneeSearch}
+                onChange={(e) => setAssigneeSearch(e.target.value)}
+                placeholder="Buscar persona…"
+                className="h-8 text-sm"
+              />
+              {(() => {
+                const q = assigneeSearch.trim().toLowerCase();
+                const filtered = q
+                  ? users.filter((u) => (u.full_name ?? "").toLowerCase().includes(q))
+                  : users;
+                return (
+                  <div className="max-h-40 overflow-y-auto rounded-md border border-border p-2 space-y-1">
+                    {users.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Sin usuarios</p>
+                    ) : filtered.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Nadie coincide con “{assigneeSearch}”.</p>
+                    ) : filtered.map((u) => {
+                      const on = editForm.default_assignees.includes(u.id);
+                      return (
+                        <label key={u.id} className="flex cursor-pointer items-center gap-2">
+                          <Checkbox
+                            checked={on}
+                            onCheckedChange={(v) => setEditForm((f) => ({
+                              ...f,
+                              default_assignees: v === true
+                                ? [...f.default_assignees, u.id]
+                                : f.default_assignees.filter((x) => x !== u.id),
+                            }))}
+                          />
+                          <span className="text-sm">{u.full_name ?? u.id.slice(0, 8)}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
               {editForm.default_assignees.length > 0 && (
                 <p className="text-[11px] text-muted-foreground">{editForm.default_assignees.length} persona(s) — auto-asignación activa en esta línea</p>
               )}
