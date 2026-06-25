@@ -23,7 +23,7 @@ import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader"
 import { ListRowButton } from "@/components/ui/list-row";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
-import ContactosKPICards from "./ContactosKPICards";
+import ContactosKPICards, { type ContactKpiKey } from "./ContactosKPICards";
 import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
 import ContactosCardList from "./ContactosCardList";
 import ContactosAnalyticsModal from "./ContactosAnalyticsModal";
@@ -31,6 +31,7 @@ import ContactosAnalyticsModal from "./ContactosAnalyticsModal";
 import { SALES_CHANNEL_NONE, SALES_CHANNEL_MULTI } from "./ContactosFilters";
 import { useContactSalesChannels } from "./useContactSalesChannels";
 import { useContactStatuses } from "./useContactStatuses";
+import { useContactFunnelStats } from "./useContactFunnelStats";
 import ContactoDetailDialog from "./ContactoDetailDialog";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
@@ -92,8 +93,7 @@ const ContactosContent = () => {
   const [activeTab, setActiveTab] = useState<"dashboard" | "contactos">("dashboard");
   const [filters, setFilters] = useState<ContactoFilters>(emptyFilters);
   const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
-  type KpiKey = "total" | "nuevos" | "convertidos" | "sinContactar";
-  const [kpiPopup, setKpiPopup] = useState<KpiKey | null>(null);
+  const [kpiPopup, setKpiPopup] = useState<ContactKpiKey | null>(null);
   // Estado del collapsed por categoría — mismo patrón que panel/
   // dashboard v2: default top expandida, resto colapsadas.
   // null = sin tocar (aplica default: solo la 1ª categoría abierta). Un Set (aunque
@@ -120,6 +120,8 @@ const ContactosContent = () => {
   const salesChannels = useContactSalesChannels(canSeeChannels);
   // Estado de cada contacto (creadora activa / ex-creadora / en proceso) para el color de fila.
   const contactStatuses = useContactStatuses();
+  // Backbone del dashboard: embudo + churn server-side, acotado por el calendario global.
+  const { stats: funnelStats } = useContactFunnelStats(filters.dateFrom, filters.dateTo);
 
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [filters]);
@@ -226,63 +228,31 @@ const ContactosContent = () => {
   const totalCount = queryResult?.total ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  // KPI counts — separados del query paginado para que reflejen el total
-  // global, no solo la página actual. count head queries baratas.
-  const { data: kpiCounts = { nuevos: 0, convertidos: 0, sinContactar: 0, wonIds: [] as string[] } } = useQuery({
-    queryKey: ["closers_contacts_kpi"],
-    queryFn: async () => {
-      // "Nuevos" = ingresados al CRM hace menos de un mes (created_at en los
-      // últimos 30 días). OJO: contactos importados con fecha histórica
-      // backdateada (p.ej. import KASH) NO cuentan acá a propósito: no son
-      // ingresos recientes para trabajar, aunque la fila se haya creado hoy.
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      thirtyDaysAgo.setHours(0, 0, 0, 0);
-      // "Convertido" = lead GANADO en el pipeline de closers (closer_creators en stage
-      // Confirmada/Completada), por source_contact_id. NO el flag status='converted'
-      // (que en realidad = "pasó a closers"; la mayoría terminaban "No interesada").
-      const WON_STAGES = ["Confirmada", "Completada", "confirmada", "completada"];
-      const [nuevosRes, wonRes, sinContactarRes] = await Promise.all([
-        supabase.from("closers_contacts").select("id", { count: "exact", head: true }).gte("created_at", thirtyDaysAgo.toISOString()),
-        (supabase as any).from("closer_creators").select("source_contact_id").in("stage", WON_STAGES),
-        // "Sin contactar" = leads sin tocar todavía (status='new').
-        supabase.from("closers_contacts").select("id", { count: "exact", head: true }).eq("status", "new"),
-      ]);
-      const wonIds = Array.from(
-        new Set(((wonRes.data ?? []) as any[]).map((r) => r.source_contact_id).filter(Boolean)),
-      ) as string[];
-      return {
-        nuevos: nuevosRes.count ?? 0,
-        convertidos: wonIds.length,
-        sinContactar: sinContactarRes.count ?? 0,
-        wonIds,
-      };
-    },
-  });
-
-  // Lista de contactos para el popup de KPI — query lazy: solo dispara
-  // cuando el usuario abre uno de los 4 cards. Limitado a 100 filas para
-  // no saturar el dialog (los conteos siguen siendo globales).
+  // Lista de contactos para el popup de KPI — query lazy: solo dispara cuando el
+  // usuario abre uno de los cards. Server-side vía get_contact_funnel_list: misma
+  // clasificación lifecycle que los conteos → la lista coincide EXACTO. Limitado a
+  // 100 filas (display); los conteos del card siguen siendo globales/server-side.
+  // El bucket "conversion" reusa el mismo set que "creadoras" (es el numerador).
   const { data: kpiPopupContacts = [], isLoading: kpiPopupLoading } = useQuery({
-    queryKey: ["closers_contacts_kpi_popup", kpiPopup, kpiCounts.convertidos],
+    queryKey: ["contact_funnel_list", kpiPopup, filters.dateFrom, filters.dateTo],
     enabled: kpiPopup !== null,
     queryFn: async () => {
-      let q = supabase
-        .from("closers_contacts")
-        .select("id, name, handle, city, country_code, physical_appearance, status, created_at, profile_picture_url")
-        .order("created_at", { ascending: false })
-        .limit(100);
-      if (kpiPopup === "nuevos") {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        thirtyDaysAgo.setHours(0, 0, 0, 0);
-        q = q.gte("created_at", thirtyDaysAgo.toISOString());
+      const bucket = kpiPopup === "conversion" ? "creator_active"
+        : kpiPopup === "creadoras" ? "creator_active"
+        : kpiPopup === "proceso" ? "in_progress"
+        : kpiPopup === "sinTocar" ? "none"
+        : kpiPopup === "churn" ? "churn"
+        : "pipeline";
+      const { data, error } = await (supabase as any).rpc("get_contact_funnel_list", {
+        p_bucket: bucket,
+        p_from: filters.dateFrom || null,
+        p_to: filters.dateTo || null,
+      });
+      if (error) {
+        if (error.code === "42501") return [];
+        throw error;
       }
-      else if (kpiPopup === "convertidos") q = q.in("id", kpiCounts.wonIds.length ? kpiCounts.wonIds : ["__none__"]);
-      else if (kpiPopup === "sinContactar") q = q.eq("status", "new");
-      const { data, error } = await q;
-      if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as any[];
     },
   });
 
@@ -447,7 +417,8 @@ const ContactosContent = () => {
           <div>
             <h1 className="text-2xl font-bold">Directorio de Contactos</h1>
             <p className="text-sm text-muted-foreground">
-              Total: {totalCount} contactos
+              {funnelStats.pipelineVivo.toLocaleString("es")} en pipeline vivo
+              <span className="text-muted-foreground/60"> · {totalCount.toLocaleString("es")} en el directorio</span>
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -491,10 +462,7 @@ const ContactosContent = () => {
         {activeTab === "dashboard" && (
           <div className="space-y-5 overflow-auto px-6 py-5">
             <ContactosKPICards
-              total={totalCount}
-              nuevos={kpiCounts.nuevos}
-              convertidos={kpiCounts.convertidos}
-              sinContactar={kpiCounts.sinContactar}
+              stats={funnelStats}
               onClick={(key) => setKpiPopup(key)}
             />
             {/* Card "por canal de venta" → admin+manager. La analítica completa
@@ -650,16 +618,20 @@ const ContactosContent = () => {
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {kpiPopup === "total" && `Todos los Contactos (${totalCount})`}
-              {kpiPopup === "nuevos" && `Nuevos · últimos 30 días (${kpiCounts.nuevos})`}
-              {kpiPopup === "convertidos" && `Contactos Convertidos (${kpiCounts.convertidos})`}
-              {kpiPopup === "sinContactar" && `Sin contactar (${kpiCounts.sinContactar})`}
+              {kpiPopup === "pipeline" && `Pipeline vivo (${funnelStats.pipelineVivo.toLocaleString("es")})`}
+              {kpiPopup === "creadoras" && `Creadoras vía pipeline (${funnelStats.creadoras})`}
+              {kpiPopup === "conversion" && `Convirtieron a creadora (${funnelStats.creadoras})`}
+              {kpiPopup === "proceso" && `En proceso (${funnelStats.enProceso})`}
+              {kpiPopup === "sinTocar" && `Sin tocar · pool vivo (${funnelStats.sinTocar})`}
+              {kpiPopup === "churn" && `Se están yendo (${funnelStats.churnLeaving + funnelStats.churnTerminated})`}
             </DialogTitle>
             <p className="text-xs text-muted-foreground">
-              {kpiPopup === "total" && "Mostrando los 100 más recientes"}
-              {kpiPopup === "nuevos" && "Ingresados al CRM en los últimos 30 días · 100 más recientes"}
-              {kpiPopup === "convertidos" && "Pasaron a creadores · 100 más recientes"}
-              {kpiPopup === "sinContactar" && "Leads sin contactar todavía (status nuevo) · 100 más recientes"}
+              {kpiPopup === "pipeline" && "Contactos trabajables (sin el import histórico de Kash) · 100 más recientes"}
+              {kpiPopup === "creadoras" && "Llegaron a creadora desde el pipeline · 100 más recientes"}
+              {kpiPopup === "conversion" && "El numerador de la tasa: contactos que se volvieron creadora · 100 más recientes"}
+              {kpiPopup === "proceso" && "Con closer asignado o ya contactados · 100 más recientes"}
+              {kpiPopup === "sinTocar" && "Pool vivo para repartir (sin tocar todavía) · 100 más recientes"}
+              {kpiPopup === "churn" && "Creadoras saliendo o dadas de baja · agrupadas por estado"}
             </p>
           </DialogHeader>
 
