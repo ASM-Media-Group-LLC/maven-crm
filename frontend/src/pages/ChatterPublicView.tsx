@@ -666,6 +666,7 @@ const ChatterPublicView = () => {
   const [deletingMsg, setDeletingMsg] = useState(false);
   const lastMessageIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Tick clock every second for countdown
@@ -1342,7 +1343,11 @@ const ChatterPublicView = () => {
             right edge via .chat-zoom { margin-left: auto }. */}
         <EmojiBar
           emojis={chatterEmojis}
-          onPick={(e) => setInput((v) => v + e)}
+          onPick={(e) => {
+            setInput((v) => v + e);
+            // Devolver foco al textarea: Enter ENVÍA (no re-inserta el emoji).
+            textareaRef.current?.focus();
+          }}
           onAdd={(e) => setChatterEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
           onRemove={(e) => setChatterEmojis((curr) => curr.filter((x) => x !== e))}
           trailing={<FontZoom />}
@@ -1403,6 +1408,7 @@ const ChatterPublicView = () => {
               <FolderOpen className="h-4 w-4" />
             </Button>
             <textarea
+              ref={textareaRef}
               value={input}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={(e) => {
