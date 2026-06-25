@@ -11,8 +11,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import VoiceNoteRecorder from "./VoiceNoteRecorder";
+import { EmojiBar, usePersistedEmojis } from "@/pages/chatter-evaluator/workspace/EmojiBar";
+import { GifPicker } from "@/pages/inbox/GifPicker";
+import { StickerPicker } from "@/pages/inbox/StickerPicker";
+import { ScriptsButton } from "@/components/chat/ScriptsButton";
 
-import { EMOJIS, MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
+import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 
 interface PendingFile {
   file: File;
@@ -50,6 +54,34 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   const typingTimeout = useRef<ReturnType<typeof setTimeout>>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<{ abort: () => void } | null>(null);
+  const [messengerEmojis, setMessengerEmojis] = usePersistedEmojis("messenger", user?.id);
+
+  // GIF (Giphy mp4, URL externa estable) → se manda como archivo (Messenger no renderiza video
+  // inline; el sticker sí porque es webp/imagen).
+  const sendGifUrl = (mp4Url: string) => {
+    onSendMessage("🎬 GIF", "file" as ChatMessage["type"], mp4Url, "gif.mp4", replyTo?.id);
+    onCancelReply();
+  };
+  // Sticker: el picker da URL FIRMADA (bucket privado, expira) → la copiamos a chat-files
+  // (bucket público de Messenger) para una URL permanente y la mandamos como imagen.
+  const sendStickerUrl = async (signedUrl: string) => {
+    if (!user) return;
+    try {
+      const resp = await fetch(signedUrl);
+      if (!resp.ok) throw new Error("no se pudo leer el sticker");
+      const blob = await resp.blob();
+      const ext = blob.type.includes("gif") ? "gif" : "webp";
+      const fileName = `sticker-${Date.now()}.${ext}`;
+      const path = `${user.id}/${fileName}`;
+      const { error } = await supabase.storage.from("chat-files").upload(path, blob, { contentType: blob.type || "image/webp" });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
+      onSendMessage("sticker", "image" as ChatMessage["type"], urlData.publicUrl, fileName, replyTo?.id);
+      onCancelReply();
+    } catch (e) {
+      toast.error("No se pudo enviar el sticker", { description: (e as Error).message });
+    }
+  };
 
   const addFilesInternal = useCallback((files: File[]) => {
     const totalFiles = pendingFiles.length + files.length;
@@ -311,43 +343,20 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         </div>
       )}
 
-      {/* Input row */}
-      <div className="flex items-end gap-1.5 px-3 py-2.5">
-        {!isRecording && (
-          <>
-            <Popover>
-              <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="shrink-0 h-11 w-11 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground">
-                  <Smile className="h-5 w-5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 p-2" side="top" align="start">
-                <div className="grid grid-cols-10 gap-0.5">
-                  {EMOJIS.map(e => (
-                    <button
-                      key={e}
-                      className="text-lg hover:bg-muted rounded-md p-1 transition-colors"
-                      onClick={() => handleTextChange(text + e)}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
+      {/* Barra de emojis ARRIBA (personalizable, scope "messenger"). Reemplaza el popover. */}
+      {!isRecording && (
+        <EmojiBar
+          emojis={messengerEmojis}
+          onPick={(e) => { setText((v) => v + e); inputRef.current?.focus(); }}
+          onAdd={(e) => setMessengerEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
+          onRemove={(e) => setMessengerEmojis((curr) => curr.filter((x) => x !== e))}
+        />
+      )}
 
-            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} multiple accept="*/*" />
-            <Button
-              variant="ghost" size="icon"
-              className="shrink-0 h-11 w-11 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
-            </Button>
-          </>
-        )}
-
+      {/* Composer: texto AL MEDIO, acciones ABAJO (adjuntar · GIF · sticker · Scripts · mic) +
+          Enviar a la derecha. NO se tocó la lógica de envío/voz/menciones/upload. */}
+      <div className="px-3 py-2.5">
+        <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} multiple accept="*/*" />
         {isRecording ? (
           <VoiceNoteRecorder
             isRecording={isRecording}
@@ -356,8 +365,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
             onCancel={() => setIsRecording(false)}
           />
         ) : (
-          <>
-            <div className="flex-1 relative">
+          <div className="space-y-2">
+            <div className="relative">
               {chatType === "group" && participants && (
                 <MentionAutocomplete
                   text={text}
@@ -370,7 +379,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               <Textarea
                 ref={inputRef}
                 placeholder={chatType === "group" ? "Escribe un mensaje... (usa @ para mencionar)" : "Escribe un mensaje..."}
-                className="min-h-[38px] max-h-[120px] resize-none bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-3xl px-4 py-2.5 text-sm"
+                className="min-h-[38px] max-h-[120px] w-full resize-none bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-2xl px-4 py-2.5 text-sm"
                 rows={1}
                 value={text}
                 onChange={e => handleTextChange(e.target.value)}
@@ -379,27 +388,44 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 onSelect={e => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
               />
             </div>
-
-            {text.trim() || pendingFiles.length > 0 ? (
+            <div className="flex items-center gap-1">
               <Button
-                size="icon"
-                onClick={handleSend}
-                className="shrink-0 h-11 w-11 sm:h-9 sm:w-9 rounded-full bg-primary text-primary-foreground shadow-none hover:bg-primary/90 transition-all"
+                variant="ghost" size="icon"
+                className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
+                onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
+                title="Adjuntar archivo"
               >
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
               </Button>
-            ) : (
+              <GifPicker onPick={sendGifUrl} disabled={uploading} />
+              <StickerPicker onPick={sendStickerUrl} disabled={uploading} />
+              <ScriptsButton
+                disabled={uploading}
+                onUse={(s) => {
+                  if (s.send_on_click) { onSendMessage(s.text, "text", undefined, undefined, replyTo?.id); onCancelReply(); }
+                  else { setText((v) => (v.trim() ? v.trimEnd() + " " : "") + s.text); inputRef.current?.focus(); }
+                }}
+              />
               <Button
-                variant="ghost"
-                size="icon"
-                className="shrink-0 h-11 w-11 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
+                variant="ghost" size="icon"
+                className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
                 onClick={() => setIsRecording(true)}
+                title="Grabar nota de voz"
               >
                 <Mic className="h-5 w-5" />
               </Button>
-            )}
-          </>
+              <Button
+                size="icon"
+                onClick={handleSend}
+                className="ml-auto h-9 w-9 shrink-0 rounded-full bg-primary text-primary-foreground shadow-none hover:bg-primary/90 transition-all"
+                disabled={uploading || (!text.trim() && pendingFiles.length === 0)}
+                title="Enviar"
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>
