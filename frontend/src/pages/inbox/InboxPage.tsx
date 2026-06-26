@@ -1104,12 +1104,25 @@ const InboxPage = () => {
                               {isOut && !isDeleted && <StatusTick status={m.status} />}
                             </p>
                             {isOut && !isDeleted && m.status === "failed" && (
-                              <p
-                                className="mt-0.5 flex items-center justify-end gap-1 text-[10px] font-medium text-red-400"
-                                title="WhatsApp rechazó la entrega. Causa más común: el número no tiene WhatsApp o no es el correcto. Verificá el número del contacto."
-                              >
-                                <AlertCircle className="h-3 w-3" /> No entregado · revisá el número
-                              </p>
+                              <div className="mt-0.5 flex flex-col items-end gap-0.5">
+                                <p
+                                  className="flex items-center gap-1 text-[10px] font-medium text-red-400"
+                                  title="WhatsApp rechazó la entrega. Causa más común: el número no tiene WhatsApp o no es el correcto. Verificá el número del contacto."
+                                >
+                                  <AlertCircle className="h-3 w-3" /> No entregado · revisá el número
+                                </p>
+                                {m.body && m.msg_type === "text" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => sendMessage(m.body!)}
+                                    disabled={sending}
+                                    className="flex items-center gap-1 text-[10px] font-medium text-primary hover:underline disabled:opacity-50"
+                                    title="Reenviar este mensaje (el número ya pudo haberse corregido). Hacelo de a uno."
+                                  >
+                                    ↻ Reintentar envío
+                                  </button>
+                                )}
+                              </div>
                             )}
                             {m.agent_reaction && (
                               <span
