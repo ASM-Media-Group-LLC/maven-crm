@@ -1,4 +1,6 @@
-import { ExternalLink, Pencil, Sparkles, Trash2, ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { ExternalLink, Pencil, Sparkles, Trash2, ArrowRight, History } from "lucide-react";
+import ContactHistoryView from "./ContactHistoryView";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +41,7 @@ interface Props {
 // Mismo patrón que CreatorDetailDialog (Dashboard 2): foto + título + IG
 // + grid de stats + botones de acción.
 const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert, onDelete, canDelete, salesChannels = [], showSalesChannels }: Props) => {
+  const [historyOpen, setHistoryOpen] = useState(false);
   if (!contacto) return null;
   const c = contacto;
   const cleanHandle = c.instagram.replace(/^@/, "");
@@ -94,6 +97,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
   ];
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
@@ -103,12 +107,25 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
               <AvatarFallback className="text-lg font-semibold">{initials}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <DialogTitle className="text-2xl mb-1 truncate">{c.nombre}</DialogTitle>
+              <DialogTitle
+                className={`text-2xl mb-1 truncate ${igUrl ? "cursor-pointer hover:underline decoration-primary/50 underline-offset-4" : ""}`}
+                onClick={() => igUrl && window.open(igUrl, "_blank", "noopener,noreferrer")}
+                title={igUrl ? "Abrir Instagram" : undefined}
+              >
+                {c.nombre}
+              </DialogTitle>
               {cleanHandle && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                <a
+                  href={igUrl ?? `https://instagram.com/${cleanHandle}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-muted"
+                  title="Abrir Instagram"
+                >
                   <InstagramIcon className="h-3.5 w-3.5" />
                   @{cleanHandle}
-                </p>
+                  <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                </a>
               )}
               {ofUrl && (
                 <a
@@ -162,18 +179,10 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
         )}
 
         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
-          {igUrl && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => window.open(igUrl, "_blank", "noopener,noreferrer")}
-            >
-              <InstagramIcon className="h-3.5 w-3.5" />
-              Abrir Instagram
-              <ExternalLink className="h-3 w-3" />
-            </Button>
-          )}
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setHistoryOpen(true)}>
+            <History className="h-3.5 w-3.5" />
+            Historial
+          </Button>
           {ofUrl && (
             <Button
               variant="outline"
@@ -207,6 +216,13 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
         </div>
       </DialogContent>
     </Dialog>
+    <ContactHistoryView
+      contactId={c.id}
+      contactName={c.nombre}
+      open={historyOpen}
+      onClose={() => setHistoryOpen(false)}
+    />
+    </>
   );
 };
 
