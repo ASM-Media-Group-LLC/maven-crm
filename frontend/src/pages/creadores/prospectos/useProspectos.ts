@@ -66,7 +66,8 @@ export function useProspectos() {
     queryKey: ["creator_prospects"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("creator_prospects" as any)
+        // vista enmascarada: phone/email reales solo para admin (revocados en la tabla base)
+        .from("v_creator_prospects" as any)
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -139,51 +140,14 @@ export function useStartOnboarding() {
   return useMutation({
     mutationFn: async ({ prospect, agency }: { prospect: ProspectRecord; agency: string }) => {
       if (!user) throw new Error("No se pudo obtener el usuario autenticado");
-      // 1. Create creator with status borrador
-      const { data: creator, error: creatorError } = await supabase
-        .from("creators")
-        .insert({
-          id: prospect.id,
-          name: prospect.name,
-          email: prospect.email || null,
-          phone: prospect.phone || null,
-          country: prospect.country || null,
-          instagram_handle: prospect.instagram || null,
-          tiktok_handle: prospect.tiktok || null,
-          category: prospect.category || null,
-          status: "borrador",
-          created_at: prospect.created_at,
-          created_by: user.id,
-        })
-        .select("id")
-        .single();
-      if (creatorError) throw creatorError;
-
-      // 2. Create creator_business with agency.
-      // Dual-write: lookup company_id en scouter_companies por name match
-      // case-insensitive. Si no matchea, queda NULL.
-      const { data: companyRow } = await supabase
-        .from("scouter_companies")
-        .select("id")
-        .ilike("name", agency)
-        .maybeSingle();
-      const { error: bizError } = await supabase
-        .from("creator_business")
-        .insert({
-          creator_id: creator.id,
-          assigned_agency: agency,
-          company_id: (companyRow as any)?.id ?? null,
-        } as any);
-      if (bizError) throw bizError;
-
-      // 3. Update prospect status to convertido
-      const { error: updateError } = await supabase
-        .from("creator_prospects" as any)
-        .update({ status: "convertido" } as any)
-        .eq("id", prospect.id);
-      if (updateError) throw updateError;
-
-      return creator.id;
+      // SERVER-SIDE: el RPC lee phone/email REALES del prospecto (que el cliente ya ve
+      // enmascarados) y crea creadora + creator_business + marca convertido en una transacción.
+      const { data, error } = await supabase.rpc("start_prospect_onboarding", {
+        p_prospect_id: prospect.id,
+        p_agency: agency,
+      } as never);
+      if (error) throw error;
+      return (data as unknown as string) || prospect.id;
     },
     onSuccess: (creatorId) => {
       qc.invalidateQueries({ queryKey: ["creator_prospects"] });

@@ -100,7 +100,12 @@ export default function ProspectosPage() {
 
   function handleUpdate() {
     if (!editForm.name.trim() || !editItem) return;
-    updateMutation.mutate({ id: editItem.id, data: editForm as any }, { onSuccess: () => setEditItem(null) });
+    // phone/email enmascarados (••••) para no-admin: si no los cambió (siguen con "•"),
+    // NO los mandamos para no pisar el valor real. Si escribió uno nuevo (sin "•"), se guarda.
+    const data: any = { ...editForm };
+    if (typeof data.phone === "string" && data.phone.includes("•")) delete data.phone;
+    if (typeof data.email === "string" && data.email.includes("•")) delete data.email;
+    updateMutation.mutate({ id: editItem.id, data }, { onSuccess: () => setEditItem(null) });
   }
 
   return (
