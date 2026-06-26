@@ -1429,6 +1429,7 @@ const InboxPage = () => {
                 <StickerPicker onPick={sendStickerUrl} disabled={mediaBusy || sending} />
                 {/* Scripts en último lugar (antes de Enviar). */}
                 <ScriptsButton
+                  surface="inbox"
                   disabled={mediaBusy || sending}
                   onUse={(s) => {
                     if (s.send_on_click) void sendMessage(s.text);

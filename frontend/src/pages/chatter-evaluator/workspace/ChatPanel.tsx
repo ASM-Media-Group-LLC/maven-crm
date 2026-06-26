@@ -1540,6 +1540,7 @@ export const ChatPanel = ({ session }: Props) => {
               )}
               {/* Scripts en último lugar (antes de Enviar), pedido del owner. */}
               <ScriptsButton
+                surface="chatter"
                 disabled={uploading}
                 onUse={(s) => {
                   if (s.send_on_click) void composerSend(s.text, []);

@@ -401,6 +401,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               <GifPicker onPick={sendGifUrl} disabled={uploading} />
               <StickerPicker onPick={sendStickerUrl} disabled={uploading} />
               <ScriptsButton
+                surface="messenger"
                 disabled={uploading}
                 onUse={(s) => {
                   if (s.send_on_click) { onSendMessage(s.text, "text", undefined, undefined, replyTo?.id); onCancelReply(); }

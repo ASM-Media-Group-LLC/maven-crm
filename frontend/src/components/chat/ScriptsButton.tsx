@@ -8,9 +8,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { MessageSquareText, Plus, Pencil, Trash2, Zap, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-// Frases hechas compartidas del equipo (tabla chatter_scripts). send_on_click=true → al click
-// se manda solo; false → al click la frase queda en el cajón sin enviar (la decisión la aplica
-// el composer vía onUse). Componente genérico: sirve para cualquier superficie de chat.
+// Frases hechas INDIVIDUALES por usuario y por SECCIÓN (surface) de Maven. Cada usuario ve/edita
+// solo las suyas (RLS user_id=auth.uid()) y cada superficie las propias ('chatter'|'inbox'|'messenger'):
+// crear/borrar en una sección NO afecta a las otras. send_on_click=true → al click se manda solo;
+// false → queda en el cajón (la decisión la aplica el composer vía onUse).
 export interface ChatterScript {
   id: string;
   label: string | null;
@@ -20,15 +21,16 @@ export interface ChatterScript {
   created_at: string;
 }
 
-export function useChatterScripts() {
+export function useChatterScripts(surface: string) {
   const qc = useQueryClient();
   const listQ = useQuery({
-    queryKey: ["chatter-scripts"],
+    queryKey: ["chatter-scripts", surface],
     staleTime: 60_000,
     queryFn: async (): Promise<ChatterScript[]> => {
       const { data, error } = await (supabase as any)
         .from("chatter_scripts")
         .select("id, label, text, send_on_click, sort_order, created_at")
+        .eq("surface", surface)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true });
       if (error) {
@@ -38,15 +40,18 @@ export function useChatterScripts() {
       return (data ?? []) as ChatterScript[];
     },
   });
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["chatter-scripts"] });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["chatter-scripts", surface] });
 
   const add = useMutation({
     mutationFn: async (v: { text: string; label?: string | null; send_on_click: boolean }) => {
+      const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
       const { error } = await (supabase as any).from("chatter_scripts").insert({
         text: v.text.trim(),
         label: v.label?.trim() || null,
         send_on_click: v.send_on_click,
-        created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+        surface,
+        user_id: uid,
+        created_by: uid,
       });
       if (error) throw error;
     },
@@ -74,6 +79,8 @@ export function useChatterScripts() {
 }
 
 interface ScriptsButtonProps {
+  /** Sección de Maven dueña de estas frases ('chatter' | 'inbox' | 'messenger'). Cada una es independiente. */
+  surface: string;
   /** Usar una frase. El composer decide: si send_on_click la manda, si no la inserta en el cajón. */
   onUse: (script: ChatterScript) => void;
   disabled?: boolean;
@@ -81,8 +88,8 @@ interface ScriptsButtonProps {
 
 type EditState = { id: string | null; text: string; label: string; sendOnClick: boolean } | null;
 
-export function ScriptsButton({ onUse, disabled }: ScriptsButtonProps) {
-  const { scripts, isLoading, add, update, remove } = useChatterScripts();
+export function ScriptsButton({ surface, onUse, disabled }: ScriptsButtonProps) {
+  const { scripts, isLoading, add, update, remove } = useChatterScripts(surface);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [edit, setEdit] = useState<EditState>(null); // null=no form, id=null=nuevo, id=set=editando
