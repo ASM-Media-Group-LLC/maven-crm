@@ -120,7 +120,8 @@ export default function ReportesPage() {
   const { data: invoices = [] } = useQuery({
     queryKey: ["reportes-invoices"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("invoices").select("*, creators(id, name, artistic_name, phone, creator_business(billing_address))").order("created_at", { ascending: false });
+      // PII: embebemos la vista enmascarada bajo el alias `creators` (phone real solo admin).
+      const { data, error } = await supabase.from("invoices").select("*, creators:v_creators(id, name, artistic_name, phone, creator_business(billing_address))").order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },

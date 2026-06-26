@@ -128,7 +128,7 @@ export function useOnboarding() {
     queryKey: ["onboarding-creators"],
     queryFn: async (): Promise<OnboardingCreator[]> => {
       const { data, error } = await supabase
-        .from("creators")
+        .from("v_creators" as never) // PII enmascarada (real solo admin)
         .select("*, creator_business(*)")
         .in("status", ["borrador", "pendiente", "onboarding", "pendiente_verificacion", "verificado", "active"]);
 

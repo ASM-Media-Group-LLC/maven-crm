@@ -332,26 +332,20 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
       const trimmedPhone = data.telefono?.trim();
       if (trimmedPhone) {
         const fullPhone = `${data.paisCodigo}${trimmedPhone}`;
-        const { data: phoneInContacts } = await supabase
-          .from("closers_contacts")
-          .select("id, name")
-          .eq("phone", trimmedPhone)
-          .maybeSingle();
-        if (phoneInContacts) {
+        // Dedup server-side (phone está revocado para no-admin): el RPC lee el número y
+        // devuelve SOLO el nombre del match, sin exponer PII.
+        const { data: contactName } = await supabase.rpc("find_contact_name_by_phone", { p_phone: trimmedPhone } as never);
+        if (contactName) {
           toast({
             title: "⚠️ Teléfono ya registrado",
-            description: `Este número ya está registrado para ${phoneInContacts.name}. El contacto se guardará de todos modos.`,
+            description: `Este número ya está registrado para ${contactName}. El contacto se guardará de todos modos.`,
           });
         }
-        const { data: phoneInCreators } = await supabase
-          .from("creators")
-          .select("id, name, phone")
-          .eq("phone", fullPhone)
-          .maybeSingle();
-        if (phoneInCreators) {
+        const { data: creatorName } = await supabase.rpc("find_creator_name_by_phone", { p_phone: fullPhone } as never);
+        if (creatorName) {
           toast({
             title: "⚠️ Teléfono en creators",
-            description: `Este número ya existe para la creadora ${phoneInCreators.name}. El contacto se guardará de todos modos.`,
+            description: `Este número ya existe para la creadora ${creatorName}. El contacto se guardará de todos modos.`,
           });
         }
       }

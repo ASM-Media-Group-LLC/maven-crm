@@ -73,11 +73,11 @@ Deno.serve(async (req) => {
   if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
 
   // ── Input ────────────────────────────────────────────────────────────────
-  let payload: { channel_id?: string; closer_creator_id?: string; contact_id?: string; phone?: string; name?: string } = {};
+  let payload: { channel_id?: string; closer_creator_id?: string; contact_id?: string; creator_id?: string; phone?: string; name?: string } = {};
   try { payload = await req.json(); } catch { /* */ }
   const channelId = payload.channel_id;
   const leadId = payload.closer_creator_id || null;
-  if (!channelId || (!leadId && !payload.contact_id && !payload.phone)) return json({ ok: false, error: "missing_channel_or_target" }, 400);
+  if (!channelId || (!leadId && !payload.contact_id && !payload.creator_id && !payload.phone)) return json({ ok: false, error: "missing_channel_or_target" }, 400);
 
   // ── Canal + verificar membresía del usuario ───────────────────────────────
   const { data: channel } = await (sb as any)
@@ -161,6 +161,19 @@ Deno.serve(async (req) => {
       if (sc.country_code && sc.phone) e164 = joinCc(sc.country_code, sc.phone);
       else if (sc.phone) e164 = cleanE164(sc.phone);
       displayName = displayName || sc.name || sc.handle || null;
+    }
+  }
+
+  // Creadora (módulo Creadoras): resolvemos el teléfono SERVER-SIDE desde creators por
+  // creator_id, sin gating de dueño (paridad con el botón actual de Creadoras). Así se
+  // mensajea sin que el número viaje al browser (creators.whatsapp_number/phone_e164/phone
+  // están enmascarados/revocados para authenticated). Preferimos whatsapp_number > phone_e164 > phone.
+  if (!e164 && payload.creator_id) {
+    const { data: cr } = await (sb as any)
+      .from("creators").select("whatsapp_number, phone_e164, phone, name, artistic_name, instagram_handle").eq("id", payload.creator_id).maybeSingle();
+    if (cr) {
+      e164 = cleanE164(cr.whatsapp_number) || cleanE164(cr.phone_e164) || cleanE164(cr.phone);
+      displayName = displayName || cr.name || cr.artistic_name || cr.instagram_handle || null;
     }
   }
 

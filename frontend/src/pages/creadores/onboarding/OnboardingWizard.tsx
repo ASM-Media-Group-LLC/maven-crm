@@ -6,7 +6,7 @@ import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { useAddCreadorWithBusiness } from "../useCreadores";
+import { useAddCreadorWithBusiness, stripMaskedPii } from "../useCreadores";
 import { useQueryClient } from "@tanstack/react-query";
 import Step1PersonalInfo, { type Step1Data, type Step1Errors, validateStep1 } from "./steps/Step1PersonalInfo";
 import Step2PsychologyLimits, { type Step2PsyData } from "./steps/Step2PsychologyLimits";
@@ -71,7 +71,10 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
 
     const profilePhotoUrl = step3Doc.profilePhotos.length > 0 ? step3Doc.profilePhotos[0].url : null;
 
-    return {
+    // PII: para no-admin el form se pre-llenó con email/phone ENMASCARADOS (vienen de la
+    // vista). stripMaskedPii dropea cualquier PII con "•" para no pisar el valor real al
+    // guardar. Si el no-admin escribe uno NUEVO (sin "•"), se guarda. El admin ve/escribe real.
+    return stripMaskedPii({
       name: step1.name || "Borrador",
       email: step1.email || null,
       phone: step1.phone || null,
@@ -168,7 +171,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       // En borrador puede quedar null; al publicar es true|false.
       blu_infloww_active: step4.bluInflowwActive ?? false,
       last_autosave_at: new Date().toISOString(),
-    };
+    });
   }, [step1, step2Psy, step3Doc, step4]);
 
   // Autosave function
@@ -216,7 +219,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
     (async () => {
       setLoadingCreator(true);
       const { data: c } = await supabase
-        .from("creators")
+        .from("v_creators" as never) // PII enmascarada (real solo admin)
         .select("*, creator_business(*)")
         .eq("id", editCreatorId)
         .maybeSingle();
@@ -455,17 +458,14 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       return;
     }
 
-    // Duplicate check by email (only for new creators)
+    // Duplicate check by email (only for new creators). Server-side: email está revocado
+    // para no-admin; el RPC lee el email y devuelve solo el nombre del match.
     if (step1.email) {
-      const { data: existingByEmail } = await supabase
-        .from("creators")
-        .select("id, name, email")
-        .ilike("email", step1.email.trim())
-        .maybeSingle();
-      if (existingByEmail) {
+      const { data: existingName } = await supabase.rpc("find_creator_name_by_email", { p_email: step1.email.trim() } as never);
+      if (existingName) {
         toast({
           title: "Duplicado detectado",
-          description: `Ya existe un creador con este email: ${existingByEmail.name}`,
+          description: `Ya existe un creador con este email: ${existingName}`,
           variant: "destructive",
         });
         setStep(1);

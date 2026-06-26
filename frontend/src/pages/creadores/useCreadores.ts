@@ -32,7 +32,9 @@ async function fetchCreators(): Promise<CreatorWithBusiness[]> {
   // (texto) se mantiene en el select por compat — los reads que aún no
   // migraron lo siguen leyendo. Una vez todos en company.name, droppeamos.
   const { data, error } = await supabase
-    .from("creators")
+    // PII: leemos la vista enmascarada (phone/email/whatsapp_number reales solo para admin).
+    // El embed creator_business resuelve igual (PostgREST detecta la relación vía la base).
+    .from("v_creators" as never)
     .select(
       "*, creator_business(assigned_agency, manager_type, kash_type, start_date, company_id, company:scouter_companies(id, name))",
     );
@@ -201,11 +203,23 @@ const PROMOTE_COL: Record<string, string> = {
   reddit: "reddit_handle",
 };
 
+// PII: las vistas devuelven phone/email/whatsapp_number ENMASCARADOS (con "•") a no-admin.
+// Si el form de edición se guarda sin tocar esos campos, NO debemos pisar el valor real con
+// el enmascarado. Dropeamos cualquier campo PII cuyo valor contenga "•" (no se editó de verdad).
+// El no-admin SÍ puede registrar/cambiar un número: si escribe uno nuevo (sin "•"), se guarda.
+export function stripMaskedPii<T extends Record<string, unknown>>(patch: T): T {
+  const out: Record<string, unknown> = { ...patch };
+  for (const k of ["phone", "phone_e164", "whatsapp_number", "email"]) {
+    if (typeof out[k] === "string" && (out[k] as string).includes("•")) delete out[k];
+  }
+  return out as T;
+}
+
 export function useUpdateCreador() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<TablesInsert<"creators">> }) => {
-      const { error } = await supabase.from("creators").update(data).eq("id", id);
+      const { error } = await supabase.from("creators").update(stripMaskedPii(data)).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["creators"] }),
@@ -222,7 +236,7 @@ export function useCreadorById(id: string) {
     queryFn: async (): Promise<CreatorFull | null> => {
       if (!id) return null;
       const { data, error } = await supabase
-        .from("creators")
+        .from("v_creators" as never) // PII enmascarada (real solo admin)
         .select("*, creator_business(*)")
         .eq("id", id)
         .maybeSingle();

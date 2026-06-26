@@ -25,6 +25,7 @@ export function WaChatButton({
   phone,
   closerCreatorId = null,
   contactId = null,
+  creatorId = null,
   name = null,
   className,
 }: {
@@ -33,6 +34,9 @@ export function WaChatButton({
   /** id de closers_contacts: el edge resuelve el teléfono SERVER-SIDE (el número
    *  nunca viaja al browser; closers_contacts.phone está revocado para no-admin). */
   contactId?: string | null;
+  /** id de creators: el edge resuelve el teléfono SERVER-SIDE (whatsapp_number/
+   *  phone_e164/phone están enmascarados/revocados para no-admin). */
+  creatorId?: string | null;
   /** Nombre a usar como display_name del contacto si aún no lo tiene (ej. el
    *  nombre de la creadora/contacto), para que la conversación no salga "sin nombre". */
   name?: string | null;
@@ -48,7 +52,7 @@ export function WaChatButton({
   const open = async (channelId: string) => {
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("wa-inbox-open", {
-      body: { channel_id: channelId, closer_creator_id: closerCreatorId, contact_id: contactId ?? null, phone: phone ?? null, name: name ?? null },
+      body: { channel_id: channelId, closer_creator_id: closerCreatorId, contact_id: contactId ?? null, creator_id: creatorId ?? null, phone: phone ?? null, name: name ?? null },
     });
     setBusy(false);
     const res = data as { ok?: boolean; error?: string; conversation_id?: string } | null;

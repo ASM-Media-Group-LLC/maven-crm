@@ -54,7 +54,8 @@ export default function NuevoInvoicePage() {
   const { data: creators = [] } = useQuery({
     queryKey: ["creators-for-invoice"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("creators").select("id, name, artistic_name, phone, creator_business(billing_address)").order("name");
+      // PII: vista enmascarada (phone real solo admin; decisión del owner: Finanzas también enmascara).
+      const { data, error } = await supabase.from("v_creators" as never).select("id, name, artistic_name, phone, creator_business(billing_address)").order("name");
       if (error) throw error;
       return (data ?? []).sort((a, b) =>
         (a.artistic_name || a.name).localeCompare(b.artistic_name || b.name)

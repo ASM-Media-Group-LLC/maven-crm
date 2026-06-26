@@ -74,7 +74,8 @@ export default function FacturacionPage() {
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["invoices"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("invoices").select("*, creators(id, name, artistic_name, phone, creator_business(billing_address)), invoice_templates(*)").order("created_at", { ascending: false });
+      // PII: vista enmascarada bajo alias `creators` (phone real solo admin).
+      const { data, error } = await supabase.from("invoices").select("*, creators:v_creators(id, name, artistic_name, phone, creator_business(billing_address)), invoice_templates(*)").order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
