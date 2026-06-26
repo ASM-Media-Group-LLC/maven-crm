@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Pencil, Upload, X, ImageIcon, Film, FileText, Save, Check, ChevronsUpDown, Plus } from "lucide-react";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
 import {
@@ -68,9 +68,12 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
   const [isSaving, setIsSaving] = useState(false);
   const tempId = useMemo(() => crypto.randomUUID(), []);
 
-  const [lastId, setLastId] = useState<string | null>(null);
-  if (contacto && contacto.id !== lastId) {
-    setLastId(contacto.id);
+  // Resetea el formulario CADA VEZ que el modal se abre (o cambia el contacto). Antes solo
+  // re-inicializaba al cambiar contacto.id → reabrir el MISMO contacto dejaba pegadas las
+  // ediciones SIN guardar (parecía que se guardaban aunque NO tocaban la DB). Ahora abrir
+  // siempre descarta lo no guardado.
+  useEffect(() => {
+    if (!open || !contacto) return;
     setNombre(contacto.nombre);
     setCategoria(contacto.categoria);
     setAccountLink(contacto.instagram || "");
@@ -84,7 +87,8 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
     setPlataforma(contacto.platform || "Instagram");
     setProfilePhoto(contacto.profile_picture_url ? { url: contacto.profile_picture_url, name: "current", type: "image/jpeg", size: 0, category: "piclink" as const } : null);
     setExtraFiles([]);
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, contacto?.id]);
 
   const handleAccountLinkChange = useCallback((value: string) => {
     setAccountLink(value);
