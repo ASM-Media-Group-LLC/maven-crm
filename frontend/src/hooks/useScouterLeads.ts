@@ -224,7 +224,8 @@ export const useScouterLeads = (params: ListParams = {}) => {
       const to = from + pageSize - 1;
 
       let q = sb
-        .from("scouter_leads")
+        // vista enmascarada: phone enmascarado para no-admin (revocado en la tabla base)
+        .from("v_scouter_leads")
         .select("*", { count: "exact" })
         .order("created_at", { ascending: false })
         .range(from, to);
@@ -369,11 +370,14 @@ export const useUpdateLead = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: LeadPatch }) => {
+      // phone enmascarado: si el valor trae "•" (no se editó de verdad) no lo escribimos.
+      const safePatch: any = { ...patch };
+      if (typeof safePatch.phone === "string" && safePatch.phone.includes("•")) delete safePatch.phone;
       const { data, error } = await sb
         .from("scouter_leads")
-        .update(patch)
+        .update(safePatch)
         .eq("id", id)
-        .select("*")
+        .select("id")  // no leer phone de vuelta (columna revocada para no-admin)
         .single();
       if (error) throw error;
       return data as ScouterLead;
@@ -533,7 +537,7 @@ export const useScouterStats = (filters: ScouterStatsFilters = {}) =>
       // Aplicamos los filtros activos a TODAS las queries para que las
       // cards coincidan con la grid filtrada.
       const head = (subFilter: (q: any) => any) =>
-        subFilter(applyStatsFilters(sb.from("scouter_leads").select("*", { count: "exact", head: true }), filters));
+        subFilter(applyStatsFilters(sb.from("scouter_leads").select("id", { count: "exact", head: true }), filters));
 
       const [
         { count: discovered24h },
@@ -649,7 +653,7 @@ export const useScouterFunnel = (window: FunnelWindow = "30d") =>
     queryFn: async (): Promise<FunnelData> => {
       const since = windowSinceIso(window);
       const head = (filter: (q: any) => any) =>
-        filter(sb.from("scouter_leads").select("*", { count: "exact", head: true }));
+        filter(sb.from("scouter_leads").select("id", { count: "exact", head: true }));
       const apply = (q: any) => (since ? q.gte("created_at", since) : q);
 
       const [
@@ -1082,7 +1086,7 @@ export const useCreateLeadManual = () => {
         );
       }
 
-      const { data, error } = await sb
+      const { data: inserted, error } = await sb
         .from("scouter_leads")
         .insert({
           tenant_id: tenantId,
@@ -1098,7 +1102,9 @@ export const useCreateLeadManual = () => {
           ai_status: null, // queda pendiente — el worker lo scoreará
           prefilter_score: 0,
         })
-        .select("*")
+        // OJO: NO `select("*")` — la columna phone está revocada para non-admin
+        // (PII). Devolvemos solo el id y releemos la fila por la vista enmascarada.
+        .select("id")
         .single();
       if (error) {
         // Friendly mensaje cuando hay duplicado (UNIQUE company_id+handle).
@@ -1107,6 +1113,12 @@ export const useCreateLeadManual = () => {
         }
         throw error;
       }
+      const { data, error: refErr } = await sb
+        .from("v_scouter_leads")
+        .select("*")
+        .eq("id", (inserted as { id: string }).id)
+        .single();
+      if (refErr) throw refErr;
       return data as ScouterLead;
     },
     onSuccess: () => {

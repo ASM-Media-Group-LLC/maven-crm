@@ -40,37 +40,10 @@ const ConvertScouterLeadModal = ({ open, onOpenChange, lead, onConverted }: Prop
 
   const convert = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No autenticado");
-
-      const ticketId = `#SC${lead.id.slice(-7).toUpperCase()}`;
-      const { data: contact, error: insertError } = await supabase
-        .from("closers_contacts")
-        .insert({
-          name: lead.name || lead.instagram_handle,
-          handle: lead.instagram_handle,
-          platform: lead.platform || "instagram",
-          city: lead.city,
-          phone: lead.phone,
-          onlyfans_url: lead.onlyfans_url,
-          profile_picture_url: lead.photo_data_url,
-          source: "scouter",
-          ticket_number: ticketId,
-          created_by: user.id,
-        } as never)
-        .select("id")
-        .single();
-      if (insertError) throw insertError;
-
-      const { error: updateError } = await supabase
-        .from("scouter_leads")
-        .update({
-          converted_at: new Date().toISOString(),
-          converted_to_contact_id: (contact as { id: string }).id,
-          status: "contacting",
-        } as never)
-        .eq("id", lead.id);
-      if (updateError) throw updateError;
+      // SERVER-SIDE: el RPC lee el phone REAL del lead (el cliente lo ve enmascarado) y crea
+      // el contacto + marca el lead convertido en una transacción.
+      const { error } = await supabase.rpc("convert_scouter_lead", { p_lead_id: lead.id } as never);
+      if (error) throw error;
 
       // Avatar fetch async — populamos models.avatar_url si todavía no estaba.
       void enqueueAvatarFetch(lead.instagram_handle);

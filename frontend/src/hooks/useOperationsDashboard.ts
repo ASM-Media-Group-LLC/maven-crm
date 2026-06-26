@@ -266,7 +266,7 @@ export const useMetricDetails = (
           const countQ1 = sb.from("leadgen_entries").select("*", { count: "exact", head: true });
           const countQ2 = sb
             .from("scouter_leads")
-            .select("*", { count: "exact", head: true })
+            .select("id", { count: "exact", head: true })
             .not("first_scouter_contact_at", "is", null);
           const q1 = sb
             .from("leadgen_entries")
@@ -274,7 +274,7 @@ export const useMetricDetails = (
             .order("created_at", { ascending: false })
             .limit(50);
           const q2 = sb
-            .from("scouter_leads")
+            .from("v_scouter_leads")
             .select("id, instagram_handle, phone, status, category, first_scouter_contact_at")
             .not("first_scouter_contact_at", "is", null)
             .order("first_scouter_contact_at", { ascending: false })
@@ -488,14 +488,14 @@ export const useMetricDetails = (
           // con creators.category por handle matching (igual que
           // numbersObtained y totalLeads).
           const countQ1 = sb.from("leadgen_entries").select("*", { count: "exact", head: true });
-          const countQ2 = sb.from("scouter_leads").select("*", { count: "exact", head: true });
+          const countQ2 = sb.from("scouter_leads").select("id", { count: "exact", head: true });
           const q1 = sb
             .from("leadgen_entries")
             .select("id, model_handle, phone_e164, status, category_code, created_at")
             .order("created_at", { ascending: false })
             .limit(50);
           const q2 = sb
-            .from("scouter_leads")
+            .from("v_scouter_leads")
             .select("id, instagram_handle, phone, status, category, created_at")
             .order("created_at", { ascending: false })
             .limit(50);
@@ -699,7 +699,7 @@ export const useMetricCategoryRows = (
         metric === "totalLeads" ? "first_scouter_contact_at" : "created_at";
       const slQ = (() => {
         let q = sb
-          .from("scouter_leads")
+          .from("v_scouter_leads")
           .select(`id, instagram_handle, phone, status, category, ${slDateCol}`)
           .order(slDateCol, { ascending: false })
           .limit(rowLimit);
@@ -758,7 +758,7 @@ export const useLeadDetail = (
         source === "leadgen"
           ? "leadgen_entries"
           : source === "scouter"
-            ? "scouter_leads"
+            ? "v_scouter_leads" // vista enmascarada: phone revocado en la base para non-admin
             : "creators";
       const { data, error } = await sb
         .from(table)
