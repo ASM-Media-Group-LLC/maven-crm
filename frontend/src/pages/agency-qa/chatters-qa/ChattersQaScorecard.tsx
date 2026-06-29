@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  Plus, Trash2, TrendingUp, TrendingDown, Minus, CalendarPlus, Info, Users, Gauge, AlertTriangle, Loader2, ClipboardCheck,
+  Plus, Trash2, TrendingUp, TrendingDown, Minus, CalendarPlus, Info, Users, Gauge, AlertTriangle, Loader2, ClipboardCheck, ChevronsUpDown, Check,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -16,7 +19,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import {
   COMPANIES, CRITERIA, MAX_TOTAL, companyLabel, periodLabel, pct, pctTone,
-  useScorecardPeriods, useScorecards, useUpdateScorecardCell, useAddChatter, useDeleteScorecard, useLatestScoredPeriod,
+  useScorecardPeriods, useScorecards, useUpdateScorecardCell, useAddChatter, useDeleteScorecard, useLatestScoredPeriod, useChatterRoster,
   type CompanyCode, type CriterionKey, type Scorecard,
 } from "./useChatterScorecards";
 
@@ -221,12 +224,20 @@ export default function ChattersQaScorecard() {
   }, [rows, prevByName]);
 
   const addChatter = useAddChatter();
-  const [newName, setNewName] = useState("");
+  const { data: chatterRoster = [] } = useChatterRoster();
+  const [newChatter, setNewChatter] = useState<{ blu_employee_id: number; name: string } | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [newCompany, setNewCompany] = useState<CompanyCode>("CP");
+  // chatters ya cargados en este mes+compañía → para deshabilitarlos en el selector (no duplicar).
+  const alreadyInMonth = useMemo(
+    () => new Set(rows.filter((r) => r.company === newCompany).map((r) => r.blu_employee_id).filter((x): x is number => x != null)),
+    [rows, newCompany],
+  );
   const submitNew = () => {
-    if (!newName.trim() || !period) return;
-    addChatter.mutate({ chatter_name: newName, company: newCompany, period },
-      { onSuccess: () => { toast.success(`${newName.trim()} agregado`); setNewName(""); },
+    if (!newChatter || !period) return;
+    addChatter.mutate(
+      { chatter_name: newChatter.name, company: newCompany, period, blu_employee_id: newChatter.blu_employee_id },
+      { onSuccess: () => { toast.success(`${newChatter.name} agregado`); setNewChatter(null); },
         onError: (e) => toast.error((e as Error).message) });
   };
 
@@ -241,10 +252,10 @@ export default function ChattersQaScorecard() {
     // roster del mes más reciente (si el activo no es el más reciente, lo traemos)
     let roster = base;
     if (!roster) {
-      const { data } = await (supabase as any).from("chatter_scorecards").select("chatter_name, company").eq("period", periods[0] ?? periodDate);
+      const { data } = await (supabase as any).from("chatter_scorecards").select("chatter_name, company, blu_employee_id").eq("period", periods[0] ?? periodDate);
       roster = (data ?? []) as Scorecard[];
     }
-    const payload = (roster ?? []).map((r) => ({ chatter_name: r.chatter_name, company: r.company, period: periodDate, source: "manual" }));
+    const payload = (roster ?? []).map((r) => ({ chatter_name: r.chatter_name, company: r.company, period: periodDate, source: "manual", blu_employee_id: r.blu_employee_id ?? null }));
     if (payload.length === 0) { toast.error("No hay roster para clonar; agregá chatters manualmente."); setPeriod(periodDate); setCreatingMonth(false); return; }
     const { error } = await (supabase as any).from("chatter_scorecards").insert(payload);
     if (error) { toast.error(error.message); return; }
@@ -313,14 +324,43 @@ export default function ChattersQaScorecard() {
         <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-border p-3">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-medium text-muted-foreground">Nuevo chatter</label>
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre completo"
-              onKeyDown={(e) => { if (e.key === "Enter") submitNew(); }} className="h-9 w-56" />
+            {/* Selector del roster de BLU (no texto libre) → la fila queda VINCULADA por
+                blu_employee_id, así el chatter la ve en "datos propios" sin depender del nombre. */}
+            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={pickerOpen} className="h-9 w-56 justify-between font-normal">
+                  <span className="truncate">{newChatter?.name ?? "Elegí un chatter…"}</span>
+                  <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar chatter…" />
+                  <CommandList>
+                    <CommandEmpty>Sin resultados — ¿está cargado en BLU?</CommandEmpty>
+                    <CommandGroup>
+                      {chatterRoster.map((c) => {
+                        const dup = alreadyInMonth.has(c.blu_employee_id);
+                        return (
+                          <CommandItem key={c.blu_employee_id} value={c.name} disabled={dup}
+                            onSelect={() => { setNewChatter(c); setPickerOpen(false); }}>
+                            <Check className={cn("mr-2 h-4 w-4", newChatter?.blu_employee_id === c.blu_employee_id ? "opacity-100" : "opacity-0")} />
+                            <span className="truncate">{c.name}</span>
+                            {dup && <span className="ml-1 text-[10px] text-muted-foreground">(ya está)</span>}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <Select value={newCompany} onValueChange={(v) => setNewCompany(v as CompanyCode)}>
             <SelectTrigger className="h-9 w-40"><SelectValue /></SelectTrigger>
             <SelectContent>{COMPANIES.map((c) => <SelectItem key={c.code} value={c.code}>{c.label} ({c.code})</SelectItem>)}</SelectContent>
           </Select>
-          <Button size="sm" className="gap-1.5" onClick={submitNew} disabled={!newName.trim() || addChatter.isPending}>
+          <Button size="sm" className="gap-1.5" onClick={submitNew} disabled={!newChatter || addChatter.isPending}>
             <Plus className="h-4 w-4" /> Agregar
           </Button>
         </div>

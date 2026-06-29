@@ -121,14 +121,42 @@ export const useUpdateScorecardCell = () => {
   });
 };
 
-// Agregar un chatter al mes (fila vacía, lista para puntuar).
+// Roster de chatters de BLU (chatter_performance) para el SELECTOR del scorecard. Trae
+// blu_employee_id + name (dedup), así toda fila nueva queda VINCULADA al chatter (su usuario
+// la ve en "datos propios"). Evita el bug histórico de nombres tipeados que no matchean.
+export const useChatterRoster = () =>
+  useQuery({
+    queryKey: ["chatter-roster"],
+    queryFn: async (): Promise<{ blu_employee_id: number; name: string }[]> => {
+      const { data, error } = await (supabase as any)
+        .from("chatter_performance")
+        .select("blu_employee_id, name")
+        .eq("is_chatter", true)
+        .not("blu_employee_id", "is", null)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      const seen = new Set<number>();
+      const out: { blu_employee_id: number; name: string }[] = [];
+      for (const r of (data ?? []) as { blu_employee_id: number; name: string }[]) {
+        if (r.blu_employee_id != null && !seen.has(r.blu_employee_id)) {
+          seen.add(r.blu_employee_id);
+          out.push({ blu_employee_id: r.blu_employee_id, name: r.name || `#${r.blu_employee_id}` });
+        }
+      }
+      return out;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+// Agregar un chatter al mes (fila vacía, lista para puntuar). blu_employee_id lo trae el
+// selector → la fila queda vinculada al chatter (clave para "datos propios" del rol Chatter).
 export const useAddChatter = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ chatter_name, company, period }: { chatter_name: string; company: CompanyCode; period: string }) => {
+    mutationFn: async ({ chatter_name, company, period, blu_employee_id }: { chatter_name: string; company: CompanyCode; period: string; blu_employee_id?: number | null }) => {
       const { error } = await (supabase as any)
         .from("chatter_scorecards")
-        .insert({ chatter_name: chatter_name.trim(), company, period, source: "manual" });
+        .insert({ chatter_name: chatter_name.trim(), company, period, source: "manual", blu_employee_id: blu_employee_id ?? null });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chatter-scorecards"] }),
