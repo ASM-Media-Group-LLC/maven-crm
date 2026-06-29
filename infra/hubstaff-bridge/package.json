@@ -1,0 +1,15 @@
+{
+  "name": "hubstaff-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Puente Hubstaff → Maven: con un Personal Access Token (refresh, rota solo), auto-descubre las orgs, jala miembros + actividad diaria (REST v2) y la ingesta en Maven (RPCs import_hubstaff_members / import_hubstaff_data).",
+  "scripts": {
+    "start": "node index.mjs",
+    "once": "RUN_ONCE=1 node index.mjs",
+    "probe": "HUBSTAFF_PROBE=1 node index.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}
