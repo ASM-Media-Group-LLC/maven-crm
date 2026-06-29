@@ -164,10 +164,17 @@ async function syncDaily(org, days) {
     const uid = String(a.user_id ?? "");
     const date = String(a.date ?? "").slice(0, 10);
     if (!uid || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    // OJO: en activities/daily, `overall` (igual que keyboard/mouse) son SEGUNDOS de actividad,
+    // NO un porcentaje. El % de productividad = overall_segundos / tracked_segundos * 100.
+    // (Verificado en vivo: overall crudo daba ~11k, /tracked da ~50% que es lo realista.)
+    const tracked = Number(a.tracked) || 0;
+    const overallPct = (tracked > 0 && a.overall != null)
+      ? Math.min(100, Math.round((Number(a.overall) / tracked) * 100))
+      : null;
     rows.push({
       hubstaff_user_id: uid, hubstaff_org_id: org.id, date,
-      tracked_seconds: Number(a.tracked) || 0,
-      overall_activity: a.overall != null ? Number(a.overall) : null,
+      tracked_seconds: tracked,
+      overall_activity: overallPct,
       project_name: a.project?.name ?? null,
     });
   }
