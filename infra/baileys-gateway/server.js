@@ -139,10 +139,19 @@ function createSession(instanceName) {
     // Buffer circular de actividad reciente (last 30).
     recentEvents: [],
     // Config por línea (settings + webhook). Persistida en AUTH_DIR/<inst>/manager-config.json.
-    config: { webhookUrl: null, rejectCalls: false, markRead: false, alwaysOnline: true, syncFullHistory: false },
+    // alwaysOnline=false por default (markOnlineOnConnect=false): así el CELULAR sigue recibiendo
+    // notificaciones y la línea no aparece "online 24/7" (señal robótica que sube el riesgo de
+    // restricción). Las líneas que quieran presencia siempre-activa lo togglean desde el manager.
+    // OJO: el config persistido pisa este default → líneas YA vinculadas conservan su valor.
+    config: { webhookUrl: null, rejectCalls: false, markRead: false, alwaysOnline: false, syncFullHistory: false },
     // Tráfico por bucket de tiempo: hourly["YYYY-MM-DDTHH"]={in,out}, daily["YYYY-MM-DD"]={in,out}.
     traffic: { hourly: {}, daily: {} },
     sseClients: [], // suscriptores del monitor en vivo (SSE)
+    // Anti-ban (slice 2): ventana de validez de envíos para el circuit-breaker + contador
+    // de envíos outreach del día para el warm-up por edad de línea.
+    waWindow: [],            // [{ ts, invalid }] de los últimos ~15min
+    breaker: { tripped: false, until: 0, invalidPct: 0, sample: 0 },
+    outreachOutToday: 0,     // envíos marcados outreach:true hoy
   };
 }
 
@@ -157,10 +166,23 @@ function instanceDir(instanceName) {
   return instanceName === INSTANCE_NAME ? AUTH_DIR : `${AUTH_DIR}/${instanceName}`;
 }
 function loadConfig(s) {
+  let existed = false;
   try {
     const raw = fs.readFileSync(`${instanceDir(s.instanceName)}/manager-config.json`, 'utf8');
     s.config = { ...s.config, ...JSON.parse(raw) };
+    existed = true;
   } catch (e) { /* sin config previa → defaults */ }
+  // Migración una sola vez (marca _aoMigrated, así un toggle futuro desde el manager se respeta):
+  //  - apaga el alwaysOnline HEREDADO (default viejo era true → online 24/7 = señal de bot + roba
+  //    notificaciones al celular).
+  //  - backdatea firstConnectedAt en líneas YA existentes para que el warm-up NO las capee (solo
+  //    capeamos líneas NUEVAS, que sellan firstConnectedAt recién en su primer 'open').
+  if (!s.config._aoMigrated) {
+    if (s.config.alwaysOnline === true) s.config.alwaysOnline = false;
+    if (existed && !s.config.firstConnectedAt) s.config.firstConnectedAt = '2020-01-01T00:00:00.000Z';
+    s.config._aoMigrated = true;
+    saveConfig(s);
+  }
 }
 function saveConfig(s) {
   try {
@@ -230,7 +252,51 @@ function rolloverDayIfNeeded(s = state) {
     s.todayDate = today;
     s.msgsInToday = 0;
     s.msgsOutToday = 0;
+    s.outreachOutToday = 0;
   }
+}
+
+// ── Anti-ban: circuit-breaker por tasa de números inválidos + warm-up por edad ──
+// Si una línea dispara a muchos números que NO existen en WhatsApp en poco tiempo, es la
+// firma de "lista mala / blasteo" (exactamente lo que restringió la +57) → pausamos su
+// outbound un rato. Umbral conservador: una línea sana (responde a contactos reales) tiene
+// ~0% inválidos y NUNCA lo dispara. Auto-reanuda tras el cooldown.
+const WA_WIN_MS = 15 * 60 * 1000;       // ventana de medición
+const WA_MIN_SAMPLE = 20;               // mínimo de envíos evaluables antes de poder pausar
+const WA_TRIP_PCT = 0.25;               // ≥25% inválidos → pausa
+const WA_COOLDOWN_MS = 30 * 60 * 1000;  // duración de la pausa
+
+function recordWaOutcome(s, invalid) {
+  const now = Date.now();
+  s.waWindow = (s.waWindow || []).filter((e) => now - e.ts < WA_WIN_MS);
+  s.waWindow.push({ ts: now, invalid: !!invalid });
+  const sample = s.waWindow.length;
+  const inv = s.waWindow.filter((e) => e.invalid).length;
+  const pct = sample ? inv / sample : 0;
+  if (sample >= WA_MIN_SAMPLE && pct >= WA_TRIP_PCT && !s.breaker.tripped) {
+    s.breaker = { tripped: true, until: now + WA_COOLDOWN_MS, invalidPct: pct, sample };
+    pushRecent({ kind: 'alert', body: `Outbound PAUSADO ${Math.round(WA_COOLDOWN_MS / 60000)}min: ${Math.round(pct * 100)}% de ${sample} envíos fueron a números inexistentes` }, s);
+    logger.warn({ instance: s.instanceName, pct, sample }, 'circuit breaker tripped (high invalid rate)');
+  }
+}
+
+function breakerBlocked(s) {
+  if (!s.breaker || !s.breaker.tripped) return false;
+  if (Date.now() >= s.breaker.until) { s.breaker.tripped = false; s.waWindow = []; return false; }
+  return true;
+}
+
+// Tope diario de envíos OUTREACH (payload outreach:true) según la edad de la línea
+// (warm-up de comportamiento). Líneas establecidas (firstConnectedAt viejo) → sin tope.
+// NO afecta respuestas reactivas (que no mandan el flag outreach).
+function warmupCap(s) {
+  const since = s.config && s.config.firstConnectedAt;
+  if (!since) return Infinity;
+  const days = (Date.now() - new Date(since).getTime()) / 86400000;
+  if (days < 3) return 30;
+  if (days < 7) return 120;
+  if (days < 14) return 400;
+  return Infinity;
 }
 
 // ---------------------------------------------------------------------------
@@ -330,6 +396,9 @@ async function startSocket(instanceName = INSTANCE_NAME) {
       s.lastError = null;
       s.reconnectCount = 0; // conexión sana → reseteamos el backoff
       s.connectedAt = Date.now();
+      // Edad de la línea para el warm-up: se sella en la PRIMERA conexión (líneas existentes
+      // quedaron backdateadas en loadConfig → no se las capea).
+      if (!s.config.firstConnectedAt) { s.config.firstConnectedAt = new Date().toISOString(); saveConfig(s); }
       // Carga profile info en background -- no bloqueante.
       loadProfileInfo(s).catch((e) => logger.warn({ err: e.message }, 'profile load failed'));
       pushRecent({ kind: 'connection', state: 'open' }, s);
@@ -860,6 +929,10 @@ app.get('/instance/list', (_req, res) => {
     msgsInToday: s.msgsInToday,
     msgsOutToday: s.msgsOutToday,
     connectedAt: s.connectedAt,
+    // Anti-ban: pausado por circuit-breaker (alta tasa de números inválidos) + warm-up.
+    paused: breakerBlocked(s),
+    pausedUntil: s.breaker && s.breaker.tripped ? s.breaker.until : null,
+    outreachOutToday: s.outreachOutToday,
   }));
   res.json({ instances });
 });
@@ -873,6 +946,7 @@ app.get('/instance/list', (_req, res) => {
 // cuentas migradas al sistema LID. HAY que enviar a ESE jid: mandar al
 // <phone>@s.whatsapp.net a un destinatario LID-only sale con error y nunca se entrega.
 async function checkOnWhatsApp(s, jid) {
+  if (breakerBlocked(s)) return { blocked: true, jid };
   if (!jid || !jid.endsWith('@s.whatsapp.net') || !s.sock) return { exists: null, jid };
   const phone = jid.split('@')[0];
   if (!phone) return { exists: null, jid };
@@ -887,6 +961,7 @@ async function checkOnWhatsApp(s, jid) {
     // JID autoritativo que devuelve WhatsApp (phone o @lid). Si no existe o no vino, dejamos el original.
     const resolvedJid = (exists && item && item.jid) ? item.jid : jid;
     s.onWaCache.set(phone, { exists, jid: resolvedJid, ts: Date.now() });
+    recordWaOutcome(s, exists === false); // alimenta el circuit-breaker (solo determinaciones frescas)
     return { exists, jid: resolvedJid };
   } catch (e) {
     logger.warn({ err: e.message }, 'onWhatsApp check failed');
@@ -927,8 +1002,19 @@ app.post('/message/sendText/:instance', async (req, res) => {
   // → rojo en el chat). Y enviamos al JID que WhatsApp RESUELVE (puede ser @lid para
   // cuentas migradas) — no al <phone>@s.whatsapp.net, que a un LID-only sale con error.
   const onWa = await checkOnWhatsApp(s, jid);
+  if (onWa.blocked) return res.status(423).json({ error: 'line_paused_high_invalid_rate', until: s.breaker.until });
   if (onWa.exists === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
   jid = onWa.jid;
+
+  // Warm-up: limita SOLO los envíos marcados outreach:true (en frío) según la edad de la
+  // línea. Las respuestas reactivas (sin el flag) nunca se topan; líneas establecidas tampoco.
+  if (body.outreach === true) {
+    rolloverDayIfNeeded(s);
+    const cap = warmupCap(s);
+    if (s.outreachOutToday >= cap) {
+      return res.status(429).json({ error: 'warmup_cap_reached', cap, outreachToday: s.outreachOutToday });
+    }
+  }
 
   try {
     const payload = { text: String(text) };
@@ -948,6 +1034,7 @@ app.post('/message/sendText/:instance', async (req, res) => {
     rolloverDayIfNeeded(s);
     s.msgsOut += 1;
     s.msgsOutToday += 1;
+    if (body.outreach === true) s.outreachOutToday += 1;
     pushRecent({ kind: 'out', jid, body: String(text).slice(0, 120) }, s);
     return res.json({
       key: {
@@ -1113,6 +1200,7 @@ app.post('/message/sendMedia/:instance', async (req, res) => {
   // → rojo en el chat). Y enviamos al JID que WhatsApp RESUELVE (puede ser @lid para
   // cuentas migradas) — no al <phone>@s.whatsapp.net, que a un LID-only sale con error.
   const onWa = await checkOnWhatsApp(s, jid);
+  if (onWa.blocked) return res.status(423).json({ error: 'line_paused_high_invalid_rate', until: s.breaker.until });
   if (onWa.exists === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
   jid = onWa.jid;
 
@@ -1197,6 +1285,7 @@ app.post('/message/react/:instance', async (req, res) => {
   // → rojo en el chat). Y enviamos al JID que WhatsApp RESUELVE (puede ser @lid para
   // cuentas migradas) — no al <phone>@s.whatsapp.net, que a un LID-only sale con error.
   const onWa = await checkOnWhatsApp(s, jid);
+  if (onWa.blocked) return res.status(423).json({ error: 'line_paused_high_invalid_rate', until: s.breaker.until });
   if (onWa.exists === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
   jid = onWa.jid;
   try {
@@ -1229,6 +1318,7 @@ app.post('/message/delete/:instance', async (req, res) => {
   // → rojo en el chat). Y enviamos al JID que WhatsApp RESUELVE (puede ser @lid para
   // cuentas migradas) — no al <phone>@s.whatsapp.net, que a un LID-only sale con error.
   const onWa = await checkOnWhatsApp(s, jid);
+  if (onWa.blocked) return res.status(423).json({ error: 'line_paused_high_invalid_rate', until: s.breaker.until });
   if (onWa.exists === false) return res.status(422).json({ error: 'not_on_whatsapp', jid });
   jid = onWa.jid;
   try {
