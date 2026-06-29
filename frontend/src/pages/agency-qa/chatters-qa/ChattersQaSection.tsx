@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { ClipboardCheck, FileText, Clock, Wrench, Bell, Megaphone } from "lucide-react";
+import { ClipboardCheck, FileText, Clock, Wrench, Bell, Megaphone, Lock } from "lucide-react";
 import ChattersQaScorecard from "./ChattersQaScorecard";
 import ChattersQaQualitative from "./ChattersQaQualitative";
 import ChatterQaNotifications from "./ChatterQaNotifications";
 import ChattersQaMasivos from "./ChattersQaMasivos";
 import { useQaProcessingWatcher } from "./useChatterQaReports";
+import { usePermissions } from "@/hooks/usePermissions";
 
 // Chatters QA — antes era un placeholder "soon" en el rail de Agency QA.
 // Ahora alberga el sistema de medición de chatters que reemplaza el sheet
@@ -31,13 +32,44 @@ const ComingSoon = ({ title, desc, slice }: { title: string; desc: string; slice
   </Card>
 );
 
+// Subtabs gateados por rol: cada uno declara su `submodule` en role_permissions ("Agency QA").
+// Sin fila → se ve (hereda del permiso de "Chatters QA"); para TAPAR uno, el admin lo destilda
+// en Roles (can_access=false). Espejo del patrón de Closers QA (AgencyQA.tsx).
+const CHATTER_QA_SUBS = [
+  { key: "scorecard",      label: "Scorecard",      icon: ClipboardCheck, submodule: "Chatters: Scorecard" },
+  { key: "qa",             label: "QA cualitativo", icon: FileText,       submodule: "Chatters: QA Cualitativo" },
+  { key: "masivos",        label: "Masivos",        icon: Megaphone,      submodule: "Chatters: Masivos" },
+  { key: "hubstaff",       label: "Hubstaff",       icon: Clock,          submodule: "Chatters: Hubstaff" },
+  { key: "notificaciones", label: "Notificaciones", icon: Bell,           submodule: "Chatters: Notificaciones" },
+] as const;
+
 export default function ChattersQaSection() {
   useQaProcessingWatcher(); // avisa (toast verde/rojo) cuando un borrador IA termina, aunque cambies de subtab
+  const { canAccess } = usePermissions();
   const [sp] = useSearchParams();
+
+  const visibleSubs = CHATTER_QA_SUBS.filter((s) => canAccess("Agency QA", s.submodule));
+
   const [tab, setTab] = useState(() => {
     const t = sp.get("tab") ?? "";
-    return ["scorecard", "qa", "masivos", "hubstaff", "notificaciones"].includes(t) ? t : "scorecard";
+    // el ?tab= del URL solo vale si ese subtab está habilitado para el rol; si no, el primero visible.
+    if (visibleSubs.some((s) => s.key === t)) return t;
+    return visibleSubs[0]?.key ?? "scorecard";
   });
+
+  if (visibleSubs.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+          <Lock className="h-4 w-4" /> No tenés acceso a ningún subtab de Chatters QA. Pedile a un admin que te habilite alguno en Roles.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Si el tab activo dejó de estar visible (cambio de permisos en vivo), caer al primero visible.
+  const activeTab = visibleSubs.some((s) => s.key === tab) ? tab : visibleSubs[0].key;
+
   return (
     <div className="space-y-4">
       <div>
@@ -46,35 +78,36 @@ export default function ChattersQaSection() {
           Medición y auditoría de chatters — reemplaza el sheet "Medidor de chatters".
         </p>
       </div>
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs value={activeTab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="scorecard" className="gap-1.5"><ClipboardCheck className="h-3.5 w-3.5" />Scorecard</TabsTrigger>
-          <TabsTrigger value="qa" className="gap-1.5"><FileText className="h-3.5 w-3.5" />QA cualitativo</TabsTrigger>
-          <TabsTrigger value="masivos" className="gap-1.5"><Megaphone className="h-3.5 w-3.5" />Masivos</TabsTrigger>
-          <TabsTrigger value="hubstaff" className="gap-1.5"><Clock className="h-3.5 w-3.5" />Hubstaff</TabsTrigger>
-          <TabsTrigger value="notificaciones" className="gap-1.5"><Bell className="h-3.5 w-3.5" />Notificaciones</TabsTrigger>
+          {visibleSubs.map((s) => {
+            const Icon = s.icon;
+            return (
+              <TabsTrigger key={s.key} value={s.key} className="gap-1.5">
+                <Icon className="h-3.5 w-3.5" />{s.label}
+              </TabsTrigger>
+            );
+          })}
         </TabsList>
 
-        <TabsContent value="scorecard" className="mt-4">
-          <ChattersQaScorecard />
-        </TabsContent>
-
-        <TabsContent value="qa" className="mt-4">
-          <ChattersQaQualitative />
-        </TabsContent>
-
-        <TabsContent value="masivos" className="mt-4">
-          <ChattersQaMasivos />
-        </TabsContent>
-
-        <TabsContent value="hubstaff" className="mt-4">
-          <ComingSoon slice="Fase 2" title="Hubstaff"
-            desc="Conexión a la API de Hubstaff para auto-completar 2 de los 8 criterios del scorecard: Puntualidad y Cumplimiento + Productividad Hubstaff, por chatter y por mes." />
-        </TabsContent>
-
-        <TabsContent value="notificaciones" className="mt-4">
-          <ChatterQaNotifications />
-        </TabsContent>
+        {visibleSubs.some((s) => s.key === "scorecard") && (
+          <TabsContent value="scorecard" className="mt-4"><ChattersQaScorecard /></TabsContent>
+        )}
+        {visibleSubs.some((s) => s.key === "qa") && (
+          <TabsContent value="qa" className="mt-4"><ChattersQaQualitative /></TabsContent>
+        )}
+        {visibleSubs.some((s) => s.key === "masivos") && (
+          <TabsContent value="masivos" className="mt-4"><ChattersQaMasivos /></TabsContent>
+        )}
+        {visibleSubs.some((s) => s.key === "hubstaff") && (
+          <TabsContent value="hubstaff" className="mt-4">
+            <ComingSoon slice="Fase 2" title="Hubstaff"
+              desc="Conexión a la API de Hubstaff para auto-completar 2 de los 8 criterios del scorecard: Puntualidad y Cumplimiento + Productividad Hubstaff, por chatter y por mes." />
+          </TabsContent>
+        )}
+        {visibleSubs.some((s) => s.key === "notificaciones") && (
+          <TabsContent value="notificaciones" className="mt-4"><ChatterQaNotifications /></TabsContent>
+        )}
       </Tabs>
     </div>
   );

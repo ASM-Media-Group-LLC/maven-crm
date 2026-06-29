@@ -149,6 +149,11 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   { group: "Operaciones",   module: "Agency QA",     submodules: [
     "Closers QA", "Chatters QA", "Managers QA", "Spammers QA",
     "Calls", "New QA", "QA History", "QA Chat", "Models", "Analytics", "Notifications", "Borrar Calls",
+    // Subtabs de Chatters QA — gating individual por rol (prefijo "Chatters: " para no
+    // colisionar con los de Closers QA como "Notifications"). Sin fila → el subtab se ve
+    // (hereda del permiso de "Chatters QA"); para TAPAR uno, destildarlo (can_access=false).
+    "Chatters: Scorecard", "Chatters: QA Cualitativo", "Chatters: Masivos",
+    "Chatters: Hubstaff", "Chatters: Notificaciones",
   ] },
   // Mensajes Pro = visor on-demand de conversaciones (BLU). Era submódulo de Agency QA,
   // pero es un tab propio del sidebar (/conversaciones) → se promovió a módulo top-level para
