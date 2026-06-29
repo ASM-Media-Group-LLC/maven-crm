@@ -46,6 +46,21 @@ const PHONE_TO_CODE: Record<string, string> = {
   "+51": "PE", "+1787": "PR", "+66": "TH", "+598": "UY", "+58": "VE",
 };
 
+// ISO alpha-2 → código de marcación. Inverso de PHONE_TO_CODE; lo usa el filtro de País de
+// Contactos, donde la columna `country_code` guarda el dial code ("+57") pero el filtro
+// ofrece ISO ("CO"). Sin esto, `country_code === "CO"` nunca matchea.
+const ISO_TO_DIAL: Record<string, string> = {
+  AR: "+54", BO: "+591", BR: "+55", GB: "+44", CL: "+56", CO: "+57", CR: "+506", CU: "+53",
+  DO: "+1", EC: "+593", SV: "+503", ES: "+34", US: "+1", GT: "+502", HN: "+504", IT: "+39",
+  MX: "+52", NI: "+505", PA: "+507", PY: "+595", PE: "+51", PR: "+1", TH: "+66", UY: "+598", VE: "+58",
+};
+
+/** Dado un ISO alpha-2 ("CO") devuelve el código de marcación ("+57"), o null si no se conoce. */
+export function dialForIso(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  return ISO_TO_DIAL[iso.trim().toUpperCase()] ?? null;
+}
+
 function resolveCode(input: string): string | null {
   if (!input) return null;
   const trimmed = input.trim();

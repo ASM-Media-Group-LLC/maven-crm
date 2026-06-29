@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import InstagramIcon from "@/components/icons/InstagramIcon";
-import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
+import { getCountryFlag, getCountryShortDisplay, dialForIso } from "@/lib/country-utils";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { format, parseISO } from "date-fns";
@@ -197,7 +197,8 @@ const ContactosContent = () => {
         const dbStatus = reverseMap[filters.estado] || filters.estado;
         q = q.eq("status", dbStatus);
       }
-      if (filters.pais) q = q.eq("country_code", filters.pais);
+      // El filtro ofrece ISO ("CO") pero la columna guarda el dial code ("+57") → mapear.
+      if (filters.pais) q = q.eq("country_code", dialForIso(filters.pais) ?? filters.pais);
       if (filters.categoria) q = q.eq("physical_appearance", filters.categoria);
       // filters.dateFrom/dateTo son strings solo-fecha ("yyyy-MM-dd"). Hay que
       // acotar por el DÍA LOCAL del usuario contra created_at (timestamptz UTC).
