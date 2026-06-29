@@ -5,9 +5,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ChevronDown, ChevronRight, Copy } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Menu as MenuIcon, MousePointerClick, Database } from "lucide-react";
 import { toast } from "sonner";
 import { useRolePermissions, useRoles, MODULES_CONFIG, type RolePermission } from "./useRoles";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -22,7 +21,7 @@ interface SetPermissionsModalProps {
 
 type PermState = Record<string, { can_access: boolean; data_scope: string }>;
 
-const getKey = (mod: string, sub: string | null) => sub ? `${mod}::${sub}` : mod;
+const getKey = (mod: string, sub: string | null) => (sub ? `${mod}::${sub}` : mod);
 
 const getDataScopeLabels = (t: (key: any) => string): Record<string, string> => ({
   all: t("permissions.allData"),
@@ -121,9 +120,8 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
     });
     // Inherit module-level access for any submodule that has no saved
     // row of its own. This keeps existing roles working when we ship
-    // new sub-keys (e.g. "Reportes" replacing legacy "Sales Report"):
-    // they pick up whatever the parent had instead of silently
-    // defaulting to off.
+    // new sub-keys: they pick up whatever the parent had instead of
+    // silently defaulting to off.
     MODULES_CONFIG.forEach((m) => {
       if (m.submodules.length === 0) return;
       const moduleKey = getKey(m.module, null);
@@ -146,17 +144,36 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
   }, [permissions, open, isAdminRole]);
 
   const allModuleKeys = useMemo(() => MODULES_CONFIG.map((m) => getKey(m.module, null)), []);
-  const allSubKeys = useMemo(() => MODULES_CONFIG.flatMap((m) => m.submodules.map((s) => getKey(m.module, s))), []);
-  const allKeys = useMemo(() => [...allModuleKeys, ...allSubKeys], [allModuleKeys, allSubKeys]);
+  const allSubtabKeys = useMemo(
+    () => MODULES_CONFIG.flatMap((m) => m.subtabs.map((s) => getKey(m.module, s.name))),
+    [],
+  );
+  const allFunctionKeys = useMemo(
+    () => MODULES_CONFIG.flatMap((m) => m.functions.map((f) => getKey(m.module, f))),
+    [],
+  );
+  const allKeys = useMemo(
+    () => [...allModuleKeys, ...allSubtabKeys, ...allFunctionKeys],
+    [allModuleKeys, allSubtabKeys, allFunctionKeys],
+  );
 
-  const allMenusChecked = useMemo(() => allModuleKeys.every((k) => state[k]?.can_access), [state, allModuleKeys]);
-  const allFunctionsChecked = useMemo(() => allSubKeys.length > 0 && allSubKeys.every((k) => state[k]?.can_access), [state, allSubKeys]);
+  // "Menús" master = every module + every navigable subtab.
+  const allMenusChecked = useMemo(
+    () => [...allModuleKeys, ...allSubtabKeys].every((k) => state[k]?.can_access),
+    [state, allModuleKeys, allSubtabKeys],
+  );
+  // "Funciones" master = every action permission.
+  const allFunctionsChecked = useMemo(
+    () => allFunctionKeys.length > 0 && allFunctionKeys.every((k) => state[k]?.can_access),
+    [state, allFunctionKeys],
+  );
 
-  // Toggle all menus AND all functions together
   const toggleAllMenus = (checked: boolean) => {
     setState((prev) => {
       const next = { ...prev };
-      allKeys.forEach((k) => { next[k] = { ...next[k], can_access: checked }; });
+      [...allModuleKeys, ...allSubtabKeys].forEach((k) => {
+        next[k] = { ...next[k], can_access: checked };
+      });
       return next;
     });
   };
@@ -164,7 +181,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
   const toggleAllFunctions = (checked: boolean) => {
     setState((prev) => {
       const next = { ...prev };
-      allSubKeys.forEach((k) => { next[k] = { ...next[k], can_access: checked }; });
+      allFunctionKeys.forEach((k) => { next[k] = { ...next[k], can_access: checked }; });
       return next;
     });
   };
@@ -177,19 +194,17 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
     });
   };
 
-  // Toggle module + cascade to all its submodules. When the parent
-  // checkbox is in indeterminate state, treat the click as "select all"
-  // (cleanest user expectation).
+  // Toggle module + cascade to all its submodules (subtabs AND functions),
+  // preserving the long-standing behaviour. When everything is on → turn it
+  // all off; otherwise turn it all on.
   const toggleModule = (mod: string) => {
     setState((prev) => {
       const next = { ...prev };
       const moduleKey = getKey(mod, null);
       const cfg = MODULES_CONFIG.find((m) => m.module === mod);
       const subs = cfg?.submodules ?? [];
-      const allSubsOn =
-        subs.length > 0 && subs.every((s) => prev[getKey(mod, s)]?.can_access);
+      const allSubsOn = subs.length > 0 && subs.every((s) => prev[getKey(mod, s)]?.can_access);
       const moduleOn = prev[moduleKey]?.can_access;
-      // If everything's on → turn it all off. Otherwise turn it all on.
       const newVal = !(moduleOn && (subs.length === 0 || allSubsOn));
       next[moduleKey] = { ...next[moduleKey], can_access: newVal };
       subs.forEach((sub) => {
@@ -200,18 +215,16 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
     });
   };
 
-  // Toggle a single sub and re-derive the parent module: if any sub is
-  // on, the module should read as "active" (so the sidebar still shows
-  // it); if every sub is off, the module is off.
+  // Toggle a single submodule (subtab or function) and re-derive the parent
+  // module: if any submodule is on, the module reads as "active" (so the
+  // sidebar still shows it); if every submodule is off, the module is off.
   const toggleSub = (mod: string, key: string) => {
     setState((prev) => {
       const next = { ...prev, [key]: { ...prev[key], can_access: !prev[key]?.can_access } };
       const cfg = MODULES_CONFIG.find((m) => m.module === mod);
       if (cfg && cfg.submodules.length > 0) {
         const moduleKey = getKey(mod, null);
-        const anySubOn = cfg.submodules.some(
-          (sub) => next[getKey(mod, sub)]?.can_access,
-        );
+        const anySubOn = cfg.submodules.some((sub) => next[getKey(mod, sub)]?.can_access);
         next[moduleKey] = { ...next[moduleKey], can_access: anySubOn };
       }
       return next;
@@ -247,14 +260,12 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
     });
   };
 
-  const getModuleDataScope = (mod: string): string => {
-    return state[getKey(mod, null)]?.data_scope ?? "all";
-  };
+  const getModuleDataScope = (mod: string): string => state[getKey(mod, null)]?.data_scope ?? "all";
 
-  const getEnabledSubCount = (mod: string): number => {
+  const getEnabledSubtabCount = (mod: string): number => {
     const cfg = MODULES_CONFIG.find((m) => m.module === mod);
-    if (!cfg || cfg.submodules.length === 0) return 0;
-    return cfg.submodules.filter((sub) => state[getKey(mod, sub)]?.can_access).length;
+    if (!cfg) return 0;
+    return cfg.subtabs.filter((s) => state[getKey(mod, s.name)]?.can_access).length;
   };
 
   const handleSave = () => {
@@ -273,9 +284,29 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
     savePermissions(perms);
   };
 
+  // Small reusable checkbox + label cell.
+  const CheckRow = ({
+    checked,
+    onToggle,
+    label,
+    className = "",
+    muted = false,
+  }: {
+    checked: boolean | "indeterminate";
+    onToggle: () => void;
+    label: string;
+    className?: string;
+    muted?: boolean;
+  }) => (
+    <label className={`flex items-center gap-2 cursor-pointer select-none ${className}`}>
+      <Checkbox checked={checked} onCheckedChange={onToggle} className="h-4 w-4" />
+      <span className={`text-sm leading-tight ${muted ? "text-muted-foreground" : ""}`}>{label}</span>
+    </label>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[85vh]">
+      <DialogContent className="sm:max-w-5xl max-h-[88vh]">
         <DialogHeader>
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1.5">
@@ -287,23 +318,14 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
             {copyableRoles.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 shrink-0"
-                    disabled={copyingFrom}
-                  >
+                  <Button variant="outline" size="sm" className="gap-2 shrink-0" disabled={copyingFrom}>
                     <Copy className="h-3.5 w-3.5" />
                     {copyingFrom ? "Copiando…" : "Copiar de otro rol"}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-[200px]">
                   {copyableRoles.map((r) => (
-                    <DropdownMenuItem
-                      key={r.id}
-                      onClick={() => handleCopyFrom(r.id, r.name)}
-                      className="capitalize"
-                    >
+                    <DropdownMenuItem key={r.id} onClick={() => handleCopyFrom(r.id, r.name)} className="capitalize">
                       {r.name}
                     </DropdownMenuItem>
                   ))}
@@ -313,130 +335,171 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
           </div>
         </DialogHeader>
 
-        <ScrollArea className="h-[58vh] pr-2">
-          {/* Column headers */}
-          <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 pb-3 border-b border-border mb-4 px-1">
-            <div className="flex items-center gap-2">
-              <Checkbox checked={allMenusChecked} onCheckedChange={(c) => toggleAllMenus(!!c)} />
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("permissions.menus")}</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox checked={allFunctionsChecked} onCheckedChange={(c) => toggleAllFunctions(!!c)} />
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("permissions.functions")}</Label>
-            </div>
-            <div>
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("permissions.data")}</Label>
-              <RadioGroup
-                value=""
-                onValueChange={(v) => setGlobalDataScope(v)}
-                className="flex flex-col gap-1.5 mt-1.5"
-              >
-                {getDataScopeOptions(t).map((o) => (
-                  <div key={o.value} className="flex items-center gap-1">
-                    <RadioGroupItem value={o.value} id={`global-${o.value}`} className="h-3 w-3" />
-                    <Label htmlFor={`global-${o.value}`} className="text-xs text-muted-foreground">{o.label}</Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
+        {/* Sticky column header — the 3 BLU columns + master toggles */}
+        <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1.55fr)_minmax(0,1fr)] gap-4 rounded-lg border border-border bg-muted/40 px-4 py-3">
+          <div className="space-y-1">
+            <button
+              type="button"
+              onClick={() => toggleAllMenus(!allMenusChecked)}
+              className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground/80 hover:text-foreground"
+            >
+              <Checkbox checked={allMenusChecked} className="h-4 w-4" />
+              <MenuIcon className="h-3.5 w-3.5" /> {t("permissions.menus")}
+            </button>
+            <p className="pl-6 text-[11px] text-muted-foreground">{t("permissions.menusHint")}</p>
           </div>
+          <div className="space-y-1">
+            <button
+              type="button"
+              onClick={() => toggleAllFunctions(!allFunctionsChecked)}
+              className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground/80 hover:text-foreground"
+            >
+              <Checkbox checked={allFunctionsChecked} className="h-4 w-4" />
+              <MousePointerClick className="h-3.5 w-3.5" /> {t("permissions.functions")}
+            </button>
+            <p className="pl-6 text-[11px] text-muted-foreground">{t("permissions.functionsHint")}</p>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground/80">
+              <Database className="h-3.5 w-3.5" /> {t("permissions.data")}
+            </div>
+            <RadioGroup value="" onValueChange={(v) => setGlobalDataScope(v)} className="flex flex-col gap-1 pl-1">
+              {getDataScopeOptions(t).map((o) => (
+                <div key={o.value} className="flex items-center gap-1.5">
+                  <RadioGroupItem value={o.value} id={`global-${o.value}`} className="h-3 w-3" />
+                  <Label htmlFor={`global-${o.value}`} className="text-[11px] text-muted-foreground cursor-pointer">{o.label}</Label>
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+        </div>
 
-          {/* Module cards — grouped by sidebar section */}
-          <div className="space-y-5 px-1">
+        <ScrollArea className="h-[56vh] pr-2">
+          <div className="space-y-5 px-0.5 pt-1">
             {Array.from(new Set(MODULES_CONFIG.map((m) => m.group))).map((group) => {
               const groupModules = MODULES_CONFIG.filter((m) => m.group === group);
               return (
-                <div key={group} className="space-y-2">
-                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                <div key={group} className="space-y-1.5">
+                  <h3 className="px-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">
                     {group}
                   </h3>
-                  <div className="space-y-2">
-                    {groupModules.map((mod) => {
+                  <div className="overflow-hidden rounded-lg border border-border">
+                    {groupModules.map((mod, idx) => {
                       const isExpanded = expanded[mod.module] ?? false;
-                      const hasSubmodules = mod.submodules.length > 0;
-                      const enabledCount = getEnabledSubCount(mod.module);
-                      const totalSubs = mod.submodules.length;
+                      const topSubtabs = mod.subtabs.filter((s) => !s.parent);
+                      const childrenOf = (parent: string) => mod.subtabs.filter((s) => s.parent === parent);
+                      const hasSubtabs = mod.subtabs.length > 0;
+                      const hasFunctions = mod.functions.length > 0;
+                      const enabledSubtabs = getEnabledSubtabCount(mod.module);
                       const dataScope = getModuleDataScope(mod.module);
                       const moduleCheckState = getModuleCheckState(mod.module);
 
                       return (
-                        <Collapsible
-                          key={mod.module}
-                          open={isExpanded}
-                          onOpenChange={(o) => setExpanded((p) => ({ ...p, [mod.module]: o }))}
-                        >
-                          <div className="border border-border rounded-lg bg-muted/30">
-                            {/* Summary row */}
-                            <div className="px-4 py-3">
-                              <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center">
-                                <div className="flex items-center gap-2">
-                                  <Checkbox
-                                    checked={moduleCheckState}
-                                    onCheckedChange={() => toggleModule(mod.module)}
-                                  />
-                                  <span className="text-sm font-semibold">{mod.module}</span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {hasSubmodules ? `${enabledCount}/${totalSubs} ${t("permissions.functionsCount")}` : "—"}
+                        <div key={mod.module} className={idx > 0 ? "border-t border-border" : ""}>
+                          {/* Module row: Menús | Funciones | Datos */}
+                          <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1.55fr)_minmax(0,1fr)] gap-4 items-start px-4 py-3 hover:bg-muted/20">
+                            {/* Col 1 — Menús */}
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {hasSubtabs ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpanded((p) => ({ ...p, [mod.module]: !isExpanded }))}
+                                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                                  aria-label={t("permissions.expandSubtabs")}
+                                >
+                                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                </button>
+                              ) : (
+                                <span className="w-4 shrink-0" />
+                              )}
+                              <Checkbox
+                                checked={moduleCheckState}
+                                onCheckedChange={() => toggleModule(mod.module)}
+                                className="h-4 w-4 shrink-0"
+                              />
+                              <span className="truncate text-sm font-semibold">{mod.module}</span>
+                              {hasSubtabs && (
+                                <span className="ml-1 shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                  {enabledSubtabs}/{mod.subtabs.length}
                                 </span>
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs text-muted-foreground">
-                                    {getDataScopeLabels(t)[dataScope] || t("permissions.allData")}
-                                  </span>
-                                  {hasSubmodules ? (
-                                    <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 cursor-pointer ml-2">
-                                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                    </CollapsibleTrigger>
-                                  ) : (
-                                    <span className="ml-2 w-4" />
-                                  )}
-                                </div>
-                              </div>
+                              )}
                             </div>
 
-                            {/* Expanded details */}
-                            <CollapsibleContent>
-                              <div className="border-t border-border px-4 py-3">
-                                <div className="grid grid-cols-[1fr_1fr] gap-4">
-                                  {/* Left: submodules */}
-                                  <div className="space-y-2">
-                                    {hasSubmodules ? (
-                                      mod.submodules.map((sub) => {
-                                        const key = getKey(mod.module, sub);
-                                        return (
-                                          <div key={key} className="flex items-center gap-2">
-                                            <Checkbox
-                                              checked={state[key]?.can_access ?? false}
-                                              onCheckedChange={() => toggleSub(mod.module, key)}
-                                            />
-                                            <span className="text-sm">{sub}</span>
-                                          </div>
-                                        );
-                                      })
-                                    ) : (
-                                      <p className="text-xs text-muted-foreground">{t("permissions.noSubfunctions")}</p>
-                                    )}
-                                  </div>
-                                  {/* Right: data scope radio */}
-                                  <div>
-                                    <RadioGroup
-                                      value={dataScope}
-                                      onValueChange={(v) => setModuleDataScope(mod.module, v)}
-                                      className="space-y-2"
-                                    >
-                                      {getDataScopeOptions(t).map((o) => (
-                                        <div key={o.value} className="flex items-center gap-2">
-                                          <RadioGroupItem value={o.value} id={`${mod.module}-${o.value}`} className="h-3.5 w-3.5" />
-                                          <Label htmlFor={`${mod.module}-${o.value}`} className="text-sm">{o.label}</Label>
-                                        </div>
-                                      ))}
-                                    </RadioGroup>
-                                  </div>
+                            {/* Col 2 — Permisos de función */}
+                            <div className="min-w-0">
+                              {hasFunctions ? (
+                                <div className="flex flex-col gap-1.5">
+                                  {mod.functions.map((fn) => {
+                                    const key = getKey(mod.module, fn);
+                                    return (
+                                      <CheckRow
+                                        key={key}
+                                        checked={state[key]?.can_access ?? false}
+                                        onToggle={() => toggleSub(mod.module, key)}
+                                        label={fn}
+                                      />
+                                    );
+                                  })}
                                 </div>
-                              </div>
-                            </CollapsibleContent>
+                              ) : (
+                                <span className="text-xs text-muted-foreground/60">—</span>
+                              )}
+                            </div>
+
+                            {/* Col 3 — Permisos de datos */}
+                            <div>
+                              <RadioGroup
+                                value={dataScope}
+                                onValueChange={(v) => setModuleDataScope(mod.module, v)}
+                                className="flex flex-col gap-1"
+                              >
+                                {getDataScopeOptions(t).map((o) => (
+                                  <div key={o.value} className="flex items-center gap-1.5">
+                                    <RadioGroupItem value={o.value} id={`${mod.module}-${o.value}`} className="h-3.5 w-3.5" />
+                                    <Label htmlFor={`${mod.module}-${o.value}`} className="text-xs cursor-pointer">{o.label}</Label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            </div>
                           </div>
-                        </Collapsible>
+
+                          {/* Expanded subtab tree (Menús column only) */}
+                          {isExpanded && hasSubtabs && (
+                            <div className="border-t border-dashed border-border/60 bg-muted/10 px-4 py-2.5">
+                              <div className="space-y-1.5">
+                                {topSubtabs.map((st) => {
+                                  const stKey = getKey(mod.module, st.name);
+                                  const kids = childrenOf(st.name);
+                                  return (
+                                    <div key={stKey} className="space-y-1.5">
+                                      <CheckRow
+                                        checked={state[stKey]?.can_access ?? false}
+                                        onToggle={() => toggleSub(mod.module, stKey)}
+                                        label={st.name}
+                                        className="pl-6"
+                                      />
+                                      {kids.map((kid) => {
+                                        const kidKey = getKey(mod.module, kid.name);
+                                        // strip the "Parent: " / "Chatters: " prefix for display when present
+                                        const label = kid.name.includes(": ") ? kid.name.split(": ").slice(1).join(": ") : kid.name;
+                                        return (
+                                          <CheckRow
+                                            key={kidKey}
+                                            checked={state[kidKey]?.can_access ?? false}
+                                            onToggle={() => toggleSub(mod.module, kidKey)}
+                                            label={label}
+                                            className="pl-12"
+                                            muted
+                                          />
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>

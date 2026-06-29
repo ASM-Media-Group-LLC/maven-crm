@@ -77,99 +77,129 @@ export interface RolePermission {
 // Grouped + ordered to mirror the live sidebar so admins flip access in
 // the same shape they see in the app. The `group` is just a label for
 // the section header in the permissions modal — runtime checks only
-// look at `module` + `submodule`.
+// look at `module` + `submodule` (a flat string).
+//
+// Cada módulo separa sus submódulos en DOS clases (estilo BLU), para que el
+// modal de permisos deje CLARO qué es navegable y qué es una acción:
+//   • subtabs   → secciones NAVEGABLES (tabs/páginas a las que el usuario entra).
+//                 Van en la columna "Menús". Pueden anidarse vía `parent`
+//                 (ej. "Perfil: Info" cuelga de "Perfil"; "Calls" de "Closers QA").
+//   • functions → ACCIONES/botones gateados (Crear/Editar/Eliminar/Exportar/Asignar…).
+//                 Van en la columna "Permisos de función".
+// `submodules` es la unión derivada (subtabs+functions) que consume la lógica
+// de carga/copia/guardado — la DB sigue guardando filas planas (module, submodule).
+// Clasificación validada contra el código vivo (auditoría 2026-06-29).
+export interface SubtabDef {
+  name: string;     // string EXACTO de role_permissions.submodule
+  parent?: string;  // nombre del subtab padre (anidación de 2 niveles); vacío = nivel raíz
+}
 export interface ModuleConfig {
   group: string;
   module: string;
-  submodules: string[];
+  subtabs: SubtabDef[];
+  functions: string[];
+  submodules: string[]; // DERIVADO (no editar a mano) — unión para load/copy/save
 }
+
+// Builder: normaliza subtabs (string | SubtabDef) y computa `submodules`.
+const def = (
+  group: string,
+  module: string,
+  subtabs: Array<string | SubtabDef> = [],
+  functions: string[] = [],
+): ModuleConfig => {
+  const subs: SubtabDef[] = subtabs.map((s) => (typeof s === "string" ? { name: s } : s));
+  return { group, module, subtabs: subs, functions, submodules: [...subs.map((s) => s.name), ...functions] };
+};
 
 export const MODULES_CONFIG: ModuleConfig[] = [
   // === Menú principal ===
-  { group: "Menú",          module: "Dashboard",     submodules: [] },
-  // Panel de control: dashboard ejecutivo. Tabs internos: modelos
-  // (default), chatters reclutamiento, cuentas spammer, control de gasto.
-  { group: "Menú",          module: "Panel de control", submodules: ["Modelos", "Chatters Reclutamiento", "Cuentas Spammer", "Control de Gasto"] },
-  // Messenger: chat interno. La acción crítica es eliminar conversación.
-  { group: "Menú",          module: "Messenger",     submodules: ["Eliminar Conversación"] },
-  { group: "Menú",          module: "Cowork",        submodules: [] },
-  // Contactos: tabs internos + acciones críticas de eliminar.
-  { group: "Menú",          module: "Contactos",     submodules: ["Dashboard", "Contactos", "Crear Contacto", "Editar Contacto", "Eliminar Contacto"] },
-  // Tareas: vistas + delete actions.
-  { group: "Menú",          module: "Tareas",        submodules: ["List", "Kanban", "Analytics", "Docs", "Crear Proyecto", "Eliminar Proyecto", "Crear Tarea", "Eliminar Tarea"] },
-  // Eventos: tabs del detalle del evento + delete.
-  { group: "Menú",          module: "Eventos",       submodules: ["Invitados", "Checklist", "Historial", "Métricas", "Crear Evento", "Editar Evento", "Eliminar Evento"] },
-  { group: "Menú",          module: "SuperContacts", submodules: ["Gráficas", "Productividad", "Agregar Handle", "Pegar Handles", "Importar Archivo"] }, // sidebar lo muestra como "Wishlist"
-  // Creadores: tabs listado + tabs del perfil + acciones críticas de
-  // edición / eliminación / cambios financieros.
-  { group: "Menú",          module: "Creadores",     submodules: [
-    "Dashboard", "Lista", "Onboarding", "Offboarding", "Personalizados", "Perfil", "Nuevo",
-    "Perfil: Info", "Perfil: Lineamientos", "Perfil: Redes", "Perfil: Monetización", "Perfil: Documentos", "Perfil: Notas", "Perfil: Tickets", "Perfil: Historial",
-    "Editar Creator", "Eliminar Creator", "Editar Banking", "Cambiar Plataforma",
-  ] },
-  { group: "Menú",          module: "Creator Sales", submodules: ["Dashboard", "Reportes", "IA Ventas", "Auditoría"] },
+  def("Menú", "Dashboard"),
+  // Panel de control: dashboard ejecutivo con tabs internos.
+  def("Menú", "Panel de control", ["Modelos", "Chatters Reclutamiento", "Cuentas Spammer", "Control de Gasto"]),
+  // Messenger: chat interno. (El borrado de conversación es por dueño/admin del grupo,
+  // no por permiso — por eso ya no se declara un submódulo que no gateaba nada.)
+  def("Menú", "Messenger"),
+  def("Menú", "Cowork"),
+  // Contactos: subtabs de navegación + acciones de edición/borrado.
+  def("Menú", "Contactos", ["Dashboard", "Contactos"], ["Crear Contacto", "Editar Contacto", "Eliminar Contacto"]),
+  // Tareas: vistas (List/Kanban/Analytics/Docs) + acciones de crear/eliminar.
+  def("Menú", "Tareas", ["List", "Kanban", "Analytics", "Docs"], ["Crear Proyecto", "Eliminar Proyecto", "Crear Tarea", "Eliminar Tarea"]),
+  // Eventos: tabs del detalle del evento + acciones.
+  def("Menú", "Eventos", ["Invitados", "Checklist", "Historial", "Métricas"], ["Crear Evento", "Editar Evento", "Eliminar Evento"]),
+  // SuperContacts (sidebar = "Wishlist"): es una sola lista; todo lo demás abre modales (acciones).
+  def("Menú", "SuperContacts", [], ["Gráficas", "Productividad", "Agregar Handle", "Pegar Handles", "Importar Archivo"]),
+  // Creadores: subtabs del listado + tabs ANIDADOS del perfil (parent "Perfil") + acciones críticas.
+  def("Menú", "Creadores",
+    [
+      "Dashboard", "Lista", "Onboarding", "Offboarding", "Personalizados", "Perfil",
+      { name: "Perfil: Info", parent: "Perfil" }, { name: "Perfil: Lineamientos", parent: "Perfil" },
+      { name: "Perfil: Redes", parent: "Perfil" }, { name: "Perfil: Monetización", parent: "Perfil" },
+      { name: "Perfil: Documentos", parent: "Perfil" }, { name: "Perfil: Notas", parent: "Perfil" },
+      { name: "Perfil: Tickets", parent: "Perfil" }, { name: "Perfil: Historial", parent: "Perfil" },
+    ],
+    ["Nuevo", "Editar Creator", "Eliminar Creator", "Editar Banking", "Cambiar Plataforma"],
+  ),
+  def("Menú", "Creator Sales", ["Dashboard", "Reportes", "IA Ventas", "Auditoría"]),
 
   // === Operaciones ===
-  // Promobot = subtab de control del pipeline (lanzar análisis manual,
-  // monitor de corridas, programación del cron). Default solo admin (se
-  // siembran filas can_access=false para roles no-admin en migración);
-  // marcable por rol desde acá.
-  { group: "Operaciones",   module: "Promolog",      submodules: ["Promos", "Rendimiento", "Promobot"] },
-  // LeadGen subtabs: rail interno + acciones críticas.
-  { group: "Operaciones",   module: "LeadGen",       submodules: ["Dashboard", "Lista", "Crear Entrada", "Eliminar Entradas", "Exportar", "Agentes", "Supervisores", "Rendimiento"] },
-  // Closers tabs top-level (Dashboard / Operaciones) + sub-tabs internos
-  // de la tabla Operaciones (status filters) + acciones críticas.
-  { group: "Operaciones",   module: "Closers",       submodules: [
-    "Dashboard", "Operaciones", "Oportunidades",
-    "Ver Todas", "Ver Nuevo", "Ver Asignadas", "Ver Confirmadas", "Ver Completadas", "Ver No Interesadas",
-    "Editar Status", "Asignar Closer", "Editar Comisiones", "Convertir a Creadora", "Exportar",
-  ] },
-  // Teléfonos (cloud phones): subtabs Dashboard (uso/stats) + Dispositivos (la grilla de teléfonos).
-  // Por defecto solo admin (sin fila => sin acceso). Habilitá "Dispositivos" a los closers; "Dashboard"
-  // (reporte de uso/minutos) a quien deba verlo. Se marcan por subtab desde este modal.
-  { group: "Operaciones",   module: "Telefonos",     submodules: ["Dashboard", "Dispositivos"] },
-  // Inbox WhatsApp propio: Bandeja (ver/responder) · IA (copiloto ✨, controla el costo) · Canales (admin de números) · Asignar conversaciones (reasignar a otros; default solo admin).
-  { group: "Operaciones",   module: "WhatsApp",      submodules: ["Bandeja", "IA", "Canales", "Asignar conversaciones"] },
-  { group: "Operaciones",   module: "Tickets",       submodules: ["Crear Ticket", "Editar Ticket", "Eliminar Ticket", "Asignar Ticket"] },
-  { group: "Operaciones",   module: "Chatters",      submodules: ["Evaluator", "Workspace", "Admin", "Borrar Historial"] },
-  // Scouter Assist submodules. Los que comienzan con "Settings →" son
-  // permisos de acciones DENTRO del tab Settings — gating granular sobre
-  // botones que gastan créditos (Lookalike = embeddings Gemini) o
-  // disparan procesos masivos (Generar Tareas = create_daily_tasks RPC).
-  // El "→" indica al admin que es child del tab Settings (la base de
-  // datos guarda el submodule exacto, no jerárquico).
-  { group: "Operaciones",   module: "Scouter Assist", submodules: ["Home", "Busquedas", "Favoritas", "Leads", "Funnel", "Mis Tareas", "Alertas", "Settings", "Editar Compañías", "Recomputar Lookalike", "Generar Tareas"] },
-  // Agency QA tiene dos tipos de submódulos:
-  //   1) Las 4 categorías de QA por rol (Closers / Chatters / Managers /
-  //      Spammers) que controlan qué tab del rail izquierdo ve el usuario.
-  //   2) Los submódulos funcionales adentro de Closers QA (Calls, New QA,
-  //      QA History, etc.) — estos gateaán los sub-tabs internos.
-  // Si un rol no tiene un toggle on para "Closers QA", todo el grupo
-  // izquierdo desaparece para él aunque tenga acceso a "Calls".
-  { group: "Operaciones",   module: "Agency QA",     submodules: [
-    "Closers QA", "Chatters QA", "Managers QA", "Spammers QA",
-    "Calls", "New QA", "QA History", "QA Chat", "Models", "Analytics", "Notifications", "Borrar Calls",
-    // Subtabs de Chatters QA — gating individual por rol (prefijo "Chatters: " para no
-    // colisionar con los de Closers QA como "Notifications"). Sin fila → el subtab se ve
-    // (hereda del permiso de "Chatters QA"); para TAPAR uno, destildarlo (can_access=false).
-    "Chatters: Scorecard", "Chatters: QA Cualitativo", "Chatters: Masivos",
-    "Chatters: Hubstaff", "Chatters: Notificaciones",
-  ] },
-  // Mensajes Pro = visor on-demand de conversaciones (BLU). Era submódulo de Agency QA,
-  // pero es un tab propio del sidebar (/conversaciones) → se promovió a módulo top-level para
-  // que se pueda asignar por rol sin tener que dar todo Agency QA. El gate de BLU
-  // (can_use_blu_mp) honra este módulo + Chatters QA.
-  { group: "Operaciones",   module: "Mensajes Pro",  submodules: [] },
+  // Promolog: Promos (tabla) + Promobot (control del pipeline, gateado por rol).
+  def("Operaciones", "Promolog", ["Promos", "Promobot"]),
+  // LeadGen: vistas internas + acciones de crear/eliminar entradas.
+  def("Operaciones", "LeadGen", ["Dashboard", "Lista", "Agentes", "Supervisores", "Rendimiento"], ["Crear Entrada", "Eliminar Entradas"]),
+  // Closers: solo 2 subtabs reales (Dashboard / Operaciones) + Oportunidades + acciones.
+  // (Los antiguos "Ver Todas/Nuevo/…" eran filtros de estado dentro de Operaciones, NO subtabs,
+  //  y nunca se gateaban — se quitaron para no ensuciar el modal con toggles muertos.)
+  def("Operaciones", "Closers", ["Dashboard", "Operaciones", "Oportunidades"],
+    ["Editar Status", "Asignar Closer", "Editar Comisiones", "Convertir a Creadora"]),
+  // Teléfonos (cloud phones): Dashboard (uso/stats) + Dispositivos (grilla).
+  def("Operaciones", "Telefonos", ["Dashboard", "Dispositivos"]),
+  // Inbox WhatsApp: Bandeja + Canales (navegables) · IA (copiloto ✨) y Asignar (reasignar) = acciones.
+  def("Operaciones", "WhatsApp", ["Bandeja", "Canales"], ["IA", "Asignar conversaciones"]),
+  // Tickets: las acciones (las subtabs Lista/Calendario aún no se gatean — ver auditoría).
+  def("Operaciones", "Tickets", [], ["Crear Ticket", "Editar Ticket", "Eliminar Ticket", "Asignar Ticket"]),
+  def("Operaciones", "Chatters", ["Evaluator", "Workspace", "Admin"], ["Borrar Historial"]),
+  // Scouter Assist: 8 subtabs navegables + 3 acciones dentro de Settings (gastan créditos / disparan RPCs).
+  def("Operaciones", "Scouter Assist",
+    ["Home", "Busquedas", "Favoritas", "Leads", "Funnel", "Mis Tareas", "Alertas", "Settings"],
+    ["Editar Compañías", "Recomputar Lookalike", "Generar Tareas"]),
+  // Agency QA: rail izquierdo (4 categorías por rol) → subtabs internos anidados.
+  //   Closers QA → Calls/New QA/QA History/QA Chat/Models/Notifications
+  //   Chatters QA → Chatters: Scorecard/QA Cualitativo/Masivos/Hubstaff/Notificaciones
+  // Si un rol no tiene "Closers QA" on, todo ese grupo desaparece aunque tenga "Calls".
+  def("Operaciones", "Agency QA",
+    [
+      "Closers QA",
+      { name: "Calls", parent: "Closers QA" }, { name: "New QA", parent: "Closers QA" },
+      { name: "QA History", parent: "Closers QA" }, { name: "QA Chat", parent: "Closers QA" },
+      { name: "Models", parent: "Closers QA" }, { name: "Notifications", parent: "Closers QA" },
+      "Chatters QA",
+      { name: "Chatters: Scorecard", parent: "Chatters QA" }, { name: "Chatters: QA Cualitativo", parent: "Chatters QA" },
+      { name: "Chatters: Masivos", parent: "Chatters QA" }, { name: "Chatters: Hubstaff", parent: "Chatters QA" },
+      { name: "Chatters: Notificaciones", parent: "Chatters QA" },
+      "Managers QA", "Spammers QA",
+    ],
+    ["Borrar Calls"],
+  ),
+  // Mensajes Pro = visor on-demand de conversaciones (BLU), tab propio del sidebar.
+  def("Operaciones", "Mensajes Pro"),
 
   // === Finanzas ===
-  { group: "Finanzas",      module: "Finanzas",      submodules: ["Dashboard", "Collections", "Nómina", "Horas Variables", "Invoices", "Templates", "Control Financiero", "Reportes", "Configuración"] },
+  def("Finanzas", "Finanzas", ["Dashboard", "Collections", "Nómina", "Horas Variables", "Invoices", "Templates", "Control Financiero", "Reportes", "Configuración"]),
 
   // === Recursos Humanos ===
-  { group: "Recursos Humanos", module: "HR",         submodules: ["Dashboard", "Candidatos", "Onboarding", "Empleados Activos", "Offboarding", "Asistencia", "Horarios", "Horarios Chatters", "Horas Extra", "Banco de Horas", "Vacaciones", "Permisos", "Monitoreo", "Incidentes", "Desempeño", "Capacitación", "Directorio", "Organigrama", "Deducciones", "Anuncios"] },
+  def("Recursos Humanos", "HR", [
+    "Dashboard", "Candidatos", "Onboarding", "Empleados Activos", "Offboarding", "Asistencia",
+    "Horarios", "Horarios Chatters",
+    { name: "Horas Extra", parent: "Horarios" }, { name: "Banco de Horas", parent: "Horarios" },
+    "Vacaciones", "Permisos", "Monitoreo", "Incidentes", "Desempeño", "Capacitación",
+    "Directorio", "Organigrama", "Deducciones", "Anuncios",
+  ]),
 
   // === Configuración / Settings ===
-  { group: "Configuración", module: "Administración", submodules: ["Usuarios", "Roles", "Auditoría"] },
-  { group: "Configuración", module: "ProyectoMP",     submodules: [] },
+  // "Roles" es una pestaña interna de Usuarios (CRUD de roles) → es una ACCIÓN, no un subtab navegable.
+  def("Configuración", "Administración", ["Usuarios", "Auditoría"], ["Roles"]),
+  def("Configuración", "ProyectoMP"),
 ];
 
 export const useRoles = () => {
