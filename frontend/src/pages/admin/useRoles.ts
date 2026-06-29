@@ -116,7 +116,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // === Menú principal ===
   def("Menú", "Dashboard"),
   // Panel de control: dashboard ejecutivo con tabs internos.
-  def("Menú", "Panel de control", ["Modelos", "Chatters Reclutamiento", "Cuentas Spammer", "Control de Gasto"]),
+  def("Menú", "Panel de control", ["Modelos", "Chatters Reclutamiento", "Cuentas Spammer", "Control de Gasto", "Bot WhatsApp"]),
   // Messenger: chat interno. (El borrado de conversación es por dueño/admin del grupo,
   // no por permiso — por eso ya no se declara un submódulo que no gateaba nada.)
   def("Menú", "Messenger"),
@@ -126,7 +126,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // Tareas: vistas (List/Kanban/Analytics/Docs) + acciones de crear/eliminar.
   def("Menú", "Tareas", ["List", "Kanban", "Analytics", "Docs"], ["Crear Proyecto", "Eliminar Proyecto", "Crear Tarea", "Eliminar Tarea"]),
   // Eventos: tabs del detalle del evento + acciones.
-  def("Menú", "Eventos", ["Invitados", "Checklist", "Historial", "Métricas"], ["Crear Evento", "Editar Evento", "Eliminar Evento"]),
+  def("Menú", "Eventos", ["Invitados", "Checklist", "Historial", "Métricas", "Enlaces"], ["Crear Evento", "Editar Evento", "Eliminar Evento"]),
   // SuperContacts (sidebar = "Wishlist"): es una sola lista; todo lo demás abre modales (acciones).
   def("Menú", "SuperContacts", [], ["Gráficas", "Productividad", "Agregar Handle", "Pegar Handles", "Importar Archivo"]),
   // Creadores: subtabs del listado + tabs ANIDADOS del perfil (parent "Perfil") + acciones críticas.
@@ -138,7 +138,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
       { name: "Perfil: Documentos", parent: "Perfil" }, { name: "Perfil: Notas", parent: "Perfil" },
       { name: "Perfil: Tickets", parent: "Perfil" }, { name: "Perfil: Historial", parent: "Perfil" },
     ],
-    ["Nuevo", "Editar Creator", "Eliminar Creator", "Editar Banking", "Cambiar Plataforma"],
+    ["Nuevo", "Editar Creator", "Eliminar Creator", "Editar Blu CRM", "Editar Banking", "Cambiar Plataforma"],
   ),
   def("Menú", "Creator Sales", ["Dashboard", "Reportes", "IA Ventas", "Auditoría"]),
 
@@ -156,8 +156,8 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   def("Operaciones", "Telefonos", ["Dashboard", "Dispositivos"]),
   // Inbox WhatsApp: Bandeja + Canales (navegables) · IA (copiloto ✨) y Asignar (reasignar) = acciones.
   def("Operaciones", "WhatsApp", ["Bandeja", "Canales"], ["IA", "Asignar conversaciones"]),
-  // Tickets: las acciones (las subtabs Lista/Calendario aún no se gatean — ver auditoría).
-  def("Operaciones", "Tickets", [], ["Crear Ticket", "Editar Ticket", "Eliminar Ticket", "Asignar Ticket"]),
+  // Tickets: subtabs (Lista/Calendario) + acciones.
+  def("Operaciones", "Tickets", ["Lista de Tickets", "Calendario"], ["Crear Ticket", "Editar Ticket", "Eliminar Ticket", "Asignar Ticket"]),
   def("Operaciones", "Chatters", ["Evaluator", "Workspace", "Admin"], ["Borrar Historial"]),
   // Scouter Assist: 8 subtabs navegables + 3 acciones dentro de Settings (gastan créditos / disparan RPCs).
   def("Operaciones", "Scouter Assist",

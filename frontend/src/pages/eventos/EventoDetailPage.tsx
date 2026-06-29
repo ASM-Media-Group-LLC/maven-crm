@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
 import { statusLabel, statusVariant } from "./useEventos";
 import { useEventDetail } from "./useEventoDetail";
 import CloseEventoModal from "./CloseEventoModal";
@@ -27,6 +28,11 @@ const EventoDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { canAccess } = usePermissions();
+  // Consistencia con la tabla (que ya gatea "Editar Evento"): el botón Editar del
+  // detalle ahora honra el mismo permiso. El subtab Enlaces se gatea aparte.
+  const canEdit = canAccess("Eventos", "Editar Evento");
+  const canSeeLinks = canAccess("Eventos", "Enlaces");
   const { data: event, isLoading } = useEventDetail(id!);
   const [closeOpen, setCloseOpen] = useState(false);
 
@@ -105,9 +111,11 @@ const EventoDetailPage = () => {
                 <PhoneCall className="h-4 w-4 mr-1" />Unirse a la llamada
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => navigate(`/eventos/${id}/editar`)}>
-              <Pencil className="h-4 w-4 mr-1" />Editar
-            </Button>
+            {canEdit && (
+              <Button variant="outline" size="sm" onClick={() => navigate(`/eventos/${id}/editar`)}>
+                <Pencil className="h-4 w-4 mr-1" />Editar
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => setCloseOpen(true)}>
               <Lock className="h-4 w-4 mr-1" />Cerrar
             </Button>
@@ -123,7 +131,7 @@ const EventoDetailPage = () => {
             <TabsTrigger value="checklist">Checklist</TabsTrigger>
             <TabsTrigger value="history">Historial</TabsTrigger>
             <TabsTrigger value="metrics">Métricas</TabsTrigger>
-            <TabsTrigger value="links">Enlaces</TabsTrigger>
+            {canSeeLinks && <TabsTrigger value="links">Enlaces</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="guests">
@@ -138,6 +146,7 @@ const EventoDetailPage = () => {
           <TabsContent value="metrics">
             <MetricsTab eventId={event.id} />
           </TabsContent>
+          {canSeeLinks && (
           <TabsContent value="links">
             <LinksTab
               eventId={event.id}
@@ -146,6 +155,7 @@ const EventoDetailPage = () => {
               externalLinkExpiresAt={(event as any).external_link_expires_at}
             />
           </TabsContent>
+          )}
         </Tabs>
       </div>
 

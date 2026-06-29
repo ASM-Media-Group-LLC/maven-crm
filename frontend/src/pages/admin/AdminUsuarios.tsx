@@ -14,6 +14,7 @@ import RolesContent from "./RolesContent";
 import ResetPasswordModal from "./ResetPasswordModal";
 import AddUserModal from "./AddUserModal";
 import type { AppRole } from "@/hooks/useUserRole";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +22,7 @@ import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 
 const AdminUsuarios = () => {
   const navigate = useNavigate();
+  const { canAccess } = usePermissions();
   const { users, isLoading, changeRole, isChangingRole, stats } = useAdminUsers();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"list" | "grid">("list");
@@ -80,9 +82,13 @@ const AdminUsuarios = () => {
     { label: "Employees", value: String(stats.employees), icon: User, color: "bg-violet-500" },
   ];
 
+  // El tab "Roles" (CRUD de roles + permisos) se gatea con el permiso "Roles".
+  // El fallback de canAccess concede a quien tenga el módulo Administración, así que
+  // los admins (que además bypassan) lo siguen viendo; permite restringirlo por rol.
+  const canManageRoles = canAccess("Administración", "Roles");
   const tabs = [
     { key: "usuarios" as const, label: "Usuarios" },
-    { key: "roles" as const, label: "Roles" },
+    ...(canManageRoles ? [{ key: "roles" as const, label: "Roles" }] : []),
   ];
 
   return (

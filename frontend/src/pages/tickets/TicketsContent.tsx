@@ -10,8 +10,15 @@ import CreateTicketModal from "./CreateTicketModal";
 import ViewTicketModal from "./ViewTicketModal";
 import EditTicketModal from "./EditTicketModal";
 import DeleteTicketDialog from "./DeleteTicketDialog";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const TicketsContent = () => {
+  const { canAccess } = usePermissions();
+  // Gates: el fallback de canAccess concede a quien tenga el módulo Tickets, así que
+  // hoy nadie pierde acceso; solo permite restringir por rol desde el modal de permisos.
+  const canCreate = canAccess("Tickets", "Crear Ticket");
+  const canSeeList = canAccess("Tickets", "Lista de Tickets");
+  const canSeeCalendar = canAccess("Tickets", "Calendario");
   const { ticketsQuery } = useTickets();
   const [modalOpen, setModalOpen] = useState(false);
   const [view, setView] = useState<"list" | "grid">("list");
@@ -80,20 +87,23 @@ const TicketsContent = () => {
               Gestión de soporte y escalaciones
             </p>
           </div>
-          <Button onClick={() => setModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Nuevo Ticket
-          </Button>
+          {canCreate && (
+            <Button onClick={() => setModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Nuevo Ticket
+            </Button>
+          )}
         </div>
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
-      <Tabs defaultValue="list">
+      <Tabs defaultValue={canSeeList ? "list" : "calendar"}>
         <TabsList className="mb-4">
-          <TabsTrigger value="list">Lista de Tickets</TabsTrigger>
-          <TabsTrigger value="calendar">Calendario</TabsTrigger>
+          {canSeeList && <TabsTrigger value="list">Lista de Tickets</TabsTrigger>}
+          {canSeeCalendar && <TabsTrigger value="calendar">Calendario</TabsTrigger>}
         </TabsList>
 
+        {canSeeList && (
         <TabsContent value="list" className="space-y-4">
           <TicketsFilters
             search={search} onSearchChange={setSearch}
@@ -119,12 +129,15 @@ const TicketsContent = () => {
             <TicketsGrid tickets={filtered} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
           )}
         </TabsContent>
+        )}
 
+        {canSeeCalendar && (
         <TabsContent value="calendar">
           <div className="flex items-center justify-center py-16 text-muted-foreground">
             <p>Calendario de tickets — próximamente</p>
           </div>
         </TabsContent>
+        )}
       </Tabs>
 
       <CreateTicketModal open={modalOpen} onOpenChange={setModalOpen} />

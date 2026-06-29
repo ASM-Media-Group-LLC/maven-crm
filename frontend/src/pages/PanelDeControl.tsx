@@ -58,6 +58,7 @@ import { ListRow } from "@/components/ui/list-row";
 import OutcomeBadge from "@/components/agency-qa/OutcomeBadge";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import { OUTCOME_META } from "@/hooks/useAgencyQa";
+import { usePermissions } from "@/hooks/usePermissions";
 import SpammerAccountsTab from "./panel-de-control/SpammerAccountsTab";
 import ControlGastoTab from "./panel-de-control/ControlGastoTab";
 import ChattersRecruitmentTab from "./panel-de-control/ChattersRecruitmentTab";
@@ -1011,6 +1012,11 @@ const PanelDeControl = () => {
     (openMetric ? EXTRA_METRIC_LABELS[openMetric] ?? "" : "");
 
   const [tab, setTab] = useState<"modelos" | "chatters" | "cuentas-spammer" | "control-gasto" | "whatsapp-bot">("modelos");
+  // El tab "Bot WhatsApp" controla el agente del bot → gateado por permiso. El fallback
+  // de canAccess concede a quien tenga el módulo Panel de control (no rompe a nadie hoy);
+  // permite ocultarlo por rol desde el modal de permisos.
+  const { canAccess } = usePermissions();
+  const canSeeWhatsappBot = canAccess("Panel de control", "Bot WhatsApp");
 
   return (
     // El layout app envuelve cada page en un wrapper con overflow-hidden.
@@ -1073,7 +1079,7 @@ const PanelDeControl = () => {
           </TabsTrigger>
           <TabsTrigger value="chatters">Reclutamiento chatters</TabsTrigger>
           <TabsTrigger value="control-gasto">Control de Gasto</TabsTrigger>
-          <TabsTrigger value="whatsapp-bot">Bot WhatsApp</TabsTrigger>
+          {canSeeWhatsappBot && <TabsTrigger value="whatsapp-bot">Bot WhatsApp</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="cuentas-spammer" className="mt-4">
@@ -1088,9 +1094,11 @@ const PanelDeControl = () => {
           <ChattersRecruitmentTab range={range} />
         </TabsContent>
 
+        {canSeeWhatsappBot && (
         <TabsContent value="whatsapp-bot" className="mt-4">
           <WhatsappAgentTab />
         </TabsContent>
+        )}
 
         <TabsContent value="modelos" className="mt-4 space-y-5">
       {/* Hero metrics: Total leads + phone rate — destacadas + clickeables */}

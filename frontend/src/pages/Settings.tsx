@@ -450,7 +450,7 @@ const AdminTab = ({ canAccess, isAdmin }: { canAccess: ReturnType<typeof usePerm
             description="Gestión de usuarios, roles y permisos."
           />
         )}
-        {(canAccess("Administración", "Roles") || isAdmin) && (
+        {(canAccess("Administración", "Auditoría") || isAdmin) && (
           <Row
             to="/settings?sub=auditoria"
             icon={ClipboardCheck}
