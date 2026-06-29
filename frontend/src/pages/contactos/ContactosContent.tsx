@@ -176,9 +176,35 @@ const ContactosContent = () => {
     return { mode: "include" as const, ids: Array.from(union) };
   }, [filters.salesChannels, canSeeChannels, salesChannels]);
 
+  // Opciones de filtro a nivel DATASET COMPLETO (no solo la página). Antes Ciudad/Agente se
+  // derivaban de los ~25 contactos visibles y se filtraban client-side → solo afectaban la página.
+  const { data: cityOptions = [] } = useQuery({
+    queryKey: ["contact_filter_cities"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("contact_filter_cities");
+      if (error) throw error;
+      return (data ?? []) as string[];
+    },
+  });
+  const { data: agentOptions = [] } = useQuery({
+    queryKey: ["contact_filter_agents"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("contact_filter_agents");
+      if (error) throw error;
+      return (data ?? []) as { id: string; name: string }[];
+    },
+  });
+  // El filtro Agente guarda el NOMBRE; el query necesita el created_by (uuid) → mapa nombre→uuid.
+  const nameToUserId = useMemo(() => {
+    const m = new Map<string, string>();
+    agentOptions.forEach((a) => { if (a.name) m.set(a.name, a.id); });
+    return m;
+  }, [agentOptions]);
+  const creadoPorUserId = filters.creadoPor ? (nameToUserId.get(filters.creadoPor) ?? null) : null;
+
   // Server-side paginated query
   const { data: queryResult, isLoading } = useQuery({
-    queryKey: ["closers_contacts", page, filters, salesChannelConstraint],
+    queryKey: ["closers_contacts", page, filters, salesChannelConstraint, creadoPorUserId],
     queryFn: async () => {
       let q = supabase
         // Vista enmascarada: phone/email solo vienen reales para admin; el resto NULL.
@@ -200,6 +226,9 @@ const ContactosContent = () => {
       // El filtro ofrece ISO ("CO") pero la columna guarda el dial code ("+57") → mapear.
       if (filters.pais) q = q.eq("country_code", dialForIso(filters.pais) ?? filters.pais);
       if (filters.categoria) q = q.eq("physical_appearance", filters.categoria);
+      // Ciudad y Agente: server-side (antes client-side sobre la página → solo filtraban lo visible).
+      if (filters.ciudad) q = q.eq("city", filters.ciudad);
+      if (creadoPorUserId) q = q.eq("created_by", creadoPorUserId);
       // filters.dateFrom/dateTo son strings solo-fecha ("yyyy-MM-dd"). Hay que
       // acotar por el DÍA LOCAL del usuario contra created_at (timestamptz UTC).
       // OJO: `new Date("yyyy-MM-dd")` parsea como medianoche UTC; al hacer
@@ -324,17 +353,10 @@ const ContactosContent = () => {
     },
   });
 
-  const creatorsList = useMemo(() => {
-    const map = new Map<string, string>();
-    creatorIds.forEach((id) => {
-      const name = profilesMap[id];
-      map.set(id, name || "Agente");
-    });
-    const entries = Array.from(map.entries())
-      .map(([, label]) => ({ value: label, label }));
-    entries.sort((a, b) => a.label.localeCompare(b.label));
-    return entries;
-  }, [creatorIds, profilesMap]);
+  const creatorsList = useMemo(
+    () => agentOptions.map((a) => ({ value: a.name, label: a.name })),
+    [agentOptions]
+  );
 
   // Fetch interaction counts for current page contacts
   const contactIds = useMemo(() => dbContactos.map(c => c.id), [dbContactos]);
@@ -392,12 +414,8 @@ const ContactosContent = () => {
   [dbContactos, interactionCounts, profilesMap, creatorsCityMap]);
 
   // Client-side filters for resolved fields
-  const filtered = useMemo(() => {
-    let list = allContactos;
-    if (filters.creadoPor) list = list.filter((c) => c.creadoPor === filters.creadoPor);
-    if (filters.ciudad) list = list.filter((c) => c.city === filters.ciudad);
-    return list;
-  }, [filters.creadoPor, filters.ciudad, allContactos]);
+  // Ciudad y Agente ahora se filtran SERVER-SIDE (en el query) → `filtered` = la página ya filtrada.
+  const filtered = allContactos;
 
   const handleView = (c: Contacto) => { setSelectedContacto(c); setViewOpen(true); };
   const handleEdit = (c: Contacto) => { setSelectedContacto(c); setEditOpen(true); };
@@ -413,16 +431,8 @@ const ContactosContent = () => {
   const updateFilters = (patch: Partial<ContactoFilters>) =>
     setFilters((prev) => ({ ...prev, ...patch }));
 
-  // Derive unique cities for filter
-  const citiesList = useMemo(() => {
-    const set = new Set<string>();
-    allContactos.forEach((c) => set.add(c.city || "No aplicable"));
-    return Array.from(set).sort((a, b) => {
-      if (a === "No aplicable") return -1;
-      if (b === "No aplicable") return 1;
-      return a.localeCompare(b);
-    });
-  }, [allContactos]);
+  // Opciones de ciudad del DATASET completo (RPC contact_filter_cities), no solo la página.
+  const citiesList = cityOptions;
 
   const hasActiveFilters = !!(filters.search || filters.pais || filters.ciudad || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor || (filters.salesChannels && filters.salesChannels.length > 0));
 
