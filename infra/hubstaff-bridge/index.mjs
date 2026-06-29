@@ -221,6 +221,19 @@ async function runOnce() {
     }
   }
   console.log(`[hubstaff-bridge] OK: ${totMembers} miembros, ${totDaily} filas de actividad diaria.`);
+
+  // Recalcular c4 (Productividad) del scorecard del mes en curso desde la actividad recién ingestada.
+  // El RPC matchea por blu_employee_id+period y solo toca c4 (rubric actividad%→0-5). Aislado: si falla, no afecta la sync.
+  try {
+    const now = new Date();
+    const period = ymd(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)));
+    const { data, error } = await sb().rpc("recalc_chatter_scorecard_hubstaff", { p_period: period });
+    if (error) throw new Error(error.message);
+    console.log(`[hubstaff-bridge] scorecard c4 recalculado (${period}): ${JSON.stringify(data)}`);
+  } catch (e) {
+    console.error(`[hubstaff-bridge] recalc scorecard falló (no afecta la sync): ${e.message}`);
+  }
+
   return { totMembers, totDaily };
 }
 
