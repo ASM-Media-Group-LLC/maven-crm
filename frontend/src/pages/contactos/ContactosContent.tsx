@@ -202,9 +202,21 @@ const ContactosContent = () => {
   }, [agentOptions]);
   const creadoPorUserId = filters.creadoPor ? (nameToUserId.get(filters.creadoPor) ?? null) : null;
 
+  // Ciudad: closers_contacts.city está vacío → la ciudad sale de creators (por handle). El RPC
+  // devuelve los ids de contacto cuya creadora está en esa ciudad; el query filtra con .in("id").
+  const { data: cityContactIds } = useQuery({
+    queryKey: ["contact_ids_by_city", filters.ciudad],
+    enabled: !!filters.ciudad,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("contact_ids_by_city", { p_city: filters.ciudad });
+      if (error) throw error;
+      return (data ?? []) as string[];
+    },
+  });
+
   // Server-side paginated query
   const { data: queryResult, isLoading } = useQuery({
-    queryKey: ["closers_contacts", page, filters, salesChannelConstraint, creadoPorUserId],
+    queryKey: ["closers_contacts", page, filters, salesChannelConstraint, creadoPorUserId, cityContactIds],
     queryFn: async () => {
       let q = supabase
         // Vista enmascarada: phone/email solo vienen reales para admin; el resto NULL.
@@ -226,9 +238,11 @@ const ContactosContent = () => {
       // El filtro ofrece ISO ("CO") pero la columna guarda el dial code ("+57") → mapear.
       if (filters.pais) q = q.eq("country_code", dialForIso(filters.pais) ?? filters.pais);
       if (filters.categoria) q = q.eq("physical_appearance", filters.categoria);
-      // Ciudad y Agente: server-side (antes client-side sobre la página → solo filtraban lo visible).
-      if (filters.ciudad) q = q.eq("city", filters.ciudad);
+      // Agente y Ciudad: server-side (antes client-side sobre la página → solo filtraban lo visible).
       if (creadoPorUserId) q = q.eq("created_by", creadoPorUserId);
+      // Ciudad: filtrar por los ids que devolvió el RPC (creadora-por-handle en esa ciudad).
+      // Si todavía no cargaron los ids (o no hay ninguno) → sentinel que devuelve 0.
+      if (filters.ciudad) q = q.in("id", (cityContactIds && cityContactIds.length) ? cityContactIds : ["__none__"]);
       // filters.dateFrom/dateTo son strings solo-fecha ("yyyy-MM-dd"). Hay que
       // acotar por el DÍA LOCAL del usuario contra created_at (timestamptz UTC).
       // OJO: `new Date("yyyy-MM-dd")` parsea como medianoche UTC; al hacer
