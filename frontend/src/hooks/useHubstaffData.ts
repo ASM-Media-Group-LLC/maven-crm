@@ -69,7 +69,7 @@ export function useHubstaffData() {
     queryFn: async () => {
       const { data: members, error } = await supabase
         .from("hubstaff_members")
-        .select("id, profile_id, hubstaff_user_id, is_active")
+        .select("id, profile_id, hubstaff_user_id, is_active, name")
         .eq("is_active", true);
       if (error) throw error;
       if (!members || members.length === 0) return [];
@@ -101,7 +101,9 @@ export function useHubstaffData() {
 
       const agents: HubstaffAgent[] = members.map(m => {
         const profile = profileMap.get(m.profile_id);
-        const name = profile?.full_name ?? "Sin nombre";
+        // El nombre de Hubstaff (m.name) es la fuente confiable: muchos miembros no
+        // tienen profile_id y profiles puede no ser legible bajo RLS. full_name es mejora.
+        const name = profile?.full_name || m.name || "Sin nombre";
         const memberActs = actByMember.get(m.id) ?? [];
 
         const totalSeconds = memberActs.reduce((s, a) => s + (a.tracked_seconds ?? 0), 0);
