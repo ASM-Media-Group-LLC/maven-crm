@@ -179,10 +179,18 @@ async function fetchActivityStarts(org, startDayExclLeft, stopDayExcl) {
 }
 
 async function syncDaily(org, days) {
-  // activities/daily soporta rango date[start]/date[stop] (inclusive). Paginado por cursor.
-  const items = await hsGetAll(`/organizations/${org.id}/activities/daily`, "daily_activities", {
-    "date[start]": days[0], "date[stop]": days[days.length - 1],
-  });
+  // activities/daily soporta rango date[start]/date[stop] (inclusive) pero RECHAZA rangos
+  // de más de 31 días (400 invalid_params). Troceamos en ventanas de 30 días para poder
+  // backfillear meses completos. Paginado por cursor adentro de cada trozo.
+  const items = [];
+  const WINDOW = 30;
+  for (let i = 0; i < days.length; i += WINDOW) {
+    const slice = days.slice(i, i + WINDOW);
+    const part = await hsGetAll(`/organizations/${org.id}/activities/daily`, "daily_activities", {
+      "date[start]": slice[0], "date[stop]": slice[slice.length - 1],
+    });
+    items.push(...part);
+  }
   // Hora de inicio (c1): solo los últimos STARTS_LOOKBACK_DAYS (granular = pesado); ±1 día por TZ.
   const sLook = Math.max(1, Number(STARTS_LOOKBACK_DAYS) || 4);
   const startsDays = days.slice(-sLook);
