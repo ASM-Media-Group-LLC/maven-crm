@@ -38,6 +38,7 @@ export const HR_NAV: HrNavGroup[] = [
     label: "Ciclo del empleado",
     icon: UserCheck,
     items: [
+      { title: "Personal", url: "/hr/personal", submodule: "Empleados Activos" },
       { title: "Candidatos", url: "/hr/candidatos", submodule: "Candidatos" },
       { title: "Onboarding", url: "/hr/onboarding", submodule: "Onboarding" },
       { title: "Empleados activos", url: "/hr/directorio", submodule: "Empleados Activos" },

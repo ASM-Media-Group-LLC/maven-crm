@@ -164,6 +164,8 @@ import HROrganigrama from "./pages/hr/HROrganigrama";
 import HRDeductions from "./pages/hr/HRDeductions";
 import HRDeductionNew from "./pages/hr/HRDeductionNew";
 import HRAnnouncements from "./pages/hr/HRAnnouncements";
+import HRPersonnel from "./pages/hr/HRPersonnel";
+import HRPersonCard from "./pages/hr/HRPersonCard";
 
 // Finanzas — eager.
 import FinanzasLayout from "./pages/finanzas/FinanzasLayout";
@@ -320,6 +322,8 @@ const App = () => (
                 <Route path="/wishlist/:id" element={<PermissionRoute module="SuperContacts"><WishlistProfile /></PermissionRoute>} />
                 {/* HR routes */}
                 <Route path="/hr" element={<PermissionRoute module="HR" submodule="Dashboard"><HRLayout><HRDashboard /></HRLayout></PermissionRoute>} />
+                <Route path="/hr/personal" element={<PermissionRoute module="HR" submodule="Empleados Activos"><HRLayout><HRPersonnel /></HRLayout></PermissionRoute>} />
+                <Route path="/hr/persona/:id" element={<PermissionRoute module="HR" submodule="Empleados Activos"><HRLayout><HRPersonCard /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/directorio" element={<PermissionRoute module="HR" submodule="Empleados Activos"><HRLayout><EmployeeDirectory /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/empleado/nuevo" element={<PermissionRoute module="HR" submodule="Empleados Activos"><HRLayout><EmployeeNew /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/empleado/:id" element={<PermissionRoute module="HR" submodule="Empleados Activos"><HRLayout><EmployeeProfile /></HRLayout></PermissionRoute>} />
