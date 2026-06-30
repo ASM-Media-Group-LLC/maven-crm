@@ -177,6 +177,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
       { name: "Chatters: Scorecard", parent: "Chatters QA" }, { name: "Chatters: QA Cualitativo", parent: "Chatters QA" },
       { name: "Chatters: Masivos", parent: "Chatters QA" }, { name: "Chatters: Hubstaff", parent: "Chatters QA" },
       { name: "Chatters: Asistencia", parent: "Chatters QA" },
+      { name: "Chatters: Anomalías", parent: "Chatters QA" },
       { name: "Chatters: Notificaciones", parent: "Chatters QA" },
       "Managers QA", "Spammers QA",
     ],

@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { ClipboardCheck, FileText, Clock, Bell, Megaphone, Lock, CalendarClock } from "lucide-react";
+import { ClipboardCheck, FileText, Clock, Bell, Megaphone, Lock, CalendarClock, ShieldAlert } from "lucide-react";
 import ChattersQaScorecard from "./ChattersQaScorecard";
 import ChattersQaQualitative from "./ChattersQaQualitative";
 import ChatterQaNotifications from "./ChatterQaNotifications";
 import ChattersQaMasivos from "./ChattersQaMasivos";
 import ChattersQaHubstaff from "./ChattersQaHubstaff";
 import ChattersQaAttendance from "./ChattersQaAttendance";
+import ChattersQaAnomalies from "./ChattersQaAnomalies";
 import { useQaProcessingWatcher } from "./useChatterQaReports";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -31,6 +32,7 @@ const CHATTER_QA_SUBS = [
   { key: "masivos",        label: "Masivos",        icon: Megaphone,      submodule: "Chatters: Masivos" },
   { key: "hubstaff",       label: "Hubstaff",       icon: Clock,          submodule: "Chatters: Hubstaff" },
   { key: "asistencia",     label: "Asistencia",     icon: CalendarClock,  submodule: "Chatters: Asistencia" },
+  { key: "anomalias",      label: "Anomalías",      icon: ShieldAlert,    submodule: "Chatters: Anomalías" },
   { key: "notificaciones", label: "Notificaciones", icon: Bell,           submodule: "Chatters: Notificaciones" },
 ] as const;
 
@@ -95,6 +97,9 @@ export default function ChattersQaSection() {
         )}
         {visibleSubs.some((s) => s.key === "asistencia") && (
           <TabsContent value="asistencia" className="mt-4"><ChattersQaAttendance /></TabsContent>
+        )}
+        {visibleSubs.some((s) => s.key === "anomalias") && (
+          <TabsContent value="anomalias" className="mt-4"><ChattersQaAnomalies /></TabsContent>
         )}
         {visibleSubs.some((s) => s.key === "notificaciones") && (
           <TabsContent value="notificaciones" className="mt-4"><ChatterQaNotifications /></TabsContent>
