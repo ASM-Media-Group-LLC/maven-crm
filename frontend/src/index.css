@@ -408,17 +408,29 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   padding: 0;
 }
 
-/* Tables inside chat — Excel-style */
+/* Tables inside chat — Excel-style.
+   El borde/radio/sombra viven en el WRAPPER scrollable (.ai-chat-table-wrap),
+   no en la <table>: así una tabla más ancha que la burbuja SCROLLEA en horizontal
+   en vez de recortarse (antes la <table> tenía overflow:hidden y cortaba columnas
+   en el panel angosto del FAB). */
+.ai-chat-content .ai-chat-table-wrap {
+  margin: 1em 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1.5px solid hsl(var(--border));
+  border-radius: 10px;
+  box-shadow: 0 2px 8px hsl(var(--foreground) / 0.06);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.ai-chat-content .ai-chat-table-wrap:first-child { margin-top: 0; }
+.ai-chat-content .ai-chat-table-wrap:last-child { margin-bottom: 0; }
+
 .ai-chat-content table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  margin: 1em 0;
   font-size: 0.82em;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1.5px solid hsl(var(--border));
-  box-shadow: 0 2px 8px hsl(var(--foreground) / 0.06);
 }
 
 .ai-chat-content thead {
@@ -443,6 +455,9 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   padding: 0.55em 0.85em;
   border-bottom: 1px solid hsl(var(--border) / 0.4);
   border-right: 1px solid hsl(var(--border) / 0.2);
+  /* Estilo Excel: celdas en una línea → la tabla crece a su ancho natural y el
+     wrapper scrollea, en vez de partir nombres a mitad de palabra ("Restrep-o"). */
+  white-space: nowrap;
 }
 
 .ai-chat-content td:last-child {

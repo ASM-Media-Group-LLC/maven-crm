@@ -204,7 +204,7 @@ const ClariAiFab = () => {
       {/* Ventana flotante estilo Messenger — sigue al FAB si fue movido. */}
       {open && (
         <div
-          className={`fixed z-50 flex h-[600px] max-h-[calc(100vh-2rem)] w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl ring-1 ring-black/5 animate-in fade-in slide-in-from-bottom-4 duration-200 ${winStyle ? "" : "bottom-24 right-6"}`}
+          className={`fixed z-50 flex h-[620px] max-h-[calc(100vh-2rem)] w-[440px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl ring-1 ring-black/5 animate-in fade-in slide-in-from-bottom-4 duration-200 ${winStyle ? "" : "bottom-24 right-6"}`}
           style={winStyle}
           role="dialog"
           aria-label="Clari AI chat"

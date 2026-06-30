@@ -26,8 +26,21 @@ const ClariBubbleAvatar = ({ size = 32 }: { size?: number }) => {
   );
 };
 import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
+
+// Render compartido del markdown de Clari. Las respuestas del orquestador (modo CRM)
+// suelen traer tablas GFM (productividad de chatters, etc.); las envolvemos en un
+// contenedor scrollable para que NO se recorten en la burbuja angosta del FAB.
+// (El estilo visual de la tabla vive en .ai-chat-content / .ai-chat-table-wrap en index.css.)
+const clariMarkdownComponents: Components = {
+  table: ({ children }) => (
+    <div className="ai-chat-table-wrap">
+      <table>{children}</table>
+    </div>
+  ),
+};
 import { useAiMessages } from "@/hooks/useAiConversations";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -378,7 +391,7 @@ const ClariAiChat = ({
                   className={`flex gap-2 ${isUser ? "flex-row-reverse items-end" : "flex-row items-end"}`}
                 >
                   {!isUser && <ClariBubbleAvatar size={28} />}
-                  <div className={`flex max-w-[80%] flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
+                  <div className={`flex flex-col gap-1 ${isUser ? "max-w-[80%] items-end" : "max-w-[94%] items-start"}`}>
                     <div
                       className={`rounded-2xl px-3 py-2 text-sm ${
                         isUser
@@ -393,7 +406,7 @@ const ClariAiChat = ({
                       )}
                       {m.role === "assistant" ? (
                         <div className="ai-chat-content">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={clariMarkdownComponents}>{m.content}</ReactMarkdown>
                         </div>
                       ) : (
                         <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
@@ -418,10 +431,10 @@ const ClariAiChat = ({
                   <ClariBubbleAvatar size={32} />
                 )}
                 <div
-                  className={`relative max-w-[85%] shadow-sm px-3 py-2.5 ${
+                  className={`relative shadow-sm px-3 py-2.5 ${
                     isUser
-                      ? "bg-primary text-primary-foreground rounded-2xl rounded-br-md"
-                      : "bg-card text-card-foreground border border-border/50 rounded-2xl rounded-bl-md"
+                      ? "max-w-[85%] bg-primary text-primary-foreground rounded-2xl rounded-br-md"
+                      : "max-w-[94%] bg-card text-card-foreground border border-border/50 rounded-2xl rounded-bl-md"
                   }`}
                 >
                   {!isUser && (
@@ -432,7 +445,7 @@ const ClariAiChat = ({
                   )}
                   {m.role === "assistant" ? (
                     <div className="ai-chat-content relative z-10">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={clariMarkdownComponents}>{m.content}</ReactMarkdown>
                     </div>
                   ) : (
                     <p className="whitespace-pre-wrap text-sm leading-relaxed relative z-10">{m.content}</p>
