@@ -242,7 +242,10 @@ async function syncLiveActivities() {
   const now = Date.now();
   const start = bogotaDate(new Date(now).toISOString()) + "T05:00:00Z";
   const stop = new Date(now + 10 * 60 * 1000).toISOString();
-  const rows = [];
+  // AGREGAR por (miembro, time_slot): /activities devuelve una fila por proyecto/tarea, así que
+  // un mismo slot puede venir repetido → sumamos los segundos y recomputamos %. Sin esto, el upsert
+  // falla con "ON CONFLICT DO UPDATE command cannot affect row a second time" (claves dup en el batch).
+  const byKey = new Map();
   for (const org of orgs) {
     let items = [];
     try {
@@ -257,17 +260,26 @@ async function syncLiveActivities() {
       const member_id = memberMap.get(String(a.user_id ?? ""));
       const ts = a.time_slot || a.starts_at || null;
       if (!member_id || !ts) continue;
-      const tracked = Number(a.tracked) || 0;
-      const pct = (v) => (tracked > 0 && v != null) ? Math.min(100, Math.round((Number(v) / tracked) * 100)) : null;
-      rows.push({
-        member_id, starts_at: ts, tracked_seconds: tracked,
-        overall_activity: pct(a.overall),
-        mouse_activity: pct(a.mouse), keyboard_activity: pct(a.keyboard),
-        mouse_events: a.mouse ?? null, keyboard_events: a.keyboard ?? null,
-        project_name: a.project?.name ?? null, task_name: a.task?.name ?? null,
-      });
+      const key = member_id + "|" + ts;
+      const cur = byKey.get(key) || { member_id, starts_at: ts, tracked: 0, overall: 0, mouse: 0, keyboard: 0, project_name: null, task_name: null };
+      cur.tracked += Number(a.tracked) || 0;
+      cur.overall += Number(a.overall) || 0;
+      cur.mouse += Number(a.mouse) || 0;
+      cur.keyboard += Number(a.keyboard) || 0;
+      cur.project_name = cur.project_name || a.project?.name || null;
+      cur.task_name = cur.task_name || a.task?.name || null;
+      byKey.set(key, cur);
     }
   }
+  const rows = [...byKey.values()].map((c) => {
+    const pct = (v) => (c.tracked > 0) ? Math.min(100, Math.round((v / c.tracked) * 100)) : null;
+    return {
+      member_id: c.member_id, starts_at: c.starts_at, tracked_seconds: c.tracked,
+      overall_activity: pct(c.overall), mouse_activity: pct(c.mouse), keyboard_activity: pct(c.keyboard),
+      mouse_events: c.mouse || null, keyboard_events: c.keyboard || null,
+      project_name: c.project_name, task_name: c.task_name,
+    };
+  });
   for (const batch of chunk(rows, 500)) {
     const { error } = await sb().from("hubstaff_activities").upsert(batch, { onConflict: "member_id,starts_at" });
     if (error) throw new Error("upsert hubstaff_activities: " + error.message);
