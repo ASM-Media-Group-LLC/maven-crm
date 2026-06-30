@@ -54,6 +54,64 @@ export interface QaAnomalyRow {
   tipo: AnomalyTipo;
 }
 
+// ── Productividad "solo esfuerzo" (horas/actividad) — para roles sin fuente de resultado (managers). ──
+export interface QaEffortRow {
+  hubstaff_user_id: string;
+  name: string;
+  role: QaRole;
+  period: string;
+  dias: number;
+  total_hours: number;
+  avg_activity_pct: number;
+}
+
+export const useQaEffort = (role: QaRole, period?: string | null) =>
+  useQuery({
+    queryKey: ["qa-effort", role, period ?? "latest"],
+    queryFn: async (): Promise<QaEffortRow[]> => {
+      let q = (supabase as any).from("v_qa_effort").select("*").eq("role", role);
+      if (period) q = q.eq("period", period);
+      const { data, error } = await q;
+      if (error) throw error;
+      let rows = (data ?? []) as QaEffortRow[];
+      if (!period && rows.length) {
+        const latest = rows.reduce((m, r) => (r.period > m ? r.period : m), rows[0].period);
+        rows = rows.filter((r) => r.period === latest);
+      }
+      return rows.sort((a, b) => (b.total_hours ?? 0) - (a.total_hours ?? 0));
+    },
+    staleTime: 60_000,
+  });
+
+// ── Productividad de LLG: esfuerzo + leads generados (leadgen_entries). ──
+export interface LlgHubstaffRow {
+  name: string;
+  period: string;
+  dias: number;
+  total_hours: number;
+  avg_activity_pct: number;
+  leads: number;
+  leads_por_hora: number | null;
+}
+
+export const useLlgHubstaff = (period?: string | null) =>
+  useQuery({
+    queryKey: ["llg-hubstaff", period ?? "latest"],
+    queryFn: async (): Promise<LlgHubstaffRow[]> => {
+      let q = (supabase as any).from("v_llg_hubstaff").select("*");
+      if (period) q = q.eq("period", period);
+      const { data, error } = await q;
+      if (error) throw error;
+      let rows = (data ?? []) as LlgHubstaffRow[];
+      if (!period && rows.length) {
+        const latest = rows.reduce((m, r) => (r.period > m ? r.period : m), rows[0].period);
+        rows = rows.filter((r) => r.period === latest);
+      }
+      return rows.sort((a, b) => (b.leads ?? 0) - (a.leads ?? 0));
+    },
+    staleTime: 60_000,
+  });
+
 export const useQaAnomalies = (role: QaRole, period?: string | null) =>
   useQuery({
     queryKey: ["qa-anomalies", role, period ?? "latest"],

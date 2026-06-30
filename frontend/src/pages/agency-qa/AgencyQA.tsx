@@ -31,6 +31,9 @@ import ChattersQaSection from "./chatters-qa/ChattersQaSection";
 import AgencyCloserHubstaff from "./AgencyCloserHubstaff";
 import QaAttendancePanel from "./QaAttendancePanel";
 import QaAnomaliesPanel from "./QaAnomaliesPanel";
+import QaEffortPanel from "./QaEffortPanel";
+import AgencyLlgHubstaff from "./AgencyLlgHubstaff";
+import RoleHubstaffSection from "./RoleHubstaffSection";
 
 // Agency QA — 2 niveles:
 //
@@ -180,20 +183,18 @@ const ROLE_SECTIONS: RoleSection[] = [
   {
     key: "managers-qa",
     label: "Managers QA",
-    description: "1-on-1 manager → modelo, follow-ups.",
+    description: "Productividad, asistencia y anomalías (Hubstaff).",
     icon: Briefcase,
-    ready: false,
-    comingSoon:
-      "Auditorías de manager → modelo: 1-on-1, follow-ups, planes de crecimiento.",
+    ready: true,
+    comingSoon: "",
   },
   {
     key: "llgs-qa",
     label: "LLG's QA",
-    description: "Lead gen: generación y calidad de leads.",
+    description: "Lead gen: esfuerzo (Hubstaff) × leads generados.",
     icon: Megaphone,
-    ready: false,
-    comingSoon:
-      "Auditoría de lead gen (LLG): volumen y calidad de leads + esfuerzo de Hubstaff.",
+    ready: true,
+    comingSoon: "",
   },
 ];
 
@@ -428,6 +429,20 @@ const AgencyQA = () => {
           <ClosersQaSection />
         ) : activeRole === "chatters-qa" ? (
           <ChattersQaSection />
+        ) : activeRole === "managers-qa" ? (
+          <RoleHubstaffSection
+            role="manager"
+            title="Managers QA"
+            description="Productividad, asistencia y anomalías (Hubstaff)."
+            productividad={<QaEffortPanel role="manager" />}
+          />
+        ) : activeRole === "llgs-qa" ? (
+          <RoleHubstaffSection
+            role="LLG"
+            title="LLG's QA"
+            description="Lead gen: esfuerzo (Hubstaff) × leads generados."
+            productividad={<AgencyLlgHubstaff />}
+          />
         ) : activeSection ? (
           <ComingSoonSection section={activeSection} />
         ) : null}
