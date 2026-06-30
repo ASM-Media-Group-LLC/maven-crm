@@ -22,6 +22,7 @@ const {
   LOOKBACK_DAYS = "8",
   STARTS_LOOKBACK_DAYS = "4",   // ventana (más corta) para jalar la hora de inicio (c1 puntualidad); la historia se acumula en DB
   RUN_EVERY_HOURS = "6",
+  LIVE_EVERY_MIN = "5",         // poll de actividad granular EN VIVO (Monitoreo HR) — cada N min
   RUN_ONCE,
   HUBSTAFF_PROBE,
 } = process.env;
@@ -220,6 +221,63 @@ async function syncDaily(org, days) {
   return rows.length;
 }
 
+// ── EN VIVO (Monitoreo HR) ──
+// Pollea la actividad GRANULAR (time_slots) de la última hora y la upsertea en hubstaff_activities
+// (la tabla que lee la pantalla Monitoreo HR). Cadencia ~5 min → presencia casi al minuto sin webhook.
+// Idempotente por (member_id, starts_at). member_id = uuid de hubstaff_members (mapeado desde user_id).
+async function loadMemberMap() {
+  const { data, error } = await sb().from("hubstaff_members").select("id, hubstaff_user_id");
+  if (error) throw new Error("loadMemberMap: " + error.message);
+  const m = new Map();
+  for (const r of (data || [])) m.set(String(r.hubstaff_user_id), r.id);
+  return m;
+}
+
+async function syncLiveActivities() {
+  await loadTokens();                       // por si el intervalo en vivo arranca antes del 1er full sync
+  const orgs = await discoverOrgs();
+  const memberMap = await loadMemberMap();
+  const now = Date.now();
+  const start = new Date(now - 65 * 60 * 1000).toISOString();   // últimos ~65 min (solapamiento de seguridad)
+  const stop = new Date(now + 10 * 60 * 1000).toISOString();
+  const rows = [];
+  for (const org of orgs) {
+    let items = [];
+    try {
+      items = await hsGetAll(`/organizations/${org.id}/activities`, "activities", {
+        "time_slot[start]": start, "time_slot[stop]": stop,
+      });
+    } catch (e) {
+      console.error(`[hubstaff-bridge] live activities de ${org.name} falló: ${e.message}`);
+      continue;
+    }
+    for (const a of items) {
+      const member_id = memberMap.get(String(a.user_id ?? ""));
+      const ts = a.time_slot || a.starts_at || null;
+      if (!member_id || !ts) continue;
+      const tracked = Number(a.tracked) || 0;
+      const pct = (v) => (tracked > 0 && v != null) ? Math.min(100, Math.round((Number(v) / tracked) * 100)) : null;
+      rows.push({
+        member_id, starts_at: ts, tracked_seconds: tracked,
+        overall_activity: pct(a.overall),
+        mouse_activity: pct(a.mouse), keyboard_activity: pct(a.keyboard),
+        mouse_events: a.mouse ?? null, keyboard_events: a.keyboard ?? null,
+        project_name: a.project?.name ?? null, task_name: a.task?.name ?? null,
+      });
+    }
+  }
+  for (const batch of chunk(rows, 500)) {
+    const { error } = await sb().from("hubstaff_activities").upsert(batch, { onConflict: "member_id,starts_at" });
+    if (error) throw new Error("upsert hubstaff_activities: " + error.message);
+  }
+  // Marcar el config como sincronizado (Monitoreo HR muestra el estado del sync).
+  await sb().from("hubstaff_config").update({
+    sync_enabled: true, last_sync_at: new Date().toISOString(), api_token_set: true,
+  }).not("id", "is", null);
+  console.log(`[hubstaff-bridge] live: ${rows.length} time_slots upserteados (Monitoreo HR).`);
+  return rows.length;
+}
+
 // PROBE: imprime el shape crudo para validar nombres de campo ANTES de confiar en el parser.
 async function probe() {
   await loadTokens();
@@ -317,6 +375,13 @@ async function main() {
   const hours = Math.max(1, Math.min(Number(RUN_EVERY_HOURS) || 6, 24));
   console.log(`[hubstaff-bridge] próxima corrida en ${hours}h.`);
   setInterval(() => runOnce().catch(warnIfExpired), hours * 3600000);
+
+  // Poll EN VIVO de actividad (Monitoreo HR) — cadencia corta, aislado del full sync.
+  const liveMin = Math.max(2, Math.min(Number(LIVE_EVERY_MIN) || 5, 60));
+  const runLive = () => syncLiveActivities().catch((e) => console.error(`[hubstaff-bridge] live poll falló: ${e.message}`));
+  console.log(`[hubstaff-bridge] poll en vivo cada ${liveMin} min.`);
+  runLive();
+  setInterval(runLive, liveMin * 60000);
 }
 
 main();
