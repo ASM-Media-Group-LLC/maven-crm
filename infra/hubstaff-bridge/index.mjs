@@ -237,8 +237,10 @@ async function syncLiveActivities() {
   await loadTokens();                       // por si el intervalo en vivo arranca antes del 1er full sync
   const orgs = await discoverOrgs();
   const memberMap = await loadMemberMap();
+  // Ventana = HOY en hora Colombia (00:00 Bogotá = 05:00 UTC) → ahora. Así Monitoreo HR ve la
+  // jornada COMPLETA (horas de hoy correctas), no solo la última hora, y se backfillea en cada poll.
   const now = Date.now();
-  const start = new Date(now - 65 * 60 * 1000).toISOString();   // últimos ~65 min (solapamiento de seguridad)
+  const start = bogotaDate(new Date(now).toISOString()) + "T05:00:00Z";
   const stop = new Date(now + 10 * 60 * 1000).toISOString();
   const rows = [];
   for (const org of orgs) {
