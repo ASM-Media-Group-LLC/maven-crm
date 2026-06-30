@@ -147,6 +147,7 @@ const DashboardSidebar = () => {
           items: [
             { title: "Asistencia", url: "/hr/asistencia", submodule: "Asistencia" },
             { title: "Horarios y Turnos", url: "/hr/horarios", submodule: "Horarios" },
+            { title: "Horario del personal", url: "/hr/horarios-personal", submodule: "Horarios" },
             { title: "Horarios Chatters", url: "/hr/horarios-chatters", submodule: "Horarios Chatters" },
             { title: "Horas Extra", url: "/hr/horarios/horas-extras", submodule: "Horas Extra" },
             { title: "Banco de Horas", url: "/hr/horarios/banco-horas", submodule: "Banco de Horas" },

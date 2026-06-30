@@ -148,6 +148,7 @@ import HRVacations from "./pages/hr/HRVacations";
 import HRPermisos from "./pages/hr/HRPermisos";
 import HRPermisoNew from "./pages/hr/HRPermisoNew";
 import HRSchedules from "./pages/hr/HRSchedules";
+import HRStaffSchedules from "./pages/hr/HRStaffSchedules";
 import HROvertimeDetail from "./pages/hr/HROvertimeDetail";
 import HRHourBank from "./pages/hr/HRHourBank";
 import HRChatterSchedules from "./pages/hr/HRChatterSchedules";
@@ -341,6 +342,7 @@ const App = () => (
                 <Route path="/hr/permisos" element={<PermissionRoute module="HR" submodule="Permisos"><HRLayout><HRPermisos /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/permisos/nuevo" element={<PermissionRoute module="HR" submodule="Permisos"><HRLayout><HRPermisoNew /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/horarios" element={<PermissionRoute module="HR" submodule="Horarios"><HRLayout><HRSchedules /></HRLayout></PermissionRoute>} />
+                <Route path="/hr/horarios-personal" element={<PermissionRoute module="HR" submodule="Horarios"><HRLayout><HRStaffSchedules /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/horarios/horas-extras" element={<PermissionRoute module="HR" submodule="Horas Extra"><HRLayout><HROvertimeDetail /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/horarios/banco-horas" element={<PermissionRoute module="HR" submodule="Banco de Horas"><HRLayout><HRHourBank /></HRLayout></PermissionRoute>} />
                 <Route path="/hr/horarios-chatters" element={<PermissionRoute module="HR" submodule="Horarios Chatters"><HRLayout><HRChatterSchedules /></HRLayout></PermissionRoute>} />
