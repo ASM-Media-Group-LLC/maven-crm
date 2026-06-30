@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import KpiCard from "@/components/dashboard/KpiCard";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
 import { PERFORMANCE_EVALUATION_STATUSES } from "@/lib/hrConstants";
+import HrPerformanceOperativo from "./HrPerformanceOperativo";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -136,6 +137,8 @@ export default function HRPerformance() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Vista: operativo (Hubstaff/QA, default) vs evaluaciones manuales
+  const [view, setView] = useState<"operativo" | "evaluaciones">("operativo");
   // Filters
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -253,27 +256,49 @@ export default function HRPerformance() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold text-foreground">Evaluaciones & Performance</h1>
-            <p className="text-sm text-muted-foreground">{evals.length} evaluaciones registradas · {completedCount} completadas</p>
+            <p className="text-sm text-muted-foreground">
+              {view === "operativo"
+                ? "Resultado operativo por rol desde Hubstaff y BLU"
+                : `${evals.length} evaluaciones registradas · ${completedCount} completadas`}
+            </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleExport} disabled={filtered.length === 0}>
-              <Download className="h-4 w-4 mr-1" />Exportar
-            </Button>
-            <Button size="sm" onClick={() => navigate("/hr/desempeno/nuevo")}>
-              <Plus className="h-4 w-4 mr-1" />Nueva Evaluación
-            </Button>
+            <div className="inline-flex items-center gap-0.5 rounded-lg border border-white/10 bg-white/5 p-0.5">
+              <Button variant={view === "operativo" ? "secondary" : "ghost"} size="sm" onClick={() => setView("operativo")}>
+                Operativo (Hubstaff)
+              </Button>
+              <Button variant={view === "evaluaciones" ? "secondary" : "ghost"} size="sm" onClick={() => setView("evaluaciones")}>
+                Evaluaciones
+              </Button>
+            </div>
+            {view === "evaluaciones" && (
+              <>
+                <Button variant="outline" size="sm" onClick={handleExport} disabled={filtered.length === 0}>
+                  <Download className="h-4 w-4 mr-1" />Exportar
+                </Button>
+                <Button size="sm" onClick={() => navigate("/hr/desempeno/nuevo")}>
+                  <Plus className="h-4 w-4 mr-1" />Nueva Evaluación
+                </Button>
+              </>
+            )}
           </div>
         </div>
-        {/* Department Tabs */}
-        <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap mt-4">
-          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
-          {departments.map((d) => (
-            <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
-          ))}
-        </div>
+        {/* Department Tabs — solo en evaluaciones manuales */}
+        {view === "evaluaciones" && (
+          <div className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1 flex-wrap mt-4">
+            <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
+            {departments.map((d) => (
+              <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
+            ))}
+          </div>
+        )}
       </header>
 
-      {/* ── Scrollable content ────────────────────────────────────────────── */}
+      {view === "operativo" ? (
+        <div className="flex-1 overflow-auto p-6">
+          <HrPerformanceOperativo />
+        </div>
+      ) : (
       <div className="flex-1 overflow-auto p-6 space-y-5">
 
         {/* KPI Cards */}
@@ -506,6 +531,7 @@ export default function HRPerformance() {
           </div>
         )}
       </div>
+      )}
 
       {/* ── View Modal ────────────────────────────────────────────────────── */}
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
