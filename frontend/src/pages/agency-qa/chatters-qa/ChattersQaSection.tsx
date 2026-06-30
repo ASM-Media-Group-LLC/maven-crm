@@ -2,11 +2,12 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { ClipboardCheck, FileText, Clock, Wrench, Bell, Megaphone, Lock } from "lucide-react";
+import { ClipboardCheck, FileText, Clock, Bell, Megaphone, Lock } from "lucide-react";
 import ChattersQaScorecard from "./ChattersQaScorecard";
 import ChattersQaQualitative from "./ChattersQaQualitative";
 import ChatterQaNotifications from "./ChatterQaNotifications";
 import ChattersQaMasivos from "./ChattersQaMasivos";
+import ChattersQaHubstaff from "./ChattersQaHubstaff";
 import { useQaProcessingWatcher } from "./useChatterQaReports";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -17,20 +18,8 @@ import { usePermissions } from "@/hooks/usePermissions";
 //   Scorecard      → la planilla mensual (Slice A, LISTO)
 //   QA cualitativo → reporte estilo correo + borrador IA (Slice B, pendiente)
 //   Masivos        → análisis de masivos por modelo (vista exploratoria)
-//   Hubstaff       → puntualidad/productividad automática (Slice C, pendiente)
+//   Hubstaff       → Esfuerzo vs Resultado (horas/actividad × venta) + estado del sync (LISTO)
 // (La evidencia 1-a-1 vive en el viewer /conversaciones; no necesita un subtab que solo linkee.)
-
-const ComingSoon = ({ title, desc, slice }: { title: string; desc: string; slice: string }) => (
-  <Card>
-    <CardContent className="space-y-3 p-6">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-500/90">
-        <Wrench className="h-3.5 w-3.5" /> Próximamente · {slice}
-      </div>
-      <h3 className="text-lg font-semibold">{title}</h3>
-      <p className="text-sm text-muted-foreground">{desc}</p>
-    </CardContent>
-  </Card>
-);
 
 // Subtabs gateados por rol: cada uno declara su `submodule` en role_permissions ("Agency QA").
 // Sin fila → se ve (hereda del permiso de "Chatters QA"); para TAPAR uno, el admin lo destilda
@@ -100,10 +89,7 @@ export default function ChattersQaSection() {
           <TabsContent value="masivos" className="mt-4"><ChattersQaMasivos /></TabsContent>
         )}
         {visibleSubs.some((s) => s.key === "hubstaff") && (
-          <TabsContent value="hubstaff" className="mt-4">
-            <ComingSoon slice="Fase 2" title="Hubstaff"
-              desc="Conexión a la API de Hubstaff para auto-completar 2 de los 8 criterios del scorecard: Puntualidad y Cumplimiento + Productividad Hubstaff, por chatter y por mes." />
-          </TabsContent>
+          <TabsContent value="hubstaff" className="mt-4"><ChattersQaHubstaff /></TabsContent>
         )}
         {visibleSubs.some((s) => s.key === "notificaciones") && (
           <TabsContent value="notificaciones" className="mt-4"><ChatterQaNotifications /></TabsContent>
