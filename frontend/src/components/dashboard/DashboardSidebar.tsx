@@ -1,8 +1,8 @@
 import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Smartphone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
-  UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign,
-  MessageCircle, MessageSquare, Contact, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox,
+  UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign, Gauge,
+  MessageCircle, MessageSquare, Contact, Rocket, Sun, Moon, Home, Briefcase, Users2, Search, Headphones, Inbox, Bell,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
@@ -29,6 +29,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { CollapsibleSidebarGroup } from "@/components/dashboard/CollapsibleSidebarGroup";
+import WhatsAppIcon from "@/components/icons/WhatsAppIcon";
 import { cn } from "@/lib/utils";
 
 const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-3 text-sm sidebar-glass-hover";
@@ -103,9 +104,9 @@ const DashboardSidebar = () => {
     { title: t("nav.leadgen"), url: "/leadgen", icon: Activity, badge: leadgenCount || undefined, module: "LeadGen", submodule: undefined },
     { title: t("nav.closers"), url: "/closers", icon: Phone, badge: closersCount || undefined, module: "Closers", submodule: undefined },
     { title: "Teléfonos", url: "/telefonos", icon: Smartphone, module: "Telefonos", submodule: undefined },
-    { title: "WhatsApp", url: "/inbox", icon: Inbox, badge: waInboxCount || undefined, module: "WhatsApp", submodule: undefined as string | undefined },
+    { title: "WhatsApp", url: "/inbox", icon: WhatsAppIcon, badge: waInboxCount || undefined, module: "WhatsApp", submodule: undefined as string | undefined },
     { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets", submodule: undefined },
-    { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: MessageSquare, module: "Chatters", submodule: "Evaluator" as string | undefined },
+    { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: ClipboardCheck, module: "Chatters", submodule: "Evaluator" as string | undefined },
     { title: "Scouter Assist", url: "/scouter-assist", icon: Search, module: "Scouter Assist", submodule: undefined },
     { title: "Company QA", url: "/agency-qa", icon: Headphones, module: "Agency QA", submodule: undefined },
     { title: "Mensajes Pro", url: "/conversaciones", icon: MessageSquare, module: "Mensajes Pro", submodule: undefined },
@@ -204,7 +205,7 @@ const DashboardSidebar = () => {
     },
     {
       label: "Comunicación",
-      icon: Megaphone,
+      icon: Bell,
       key: "comunicacion",
       items: [
         { title: "Anuncios Internos", url: "/hr/anuncios", submodule: "Anuncios" },
@@ -713,7 +714,7 @@ const DashboardSidebar = () => {
                   }`
                 }
               >
-                <BarChart3 className="h-3.5 w-3.5 shrink-0 opacity-70 transition-opacity group-hover/label:opacity-100" />
+                <Gauge className="h-3.5 w-3.5 shrink-0 opacity-70 transition-opacity group-hover/label:opacity-100" />
                 <span className="flex-1 text-left">Panel de control</span>
               </NavLink>
             </SidebarGroupLabel>
