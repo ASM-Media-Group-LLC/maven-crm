@@ -198,6 +198,7 @@ const DashboardSidebar = () => {
       icon: Wallet,
       key: "finanzas",
       items: [
+        { title: "Nómina y costo", url: "/hr/nomina", submodule: "Deducciones" },
         { title: "Deducciones", url: "/hr/deducciones", submodule: "Deducciones" },
       ],
     },
