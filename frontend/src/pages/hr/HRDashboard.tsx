@@ -24,6 +24,8 @@ import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import KpiCard from "@/components/dashboard/KpiCard";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import { useHrProductivity } from "./useHrProductivity";
+import { useHrAttendance } from "./useHrAttendance";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface QuickAction {
@@ -154,7 +156,14 @@ function FinancialSummaryCards() {
 export default function HRDashboard() {
   const { data: employees = [], isLoading } = useEmployees();
   const { data: pendingAbsences = [], isLoading: absencesLoading } = usePendingAbsences();
+  const { data: prod } = useHrProductivity(7);
+  const { data: attRows = [] } = useHrAttendance();
   const navigate = useNavigate();
+
+  // Puntualidad agregada del equipo (Hubstaff) — promedio de % a tiempo del último período.
+  const avgPunct = attRows.length
+    ? Math.round(attRows.reduce((s, r) => s + (r.pct_a_tiempo ?? 0), 0) / attRows.length)
+    : null;
 
   // Quick actions state
   const [selectedIds, setSelectedIds] = useState<string[]>(loadShortcuts);
@@ -267,12 +276,46 @@ export default function HRDashboard() {
           ) : (
             <>
               <KpiCard label="Total Empleados" value={String(total)} icon={Users} color="bg-blue-500" subtitle="En nómina" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Check-ins Hoy" value="0" icon={UserCheck} color="bg-slate-500" subtitle="Sin sistema de asistencia" />
+              <KpiCard label="Puntualidad equipo" value={avgPunct != null ? `${avgPunct}%` : "—"} icon={UserCheck} color="bg-emerald-500" subtitle={attRows.length ? `${attRows.length} trackeados · Hubstaff` : "Sin datos Hubstaff"} onClick={() => navigate("/hr/asistencia", { state: { fromHR: true } })} />
               <KpiCard label="Ausencias Pend." value={String(pendingAbsences.length)} icon={AlertTriangle} color="bg-amber-500" subtitle="Pendientes de revisión" onClick={() => setKpiPopup("ausencias")} />
               <KpiCard label="En Onboarding" value={String(nuevos30d)} icon={UserPlus} color="bg-emerald-500" subtitle="Ingresos últimos 30d" onClick={() => setKpiPopup("onboarding")} />
             </>
           )}
         </div>
+
+        {/* Productividad del equipo (Hubstaff) — horas/actividad/personas reales */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Activity className="h-4 w-4 text-muted-foreground" />
+                Productividad del equipo (Hubstaff)
+                <span className="text-xs font-normal text-muted-foreground">· últimos 7 días</span>
+              </CardTitle>
+              <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => navigate("/hr/asistencia", { state: { fromHR: true } })}>
+                Ver asistencia <ChevronRight className="h-3 w-3" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "Horas trackeadas", value: prod ? `${prod.totalHours.toLocaleString("es-CO")}h` : "—", icon: Clock, color: "bg-blue-500/10 border-blue-500/20", textColor: "text-blue-400" },
+                { label: "Actividad prom.", value: prod ? `${prod.avgActivity}%` : "—", icon: Activity, color: "bg-violet-500/10 border-violet-500/20", textColor: "text-violet-400" },
+                { label: "Personas activas", value: prod ? String(prod.people) : "—", icon: Users, color: "bg-primary/10 border-primary/20", textColor: "text-primary" },
+                { label: "Puntualidad prom.", value: avgPunct != null ? `${avgPunct}%` : "—", icon: Percent, color: "bg-success/10 border-success/20", textColor: "text-success" },
+              ].map((c) => (
+                <div key={c.label} className={cn("rounded-lg border p-3 flex flex-col gap-1", c.color)}>
+                  <div className="flex items-center gap-1.5">
+                    <c.icon className={cn("h-3.5 w-3.5", c.textColor)} />
+                    <span className="text-xs text-muted-foreground">{c.label}</span>
+                  </div>
+                  <span className={cn("text-xl font-bold", c.textColor)}>{c.value}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Rotación y Retención */}
         <Card>

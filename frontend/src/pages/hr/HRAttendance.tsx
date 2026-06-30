@@ -27,6 +27,7 @@ import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import KpiCard from "@/components/dashboard/KpiCard";
 import KpiDetailDialog, { type KpiRow } from "@/components/dashboard/KpiDetailDialog";
+import HrAttendanceAuto from "./HrAttendanceAuto";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AttendanceRecord {
@@ -447,6 +448,7 @@ export default function HRAttendance() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const [view, setView] = useState<"auto" | "manual">("auto");
   const [modalOpen, setModalOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -501,15 +503,34 @@ export default function HRAttendance() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold text-foreground">Control de Asistencia</h1>
-            <p className="text-sm text-muted-foreground">Registro y seguimiento de asistencia del equipo</p>
+            <p className="text-sm text-muted-foreground">
+              {view === "auto"
+                ? "Check-in y puntualidad automáticos desde Hubstaff"
+                : "Registro y seguimiento manual de asistencia del equipo"}
+            </p>
           </div>
-          <Button onClick={() => setModalOpen(true)} size="sm">
-            + Registrar Asistencia
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="inline-flex items-center gap-0.5 rounded-lg border border-white/10 bg-white/5 p-0.5">
+              <Button variant={view === "auto" ? "secondary" : "ghost"} size="sm" onClick={() => setView("auto")}>
+                Automática (Hubstaff)
+              </Button>
+              <Button variant={view === "manual" ? "secondary" : "ghost"} size="sm" onClick={() => setView("manual")}>
+                Manual
+              </Button>
+            </div>
+            {view === "manual" && (
+              <Button onClick={() => setModalOpen(true)} size="sm">+ Registrar</Button>
+            )}
+          </div>
         </div>
       </header>
 
       {/* ── Scrollable content ────────────────────────────────────────────────── */}
+      {view === "auto" ? (
+        <div className="flex-1 overflow-auto p-6">
+          <HrAttendanceAuto />
+        </div>
+      ) : (
       <div className="flex-1 overflow-auto p-6 space-y-5">
 
         {/* KPI Cards */}
@@ -694,6 +715,7 @@ export default function HRAttendance() {
           </p>
         )}
       </div>
+      )}
 
       <RegisterAttendanceModal open={modalOpen} onOpenChange={setModalOpen} />
       <EditAttendanceModal record={editRecord} onClose={() => setEditRecord(null)} />
