@@ -15,6 +15,8 @@ import {
   History,
   Bell,
   Clock,
+  CalendarClock,
+  ShieldAlert,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
@@ -27,6 +29,8 @@ import AgencyQaNotifications from "./AgencyQaNotifications";
 import CallDetailPage from "./CallDetailPage";
 import ChattersQaSection from "./chatters-qa/ChattersQaSection";
 import AgencyCloserHubstaff from "./AgencyCloserHubstaff";
+import QaAttendancePanel from "./QaAttendancePanel";
+import QaAnomaliesPanel from "./QaAnomaliesPanel";
 
 // Agency QA — 2 niveles:
 //
@@ -43,6 +47,8 @@ import AgencyCloserHubstaff from "./AgencyCloserHubstaff";
 type ClosersQaKey =
   | "calls"
   | "hubstaff"
+  | "asistencia"
+  | "anomalias"
   | "new-qa"
   | "qa-history"
   | "qa-chat"
@@ -74,11 +80,27 @@ const CLOSERS_QA_SUBS: ClosersQaSub[] = [
   },
   {
     key: "hubstaff",
-    label: "Hubstaff",
+    label: "Productividad",
     submodule: "Closers: Hubstaff",
     icon: Clock,
     whatsComing: "Esfuerzo (horas Hubstaff) vs cierre (pipeline + QA).",
     source: "(Maven — v_closer_hubstaff)",
+  },
+  {
+    key: "asistencia",
+    label: "Asistencia",
+    submodule: "Closers: Asistencia",
+    icon: CalendarClock,
+    whatsComing: "Check-in y puntualidad desde Hubstaff.",
+    source: "(Maven — v_qa_attendance)",
+  },
+  {
+    key: "anomalias",
+    label: "Anomalías",
+    submodule: "Closers: Anomalías",
+    icon: ShieldAlert,
+    whatsComing: "Días raros de actividad (jornadas cortas/largas).",
+    source: "(Maven — v_qa_anomalies)",
   },
   {
     key: "new-qa",
@@ -127,7 +149,7 @@ const CLOSERS_QA_SUBS: ClosersQaSub[] = [
   },
 ];
 
-type RoleKey = "closers-qa" | "chatters-qa" | "managers-qa" | "spammers-qa";
+type RoleKey = "closers-qa" | "chatters-qa" | "managers-qa" | "llgs-qa";
 
 interface RoleSection {
   key: RoleKey;
@@ -165,13 +187,13 @@ const ROLE_SECTIONS: RoleSection[] = [
       "Auditorías de manager → modelo: 1-on-1, follow-ups, planes de crecimiento.",
   },
   {
-    key: "spammers-qa",
-    label: "Spammers QA",
-    description: "DMs masivos, bumps, content drops.",
+    key: "llgs-qa",
+    label: "LLG's QA",
+    description: "Lead gen: generación y calidad de leads.",
     icon: Megaphone,
     ready: false,
     comingSoon:
-      "Auditorías de spam outbound (DMs masivos, bumps, content drops).",
+      "Auditoría de lead gen (LLG): volumen y calidad de leads + esfuerzo de Hubstaff.",
   },
 ];
 
@@ -261,6 +283,10 @@ const ClosersQaSection = () => {
               <AgencyAnalytics />
             ) : s.key === "hubstaff" ? (
               <AgencyCloserHubstaff />
+            ) : s.key === "asistencia" ? (
+              <QaAttendancePanel role="closer" />
+            ) : s.key === "anomalias" ? (
+              <QaAnomaliesPanel role="closer" />
             ) : s.key === "models" ? (
               <AgencyModels />
             ) : s.key === "new-qa" ? (
@@ -322,7 +348,7 @@ const ROLE_TO_SUBMODULE: Record<RoleKey, string> = {
   "closers-qa": "Closers QA",
   "chatters-qa": "Chatters QA",
   "managers-qa": "Managers QA",
-  "spammers-qa": "Spammers QA",
+  "llgs-qa": "LLG QA",
 };
 
 const AgencyQA = () => {

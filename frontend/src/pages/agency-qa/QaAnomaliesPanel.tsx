@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertTriangle, Activity, Hourglass, Timer, CheckCircle2, ShieldAlert } from "lucide-react";
-import { useChatterAnomalies, type AnomalyTipo } from "./useChatterAnomalies";
-import { useHubstaffSyncStatus } from "./useHubstaffEffort";
-import { periodLabel } from "./useChatterScorecards";
+import { useQaAnomalies, type QaRole, type AnomalyTipo } from "./useQaHubstaff";
+import { useHubstaffSyncStatus } from "./chatters-qa/useHubstaffEffort";
+import { periodLabel } from "./chatters-qa/useChatterScorecards";
 
-// Subtab "Anomalías" de Chatters QA. Días "raros" de actividad detectados desde Hubstaff
-// (sin endpoints nuevos): online pero inactivo, jornada corta, jornada larga. management-only.
+// Panel GENÉRICO de Anomalías de actividad — idéntico para los 4 QA por rol.
+// baja_actividad solo aplica a roles de escritorio (chatter/LLG); closers/managers están en
+// llamadas, así que la vista no les genera ese flag.
 
 const TIPO_META: Record<AnomalyTipo, { label: string; tone: string; icon: any }> = {
   baja_actividad: { label: "Online inactivo", tone: "bg-rose-500/15 text-rose-600",  icon: Activity },
@@ -25,7 +26,6 @@ const relativeTime = (iso: string | null): string => {
 };
 
 const dayLabel = (iso: string) => {
-  // iso = 'YYYY-MM-DD' → 'DD/MM' sin desfase de zona horaria.
   const [, m, d] = iso.split("-");
   return `${d}/${m}`;
 };
@@ -36,20 +36,15 @@ const detalle = (tipo: AnomalyTipo, hours: number, act: number) => {
   return hours < 0.1 ? "casi sin tiempo registrado" : `solo ${hours}h trabajadas`;
 };
 
-export default function ChattersQaAnomalies() {
-  const { data: rows = [], isLoading } = useChatterAnomalies();
+export default function QaAnomaliesPanel({ role }: { role: QaRole }) {
+  const { data: rows = [], isLoading } = useQaAnomalies(role);
   const { data: sync } = useHubstaffSyncStatus();
 
   const stats = useMemo(() => {
     if (!rows.length) return null;
     const byTipo: Record<string, number> = {};
     for (const r of rows) byTipo[r.tipo] = (byTipo[r.tipo] ?? 0) + 1;
-    return {
-      total: rows.length,
-      chatters: new Set(rows.map((r) => r.blu_employee_id)).size,
-      byTipo,
-      period: rows[0].period,
-    };
+    return { total: rows.length, byTipo, period: rows[0].period };
   }, [rows]);
 
   if (isLoading) {
@@ -97,7 +92,7 @@ export default function ChattersQaAnomalies() {
             <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-3 text-left font-semibold">Chatter</th>
+                  <th className="px-4 py-3 text-left font-semibold">Persona</th>
                   <th className="px-3 py-3 text-left font-semibold">Día</th>
                   <th className="px-3 py-3 text-left font-semibold">Anomalía</th>
                   <th className="px-4 py-3 text-left font-semibold">Detalle</th>
@@ -108,7 +103,7 @@ export default function ChattersQaAnomalies() {
                   const meta = TIPO_META[r.tipo];
                   const Icon = meta.icon;
                   return (
-                    <tr key={`${r.blu_employee_id}-${r.date}-${i}`} className="border-b border-border/60">
+                    <tr key={`${r.hubstaff_user_id}-${r.date}-${i}`} className="border-b border-border/60">
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
                       <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{dayLabel(r.date)}</td>
                       <td className="px-3 py-2.5">
@@ -127,9 +122,9 @@ export default function ChattersQaAnomalies() {
       </Card>
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        <strong>Online inactivo</strong> = ≥2h con &lt;35% de actividad. <strong>Jornada corta</strong> = &lt;2.5h trabajadas
-        (apareció poco). <strong>Jornada larga</strong> = &gt;12h (posible tiempo manual). Señales para revisar/coachear,
-        no sanciones automáticas.
+        <strong>Jornada corta</strong> = &lt;2.5h trabajadas (apareció poco). <strong>Jornada larga</strong> = &gt;12h.
+        <strong> Online inactivo</strong> (≥2h con &lt;35% actividad) solo aplica a roles de escritorio; en llamadas (closers/managers) no se mide.
+        Señales para revisar/coachear, no sanciones automáticas.
       </p>
     </div>
   );

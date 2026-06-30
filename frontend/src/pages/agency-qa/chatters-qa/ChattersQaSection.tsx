@@ -8,8 +8,8 @@ import ChattersQaQualitative from "./ChattersQaQualitative";
 import ChatterQaNotifications from "./ChatterQaNotifications";
 import ChattersQaMasivos from "./ChattersQaMasivos";
 import ChattersQaHubstaff from "./ChattersQaHubstaff";
-import ChattersQaAttendance from "./ChattersQaAttendance";
-import ChattersQaAnomalies from "./ChattersQaAnomalies";
+import QaAttendancePanel from "../QaAttendancePanel";
+import QaAnomaliesPanel from "../QaAnomaliesPanel";
 import { useQaProcessingWatcher } from "./useChatterQaReports";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -30,7 +30,7 @@ const CHATTER_QA_SUBS = [
   { key: "scorecard",      label: "Scorecard",      icon: ClipboardCheck, submodule: "Chatters: Scorecard" },
   { key: "qa",             label: "QA cualitativo", icon: FileText,       submodule: "Chatters: QA Cualitativo" },
   { key: "masivos",        label: "Masivos",        icon: Megaphone,      submodule: "Chatters: Masivos" },
-  { key: "hubstaff",       label: "Hubstaff",       icon: Clock,          submodule: "Chatters: Hubstaff" },
+  { key: "hubstaff",       label: "Productividad",  icon: Clock,          submodule: "Chatters: Hubstaff" },
   { key: "asistencia",     label: "Asistencia",     icon: CalendarClock,  submodule: "Chatters: Asistencia" },
   { key: "anomalias",      label: "Anomalías",      icon: ShieldAlert,    submodule: "Chatters: Anomalías" },
   { key: "notificaciones", label: "Notificaciones", icon: Bell,           submodule: "Chatters: Notificaciones" },
@@ -96,10 +96,10 @@ export default function ChattersQaSection() {
           <TabsContent value="hubstaff" className="mt-4"><ChattersQaHubstaff /></TabsContent>
         )}
         {visibleSubs.some((s) => s.key === "asistencia") && (
-          <TabsContent value="asistencia" className="mt-4"><ChattersQaAttendance /></TabsContent>
+          <TabsContent value="asistencia" className="mt-4"><QaAttendancePanel role="Chatter" /></TabsContent>
         )}
         {visibleSubs.some((s) => s.key === "anomalias") && (
-          <TabsContent value="anomalias" className="mt-4"><ChattersQaAnomalies /></TabsContent>
+          <TabsContent value="anomalias" className="mt-4"><QaAnomaliesPanel role="Chatter" /></TabsContent>
         )}
         {visibleSubs.some((s) => s.key === "notificaciones") && (
           <TabsContent value="notificaciones" className="mt-4"><ChatterQaNotifications /></TabsContent>

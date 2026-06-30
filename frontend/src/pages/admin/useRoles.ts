@@ -171,6 +171,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     [
       "Closers QA",
       { name: "Calls", parent: "Closers QA" }, { name: "Closers: Hubstaff", parent: "Closers QA" },
+      { name: "Closers: Asistencia", parent: "Closers QA" }, { name: "Closers: Anomalías", parent: "Closers QA" },
       { name: "New QA", parent: "Closers QA" },
       { name: "QA History", parent: "Closers QA" }, { name: "QA Chat", parent: "Closers QA" },
       { name: "Models", parent: "Closers QA" }, { name: "Notifications", parent: "Closers QA" },
@@ -180,7 +181,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
       { name: "Chatters: Asistencia", parent: "Chatters QA" },
       { name: "Chatters: Anomalías", parent: "Chatters QA" },
       { name: "Chatters: Notificaciones", parent: "Chatters QA" },
-      "Managers QA", "Spammers QA",
+      "Managers QA", "LLG QA",
     ],
     ["Borrar Calls"],
   ),

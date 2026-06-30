@@ -1,13 +1,13 @@
 import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock, CalendarClock, AlertTriangle, Users, CheckCircle2, LogIn } from "lucide-react";
-import { useChatterAttendance } from "./useChatterAttendance";
-import { useHubstaffSyncStatus } from "./useHubstaffEffort";
-import { periodLabel } from "./useChatterScorecards";
+import { useQaAttendance, type QaRole } from "./useQaHubstaff";
+import { useHubstaffSyncStatus } from "./chatters-qa/useHubstaffEffort";
+import { periodLabel } from "./chatters-qa/useChatterScorecards";
 
-// Subtab "Asistencia" de Chatters QA. Check-in y puntualidad AUTOMÁTICOS desde la 1ª actividad
-// de Hubstaff + el turno deducido de cada chatter (vista v_chatter_attendance, management-only).
-// Tolerancia 10 min = "a tiempo". Reemplaza el control manual de asistencia para los chatters.
+// Panel GENÉRICO de Asistencia (check-in + puntualidad) — idéntico para los 4 QA por rol.
+// Deriva el turno de la 1ª actividad de Hubstaff (vista v_qa_attendance, management-only).
+// Tolerancia 10 min = a tiempo (llegar antes cuenta a tiempo).
 
 const relativeTime = (iso: string | null): string => {
   if (!iso) return "sin sincronizar";
@@ -25,17 +25,16 @@ const hhmm = (min: number | null | undefined) => {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 };
 
-export default function ChattersQaAttendance() {
-  const { data: rows = [], isLoading } = useChatterAttendance();
+export default function QaAttendancePanel({ role }: { role: QaRole }) {
+  const { data: rows = [], isLoading } = useQaAttendance(role);
   const { data: sync } = useHubstaffSyncStatus();
 
   const stats = useMemo(() => {
     if (!rows.length) return null;
     const avgPunct = Math.round(rows.reduce((s, r) => s + (r.pct_a_tiempo ?? 0), 0) / rows.length);
     const totalTard = rows.reduce((s, r) => s + (r.tardanzas ?? 0), 0);
-    const puntuales = rows.filter((r) => (r.pct_a_tiempo ?? 0) >= 90).length;
     const aRevisar = rows.filter((r) => (r.pct_a_tiempo ?? 100) < 80).length;
-    return { chatters: rows.length, avgPunct, totalTard, puntuales, aRevisar, period: rows[0].period };
+    return { count: rows.length, avgPunct, totalTard, aRevisar, period: rows[0].period };
   }, [rows]);
 
   if (isLoading) {
@@ -47,8 +46,7 @@ export default function ChattersQaAttendance() {
       <Card>
         <CardContent className="space-y-2 p-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-2 font-medium text-foreground"><CalendarClock className="h-4 w-4" /> Asistencia</div>
-          Todavía no hay datos de asistencia. El micro <code>hubstaff-bridge</code> sincroniza la 1ª actividad del día cada 6h;
-          el turno de cada chatter se deduce de sus horarios de inicio.
+          Todavía no hay datos de asistencia para este rol. El micro <code>hubstaff-bridge</code> sincroniza la 1ª actividad del día cada 6h.
         </CardContent>
       </Card>
     );
@@ -70,7 +68,7 @@ export default function ChattersQaAttendance() {
 
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard icon={Users} label="Chatters" value={String(stats.chatters)} />
+          <StatCard icon={Users} label="Personas" value={String(stats.count)} />
           <StatCard icon={CheckCircle2} label="Puntualidad prom." value={`${stats.avgPunct}%`}
             tone={stats.avgPunct >= 90 ? "ok" : stats.avgPunct >= 75 ? "warn" : "bad"} />
           <StatCard icon={Clock} label="Tardanzas (total)" value={String(stats.totalTard)}
@@ -86,7 +84,7 @@ export default function ChattersQaAttendance() {
             <table className="w-full min-w-[680px] text-sm">
               <thead>
                 <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-3 text-left font-semibold">Chatter</th>
+                  <th className="px-4 py-3 text-left font-semibold">Persona</th>
                   <th className="px-3 py-3 text-left font-semibold">Turno</th>
                   <th className="px-3 py-3 text-right font-semibold">Días</th>
                   <th className="px-3 py-3 text-right font-semibold"><LogIn className="inline h-3 w-3" /> Entrada</th>
@@ -103,7 +101,7 @@ export default function ChattersQaAttendance() {
                   const pctTone = pct >= 90 ? "text-emerald-500" : pct >= 80 ? "text-amber-500" : "text-rose-500";
                   const rowTint = pct < 80 ? "bg-rose-500/5" : "";
                   return (
-                    <tr key={r.blu_employee_id} className={`border-b border-border/60 ${rowTint}`}>
+                    <tr key={r.hubstaff_user_id} className={`border-b border-border/60 ${rowTint}`}>
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{r.turno ?? "—"}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.dias}</td>
@@ -124,9 +122,9 @@ export default function ChattersQaAttendance() {
       </Card>
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        El <strong>turno</strong> se deduce de los horarios de inicio de cada chatter (mañana 8–4, tarde 4–12, madrugada 12–8).
-        "A tiempo" = arrancó dentro de <strong>10 min</strong> del inicio de su turno (llegar antes cuenta como a tiempo).
-        Las muestras chicas (&lt;4 días) se marcan "pocos datos" — el % se afina a medida que avanza el mes.
+        El <strong>turno</strong> se deduce de los horarios de inicio (mañana 8–4, tarde 4–12, madrugada 12–8).
+        "A tiempo" = arrancó dentro de <strong>10 min</strong> del inicio de su turno (llegar antes cuenta a tiempo).
+        Muestras &lt;4 días = "pocos datos" — el % se afina con el mes.
       </p>
     </div>
   );
