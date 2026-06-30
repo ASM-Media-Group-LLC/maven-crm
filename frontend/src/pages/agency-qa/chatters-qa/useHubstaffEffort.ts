@@ -20,6 +20,13 @@ export interface HubstaffEffortRow {
   sold_messages: number | null;
   fans_chatted: number | null;
   online_improductivo: boolean;
+  // Costo / ROI (admin-only → null si el rol no puede leer chatter_cost_config).
+  cost_usd: number | null;
+  agency_revenue_usd: number | null;
+  margin_usd: number | null;
+  roi_x: number | null;
+  no_rentable: boolean | null;
+  agency_rate_used: number | null;
 }
 
 // Estado del sync del bridge (para mostrar "actualizado hace X").

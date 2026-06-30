@@ -32,14 +32,16 @@ export const qaTools: AgentTool[] = [
   {
     name: "get_chatter_productivity",
     description:
-      "Productividad de chatters cruzando Hubstaff (horas trabajadas + % de actividad) con la venta de BLU " +
-      "del mes en curso: $/hora, ventas, tiempo de respuesta. Detecta 'online pero improductivo' (bastante " +
-      "actividad pero poca venta). Pasá only_flagged=true para listar SOLO a los que hay que revisar/coachear. " +
-      "Útil para '¿quién está conectado pero no vende?' o un resumen de rendimiento del equipo.",
+      "Productividad y RENTABILIDAD de chatters cruzando Hubstaff (horas + % actividad) con la venta de BLU " +
+      "del mes en curso. Devuelve por chatter: ventas, $/hora, ingreso de la agencia (venta × 80% neto OF × % " +
+      "efectivo firmado), costo (salario base), margen y ROI (×). Detecta 'online pero improductivo' (mucha " +
+      "actividad, poca venta) y 'no rentable' (la agencia recibe menos de lo que cuesta el chatter, ROI<1). " +
+      "Pasá only_flagged=true para listar SOLO a los que hay que revisar (no rentables u online-improductivos). " +
+      "Útil para '¿quién está conectado pero no vende?', '¿quién no es rentable?' o un resumen de rendimiento del equipo.",
     input_schema: {
       type: "object",
       properties: {
-        only_flagged: { type: "boolean", description: "true → solo los marcados 'online pero improductivo'" },
+        only_flagged: { type: "boolean", description: "true → solo los 'no rentables' u 'online improductivos'" },
         limit: { type: "number", description: "máximo de chatters a devolver (default 20)" },
       },
       additionalProperties: false,
@@ -49,25 +51,36 @@ export const qaTools: AgentTool[] = [
     handler: async (args, ctx) => {
       const limit = Math.min(Math.max(Number(args.limit) || 20, 1), 100);
       // v_chatter_hubstaff_effort: cruce Hubstaff×BLU, mes en curso. No tiene tenant_id (datos de chatters,
-      // single-tenant). El cliente service-role bypassa la RLS de las tablas base.
-      let q = ctx.sb
+      // single-tenant). El cliente service-role bypassa la RLS de las tablas base (incl. el costo).
+      const { data, error } = await ctx.sb
         .from("v_chatter_hubstaff_effort")
-        .select("name, total_hours, avg_activity_pct, sales, sales_per_hour, avg_response_min, online_improductivo");
-      if (args.only_flagged === true) q = q.eq("online_improductivo", true);
-      const { data, error } = await q;
+        .select("name, total_hours, avg_activity_pct, sales, sales_per_hour, avg_response_min, " +
+          "online_improductivo, cost_usd, agency_revenue_usd, margin_usd, roi_x, no_rentable, agency_rate_used");
       if (error) throw new Error(`get_chatter_productivity: ${error.message}`);
-      const rows = (data ?? []) as Array<Record<string, unknown>>;
-      rows.sort((a, b) => (Number(b.sales_per_hour) || 0) - (Number(a.sales_per_hour) || 0));
+      let rows = (data ?? []) as Array<Record<string, unknown>>;
+      if (args.only_flagged === true) rows = rows.filter((r) => r.no_rentable === true || r.online_improductivo === true);
+      // Peor ROI primero cuando se filtran problemas; si no, mejor ROI primero.
+      rows.sort((a, b) => (Number(a.roi_x) || 0) - (Number(b.roi_x) || 0));
+      if (args.only_flagged !== true) rows.reverse();
+      const num = (v: unknown) => (v == null ? null : Number(v));
       return {
         total: rows.length,
-        a_revisar: rows.filter((r) => r.online_improductivo === true).length,
+        no_rentables: rows.filter((r) => r.no_rentable === true).length,
+        online_improductivos: rows.filter((r) => r.online_improductivo === true).length,
+        tasa_agencia_efectiva_pct: num(rows.find((r) => r.agency_rate_used != null)?.agency_rate_used),
+        margen_total_equipo_usd: rows.reduce((s, r) => s + (num(r.margin_usd) ?? 0), 0),
         chatters: rows.slice(0, limit).map((r) => ({
           chatter: r.name,
           horas: r.total_hours,
           actividad_pct: r.avg_activity_pct,
-          venta: r.sales,
+          venta_bruta: r.sales,
           venta_por_hora: r.sales_per_hour,
+          ingreso_agencia_usd: r.agency_revenue_usd,
+          costo_usd: r.cost_usd,
+          margen_usd: r.margin_usd,
+          roi_x: r.roi_x,
           respuesta_min: r.avg_response_min,
+          no_rentable: r.no_rentable,
           online_improductivo: r.online_improductivo,
         })),
       };

@@ -273,7 +273,36 @@ async function runOnce() {
     console.error(`[hubstaff-bridge] recalc scorecard falló (no afecta la sync): ${e.message}`);
   }
 
+  // Costo/ROI: FX en vivo + % efectivo del mes (lo consume el subtab Hubstaff + la tool de Clari).
+  try {
+    await refreshCostConfig();
+  } catch (e) {
+    console.error(`[hubstaff-bridge] refresh costo/ROI falló (no afecta la sync): ${e.message}`);
+  }
+
   return { totMembers, totDaily };
+}
+
+// Refresca el costo/ROI por chatter: trae el FX COP→USD en vivo (open.er-api.com, sin key) y
+// recalcula el % efectivo de la agencia (agency_percentage ponderado por ingreso del mes) vía RPC.
+// El subtab Hubstaff y la tool de Clari leen chatter_cost_config. Aislado: si falla, no afecta la sync.
+async function refreshCostConfig() {
+  let fx = null;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10000);
+    const res = await fetch("https://open.er-api.com/v6/latest/USD", { signal: ctrl.signal });
+    clearTimeout(t);
+    const j = await res.json();
+    const cop = Number(j?.rates?.COP);
+    if (Number.isFinite(cop) && cop > 0) fx = cop;
+  } catch (e) {
+    console.error(`[hubstaff-bridge] FX fetch falló (conservo el valor previo): ${e.message}`);
+  }
+  // p_fx=null → el RPC solo recalcula la tasa efectiva y conserva el FX guardado.
+  const { data, error } = await sb().rpc("refresh_chatter_cost_config", { p_fx: fx });
+  if (error) throw new Error(error.message);
+  console.log(`[hubstaff-bridge] costo/ROI: FX=${data?.fx_cop_per_usd} COP/USD, % efectivo agencia=${data?.effective_agency_rate}`);
 }
 
 function warnIfExpired(e) {
