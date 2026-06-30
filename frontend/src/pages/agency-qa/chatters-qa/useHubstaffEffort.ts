@@ -48,6 +48,30 @@ export const useHubstaffSyncStatus = () =>
     staleTime: 60_000,
   });
 
+// Esfuerzo (horas/actividad/días) por chatter re-agregado por RANGO DE FECHAS arbitrario
+// desde hubstaff_daily_data (RPC get_chatter_effort_range). A diferencia de la vista mensual,
+// esto sí responde al "calendario de movimiento". Ventas/costo/ROI NO salen de acá (son del
+// snapshot mensual de chatter_performance) — se combinan en el componente.
+export interface ChatterEffortRangeRow {
+  blu_employee_id: number;
+  name: string;
+  days_tracked: number;
+  total_hours: number;
+  avg_activity_pct: number;
+}
+
+export const useChatterEffortRange = (from: string | null, to: string | null) =>
+  useQuery({
+    queryKey: ["chatter-effort-range", from, to],
+    enabled: !!from && !!to,
+    queryFn: async (): Promise<ChatterEffortRangeRow[]> => {
+      const { data, error } = await (supabase as any).rpc("get_chatter_effort_range", { p_from: from, p_to: to });
+      if (error) throw error;
+      return (data ?? []) as ChatterEffortRangeRow[];
+    },
+    staleTime: 60_000,
+  });
+
 // Filas de esfuerzo-vs-resultado del período más reciente con datos (o el período dado).
 export const useHubstaffEffort = (period?: string | null) =>
   useQuery({

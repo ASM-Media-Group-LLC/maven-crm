@@ -9,6 +9,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useBluModels, bluModelLabel } from "../../sales-performance/useBluMp";
 import { COMPANIES, companyLabel, periodLabel, type CompanyCode } from "./useChatterScorecards";
 import {
@@ -21,6 +24,8 @@ const toneBadge: Record<string, string> = {
 };
 // Mes actual YYYY-MM (en el navegador del usuario).
 const currentMonth = () => new Date().toISOString().slice(0, 7);
+// Día exacto en que se hizo el reporte (created_at).
+const fmtDay = (iso?: string | null) => (iso ? format(new Date(iso), "d MMM yyyy", { locale: es }) : "—");
 
 export default function ChattersQaQualitative() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -39,6 +44,18 @@ export default function ChattersQaQualitative() {
   const [newModels, setNewModels] = useState<EvaluatedModel[]>([]);
   const [toDelete, setToDelete] = useState<ChatterQaReport | null>(null);
   const [toResend, setToResend] = useState<ChatterQaReport | null>(null);
+  // Filtro por fecha de creación (calendario de movimiento). Vacío = todos.
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+
+  // Reportes filtrados por la fecha en que se HICIERON (created_at).
+  const shown = reports.filter((r) => {
+    if (!r.created_at) return true;
+    const d = new Date(r.created_at);
+    if (dateFrom && d < dateFrom) return false;
+    if (dateTo && d > dateTo) return false;
+    return true;
+  });
 
   if (selectedId) return <ChatterQaReportDetail id={selectedId} onBack={() => setSelectedId(null)} />;
 
@@ -64,9 +81,12 @@ export default function ChattersQaQualitative() {
         <p className="text-sm text-muted-foreground">
           Reportes de QA por chatter — reemplaza el correo del supervisor. Redactá manual o generá un borrador con IA desde Mensajes Pro.
         </p>
-        {!creating ? (
-          <Button size="sm" className="gap-1.5" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nuevo reporte</Button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Filtrar por fecha" />
+          {!creating ? (
+            <Button size="sm" className="gap-1.5" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Nuevo reporte</Button>
+          ) : null}
+        </div>
       </div>
 
       {creating && (
@@ -135,16 +155,17 @@ export default function ChattersQaQualitative() {
 
       {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
       {!isLoading && reports.length === 0 && <p className="text-sm text-muted-foreground">No hay reportes todavía. Creá el primero con "Nuevo reporte".</p>}
+      {!isLoading && reports.length > 0 && shown.length === 0 && <p className="text-sm text-muted-foreground">Sin reportes en el rango de fechas seleccionado.</p>}
 
       <div className="space-y-2">
-        {reports.map((r) => (
+        {shown.map((r) => (
           <button key={r.id} type="button" onClick={() => setSelectedId(r.id)}
             className="flex w-full items-center gap-3 rounded-lg border border-border bg-card/40 px-4 py-3 text-left hover:bg-muted/30">
             <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="font-medium">{r.chatter_name}</span>
-                <span className="text-xs text-muted-foreground">{companyLabel(r.company)} · {periodLabel(r.period)}</span>
+                <span className="text-xs text-muted-foreground">{companyLabel(r.company)} · {periodLabel(r.period)} · hecho el {fmtDay(r.created_at)}</span>
               </div>
               <p className="truncate text-xs text-muted-foreground">
                 {(r.evaluated_models ?? []).map((m) => m.model_name).join(", ") || "sin modelos"}
