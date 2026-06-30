@@ -725,6 +725,7 @@ app.get('/manager/lines', (_req, res) => {
   const now = Date.now();
   const lines = [...sessions.values()].map((s) => ({
     instance: s.instanceName,
+    isDefault: s.instanceName === INSTANCE_NAME,
     connection: s.connection,
     profile: { name: s.profileName, number: s.profileNumber, pic: s.profilePicUrl },
     msgsInToday: s.msgsInToday,
@@ -1381,6 +1382,32 @@ app.delete('/instance/logout/:instance', async (req, res) => {
     res.json({ status: 'logged_out' });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// Eliminar una línea POR COMPLETO: logout best-effort + teardown del socket + BORRA
+// credenciales + saca la sesión del Map → desaparece del listado y del rescan de boot
+// (su subdirectorio ya no existe). Distinto de /logout (solo desloguea, la línea
+// queda) y de /reset (borra creds pero re-inicia para re-escanear). NUNCA el default
+// (sus credenciales viven en la raíz de AUTH_DIR y es el bot principal).
+app.delete('/instance/delete/:instance', async (req, res) => {
+  const name = (req.params && req.params.instance) || '';
+  if (!name || name === INSTANCE_NAME) return res.status(400).json({ error: 'cannot_delete_default' });
+  const s = sessions.get(name);
+  if (!s) return res.status(404).json({ error: 'not_found' });
+  try {
+    if (s.reconnectTimer) { clearTimeout(s.reconnectTimer); s.reconnectTimer = null; }
+    // logout best-effort si está conectada (avisa a WhatsApp que se quita el dispositivo)
+    try { if (s.sock && s.connection === 'open') await s.sock.logout(); } catch (e) { /* ignora */ }
+    // teardown sin disparar reconnect (quitar listeners ANTES de cerrar, como /reset)
+    try { if (s.sock) { s.sock.ev.removeAllListeners(); s.sock.end(new Error('deleted')); } } catch (e) { /* socket ya muerto */ }
+    s.sock = null;
+    const cleared = clearAuth(name);   // borra AUTH_DIR/<instance> en disco
+    sessions.delete(name);             // saca del Map → no reaparece
+    logger.info({ instance: name, cleared }, 'instance deleted');
+    return res.json({ message: 'deleted', cleared, instance: name });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
   }
 });
 

@@ -214,6 +214,7 @@
                 <button onclick="openLine('${i.instance}')" class="text-xs px-2.5 py-1.5 rounded border border-slate-200 text-slate-600 font-medium hover:bg-slate-50">Abrir ▸</button>
                 ${i.connection === "open" ? `<button onclick="openProfile('${i.instance}')" class="text-xs px-2.5 py-1.5 rounded border border-slate-200 text-slate-500 hover:bg-slate-50">Perfil</button>` : ""}
                 ${action}
+                ${i.isDefault ? "" : `<button onclick="deleteLine('${i.instance}')" title="Elimina la línea por completo: la desvincula, borra sus credenciales y la quita del listado" class="text-xs px-2.5 py-1.5 rounded border border-red-300 text-red-700 hover:bg-red-50">Eliminar</button>`}
               </div>
             </div>
             <div id="act-${i.instance}" class="${expanded === i.instance ? "" : "hidden"} border-t border-slate-100 px-4 py-2 max-h-64 overflow-y-auto"><p class="text-xs text-slate-400 py-2">cargando…</p></div>
@@ -297,6 +298,19 @@
         if (!r.ok) { const j = await r.json().catch(() => ({})); alert("No se pudo resetear: " + (j.error || r.status)); return; }
       } catch (e) { alert("Error: " + e.message); return; }
       connectLine(name); // abre el modal de QR y poll-ea (la sesión ya re-inició limpia)
+    }
+
+    // Eliminar una línea por completo (desvincula + borra credenciales + la quita del
+    // listado). Para volver a usarla hay que agregarla de nuevo y escanear el QR.
+    async function deleteLine(name) {
+      if (!needKey()) return;
+      if (!confirm("¿Eliminar la línea " + name + " por completo?\n\nLa DESVINCULA, borra su sesión/credenciales y la quita del listado. Para volver a usarla tendrás que agregarla de nuevo y escanear el QR.\n\nEsta acción no se puede deshacer.")) return;
+      try {
+        const r = await fetch("/instance/delete/" + name, { method: "DELETE", headers: authH() });
+        if (!r.ok) { const j = await r.json().catch(() => ({})); alert("No se pudo eliminar: " + (j.error || r.status)); return; }
+      } catch (e) { alert("Error: " + e.message); return; }
+      if (expanded === name) expanded = null;
+      loadLines();
     }
     // ── Perfil de la línea ──────────────────────────────────────────────────
     let pfLine = null;
@@ -478,6 +492,7 @@
     window.openLine = openLine;
 
     window.connectLine = connectLine; window.logoutLine = logoutLine; window.toggleAct = toggleAct; window.openProfile = openProfile;
+    window.deleteLine = deleteLine;
 
     loadLines();
     setInterval(loadLines, 12000);
