@@ -8,6 +8,7 @@ export interface QaStaff {
   profile_id: string;
   name: string;
   role: string;
+  in_hubstaff?: boolean;   // si está trackeado en Hubstaff → su puntualidad se puede medir
   hasSchedule: boolean;
 }
 

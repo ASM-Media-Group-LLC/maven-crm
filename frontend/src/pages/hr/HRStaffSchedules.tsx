@@ -42,6 +42,10 @@ export default function HRStaffSchedules() {
     }));
   }, [selected, sched]);
 
+  const roles = useMemo(
+    () => Array.from(new Set(staff.map((s) => s.role).filter(Boolean))).sort() as string[],
+    [staff],
+  );
   const filtered = useMemo(() => staff.filter((s) =>
     (roleFilter === "all" || s.role === roleFilter) &&
     (!q || s.name.toLowerCase().includes(q.toLowerCase()))
@@ -95,10 +99,10 @@ export default function HRStaffSchedules() {
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar persona…" className="pl-8" />
             </div>
             <div className="flex flex-wrap gap-1">
-              {["all", "Chatter", "closer", "manager", "LLG"].map((r) => (
+              {["all", ...roles].map((r) => (
                 <button key={r} onClick={() => setRoleFilter(r)}
                   className={`rounded-full px-2 py-0.5 text-[11px] ${roleFilter === r ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}>
-                  {r === "all" ? "Todos" : ROLE_LABEL[r]}
+                  {r === "all" ? "Todos" : (ROLE_LABEL[r] ?? r)}
                 </button>
               ))}
             </div>
