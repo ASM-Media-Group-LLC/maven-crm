@@ -170,7 +170,8 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   def("Operaciones", "Agency QA",
     [
       "Closers QA",
-      { name: "Calls", parent: "Closers QA" }, { name: "New QA", parent: "Closers QA" },
+      { name: "Calls", parent: "Closers QA" }, { name: "Closers: Hubstaff", parent: "Closers QA" },
+      { name: "New QA", parent: "Closers QA" },
       { name: "QA History", parent: "Closers QA" }, { name: "QA Chat", parent: "Closers QA" },
       { name: "Models", parent: "Closers QA" }, { name: "Notifications", parent: "Closers QA" },
       "Chatters QA",

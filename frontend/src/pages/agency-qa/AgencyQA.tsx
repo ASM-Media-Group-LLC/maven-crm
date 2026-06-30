@@ -14,6 +14,7 @@ import {
   Megaphone,
   History,
   Bell,
+  Clock,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ import AgencyQaHistory from "./AgencyQaHistory";
 import AgencyQaNotifications from "./AgencyQaNotifications";
 import CallDetailPage from "./CallDetailPage";
 import ChattersQaSection from "./chatters-qa/ChattersQaSection";
+import AgencyCloserHubstaff from "./AgencyCloserHubstaff";
 
 // Agency QA — 2 niveles:
 //
@@ -40,6 +42,7 @@ import ChattersQaSection from "./chatters-qa/ChattersQaSection";
 
 type ClosersQaKey =
   | "calls"
+  | "hubstaff"
   | "new-qa"
   | "qa-history"
   | "qa-chat"
@@ -68,6 +71,14 @@ const CLOSERS_QA_SUBS: ClosersQaSub[] = [
     icon: BarChart3,
     whatsComing: "Dashboard de analytics: leaderboard, outcomes, métricas.",
     source: "app/analytics/page.tsx",
+  },
+  {
+    key: "hubstaff",
+    label: "Hubstaff",
+    submodule: "Closers: Hubstaff",
+    icon: Clock,
+    whatsComing: "Esfuerzo (horas Hubstaff) vs cierre (pipeline + QA).",
+    source: "(Maven — v_closer_hubstaff)",
   },
   {
     key: "new-qa",
@@ -248,6 +259,8 @@ const ClosersQaSection = () => {
               // Calls ahora muestra el dashboard de Analytics (la lista
               // se eliminó por ser redundante con QA History).
               <AgencyAnalytics />
+            ) : s.key === "hubstaff" ? (
+              <AgencyCloserHubstaff />
             ) : s.key === "models" ? (
               <AgencyModels />
             ) : s.key === "new-qa" ? (
