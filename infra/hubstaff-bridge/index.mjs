@@ -19,7 +19,7 @@ const {
   HUBSTAFF_PAT_REFRESH_TOKEN,
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
-  LOOKBACK_DAYS = "8",
+  LOOKBACK_DAYS = "45",         // ventana de actividad DIARIA (agregada, liviana) → cubre el mes completo + backfillea historia (idempotente). El granular pesado va aparte (STARTS_LOOKBACK_DAYS).
   STARTS_LOOKBACK_DAYS = "4",   // ventana (más corta) para jalar la hora de inicio (c1 puntualidad); la historia se acumula en DB
   RUN_EVERY_HOURS = "6",
   LIVE_EVERY_MIN = "5",         // poll de actividad granular EN VIVO (Monitoreo HR) — cada N min
