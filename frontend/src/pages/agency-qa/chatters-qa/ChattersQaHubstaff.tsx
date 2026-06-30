@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Clock, TrendingUp, AlertTriangle, Activity, DollarSign, Wallet, Scale } from "lucide-react";
+import { Clock, TrendingUp, AlertTriangle, Activity, DollarSign, Wallet, Scale, Info } from "lucide-react";
 import { useHubstaffEffort, useHubstaffSyncStatus } from "./useHubstaffEffort";
 import { periodLabel } from "./useChatterScorecards";
 
@@ -38,11 +38,12 @@ export default function ChattersQaHubstaff() {
     const totalAgencyRev = rows.reduce((s, r) => s + (r.agency_revenue_usd ?? 0), 0);
     const totalMargin = rows.reduce((s, r) => s + (r.margin_usd ?? 0), 0);
     const noRentables = rows.filter((r) => r.no_rentable).length;
+    const sinVentaBlu = rows.filter((r) => r.sin_venta_blu).length;
     const costPer = rows.find((r) => r.cost_usd != null)?.cost_usd ?? null;
     const rate = rows.find((r) => r.agency_rate_used != null)?.agency_rate_used ?? null;
     return {
       chatters: rows.length, flaggedEffort, avgAct, totalHours, period: rows[0].period,
-      hasCost, totalCost, totalAgencyRev, totalMargin, noRentables, costPer, rate,
+      hasCost, totalCost, totalAgencyRev, totalMargin, noRentables, sinVentaBlu, costPer, rate,
     };
   }, [rows]);
 
@@ -71,7 +72,8 @@ export default function ChattersQaHubstaff() {
             <Activity className="h-4 w-4 text-emerald-500" /> Esfuerzo · Resultado · Rentabilidad
           </h3>
           <p className="text-sm text-muted-foreground">
-            {stats?.chatters} chatters · {stats?.avgAct}% actividad prom. · {stats?.totalHours}h · {stats?.flaggedEffort} online improductivos — {stats && periodLabel(stats.period)}.
+            {stats?.chatters} chatters · {stats?.avgAct}% actividad prom. · {stats?.totalHours}h
+            {stats?.hasCost ? ` · ${stats.sinVentaBlu} sin venta BLU` : ""} — {stats && periodLabel(stats.period)}.
           </p>
         </div>
         <span className="text-xs text-muted-foreground">Sincronizado {relativeTime(sync?.last_sync_at ?? null)}</span>
@@ -111,24 +113,25 @@ export default function ChattersQaHubstaff() {
                 {rows.map((r) => {
                   const roi = r.roi_x ?? null;
                   const margin = r.margin_usd ?? 0;
-                  const rowTint = r.no_rentable ? "bg-rose-500/5" : r.online_improductivo ? "bg-amber-500/5" : "";
+                  const sinVenta = !!r.sin_venta_blu;
+                  const rowTint = sinVenta ? "" : r.no_rentable ? "bg-rose-500/5" : r.online_improductivo ? "bg-amber-500/5" : "";
                   return (
                     <tr key={r.blu_employee_id} className={`border-b border-border/60 ${rowTint}`}>
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">{r.total_hours}h</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">{r.avg_activity_pct}%</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{money(r.sales)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{sinVenta ? "—" : money(r.sales)}</td>
                       {stats?.hasCost && (
-                        <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{money(r.agency_revenue_usd)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{sinVenta ? "—" : money(r.agency_revenue_usd)}</td>
                       )}
                       {stats?.hasCost && (
-                        <td className={`px-3 py-2.5 text-right font-semibold tabular-nums ${margin >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                          {money(margin)}
+                        <td className={`px-3 py-2.5 text-right font-semibold tabular-nums ${sinVenta ? "text-muted-foreground" : margin >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                          {sinVenta ? "—" : money(margin)}
                         </td>
                       )}
                       {stats?.hasCost && (
-                        <td className={`px-3 py-2.5 text-right font-bold tabular-nums ${roi == null ? "text-muted-foreground" : roi >= 1 ? "text-emerald-500" : "text-rose-500"}`}>
-                          {roi == null ? "—" : `${roi.toFixed(2)}×`}
+                        <td className={`px-3 py-2.5 text-right font-bold tabular-nums ${sinVenta || roi == null ? "text-muted-foreground" : roi >= 1 ? "text-emerald-500" : "text-rose-500"}`}>
+                          {sinVenta || roi == null ? "—" : `${roi.toFixed(2)}×`}
                         </td>
                       )}
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
@@ -149,7 +152,7 @@ export default function ChattersQaHubstaff() {
           <>
             <strong>Ingreso agencia</strong> = venta bruta × 80% (neto OF) × {stats.rate}% (comisión efectiva ponderada).
             <strong> Costo</strong> = {money(stats.costPer)}/mes por chatter (salario base, <em>sin comisión</em>) @ tipo de cambio en vivo.
-            ROI &lt; 1 (rojo) = la agencia recibe menos de lo que cuesta el chatter ese mes. Las filas en $0 pueden incluir gaps de match BLU↔Hubstaff → revisar antes de concluir.
+            ROI &lt; 1 (rojo) = la agencia recibe menos de lo que cuesta el chatter ese mes (solo sobre venta BLU). "Sin venta BLU" = no hay datos de venta para ese chatter (no es un veredicto).
           </>
         ) : (
           <>🚩 "online, poca venta" = ≥25h y ≥50% actividad pero baja venta. Las notas de Puntualidad y Productividad del scorecard salen de estos mismos datos.</>
@@ -159,7 +162,14 @@ export default function ChattersQaHubstaff() {
   );
 }
 
-function statusPill(r: { no_rentable: boolean | null; online_improductivo: boolean; roi_x: number | null }) {
+function statusPill(r: { no_rentable: boolean | null; online_improductivo: boolean; roi_x: number | null; sin_venta_blu: boolean | null }) {
+  if (r.sin_venta_blu) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-600">
+        <Info className="h-3 w-3" /> sin venta BLU
+      </span>
+    );
+  }
   if (r.no_rentable) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-medium text-rose-600">

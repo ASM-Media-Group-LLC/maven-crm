@@ -27,6 +27,9 @@ export interface HubstaffEffortRow {
   roi_x: number | null;
   no_rentable: boolean | null;
   agency_rate_used: number | null;
+  // true = no hay venta registrada en BLU (probablemente trabaja en Infloww, aún no integrado) →
+  // NO es veredicto de rendimiento, es falta de datos.
+  sin_venta_blu: boolean | null;
 }
 
 // Estado del sync del bridge (para mostrar "actualizado hace X").
