@@ -265,6 +265,10 @@ async function runOnce() {
     const { data, error } = await sb().rpc("recalc_chatter_scorecard_hubstaff", { p_period: period });
     if (error) throw new Error(error.message);
     console.log(`[hubstaff-bridge] scorecard c4 recalculado (${period}): ${JSON.stringify(data)}`);
+    // c1 Puntualidad: deduce turno + puntúa (guarda de mínimo de días adentro del RPC → no puntúa con muestra chica).
+    const { data: d1, error: e1 } = await sb().rpc("recalc_chatter_c1_puntualidad", { p_period: period });
+    if (e1) throw new Error(e1.message);
+    console.log(`[hubstaff-bridge] scorecard c1 recalculado (${period}): ${JSON.stringify(d1)}`);
   } catch (e) {
     console.error(`[hubstaff-bridge] recalc scorecard falló (no afecta la sync): ${e.message}`);
   }
