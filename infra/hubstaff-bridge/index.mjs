@@ -20,6 +20,7 @@ const {
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
   LOOKBACK_DAYS = "8",
+  STARTS_LOOKBACK_DAYS = "4",   // ventana (más corta) para jalar la hora de inicio (c1 puntualidad); la historia se acumula en DB
   RUN_EVERY_HOURS = "6",
   RUN_ONCE,
   HUBSTAFF_PROBE,
@@ -39,7 +40,9 @@ const sb = () => createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 const DAY = 86400000;
+const BOGOTA_OFFSET_MS = 5 * 3600 * 1000;   // Colombia = UTC-5 (sin DST) → fecha/hora de turno se calcula acá
 const ymd = (d) => d.toISOString().slice(0, 10);
+const bogotaDate = (iso) => ymd(new Date(Date.parse(iso) - BOGOTA_OFFSET_MS));   // fecha-Colombia de un instante UTC
 const daysBack = (n) => { const out = []; for (let i = n; i >= 0; i--) out.push(ymd(new Date(Date.now() - i * DAY))); return out; };
 const chunk = (arr, size) => { const out = []; for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size)); return out; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -154,11 +157,42 @@ async function syncMembers(org) {
   return rows.length;
 }
 
+// c1: primer time_slot por (usuario, fecha-Colombia) desde las actividades granulares.
+// Agrupar por fecha-Colombia (no UTC) es clave: el turno de madrugada (12-8) y el de 4-12 cruzan
+// medianoche UTC, pero caen dentro de UN día en hora Colombia.
+async function fetchActivityStarts(org, startDayExclLeft, stopDayExcl) {
+  const items = await hsGetAll(`/organizations/${org.id}/activities`, "activities", {
+    "time_slot[start]": startDayExclLeft + "T00:00:00Z",
+    "time_slot[stop]": stopDayExcl + "T00:00:00Z",
+  });
+  const firstByKey = new Map();
+  for (const a of items) {
+    const uid = String(a.user_id ?? "");
+    const ts = a.time_slot || a.starts_at || null;
+    if (!uid || !ts) continue;
+    const key = uid + "|" + bogotaDate(ts);
+    const cur = firstByKey.get(key);
+    if (!cur || ts < cur) firstByKey.set(key, ts);   // ISO UTC ordena lexicográficamente
+  }
+  return firstByKey;
+}
+
 async function syncDaily(org, days) {
   // activities/daily soporta rango date[start]/date[stop] (inclusive). Paginado por cursor.
   const items = await hsGetAll(`/organizations/${org.id}/activities/daily`, "daily_activities", {
     "date[start]": days[0], "date[stop]": days[days.length - 1],
   });
+  // Hora de inicio (c1): solo los últimos STARTS_LOOKBACK_DAYS (granular = pesado); ±1 día por TZ.
+  const sLook = Math.max(1, Number(STARTS_LOOKBACK_DAYS) || 4);
+  const startsDays = days.slice(-sLook);
+  let starts = new Map();
+  try {
+    const left = ymd(new Date(Date.parse(startsDays[0] + "T00:00:00Z") - DAY));
+    const right = ymd(new Date(Date.parse(startsDays[startsDays.length - 1] + "T00:00:00Z") + 2 * DAY));
+    starts = await fetchActivityStarts(org, left, right);
+  } catch (e) {
+    console.error(`[hubstaff-bridge] starts (c1) de ${org.name} fallaron, sigo sin ellos: ${e.message}`);
+  }
   const rows = [];
   for (const a of items) {
     const uid = String(a.user_id ?? "");
@@ -176,6 +210,7 @@ async function syncDaily(org, days) {
       tracked_seconds: tracked,
       overall_activity: overallPct,
       project_name: a.project?.name ?? null,
+      first_activity_at: starts.get(uid + "|" + date) ?? null,   // null → el RPC conserva el valor previo
     });
   }
   for (const batch of chunk(rows, 1000)) {
