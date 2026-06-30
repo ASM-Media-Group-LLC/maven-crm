@@ -313,7 +313,11 @@ async function probe() {
 async function runOnce() {
   requireEnv();
   await loadTokens();
-  const days = daysBack(Math.max(1, Number(LOOKBACK_DAYS) || 8));
+  // Piso de 45 días para la actividad DIARIA (agregada, liviana): los agregados
+  // mensuales necesitan el mes COMPLETO, así que ignoramos un LOOKBACK_DAYS más chico
+  // (en Dokploy estaba en 8 → el mes salía truncado/sin backfill). El fetch granular
+  // pesado (hora de inicio / c1) va aparte y sigue acotado a STARTS_LOOKBACK_DAYS.
+  const days = daysBack(Math.max(45, Number(LOOKBACK_DAYS) || 45));
   const orgs = await discoverOrgs();
   console.log(`[hubstaff-bridge] ${orgs.length} org(s): ${orgs.map((o) => o.name).join(", ")}. Ventana ${days[0]}..${days[days.length - 1]}.`);
   let totMembers = 0, totDaily = 0;
