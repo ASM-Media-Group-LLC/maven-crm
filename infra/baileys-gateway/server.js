@@ -262,8 +262,8 @@ function rolloverDayIfNeeded(s = state) {
 // outbound un rato. Umbral conservador: una línea sana (responde a contactos reales) tiene
 // ~0% inválidos y NUNCA lo dispara. Auto-reanuda tras el cooldown.
 const WA_WIN_MS = 15 * 60 * 1000;       // ventana de medición
-const WA_MIN_SAMPLE = 20;               // mínimo de envíos evaluables antes de poder pausar
-const WA_TRIP_PCT = 0.25;               // ≥25% inválidos → pausa
+const WA_MIN_SAMPLE = 12;               // mínimo de envíos evaluables antes de poder pausar
+const WA_TRIP_PCT = 0.15;               // ≥15% inválidos → pausa (endurecido: corta la firma de "lista mala" más temprano)
 const WA_COOLDOWN_MS = 30 * 60 * 1000;  // duración de la pausa
 
 function recordWaOutcome(s, invalid) {
@@ -293,10 +293,12 @@ function warmupCap(s) {
   const since = s.config && s.config.firstConnectedAt;
   if (!since) return Infinity;
   const days = (Date.now() - new Date(since).getTime()) / 86400000;
-  if (days < 3) return 30;
-  if (days < 7) return 120;
-  if (days < 14) return 400;
-  return Infinity;
+  // Warm-up de comportamiento (endurecido): tope de envíos EN FRÍO por edad de línea.
+  // Antes ≥14d no tenía tope → una línea "vieja" podía blastear ilimitado y morir igual.
+  if (days < 3) return 20;
+  if (days < 7) return 80;
+  if (days < 14) return 250;
+  return 800;   // techo para líneas establecidas: corta el blasteo extremo, no el uso normal.
 }
 
 // ---------------------------------------------------------------------------
