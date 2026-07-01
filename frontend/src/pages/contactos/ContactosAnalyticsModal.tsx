@@ -11,6 +11,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCountryFlag, getCountryName } from "@/lib/country-utils";
+import { CLOSE_REASON_LABELS } from "@/pages/closers/hooks/useCloserLeads";
 import CategoryAuditLog from "./CategoryAuditLog";
 
 interface Props {
@@ -129,7 +130,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
       return await fetchAllRows((from, to) =>
         supabase
           .from("closer_creators")
-          .select("id, source_contact_id, estimated_monetization, stage, created_at, assigned_to")
+          .select("id, source_contact_id, estimated_monetization, stage, created_at, assigned_to, close_reason_code")
           .order("id", { ascending: true })
           .range(from, to));
     },
@@ -454,6 +455,38 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
     };
   }, [closerCreators, platformSales, contacts, profiles, creatorMonetization]);
 
+  // Embudo de reclutamiento (P1.2): tasas de conversión sobre el pipeline de
+  // closers + drop-off por MOTIVO de cierre (close_reason_code, poblado hacia
+  // adelante desde el diálogo de "No interesada"). Cierra el loop bandeja↔embudo.
+  const funnelData = useMemo(() => {
+    const cc = closerCreators as any[];
+    const countStage = (stages: string[]) => cc.filter((r) => stages.includes(r.stage)).length;
+    const totalPipeline = cc.length;
+    const asignadas = countStage(["Asignada"]);
+    const confirmadas = countStage(["Confirmada"]);
+    const completadas = countStage(["Completada"]);
+    const noInteresada = countStage(["No interesada"]);
+    const convertidas = confirmadas + completadas;
+    // "Trabajadas" = salieron del pool (todo menos Nuevo/Pendiente LG).
+    const trabajadas = asignadas + convertidas + noInteresada;
+    const convRate = totalPipeline > 0 ? (convertidas / totalPipeline) * 100 : 0;
+    const workedConvRate = trabajadas > 0 ? (convertidas / trabajadas) * 100 : 0;
+
+    // Drop-off por motivo — solo leads cerrados como "No interesada".
+    const reasonMap: Record<string, number> = {};
+    let sinMotivo = 0;
+    cc.forEach((r) => {
+      if (r.stage !== "No interesada") return;
+      if (r.close_reason_code) reasonMap[r.close_reason_code] = (reasonMap[r.close_reason_code] || 0) + 1;
+      else sinMotivo++;
+    });
+    const dropoff = Object.entries(reasonMap)
+      .map(([code, count]) => ({ name: CLOSE_REASON_LABELS[code] || code, count }))
+      .sort((a, b) => b.count - a.count);
+
+    return { totalPipeline, asignadas, confirmadas, completadas, noInteresada, convertidas, trabajadas, convRate, workedConvRate, dropoff, sinMotivo };
+  }, [closerCreators]);
+
   const total = contacts.length;
 
   const tooltipStyle = {
@@ -528,6 +561,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
               <TabsTrigger value="city">Por Ciudad</TabsTrigger>
               <TabsTrigger value="category">Categoría</TabsTrigger>
               <TabsTrigger value="status">Estado</TabsTrigger>
+              <TabsTrigger value="funnel">Embudo</TabsTrigger>
               {!inline && <TabsTrigger value="audit" className="text-amber-500">⚠ Auditoría</TabsTrigger>}
             </TabsList>
 
@@ -839,6 +873,85 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+              </TabsContent>
+
+              {/* Embudo de reclutamiento — tasas de conversión + drop-off por motivo */}
+              <TabsContent value="funnel" className="mt-0">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Pipeline (leads)</p>
+                    <p className="text-xl font-bold text-foreground">{funnelData.totalPipeline.toLocaleString()}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Convertidas</p>
+                    <p className="text-xl font-bold" style={{ color: "hsl(150, 60%, 45%)" }}>{funnelData.convertidas}</p>
+                    <p className="text-xs text-muted-foreground">{funnelData.convRate.toFixed(1)}% del pipeline</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">No interesada</p>
+                    <p className="text-xl font-bold" style={{ color: "hsl(0, 65%, 55%)" }}>{funnelData.noInteresada}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Conversión (trabajadas)</p>
+                    <p className="text-xl font-bold text-foreground">{funnelData.workedConvRate.toFixed(1)}%</p>
+                    <p className="text-xs text-muted-foreground">convertidas / trabajadas</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground mb-2 font-semibold">Embudo de conversión</p>
+                <div className="space-y-1.5 mb-6">
+                  {[
+                    { label: "Pipeline (leads)", count: funnelData.totalPipeline, color: "hsl(210, 70%, 55%)" },
+                    { label: "Trabajadas (salieron del pool)", count: funnelData.trabajadas, color: "hsl(280, 60%, 55%)" },
+                    { label: "Con acuerdo (Confirmada + Completada)", count: funnelData.convertidas, color: "hsl(150, 60%, 45%)" },
+                    { label: "Completadas", count: funnelData.completadas, color: "hsl(150, 70%, 35%)" },
+                  ].map((s) => {
+                    const pct = funnelData.totalPipeline > 0 ? (s.count / funnelData.totalPipeline) * 100 : 0;
+                    return (
+                      <div key={s.label} className="flex items-center gap-3">
+                        <div className="w-56 shrink-0 text-xs text-muted-foreground text-right">{s.label}</div>
+                        <div className="flex-1 bg-muted/40 rounded h-6 relative overflow-hidden">
+                          <div
+                            className="h-full rounded flex items-center px-2 text-[11px] font-semibold text-white"
+                            style={{ width: `${Math.max(pct, 4)}%`, backgroundColor: s.color }}
+                          >
+                            {s.count.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="w-14 shrink-0 text-xs text-muted-foreground text-right">{pct.toFixed(0)}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <p className="text-xs text-muted-foreground mb-2 font-semibold">Por qué se caen — motivo de "No interesada"</p>
+                {funnelData.dropoff.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                    Todavía no hay motivos registrados. Se irán poblando a medida que los closers cierren leads con el nuevo diálogo de motivo.
+                    {funnelData.sinMotivo > 0 && (
+                      <span className="block mt-1 text-xs">({funnelData.sinMotivo.toLocaleString()} cierres previos sin motivo estructurado.)</span>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={funnelData.dropoff} layout="vertical" margin={{ left: 160, right: 40 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                          <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={160} />
+                          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [v, "Leads"]} />
+                          <Bar dataKey="count" fill="hsl(0, 65%, 55%)" radius={[0, 4, 4, 0]}>
+                            <LabelList dataKey="count" position="right" style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }} />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    {funnelData.sinMotivo > 0 && (
+                      <p className="text-[11px] text-muted-foreground mt-1">+ {funnelData.sinMotivo.toLocaleString()} cierres sin motivo estructurado (previos al cambio).</p>
+                    )}
+                  </>
+                )}
               </TabsContent>
 
               {!inline && (
