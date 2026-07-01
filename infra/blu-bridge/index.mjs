@@ -203,7 +203,9 @@ async function fetchEmployeeReportsDaily(token, days) {
     function done(fn, arg) { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} fn(arg); }
     function queryNext() {
       if (idx >= days.length) return done(resolve, { results, freshToken });
-      ws.send(JSON.stringify({ type: "agency:analytics:employee-reports", startDate: days[idx], endDate: addDay(days[idx]), groupBy: "day", ranking: "descending", chatterOnly: false, creatorIds: [], employeeIds: [], groupIds: [], employeeFilterMode: "or", assignment: "all", recordsLimit: 5000 }));
+      // employee-reports es INCLUSIVO [start,end]: usar el MISMO día (no addDay) → 1 día por call.
+      // Con addDay contaba [día, día+1] = 2 días y las ventanas consecutivas se solapaban (~2× la venta real).
+      ws.send(JSON.stringify({ type: "agency:analytics:employee-reports", startDate: days[idx], endDate: days[idx], groupBy: "day", ranking: "descending", chatterOnly: false, creatorIds: [], employeeIds: [], groupIds: [], employeeFilterMode: "or", assignment: "all", recordsLimit: 5000 }));
     }
     ws.on("open", () => ws.send(JSON.stringify({ type: "auth:token", token })));
     ws.on("message", (data) => {
