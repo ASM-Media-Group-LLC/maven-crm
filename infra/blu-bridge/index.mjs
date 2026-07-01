@@ -189,6 +189,63 @@ async function fetchEmployeeReports(token, startDate, endDate) {
   });
 }
 
+// employee-reports POR DÍA: auth → loop de días sobre UN socket (como fetchEarningsWS), pide
+// employee-reports [day, day+1) por día → cada respuesta trae el total de ESE día por chatter.
+// Sirve para diarizar la venta por chatter (chatter_performance es solo snapshot mensual).
+async function fetchEmployeeReportsDaily(token, days) {
+  const { default: WS } = await import("ws");
+  return await new Promise((resolve, reject) => {
+    const ws = new WS(BLU_WS_URL);
+    const results = [];
+    let idx = 0, authed = false, resolved = false, freshToken = null;
+    const timeoutMs = Math.max(120000, days.length * 4000);
+    const to = setTimeout(() => done(reject, new Error(`WS timeout employee-daily (${Math.round(timeoutMs / 1000)}s)`)), timeoutMs);
+    function done(fn, arg) { if (resolved) return; resolved = true; clearTimeout(to); try { ws.close(); } catch {} fn(arg); }
+    function queryNext() {
+      if (idx >= days.length) return done(resolve, { results, freshToken });
+      ws.send(JSON.stringify({ type: "agency:analytics:employee-reports", startDate: days[idx], endDate: addDay(days[idx]), groupBy: "day", ranking: "descending", chatterOnly: false, creatorIds: [], employeeIds: [], groupIds: [], employeeFilterMode: "or", assignment: "all", recordsLimit: 5000 }));
+    }
+    ws.on("open", () => ws.send(JSON.stringify({ type: "auth:token", token })));
+    ws.on("message", (data) => {
+      let m; try { m = JSON.parse(data.toString()); } catch { return; }
+      const t = typeof m.type === "string" ? m.type : "";
+      if (t === "ping") { try { ws.send(JSON.stringify({ type: "pong" })); } catch {} return; }
+      if (/auth:error|unauthorized|token.*(invalid|expired)|invalid.*token/i.test(t + " " + (m.error || ""))) {
+        return done(reject, Object.assign(new Error("WS auth rechazado employee-daily: " + t), { expired: true }));
+      }
+      if (t === "auth:ok") { authed = true; if (m.token) freshToken = m.token; queryNext(); return; }
+      if (!authed) return;
+      if (t === "agency:analytics:employee-reports" && Array.isArray(m.employees)) {
+        results.push({ date: days[idx], employees: m.employees });
+        idx++;
+        queryNext();
+      }
+    });
+    ws.on("error", (e) => done(reject, new Error("WS error employee-daily: " + e.message)));
+    ws.on("close", () => { if (!resolved) done(reject, new Error("WS cerró antes de terminar (employee-daily)")); });
+  });
+}
+
+// {date, employees[]} por día → filas {blu_employee_id, date, total_sales, ...}. Solo con actividad.
+function transformChatterDaily(results) {
+  const rows = [];
+  for (const { date, employees } of (results || [])) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    for (const e of (employees || [])) {
+      if (e?.id == null) continue;
+      const m = e.metrics || {};
+      const sales = Number(m.totalSales) || 0;
+      const sold = Number(m.soldMessages) || 0;
+      if (sales <= 0 && sold <= 0) continue;   // sin actividad ese día → no guardamos fila
+      rows.push({
+        blu_employee_id: e.id, date, name: e.name ?? null,
+        total_sales: sales, sold_messages: sold, fans_chatted: Number(m.fansChatted) || 0,
+      });
+    }
+  }
+  return rows;
+}
+
 // employee-reports.employees[] → filas de chatter_performance (metrics + deltas).
 function transformChatters(employees) {
   const rows = [];
@@ -408,6 +465,24 @@ async function runOnce(firstRun = false) {
   } catch (e) {
     if (e.expired) throw e;
     console.error(`[blu-bridge] employee-reports falló (no afecta el resto): ${e.message}`);
+  }
+
+  // Chatters POR DÍA (employee-reports día a día) → chatter_daily_sales, para diarizar venta/ROI
+  // del subtab Productividad por rango de fechas. 1 call WS por día (sin límite de 31 días).
+  // Aislado: si falla, no afecta el snapshot mensual ni el resto.
+  try {
+    const chatterDays = daysBack(45);   // mes en curso + margen
+    const { results, freshToken } = await fetchEmployeeReportsDaily(token, chatterDays);
+    if (freshToken && freshToken !== token) { await saveToken(freshToken); token = freshToken; }
+    const dRows = transformChatterDaily(results);
+    for (const batch of chunk(dRows, 2000)) {
+      const { error } = await sb().rpc("import_blu_chatter_daily", { p_rows: batch });
+      if (error) throw new Error("import_blu_chatter_daily: " + error.message);
+    }
+    console.log(`[blu-bridge] chatters/día: ${dRows.length} filas en ${chatterDays.length} días.`);
+  } catch (e) {
+    if (e.expired) throw e;
+    console.error(`[blu-bridge] employee-reports diario falló (no afecta el resto): ${e.message}`);
   }
 
   return { rows: totalRows, fanRows };
