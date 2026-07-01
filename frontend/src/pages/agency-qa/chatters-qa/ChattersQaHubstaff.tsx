@@ -4,7 +4,7 @@ import { Clock, TrendingUp, AlertTriangle, Activity, DollarSign, Wallet, Scale, 
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { useHubstaffEffort, useHubstaffSyncStatus, useChatterEffortRange } from "./useHubstaffEffort";
+import { useHubstaffEffort, useHubstaffSyncStatus, useChatterEffortRange, useChatterSalesRange } from "./useHubstaffEffort";
 import { periodLabel } from "./useChatterScorecards";
 
 // Subtab "Productividad" de Chatters QA. Cruza ESFUERZO (Hubstaff: horas + % actividad) ×
@@ -46,26 +46,35 @@ export default function ChattersQaHubstaff() {
     return m;
   }, [rangeRows]);
 
+  // Venta POR RANGO (chatter_daily_sales vía RPC). Diariza venta/ingreso/margen/ROI.
+  const { data: salesRows = [] } = useChatterSalesRange(ymd(from), ymd(to));
+  const salesMap = useMemo(() => {
+    const m = new Map<number, (typeof salesRows)[number]>();
+    for (const s of salesRows) m.set(s.blu_employee_id, s);
+    return m;
+  }, [salesRows]);
+  // Costo prorrateado por los días del rango (igual para todos los chatters).
+  const costPerRange = salesRows.find((s) => s.cost_usd != null)?.cost_usd ?? null;
+
   const stats = useMemo(() => {
     if (!rows.length) return null;
-    const hasCost = rows.some((r) => r.cost_usd != null);
-    const totalCost = rows.reduce((s, r) => s + (r.cost_usd ?? 0), 0);
-    const totalAgencyRev = rows.reduce((s, r) => s + (r.agency_revenue_usd ?? 0), 0);
-    const totalMargin = rows.reduce((s, r) => s + (r.margin_usd ?? 0), 0);
-    const noRentables = rows.filter((r) => r.no_rentable).length;
-    const sinVentaBlu = rows.filter((r) => r.sin_venta_blu).length;
-    const costPer = rows.find((r) => r.cost_usd != null)?.cost_usd ?? null;
     const rate = rows.find((r) => r.agency_rate_used != null)?.agency_rate_used ?? null;
-    // Esfuerzo del RANGO seleccionado (no del mes).
+    const hasCost = costPerRange != null;
+    // Financiero POR RANGO: ingreso de la venta diarizada; costo = base prorrateada × nº chatters.
+    const totalAgencyRev = salesRows.reduce((s, x) => s + (x.agency_revenue_usd ?? 0), 0);
+    const totalCost = hasCost ? Math.round(rows.length * (costPerRange ?? 0)) : 0;
+    const totalMargin = totalAgencyRev - totalCost;
+    const noRentables = rows.filter((r) => { const sr = salesMap.get(r.blu_employee_id); return sr && sr.sales > 0 && (sr.margin_usd ?? 0) < 0; }).length;
+    const sinVentaBlu = rows.filter((r) => { const sr = salesMap.get(r.blu_employee_id); return !sr || sr.sales <= 0; }).length;
     const rangeHours = Math.round(rangeRows.reduce((s, r) => s + (r.total_hours ?? 0), 0));
     const rangeAvgAct = rangeRows.length
       ? Math.round(rangeRows.reduce((s, r) => s + (r.avg_activity_pct ?? 0), 0) / rangeRows.length)
       : 0;
     return {
       chatters: rows.length, period: rows[0].period, hasCost, totalCost, totalAgencyRev,
-      totalMargin, noRentables, sinVentaBlu, costPer, rate, rangeHours, rangeAvgAct,
+      totalMargin, noRentables, sinVentaBlu, costPer: costPerRange, rate, rangeHours, rangeAvgAct,
     };
-  }, [rows, rangeRows]);
+  }, [rows, rangeRows, salesRows, salesMap, costPerRange]);
 
   if (isLoading) {
     return <Card><CardContent className="p-6 text-sm text-muted-foreground">Cargando datos de Hubstaff…</CardContent></Card>;
@@ -92,8 +101,8 @@ export default function ChattersQaHubstaff() {
             <Activity className="h-4 w-4 text-emerald-500" /> Esfuerzo · Resultado · Rentabilidad
           </h3>
           <p className="text-sm text-muted-foreground">
-            {stats?.chatters} chatters · {stats?.rangeAvgAct}% actividad · {stats?.rangeHours}h — esfuerzo del{" "}
-            <strong>{dayLabel(from)}–{dayLabel(to)}</strong> · ventas/ROI del mes ({stats && periodLabel(stats.period)}).
+            {stats?.chatters} chatters · {stats?.rangeAvgAct}% actividad · {stats?.rangeHours}h —{" "}
+            <strong>{dayLabel(from)}–{dayLabel(to)}</strong> (esfuerzo y venta por el rango elegido).
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -135,20 +144,24 @@ export default function ChattersQaHubstaff() {
               </thead>
               <tbody>
                 {rows.map((r) => {
-                  const roi = r.roi_x ?? null;
-                  const margin = r.margin_usd ?? 0;
-                  const sinVenta = !!r.sin_venta_blu;
                   const eff = rangeMap.get(r.blu_employee_id);
-                  const rowTint = sinVenta ? "" : r.no_rentable ? "bg-rose-500/5" : r.online_improductivo ? "bg-amber-500/5" : "";
+                  const sr = salesMap.get(r.blu_employee_id);
+                  const sales = sr?.sales ?? 0;
+                  const sinVenta = !sr || sales <= 0;
+                  const agencyRev = sr?.agency_revenue_usd ?? 0;
+                  const margin = sr?.margin_usd ?? (costPerRange != null ? -costPerRange : 0);
+                  const roi = sr?.roi_x ?? (sinVenta ? 0 : null);
+                  const noRent = !sinVenta && margin < 0;
+                  const rowTint = sinVenta ? "" : noRent ? "bg-rose-500/5" : r.online_improductivo ? "bg-amber-500/5" : "";
                   return (
                     <tr key={r.blu_employee_id} className={`border-b border-border/60 ${rowTint}`}>
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{eff ? eff.days_tracked : "—"}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">{eff ? `${eff.total_hours}h` : "0h"}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">{eff ? `${eff.avg_activity_pct}%` : "—"}</td>
-                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{sinVenta ? "—" : money(r.sales)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{sinVenta ? "—" : money(sales)}</td>
                       {stats?.hasCost && (
-                        <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{sinVenta ? "—" : money(r.agency_revenue_usd)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{sinVenta ? "—" : money(agencyRev)}</td>
                       )}
                       {stats?.hasCost && (
                         <td className={`px-3 py-2.5 text-right font-semibold tabular-nums ${sinVenta ? "text-muted-foreground" : margin >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
@@ -163,7 +176,7 @@ export default function ChattersQaHubstaff() {
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
                         {r.avg_response_min != null ? `${r.avg_response_min}m` : "—"}
                       </td>
-                      <td className="px-4 py-2.5">{statusPill(r)}</td>
+                      <td className="px-4 py-2.5">{statusPill({ no_rentable: noRent, online_improductivo: r.online_improductivo, roi_x: roi, sin_venta_blu: sinVenta })}</td>
                     </tr>
                   );
                 })}
@@ -174,13 +187,12 @@ export default function ChattersQaHubstaff() {
       </Card>
 
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
-        <strong>Días/Horas/Actividad</strong> = del rango seleccionado ({dayLabel(from)}–{dayLabel(to)}){rangeLoading ? " (cargando…)" : ""}.{" "}
-        <strong>Venta, ingreso, margen y ROI</strong> = del <em>mes</em> (snapshot de BLU) — no se recortan por día.
+        <strong>Días/Horas/Actividad y Venta/Ingreso/Margen/ROI</strong> = del rango seleccionado ({dayLabel(from)}–{dayLabel(to)}){rangeLoading ? " (cargando…)" : ""} — venta diaria de BLU.
         {stats?.hasCost ? (
           <>
-            {" "}Ingreso agencia = venta bruta × 80% (neto OF) × {stats.rate}% (comisión efectiva ponderada).
-            Costo = {money(stats.costPer)}/mes por chatter (salario base, <em>sin comisión</em>) @ tipo de cambio en vivo.
-            ROI &lt; 1 (rojo) = la agencia recibe menos de lo que cuesta el chatter ese mes. "Sin venta BLU" = no hay datos de venta (no es un veredicto).
+            {" "}Ingreso agencia = venta × 80% (neto OF) × {stats.rate}% (comisión efectiva ponderada).
+            Costo = salario base <em>prorrateado por los días del rango</em> ({money(stats.costPer)} en este rango) @ tipo de cambio en vivo.
+            ROI &lt; 1 (rojo) = la agencia recibe menos de lo que cuesta el chatter en el rango. "Sin venta BLU" = no hubo venta registrada en el rango.
           </>
         ) : (
           <> 🚩 "online, poca venta" = ≥25h y ≥50% actividad pero baja venta. Las notas de Puntualidad y Productividad del scorecard salen de estos mismos datos.</>

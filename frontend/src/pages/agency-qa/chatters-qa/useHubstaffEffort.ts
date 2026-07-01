@@ -72,6 +72,31 @@ export const useChatterEffortRange = (from: string | null, to: string | null) =>
     staleTime: 60_000,
   });
 
+// Venta por chatter POR RANGO de fechas (RPC get_chatter_sales_range sobre chatter_daily_sales).
+// Diariza venta/ingreso/margen/ROI para el calendario de Productividad (costo prorrateado por días).
+export interface ChatterSalesRangeRow {
+  blu_employee_id: number;
+  name: string;
+  sales: number;
+  agency_revenue_usd: number;
+  cost_usd: number;
+  margin_usd: number;
+  roi_x: number | null;
+  sin_venta_blu: boolean;
+}
+
+export const useChatterSalesRange = (from: string | null, to: string | null) =>
+  useQuery({
+    queryKey: ["chatter-sales-range", from, to],
+    enabled: !!from && !!to,
+    queryFn: async (): Promise<ChatterSalesRangeRow[]> => {
+      const { data, error } = await (supabase as any).rpc("get_chatter_sales_range", { p_from: from, p_to: to });
+      if (error) throw error;
+      return (data ?? []) as ChatterSalesRangeRow[];
+    },
+    staleTime: 60_000,
+  });
+
 // Filas de esfuerzo-vs-resultado del período más reciente con datos (o el período dado).
 export const useHubstaffEffort = (period?: string | null) =>
   useQuery({
