@@ -155,7 +155,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   // Teléfonos (cloud phones): Dashboard (uso/stats) + Dispositivos (grilla).
   def("Operaciones", "Telefonos", ["Dashboard", "Dispositivos"]),
   // Inbox WhatsApp: Bandeja + Canales (navegables) · IA (copiloto ✨) y Asignar (reasignar) = acciones.
-  def("Operaciones", "WhatsApp", ["Bandeja", "Canales"], ["IA", "Asignar conversaciones"]),
+  def("Operaciones", "WhatsApp", ["Bandeja", "Canales", "Analítica"], ["IA", "Asignar conversaciones"]),
   // Tickets: subtabs (Lista/Calendario) + acciones.
   def("Operaciones", "Tickets", ["Lista de Tickets", "Calendario"], ["Crear Ticket", "Editar Ticket", "Eliminar Ticket", "Asignar Ticket"]),
   def("Operaciones", "Chatters", ["Evaluator", "Workspace", "Admin"], ["Borrar Historial"]),

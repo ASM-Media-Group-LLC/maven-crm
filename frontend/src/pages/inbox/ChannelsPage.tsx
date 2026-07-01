@@ -30,7 +30,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Radio, Users, Plus, Loader2, Bot, ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { Radio, Users, Plus, Loader2, Bot, ArrowLeft, Pencil, Trash2, BarChart3 } from "lucide-react";
 import type { WaChannel, WaChannelDepartment, WaChannelType } from "./types";
 
 const DEPTS: { value: WaChannelDepartment; label: string }[] = [
@@ -209,6 +209,9 @@ const ChannelsPage = () => {
             <a href="https://evolution.147-93-3-97.nip.io/manager" target="_blank" rel="noreferrer" className="underline hover:text-foreground">panel del gateway</a>.
           </p>
         </div>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/inbox/analitica"><BarChart3 className="h-4 w-4" /> Analítica</Link>
+        </Button>
         <Button variant="outline" size="sm" asChild>
           <Link to="/inbox/bots"><Bot className="h-4 w-4" /> Bots</Link>
         </Button>
