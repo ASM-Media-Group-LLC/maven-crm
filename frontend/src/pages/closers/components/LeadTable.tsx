@@ -20,10 +20,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogAction,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import { MoreHorizontal, ExternalLink, MessageCircle, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown } from "lucide-react";
-import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, isContactOverdue, needsContactDecision, getNextContactDate } from "../hooks/useCloserLeads";
+import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, CLOSE_REASONS, CLOSE_REASON_LABELS, isContactOverdue, needsContactDecision, getNextContactDate } from "../hooks/useCloserLeads";
 import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
 import { format } from "date-fns";
@@ -180,6 +180,35 @@ const InlineCategorySelect = memo(({ value, onSave }: { value: string | null; on
   );
 });
 InlineCategorySelect.displayName = "InlineCategorySelect";
+
+// ─── InlineCloseReasonSelect (motivo estructurado de cierre) ───
+const InlineCloseReasonSelect = memo(({ value, onSave }: { value: string | null; onSave: (v: string) => void }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
+      <PopoverTrigger asChild>
+        <button className="cursor-pointer hover:opacity-80 inline-flex items-center gap-1">
+          <Badge variant={value ? "destructive-soft" : "outline"}>{value ? (CLOSE_REASON_LABELS[value] || value) : "—"}</Badge>
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-1" align="start" side="bottom">
+        <div className="flex flex-col gap-0.5">
+          {CLOSE_REASONS.map((r) => (
+            <button
+              key={r.code}
+              className={`text-left text-sm px-2 py-1 rounded cursor-pointer hover:bg-muted ${r.code === value ? "bg-primary/10 font-medium" : ""}`}
+              onClick={() => { onSave(r.code); setOpen(false); }}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+});
+InlineCloseReasonSelect.displayName = "InlineCloseReasonSelect";
 
 // ─── InlineSourceSelect ───
 const InlineSourceSelect = memo(({ value, onSave, options }: { value: string | null; onSave: (v: string | null) => void; options: string[] }) => {
@@ -465,6 +494,34 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
 
+  // Motivo estructurado al cerrar: al mover un lead a "No interesada" pedimos el
+  // motivo (enum) + detalle opcional antes de confirmar. El code va a
+  // close_reason_code y alimenta el embudo (drop-off por motivo); el detalle a
+  // rejection_reason. Cualquier otro cambio de stage pasa directo.
+  const [closeReasonTarget, setCloseReasonTarget] = useState<{ id: string; source?: "closer" | "leadgen" } | null>(null);
+  const [closeReasonCode, setCloseReasonCode] = useState<string>("");
+  const [closeReasonDetail, setCloseReasonDetail] = useState<string>("");
+
+  const requestStageChange = useCallback((id: string, stage: string, source?: "closer" | "leadgen") => {
+    if (stage === "No interesada") {
+      setCloseReasonTarget({ id, source });
+      setCloseReasonCode("");
+      setCloseReasonDetail("");
+      return;
+    }
+    onStageChange(id, stage, source);
+  }, [onStageChange]);
+
+  const confirmCloseReason = () => {
+    if (!closeReasonTarget || !closeReasonCode) return;
+    const { id, source } = closeReasonTarget;
+    onFieldChange(id, "close_reason_code", closeReasonCode);
+    const detail = closeReasonDetail.trim();
+    if (detail) onFieldChange(id, "rejection_reason", detail);
+    onStageChange(id, "No interesada", source);
+    setCloseReasonTarget(null);
+  };
+
   // Permisos por acción. Default true para roles con acceso al módulo
   // padre (default DB sembrado heredando del parent). Si admin quita
   // específicamente uno, esos controles se ven disabled o desaparecen.
@@ -676,7 +733,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <SortHeader label="Closer" sortKey="agent_name" {...sp} />
             <SortHeader label="Último contacto" sortKey="last_contact_date" {...sp} />
             <TableHead className={stickyBase}>OF URL</TableHead>
-            <TableHead className={stickyBase}>Motivo rechazo</TableHead>
+            <TableHead className={stickyBase}>Motivo</TableHead>
+            <TableHead className={stickyBase}>Detalle</TableHead>
             <TableHead className={stickyBase}>Notas</TableHead>
           </TableRow>
         );
@@ -806,7 +864,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                         <DropdownMenuItem onClick={() => onStageChange(c.id, "Confirmada")}>
                           Mover a Confirmada
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onStageChange(c.id, "No interesada")}>
+                        <DropdownMenuItem onClick={() => requestStageChange(c.id, "No interesada")}>
                           Marcar No interesada
                         </DropdownMenuItem>
                       </>
@@ -987,7 +1045,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               ) : <span className="text-muted-foreground">—</span>}
             </TableCell>
             <TableCell>
-              <InlineText value={c.rejection_reason} onSave={(v) => onFieldChange(c.id, "rejection_reason", v)} placeholder="Sin motivo" />
+              <InlineCloseReasonSelect value={c.close_reason_code} onSave={(v) => onFieldChange(c.id, "close_reason_code", v)} />
+            </TableCell>
+            <TableCell>
+              <InlineText value={c.rejection_reason} onSave={(v) => onFieldChange(c.id, "rejection_reason", v)} placeholder="—" />
             </TableCell>
             <TableCell>
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
@@ -1010,7 +1071,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
             </TableCell>
             <TableCell>
-              <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v)} disabled={!canEditStatus} />
+              <InlineStageSelect value={c.stage} onSave={(v) => requestStageChange(c.id, v)} disabled={!canEditStatus} />
             </TableCell>
             <TableCell><LeadWhatsappButton leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
             <TableCell className="text-sm">
@@ -1060,7 +1121,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell>
-              <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v, c._source)} disabled={!canEditStatus} />
+              <InlineStageSelect value={c.stage} onSave={(v) => requestStageChange(c.id, v, c._source)} disabled={!canEditStatus} />
             </TableCell>
             <TableCell>
               <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
@@ -1092,7 +1153,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     {CLOSER_STAGES.filter((s) => s !== c.stage && s !== "Asignada").map((s) => (
-                      <DropdownMenuItem key={s} onClick={() => onStageChange(c.id, s, c._source)}>
+                      <DropdownMenuItem key={s} onClick={() => requestStageChange(c.id, s, c._source)}>
                         Mover a {s}
                       </DropdownMenuItem>
                     ))}
@@ -1151,6 +1212,45 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           onOpenChange={(open) => { if (!open) setPlatformModalId(null); }}
         />
       )}
+
+      {/* Motivo estructurado al cerrar (stage → No interesada) */}
+      <AlertDialog open={!!closeReasonTarget} onOpenChange={(o) => { if (!o) setCloseReasonTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Por qué se cierra?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Elegí el motivo del cierre. Alimenta el embudo de reclutamiento para ver dónde y por qué se caen los leads.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-1">
+            <div className="space-y-1">
+              <Label className="text-xs">Motivo *</Label>
+              <Select value={closeReasonCode} onValueChange={setCloseReasonCode}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Seleccionar motivo" /></SelectTrigger>
+                <SelectContent>
+                  {CLOSE_REASONS.map((r) => <SelectItem key={r.code} value={r.code}>{r.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Detalle (opcional)</Label>
+              <Textarea
+                value={closeReasonDetail}
+                onChange={(e) => setCloseReasonDetail(e.target.value)}
+                rows={2}
+                className="text-sm"
+                placeholder="Notas del cierre…"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCloseReasonTarget(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={!closeReasonCode} onClick={(e) => { e.preventDefault(); confirmCloseReason(); }}>
+              Marcar No interesada
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

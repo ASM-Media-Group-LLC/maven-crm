@@ -21,6 +21,7 @@ export interface CloserCreatorRow {
   stage: string;
   assigned_to: string | null;
   rejection_reason: string | null;
+  close_reason_code: string | null;
   confirmed_date: string | null;
   completed_date: string | null;
   last_contact_date: string | null;
@@ -70,6 +71,22 @@ export const PLATFORMS = ["OnlyFans", "Trafix", "Blu", "Piclink", "Content Prote
 export const SALE_PLATFORMS = ["Trafix", "Blu", "Piclink", "Content Protector", "ORA"] as const;
 export const CHANNELS = ["Instagram", "WhatsApp", "Telegram"] as const;
 export const RESULTS = ["Contestó", "No contestó", "Interesada", "No interesada", "Pendiente"] as const;
+
+// Motivo estructurado al cerrar un lead (stage → "No interesada"). El code se
+// guarda en closer_creators.close_reason_code; el detalle libre sigue en
+// rejection_reason. Alimenta el embudo de reclutamiento (drop-off por motivo).
+export const CLOSE_REASONS: { code: string; label: string }[] = [
+  { code: "no_factura_of", label: "No factura en OnlyFans" },
+  { code: "categoria_baja", label: "No cumple requisitos / categoría baja" },
+  { code: "dejo_de_responder", label: "Dejó de responder" },
+  { code: "sin_whatsapp", label: "Número sin WhatsApp / inválido" },
+  { code: "ya_con_agencia", label: "Ya trabaja con otra agencia" },
+  { code: "no_interesada", label: "No le interesa" },
+  { code: "otro", label: "Otro (ver detalle)" },
+];
+export const CLOSE_REASON_LABELS: Record<string, string> = Object.fromEntries(
+  CLOSE_REASONS.map((r) => [r.code, r.label]),
+);
 
 // Cadencia de contactos: días desde passed_date donde el closer debe
 // haber realizado cada contacto. Espejada en SQL en la función
