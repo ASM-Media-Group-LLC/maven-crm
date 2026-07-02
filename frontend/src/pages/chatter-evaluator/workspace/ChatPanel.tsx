@@ -114,6 +114,10 @@ const QUICK_REACTIONS = ["👍", "❤️", "🔥", "😂", "😮", "👀", "🙏
 // kind por extensión).
 const VIDEO_EXT_RE = /\.(mp4|mov|webm|m4v|avi|mkv|hevc)(\?|#|$)/i;
 const isVideoUrl = (u: string) => VIDEO_EXT_RE.test(u);
+// GIF: Giphy/Tenor los sirven como .mp4. Se muestran reproduciéndose solos (autoplay+loop+muted),
+// no como video con botón de play (que obligaba a hacer zoom para verlos animados).
+const GIF_URL_RE = /(giphy|tenor)\.com|\.gif(\?|#|$)/i;
+const isGifUrl = (u: string) => GIF_URL_RE.test(u);
 
 const MediaThumb = ({
   url,
@@ -124,6 +128,29 @@ const MediaThumb = ({
   onClick: () => void;
   className?: string;
 }) => {
+  const isGif = isGifUrl(url);
+  if (isGif) {
+    // .gif nativo → <img> (anima solo); Giphy/Tenor .mp4 → <video> autoplay+loop+muted.
+    const gifIsImg = /\.gif(\?|#|$)/i.test(url);
+    return gifIsImg ? (
+      <img
+        src={url}
+        alt="GIF"
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        className={className}
+      />
+    ) : (
+      <video
+        src={url}
+        autoPlay
+        loop
+        muted
+        playsInline
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        className={className}
+      />
+    );
+  }
   const isVideo = isVideoUrl(url);
   if (isVideo) {
     return (

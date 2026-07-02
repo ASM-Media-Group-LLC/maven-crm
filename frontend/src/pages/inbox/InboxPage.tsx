@@ -1054,7 +1054,12 @@ const InboxPage = () => {
                             )}
                             {m.media_url && m.msg_type === "video" && (
                               <div className="relative mb-1">
-                                <video controls src={m.media_url} className="max-h-64 rounded-lg" />
+                                {/(giphy|tenor)\.com|\.gif(\?|#|$)/i.test(m.media_url) ? (
+                                  // GIF (Giphy/Tenor los manda como .mp4): reproducir solo, sin botón de play.
+                                  <video autoPlay loop muted playsInline src={m.media_url} className="max-h-64 rounded-lg" />
+                                ) : (
+                                  <video controls src={m.media_url} className="max-h-64 rounded-lg" />
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => openMediaViewer(m.id)}

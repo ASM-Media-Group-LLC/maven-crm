@@ -67,14 +67,13 @@ export default function ChatView({
     if (except !== "search") setHighlightedMsgId(null);
   }, []);
 
-  const mainMessages = useMemo(() => {
-    return messages.filter(m => {
-      if (!m.reply_to_id) return true;
-      const parent = messages.find(p => p.id === m.reply_to_id);
-      if (parent && !parent.reply_to_id) return false;
-      return true;
-    });
-  }, [messages]);
+  // Mostramos TODOS los mensajes en el timeline principal. El filtro anterior intentaba
+  // esconder las respuestas de hilo, pero lo infería según si el mensaje padre estaba en la
+  // ventana paginada (PAGE_SIZE=50) → los mensajes aparecían/desaparecían al hacer scroll y
+  // TODA respuesta-cita a un mensaje de primer nivel se perdía del chat. Las citas se
+  // renderizan inline (bloque de cita en la burbuja) y el hilo sigue disponible en su panel.
+  // (Separar del todo "cita" vs "hilo" requeriría un flag is_thread_reply en la DB.)
+  const mainMessages = messages;
 
   const threadReplies = useMemo(() => {
     if (!threadParent) return [];

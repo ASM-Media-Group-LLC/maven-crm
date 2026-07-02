@@ -115,9 +115,17 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   const audioExtPattern = /\.(webm|ogg|mp3|m4a|wav)(\?|$)/i;
   const isAudioFile = message.file_url && audioExtPattern.test(message.file_url);
   const isImage = message.type === "image" && message.file_url;
-  // OJO: los .webm de nota de voz también matchean este regex → excluir audio/nota
-  // de voz para que NO se dibujen como un player de video gigante (bug de layout).
-  const isVideo = !isVoiceNote && !isAudioFile && message.file_url && (message.file_url.match(/\.(mp4|webm|mov)(\?|$)/i));
+  // GIF: Giphy los manda como .mp4 con file_name "gif.mp4". Se muestran en chico y
+  // reproduciéndose SOLOS (autoplay+loop+muted), como en WhatsApp — no como video con
+  // botón de play (que obligaba a hacer zoom para verlo animado).
+  const isGif = !!message.file_url && (
+    /\.gif(\?|$)/i.test(message.file_url) ||
+    (message.file_name || "").toLowerCase().startsWith("gif") ||
+    /(giphy|tenor)\.com/i.test(message.file_url)
+  );
+  // OJO: los .webm de nota de voz y los gifs .mp4 también matchean este regex →
+  // excluirlos para que NO se dibujen como player de video con botón de play.
+  const isVideo = !isVoiceNote && !isAudioFile && !isGif && message.file_url && (message.file_url.match(/\.(mp4|webm|mov)(\?|$)/i));
 
   const openLightbox = (src: string, type: "image" | "video") => {
     setLightboxSrc(src);
@@ -196,6 +204,30 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   const renderContent = () => {
     if (isImage) {
       return renderImageGrid();
+    }
+
+    if (isGif) {
+      const gifIsImg = /\.gif(\?|$)/i.test(message.file_url!);
+      return gifIsImg ? (
+        <img
+          src={message.file_url!}
+          alt="GIF"
+          className="rounded-2xl max-w-full max-h-52 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={() => openLightbox(message.file_url!, "image")}
+        />
+      ) : (
+        <video
+          src={message.file_url!}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          className="rounded-2xl max-w-full max-h-52 object-contain cursor-pointer"
+          onClick={() => openLightbox(message.file_url!, "video")}
+          onContextMenu={(e) => e.preventDefault()}
+        />
+      );
     }
 
     if (isVideo) {
