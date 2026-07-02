@@ -189,7 +189,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
             </div>
             <div className="flex items-center gap-4 ml-4">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
                 <span className="text-xs text-muted-foreground">Tiempo Activo</span>
                 <span className="text-sm font-mono font-semibold">
                   {String(activeHours).padStart(2, "0")}h {String(activeMinutes).padStart(2, "0")}min {String(activeSeconds).padStart(2, "0")}s
@@ -198,7 +198,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
                 <span className="text-xs text-muted-foreground">Última Hora</span>
                 <span className="text-sm font-semibold">{lastHourLeads.length}</span>
-                <Badge className={`text-xs ${lastHourDelta >= 0 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-destructive/20 text-destructive border-destructive/30"}`}>
+                <Badge className={`text-xs ${lastHourDelta >= 0 ? "bg-success/20 text-success border-success/30" : "bg-destructive/20 text-destructive border-destructive/30"}`}>
                   {lastHourDelta >= 0 ? `+${lastHourDelta}` : lastHourDelta}
                 </Badge>
               </div>

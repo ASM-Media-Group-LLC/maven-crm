@@ -25,14 +25,14 @@ interface HistoryEvent {
 
 // Ícono + color por tipo de evento.
 const KIND_META: Record<string, { icon: typeof Circle; cls: string }> = {
-  alta:         { icon: UserPlus,       cls: "text-emerald-500 bg-emerald-500/10" },
+  alta:         { icon: UserPlus,       cls: "text-success bg-success/10" },
   lead:         { icon: ArrowRightLeft, cls: "text-blue-500 bg-blue-500/10" },
   pipeline:     { icon: ArrowRightLeft, cls: "text-blue-500 bg-blue-500/10" },
-  contacto_wa:  { icon: MessageCircle,  cls: "text-green-500 bg-green-500/10" },
+  contacto_wa:  { icon: MessageCircle,  cls: "text-success bg-success/10" },
   contactos:    { icon: Phone,          cls: "text-sky-500 bg-sky-500/10" },
-  nota:         { icon: StickyNote,     cls: "text-amber-500 bg-amber-500/10" },
+  nota:         { icon: StickyNote,     cls: "text-warning bg-warning/10" },
   conversion:   { icon: Sparkles,       cls: "text-violet-500 bg-violet-500/10" },
-  baja:         { icon: TrendingDown,   cls: "text-red-500 bg-red-500/10" },
+  baja:         { icon: TrendingDown,   cls: "text-destructive bg-destructive/10" },
   agencia:      { icon: Building2,      cls: "text-indigo-500 bg-indigo-500/10" },
   monetizacion: { icon: Megaphone,      cls: "text-pink-500 bg-pink-500/10" },
   evento:       { icon: Calendar,       cls: "text-orange-500 bg-orange-500/10" },

@@ -352,10 +352,10 @@ const LeadGenContent = () => {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header */}
       <header className="shrink-0 px-6 pt-6 pb-4 border-b">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+          <div className="shrink-0">
             <h1 className="text-2xl font-semibold">LeadGen</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground mt-1 whitespace-nowrap">
               {viewMode === "agent" ? "Tus leads" : "Gestión de leads"} · {totalLeads.toLocaleString()} leads
               {dateFrom && dateTo && (
                 <span className="ml-1">
@@ -364,7 +364,7 @@ const LeadGenContent = () => {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">
             {/* Date picker global — visible en TODOS los subtabs.
                 Antes vivía en la filter bar (sólo Leads / Agentes).
                 Ahora persiste arriba a la derecha porque también

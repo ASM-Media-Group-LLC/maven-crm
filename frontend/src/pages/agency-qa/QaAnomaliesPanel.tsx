@@ -10,8 +10,8 @@ import { periodLabel } from "./chatters-qa/useChatterScorecards";
 // llamadas, así que la vista no les genera ese flag.
 
 const TIPO_META: Record<AnomalyTipo, { label: string; tone: string; icon: any }> = {
-  baja_actividad: { label: "Online inactivo", tone: "bg-rose-500/15 text-rose-600",  icon: Activity },
-  dia_corto:      { label: "Jornada corta",   tone: "bg-amber-500/15 text-amber-600", icon: Hourglass },
+  baja_actividad: { label: "Online inactivo", tone: "bg-destructive/15 text-destructive",  icon: Activity },
+  dia_corto:      { label: "Jornada corta",   tone: "bg-warning/15 text-warning", icon: Hourglass },
   dia_largo:      { label: "Jornada larga",   tone: "bg-sky-500/15 text-sky-600",     icon: Timer },
 };
 
@@ -55,7 +55,7 @@ export default function QaAnomaliesPanel({ role }: { role: QaRole }) {
     return (
       <Card>
         <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-          <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Sin anomalías de actividad en el período. 👌
+          <CheckCircle2 className="h-4 w-4 text-success" /> Sin anomalías de actividad en el período. 👌
         </CardContent>
       </Card>
     );
@@ -132,8 +132,8 @@ export default function QaAnomaliesPanel({ role }: { role: QaRole }) {
 
 function StatCard({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone?: "ok" | "warn" | "bad" }) {
   const toneCls =
-    tone === "warn" ? "bg-amber-500/15 text-amber-600"
-    : tone === "bad" ? "bg-rose-500/15 text-rose-600"
+    tone === "warn" ? "bg-warning/15 text-warning"
+    : tone === "bad" ? "bg-destructive/15 text-destructive"
     : "bg-muted text-muted-foreground";
   return (
     <Card>

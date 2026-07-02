@@ -97,9 +97,9 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
         </div>
 
         {missingHandle ? (
-          <div className="flex items-start gap-2.5 rounded-lg bg-amber-500/10 p-3">
-            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-900 dark:text-amber-200">
+          <div className="flex items-start gap-2.5 rounded-lg bg-warning/10 p-3">
+            <AlertTriangle className="h-4 w-4 text-warning dark:text-warning shrink-0 mt-0.5" />
+            <p className="text-xs text-warning dark:text-warning">
               <span className="font-semibold">Falta el handle de Instagram.</span> Ningún
               creador puede entrar al sistema sin handle. Cerrá este modal, editá el contacto
               para agregarlo y volvé a intentar.

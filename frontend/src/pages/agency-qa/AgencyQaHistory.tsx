@@ -80,7 +80,7 @@ const StatusBadge = ({
     return (
       <Badge
         variant="outline"
-        className="gap-1 border-emerald-500/40 text-emerald-500"
+        className="gap-1 border-success/40 text-success"
       >
         <CheckCircle2 className="h-3 w-3" />
         Listo
@@ -91,7 +91,7 @@ const StatusBadge = ({
     return (
       <Badge
         variant="outline"
-        className="gap-1 border-amber-500/40 text-amber-500"
+        className="gap-1 border-warning/40 text-warning"
       >
         <Clock className="h-3 w-3" />
         Sin análisis
@@ -108,14 +108,14 @@ const StatusBadge = ({
   }
   if (status === "failed") {
     return (
-      <Badge variant="outline" className="gap-1 border-rose-500/40 text-rose-400">
+      <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
         <AlertTriangle className="h-3 w-3" />
         Falló
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="gap-1 border-rose-500/40 text-rose-400">
+    <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
       <AlertCircle className="h-3 w-3" />
       Sin transcript
     </Badge>
@@ -397,7 +397,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                           <StatusBadge status={status} />
                           {status === "ready" && (
                             <span
-                              className="hidden items-center gap-0.5 text-[11px] text-emerald-500 lg:flex"
+                              className="hidden items-center gap-0.5 text-[11px] text-success lg:flex"
                               title="Análisis IA generado"
                             >
                               <Sparkles className="h-3 w-3" />
@@ -434,7 +434,7 @@ const AgencyQaHistory = ({ onOpenDetail }: AgencyQaHistoryProps) => {
                               type="button"
                               onClick={(e) => askDelete(e, call.id, label)}
                               disabled={deleteCall.isPending}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-400 disabled:opacity-50"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
                               title="Borrar QA"
                             >
                               <Trash2 className="h-4 w-4" />

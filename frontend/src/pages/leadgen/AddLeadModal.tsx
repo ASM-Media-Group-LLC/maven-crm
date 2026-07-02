@@ -262,7 +262,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                     "rounded-lg border p-3 flex items-start gap-2.5",
                     availabilityResult.kind === "blocked"
                       ? "border-destructive/40 bg-destructive/10 text-destructive"
-                      : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                      : "border-warning/40 bg-warning/10 text-warning dark:text-warning"
                   )}
                 >
                   {availabilityResult.kind === "blocked" ? (

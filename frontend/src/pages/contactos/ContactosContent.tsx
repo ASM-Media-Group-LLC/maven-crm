@@ -549,7 +549,7 @@ const ContactosContent = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-amber-600 hover:text-amber-700"
+                    className="text-warning hover:text-warning"
                     onClick={() => setAuditOpen(true)}
                   >
                     <ShieldAlert className="mr-2 h-4 w-4" />

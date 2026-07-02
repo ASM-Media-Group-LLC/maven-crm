@@ -20,7 +20,7 @@ import {
 import ChatterQaReportDetail from "./ChatterQaReportDetail";
 
 const toneBadge: Record<string, string> = {
-  good: "border-success/40 text-success", warn: "border-amber-500/40 text-amber-600", bad: "border-destructive/40 text-destructive",
+  good: "border-success/40 text-success", warn: "border-warning/40 text-warning", bad: "border-destructive/40 text-destructive",
 };
 // Mes actual YYYY-MM (en el navegador del usuario).
 const currentMonth = () => new Date().toISOString().slice(0, 7);

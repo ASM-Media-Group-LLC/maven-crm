@@ -465,7 +465,7 @@ const AgencyNewQa = () => {
                   />
                 )}
                 {errors.closer && (
-                  <p className="text-xs text-rose-400">{errors.closer}</p>
+                  <p className="text-xs text-destructive">{errors.closer}</p>
                 )}
                 {/* Closers de soporte: solo para admin/manager/supervisor.
                     El primary lleva el 100% al inicio; qa-analyze redistribuye
@@ -573,7 +573,7 @@ const AgencyNewQa = () => {
                   </div>
                 )}
                 {errors.model && (
-                  <p className="text-xs text-rose-400">{errors.model}</p>
+                  <p className="text-xs text-destructive">{errors.model}</p>
                 )}
               </div>
             </div>
@@ -598,14 +598,14 @@ const AgencyNewQa = () => {
                   </SelectContent>
                 </Select>
                 {errors.category && (
-                  <p className="text-xs text-rose-400">{errors.category}</p>
+                  <p className="text-xs text-destructive">{errors.category}</p>
                 )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="country">País modelo *</Label>
                 <CountryCombobox value={modelCountry} onChange={setModelCountry} />
                 {errors.country && (
-                  <p className="text-xs text-rose-400">{errors.country}</p>
+                  <p className="text-xs text-destructive">{errors.country}</p>
                 )}
               </div>
               <div className="space-y-1.5">
@@ -618,7 +618,7 @@ const AgencyNewQa = () => {
                   required
                 />
                 {errors.ig && (
-                  <p className="text-xs text-rose-400">{errors.ig}</p>
+                  <p className="text-xs text-destructive">{errors.ig}</p>
                 )}
               </div>
             </div>
@@ -642,7 +642,7 @@ const AgencyNewQa = () => {
                   onChange={(e) => setCallDate(e.target.value)}
                 />
                 {errors.callDate && (
-                  <p className="text-xs text-rose-400">{errors.callDate}</p>
+                  <p className="text-xs text-destructive">{errors.callDate}</p>
                 )}
               </div>
               <div className="space-y-1.5">
@@ -655,7 +655,7 @@ const AgencyNewQa = () => {
                   required
                 />
                 {errors.evaluator && (
-                  <p className="text-xs text-rose-400">{errors.evaluator}</p>
+                  <p className="text-xs text-destructive">{errors.evaluator}</p>
                 )}
               </div>
             </div>
@@ -676,7 +676,7 @@ const AgencyNewQa = () => {
               {audioFile ? (
                 <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 p-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <FileAudio className="h-5 w-5 shrink-0 text-emerald-500" />
+                    <FileAudio className="h-5 w-5 shrink-0 text-success" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{audioFile.name}</p>
                       <p className="text-[11px] text-muted-foreground">
@@ -714,7 +714,7 @@ const AgencyNewQa = () => {
                 </button>
               )}
               {errors.audio && (
-                <p className="text-xs text-rose-400">{errors.audio}</p>
+                <p className="text-xs text-destructive">{errors.audio}</p>
               )}
             </div>
 
@@ -756,7 +756,7 @@ const AgencyNewQa = () => {
       {lastSavedId && (
         <Card>
           <CardContent className="flex items-start gap-3 p-4">
-            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" />
             <div className="flex-1 space-y-0.5 text-sm">
               <p className="font-semibold">QA registrada (id corto: {lastSavedId.slice(0, 8)})</p>
               <p className="text-muted-foreground">

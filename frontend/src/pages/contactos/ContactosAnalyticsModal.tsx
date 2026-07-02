@@ -562,7 +562,7 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly", i
               <TabsTrigger value="category">Categoría</TabsTrigger>
               <TabsTrigger value="status">Estado</TabsTrigger>
               <TabsTrigger value="funnel">Embudo</TabsTrigger>
-              {!inline && <TabsTrigger value="audit" className="text-amber-500">⚠ Auditoría</TabsTrigger>}
+              {!inline && <TabsTrigger value="audit" className="text-warning">⚠ Auditoría</TabsTrigger>}
             </TabsList>
 
             <div className={inline ? "pt-4" : "flex-1 min-h-0 overflow-auto pt-4"}>

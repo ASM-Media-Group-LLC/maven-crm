@@ -33,9 +33,9 @@ interface Props {
 
 // Tinte de la fila según el estado del contacto (degradado glass sutil).
 const ROW_BG: Record<ContactStatus, string> = {
-  creator_active: "border-emerald-500/30 bg-gradient-to-r from-emerald-500/[0.16] to-emerald-500/[0.04] hover:from-emerald-500/25",
-  in_progress: "border-amber-500/30 bg-gradient-to-r from-amber-500/[0.16] to-amber-500/[0.04] hover:from-amber-500/25",
-  ex_creator: "border-rose-500/30 bg-gradient-to-r from-rose-500/[0.16] to-rose-500/[0.04] hover:from-rose-500/25",
+  creator_active: "border-success/30 bg-gradient-to-r from-success/[0.16] to-success/[0.04] hover:from-success/25",
+  in_progress: "border-warning/30 bg-gradient-to-r from-warning/[0.16] to-warning/[0.04] hover:from-warning/25",
+  ex_creator: "border-destructive/30 bg-gradient-to-r from-destructive/[0.16] to-destructive/[0.04] hover:from-destructive/25",
 };
 
 // Lista de cajones clickeables — mismo patrón que Pareto / Creator Reports

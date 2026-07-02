@@ -83,11 +83,14 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 145 63% 32%;
-    --success-foreground: 0 0% 100%;
+    /* dark: success/warning más claros que el light (:root) para legibilidad como texto
+       sobre fondo oscuro y para poder mapear emerald/amber sueltos a estos tokens sin
+       perder contraste. Ver reskin S4 (tokens semánticos). */
+    --success: 150 56% 47%;
+    --success-foreground: 145 80% 8%;
 
-    --warning: 40 96% 40%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 40 92% 56%;
+    --warning-foreground: 40 90% 10%;
 
     --border: 240 6% 18%;
     --input: 240 6% 18%;

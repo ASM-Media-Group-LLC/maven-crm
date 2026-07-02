@@ -56,7 +56,7 @@ function ScoreCell({ row, field }: { row: Scorecard; field: CriterionKey }) {
 
 const toneClass: Record<"good" | "warn" | "bad", string> = {
   good: "bg-success/15 text-success border-success/30",
-  warn: "bg-amber-500/15 text-amber-600 border-amber-500/30",
+  warn: "bg-warning/15 text-warning border-warning/30",
   bad: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
@@ -297,7 +297,7 @@ export default function ChattersQaScorecard() {
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat icon={Users} label="Chatters" value={summary.n} />
           <Stat icon={Gauge} label="Promedio" value={`${summary.avg}%`}
-            tone={summary.n ? (summary.avg >= 80 ? "text-success" : summary.avg >= 70 ? "text-amber-500" : "text-destructive") : undefined} />
+            tone={summary.n ? (summary.avg >= 80 ? "text-success" : summary.avg >= 70 ? "text-warning" : "text-destructive") : undefined} />
           <Stat icon={TrendingUp} label="Subieron" value={summary.comparables ? summary.up : "—"} tone={summary.up ? "text-success" : undefined} />
           <Stat icon={TrendingDown} label="Bajaron" value={summary.comparables ? summary.down : "—"} tone={summary.down ? "text-destructive" : undefined} />
         </div>

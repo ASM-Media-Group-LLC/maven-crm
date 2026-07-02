@@ -31,8 +31,8 @@ const iconMap = {
 const colorMap = {
   assigned: "text-primary",
   contact: "text-muted-foreground",
-  confirmed: "text-green-600 dark:text-green-400",
-  completed: "text-green-700 dark:text-green-300",
+  confirmed: "text-success dark:text-success",
+  completed: "text-success dark:text-success",
   rejected: "text-destructive",
 };
 

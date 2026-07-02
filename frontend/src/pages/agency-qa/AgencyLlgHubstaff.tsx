@@ -88,7 +88,7 @@ export default function AgencyLlgHubstaff() {
               <tbody>
                 {rows.map((r) => {
                   const lph = r.leads_por_hora ?? 0;
-                  const lphTone = lph >= 20 ? "text-emerald-500" : lph > 0 ? "text-foreground" : "text-muted-foreground";
+                  const lphTone = lph >= 20 ? "text-success" : lph > 0 ? "text-foreground" : "text-muted-foreground";
                   return (
                     <tr key={r.name} className="border-b border-border/60">
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>

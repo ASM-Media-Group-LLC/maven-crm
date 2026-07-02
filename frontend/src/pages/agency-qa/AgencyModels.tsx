@@ -61,9 +61,9 @@ const Avatar = ({ name, dataUrl, size = 32 }: { name: string; dataUrl: string | 
 
 const OutcomeMini = ({ outcome }: { outcome: CallOutcome }) => {
   // Compacto: "Sí / No / Espera" en lugar del badge completo.
-  if (outcome === "cerro") return <span className="font-bold text-green-500">Sí</span>;
-  if (outcome === "no_cerro") return <span className="font-bold text-red-500">No</span>;
-  if (outcome === "en_espera") return <span className="font-bold text-amber-500">Espera</span>;
+  if (outcome === "cerro") return <span className="font-bold text-success">Sí</span>;
+  if (outcome === "no_cerro") return <span className="font-bold text-destructive">No</span>;
+  if (outcome === "en_espera") return <span className="font-bold text-warning">Espera</span>;
   return <span className="text-muted-foreground">—</span>;
 };
 

@@ -22,7 +22,7 @@ import {
 type FanIndex = Record<string, { m: number; c: number; n?: string }>;
 const toneBadge: Record<string, string> = {
   good: "border-success/40 bg-success/10 text-success",
-  warn: "border-amber-500/40 bg-amber-500/10 text-amber-600",
+  warn: "border-warning/40 bg-warning/10 text-warning",
   bad: "border-destructive/40 bg-destructive/10 text-destructive",
 };
 
@@ -275,7 +275,7 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
           <Section icon={FileText} title="Introducción / objetivo"><Textarea rows={2} value={report.intro ?? ""} onChange={(e) => patch({ intro: e.target.value })} placeholder="Objetivo de la evaluación…" /></Section>
           <Section icon={MessageSquareText} title="Resumen / diagnóstico"><Textarea rows={3} value={report.resumen ?? ""} onChange={(e) => patch({ resumen: e.target.value })} /></Section>
           <Section icon={ThumbsUp} title="Aspectos positivos" accent="bg-success/15 text-success"><StringList label="" items={report.aspectos_positivos ?? []} onChange={(v) => patch({ aspectos_positivos: v })} /></Section>
-          <Section icon={Wrench} title="Aspectos de mejora" accent="bg-amber-500/15 text-amber-600">
+          <Section icon={Wrench} title="Aspectos de mejora" accent="bg-warning/15 text-warning">
             {mejoras.map((m, i) => (
               <div key={i} className="mb-2 flex items-start gap-2">
                 <div className="flex-1 space-y-1.5">
@@ -329,10 +329,10 @@ export default function ChatterQaReportDetail({ id, onBack }: { id: string; onBa
             </Section>
           )}
           {!!report.aspectos_mejora?.length && (
-            <Section icon={Wrench} title="Aspectos de mejora" accent="bg-amber-500/15 text-amber-600" collapsible defaultOpen={false} count={report.aspectos_mejora?.length}>
+            <Section icon={Wrench} title="Aspectos de mejora" accent="bg-warning/15 text-warning" collapsible defaultOpen={false} count={report.aspectos_mejora?.length}>
               <div className="space-y-2.5">{report.aspectos_mejora.map((m, i) => (
-                <div key={i} className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5">
-                  <p className="text-sm font-semibold text-amber-600">{m.categoria}</p>
+                <div key={i} className="rounded-lg border border-warning/20 bg-warning/5 p-2.5">
+                  <p className="text-sm font-semibold text-warning">{m.categoria}</p>
                   <p className="mt-0.5 text-sm text-foreground/85"><Linkified text={m.detalle} fanIndex={fanIndex} /></p>
                 </div>
               ))}</div>

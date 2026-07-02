@@ -94,9 +94,9 @@ export default function AgencyCloserHubstaff() {
               <tbody>
                 {rows.map((r) => {
                   const uph = r.usd_por_hora ?? 0;
-                  const uphTone = uph >= 50 ? "text-emerald-500" : uph > 0 ? "text-foreground" : "text-muted-foreground";
+                  const uphTone = uph >= 50 ? "text-success" : uph > 0 ? "text-foreground" : "text-muted-foreground";
                   return (
-                    <tr key={r.name} className={`border-b border-border/60 ${r.sin_cierres ? "bg-amber-500/5" : ""}`}>
+                    <tr key={r.name} className={`border-b border-border/60 ${r.sin_cierres ? "bg-warning/5" : ""}`}>
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
                       <td className="px-3 py-2.5 text-right tabular-nums">{r.total_hours}h</td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.avg_activity_pct}%</td>
@@ -109,11 +109,11 @@ export default function AgencyCloserHubstaff() {
                       </td>
                       <td className="px-4 py-2.5">
                         {r.sin_cierres ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-600">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-warning">
                             <AlertTriangle className="h-3 w-3" /> trabaja, no cierra
                           </span>
                         ) : r.cerradas > 0 && uph >= 50 ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-medium text-success">
                             <TrendingUp className="h-3 w-3" /> rinde
                           </span>
                         ) : (
@@ -142,7 +142,7 @@ function StatCard({ icon: Icon, label, value, tone }: { icon: any; label: string
   return (
     <Card>
       <CardContent className="flex items-center gap-3 p-3">
-        <div className={`rounded-lg p-2 ${tone === "warn" ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"}`}>
+        <div className={`rounded-lg p-2 ${tone === "warn" ? "bg-warning/15 text-warning" : "bg-muted text-muted-foreground"}`}>
           <Icon className="h-4 w-4" />
         </div>
         <div>

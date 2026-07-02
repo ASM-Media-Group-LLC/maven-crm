@@ -152,7 +152,7 @@ export default function ChattersQaHubstaff() {
                   const margin = sr?.margin_usd ?? (costPerRange != null ? -costPerRange : 0);
                   const roi = sr?.roi_x ?? (sinVenta ? 0 : null);
                   const noRent = !sinVenta && margin < 0;
-                  const rowTint = sinVenta ? "" : noRent ? "bg-rose-500/5" : r.online_improductivo ? "bg-amber-500/5" : "";
+                  const rowTint = sinVenta ? "" : noRent ? "bg-destructive/5" : r.online_improductivo ? "bg-warning/5" : "";
                   return (
                     <tr key={r.blu_employee_id} className={`border-b border-border/60 ${rowTint}`}>
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
@@ -164,12 +164,12 @@ export default function ChattersQaHubstaff() {
                         <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{sinVenta ? "—" : money(agencyRev)}</td>
                       )}
                       {stats?.hasCost && (
-                        <td className={`px-3 py-2.5 text-right font-semibold tabular-nums ${sinVenta ? "text-muted-foreground" : margin >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                        <td className={`px-3 py-2.5 text-right font-semibold tabular-nums ${sinVenta ? "text-muted-foreground" : margin >= 0 ? "text-success" : "text-destructive"}`}>
                           {sinVenta ? "—" : money(margin)}
                         </td>
                       )}
                       {stats?.hasCost && (
-                        <td className={`px-3 py-2.5 text-right font-bold tabular-nums ${sinVenta || roi == null ? "text-muted-foreground" : roi >= 1 ? "text-emerald-500" : "text-rose-500"}`}>
+                        <td className={`px-3 py-2.5 text-right font-bold tabular-nums ${sinVenta || roi == null ? "text-muted-foreground" : roi >= 1 ? "text-success" : "text-destructive"}`}>
                           {sinVenta || roi == null ? "—" : `${roi.toFixed(2)}×`}
                         </td>
                       )}
@@ -212,21 +212,21 @@ function statusPill(r: { no_rentable: boolean | null; online_improductivo: boole
   }
   if (r.no_rentable) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-medium text-rose-600">
+      <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-destructive">
         <AlertTriangle className="h-3 w-3" /> no rentable
       </span>
     );
   }
   if (r.online_improductivo) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-600">
+      <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-warning">
         <AlertTriangle className="h-3 w-3" /> online, poca venta
       </span>
     );
   }
   if ((r.roi_x ?? 0) >= 2) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
+      <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-medium text-success">
         <TrendingUp className="h-3 w-3" /> rinde
       </span>
     );
@@ -236,8 +236,8 @@ function statusPill(r: { no_rentable: boolean | null; online_improductivo: boole
 
 function StatCard({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone?: "ok" | "warn" | "bad" }) {
   const toneCls =
-    tone === "warn" ? "bg-amber-500/15 text-amber-600"
-    : tone === "bad" ? "bg-rose-500/15 text-rose-600"
+    tone === "warn" ? "bg-warning/15 text-warning"
+    : tone === "bad" ? "bg-destructive/15 text-destructive"
     : "bg-muted text-muted-foreground";
   return (
     <Card>

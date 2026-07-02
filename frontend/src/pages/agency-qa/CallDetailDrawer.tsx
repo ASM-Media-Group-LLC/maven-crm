@@ -209,7 +209,7 @@ const SectionThumbs = ({
         className={cn(
           "flex h-6 w-6 items-center justify-center rounded-full transition-colors",
           isUp
-            ? "bg-emerald-500/20 text-emerald-500"
+            ? "bg-success/20 text-success"
             : "text-muted-foreground hover:bg-muted/50",
         )}
         title={isUp ? "Quitar 👍" : "Marcar 👍"}
@@ -223,7 +223,7 @@ const SectionThumbs = ({
         className={cn(
           "flex h-6 w-6 items-center justify-center rounded-full transition-colors",
           isDown
-            ? "bg-rose-500/20 text-rose-400"
+            ? "bg-destructive/20 text-destructive"
             : "text-muted-foreground hover:bg-muted/50",
         )}
         title={isDown ? "Quitar 👎" : "Marcar 👎"}
@@ -413,11 +413,11 @@ const RedFlagsBlock = ({
     <Section title="Red flags" hint={`${flags.length}`}>
       <ul className="space-y-2">
         {flags.map((f, i) => (
-          <li key={i} className="rounded-md border border-rose-500/30 bg-rose-500/5 p-2.5">
+          <li key={i} className="rounded-md border border-destructive/30 bg-destructive/5 p-2.5">
             <div className="mb-1 flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">
+                <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-destructive">
                   {f.type.replace(/_/g, " ")}
                 </span>
               </div>
@@ -425,7 +425,7 @@ const RedFlagsBlock = ({
             </div>
             <p className="text-xs text-foreground/80">{f.description}</p>
             {f.quote && (
-              <blockquote className="mt-1 border-l-2 border-rose-500/50 pl-2 text-xs italic text-muted-foreground">
+              <blockquote className="mt-1 border-l-2 border-destructive/50 pl-2 text-xs italic text-muted-foreground">
                 "{f.quote}"
               </blockquote>
             )}
@@ -676,7 +676,7 @@ const CallDetailDrawer = ({
 
               {/* Empty-analysis fallback */}
               {!a.summary && (!a.dimensions || a.dimensions.length === 0) && (
-                <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-400">
+                <div className="rounded-md border border-warning/30 bg-warning/5 p-3 text-xs text-warning">
                   <Star className="mr-1 inline h-3.5 w-3.5" />
                   Esta llamada no tiene un análisis IA completo. Probablemente sea
                   una entrada legacy o el análisis falló — usar el botón

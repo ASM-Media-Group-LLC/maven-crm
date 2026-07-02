@@ -305,7 +305,7 @@ const ClosersQaSection = () => {
             ) : (
               <Card>
                 <CardContent className="space-y-3 p-6">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-500/90">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-warning/90">
                     <Wrench className="h-3.5 w-3.5" />
                     En migración
                   </div>
@@ -332,7 +332,7 @@ const ComingSoonSection = ({ section }: { section: RoleSection }) => (
     </div>
     <Card>
       <CardContent className="space-y-3 p-6">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-500/90">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-warning/90">
           <Wrench className="h-3.5 w-3.5" />
           Próximamente
         </div>

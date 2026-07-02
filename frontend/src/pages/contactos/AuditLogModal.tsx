@@ -144,7 +144,7 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
       <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-amber-500" />
+            <Shield className="h-5 w-5 text-warning" />
             Log de Auditoría — Cambios de Categoría
           </DialogTitle>
         </DialogHeader>
@@ -162,9 +162,9 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
                   <p className="text-xs text-muted-foreground">Total cambios</p>
                   <p className="text-2xl font-bold">{changes.length}</p>
                 </div>
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                  <p className="text-xs text-amber-500">⚠ Sospechosos (&gt;24h)</p>
-                  <p className="text-2xl font-bold text-amber-500">{suspicious.length}</p>
+                <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
+                  <p className="text-xs text-warning">⚠ Sospechosos (&gt;24h)</p>
+                  <p className="text-2xl font-bold text-warning">{suspicious.length}</p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-muted-foreground">Agentes involucrados</p>
@@ -266,7 +266,7 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
                         const flag = detail?.country_code ? getCountryFlag(detail.country_code) : "";
 
                         return (
-                          <TableRow key={c.id} className={isSuspicious ? "bg-amber-500/5" : ""}>
+                          <TableRow key={c.id} className={isSuspicious ? "bg-warning/5" : ""}>
                             <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                               {c.changed_at
                                 ? format(new Date(c.changed_at), "dd MMM yy, HH:mm", { locale: es })

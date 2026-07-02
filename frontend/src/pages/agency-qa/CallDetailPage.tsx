@@ -274,7 +274,7 @@ const SectionThumbs = ({
           className={cn(
             "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
             isUp
-              ? "bg-emerald-500/20 text-emerald-500"
+              ? "bg-success/20 text-success"
               : "text-muted-foreground hover:bg-muted/50"
           )}
           title={isUp ? "Quitar 👍" : "Te gusta este análisis"}
@@ -292,7 +292,7 @@ const SectionThumbs = ({
               className={cn(
                 "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
                 isDown
-                  ? "bg-rose-500/20 text-rose-400"
+                  ? "bg-destructive/20 text-destructive"
                   : "text-muted-foreground hover:bg-muted/50"
               )}
               title={isDown ? "Editar comentario" : "Marcar 👎 + comentar"}

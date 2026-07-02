@@ -40,7 +40,7 @@ const renderRow = (row: ClosersKpiPopupRow) => (
         </Badge>
       )}
       {row.amount && (
-        <span className="text-sm font-bold tabular-nums text-emerald-400">
+        <span className="text-sm font-bold tabular-nums text-success">
           {row.amount}
         </span>
       )}

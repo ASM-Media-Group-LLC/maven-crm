@@ -98,8 +98,8 @@ export default function QaAttendancePanel({ role }: { role: QaRole }) {
                 {rows.map((r) => {
                   const pct = r.pct_a_tiempo ?? 0;
                   const smallSample = (r.dias ?? 0) < 4;
-                  const pctTone = pct >= 90 ? "text-emerald-500" : pct >= 80 ? "text-amber-500" : "text-rose-500";
-                  const rowTint = pct < 80 ? "bg-rose-500/5" : "";
+                  const pctTone = pct >= 90 ? "text-success" : pct >= 80 ? "text-warning" : "text-destructive";
+                  const rowTint = pct < 80 ? "bg-destructive/5" : "";
                   return (
                     <tr key={r.hubstaff_user_id} className={`border-b border-border/60 ${rowTint}`}>
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
@@ -136,14 +136,14 @@ function statusPill(pct: number, smallSample: boolean) {
   }
   if (pct < 80) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-medium text-rose-600">
+      <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-destructive">
         <AlertTriangle className="h-3 w-3" /> impuntual
       </span>
     );
   }
   if (pct >= 100) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
+      <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-medium text-success">
         <CheckCircle2 className="h-3 w-3" /> puntual
       </span>
     );
@@ -153,8 +153,8 @@ function statusPill(pct: number, smallSample: boolean) {
 
 function StatCard({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone?: "ok" | "warn" | "bad" }) {
   const toneCls =
-    tone === "warn" ? "bg-amber-500/15 text-amber-600"
-    : tone === "bad" ? "bg-rose-500/15 text-rose-600"
+    tone === "warn" ? "bg-warning/15 text-warning"
+    : tone === "bad" ? "bg-destructive/15 text-destructive"
     : "bg-muted text-muted-foreground";
   return (
     <Card>

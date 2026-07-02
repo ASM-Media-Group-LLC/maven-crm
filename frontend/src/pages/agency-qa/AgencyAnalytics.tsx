@@ -134,9 +134,9 @@ const AgencyAnalytics = () => {
       </div>
 
       {q.isError ? (
-        <div className="rounded-xl border border-rose-500/40 bg-rose-500/5 p-6 text-sm">
-          <p className="font-semibold text-rose-400">No se pudo cargar Analytics</p>
-          <p className="mt-1 text-xs text-rose-300/80">
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-6 text-sm">
+          <p className="font-semibold text-destructive">No se pudo cargar Analytics</p>
+          <p className="mt-1 text-xs text-destructive/80">
             {(q.error as Error)?.message ??
               "Error desconocido leyendo qa_calls."}
           </p>
@@ -176,7 +176,7 @@ const AgencyAnalytics = () => {
               label="Close rate"
               value={formatPct(data.close_rate)}
               hint={`${data.cerro} cerros`}
-              color="bg-emerald-500"
+              color="bg-success"
               icon={Trophy}
               onClick={() => setKpiPopup("close_rate")}
             />
@@ -184,7 +184,7 @@ const AgencyAnalytics = () => {
               label="Score promedio"
               value={data.avg_score}
               hint={`/ 100`}
-              color={data.avg_score >= 70 ? "bg-emerald-500" : data.avg_score >= 50 ? "bg-amber-500" : "bg-rose-500"}
+              color={data.avg_score >= 70 ? "bg-success" : data.avg_score >= 50 ? "bg-warning" : "bg-destructive"}
               icon={TrendingUp}
               onClick={() => setKpiPopup("score")}
             />

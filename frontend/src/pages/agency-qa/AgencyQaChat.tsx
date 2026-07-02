@@ -603,7 +603,7 @@ const AgencyQaChat = () => {
                             className={cn(
                               "gap-1.5",
                               speech.listening &&
-                                "bg-rose-500 text-white hover:bg-rose-500/90",
+                                "bg-destructive text-white hover:bg-destructive/90",
                             )}
                             aria-pressed={speech.listening}
                           >

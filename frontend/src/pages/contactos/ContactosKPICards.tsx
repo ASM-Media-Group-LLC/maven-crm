@@ -35,7 +35,7 @@ const ContactosKPICards = ({ stats, onClick }: Props) => {
       value: stats.creadoras.toLocaleString("es"),
       subtitle: `de ${stats.activasHoy} activas en el roster total`,
       icon: Sparkles,
-      color: "bg-emerald-500",
+      color: "bg-success",
     },
     {
       key: "conversion" as const,
@@ -51,7 +51,7 @@ const ContactosKPICards = ({ stats, onClick }: Props) => {
       value: stats.enProceso.toLocaleString("es"),
       subtitle: "Con closer asignado o ya contactados",
       icon: Loader,
-      color: "bg-amber-500",
+      color: "bg-warning",
     },
     {
       key: "sinTocar" as const,
@@ -67,7 +67,7 @@ const ContactosKPICards = ({ stats, onClick }: Props) => {
       value: churn.toLocaleString("es"),
       subtitle: `${stats.churnLeaving} saliendo · ${stats.churnTerminated} baja`,
       icon: TrendingDown,
-      color: "bg-rose-500",
+      color: "bg-destructive",
     },
   ];
 
