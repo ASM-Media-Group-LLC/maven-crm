@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useMemo } from "react";
 import { ChatMessage, UserProfile } from "../types";
 import { ReactionGroup } from "@/hooks/useReactions";
 import MessageBubble from "./MessageBubble";
@@ -132,6 +132,14 @@ export default function MessageList({
 
   const groups = groupMessages(messages);
 
+  // Índice id→mensaje para resolver la cita (reply_to_id) en O(1). Antes se hacía
+  // messages.find(...) por CADA burbuja → O(n²) dentro del render de la lista.
+  const msgById = useMemo(() => {
+    const m = new Map<string, ChatMessage>();
+    for (const x of messages) m.set(x.id, x);
+    return m;
+  }, [messages]);
+
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -237,7 +245,7 @@ export default function MessageList({
                       onCopy={() => onCopy(msg.content || "")}
                       onEdit={(content) => onEdit(msg.id, content)}
                       onDelete={() => onDelete(msg.id)}
-                      replyMessage={msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : undefined}
+                      replyMessage={msg.reply_to_id ? msgById.get(msg.reply_to_id) : undefined}
                       showAvatar={isLastInGroup && !isMe}
                       showSender={isFirstInGroup && !isMe}
                       isLastInGroup={isLastInGroup}

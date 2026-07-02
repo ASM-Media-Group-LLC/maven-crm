@@ -437,12 +437,14 @@ export function useChat() {
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
-    // Fallback sync in case websocket is temporarily unavailable
+    // Fallback sync por si el websocket se cae. El realtime ya trae los cambios en
+    // vivo, así que esto es solo red de seguridad → 20s (antes 5s recargaba toda la
+    // lista 12×/min de más). visibilitychange + reconexión del canal cubren el resto.
     const pollInterval = setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadConversations();
       }
-    }, 5_000);
+    }, 20_000);
 
     return () => {
       if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
