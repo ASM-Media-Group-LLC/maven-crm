@@ -6,111 +6,126 @@
   <title>Telegram Gateway · Manager</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 min-h-screen text-slate-100 p-4">
-  <div class="max-w-xl mx-auto space-y-4">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold">Telegram Gateway</h1>
-      <span id="badge" class="text-xs px-2 py-1 rounded bg-slate-700">cargando…</span>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+  <div class="max-w-2xl mx-auto p-4 sm:p-6">
+    <div class="flex items-center justify-between mb-5">
+      <h1 class="text-xl font-bold">Telegram Gateway</h1>
+      <span id="hdr" class="text-xs px-2 py-1 rounded bg-emerald-600/80">cargando…</span>
     </div>
 
-    <!-- No logueado: login por web (teléfono → código → 2FA) -->
-    <div id="login" class="hidden bg-white text-slate-900 rounded-2xl shadow p-5 space-y-3">
-      <p class="text-sm text-slate-500">Logueá la cuenta de Telegram que va a leer los canales. (Una sola vez; la sesión queda guardada.)</p>
-      <div id="step1" class="space-y-2">
-        <label class="text-sm font-medium">Teléfono (con +código país)</label>
-        <input id="phone" placeholder="+57..." class="w-full px-3 py-2 rounded border border-slate-300" />
-        <button id="sendCode" class="w-full py-2 rounded bg-sky-600 hover:bg-sky-700 text-white font-semibold">Enviar código</button>
+    <!-- Cuentas -->
+    <div class="bg-white text-slate-800 rounded-2xl shadow-xl p-5 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold">Cuentas vinculadas</h2>
+        <button id="btn-add" class="text-sm px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-700 text-white font-semibold">+ Agregar cuenta</button>
       </div>
-      <div id="step2" class="hidden space-y-2">
-        <label class="text-sm font-medium">Código que te llegó por Telegram</label>
-        <input id="code" inputmode="numeric" placeholder="12345" class="w-full px-3 py-2 rounded border border-slate-300" />
-        <label class="text-sm font-medium">Password 2FA (si tenés; sino dejalo vacío)</label>
-        <input id="pw2fa" type="password" placeholder="(opcional)" class="w-full px-3 py-2 rounded border border-slate-300" />
-        <button id="verify" class="w-full py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Verificar</button>
+      <div id="accounts" class="space-y-2 text-sm text-slate-500">Cargando…</div>
+
+      <!-- Alta de cuenta -->
+      <div id="add-form" class="hidden mt-4 border-t border-slate-200 pt-4 space-y-3">
+        <div id="step-phone" class="space-y-2">
+          <p class="text-xs text-slate-500">Vincular una cuenta de Telegram (teléfono + código, como el QR de WhatsApp).</p>
+          <input id="label" placeholder="Nombre (ej: Kash Ventas)" class="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
+          <input id="phone" placeholder="Teléfono con código de país (+57...)" class="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
+          <div class="flex gap-2">
+            <button id="btn-send" class="px-3 py-2 rounded bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold">Enviar código</button>
+            <button id="btn-cancel" class="px-3 py-2 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm">Cancelar</button>
+          </div>
+        </div>
+        <div id="step-code" class="hidden space-y-2">
+          <p class="text-xs text-slate-500">Te llegó un código a la app de Telegram. Ingresalo:</p>
+          <input id="code" inputmode="numeric" placeholder="Código" class="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
+          <input id="pw2fa" type="password" placeholder="Contraseña 2FA (si tenés)" class="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
+          <button id="btn-verify" class="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">Verificar y vincular</button>
+        </div>
+        <div id="add-msg" class="text-xs"></div>
       </div>
-      <div id="loginErr" class="text-sm text-red-600 hidden"></div>
     </div>
 
-    <!-- Logueado: estado + lector de prueba -->
-    <div id="ok" class="hidden bg-white text-slate-900 rounded-2xl shadow p-5 space-y-4">
-      <div class="flex items-center justify-between">
-        <p class="text-sm">Conectado como <b id="acct"></b></p>
-        <button id="logout" class="text-xs px-2 py-1 rounded bg-slate-200 hover:bg-slate-300">Cerrar sesión</button>
+    <!-- Probar canal (Promolog) -->
+    <div class="bg-white text-slate-800 rounded-2xl shadow-xl p-5">
+      <h2 class="font-semibold mb-1">Probar un canal (últimas 24h)</h2>
+      <p class="text-xs text-slate-500 mb-3">Une la cuenta por defecto al canal (público o privado) y lee sus últimos posts — lo mismo que hace Promolog.</p>
+      <div class="flex gap-2">
+        <input id="chan" placeholder="@canal · t.me/canal · t.me/+hash" class="flex-1 px-3 py-2 rounded border border-slate-300 text-sm" />
+        <button id="btn-read" class="px-4 py-2 rounded bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold">Leer</button>
       </div>
-      <div class="space-y-2">
-        <label class="text-sm font-medium">Probar un canal (últimas 24h)</label>
-        <div class="flex gap-2">
-          <input id="chan" placeholder="@canal o t.me/canal (público / ya unido)" class="flex-1 px-3 py-2 rounded border border-slate-300" />
-          <button id="read" class="px-4 py-2 rounded bg-sky-600 hover:bg-sky-700 text-white font-semibold">Leer</button>
-        </div>
-      </div>
-      <div class="space-y-2 border-t border-slate-200 pt-3">
-        <label class="text-sm font-medium">Unirse a un canal y leer</label>
-        <div class="flex gap-2">
-          <input id="joinlink" placeholder="https://t.me/+abc...  o  @canal" class="flex-1 px-3 py-2 rounded border border-slate-300" />
-          <button id="join" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Unirse y leer</button>
-        </div>
-        <p class="text-xs text-slate-500">Une la cuenta al canal (privado o público) si hace falta y lee las últimas 24h. Esto es lo que Maven hará al guardar el Telegram de una creadora.</p>
-      </div>
-      <pre id="out" class="text-xs bg-slate-100 rounded p-3 overflow-auto max-h-96 whitespace-pre-wrap"></pre>
+      <pre id="chan-out" class="hidden mt-3 text-xs bg-slate-100 rounded p-3 max-h-64 overflow-auto whitespace-pre-wrap"></pre>
     </div>
   </div>
 
   <script>
-    const apikey = () => localStorage.getItem('apikey') || '';
     const $ = (id) => document.getElementById(id);
-    const showErr = (m) => { const e = $('loginErr'); e.textContent = m; e.classList.remove('hidden'); };
+    const apikey = () => localStorage.getItem("apikey") || "";
+    const authH = () => ({ apikey: apikey() });
+    let currentLoginId = null;
 
-    async function refresh() {
-      const r = await fetch('/manager/status');
-      const j = await r.json();
-      if (j.loggedIn) {
-        $('badge').textContent = 'conectado'; $('badge').className = 'text-xs px-2 py-1 rounded bg-emerald-600';
-        $('acct').textContent = j.account || '?';
-        $('ok').classList.remove('hidden'); $('login').classList.add('hidden');
-      } else {
-        $('badge').textContent = 'sin sesión'; $('badge').className = 'text-xs px-2 py-1 rounded bg-amber-600';
-        $('login').classList.remove('hidden'); $('ok').classList.add('hidden');
-      }
+    async function loadAccounts() {
+      const box = $("accounts");
+      try {
+        const j = await (await fetch("/manager/accounts")).json();
+        const accs = (j && j.accounts) || [];
+        $("hdr").textContent = accs.length + (accs.length === 1 ? " cuenta" : " cuentas");
+        if (!accs.length) { box.innerHTML = '<p class="text-slate-400">Sin cuentas vinculadas todavía.</p>'; return; }
+        box.innerHTML = "";
+        for (const a of accs) {
+          const el = document.createElement("div");
+          el.className = "flex items-center justify-between border border-slate-200 rounded-lg px-3 py-2";
+          const dot = a.loggedIn ? '<span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>' : '<span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span>';
+          const sub = a.loggedIn ? ("@" + (a.account || "?")) : ("caída — " + (a.error || "re-vinculá"));
+          el.innerHTML =
+            '<div class="min-w-0">' +
+              '<div class="font-medium text-slate-800 flex items-center gap-2">' + dot + " " + (a.label || a.id) + (a.isDefault ? ' <span class="text-[10px] px-1.5 rounded bg-slate-200 text-slate-600">Promolog</span>' : "") + "</div>" +
+              '<div class="text-xs text-slate-500 truncate">' + sub + "</div>" +
+            "</div>" +
+            '<button data-id="' + a.id + '" class="js-logout text-xs px-2 py-1 rounded border border-rose-300 text-rose-600 hover:bg-rose-50">Desvincular</button>';
+          box.appendChild(el);
+        }
+        box.querySelectorAll(".js-logout").forEach((b) => b.addEventListener("click", async () => {
+          if (!confirm("¿Desvincular esta cuenta? Se borra su sesión.")) return;
+          await fetch("/manager/telegram/logout/" + b.dataset.id, { method: "POST" });
+          loadAccounts();
+        }));
+      } catch (e) { box.innerHTML = '<p class="text-rose-500">Error cargando cuentas: ' + e + "</p>"; }
     }
 
-    $('sendCode').onclick = async () => {
-      $('loginErr').classList.add('hidden');
-      const r = await fetch('/manager/telegram/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: $('phone').value }) });
-      const j = await r.json();
-      if (j.ok) { $('step2').classList.remove('hidden'); $('sendCode').disabled = true; }
-      else showErr(j.error || 'No se pudo enviar el código');
-    };
+    $("btn-add").addEventListener("click", () => { $("add-form").classList.toggle("hidden"); $("step-phone").classList.remove("hidden"); $("step-code").classList.add("hidden"); $("add-msg").textContent = ""; });
+    $("btn-cancel").addEventListener("click", () => { $("add-form").classList.add("hidden"); });
 
-    $('verify').onclick = async () => {
-      $('loginErr').classList.add('hidden');
-      const r = await fetch('/manager/telegram/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: $('code').value, password: $('pw2fa').value }) });
-      const j = await r.json();
-      if (j.ok) { await refresh(); }
-      else if (j.need2fa) showErr('Esta cuenta tiene 2FA: poné el password y reintentá.');
-      else showErr(j.error || 'Código inválido');
-    };
+    $("btn-send").addEventListener("click", async () => {
+      const msg = $("add-msg"); msg.textContent = "Enviando código…"; msg.className = "text-xs text-slate-500";
+      try {
+        const r = await fetch("/manager/telegram/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: $("phone").value.trim(), label: $("label").value.trim() }) });
+        const j = await r.json();
+        if (!r.ok || !j.ok) throw new Error(j.error || "error");
+        currentLoginId = j.id;
+        $("step-phone").classList.add("hidden"); $("step-code").classList.remove("hidden");
+        msg.textContent = "Código enviado. Revisá tu Telegram."; msg.className = "text-xs text-emerald-600";
+      } catch (e) { msg.textContent = "Error: " + e.message; msg.className = "text-xs text-rose-600"; }
+    });
 
-    $('logout').onclick = async () => { await fetch('/manager/telegram/logout', { method: 'POST' }); $('step2').classList.add('hidden'); $('sendCode').disabled = false; await refresh(); };
+    $("btn-verify").addEventListener("click", async () => {
+      const msg = $("add-msg"); msg.textContent = "Verificando…"; msg.className = "text-xs text-slate-500";
+      try {
+        const r = await fetch("/manager/telegram/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: currentLoginId, code: $("code").value.trim(), password: $("pw2fa").value }) });
+        const j = await r.json();
+        if (r.status === 401 && j.need2fa) { msg.textContent = "Esta cuenta tiene 2FA — ingresá la contraseña y verificá de nuevo."; msg.className = "text-xs text-amber-600"; return; }
+        if (!r.ok || !j.ok) throw new Error(j.error || "error");
+        msg.textContent = "✓ Vinculada (@" + (j.account || "") + ")"; msg.className = "text-xs text-emerald-600";
+        $("add-form").classList.add("hidden"); $("phone").value = ""; $("label").value = ""; $("code").value = ""; $("pw2fa").value = "";
+        loadAccounts();
+      } catch (e) { msg.textContent = "Error: " + e.message; msg.className = "text-xs text-rose-600"; }
+    });
 
-    $('read').onclick = async () => {
-      $('out').textContent = 'leyendo…';
-      const h = $('chan').value.trim().replace(/^@/, '').replace(/^https?:\/\/t\.me\//i, '').replace(/\/.*$/, '');
-      const r = await fetch('/channel/' + encodeURIComponent(h) + '/recent?hours=24', { headers: { apikey: apikey() } });
-      const j = await r.json();
-      $('out').textContent = JSON.stringify(j, null, 2);
-    };
+    $("btn-read").addEventListener("click", async () => {
+      const out = $("chan-out"); out.classList.remove("hidden"); out.textContent = "Leyendo…";
+      try {
+        const r = await fetch("/channel/join", { method: "POST", headers: Object.assign({ "Content-Type": "application/json" }, authH()), body: JSON.stringify({ link: $("chan").value.trim(), hours: 24 }) });
+        out.textContent = JSON.stringify(await r.json(), null, 2);
+      } catch (e) { out.textContent = "Error: " + e; }
+    });
 
-    $('join').onclick = async () => {
-      const link = $('joinlink').value.trim();
-      if (!link) { $('out').textContent = 'Pegá un link de invitación (t.me/+...) o @canal.'; return; }
-      $('out').textContent = 'uniéndome y leyendo…';
-      const r = await fetch('/channel/join', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: apikey() }, body: JSON.stringify({ link, hours: 24 }) });
-      const j = await r.json();
-      $('out').textContent = JSON.stringify(j, null, 2);
-    };
-
-    refresh();
+    loadAccounts();
   </script>
 </body>
 </html>
