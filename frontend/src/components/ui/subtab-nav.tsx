@@ -33,7 +33,7 @@ export const subtabNavItemClass = (active: boolean, extraClassName?: string) =>
   cn(
     "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-all shrink-0",
     active
-      ? "bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500 dark:from-sky-500/25 dark:via-blue-500/30 dark:to-indigo-500/25 text-white ring-1 ring-blue-400/60 dark:ring-blue-400/50 shadow-[0_2px_8px_-2px_rgba(59,130,246,0.5)] font-semibold"
+      ? "bg-gradient-to-r from-accent to-primary dark:from-accent/30 dark:to-primary/30 text-white ring-1 ring-white/15 shadow-[0_3px_12px_-3px_hsl(var(--accent)/0.5)] font-semibold"
       : "text-foreground/70 hover:bg-foreground/5 dark:hover:bg-white/10 hover:text-foreground",
     extraClassName,
   );

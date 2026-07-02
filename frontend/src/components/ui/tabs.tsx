@@ -30,15 +30,12 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      // Mismo lenguaje visual que <SubtabNavItem> — gradient azul
-      // metalizado estilo Linear/Vercel. Light vs dark:
-      //  · light: gradient full opacity (saturado) para que text-white
-      //    tenga contraste sobre el fondo claro.
-      //  · dark: gradient ~30% opacity para que se vea sutil sobre el
-      //    fondo oscuro.
+      // Estado activo = gradiente de MARCA Maven (accent violeta → primary azul),
+      // unificado con el botón primario y el wordmark. Light: full opacity para que
+      // text-white contraste; dark: ~30% opacity para que se vea sutil sobre el fondo.
       "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ring-offset-background transition-all",
       "data-[state=inactive]:text-foreground/70 data-[state=inactive]:hover:bg-foreground/5 dark:data-[state=inactive]:hover:bg-white/10 data-[state=inactive]:hover:text-foreground",
-      "data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:via-blue-500 data-[state=active]:to-indigo-500 dark:data-[state=active]:from-sky-500/25 dark:data-[state=active]:via-blue-500/30 dark:data-[state=active]:to-indigo-500/25 data-[state=active]:text-white data-[state=active]:ring-1 data-[state=active]:ring-blue-400/60 dark:data-[state=active]:ring-blue-400/50 data-[state=active]:shadow-[0_2px_8px_-2px_rgba(59,130,246,0.5)] data-[state=active]:font-semibold",
+      "data-[state=active]:bg-gradient-to-r data-[state=active]:from-accent data-[state=active]:to-primary dark:data-[state=active]:from-accent/30 dark:data-[state=active]:to-primary/30 data-[state=active]:text-white data-[state=active]:ring-1 data-[state=active]:ring-white/15 data-[state=active]:shadow-[0_3px_12px_-3px_hsl(var(--accent)/0.5)] data-[state=active]:font-semibold",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
       className,
     )}
