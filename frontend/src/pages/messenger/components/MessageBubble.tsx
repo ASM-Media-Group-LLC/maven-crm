@@ -115,7 +115,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   const audioExtPattern = /\.(webm|ogg|mp3|m4a|wav)(\?|$)/i;
   const isAudioFile = message.file_url && audioExtPattern.test(message.file_url);
   const isImage = message.type === "image" && message.file_url;
-  const isVideo = message.file_url && (message.file_url.match(/\.(mp4|webm|mov)(\?|$)/i));
+  // OJO: los .webm de nota de voz también matchean este regex → excluir audio/nota
+  // de voz para que NO se dibujen como un player de video gigante (bug de layout).
+  const isVideo = !isVoiceNote && !isAudioFile && message.file_url && (message.file_url.match(/\.(mp4|webm|mov)(\?|$)/i));
 
   const openLightbox = (src: string, type: "image" | "video") => {
     setLightboxSrc(src);

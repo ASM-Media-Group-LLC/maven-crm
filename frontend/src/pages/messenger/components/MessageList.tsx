@@ -147,7 +147,7 @@ export default function MessageList({
 
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto">
-      <div className="max-w-2xl mx-auto py-4 px-2 md:px-4 space-y-1">
+      <div className="w-full py-4 px-3 md:px-6 space-y-1">
         {loadingMore && (
           <div className="flex justify-center py-3">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
