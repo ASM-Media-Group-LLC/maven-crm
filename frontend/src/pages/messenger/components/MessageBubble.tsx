@@ -358,14 +358,15 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
           </div>
 
           <div className={cn(
-            "px-3.5 py-2",
+            "relative px-3.5 py-2",
             bubbleRadius,
-            isMe ? "bg-primary text-primary-foreground" : "bg-primary/8 border-0"
+            reactions.length > 0 && "mb-3",
+            isMe ? "bg-primary text-primary-foreground" : "bg-muted"
           )}>
             {replyMessage && (
               <div className={cn(
                 "text-[11px] mb-1.5 px-2.5 py-1.5 rounded-xl",
-                isMe ? "bg-primary-foreground/10" : "bg-primary/5"
+                isMe ? "bg-primary-foreground/10" : "bg-background/60"
               )}>
                 <p className="font-semibold opacity-80">{profileName(profiles[replyMessage.sender_id])}</p>
                 <p className="truncate opacity-70">{replyMessage.content}</p>
@@ -392,9 +393,8 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                 totalParticipants={totalParticipants}
               />
             </div>
+            <ReactionsDisplay reactions={reactions} profiles={profiles} isMe={isMe} onToggle={onToggleReaction} />
           </div>
-
-          <ReactionsDisplay reactions={reactions} profiles={profiles} isMe={isMe} onToggle={onToggleReaction} />
 
           {threadCount > 0 && (
             <button
