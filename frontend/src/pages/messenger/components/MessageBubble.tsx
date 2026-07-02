@@ -8,6 +8,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChatMessage, UserProfile } from "../types";
+import { profileName } from "../utils";
 import { ReactionGroup } from "@/hooks/useReactions";
 import { cn } from "@/lib/utils";
 import ReactionPicker from "./ReactionPicker";
@@ -52,7 +53,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   threadCount = 0, unreadThreadCount = 0, onOpenThread,
   adjacentImages, isGridLeader, isPartOfGrid,
 }, ref) => {
-  const senderName = profiles[message.sender_id]?.full_name || "Usuario";
+  const senderName = profileName(profiles[message.sender_id]);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState("");
   const [lightboxType, setLightboxType] = useState<"image" | "video">("image");
@@ -366,7 +367,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
                 "text-[11px] mb-1.5 px-2.5 py-1.5 rounded-xl",
                 isMe ? "bg-primary-foreground/10" : "bg-primary/5"
               )}>
-                <p className="font-semibold opacity-80">{profiles[replyMessage.sender_id]?.full_name || "Usuario"}</p>
+                <p className="font-semibold opacity-80">{profileName(profiles[replyMessage.sender_id])}</p>
                 <p className="truncate opacity-70">{replyMessage.content}</p>
               </div>
             )}

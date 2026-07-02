@@ -55,6 +55,7 @@ export interface UserProfile {
   id: string;
   full_name: string | null;
   avatar_url: string | null;
+  whatsapp_push_name?: string | null;
 }
 
 // Enriched conversation for UI

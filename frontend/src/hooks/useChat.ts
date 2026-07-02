@@ -8,6 +8,7 @@ import {
   ConversationWithDetails,
   UserProfile,
 } from "@/pages/messenger/types";
+import { profileName } from "@/pages/messenger/utils";
 import { toast } from "sonner";
 
 export function useChat() {
@@ -26,7 +27,7 @@ export function useChat() {
   const loadProfiles = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, full_name, avatar_url");
+      .select("id, full_name, avatar_url, whatsapp_push_name");
     if (data) {
       const map: Record<string, UserProfile> = {};
       data.forEach((p: any) => { map[p.id] = p; });
@@ -128,9 +129,7 @@ export function useChat() {
             (p: any) => p.user_id !== user.id
           );
           if (otherParticipant) {
-            displayName =
-              profilesRef.current[otherParticipant.user_id]?.full_name ||
-              "Usuario";
+            displayName = profileName(profilesRef.current[otherParticipant.user_id]);
           }
         }
 
