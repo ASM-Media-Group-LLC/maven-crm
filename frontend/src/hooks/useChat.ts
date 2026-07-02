@@ -9,6 +9,7 @@ import {
   UserProfile,
 } from "@/pages/messenger/types";
 import { profileName } from "@/pages/messenger/utils";
+import { markMessagesDelivered } from "@/hooks/useReadReceipts";
 import { toast } from "sonner";
 
 export function useChat() {
@@ -238,6 +239,11 @@ export function useChat() {
           const msg = payload.new as any;
           if (!isKnownConversation(msg?.conversation_id)) return;
           updateConversationWithMessage(msg);
+          // Ack "entregado": llegó un mensaje de otro por el canal global (aunque el chat no
+          // esté abierto) → marcar entregado para que el remitente vea ✓✓ gris.
+          if (msg?.id && msg.sender_id !== user.id) {
+            void markMessagesDelivered(user.id, [msg.id]);
+          }
         }
       )
       .on(
@@ -768,6 +774,12 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       setMessages(sorted);
       setHasMore((data?.length || 0) >= PAGE_SIZE);
       optimisticIdsRef.current.clear();
+
+      // Backfill "entregado": al abrir la conversación, marcar como entregados los mensajes
+      // de otros (los que llegaron mientras no estábamos conectados/mirando).
+      if (user) {
+        void markMessagesDelivered(user.id, sorted.filter(m => m.sender_id !== user.id).map(m => m.id));
+      }
 
       // Mark as read
       if (user) {

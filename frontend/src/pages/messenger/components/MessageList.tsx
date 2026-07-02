@@ -19,6 +19,7 @@ interface MessageListProps {
   getReactionsForMessage: (messageId: string) => ReactionGroup[];
   onToggleReaction: (messageId: string, emoji: string) => void;
   getReadByUsers: (messageId: string) => string[];
+  getDeliveredByUsers: (messageId: string) => string[];
   totalParticipants: number;
   highlightedMsgId?: string | null;
   onOpenThread: (msg: ChatMessage) => void;
@@ -61,7 +62,7 @@ function isSameGroup(a: ChatMessage, b: ChatMessage): boolean {
 export default function MessageList({
   messages, profiles, chatType, currentUserId, searchQuery,
   loading, onReply, onCopy, onEdit, onDelete,
-  getReactionsForMessage, onToggleReaction, getReadByUsers, totalParticipants,
+  getReactionsForMessage, onToggleReaction, getReadByUsers, getDeliveredByUsers, totalParticipants,
   highlightedMsgId, onOpenThread, getThreadCount, getUnreadThreadCount,
   hasMore, loadingMore, onLoadMore,
 }: MessageListProps) {
@@ -252,6 +253,7 @@ export default function MessageList({
                       reactions={getReactionsForMessage(msg.id)}
                       onToggleReaction={(emoji) => onToggleReaction(msg.id, emoji)}
                       readByUsers={getReadByUsers(msg.id)}
+                      deliveredByUsers={getDeliveredByUsers(msg.id)}
                       totalParticipants={totalParticipants}
                       threadCount={threadCount}
                       unreadThreadCount={getUnreadThreadCount?.(msg.id) ?? 0}

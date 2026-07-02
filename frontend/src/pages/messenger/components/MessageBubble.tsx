@@ -37,6 +37,7 @@ interface MessageBubbleProps {
   reactions: ReactionGroup[];
   onToggleReaction: (emoji: string) => void;
   readByUsers: string[];
+  deliveredByUsers: string[];
   totalParticipants: number;
   threadCount?: number;
   unreadThreadCount?: number;
@@ -49,7 +50,7 @@ interface MessageBubbleProps {
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   message, isMe, chatType, profiles, highlight, onReply, onCopy, onEdit, onDelete,
   replyMessage, showAvatar, showSender, isLastInGroup,
-  reactions, onToggleReaction, readByUsers, totalParticipants,
+  reactions, onToggleReaction, readByUsers, deliveredByUsers, totalParticipants,
   threadCount = 0, unreadThreadCount = 0, onOpenThread,
   adjacentImages, isGridLeader, isPartOfGrid,
 }, ref) => {
@@ -388,6 +389,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
               </span>
               <ReadReceiptIndicator
                 isMe={isMe}
+                deliveredByUsers={deliveredByUsers}
                 readByUsers={readByUsers}
                 profiles={profiles}
                 totalParticipants={totalParticipants}
@@ -441,6 +443,7 @@ const MemoizedMessageBubble = memo(MessageBubble, (prev, next) => {
     prev.isLastInGroup === next.isLastInGroup &&
     prev.reactions === next.reactions &&
     prev.readByUsers === next.readByUsers &&
+    prev.deliveredByUsers === next.deliveredByUsers &&
     prev.threadCount === next.threadCount &&
     prev.unreadThreadCount === next.unreadThreadCount &&
     prev.replyMessage === next.replyMessage &&

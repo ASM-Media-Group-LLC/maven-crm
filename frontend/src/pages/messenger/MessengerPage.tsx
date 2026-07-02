@@ -80,7 +80,7 @@ export default function MessengerPage() {
 
   useEffect(() => { messages.forEach((m) => addMessageId(m.id)); }, [messages, addMessageId]);
   const messageIds = useMemo(() => messages.map(m => m.id), [messages]);
-  const { getReadBy } = useReadReceipts(activeChatId, messageIds);
+  const { getReadBy, getDeliveredBy } = useReadReceipts(activeChatId, messageIds);
 
   const handleSelectUser = useCallback((userId: string) => {
     const convId = createDirectChat(userId);
@@ -209,6 +209,7 @@ export default function MessengerPage() {
               getReactionsForMessage={getReactionsForMessage}
               onToggleReaction={toggleReaction}
               getReadByUsers={getReadBy}
+              getDeliveredByUsers={getDeliveredBy}
               hasMore={hasMore}
               loadingMore={loadingMore}
               onLoadMore={loadOlderMessages}

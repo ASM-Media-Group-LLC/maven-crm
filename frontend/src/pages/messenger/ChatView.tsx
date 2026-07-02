@@ -28,6 +28,7 @@ interface ChatViewProps {
   getReactionsForMessage: (messageId: string) => ReactionGroup[];
   onToggleReaction: (messageId: string, emoji: string) => void;
   getReadByUsers: (messageId: string) => string[];
+  getDeliveredByUsers: (messageId: string) => string[];
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
@@ -42,7 +43,7 @@ interface ChatViewProps {
 export default function ChatView({
   conversation, messages, profiles, typingUsers, onSendMessage, onSendTyping,
   onEditMessage, onDeleteMessage, onBack, onStartVideoCall, loading,
-  getReactionsForMessage, onToggleReaction, getReadByUsers,
+  getReactionsForMessage, onToggleReaction, getReadByUsers, getDeliveredByUsers,
   hasMore, loadingMore, onLoadMore, onMembersChanged,
   isPinned, onTogglePin, onArchive, onDelete, canDelete,
 }: ChatViewProps) {
@@ -207,6 +208,7 @@ export default function ChatView({
         getReactionsForMessage={getReactionsForMessage}
         onToggleReaction={onToggleReaction}
         getReadByUsers={getReadByUsers}
+        getDeliveredByUsers={getDeliveredByUsers}
         totalParticipants={conversation.participants.length}
         highlightedMsgId={highlightedMsgId}
         onOpenThread={handleOpenThreadWithTracking}
@@ -261,6 +263,7 @@ export default function ChatView({
               getReactionsForMessage={getReactionsForMessage}
               onToggleReaction={onToggleReaction}
               getReadByUsers={getReadByUsers}
+              getDeliveredByUsers={getDeliveredByUsers}
               totalParticipants={conversation.participants.length}
             />
           )}

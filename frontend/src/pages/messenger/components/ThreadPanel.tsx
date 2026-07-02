@@ -39,13 +39,14 @@ interface ThreadPanelProps {
   getReactionsForMessage: (messageId: string) => ReactionGroup[];
   onToggleReaction: (messageId: string, emoji: string) => void;
   getReadByUsers: (messageId: string) => string[];
+  getDeliveredByUsers: (messageId: string) => string[];
   totalParticipants: number;
 }
 
 export default function ThreadPanel({
   parentMessage, replies, profiles, currentUserId, onSendReply, onClose, participants,
   onEditMessage, onDeleteMessage, getReactionsForMessage, onToggleReaction,
-  getReadByUsers, totalParticipants,
+  getReadByUsers, getDeliveredByUsers, totalParticipants,
 }: ThreadPanelProps) {
   const { user } = useAuth();
   const [text, setText] = useState("");
@@ -245,6 +246,7 @@ export default function ThreadPanel({
     const sender = profiles[msg.sender_id]?.full_name || "Usuario";
     const reactions = getReactionsForMessage(msg.id);
     const readBy = getReadByUsers(msg.id);
+    const deliveredBy = getDeliveredByUsers(msg.id);
 
     return (
       <div
@@ -325,6 +327,7 @@ export default function ThreadPanel({
               <div className="flex justify-end mt-0.5">
                 <ReadReceiptIndicator
                   isMe={isMe}
+                  deliveredByUsers={deliveredBy}
                   readByUsers={readBy}
                   profiles={profiles}
                   totalParticipants={totalParticipants}
