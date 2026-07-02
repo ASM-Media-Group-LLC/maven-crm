@@ -733,6 +733,8 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   const loadMessagesRef = useRef<() => Promise<void>>();
   const optimisticIdsRef = useRef<Set<string>>(new Set());
   const offlineQueueRef = useRef<Array<{
+    optimisticId: string;
+    conversationId: string;
     content: string;
     type: ChatMessage["type"];
     fileUrl?: string;
@@ -822,23 +824,40 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   // Flush offline queue when back online
   useEffect(() => {
     const handleOnline = async () => {
-      if (!conversationId || !user) return;
+      if (!user) return;
       const queue = offlineQueueRef.current;
       if (queue.length === 0) return;
       offlineQueueRef.current = [];
-      
+
+      let synced = 0;
       for (const item of queue) {
-        await supabase.from("chat_messages").insert({
-          conversation_id: conversationId,
+        const { data, error } = await supabase.from("chat_messages").insert({
+          conversation_id: item.conversationId,
           sender_id: user.id,
           content: item.content,
           type: item.type,
           file_url: item.fileUrl || null,
           file_name: item.fileName || null,
           reply_to_id: item.replyToId || null,
-        });
+        }).select().single();
+
+        if (!error && data) {
+          synced += 1;
+          const real = data as ChatMessage;
+          optimisticIdsRef.current.delete(item.optimisticId);
+          // Reemplazar el placeholder optimista por la fila real. Si el canal realtime
+          // ya insertó esa fila (carrera), solo quitamos el optimista → nunca se duplica.
+          setMessages((prev) =>
+            prev.some((m) => m.id === real.id)
+              ? prev.filter((m) => m.id !== item.optimisticId)
+              : prev.map((m) => (m.id === item.optimisticId ? real : m))
+          );
+        } else {
+          // Falló el re-envío → re-encolar para el próximo reconnect (no perder el mensaje).
+          offlineQueueRef.current.push(item);
+        }
       }
-      toast.success(`${queue.length} mensaje(s) sincronizado(s)`);
+      if (synced > 0) toast.success(`${synced} mensaje(s) sincronizado(s)`);
     };
 
     window.addEventListener("online", handleOnline);
@@ -1033,9 +1052,9 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       };
       setMessages((prev) => [...prev, optimisticMsg]);
 
-      // If offline, queue the message
+      // If offline, queue the message (con el optimisticId para reconciliar por id al reconectar)
       if (!navigator.onLine) {
-        offlineQueueRef.current.push({ content, type, fileUrl, fileName, replyToId });
+        offlineQueueRef.current.push({ optimisticId, conversationId, content, type, fileUrl, fileName, replyToId });
         toast.info("Sin conexión — el mensaje se enviará al reconectar");
         return;
       }
@@ -1081,6 +1100,12 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
   const editMessage = useCallback(
     async (messageId: string, newContent: string) => {
+      // Si el mensaje todavía se está enviando (id optimista), el UPDATE no matchearía
+      // ninguna fila real y la edición se perdería en silencio → bloquear hasta que persista.
+      if (optimisticIdsRef.current.has(messageId)) {
+        toast.info("Espera a que el mensaje termine de enviarse");
+        return;
+      }
       // Optimistic update
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: newContent, is_edited: true } : m));
       const { error } = await supabase
@@ -1096,6 +1121,12 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   );
 
   const deleteMessage = useCallback(async (messageId: string) => {
+    // Igual que editMessage: si el id es optimista (aún enviándose), el UPDATE no
+    // matchearía nada y el borrado se perdería en silencio → bloquear hasta que persista.
+    if (optimisticIdsRef.current.has(messageId)) {
+      toast.info("Espera a que el mensaje termine de enviarse");
+      return;
+    }
     // Optimistic soft delete
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: true, content: null } : m));
     const { error } = await supabase
