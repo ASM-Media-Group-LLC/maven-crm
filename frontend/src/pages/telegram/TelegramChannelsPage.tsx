@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { ExternalLink, Radio, MessageSquarePlus, Inbox } from "lucide-react";
 
 // Panel del gateway de Telegram (Dokploy) — ahí se vincula la cuenta (teléfono + código).
-const TG_GATEWAY_MANAGER = "https://telegram-gw.147.93.3.97.nip.io/manager";
+// El gateway de Telegram se sirve por HTTP (nip.io sin TLS) — verificado en vivo.
+const TG_GATEWAY_MANAGER = "http://telegram-gw.147.93.3.97.nip.io/manager";
 
 const TelegramChannelsPage = () => {
   return (
