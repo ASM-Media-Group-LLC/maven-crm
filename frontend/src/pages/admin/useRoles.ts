@@ -156,6 +156,8 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   def("Operaciones", "Telefonos", ["Dashboard", "Dispositivos"]),
   // Inbox WhatsApp: Bandeja + Canales (navegables) · IA (copiloto ✨) y Asignar (reasignar) = acciones.
   def("Operaciones", "WhatsApp", ["Bandeja", "Canales", "Analítica"], ["IA", "Asignar conversaciones"]),
+  // Telegram (canal): por ahora solo "Cuentas" (vincular cuenta en el gateway). Bandeja/botón = próximos slices.
+  def("Operaciones", "Telegram", ["Cuentas"]),
   // Tickets: subtabs (Lista/Calendario) + acciones.
   def("Operaciones", "Tickets", ["Lista de Tickets", "Calendario"], ["Crear Ticket", "Editar Ticket", "Eliminar Ticket", "Asignar Ticket"]),
   def("Operaciones", "Chatters", ["Evaluator", "Workspace", "Admin"], ["Borrar Historial"]),
