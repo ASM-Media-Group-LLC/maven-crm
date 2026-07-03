@@ -1,0 +1,39 @@
+# LiveKit self-hosted (SFU) — servidor de medios para videollamadas de Maven
+# (botón de video en Messenger) + Cowork. Reemplaza a LiveKit Cloud.
+#
+# Deploy: Dokploy > proyecto maven_v3 > Create Service > Compose (misma caja, VPS Contabo).
+# - Señalización wss: se enruta por Traefik al puerto 7880 vía el tab "Domains" de Dokploy
+#   (dominio lk.asmtech.ai, TLS Let's Encrypt automático). NO hace falta escribir labels a mano.
+# - Media WebRTC (UDP/TCP): se publica directo en el host (abajo). Docker abre estos puertos
+#   en iptables automáticamente (no requiere tocar el firewall del host).
+services:
+  livekit:
+    # [SIN VERIFICAR el tag exacto] estable al 2026-07-03 = v1.13.3.
+    # Confirmar en https://hub.docker.com/r/livekit/livekit-server/tags antes de deployar.
+    image: livekit/livekit-server:v1.13.3
+    restart: unless-stopped
+    command: --config /etc/livekit/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit/livekit.yaml:ro
+    environment:
+      # Formato: "APIxxxxxxxx: secretxxxxxxxx" (una línea key: secret).
+      # Se setea en Dokploy > Environment (NO se commitea). Debe coincidir EXACTO
+      # con los secrets LIVEKIT_API_KEY / LIVEKIT_API_SECRET de Supabase al hacer el cutover.
+      LIVEKIT_KEYS: ${LIVEKIT_KEYS}
+    ports:
+      - "7881:7881"        # media TCP (fallback cuando UDP está bloqueado)
+      - "7882:7882/udp"    # media UDP (puerto único multiplexado)
+    networks:
+      - dokploy-network
+    deploy:
+      resources:
+        limits:
+          # Techo para que un all-hands de 50 no ahogue a los otros ~20 contenedores
+          # de la caja. La caja tiene 8 vCPU / 32 GB; dejamos hasta 4 cores / 3 GB a LiveKit.
+          cpus: "4"
+          memory: 3g
+
+networks:
+  # Red de Dokploy (para que Traefik alcance el puerto 7880 de señalización).
+  dokploy-network:
+    external: true

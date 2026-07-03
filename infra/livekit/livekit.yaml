@@ -1,0 +1,10 @@
+# Config del servidor LiveKit self-hosted. Sin secrets (las keys van por env LIVEKIT_KEYS).
+port: 7880                 # HTTP/WebSocket de señalización (Traefik enruta lk.asmtech.ai -> acá)
+rtc:
+  tcp_port: 7881           # media TCP (fallback)
+  udp_port: 7882           # media UDP: puerto ÚNICO multiplexado (más simple que un rango para Docker)
+  use_external_ip: true    # anuncia la IP pública del VPS en los candidatos ICE — CLAVE para que conecte
+logging:
+  level: info
+# keys: se inyectan por la variable de entorno LIVEKIT_KEYS (Dokploy), no van en este archivo.
+# turn: (opcional, Slice 2) se activa solo si hay clientes detrás de NAT/firewall estricto que no conecten.
