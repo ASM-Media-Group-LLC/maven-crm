@@ -1,15 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// tg-inbox-open (S3.3) — abre (o reutiliza) una conversación de Telegram desde un
-// contacto/creadora y devuelve su conversation_id para el deep-link
-// /telegram/bandeja?c=<id>. Espejo de wa-inbox-open, pero:
-//   - Telegram NO resuelve teléfono→usuario en frío → SOLO por @username/link/id.
-//   - resuelve el peer nativo vía el gateway (POST /resolve) sobre la cuenta default.
+// tg-inbox-open (S3.3/S4) — abre (o reutiliza) una conversación de Telegram con el
+// CREADOR/CONTACTO y devuelve conversation_id para el deep-link /telegram/bandeja?c=<id>.
 //
-// Flujo: JWT del usuario → permiso Telegram/Bandeja → username del destino
-// (payload | creators.telegram_handle) → gateway /resolve → find-or-create
-// tg_conversations(account_id, peer_id) asignada al que abre.
+// IMPORTANTE (pedido del owner): se contacta por el TELÉFONO PERSONAL del creador
+// (creators.whatsapp_number/phone_e164/phone), igual que WhatsApp — NO por
+// creators.telegram_handle, que es el canal de PROMO (eso es solo para Promolog).
+// El gateway resuelve el teléfono vía contacts.importContacts (única vía en Telegram;
+// además lo guarda como contacto). Si el número no está en Telegram → aviso claro.
+// Flujo: JWT → permiso Telegram/Bandeja → teléfono del destino → gateway /resolve
+// (en la línea elegida) → find-or-create tg_conversations(account_id, peer_id).
 
 const GW_URL = (Deno.env.get("TELEGRAM_GW_URL") || "http://telegram-gw.147.93.3.97.nip.io").replace(/\/+$/, "");
 const GW_API_KEY = Deno.env.get("TELEGRAM_GW_API_KEY") || "";
@@ -46,37 +47,51 @@ serve(async (req) => {
   });
   if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
 
-  let payload: { creator_id?: string; contact_id?: string; telegram_username?: string; name?: string; account_id?: string } = {};
+  let payload: { creator_id?: string; contact_id?: string; phone?: string; telegram_username?: string; name?: string; account_id?: string } = {};
   try { payload = await req.json(); } catch { /* */ }
   const creatorId = payload.creator_id ?? null;
   const contactId = payload.contact_id ?? null;
   const reqAccountId = payload.account_id ?? null; // línea desde la que se abre (opcional)
   let displayName = payload.name ?? null;
 
-  // ── Resolver el @username del destino (payload directo o creators.telegram_handle) ──
-  let handle = payload.telegram_username ? cleanHandle(payload.telegram_username) : "";
-  if (!handle && creatorId) {
+  // ── Destino: contactar al CREADOR por su TELÉFONO PERSONAL (como WhatsApp), NO por
+  //    creators.telegram_handle (eso es el canal de PROMO → solo Promolog). Se acepta un
+  //    @username explícito solo si viene en el payload (contacto personal real). ──
+  let to = payload.telegram_username ? cleanHandle(payload.telegram_username) : "";
+  if (!to && payload.phone) to = String(payload.phone).trim();
+  if (!to && creatorId) {
     const { data: cr } = await (sb as any)
-      .from("creators").select("telegram_handle, name").eq("id", creatorId).maybeSingle();
-    if (cr?.telegram_handle) handle = cleanHandle(String(cr.telegram_handle));
+      .from("creators").select("whatsapp_number, phone_e164, phone, name").eq("id", creatorId).maybeSingle();
+    to = (cr?.whatsapp_number || cr?.phone_e164 || cr?.phone || "").toString().trim();
     if (!displayName) displayName = cr?.name ?? null;
   }
-  if (!handle) {
-    return json({ ok: false, error: "Este contacto no tiene usuario de Telegram cargado." }, 200);
+  if (!to && contactId) {
+    const { data: ct } = await (sb as any)
+      .from("closers_contacts").select("country_code, phone").eq("id", contactId).maybeSingle();
+    const cc = (ct?.country_code || "").toString().trim();
+    const ph = (ct?.phone || "").toString().trim();
+    to = ph.startsWith("+") ? ph
+      : (cc && ph ? (cc.startsWith("+") ? cc : "+" + cc.replace(/\D/g, "")) + ph.replace(/\D/g, "") : ph);
+  }
+  if (!to) {
+    return json({ ok: false, error: "Este contacto no tiene teléfono (ni usuario de Telegram) cargado." }, 200);
   }
 
-  // ── Resolver el peer nativo vía el gateway (username → peer_id + account_id) ─────
+  // ── Resolver el peer nativo vía el gateway (teléfono→importContacts o @username→getEntity) ──
   if (!GW_API_KEY) return json({ ok: false, error: "gateway_not_configured" }, 500);
   let resolved: any = null;
   try {
     const r = await fetch(`${GW_URL}/resolve`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: GW_API_KEY },
-      body: JSON.stringify({ to: handle, accountId: reqAccountId }),
+      body: JSON.stringify({ to, name: displayName, accountId: reqAccountId }),
     });
     resolved = await r.json().catch(() => ({}));
+    if (resolved?.error === "not_on_telegram") {
+      return json({ ok: false, error: "Este número no está en Telegram (o su privacidad no permite contactarlo)." }, 200);
+    }
     if (!r.ok || !resolved?.ok || !resolved?.peer_id) {
-      return json({ ok: false, error: `No pude resolver @${handle} en Telegram (¿usuario correcto?).` }, 200);
+      return json({ ok: false, error: "No pude abrir el chat de Telegram con este contacto." }, 200);
     }
   } catch (e) {
     return json({ ok: false, error: "gateway_unreachable: " + (e as Error).message }, 200);
@@ -84,7 +99,7 @@ serve(async (req) => {
 
   const accountId = String(resolved.account_id);
   const peerId = String(resolved.peer_id);
-  const peerUsername = resolved.username ?? handle;
+  const peerUsername = resolved.username ?? null;
   const peerName = resolved.name ?? displayName;
 
   // ── find-or-create tg_conversations (account_id, peer_id) ───────────────────────

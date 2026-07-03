@@ -323,8 +323,9 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
         {/* WhatsApp: abre el chat en la bandeja de Maven (sin exponer el número) */}
         <InfoField label="WhatsApp" value={<WaChatButton phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} />} />
 
-        {/* Telegram: abre el chat en la bandeja de Maven (solo por @usuario, espejo de WhatsApp) */}
-        <InfoField label="Telegram" value={c.telegram_handle ? <TgChatButton creatorId={creatorId} telegramUsername={c.telegram_handle} name={c.name} /> : null} />
+        {/* Telegram: abre el chat en la bandeja de Maven contactando por el TELÉFONO del
+            creador (importContacts server-side), como WhatsApp. NO usa telegram_handle (promo). */}
+        <InfoField label="Telegram" value={(c.whatsapp_number || c.phone) ? <TgChatButton creatorId={creatorId} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} /> : null} />
 
         {/* Notas Internas */}
         {isEditing ? (

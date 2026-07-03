@@ -8,6 +8,7 @@ import ContactHistoryPanel from "./ContactHistoryPanel";
 import ActivityTimeline from "./ActivityTimeline";
 import EvidenceViewer from "@/components/leadgen/EvidenceViewer";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
+import { TgChatButton } from "@/components/TgChatButton";
 
 interface Creator {
   id: string;
@@ -98,7 +99,12 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
           <Field label="Categoría" value={creator.category} />
           <Field label="Fecha de paso" value={creator.passed_date} />
           <Field label="Cuenta origen" value={creator.source_account} />
-          <Field label="WhatsApp" value={<WaChatButton phone={toE164({ phone: creator.phone })} closerCreatorId={creator.id} />} />
+          <Field label="WhatsApp" value={
+            <div className="flex items-center gap-1">
+              <WaChatButton phone={toE164({ phone: creator.phone })} closerCreatorId={creator.id} />
+              <TgChatButton phone={toE164({ phone: creator.phone })} name={creator.instagram_handle} />
+            </div>
+          } />
           <Field label="OnlyFans" value={creator.onlyfans_url} />
           <Field label="Plataforma principal" value={creator.main_platform} />
           <Field label="Monetización estimada" value={`$${Number(creator.estimated_monetization || 0).toLocaleString()}`} />

@@ -189,7 +189,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 <InfoField icon={Building2} label="Agencia" value={c.creator_business?.company?.name ?? c.creator_business?.assigned_agency} />
                 <InfoField icon={Mail} label="Email" value={c.email} />
                 <InfoField icon={Phone} label="WhatsApp" value={<WaChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} />} />
-                <InfoField icon={Send} label="Telegram" value={c.telegram_handle ? <TgChatButton creatorId={c.id} telegramUsername={c.telegram_handle} name={c.name} /> : null} />
+                <InfoField icon={Send} label="Telegram" value={(c.whatsapp_number || c.phone) ? <TgChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} /> : null} />
                 <InfoField icon={UserCog} label="Tipo de Manager" value={c.creator_business?.manager_type} />
                 <InfoField icon={CalendarDays} label="Fecha de Registro" value={regDate} />
               </div>
@@ -226,13 +226,13 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                   <WaChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number })} name={c.name} />
                 </div>
               )}
-              {c.telegram_handle && (
+              {(c.whatsapp_number || c.phone) && (
                 <div className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
                     <PlatformIcon><TelegramIcon className="h-4 w-4" /></PlatformIcon>
                     <span className="text-sm font-medium">Telegram</span>
                   </div>
-                  <TgChatButton creatorId={c.id} telegramUsername={c.telegram_handle} name={c.name} />
+                  <TgChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} />
                 </div>
               )}
             </TabsContent>

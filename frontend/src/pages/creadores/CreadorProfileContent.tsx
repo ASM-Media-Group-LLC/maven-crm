@@ -204,8 +204,8 @@ const CreadorProfileContent = () => {
               {c.whatsapp_number && (
                 <WaChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number })} name={c.name} className="h-7 gap-1.5 px-2 text-xs text-emerald-600 hover:text-emerald-700" />
               )}
-              {c.telegram_handle && (
-                <TgChatButton creatorId={c.id} telegramUsername={c.telegram_handle} name={c.name} />
+              {(c.whatsapp_number || c.phone) && (
+                <TgChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} className="h-7 gap-1.5 px-2 text-xs text-sky-600 hover:text-sky-700" />
               )}
               {c.instagram_handle && (
                 <a href={buildSocialUrl("instagram", c.instagram_handle)} target="_blank" rel="noopener noreferrer">

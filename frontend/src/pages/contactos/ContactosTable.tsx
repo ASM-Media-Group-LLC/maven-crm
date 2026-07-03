@@ -3,6 +3,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { ArrowUpDown, ExternalLink, MoreHorizontal, Eye, Pencil, Sparkles, Phone, Trash2 } from "lucide-react";
 import { getCountryFlag, getCountryShortDisplay, maskPhone } from "@/lib/country-utils";
 import { WaChatButton } from "@/components/WaChatButton";
+import { TgChatButton } from "@/components/TgChatButton";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import {
   Table,
@@ -182,7 +183,10 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert, onDelete }: Prop
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{c.city || "No aplicable"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  <WaChatButton contactId={c.id} />
+                  <div className="flex items-center gap-1">
+                    <WaChatButton contactId={c.id} />
+                    <TgChatButton contactId={c.id} />
+                  </div>
                 </TableCell>
 
                 <TableCell className="sticky right-0 z-10 bg-card">

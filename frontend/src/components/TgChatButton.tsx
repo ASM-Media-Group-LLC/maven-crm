@@ -1,9 +1,8 @@
 // Botón "Telegram" (al lado del de WhatsApp). Abre el chat DENTRO de la bandeja de
-// Maven vía la edge `tg-inbox-open`, que resuelve el peer server-side y crea/reutiliza
-// la conversación. Igual que WhatsApp: si hay más de una línea, deja ELEGIR desde qué
-// línea abrir (dropdown "¿Desde qué línea?"). A diferencia de WhatsApp (wa.me por
-// teléfono), Telegram SOLO abre en frío por @username → si el contacto no tiene usuario
-// de Telegram, el edge devuelve un aviso claro (no un error).
+// Maven vía la edge `tg-inbox-open`, que contacta al creador por su TELÉFONO PERSONAL
+// (importContacts server-side; NO el canal de promo). Igual que WhatsApp: si hay más de
+// una línea, deja ELEGIR desde qué línea abrir (dropdown "¿Desde qué línea?") — y esa es
+// la cuenta que importa el contacto. Si el número no está en Telegram, aviso claro.
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,13 +22,17 @@ import { Loader2, ChevronDown } from "lucide-react";
 export function TgChatButton({
   creatorId = null,
   contactId = null,
+  phone = null,
   telegramUsername = null,
   name = null,
   className,
 }: {
   creatorId?: string | null;
   contactId?: string | null;
-  /** @username directo (si no, el edge lo saca de creators.telegram_handle por creatorId). */
+  /** Teléfono E.164 del creador/contacto (con "+"). El edge lo resuelve por importContacts.
+   *  Si no viene, el edge lo saca del teléfono del creator/contact por id. */
+  phone?: string | null;
+  /** @username personal directo (opcional). NO es el canal de promo (telegram_handle). */
   telegramUsername?: string | null;
   name?: string | null;
   className?: string;
@@ -41,14 +44,14 @@ export function TgChatButton({
   const [busy, setBusy] = useState(false);
   const [gateMsg, setGateMsg] = useState<string | null>(null);
 
-  // Sin ningún identificador utilizable → no renderiza (no ocupa espacio).
-  if (!creatorId && !contactId && !telegramUsername) return null;
+  // Sin nada para contactar → no renderiza (no ocupa espacio).
+  if (!creatorId && !contactId && !phone && !telegramUsername) return null;
 
   // accountId = línea elegida (o null → el edge usa la default del gateway).
   const open = async (accountId: string | null) => {
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("tg-inbox-open", {
-      body: { creator_id: creatorId, contact_id: contactId, telegram_username: telegramUsername, name, account_id: accountId },
+      body: { creator_id: creatorId, contact_id: contactId, phone, telegram_username: telegramUsername, name, account_id: accountId },
     });
     setBusy(false);
     const res = data as { ok?: boolean; error?: string; conversation_id?: string } | null;

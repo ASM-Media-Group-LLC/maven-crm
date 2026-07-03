@@ -295,8 +295,15 @@ app.get("/accounts", apiGuard, (req, res) => {
   res.json({ ok: true, accounts });
 });
 
+// ¿el "to" es un teléfono? (E.164 con "+" o 8-15 dígitos). Un @username tiene letras.
+function looksLikePhone(s) {
+  const digits = s.replace(/\D/g, "");
+  return /^\+?[\d\s().-]+$/.test(s) && digits.length >= 8 && digits.length <= 15;
+}
+
 app.post("/resolve", apiGuard, async (req, res) => {
   const to = ((req.body && req.body.to) || "").toString().trim();
+  const displayName = ((req.body && req.body.name) || "").toString().trim();
   if (!to) return res.status(400).json({ ok: false, error: "falta 'to'" });
   try {
     // Línea desde la que se abre el chat: la que pida Maven, o la default.
@@ -304,8 +311,30 @@ app.post("/resolve", apiGuard, async (req, res) => {
     const accountId = requested || defaultAccountId();
     if (!accountId) return res.status(400).json({ ok: false, error: "no hay cuentas vinculadas" });
     const c = await getClient(accountId);
-    const handle = to.replace(/^https?:\/\/(t\.me|telegram\.me)\//i, "").replace(/^@/, "");
-    const entity = await c.getEntity(/^\d+$/.test(handle) ? Number(handle) : handle);
+
+    let entity;
+    if (looksLikePhone(to)) {
+      // Contacto por TELÉFONO: Telegram NO resuelve un número→usuario salvo importándolo
+      // como contacto (contacts.importContacts). Eso además lo GUARDA como contacto en la
+      // cuenta (patrón más sano que un link en frío). Solo funciona si el número está en
+      // Telegram y su privacidad lo permite → si no, users viene vacío.
+      const phone = to.replace(/[^\d+]/g, "");
+      const imported = await c.invoke(new Api.contacts.ImportContacts({
+        contacts: [new Api.InputPhoneContact({
+          clientId: Date.now(), // GramJS convierte number→long internamente (returnBigInt)
+          phone,
+          firstName: displayName || "Contacto Maven",
+          lastName: "",
+        })],
+      }));
+      entity = imported && imported.users && imported.users[0];
+      if (!entity) return res.json({ ok: false, error: "not_on_telegram", phone });
+    } else {
+      // Username / t.me link / id numérico.
+      const handle = to.replace(/^https?:\/\/(t\.me|telegram\.me)\//i, "").replace(/^@/, "");
+      entity = await c.getEntity(/^\d+$/.test(handle) ? Number(handle) : handle);
+    }
+
     const name = [entity && entity.firstName, entity && entity.lastName].filter(Boolean).join(" ").trim()
       || (entity && entity.title) || null;
     res.json({

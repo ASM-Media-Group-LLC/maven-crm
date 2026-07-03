@@ -12,6 +12,7 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import { WaChatButton } from "@/components/WaChatButton";
+import { TgChatButton } from "@/components/TgChatButton";
 import type { Contacto } from "./ContactosContent";
 import type { ContactChannel } from "./useContactSalesChannels";
 
@@ -92,7 +93,12 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
     { label: "Ciudad", value: c.city || "—" },
     {
       label: "Contacto",
-      value: <WaChatButton contactId={c.id} name={c.nombre} />,
+      value: (
+        <div className="flex items-center gap-1">
+          <WaChatButton contactId={c.id} name={c.nombre} />
+          <TgChatButton contactId={c.id} name={c.nombre} />
+        </div>
+      ),
     },
   ];
 

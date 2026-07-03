@@ -386,6 +386,8 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
                     <ExtraAccountsInline creatorId={creatorId} network="whatsapp" canManage={false} />
                   </div>
                   <WaChatButton creatorId={creatorId} phone={toE164({ whatsapp: creator.whatsapp_number })} name={creator.name} />
+                  {/* Telegram por el MISMO teléfono (contacto personal, no el canal de promo). */}
+                  <TgChatButton creatorId={creatorId} phone={toE164({ whatsapp: creator.whatsapp_number })} name={creator.name} />
                 </Card>
               );
             }
@@ -407,12 +409,6 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
                     <ExtraAccountsInline creatorId={creatorId} network={MULTI_NET[platform.key]!} canManage={false} />
                   )}
                 </div>
-                {/* Telegram: además del link a t.me, botón que abre la bandeja de Maven. */}
-                {platform.key === "telegram_handle" && creator.telegram_handle && (
-                  <span className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <TgChatButton creatorId={creatorId} telegramUsername={creator.telegram_handle} name={creator.name} />
-                  </span>
-                )}
                 {hasLink && (
                   <a
                     href={url}
