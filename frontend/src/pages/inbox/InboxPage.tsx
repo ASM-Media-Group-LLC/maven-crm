@@ -107,15 +107,18 @@ const contactLabel = (c: ConvRow["contact"]): string =>
 // el mockup (Content P. violeta, Unlock azul, Kash verde…). Color determinista
 // por id de canal para que sea estable entre renders. Decorativo (identidad de
 // marca), no semántico.
+// Texto oscuro (-700) en modo claro sobre el tinte pálido, y claro (-300) en
+// dark. Sin el dark: variant, en light quedaba texto-claro-sobre-claro = casi
+// invisible. Borde suave del mismo color para definir el chip en ambos modos.
 const CHANNEL_CHIP_PALETTE = [
-  "bg-violet-500/15 text-violet-300",
-  "bg-blue-500/15 text-blue-300",
-  "bg-emerald-500/15 text-emerald-300",
-  "bg-amber-500/15 text-amber-300",
-  "bg-rose-500/15 text-rose-300",
-  "bg-cyan-500/15 text-cyan-300",
-  "bg-indigo-500/15 text-indigo-300",
-  "bg-teal-500/15 text-teal-300",
+  "bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-500/20",
+  "bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/20",
+  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20",
+  "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/20",
+  "bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/20",
+  "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20",
+  "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20",
+  "bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/20",
 ];
 const channelChipClass = (key: string | null): string => {
   if (!key) return "bg-muted text-muted-foreground";
@@ -761,7 +764,7 @@ const InboxPage = () => {
               onClick={() => setChannelFilter(null)}
               className={cn(
                 "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                !channelFilter ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/70",
+                !channelFilter ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-foreground border border-border hover:bg-muted/70",
               )}
             >
               Todos
@@ -773,7 +776,7 @@ const InboxPage = () => {
                 onClick={() => setChannelFilter(ch.id)}
                 className={cn(
                   "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                  channelFilter === ch.id ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/70",
+                  channelFilter === ch.id ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-foreground border border-border hover:bg-muted/70",
                 )}
               >
                 {ch.label || ch.evolution_instance || "—"}
@@ -790,7 +793,7 @@ const InboxPage = () => {
               onClick={() => { setChatFilter(key); setLabelFilter(null); setShowArchived(false); }}
               className={cn(
                 "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                !labelFilter && !showArchived && chatFilter === key ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/70",
+                !labelFilter && !showArchived && chatFilter === key ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-foreground border border-border hover:bg-muted/70",
               )}
             >
               {label}
@@ -803,7 +806,7 @@ const InboxPage = () => {
               onClick={() => { setLabelFilter(lb.id); setShowArchived(false); }}
               className={cn(
                 "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                labelFilter === lb.id ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/70",
+                labelFilter === lb.id ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-foreground border border-border hover:bg-muted/70",
               )}
             >
               <Tags className="h-3 w-3" /> {lb.name}
@@ -813,7 +816,7 @@ const InboxPage = () => {
             type="button"
             onClick={() => { setNewListName(""); setListDialog({ forConversation: null }); }}
             title="Nueva lista"
-            className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground hover:bg-muted/70"
+            className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-foreground border border-border hover:bg-muted/70"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
@@ -823,7 +826,7 @@ const InboxPage = () => {
             title="Archivados"
             className={cn(
               "grid h-6 w-6 shrink-0 place-items-center rounded-full transition-colors",
-              showArchived ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/70",
+              showArchived ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-foreground border border-border hover:bg-muted/70",
             )}
           >
             <Archive className="h-3 w-3" />
