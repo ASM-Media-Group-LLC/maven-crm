@@ -204,7 +204,7 @@ export const ChatComposer = ({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="w-full resize-none rounded-md border bg-transparent px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+            className="min-h-[42px] w-full resize-none rounded-md border bg-transparent px-3 py-2.5 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
             style={{ maxHeight: MAX_TEXTAREA_PX }}
           />
           <Button
@@ -212,7 +212,7 @@ export const ChatComposer = ({
             onClick={() => void doSend()}
             disabled={!canSend}
             size="icon"
-            className="absolute bottom-1.5 right-1.5 h-8 w-8 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90"
+            className="absolute bottom-[7px] right-2 h-7 w-7 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90"
             title="Enviar"
           >
             {spinning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

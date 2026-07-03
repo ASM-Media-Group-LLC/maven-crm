@@ -1438,7 +1438,7 @@ const InboxPage = () => {
                   onClick={() => sendMessage()}
                   disabled={sending || !draft.trim()}
                   size="icon"
-                  className="absolute right-1 top-1/2 h-8 w-8 shrink-0 -translate-y-1/2 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90"
+                  className="absolute right-1.5 top-1/2 h-7 w-7 shrink-0 -translate-y-1/2 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90"
                   title="Enviar"
                 >
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
