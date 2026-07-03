@@ -818,7 +818,7 @@ const InboxPage = () => {
               {conversations.length === 0 ? "Todavía no hay conversaciones." : "Sin resultados."}
             </div>
           ) : (
-            <ul className="divide-y divide-border">
+            <ul className="space-y-0.5 px-2 py-2">
               {filtered.map((c) => {
                 const unread = isUnread(c);
                 return (
@@ -829,8 +829,8 @@ const InboxPage = () => {
                         type="button"
                         onClick={() => { setSelectedId(c.id); setCopilotInfo(null); }}
                         className={cn(
-                          "relative flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40",
-                          selectedId === c.id && "bg-primary/10 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary",
+                          "relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/50",
+                          selectedId === c.id && "bg-muted before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary",
                         )}
                       >
                         <WaContactAvatar conversationId={c.id} name={contactLabel(c.contact)} className="h-11 w-11 text-sm" />
@@ -1029,10 +1029,10 @@ const InboxPage = () => {
                         <div className={cn("flex max-w-[80%] items-end gap-1", isOut ? "flex-row-reverse" : "flex-row")}>
                           <div
                             className={cn(
-                              "relative min-w-0 rounded-2xl px-3 py-2 text-sm",
+                              "relative min-w-0 rounded-2xl px-3 py-2 text-sm shadow-sm",
                               isDeleted
                                 ? "border border-destructive/30 bg-destructive/10 text-destructive"
-                                : isOut ? "bg-primary text-primary-foreground" : "bg-muted",
+                                : isOut ? "rounded-br-md bg-gradient-to-br from-accent to-primary text-white" : "rounded-bl-md bg-muted",
                               m.agent_reaction && "mb-2",
                             )}
                           >
@@ -1109,7 +1109,7 @@ const InboxPage = () => {
                                 "mt-0.5 flex items-center justify-end gap-1 text-[10px] tabular-nums",
                                 isDeleted
                                   ? "text-destructive/80 dark:text-destructive/80"
-                                  : isOut ? "text-primary-foreground/70" : "text-muted-foreground",
+                                  : isOut ? "text-white/75" : "text-muted-foreground",
                               )}
                             >
                               {fmtTime(m.sent_at)}
