@@ -733,7 +733,7 @@ const InboxPage = () => {
               onClick={() => setChannelFilter(null)}
               className={cn(
                 "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                !channelFilter ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+                !channelFilter ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/70",
               )}
             >
               Todos
@@ -745,7 +745,7 @@ const InboxPage = () => {
                 onClick={() => setChannelFilter(ch.id)}
                 className={cn(
                   "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                  channelFilter === ch.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+                  channelFilter === ch.id ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/70",
                 )}
               >
                 {ch.label || ch.evolution_instance || "—"}
@@ -762,7 +762,7 @@ const InboxPage = () => {
               onClick={() => { setChatFilter(key); setLabelFilter(null); setShowArchived(false); }}
               className={cn(
                 "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                !labelFilter && !showArchived && chatFilter === key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+                !labelFilter && !showArchived && chatFilter === key ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/70",
               )}
             >
               {label}
@@ -775,7 +775,7 @@ const InboxPage = () => {
               onClick={() => { setLabelFilter(lb.id); setShowArchived(false); }}
               className={cn(
                 "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                labelFilter === lb.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+                labelFilter === lb.id ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/70",
               )}
             >
               <Tags className="h-3 w-3" /> {lb.name}
@@ -795,7 +795,7 @@ const InboxPage = () => {
             title="Archivados"
             className={cn(
               "grid h-6 w-6 shrink-0 place-items-center rounded-full transition-colors",
-              showArchived ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+              showArchived ? "bg-gradient-to-r from-accent to-primary text-white shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/70",
             )}
           >
             <Archive className="h-3 w-3" />
@@ -822,8 +822,8 @@ const InboxPage = () => {
                         type="button"
                         onClick={() => { setSelectedId(c.id); setCopilotInfo(null); }}
                         className={cn(
-                          "flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40",
-                          selectedId === c.id && "bg-muted/60",
+                          "relative flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40",
+                          selectedId === c.id && "bg-primary/10 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary",
                         )}
                       >
                         <WaContactAvatar conversationId={c.id} name={contactLabel(c.contact)} className="h-11 w-11 text-sm" />
