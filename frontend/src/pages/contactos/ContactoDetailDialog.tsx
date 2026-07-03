@@ -61,7 +61,7 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
     .toUpperCase() || "?";
   const recordType = (c as unknown as { record_type?: string }).record_type;
   const tipo = recordType === "reactivado" ? "Reactivado" : "Nuevo";
-  const stats: { label: string; value: React.ReactNode }[] = [
+  const stats: { label: string; value: React.ReactNode; full?: boolean }[] = [
     { label: "Creación", value: c.creacion || "—" },
     { label: "Registro", value: c.ticket || "—" },
     { label: "Agente", value: c.creadoPor || "No asignado" },
@@ -93,8 +93,9 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
     { label: "Ciudad", value: c.city || "—" },
     {
       label: "Contacto",
+      full: true,
       value: (
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1.5">
           <WaChatButton contactId={c.id} name={c.nombre} />
           <TgChatButton contactId={c.id} name={c.nombre} />
         </div>
@@ -150,9 +151,16 @@ const ContactoDetailDialog = ({ open, onOpenChange, contacto, onEdit, onConvert,
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
           {stats.map((s) => (
-            <div key={s.label} className="rounded-lg border border-border bg-card p-3">
+            <div
+              key={s.label}
+              className={`rounded-lg border border-border bg-card p-3 ${s.full ? "col-span-2 sm:col-span-3" : ""}`}
+            >
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{s.label}</p>
-              <p className="text-sm font-medium tabular-nums truncate">{s.value}</p>
+              {s.full ? (
+                <div className="mt-0.5 text-sm font-medium">{s.value}</div>
+              ) : (
+                <p className="text-sm font-medium tabular-nums truncate">{s.value}</p>
+              )}
             </div>
           ))}
         </div>

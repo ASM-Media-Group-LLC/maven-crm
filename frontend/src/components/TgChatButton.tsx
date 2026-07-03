@@ -22,6 +22,7 @@ import { Loader2, ChevronDown } from "lucide-react";
 export function TgChatButton({
   creatorId = null,
   contactId = null,
+  closerCreatorId = null,
   phone = null,
   telegramUsername = null,
   name = null,
@@ -29,8 +30,11 @@ export function TgChatButton({
 }: {
   creatorId?: string | null;
   contactId?: string | null;
+  /** Lead de Closers (closer_creators.id). El edge resuelve el teléfono server-side vía
+   *  source_contact_id y aplica el gating por dueño (el closer solo abre SUS leads). */
+  closerCreatorId?: string | null;
   /** Teléfono E.164 del creador/contacto (con "+"). El edge lo resuelve por importContacts.
-   *  Si no viene, el edge lo saca del teléfono del creator/contact por id. */
+   *  Si no viene, el edge lo saca del teléfono del creator/contact/lead por id. */
   phone?: string | null;
   /** @username personal directo (opcional). NO es el canal de promo (telegram_handle). */
   telegramUsername?: string | null;
@@ -45,13 +49,13 @@ export function TgChatButton({
   const [gateMsg, setGateMsg] = useState<string | null>(null);
 
   // Sin nada para contactar → no renderiza (no ocupa espacio).
-  if (!creatorId && !contactId && !phone && !telegramUsername) return null;
+  if (!creatorId && !contactId && !closerCreatorId && !phone && !telegramUsername) return null;
 
   // accountId = línea elegida (o null → el edge usa la default del gateway).
   const open = async (accountId: string | null) => {
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("tg-inbox-open", {
-      body: { creator_id: creatorId, contact_id: contactId, phone, telegram_username: telegramUsername, name, account_id: accountId },
+      body: { creator_id: creatorId, contact_id: contactId, closer_creator_id: closerCreatorId, phone, telegram_username: telegramUsername, name, account_id: accountId },
     });
     setBusy(false);
     const res = data as { ok?: boolean; error?: string; conversation_id?: string } | null;

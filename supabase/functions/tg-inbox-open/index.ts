@@ -2,15 +2,22 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // tg-inbox-open (S3.3/S4) — abre (o reutiliza) una conversación de Telegram con el
-// CREADOR/CONTACTO y devuelve conversation_id para el deep-link /telegram/bandeja?c=<id>.
+// CREADOR/CONTACTO/LEAD y devuelve conversation_id para el deep-link /telegram/bandeja?c=<id>.
 //
-// IMPORTANTE (pedido del owner): se contacta por el TELÉFONO PERSONAL del creador
-// (creators.whatsapp_number/phone_e164/phone), igual que WhatsApp — NO por
-// creators.telegram_handle, que es el canal de PROMO (eso es solo para Promolog).
-// El gateway resuelve el teléfono vía contacts.importContacts (única vía en Telegram;
-// además lo guarda como contacto). Si el número no está en Telegram → aviso claro.
-// Flujo: JWT → permiso Telegram/Bandeja → teléfono del destino → gateway /resolve
-// (en la línea elegida) → find-or-create tg_conversations(account_id, peer_id).
+// IMPORTANTE (pedido del owner): se contacta por el TELÉFONO PERSONAL (whatsapp_number/
+// phone_e164/phone), igual que WhatsApp — NO por creators.telegram_handle, que es el canal
+// de PROMO (eso es solo para Promolog). El gateway resuelve el teléfono vía
+// contacts.importContacts (única vía en Telegram; además lo guarda como contacto). Si el
+// número no está en Telegram → aviso claro.
+//
+// Destinos soportados (paridad con wa-inbox-open):
+//   - telegram_username: @username explícito (contacto personal real).
+//   - phone: E.164 directo (leadgen / fallback).
+//   - creator_id: creators (módulo Creadoras), sin gating de dueño.
+//   - contact_id: closers_contacts (módulo Contactos), sin gating de dueño.
+//   - closer_creator_id: closer_creators (tabla de leads de Closers) → resuelve el teléfono
+//     vía source_contact_id (closers_contacts.country_code+phone, fuente confiable) y APLICA
+//     el gating por dueño del lead (el closer solo abre los suyos; supervisor+ abre cualquiera).
 
 const GW_URL = (Deno.env.get("TELEGRAM_GW_URL") || "http://telegram-gw.147.93.3.97.nip.io").replace(/\/+$/, "");
 const GW_API_KEY = Deno.env.get("TELEGRAM_GW_API_KEY") || "";
@@ -25,6 +32,18 @@ function json(body: unknown, status = 200) {
 }
 const cleanHandle = (s: string) =>
   s.trim().replace(/^https?:\/\/(t\.me|telegram\.me)\//i, "").replace(/^@/, "").trim();
+
+// ── Normalización de teléfono (mismo criterio que wa-inbox-open) ──
+const onlyDigits = (s: unknown) => String(s ?? "").replace(/\D/g, "");
+const cleanE164 = (s: unknown): string | null => {
+  const d = onlyDigits(s);
+  return d ? "+" + d : null;
+};
+const joinCc = (cc: unknown, phone: unknown): string | null => {
+  const c = onlyDigits(cc), p = onlyDigits(phone);
+  if (!p) return null;
+  return "+" + c + p;
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
@@ -47,32 +66,76 @@ serve(async (req) => {
   });
   if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
 
-  let payload: { creator_id?: string; contact_id?: string; phone?: string; telegram_username?: string; name?: string; account_id?: string } = {};
+  let payload: {
+    creator_id?: string; contact_id?: string; closer_creator_id?: string;
+    phone?: string; telegram_username?: string; name?: string; account_id?: string;
+  } = {};
   try { payload = await req.json(); } catch { /* */ }
   const creatorId = payload.creator_id ?? null;
   const contactId = payload.contact_id ?? null;
+  const closerCreatorId = payload.closer_creator_id ?? null;
   const reqAccountId = payload.account_id ?? null; // línea desde la que se abre (opcional)
   let displayName = payload.name ?? null;
 
-  // ── Destino: contactar al CREADOR por su TELÉFONO PERSONAL (como WhatsApp), NO por
-  //    creators.telegram_handle (eso es el canal de PROMO → solo Promolog). Se acepta un
-  //    @username explícito solo si viene en el payload (contacto personal real). ──
+  // ── Destino: contactar por TELÉFONO PERSONAL (como WhatsApp), NO por telegram_handle. ──
   let to = payload.telegram_username ? cleanHandle(payload.telegram_username) : "";
   if (!to && payload.phone) to = String(payload.phone).trim();
+
   if (!to && creatorId) {
     const { data: cr } = await (sb as any)
       .from("creators").select("whatsapp_number, phone_e164, phone, name").eq("id", creatorId).maybeSingle();
     to = (cr?.whatsapp_number || cr?.phone_e164 || cr?.phone || "").toString().trim();
     if (!displayName) displayName = cr?.name ?? null;
   }
+
   if (!to && contactId) {
     const { data: ct } = await (sb as any)
-      .from("closers_contacts").select("country_code, phone").eq("id", contactId).maybeSingle();
-    const cc = (ct?.country_code || "").toString().trim();
-    const ph = (ct?.phone || "").toString().trim();
-    to = ph.startsWith("+") ? ph
-      : (cc && ph ? (cc.startsWith("+") ? cc : "+" + cc.replace(/\D/g, "")) + ph.replace(/\D/g, "") : ph);
+      .from("closers_contacts").select("country_code, phone, name, handle").eq("id", contactId).maybeSingle();
+    if (ct) {
+      to = (ct.country_code && ct.phone) ? (joinCc(ct.country_code, ct.phone) || "")
+         : (ct.phone ? (cleanE164(ct.phone) || "") : "");
+      if (!displayName) displayName = ct.name || ct.handle || null;
+    }
   }
+
+  // ── Lead de Closers (closer_creators) → teléfono server-side + GATING por dueño ──
+  // Paridad con wa-inbox-open: el número no viaja al browser; el closer solo abre SUS leads.
+  if (!to && closerCreatorId) {
+    const { data: lead } = await (sb as any)
+      .from("closer_creators").select("*").eq("id", closerCreatorId).maybeSingle();
+    if (lead) {
+      // Gating: closer abre solo lo asignado a él; supervisor/manager/admin abren cualquiera.
+      const { data: isSup } = await sb.rpc("is_in_role_group", { _user_id: userId, _group: "supervisor_or_above" });
+      if (!isSup) {
+        const leadOwner = lead.assigned_to ?? null;
+        if (!leadOwner) {
+          return json({ ok: false, error: "Este lead no está asignado a vos. Tomalo desde Closers para poder abrir su chat." });
+        }
+        if (leadOwner !== userId) {
+          const { data: owner } = await (sb as any).from("profiles").select("full_name").eq("id", leadOwner).maybeSingle();
+          const who = owner?.full_name || "otra persona";
+          return json({ ok: false, error: `Este lead ya está asignado a ${who}. No podés abrir su chat.` });
+        }
+      }
+      // Teléfono: preferimos el del contacto origen (closers_contacts.country_code es la
+      // fuente confiable) si el del lead viene sin país (≤10 díg) o falta.
+      let e164 = lead.phone ? cleanE164(lead.phone) : null;
+      if (lead.source_contact_id && (!e164 || onlyDigits(e164).length <= 10)) {
+        const { data: sc } = await (sb as any)
+          .from("closers_contacts").select("country_code, phone").eq("id", lead.source_contact_id).maybeSingle();
+        if (sc) {
+          const fromContact = (sc.country_code && sc.phone) ? joinCc(sc.country_code, sc.phone)
+                            : (sc.phone ? cleanE164(sc.phone) : null);
+          if (fromContact && onlyDigits(fromContact).length > 10) e164 = fromContact;
+        }
+      }
+      to = e164 || "";
+      if (!displayName) {
+        displayName = lead.name || lead.full_name || lead.creator_name || lead.display_name || lead.instagram_handle || lead.handle || null;
+      }
+    }
+  }
+
   if (!to) {
     return json({ ok: false, error: "Este contacto no tiene teléfono (ni usuario de Telegram) cargado." }, 200);
   }

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useMyWaChannels } from "@/hooks/useMyWaChannels";
+import { TgChatButton } from "@/components/TgChatButton";
 import PlatformSalesModal from "./PlatformSalesModal";
 import { LEADGEN_COMPANIES } from "@/pages/leadgen/leadgenConstants";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
@@ -22,7 +23,7 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, ExternalLink, MessageCircle, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown } from "lucide-react";
+import { MoreHorizontal, ExternalLink, MessageCircle, Loader2, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown, StickyNote, Plus } from "lucide-react";
 import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, CLOSE_REASONS, CLOSE_REASON_LABELS, isContactOverdue, needsContactDecision, getNextContactDate } from "../hooks/useCloserLeads";
 import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
@@ -106,38 +107,66 @@ const InlineNumber = memo(({ value, onSave, prefix = "", suffix = "", disabled }
 });
 InlineNumber.displayName = "InlineNumber";
 
-// ─── Inline text cell (kept for notes/rejection) ───
-const InlineText = memo(({ value, onSave, placeholder = "—" }: { value: string | null; onSave: (v: string | null) => void; placeholder?: string }) => {
-  const [editing, setEditing] = useState(false);
+// ─── Inline note/rejection cell ───
+// Celda de texto libre (notas, motivo). La versión vieja era un input de UNA línea
+// truncado en 180px → incómodo de leer y de editar notas largas. Ahora: la celda muestra
+// un preview legible de hasta 2 líneas (con ícono), y al hacer clic abre un Popover con un
+// Textarea cómodo (multilínea, ⌘/Ctrl+Enter para guardar, Esc para cancelar). Estado vacío
+// con una pista clara ("+ Nota") en vez de un guión mudo.
+const InlineText = memo(({ value, onSave, placeholder = "—", emptyLabel = "Nota" }: {
+  value: string | null; onSave: (v: string | null) => void; placeholder?: string; emptyLabel?: string;
+}) => {
+  const [open, setOpen] = useState(false);
   const [text, setText] = useState(value || "");
 
   const save = () => {
-    setEditing(false);
     const v = text.trim();
     if (v !== (value || "")) onSave(v || null);
+    setOpen(false);
   };
 
-  if (!editing) {
-    return (
-      <span
-        className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 block max-w-[180px] truncate text-sm"
-        onClick={() => { setText(value || ""); setEditing(true); }}
-        title={value || placeholder}
-      >
-        {value || placeholder}
-      </span>
-    );
-  }
-
   return (
-    <Input
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
-      onBlur={save}
-      autoFocus
-      className="h-7 text-sm w-44"
-    />
+    <Popover open={open} onOpenChange={(o) => { if (o) setText(value || ""); setOpen(o); }} modal={true}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title={value || undefined}
+          className="group flex w-full max-w-[220px] items-start gap-1.5 rounded px-1.5 py-1 text-left text-sm transition-colors hover:bg-muted/60"
+        >
+          {value ? (
+            <>
+              <StickyNote className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/60" />
+              <span className="line-clamp-2 leading-snug">{value}</span>
+            </>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/50 group-hover:text-muted-foreground">
+              <Plus className="h-3 w-3" /> {placeholder !== "—" ? placeholder : emptyLabel}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" side="bottom" className="w-80 p-3">
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(); }
+            if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
+          }}
+          autoFocus
+          rows={5}
+          placeholder={`Escribí ${emptyLabel === "Nota" ? "una nota" : "el motivo"}…`}
+          className="resize-none text-sm"
+        />
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">⌘/Ctrl+Enter para guardar · Esc para cancelar</span>
+          <div className="flex gap-1.5">
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={save}>Guardar</Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 });
 InlineText.displayName = "InlineText";
@@ -474,6 +503,22 @@ const LeadWhatsappButton = ({ leadId, source, resolvedPhone }: { leadId: string;
   );
 };
 
+// Contacto del lead: WhatsApp + Telegram apilados (mismo patrón/gating). El de Telegram
+// contacta por el TELÉFONO del lead (importContacts server-side), no por el canal de promo;
+// para leads de closer pasa closer_creator_id (el edge resuelve teléfono + gatea por dueño),
+// para leadgen pasa el phone ya resuelto. Si el usuario no tiene líneas de TG, el botón no
+// aparece (TgChatButton se auto-oculta) y queda solo WhatsApp.
+const LeadContactButtons = ({ leadId, source, resolvedPhone }: { leadId: string; source: "closer" | "leadgen"; resolvedPhone: string | null }) => (
+  <div className="flex flex-col items-start gap-0.5">
+    <LeadWhatsappButton leadId={leadId} source={source} resolvedPhone={resolvedPhone} />
+    <TgChatButton
+      closerCreatorId={source === "closer" ? leadId : null}
+      phone={resolvedPhone}
+      className="h-7 gap-1 px-1.5 text-xs text-sky-600 hover:text-sky-700"
+    />
+  </div>
+);
+
 // ─── SortHeader ───
 const SortHeader = ({ label, sortKey: key, currentKey, asc, onSort, className = "" }: {
   label: string; sortKey: string; currentKey: string | null; asc: boolean;
@@ -640,7 +685,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                         <AlertTriangle className="h-3 w-3" /> Decidir
                       </Badge>
                     )}
-                    {c.phone && <LeadWhatsappButton leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} />}
+                    {c.phone && <LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} />}
                   </div>
                 </div>
               );
@@ -821,7 +866,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 </p>
               )}
             </TableCell>
-            <TableCell><LeadWhatsappButton leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
+            <TableCell><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
             <TableCell className="text-sm">
               {c.onlyfans_url ? (
                 <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
@@ -892,7 +937,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
               <TableCell>{igLink}</TableCell>
               <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
-              <TableCell><LeadWhatsappButton leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
+              <TableCell><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
               <TableCell>
                 <InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} disabled={!canEditComisiones} />
               </TableCell>
@@ -1048,7 +1093,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <InlineCloseReasonSelect value={c.close_reason_code} onSave={(v) => onFieldChange(c.id, "close_reason_code", v)} />
             </TableCell>
             <TableCell>
-              <InlineText value={c.rejection_reason} onSave={(v) => onFieldChange(c.id, "rejection_reason", v)} placeholder="—" />
+              <InlineText value={c.rejection_reason} onSave={(v) => onFieldChange(c.id, "rejection_reason", v)} emptyLabel="Motivo" />
             </TableCell>
             <TableCell>
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
@@ -1073,7 +1118,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>
               <InlineStageSelect value={c.stage} onSave={(v) => requestStageChange(c.id, v)} disabled={!canEditStatus} />
             </TableCell>
-            <TableCell><LeadWhatsappButton leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
+            <TableCell><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
             <TableCell className="text-sm">
               {c.onlyfans_url ? (
                 <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
@@ -1133,7 +1178,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>
               <ContactCountCell creatorId={c.id} count={c.contact_count} />
             </TableCell>
-            <TableCell><LeadWhatsappButton leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
+            <TableCell><LeadContactButtons leadId={c.id} source={c._source} resolvedPhone={c.resolved_whatsapp_phone} /></TableCell>
             <TableCell className="text-sm">
               {c.onlyfans_url ? (
                 <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
