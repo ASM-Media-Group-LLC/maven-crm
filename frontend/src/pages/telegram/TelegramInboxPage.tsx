@@ -14,15 +14,36 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Radio, Inbox as InboxIcon, Loader2, AtSign } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
+import { ArrowLeft, Radio, Inbox as InboxIcon, Loader2, AtSign, UserCheck } from "lucide-react";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { usePersistedEmojis } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
 
 // Acento del canal Telegram (mockup: --tg-grad linear-gradient(135deg,#4bc0f0,#2b8fd8)).
 const TG_GRAD = "bg-gradient-to-br from-[#4bc0f0] to-[#2b8fd8]";
+
+// Paleta de avatares del mockup (g1..g5 + celeste): contactos sin foto reciben un
+// gradiente DISTINTO según su peer_id (determinístico, no aleatorio).
+const AVATAR_GRADS = [
+  "bg-gradient-to-br from-[#9b52ff] to-[#2b9bff]", // g1 violeta→azul
+  "bg-gradient-to-br from-[#f6789b] to-[#f6a06c]", // g2 rosa→naranja
+  "bg-gradient-to-br from-[#43c6ac] to-[#3a7bd5]", // g3 teal→azul
+  "bg-gradient-to-br from-[#8e54e9] to-[#4776e6]", // g4 púrpura→índigo
+  TG_GRAD,                                          // celeste del canal
+];
+const avatarGrad = (peerId: string) => {
+  let h = 0;
+  for (let i = 0; i < peerId.length; i++) h = (h * 31 + peerId.charCodeAt(i)) >>> 0;
+  return AVATAR_GRADS[h % AVATAR_GRADS.length];
+};
 
 // Columnas explícitas (peer_phone está revocado para authenticated → NO se pide).
 const CONV_COLS =
@@ -88,9 +109,13 @@ const TelegramInboxPage = () => {
   const [search, setSearch] = useState("");
   const [chatFilter, setChatFilter] = useState<"todos" | "no_leidos">("todos");
   const [draft, setDraft] = useState("");
+  const [assignOpen, setAssignOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // Barra de emojis del composer, persistida por usuario (scope "telegram").
   const [tgEmojis, setTgEmojis] = usePersistedEmojis("telegram", user?.id);
+  // Asignación (espejo de WhatsApp): gate por función del módulo + RPC con doble candado.
+  const { canAccess } = usePermissions();
+  const canAssign = canAccess("Telegram", "Asignar conversaciones");
 
   // Deep-link /telegram/bandeja?c=<id>
   useEffect(() => {
@@ -153,6 +178,33 @@ const TelegramInboxPage = () => {
   });
 
   const selected = allConversations.find((c) => c.id === selectedId) ?? null;
+
+  // Usuarios asignables (mismo criterio que WhatsApp: profiles del tenant, RLS filtra).
+  const { data: users = [] } = useQuery({
+    queryKey: ["tg-inbox-users"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name").order("full_name", { ascending: true });
+      return (data ?? []) as { id: string; full_name: string | null }[];
+    },
+    refetchOnWindowFocus: false,
+  });
+  const userName = (id: string | null) => (!id ? null : users.find((u) => u.id === id)?.full_name || id.slice(0, 8));
+
+  // Asignar (espejo del handler de WhatsApp: RPC wrapper mono-usuario, doble candado en SQL).
+  const assignConversation = async (userId: string | null) => {
+    if (!selectedId) return;
+    setAssignOpen(false);
+    const { error } = await (supabase as any).rpc("tg_assign_conversation", {
+      p_conversation_id: selectedId,
+      p_assignee: userId,
+    });
+    if (error) {
+      toast({ title: "No se pudo asignar", description: error.message, variant: "destructive" });
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
+    toast({ title: userId ? `Asignada a ${userName(userId)}` : "Asignación quitada" });
+  };
 
   // Marcar leído al abrir (RPC; el cliente no puede UPDATE directo).
   useEffect(() => {
@@ -285,7 +337,7 @@ const TelegramInboxPage = () => {
                   >
                     {/* Barra indicadora de la fila activa (mockup). */}
                     {active && <span className={`absolute bottom-2.5 left-0 top-2.5 w-[3px] rounded-r ${TG_GRAD}`} />}
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${TG_GRAD}`}>
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${avatarGrad(c.peer_id)}`}>
                       {initials(c)}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -330,7 +382,7 @@ const TelegramInboxPage = () => {
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </button>
-                <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${TG_GRAD}`}>
+                <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${avatarGrad(selected.peer_id)}`}>
                   {initials(selected)}
                 </div>
                 <div className="min-w-0">
@@ -347,6 +399,40 @@ const TelegramInboxPage = () => {
                     <span className="ml-1 rounded bg-muted px-1">{selected.account_id}</span>
                   </div>
                 </div>
+                {/* Asignación (espejo de WhatsApp): dropdown si tiene la función, read-only si no. */}
+                {canAssign ? (
+                  <Popover open={assignOpen} onOpenChange={setAssignOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="ml-auto h-7 gap-1 text-xs" title="Asignar conversación">
+                        <UserCheck className="h-3.5 w-3.5" />
+                        {userName(selected.assigned_to) ?? "Asignar"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-56 p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar persona…" className="h-9" />
+                        <CommandList>
+                          <CommandEmpty>Sin resultados.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem value="sin asignar" onSelect={() => assignConversation(null)}>
+                              Sin asignar
+                            </CommandItem>
+                            {users.map((u) => (
+                              <CommandItem key={u.id} value={u.full_name || u.id} onSelect={() => assignConversation(u.id)}>
+                                {u.full_name || u.id.slice(0, 8)}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground" title="Asignación (solo lectura)">
+                    <UserCheck className="h-3.5 w-3.5" />
+                    {userName(selected.assigned_to) ?? "Sin asignar"}
+                  </span>
+                )}
               </div>
 
               <ScrollArea className="flex-1 bg-muted/20">

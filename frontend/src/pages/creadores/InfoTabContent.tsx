@@ -17,6 +17,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
+import { TgChatButton } from "@/components/TgChatButton";
 import { useScouterCompanies } from "@/hooks/useScouterLeads";
 import { useModelCategories } from "@/hooks/useModelCategories";
 import { ExternalLink } from "lucide-react";
@@ -321,6 +322,9 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
 
         {/* WhatsApp: abre el chat en la bandeja de Maven (sin exponer el número) */}
         <InfoField label="WhatsApp" value={<WaChatButton phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} />} />
+
+        {/* Telegram: abre el chat en la bandeja de Maven (solo por @usuario, espejo de WhatsApp) */}
+        <InfoField label="Telegram" value={c.telegram_handle ? <TgChatButton creatorId={creatorId} telegramUsername={c.telegram_handle} name={c.name} /> : null} />
 
         {/* Notas Internas */}
         {isEditing ? (

@@ -3,6 +3,7 @@ import { Edit, Save, X, Phone, ExternalLink, Linkedin, Link, Facebook } from "lu
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
+import { TgChatButton } from "@/components/TgChatButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
@@ -406,6 +407,12 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
                     <ExtraAccountsInline creatorId={creatorId} network={MULTI_NET[platform.key]!} canManage={false} />
                   )}
                 </div>
+                {/* Telegram: además del link a t.me, botón que abre la bandeja de Maven. */}
+                {platform.key === "telegram_handle" && creator.telegram_handle && (
+                  <span className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <TgChatButton creatorId={creatorId} telegramUsername={creator.telegram_handle} name={creator.name} />
+                  </span>
+                )}
                 {hasLink && (
                   <a
                     href={url}

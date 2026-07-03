@@ -4,7 +4,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotificationSettings } from "@/hooks/useNotificationSettings";
-import { useBrowserNotifications } from "@/hooks/useBrowserNotifications";
+import {
+  useBrowserNotifications,
+  useNotificationPermission,
+} from "@/hooks/useBrowserNotifications";
 
 // Etiqueta legible cuando el mensaje no trae texto (mismo criterio que WhatsApp).
 const MEDIA_LABEL: Record<string, string> = {
@@ -37,6 +40,7 @@ export function useTgInboxNotifications() {
   const { notify } = useBrowserNotifications();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  useNotificationPermission();
 
   const settingsRef = useRef(settings);
   settingsRef.current = settings;

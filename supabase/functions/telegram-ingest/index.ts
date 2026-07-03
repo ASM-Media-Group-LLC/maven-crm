@@ -1,27 +1,24 @@
 // telegram-ingest — recibe mensajes entrantes/salientes del telegram-gateway y los
-// guarda en la bandeja (tg_conversations + tg_messages). Espejo minimalista de
-// whatsapp-ingest, pero con identificadores nativos de Telegram (account_id de la
-// línea + peer_id del interlocutor).
+// guarda en la bandeja (tg_conversations + tg_messages). Espejo de whatsapp-ingest:
+//   · conversación NUEVA → auto-asigna según tg_channels.default_assignees de la línea
+//     (assigned_to = 1º del array + TODOS en tg_conversation_assignees, como WhatsApp).
+//   · entrante (direction='in') → tg_bump_unread (sin esto no hay badge de no-leídos).
+//   · upsertea tg_channels lazy (para que la línea aparezca en la config de Cuentas).
 //
-// AUTH: token compartido con el gateway (header `x-telegram-ingest-token` o `?token=`),
-// validado contra el secret TELEGRAM_INGEST_TOKEN. verify_jwt=false (es un webhook).
-// Escribe con service_role → pasa por encima de la RLS deny-all de las tablas tg_*.
+// AUTH: token compartido (header x-telegram-ingest-token o ?token=) vs TELEGRAM_INGEST_TOKEN.
+// verify_jwt=false (webhook). Escribe con service_role.
 //
-// PAYLOAD esperado (lo arma el gateway en S2.3):
-// {
-//   accountId: "main",                      // id de la línea en el gateway
-//   peer: { id, username?, name?, phone? }, // interlocutor
-//   message: { id, direction:"in"|"out", text?, type?, mediaUrl?, senderId?, date? }  // date = unix secs
-// }
+// PAYLOAD (lo arma el gateway en S2.3):
+// { accountId, peer: { id, username?, name?, phone? },
+//   message: { id, direction:"in"|"out", text?, type?, mediaUrl?, senderId?, date? } }
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const PROJECT_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const INGEST_TOKEN = Deno.env.get("TELEGRAM_INGEST_TOKEN") ?? "";
-// Inbox v1 mono-tenant (igual que wa-inbox-send). Se setea explícito porque el default
-// current_tenant_id() da NULL para service_role → sin esto las filas quedan invisibles a
-// la RLS de la bandeja (tenant_id = current_tenant_id()).
+// Inbox v1 mono-tenant (igual que wa-inbox-send). Explícito porque current_tenant_id()
+// da NULL para service_role → sin esto las filas quedan invisibles a la RLS por tenant.
 const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech
 
 const cors = {
@@ -40,7 +37,6 @@ function json(body: unknown, status = 200) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
 
-  // ── auth por token compartido ────────────────────────────────────────────
   const url = new URL(req.url);
   const token =
     req.headers.get("x-telegram-ingest-token") ?? url.searchParams.get("token") ?? "";
@@ -54,32 +50,74 @@ serve(async (req) => {
 
   const sb = createClient(PROJECT_URL, SERVICE_KEY);
 
+  const acct = String(accountId);
+  const peerId = String(peer.id);
   const direction = message.direction === "out" ? "out" : "in";
   const preview = String(message.text ?? `[${message.type || "media"}]`).slice(0, 120);
   const sentAt = message.date
     ? new Date(Number(message.date) * 1000).toISOString()
     : new Date().toISOString();
+  const nowIso = new Date().toISOString();
 
-  // 1) upsert de la conversación por (account_id, peer_id). Solo pisa los campos "vivos".
-  const { data: conv, error: cErr } = await sb
+  // 0) La línea existe en la config (lazy): así aparece en Cuentas para setear
+  //    auto-asignación aunque nunca se haya tocado a mano.
+  await sb.from("tg_channels")
+    .upsert({ tenant_id: TENANT_ID, account_id: acct, label: acct }, { onConflict: "account_id", ignoreDuplicates: true });
+
+  // 1) find-or-create de la conversación por (account_id, peer_id) — split explícito
+  //    porque la NUEVA se auto-asigna con los defaults de la línea (como whatsapp-ingest).
+  const { data: existing } = await sb
     .from("tg_conversations")
-    .upsert(
-      {
+    .select("id")
+    .eq("account_id", acct)
+    .eq("peer_id", peerId)
+    .maybeSingle();
+
+  let conversationId: string;
+  if (existing) {
+    conversationId = existing.id as string;
+    await sb.from("tg_conversations").update({
+      peer_username: peer.username ?? null,
+      peer_name: peer.name ?? null,
+      peer_phone: peer.phone ?? null,
+      last_message_at: sentAt,
+      last_message_preview: preview,
+      updated_at: nowIso,
+    }).eq("id", conversationId);
+  } else {
+    // Auto-asignación por línea: assigned_to = 1º del array; N:N con TODOS (abajo).
+    let channelDefaults: string[] = [];
+    const { data: ch } = await sb
+      .from("tg_channels").select("default_assignees")
+      .eq("account_id", acct).maybeSingle();
+    if (Array.isArray(ch?.default_assignees)) channelDefaults = ch!.default_assignees as string[];
+
+    const { data: created, error: cErr } = await sb
+      .from("tg_conversations")
+      .insert({
         tenant_id: TENANT_ID,
-        account_id: String(accountId),
-        peer_id: String(peer.id),
+        account_id: acct,
+        peer_id: peerId,
         peer_username: peer.username ?? null,
         peer_name: peer.name ?? null,
         peer_phone: peer.phone ?? null,
+        status: "open",
+        assigned_to: channelDefaults[0] ?? null,
         last_message_at: sentAt,
         last_message_preview: preview,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "account_id,peer_id" },
-    )
-    .select("id")
-    .single();
-  if (cErr) return json({ ok: false, error: "conv_upsert: " + cErr.message }, 500);
+      })
+      .select("id")
+      .single();
+    if (cErr || !created) return json({ ok: false, error: "conv_insert: " + (cErr?.message ?? "?") }, 500);
+    conversationId = created.id as string;
+
+    if (channelDefaults.length > 0) {
+      await sb.from("tg_conversation_assignees").upsert(
+        channelDefaults.map((uid) => ({ conversation_id: conversationId, user_id: uid })),
+        { onConflict: "conversation_id,user_id", ignoreDuplicates: true },
+      );
+    }
+  }
 
   // 2) insert idempotente del mensaje por (conversation_id, external_id).
   const { error: mErr } = await sb
@@ -87,7 +125,7 @@ serve(async (req) => {
     .upsert(
       {
         tenant_id: TENANT_ID,
-        conversation_id: conv.id,
+        conversation_id: conversationId,
         direction,
         external_id: message.id != null ? String(message.id) : null,
         sender_id: message.senderId != null ? String(message.senderId) : null,
@@ -100,5 +138,10 @@ serve(async (req) => {
     );
   if (mErr) return json({ ok: false, error: "msg_upsert: " + mErr.message }, 500);
 
-  return json({ ok: true, conversationId: conv.id });
+  // 3) Entrante → sube el contador de no-leídos (badge lista + sidebar + filtro).
+  if (direction === "in") {
+    await sb.rpc("tg_bump_unread", { p_conversation_id: conversationId });
+  }
+
+  return json({ ok: true, conversationId });
 });

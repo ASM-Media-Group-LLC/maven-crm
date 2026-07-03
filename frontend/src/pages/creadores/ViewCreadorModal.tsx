@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Globe, MessageCircle, Trash2, Facebook, Link as LinkIcon } from "lucide-react";
+import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Globe, MessageCircle, Trash2, Facebook, Link as LinkIcon, Send } from "lucide-react";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
+import { TgChatButton } from "@/components/TgChatButton";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -188,6 +189,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 <InfoField icon={Building2} label="Agencia" value={c.creator_business?.company?.name ?? c.creator_business?.assigned_agency} />
                 <InfoField icon={Mail} label="Email" value={c.email} />
                 <InfoField icon={Phone} label="WhatsApp" value={<WaChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number, phone: c.phone })} name={c.name} />} />
+                <InfoField icon={Send} label="Telegram" value={c.telegram_handle ? <TgChatButton creatorId={c.id} telegramUsername={c.telegram_handle} name={c.name} /> : null} />
                 <InfoField icon={UserCog} label="Tipo de Manager" value={c.creator_business?.manager_type} />
                 <InfoField icon={CalendarDays} label="Fecha de Registro" value={regDate} />
               </div>
@@ -222,6 +224,15 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                     <span className="text-sm font-medium">WhatsApp</span>
                   </div>
                   <WaChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number })} name={c.name} />
+                </div>
+              )}
+              {c.telegram_handle && (
+                <div className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-3">
+                    <PlatformIcon><TelegramIcon className="h-4 w-4" /></PlatformIcon>
+                    <span className="text-sm font-medium">Telegram</span>
+                  </div>
+                  <TgChatButton creatorId={c.id} telegramUsername={c.telegram_handle} name={c.name} />
                 </div>
               )}
             </TabsContent>
