@@ -28,6 +28,9 @@ import { usePermissions } from "@/hooks/usePermissions";
 // Acento del canal Telegram (mockup: --tg-grad linear-gradient(135deg,#4bc0f0,#2b8fd8)).
 const TG_GRAD = "bg-gradient-to-br from-[#4bc0f0] to-[#2b8fd8]";
 const TG_GRAD_R = "bg-gradient-to-r from-[#4bc0f0] to-[#2b8fd8]"; // para chips/indicadores
+// Barra indicadora de la fila activa: el gradiente va en el pseudo-elemento `before:`,
+// NO en la fila (si no, se pinta TODA la fila de celeste — bug que reportó el owner).
+const TG_GRAD_BAR = "before:bg-gradient-to-b before:from-[#4bc0f0] before:to-[#2b8fd8]";
 
 // Avatares de contactos sin foto: gradiente DISTINTO por peer (paleta del mockup g1..g5).
 const AVATAR_GRADS = [
@@ -345,7 +348,7 @@ const TelegramInboxPage = () => {
                         onClick={() => setSelectedId(c.id)}
                         className={cn(
                           "relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/50",
-                          active && `bg-muted before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r ${TG_GRAD}`,
+                          active && `bg-muted before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r ${TG_GRAD_BAR}`,
                         )}
                       >
                         <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white", avatarGrad(c.peer_id))}>

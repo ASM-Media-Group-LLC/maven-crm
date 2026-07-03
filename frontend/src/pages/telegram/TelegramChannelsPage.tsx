@@ -2,7 +2,7 @@
 // etiqueta + auto-asignación de conversaciones nuevas (espejo del editor de canales de
 // WhatsApp/ChannelsPage). Las líneas aparecen solas acá (el ingest las upsertea lazy al
 // primer mensaje); la vinculación en sí (teléfono + código) vive en el /manager del gateway.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { ExternalLink, Radio, Inbox, Pencil, Users, Loader2 } from "lucide-react";
+import { ExternalLink, Radio, Inbox, Pencil, Users, Loader2, RefreshCw } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
 
@@ -39,6 +39,32 @@ const TelegramChannelsPage = () => {
   const [editLabel, setEditLabel] = useState("");
   const [editAssignees, setEditAssignees] = useState<string[]>([]);
   const [assigneeSearch, setAssigneeSearch] = useState("");
+  const [syncing, setSyncing] = useState(false);
+
+  // Sincroniza tg_channels con las cuentas vinculadas del gateway (edge tg-sync-channels):
+  // así aparecen TODAS las líneas aunque no hayan recibido un DM todavía. Corre 1 vez al
+  // abrir (silencioso) + botón manual. Preserva default_assignees y labels editados a mano.
+  const syncChannels = async (opts?: { manual?: boolean }) => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("tg-sync-channels", {});
+      const res = data as { ok?: boolean; synced?: number; accounts?: number; error?: string } | null;
+      if (error || !res?.ok) {
+        if (opts?.manual) toast({ title: "No se pudo sincronizar", description: res?.error || error?.message || "Error", variant: "destructive" });
+        return;
+      }
+      qc.invalidateQueries({ queryKey: ["tg-channels"] });
+      qc.invalidateQueries({ queryKey: ["my-tg-channels"] });
+      if (opts?.manual) toast({ title: `Sincronizado: ${res.accounts} línea(s)` });
+    } finally {
+      setSyncing(false);
+    }
+  };
+  const didAutoSync = useRef(false);
+  useEffect(() => {
+    if (canEdit && !didAutoSync.current) { didAutoSync.current = true; void syncChannels(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit]);
 
   // Líneas configuradas (el ingest las crea lazy al primer mensaje de cada cuenta).
   const { data: channels = [], isLoading } = useQuery({
@@ -114,6 +140,11 @@ const TelegramChannelsPage = () => {
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-sky-500" />
           <h2 className="text-sm font-semibold">Líneas y auto-asignación</h2>
+          {canEdit && (
+            <Button variant="ghost" size="sm" className="ml-auto h-7 gap-1.5 text-xs" disabled={syncing} onClick={() => syncChannels({ manual: true })} title="Traer las cuentas vinculadas del gateway">
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} /> Sincronizar
+            </Button>
+          )}
         </div>
         <p className="text-[11px] text-muted-foreground">
           Cada conversación NUEVA de una línea se asigna automáticamente a quien marques (podés elegir

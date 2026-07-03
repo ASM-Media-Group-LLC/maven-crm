@@ -46,10 +46,11 @@ serve(async (req) => {
   });
   if (pErr || !allowed) return json({ ok: false, error: "forbidden" }, 403);
 
-  let payload: { creator_id?: string; contact_id?: string; telegram_username?: string; name?: string } = {};
+  let payload: { creator_id?: string; contact_id?: string; telegram_username?: string; name?: string; account_id?: string } = {};
   try { payload = await req.json(); } catch { /* */ }
   const creatorId = payload.creator_id ?? null;
   const contactId = payload.contact_id ?? null;
+  const reqAccountId = payload.account_id ?? null; // línea desde la que se abre (opcional)
   let displayName = payload.name ?? null;
 
   // ── Resolver el @username del destino (payload directo o creators.telegram_handle) ──
@@ -71,7 +72,7 @@ serve(async (req) => {
     const r = await fetch(`${GW_URL}/resolve`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: GW_API_KEY },
-      body: JSON.stringify({ to: handle }),
+      body: JSON.stringify({ to: handle, accountId: reqAccountId }),
     });
     resolved = await r.json().catch(() => ({}));
     if (!r.ok || !resolved?.ok || !resolved?.peer_id) {

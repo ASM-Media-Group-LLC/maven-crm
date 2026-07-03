@@ -284,11 +284,24 @@ app.post("/message/sendText/:id", apiGuard, async (req, res) => {
 // desde Maven, ya que la bandeja necesita el peer_id nativo). Usa la cuenta DEFAULT y
 // devuelve qué account_id usó (así la conversación queda ligada a esa línea). Telegram
 // NO resuelve teléfono→usuario en frío → esto solo funciona con username/link/id.
+// Lista de cuentas vinculadas (apikey) — para que Maven sincronice sus "canales"
+// (tg_channels) y muestre el selector de línea. Liviano: lee la meta de disco, no conecta.
+app.get("/accounts", apiGuard, (req, res) => {
+  const def = defaultAccountId();
+  const accounts = listAccountIds().map((id) => {
+    const m = readMeta(id);
+    return { id, label: m.label || id, username: m.username || null, isDefault: id === def };
+  });
+  res.json({ ok: true, accounts });
+});
+
 app.post("/resolve", apiGuard, async (req, res) => {
   const to = ((req.body && req.body.to) || "").toString().trim();
   if (!to) return res.status(400).json({ ok: false, error: "falta 'to'" });
   try {
-    const accountId = defaultAccountId();
+    // Línea desde la que se abre el chat: la que pida Maven, o la default.
+    const requested = (req.body && req.body.accountId) ? String(req.body.accountId) : null;
+    const accountId = requested || defaultAccountId();
     if (!accountId) return res.status(400).json({ ok: false, error: "no hay cuentas vinculadas" });
     const c = await getClient(accountId);
     const handle = to.replace(/^https?:\/\/(t\.me|telegram\.me)\//i, "").replace(/^@/, "");

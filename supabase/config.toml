@@ -49,6 +49,9 @@ verify_jwt = false  # envía saliente desde la bandeja de Telegram (auth propia:
 [functions.tg-inbox-open]
 verify_jwt = false  # abre/crea conversación de Telegram desde un contacto/creadora (auth propia: getUser + permiso Telegram/Bandeja)
 
+[functions.tg-sync-channels]
+verify_jwt = false  # sincroniza las cuentas del gateway → tg_channels (auth propia: getUser + permiso Telegram/Cuentas)
+
 [functions.wa-inbox-open]
 verify_jwt = false  # abre/crea conversación del inbox para un lead (auth propia: getUser + permiso + membresía de canal)
 
