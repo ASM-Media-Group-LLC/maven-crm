@@ -1377,7 +1377,7 @@ const InboxPage = () => {
                 (Copiloto · adjuntar · mic · GIF · sticker · Scripts) + Enviar a la derecha.
                 NO se tocó la lógica de envío (sendMessage/sendMedia/optimista/errores). */}
             {!recording && (
-            <div className="space-y-2 border-t border-border px-4 py-3">
+            <div className="space-y-2 px-4 pb-3 pt-1.5">
               {/* Barra de "respondiendo a" (responder/citar) — arriba del cajón */}
               {replyingTo && (
                 <div className="flex items-start gap-2 rounded-md border-l-4 border-primary bg-muted/50 px-3 py-1.5 text-xs">
