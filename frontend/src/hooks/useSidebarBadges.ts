@@ -85,7 +85,18 @@ export function useSidebarBadges() {
           (sum: number, c: { unread_count: number | null }) => sum + (c.unread_count || 0), 0);
       }
 
-      return { promologCount, leadgenCount, closersCount, waInboxCount };
+      // --- Telegram (bandeja): mismo criterio que WhatsApp (RLS filtra lo visible).
+      let tgInboxCount = 0;
+      if (canAccess("Telegram", "Bandeja")) {
+        const { data: tgData } = await (supabase as unknown as { from: (t: string) => any })
+          .from("tg_conversations")
+          .select("unread_count")
+          .gt("unread_count", 0);
+        tgInboxCount = (tgData ?? []).reduce(
+          (sum: number, c: { unread_count: number | null }) => sum + (c.unread_count || 0), 0);
+      }
+
+      return { promologCount, leadgenCount, closersCount, waInboxCount, tgInboxCount };
     },
     enabled: !!user && !permsLoading,
     staleTime: 60_000,
@@ -97,5 +108,6 @@ export function useSidebarBadges() {
     leadgenCount: data?.leadgenCount || 0,
     closersCount: data?.closersCount || 0,
     waInboxCount: data?.waInboxCount || 0,
+    tgInboxCount: data?.tgInboxCount || 0,
   };
 }

@@ -51,12 +51,16 @@ interface ChatComposerProps {
   replyBar?: ReactNode;
   /** Tipos aceptados para adjuntar/pegar. Default imágenes + video. */
   accept?: string;
+  /** Override del fondo del botón Enviar (p.ej. gradiente celeste del canal Telegram).
+   *  Default: gradiente Maven (accent→primary). */
+  sendButtonClassName?: string;
 }
 
 export const ChatComposer = ({
   value, onChange, onSend, placeholder, disabled, busy,
   emojis, onAddEmoji, onRemoveEmoji, emojiTrailing, toolbarExtra, replyBar,
   accept = "image/*,video/*",
+  sendButtonClassName,
 }: ChatComposerProps) => {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -206,7 +210,7 @@ export const ChatComposer = ({
             onClick={() => void doSend()}
             disabled={!canSend}
             size="icon"
-            className="absolute bottom-[7px] right-2 h-7 w-7 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90"
+            className={`absolute bottom-[7px] right-2 h-7 w-7 rounded-full text-white shadow-sm hover:opacity-90 ${sendButtonClassName ?? "bg-gradient-to-br from-accent to-primary"}`}
             title="Enviar"
           >
             {spinning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

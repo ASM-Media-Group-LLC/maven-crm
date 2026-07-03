@@ -8,6 +8,7 @@ import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
 import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useWaInboxNotifications } from "@/hooks/useWaInboxNotifications";
+import { useTgInboxNotifications } from "@/hooks/useTgInboxNotifications";
 
 // Persistent shell for protected pages. Mounting Sidebar + Topbar (plus
 // global overlays like the ClariAi FAB and announcement popups) at the
@@ -20,9 +21,10 @@ import { useWaInboxNotifications } from "@/hooks/useWaInboxNotifications";
 const AppShell = () => {
   const { popups } = useAnnouncementsByChannel();
   const { isAdmin } = useUserRole();
-  // Aviso global de WhatsApp entrante (sonido + notificación del navegador),
-  // funcione donde funcione el usuario dentro de Maven (no solo en la bandeja).
+  // Aviso global de WhatsApp/Telegram entrante (sonido + notificación del navegador),
+  // funcione donde funcione el usuario dentro de Maven (no solo en las bandejas).
   useWaInboxNotifications();
+  useTgInboxNotifications();
 
   return (
     <SidebarProvider>

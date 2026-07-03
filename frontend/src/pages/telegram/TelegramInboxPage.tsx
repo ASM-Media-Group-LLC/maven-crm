@@ -1,10 +1,13 @@
-// Bandeja de Telegram — LECTURA (S3.1) + RESPONDER (S3.2). Espejo simplificado de la bandeja
-// de WhatsApp (pages/inbox/InboxPage.tsx): lista + hilo + realtime + deep-link ?c=<id> + envío.
-// Muestra los DMs que el gateway ingesta vía telegram-ingest (tg_conversations/tg_messages) y
-// responde vía la edge tg-inbox-send (gateway MTProto).
+// Bandeja de Telegram — LECTURA (S3.1) + RESPONDER (S3.2) + diseño del mockup de mensajería
+// (acento CELESTE del canal: gradiente #4bc0f0→#2b8fd8 en burbuja saliente/badges/filtro
+// activo/Enviar — espejo de WhatsApp pero con la identidad Telegram).
 //
 // Seguridad: RLS por dueño (closer ve solo lo asignado; supervisor+ ve todo) + peer_phone
 // REVOCADO a authenticated → acá SIEMPRE se seleccionan columnas explícitas (nunca *).
+//
+// REALTIME: esta página solo escucha tg_conversations. Los INSERT de tg_messages los maneja
+// la suscripción GLOBAL única de useTgInboxNotifications (AppShell) — igual que WhatsApp:
+// un 2º canal al mismo topic compite por el routing de postgres_changes y queda MUDO.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,6 +20,9 @@ import { ChatComposer } from "@/components/chat/ChatComposer";
 import { usePersistedEmojis } from "@/pages/chatter-evaluator/workspace/EmojiBar";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+
+// Acento del canal Telegram (mockup: --tg-grad linear-gradient(135deg,#4bc0f0,#2b8fd8)).
+const TG_GRAD = "bg-gradient-to-br from-[#4bc0f0] to-[#2b8fd8]";
 
 // Columnas explícitas (peer_phone está revocado para authenticated → NO se pide).
 const CONV_COLS =
@@ -66,6 +72,13 @@ const shortTime = (iso: string | null): string => {
 const peerLabel = (c: TgConv) =>
   c.peer_name || (c.peer_username ? `@${c.peer_username}` : null) || `Telegram ${c.peer_id.slice(0, 8)}`;
 
+// Iniciales para el avatar (mockup: círculo con gradiente + iniciales, no ícono plano).
+const initials = (c: TgConv) => {
+  const label = (c.peer_name || c.peer_username || "?").replace(/^@/, "");
+  const parts = label.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "TG";
+};
+
 const TelegramInboxPage = () => {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -73,6 +86,7 @@ const TelegramInboxPage = () => {
   const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [chatFilter, setChatFilter] = useState<"todos" | "no_leidos">("todos");
   const [draft, setDraft] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // Barra de emojis del composer, persistida por usuario (scope "telegram").
@@ -145,6 +159,7 @@ const TelegramInboxPage = () => {
     if (!selectedId) return;
     (supabase as any).rpc("tg_mark_read", { p_conversation_id: selectedId }).then(() => {
       qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
+      qc.invalidateQueries({ queryKey: ["sidebar-badges"] });
     });
   }, [selectedId, qc]);
 
@@ -156,31 +171,29 @@ const TelegramInboxPage = () => {
     requestAnimationFrame(() => { if (vp) vp.scrollTop = vp.scrollHeight; });
   }, [selectedId, msgLoading, messages]);
 
-  // Realtime: conversaciones + mensajes → invalidar.
+  // Realtime: SOLO cambios de conversación (asignación/no-leídos/archivar). Los mensajes
+  // nuevos los maneja la suscripción global de useTgInboxNotifications (ver header).
   useEffect(() => {
     const ch = supabase
-      .channel("tg-inbox-rt-" + Math.random().toString(36).slice(2))
+      .channel("tg-inbox-conv-rt-" + Math.random().toString(36).slice(2))
       .on("postgres_changes", { event: "*", schema: "public", table: "tg_conversations" }, () =>
         qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] }),
       )
-      .on("postgres_changes", { event: "*", schema: "public", table: "tg_messages" }, () => {
-        qc.invalidateQueries({ queryKey: ["tg-inbox-conversations"] });
-        qc.invalidateQueries({ queryKey: ["tg-inbox-messages", selectedId] });
-      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [qc, selectedId]);
+  }, [qc]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = allConversations.filter((c) => !c.archived);
+    let list = allConversations.filter((c) => !c.archived);
+    if (chatFilter === "no_leidos") list = list.filter((c) => (c.unread_count ?? 0) > 0);
     if (!q) return list;
     return list.filter(
       (c) =>
         peerLabel(c).toLowerCase().includes(q) ||
         (c.last_message_preview ?? "").toLowerCase().includes(q),
     );
-  }, [allConversations, search]);
+  }, [allConversations, search, chatFilter]);
 
   // Envío (S3.2): responder por el gateway vía la edge tg-inbox-send. Solo texto por ahora
   // (media = slice posterior). onSend del ChatComposer: si throwea, conserva el texto.
@@ -209,7 +222,8 @@ const TelegramInboxPage = () => {
       {/* Header interno (patrón WhatsApp: cada subtab con su header + nav a hermanos). */}
       <div className="flex items-center gap-2 border-b px-4 py-2.5">
         <TelegramIcon className="h-5 w-5 text-sky-500" />
-        <h1 className="text-base font-semibold">Bandeja de Telegram</h1>
+        <h1 className="text-base font-semibold">Telegram</h1>
+        <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-400">Beta</span>
         <Link
           to="/telegram"
           className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
@@ -221,13 +235,29 @@ const TelegramInboxPage = () => {
       <div className="flex min-h-0 flex-1">
         {/* Lista */}
         <aside className={`${selectedId ? "hidden md:flex" : "flex"} w-full flex-col border-r md:w-80`}>
-          <div className="border-b p-2">
+          <div className="space-y-2 border-b p-2">
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar…"
+              placeholder="Buscar conversación…"
               className="h-9 rounded-lg border-0 bg-primary/5 text-sm focus-visible:ring-1 focus-visible:ring-primary/30"
             />
+            {/* Chips de filtro (mockup): activo = gradiente celeste del canal. */}
+            <div className="flex gap-1.5">
+              {([["todos", "Todos"], ["no_leidos", "No leídos"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setChatFilter(key)}
+                  className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                    chatFilter === key
+                      ? `${TG_GRAD} font-semibold text-white shadow-sm`
+                      : "bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <ScrollArea className="flex-1">
             {convLoading ? (
@@ -237,28 +267,33 @@ const TelegramInboxPage = () => {
             ) : filtered.length === 0 ? (
               <div className="px-4 py-10 text-center text-sm text-muted-foreground">
                 <InboxIcon className="mx-auto mb-2 h-8 w-8 opacity-40" />
-                No hay conversaciones todavía. Aparecen acá cuando alguien te escribe por Telegram.
+                {chatFilter === "no_leidos"
+                  ? "No hay conversaciones sin leer."
+                  : "No hay conversaciones todavía. Aparecen acá cuando alguien te escribe por Telegram."}
               </div>
             ) : (
               filtered.map((c) => {
                 const unread = (c.unread_count ?? 0) > 0;
+                const active = selectedId === c.id;
                 return (
                   <button
                     key={c.id}
                     onClick={() => setSelectedId(c.id)}
-                    className={`flex w-full items-start gap-2 border-b px-3 py-2.5 text-left transition-colors hover:bg-primary/5 ${
-                      selectedId === c.id ? "bg-primary/10" : ""
+                    className={`relative flex w-full items-start gap-2.5 border-b px-3 py-2.5 text-left transition-colors hover:bg-muted/60 ${
+                      active ? "bg-muted" : ""
                     }`}
                   >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-sky-600">
-                      <TelegramIcon className="h-4 w-4" />
+                    {/* Barra indicadora de la fila activa (mockup). */}
+                    {active && <span className={`absolute bottom-2.5 left-0 top-2.5 w-[3px] rounded-r ${TG_GRAD}`} />}
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${TG_GRAD}`}>
+                      {initials(c)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-baseline gap-1.5">
                         <span className={`truncate text-sm ${unread ? "font-semibold" : "font-medium"}`}>
                           {peerLabel(c)}
                         </span>
-                        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+                        <span className="ml-auto shrink-0 text-[10px] tabular-nums text-muted-foreground">
                           {shortTime(c.last_message_at)}
                         </span>
                       </div>
@@ -267,7 +302,7 @@ const TelegramInboxPage = () => {
                           {c.last_message_preview || "—"}
                         </p>
                         {unread && (
-                          <span className="ml-auto flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-semibold text-white">
+                          <span className={`ml-auto flex h-[19px] min-w-[19px] shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold text-white ${TG_GRAD}`}>
                             {c.unread_count}
                           </span>
                         )}
@@ -288,25 +323,29 @@ const TelegramInboxPage = () => {
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2 border-b px-4 py-2.5">
+              <div className="flex items-center gap-2.5 border-b px-4 py-2.5">
                 <button
                   onClick={() => setSelectedId(null)}
                   className="md:hidden text-muted-foreground hover:text-foreground"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </button>
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500/10 text-sky-600">
-                  <TelegramIcon className="h-4 w-4" />
+                <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white ${TG_GRAD}`}>
+                  {initials(selected)}
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold">{peerLabel(selected)}</div>
-                  {selected.peer_username && (
-                    <div className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
-                      <AtSign className="h-3 w-3" />
-                      {selected.peer_username}
-                      <span className="ml-1.5 rounded bg-muted px-1">{selected.account_id}</span>
-                    </div>
-                  )}
+                  <div className="truncate text-sm font-bold">{peerLabel(selected)}</div>
+                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    {selected.peer_username && (
+                      <>
+                        <AtSign className="h-3 w-3" />
+                        {selected.peer_username}
+                        <span className="mx-0.5">·</span>
+                      </>
+                    )}
+                    <span>Telegram</span>
+                    <span className="ml-1 rounded bg-muted px-1">{selected.account_id}</span>
+                  </div>
                 </div>
               </div>
 
@@ -319,40 +358,45 @@ const TelegramInboxPage = () => {
                   ) : messages.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">Sin mensajes.</div>
                   ) : (
-                    messages.map((m) => (
-                      <div
-                        key={m.id}
-                        className={`flex ${m.direction === "out" ? "justify-end" : "justify-start"}`}
-                      >
+                    messages.map((m) => {
+                      const failed = m.direction === "out" && m.status === "failed";
+                      return (
                         <div
-                          className={`max-w-[75%] rounded-2xl px-3 py-1.5 text-sm ${
-                            m.direction === "out"
-                              ? "bg-sky-500 text-white"
-                              : "bg-card border"
-                          }`}
+                          key={m.id}
+                          className={`flex ${m.direction === "out" ? "justify-end" : "justify-start"}`}
                         >
-                          {m.msg_type !== "text" && !m.body ? (
-                            <span className="italic opacity-80">[{m.msg_type}]</span>
-                          ) : (
-                            <span className="whitespace-pre-wrap break-words">{m.body}</span>
-                          )}
-                          <span
-                            className={`ml-2 align-bottom text-[10px] ${
-                              m.direction === "out" ? "text-white/70" : "text-muted-foreground"
+                          <div
+                            className={`max-w-[75%] px-3 py-1.5 text-sm shadow-sm ${
+                              m.direction === "out"
+                                ? failed
+                                  ? "rounded-2xl rounded-br-md bg-destructive/80 text-white"
+                                  : `rounded-2xl rounded-br-md text-white ${TG_GRAD}`
+                                : "rounded-2xl rounded-bl-md border bg-card"
                             }`}
                           >
-                            {shortTime(m.sent_at)}
-                          </span>
+                            {m.msg_type !== "text" && !m.body ? (
+                              <span className="italic opacity-80">[{m.msg_type}]</span>
+                            ) : (
+                              <span className="whitespace-pre-wrap break-words">{m.body}</span>
+                            )}
+                            <span
+                              className={`ml-2 align-bottom text-[10px] tabular-nums ${
+                                m.direction === "out" ? "text-white/70" : "text-muted-foreground"
+                              }`}
+                            >
+                              {failed ? "no entregado · " : ""}
+                              {shortTime(m.sent_at)}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                   <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
 
-              {/* Composer unificado (emojis arriba · cajón auto-grow al medio · Enviar). Hereda el
-                  auto-grow compartido con WhatsApp/Messenger/Chatter. Solo texto por ahora. */}
+              {/* Composer unificado (emojis arriba · cajón auto-grow · Enviar celeste del canal). */}
               <ChatComposer
                 value={draft}
                 onChange={setDraft}
@@ -361,6 +405,7 @@ const TelegramInboxPage = () => {
                 emojis={tgEmojis}
                 onAddEmoji={(e) => setTgEmojis((curr) => (curr.includes(e) ? curr : [...curr, e]))}
                 onRemoveEmoji={(e) => setTgEmojis((curr) => curr.filter((x) => x !== e))}
+                sendButtonClassName={TG_GRAD}
               />
             </>
           )}
