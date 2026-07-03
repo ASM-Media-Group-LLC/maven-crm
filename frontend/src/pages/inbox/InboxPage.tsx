@@ -1377,7 +1377,7 @@ const InboxPage = () => {
                 (Copiloto · adjuntar · mic · GIF · sticker · Scripts) + Enviar a la derecha.
                 NO se tocó la lógica de envío (sendMessage/sendMedia/optimista/errores). */}
             {!recording && (
-            <div className="space-y-2 px-4 pb-3 pt-1.5">
+            <div className="space-y-2 px-3 pb-2.5 pt-1.5">
               {/* Barra de "respondiendo a" (responder/citar) — arriba del cajón */}
               {replyingTo && (
                 <div className="flex items-start gap-2 rounded-md border-l-4 border-primary bg-muted/50 px-3 py-1.5 text-xs">
@@ -1431,7 +1431,7 @@ const InboxPage = () => {
                     }
                   }}
                   placeholder="Escribí un mensaje…"
-                  className="h-10 pr-11"
+                  className="h-11 rounded-2xl border-0 bg-primary/5 px-4 pr-11 text-sm focus-visible:ring-1 focus-visible:ring-primary/30"
                 />
                 {/* Enviar DENTRO del cajón, borde derecho. */}
                 <Button
@@ -1453,7 +1453,7 @@ const InboxPage = () => {
                       disabled={!!copilotBusy || sending}
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9 shrink-0 text-muted-foreground"
+                      className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
                       title="Copiloto IA"
                     >
                       {copilotBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
@@ -1474,7 +1474,7 @@ const InboxPage = () => {
                 </DropdownMenu>
                 )}
                 <Button
-                  variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-muted-foreground"
+                  variant="ghost" size="icon" className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
                   title="Adjuntar archivo"
                   disabled={mediaBusy || sending || recording}
                   onClick={() => fileInputRef.current?.click()}
@@ -1482,7 +1482,7 @@ const InboxPage = () => {
                   {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
                 </Button>
                 <Button
-                  variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-muted-foreground"
+                  variant="ghost" size="icon" className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
                   title="Grabar nota de voz"
                   disabled={mediaBusy || sending}
                   onClick={startRecording}

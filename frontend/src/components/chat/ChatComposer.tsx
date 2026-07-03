@@ -204,7 +204,7 @@ export const ChatComposer = ({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="min-h-[42px] w-full resize-none rounded-md border bg-transparent px-3 py-2.5 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+            className="min-h-[42px] w-full resize-none rounded-2xl border-0 bg-primary/5 px-4 py-2.5 pr-12 text-sm focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
             style={{ maxHeight: MAX_TEXTAREA_PX }}
           />
           <Button
