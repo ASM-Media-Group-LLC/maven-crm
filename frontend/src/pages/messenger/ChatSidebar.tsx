@@ -212,7 +212,7 @@ export default function ChatSidebar({
         <div className="pb-6">
           {/* Quick access section */}
           <CollapsibleSection label="Acceso Rápido" defaultOpen>
-            <div className="px-2 pb-1">
+            <div className="flex flex-wrap gap-1.5 px-3 pb-1">
               {[
                 { key: "all", icon: Home, label: "Todos", badge: 0 },
                 { key: "unread", icon: Mail, label: "No leídos", badge: unreadTotal },
@@ -227,16 +227,16 @@ export default function ChatSidebar({
                     key={item.key}
                     onClick={() => setTab(item.key)}
                     className={cn(
-                      "w-full flex items-center gap-3 px-3 py-[7px] min-h-[40px] sm:min-h-0 rounded-full text-sm transition-colors",
+                      "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
                       isActive
-                        ? "bg-primary/12 text-primary font-medium"
-                        : "text-foreground/70 hover:bg-primary/5 font-normal"
+                        ? "bg-primary/15 text-primary"
+                        : "bg-muted text-muted-foreground hover:bg-muted/70"
                     )}
                   >
-                    <Icon className={cn("h-[18px] w-[18px] shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
-                    <span className="truncate flex-1 text-left">{item.label}</span>
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{item.label}</span>
                     {item.badge > 0 && (
-                      <Badge className="h-5 min-w-5 px-1.5 text-[10px] bg-primary text-primary-foreground rounded-full font-bold">
+                      <Badge className="h-4 min-w-4 px-1 text-[9px] bg-primary text-primary-foreground rounded-full font-bold">
                         {item.badge > 99 ? "99+" : item.badge}
                       </Badge>
                     )}
