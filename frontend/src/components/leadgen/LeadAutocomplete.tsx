@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,15 +59,23 @@ export function LeadAutocomplete({
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const trimmed = value.trim();
+  // Debounce del término: dispara la búsqueda 250ms después de que el user deja
+  // de tipear, no en cada tecla (antes "paola" = 5 RPC; ahora 1).
+  const [debounced, setDebounced] = useState(trimmed);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(trimmed), 250);
+    return () => clearTimeout(t);
+  }, [trimmed]);
+
   // Mostramos resultados cuando: el input está focuseado, hay 2+ caracteres,
   // y NO hay lead seleccionado todavía (el user seleccionó uno → ocultamos).
   const showResults = focused && trimmed.length >= 2 && !selectedLead;
 
   const { data: leads = [], isLoading } = useQuery({
-    queryKey: ["leadgen-search-fuzzy", trimmed],
+    queryKey: ["leadgen-search-fuzzy", debounced],
     queryFn: async () => {
       const { data, error: err } = await (supabase as any).rpc("leadgen_search_fuzzy", {
-        p_query: trimmed,
+        p_query: debounced,
         p_limit: 20,
         p_min_similarity: 0.2,
       });
@@ -91,7 +99,7 @@ export function LeadAutocomplete({
       }
       return rows;
     },
-    enabled: showResults,
+    enabled: showResults && debounced.length >= 2,
     staleTime: 30_000,
   });
 
