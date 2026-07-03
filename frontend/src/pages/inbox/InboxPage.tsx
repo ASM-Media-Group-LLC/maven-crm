@@ -704,6 +704,13 @@ const InboxPage = () => {
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
           <MessageSquare className="h-5 w-5 text-primary" />
           <h1 className="text-base font-semibold">Bandeja</h1>
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground" title="Actualización en tiempo real">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-500" />
+            </span>
+            en vivo
+          </span>
           <div className="ml-auto flex items-center gap-2">
             {canAccess("WhatsApp", "Canales") && (
               <Button asChild variant="ghost" size="icon" className="h-7 w-7" title="Gestionar canales">
@@ -726,7 +733,7 @@ const InboxPage = () => {
         </div>
         {/* Filtro por CANAL (línea/número) — solo si hay más de uno. Ortogonal a los chips de abajo. */}
         {channels.length > 1 && (
-          <div className="flex items-center gap-1 overflow-x-auto px-3 pb-1.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide px-3 pb-2">
             <span className="shrink-0 pr-0.5 text-[11px] font-medium text-muted-foreground">Canal</span>
             <button
               type="button"
@@ -754,7 +761,7 @@ const InboxPage = () => {
           </div>
         )}
         {/* Filtros (chips): presets + mis listas personales + nueva lista + archivados */}
-        <div className="flex items-center gap-1 overflow-x-auto px-3 pb-2">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide px-3 pb-3">
           {([["todos", "Todos"], ["no_leidos", "No leídos"], ["favoritos", "Favoritos"]] as const).map(([key, label]) => (
             <button
               key={key}

@@ -512,3 +512,17 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+
+/* Hide the horizontal scrollbar on chip/pill rows that scroll sideways
+   (filtros de la bandeja, tabs con overflow) while keeping wheel/trackpad
+   scroll — como WhatsApp/Telegram. Evita que la barrita quede pegada a la
+   fila de botones de abajo. */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;    /* IE/Edge */
+    scrollbar-width: none;       /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;               /* Chrome/Safari/WebKit */
+  }
+}
