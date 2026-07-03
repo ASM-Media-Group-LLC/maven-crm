@@ -5,6 +5,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Send, Loader2, Paperclip, X as XIcon, Play } from "lucide-react";
 import { EmojiBar } from "@/pages/chatter-evaluator/workspace/EmojiBar";
+import { useAutoGrowTextarea, MAX_TEXTAREA_PX } from "@/hooks/useAutoGrowTextarea";
 
 // Composer unificado para los 3 chats de Maven (bandeja WhatsApp, Messenger, Chatter
 // Evaluator). Layout pedido por el owner: emojis ARRIBA · cajón de texto AL MEDIO (auto-crece)
@@ -52,8 +53,6 @@ interface ChatComposerProps {
   accept?: string;
 }
 
-const MAX_TEXTAREA_PX = 160; // ~6 líneas; arriba de eso, scroll interno
-
 export const ChatComposer = ({
   value, onChange, onSend, placeholder, disabled, busy,
   emojis, onAddEmoji, onRemoveEmoji, emojiTrailing, toolbarExtra, replyBar,
@@ -65,13 +64,8 @@ export const ChatComposer = ({
   const [sending, setSending] = useState(false);
   const fileInputId = useId();
 
-  // Auto-grow del textarea según el contenido.
-  useEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, MAX_TEXTAREA_PX)}px`;
-  }, [value]);
+  // Auto-grow del textarea según el contenido (lógica compartida con WhatsApp/Messenger/Telegram).
+  useAutoGrowTextarea(taRef, value);
 
   // Limpia los object URLs al desmontar.
   useEffect(() => () => { pending.forEach((p) => URL.revokeObjectURL(p.url)); }, [pending]);

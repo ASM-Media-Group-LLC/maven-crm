@@ -15,6 +15,7 @@ import { EmojiBar, usePersistedEmojis } from "@/pages/chatter-evaluator/workspac
 import { GifPicker } from "@/pages/inbox/GifPicker";
 import { StickerPicker } from "@/pages/inbox/StickerPicker";
 import { ScriptsButton } from "@/components/chat/ScriptsButton";
+import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 
 import { MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 
@@ -55,6 +56,9 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<{ abort: () => void } | null>(null);
   const [messengerEmojis, setMessengerEmojis] = usePersistedEmojis("messenger", user?.id);
+
+  // Auto-grow del cajón (misma lógica que Chatter Evaluator/WhatsApp/Telegram).
+  useAutoGrowTextarea(inputRef, text);
 
   // GIF (Giphy mp4, URL externa estable) → se manda como archivo (Messenger no renderiza video
   // inline; el sticker sí porque es webp/imagen).
@@ -379,7 +383,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               <Textarea
                 ref={inputRef}
                 placeholder={chatType === "group" ? "Escribe un mensaje... (usa @ para mencionar)" : "Escribe un mensaje..."}
-                className="min-h-[42px] max-h-[120px] w-full resize-none bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-2xl px-4 py-2.5 pr-12 text-sm"
+                className="min-h-[42px] max-h-[160px] w-full resize-none bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-2xl px-4 py-2.5 pr-12 text-sm"
                 rows={1}
                 value={text}
                 onChange={e => handleTextChange(e.target.value)}

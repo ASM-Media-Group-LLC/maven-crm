@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
+import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 import { cn } from "@/lib/utils";
 import { MessageSquare, Search, Send, Loader2, Instagram, Radio, Sparkles, PenLine, FileText, Gauge, X, UserCheck, Paperclip, Mic, MoreHorizontal, Trash2, Reply, Phone, Check, CheckCheck, AlertCircle, Sticker, Maximize2, Pin, Star, Archive, MailOpen, Eraser, Tags, Plus, ArrowLeft } from "lucide-react";
 import {
@@ -149,9 +150,9 @@ const InboxPage = () => {
   // (localStorage): lo que el usuario agrega/quita sobrevive al refrescar.
   const { user } = useAuth();
   const [inboxEmojis, setInboxEmojis] = usePersistedEmojis("inbox", user?.id);
-  // Ref del input de redacción: tras insertar un emoji, devolvemos el foco acá para que
+  // Ref del cajón de redacción: tras insertar un emoji, devolvemos el foco acá para que
   // Enter ENVÍE (no re-inserte el emoji). Mismo fix que en Chatter Evaluator.
-  const draftInputRef = useRef<HTMLInputElement>(null);
+  const draftInputRef = useRef<HTMLTextAreaElement>(null);
   const [searchParams] = useSearchParams();
   // "← Volver" cuando se llegó desde otra pantalla (Contactos/Creadoras/Closers) vía el
   // botón de WhatsApp. Esa pantalla restaura sus filtros sola (sessionStorage).
@@ -174,6 +175,8 @@ const InboxPage = () => {
   const [listDialog, setListDialog] = useState<{ forConversation: string | null } | null>(null);
   const [newListName, setNewListName] = useState("");
   const [draft, setDraft] = useState("");
+  // Auto-grow del cajón (misma lógica que Chatter Evaluator/Messenger/Telegram).
+  useAutoGrowTextarea(draftInputRef, draft);
   const [replyingTo, setReplyingTo] = useState<MsgRow | null>(null);
   const [sending, setSending] = useState(false);
   const [copilotBusy, setCopilotBusy] = useState<string | null>(null); // acción del copiloto en curso
@@ -1417,8 +1420,9 @@ const InboxPage = () => {
               {/* Cajón de texto al medio. Pegar imagen/video del portapapeles → se manda (mismo
                   flujo de media inmediata que el adjuntar de la bandeja). */}
               <div className="relative">
-                <Input
+                <textarea
                   ref={draftInputRef}
+                  rows={1}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => {
@@ -1441,14 +1445,14 @@ const InboxPage = () => {
                     }
                   }}
                   placeholder="Escribí un mensaje…"
-                  className="h-11 rounded-2xl border-0 bg-primary/5 px-4 pr-11 text-sm focus-visible:ring-1 focus-visible:ring-primary/30"
+                  className="block min-h-[44px] max-h-[160px] w-full resize-none rounded-2xl border-0 bg-primary/5 px-4 py-2.5 pr-11 text-sm focus:outline-none focus:ring-1 focus:ring-primary/30"
                 />
-                {/* Enviar DENTRO del cajón, borde derecho. */}
+                {/* Enviar DENTRO del cajón, pegado al borde inferior (crece con el cajón). */}
                 <Button
                   onClick={() => sendMessage()}
                   disabled={sending || !draft.trim()}
                   size="icon"
-                  className="absolute right-1.5 top-1/2 h-7 w-7 shrink-0 -translate-y-1/2 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90"
+                  className="absolute bottom-[7px] right-1.5 h-7 w-7 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90"
                   title="Enviar"
                 >
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
