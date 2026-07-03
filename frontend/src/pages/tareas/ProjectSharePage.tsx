@@ -11,8 +11,8 @@ import { priorityConfig } from "./PrioritySelect";
 const statusConfig: Record<string, { label: string; icon: React.ElementType; color: string }> = {
   active: { label: "Pendiente", icon: Clock, color: "text-primary" },
   in_progress: { label: "En progreso", icon: Play, color: "text-blue-400" },
-  paused: { label: "Pausada", icon: Pause, color: "text-yellow-400" },
-  completed: { label: "Completada", icon: CheckSquare, color: "text-emerald-400" },
+  paused: { label: "Pausada", icon: Pause, color: "text-warning" },
+  completed: { label: "Completada", icon: CheckSquare, color: "text-success" },
 };
 
 const ProjectSharePage = () => {

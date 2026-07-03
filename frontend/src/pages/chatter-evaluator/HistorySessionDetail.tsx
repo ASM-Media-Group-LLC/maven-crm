@@ -43,10 +43,10 @@ const statusLabel = (s: "pass" | "partial" | "fail"): string =>
 
 const statusColors = (s: "pass" | "partial" | "fail") =>
   s === "pass"
-    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+    ? "bg-success/10 text-success"
     : s === "partial"
-      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-      : "bg-rose-500/10 text-rose-600 dark:text-rose-400";
+      ? "bg-warning/10 text-warning"
+      : "bg-destructive/10 text-destructive";
 
 const HistorySessionDetail = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -151,9 +151,9 @@ const HistorySessionDetail = () => {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   {evaluation.verdict === "apto" ? (
-                    <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                    <CheckCircle2 className="h-6 w-6 text-success" />
                   ) : (
-                    <XCircle className="h-6 w-6 text-rose-500" />
+                    <XCircle className="h-6 w-6 text-destructive" />
                   )}
                   <div>
                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -162,8 +162,8 @@ const HistorySessionDetail = () => {
                     <div
                       className={`text-xl font-bold ${
                         evaluation.verdict === "apto"
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-rose-600 dark:text-rose-400"
+                          ? "text-success"
+                          : "text-destructive"
                       }`}
                     >
                       {evaluation.verdict === "apto" ? "APTO" : "NO APTO"}

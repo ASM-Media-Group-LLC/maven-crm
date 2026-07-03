@@ -44,9 +44,9 @@ export const readScoresFromStorage = (sessionId: string | null): CriteriaScores 
 const verdictButtonClass = (active: boolean, kind: CriterionVerdict): string => {
   if (!active) return "bg-muted text-muted-foreground hover:bg-muted/70";
   switch (kind) {
-    case "pass":    return "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40";
-    case "partial": return "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40";
-    case "fail":    return "bg-rose-500/20 text-rose-300 ring-1 ring-rose-500/40";
+    case "pass":    return "bg-success/20 text-success ring-1 ring-success/40";
+    case "partial": return "bg-warning/20 text-warning ring-1 ring-warning/40";
+    case "fail":    return "bg-destructive/20 text-destructive ring-1 ring-destructive/40";
     default:        return "bg-muted text-muted-foreground";
   }
 };
@@ -89,9 +89,9 @@ export const CriteriaPanel = ({
   }, [criteria, scores]);
 
   const badge =
-    scorePct >= 80 ? { label: "APROBADO", color: "text-emerald-400" } :
-    scorePct >= 50 ? { label: "A CRITERIO", color: "text-amber-400" } :
-    { label: "NO APTO", color: "text-rose-400" };
+    scorePct >= 80 ? { label: "APROBADO", color: "text-success" } :
+    scorePct >= 50 ? { label: "A CRITERIO", color: "text-warning" } :
+    { label: "NO APTO", color: "text-destructive" };
 
   return (
     <div className="flex h-full flex-col">

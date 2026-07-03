@@ -65,7 +65,7 @@ const ScouterAlertas = () => {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <AlertTriangle className="h-4 w-4 text-warning" />
           <h2 className="text-base font-semibold">Tareas pendientes</h2>
           {alertsQ.isLoading ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
@@ -129,13 +129,13 @@ const ScouterAlertas = () => {
                   <TableCell className="text-right tabular-nums">
                     {r.total_assignments}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                  <TableCell className="text-right tabular-nums text-success">
                     {r.done}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     <Badge
                       variant="outline"
-                      className="border-amber-300/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      className="border-warning/40 bg-warning/10 text-warning"
                     >
                       {r.pending}
                     </Badge>

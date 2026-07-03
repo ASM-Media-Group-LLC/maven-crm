@@ -31,9 +31,9 @@ interface TasksTableProps {
 const statusConfig: Record<string, { label: string; badgeClass: string }> = {
   active: { label: "Pendiente", badgeClass: "bg-secondary text-secondary-foreground border-border" },
   in_progress: { label: "En curso", badgeClass: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
-  paused: { label: "Pausada", badgeClass: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
+  paused: { label: "Pausada", badgeClass: "bg-warning/20 text-warning border-warning/30" },
   overdue: { label: "Vencida", badgeClass: "bg-destructive/20 text-destructive border-destructive/30" },
-  completed: { label: "Completada", badgeClass: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
+  completed: { label: "Completada", badgeClass: "bg-success/20 text-success border-success/30" },
 };
 
 const getStatusTransitions = (status: string, isOverdue: boolean, hasOverdueReason: boolean) => {
@@ -70,7 +70,7 @@ const getStatusTransitions = (status: string, isOverdue: boolean, hasOverdueReas
 const CountdownCell = ({ dueAt, status }: { dueAt: string; status: string }) => {
   const { display, isOverdue, isWarning } = useCountdown(dueAt);
   const isCompleted = status === "completed";
-  const color = isCompleted ? "text-muted-foreground" : isOverdue ? "text-destructive" : isWarning ? "text-yellow-400" : "text-foreground";
+  const color = isCompleted ? "text-muted-foreground" : isOverdue ? "text-destructive" : isWarning ? "text-warning" : "text-foreground";
   return <span className={`font-mono text-sm font-semibold ${color}`}>{isCompleted ? "✓" : display}</span>;
 };
 

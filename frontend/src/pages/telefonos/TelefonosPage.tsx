@@ -389,7 +389,7 @@ export default function TelefonosPage() {
                   <span className="font-medium truncate">{p.serial_name || p.id}</span>
                 </div>
                 {p.session ? (
-                  <Badge className="bg-emerald-600 hover:bg-emerald-600 shrink-0">
+                  <Badge className="bg-success hover:bg-success shrink-0">
                     En uso{p.session.user_name ? ` · ${p.session.user_name}` : ""}
                   </Badge>
                 ) : (
@@ -541,7 +541,7 @@ export default function TelefonosPage() {
               <span className="flex items-center gap-1.5">
                 <span
                   className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-mono ${
-                    lowTime ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" : "bg-muted text-muted-foreground"
+                    lowTime ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
                   }`}
                 >
                   <Clock className="h-3 w-3" />

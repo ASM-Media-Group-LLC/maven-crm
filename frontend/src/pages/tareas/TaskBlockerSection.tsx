@@ -127,7 +127,7 @@ const TaskBlockerSection = ({ taskId, profiles }: TaskBlockerSectionProps) => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 text-xs gap-1 text-emerald-500 hover:text-emerald-600 shrink-0"
+                      className="h-6 text-xs gap-1 text-success hover:text-success/90 shrink-0"
                       onClick={() => resolveBlocker.mutate(b.id)}
                       disabled={resolveBlocker.isPending}
                     >
@@ -135,7 +135,7 @@ const TaskBlockerSection = ({ taskId, profiles }: TaskBlockerSectionProps) => {
                     </Button>
                   )}
                   {b.resolved && (
-                    <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs shrink-0">
+                    <Badge className="bg-success/20 text-success border-success/30 text-xs shrink-0">
                       Resuelto
                     </Badge>
                   )}

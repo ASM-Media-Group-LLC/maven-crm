@@ -153,12 +153,12 @@ const ImportModal = ({ open, onOpenChange }: Props) => {
           <div className="space-y-4">
             {/* Summary */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-center">
-                <p className="text-2xl font-bold text-emerald-600">{newHandles.length}</p>
+              <div className="rounded-lg border border-success/30 bg-success/10 p-3 text-center">
+                <p className="text-2xl font-bold text-success">{newHandles.length}</p>
                 <p className="text-xs text-muted-foreground">Nuevos</p>
               </div>
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-center">
-                <p className="text-2xl font-bold text-amber-600">{duplicates.length}</p>
+              <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-center">
+                <p className="text-2xl font-bold text-warning">{duplicates.length}</p>
                 <p className="text-xs text-muted-foreground">Ya registrados</p>
               </div>
             </div>
@@ -167,10 +167,10 @@ const ImportModal = ({ open, onOpenChange }: Props) => {
             {duplicates.length > 0 && (
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 <p className="text-sm font-medium flex items-center gap-1">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" /> Duplicados encontrados:
+                  <AlertTriangle className="h-4 w-4 text-warning" /> Duplicados encontrados:
                 </p>
                 {duplicates.map((d) => (
-                  <div key={d.handle} className="flex items-center justify-between rounded border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm">
+                  <div key={d.handle} className="flex items-center justify-between rounded border border-warning/20 bg-warning/5 px-3 py-2 text-sm">
                     <div>
                       <span className="font-medium">@{d.handle}</span>
                       <span className="text-muted-foreground ml-2">— {d.sourceLabel}</span>
@@ -193,7 +193,7 @@ const ImportModal = ({ open, onOpenChange }: Props) => {
             {/* New handles */}
             {newHandles.length > 0 && (
               <div className="space-y-1">
-                <p className="text-sm font-medium text-emerald-600">Se importarán:</p>
+                <p className="text-sm font-medium text-success">Se importarán:</p>
                 <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                   {newHandles.map((h) => (
                     <Badge key={h} variant="secondary" className="text-xs">@{h}</Badge>

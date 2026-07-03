@@ -140,11 +140,11 @@ const AuditHistory = () => {
                     <TableCell className="text-xs max-w-[120px] truncate">{log.file_name}</TableCell>
                     <TableCell className="text-center">
                       {log.status === "applied" ? (
-                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 gap-1">
+                        <Badge variant="outline" className="bg-success/10 text-success border-success/30 gap-1">
                           <CheckCircle className="h-3 w-3" /> Aplicada
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/30 gap-1">
+                        <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 gap-1">
                           <Clock className="h-3 w-3" /> Pendiente
                         </Badge>
                       )}
@@ -192,7 +192,7 @@ const AuditHistory = () => {
                           <RotateCcw className="h-3 w-3" /> Revertida
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30">Activa</Badge>
+                        <Badge variant="outline" className="bg-success/10 text-success border-success/30">Activa</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-center">

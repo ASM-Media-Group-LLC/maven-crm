@@ -282,9 +282,9 @@ export default function CollectionsPage() {
           {isLoading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
               <KpiCard label="Total" value={String(invoices.length)} icon={Users} color="bg-blue-500" subtitle={`Bruto: ${fmt(totalCobrado + totalPendiente + totalVencido)}`} onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pagadas" value={String(cobrados.length)} icon={CheckCircle} color="bg-emerald-500" subtitle={fmt(totalCobrado)} onClick={() => setKpiPopup("pagadas")} />
-              <KpiCard label="Pendientes" value={String(pendientes.length)} icon={Clock} color="bg-amber-500" subtitle={fmt(totalPendiente)} onClick={() => setKpiPopup("pendientes")} />
-              <KpiCard label="Vencidas" value={String(vencidos.length)} icon={AlertTriangle} color="bg-rose-500" subtitle={fmt(totalVencido)} onClick={() => setKpiPopup("vencidas")} />
+              <KpiCard label="Pagadas" value={String(cobrados.length)} icon={CheckCircle} color="bg-success" subtitle={fmt(totalCobrado)} onClick={() => setKpiPopup("pagadas")} />
+              <KpiCard label="Pendientes" value={String(pendientes.length)} icon={Clock} color="bg-warning" subtitle={fmt(totalPendiente)} onClick={() => setKpiPopup("pendientes")} />
+              <KpiCard label="Vencidas" value={String(vencidos.length)} icon={AlertTriangle} color="bg-destructive" subtitle={fmt(totalVencido)} onClick={() => setKpiPopup("vencidas")} />
               <KpiCard label="Sin Cobro" value={String(sinCobro.length)} icon={Ban} color="bg-slate-500" subtitle="$0" onClick={() => setKpiPopup("sinCobro")} />
             </>
           )}

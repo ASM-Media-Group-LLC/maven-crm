@@ -57,9 +57,9 @@ const PROJECT_COLORS: Record<string, { bg: string; dot: string; text: string; bo
 };
 
 const GUEST_STATUS: Record<string, { dot: string; label: string }> = {
-  confirmed: { dot: "bg-emerald-500", label: "Confirmado" },
-  cancelled: { dot: "bg-red-500", label: "Cancelado" },
-  pending: { dot: "bg-amber-500", label: "Pendiente" },
+  confirmed: { dot: "bg-success", label: "Confirmado" },
+  cancelled: { dot: "bg-destructive", label: "Cancelado" },
+  pending: { dot: "bg-warning", label: "Pendiente" },
 };
 
 const typeIcons: Record<string, React.ElementType> = {

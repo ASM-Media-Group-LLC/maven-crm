@@ -41,7 +41,7 @@ const SharedTaskCard = ({ task }: { task: Task }) => {
     : isOverdue
     ? "text-destructive"
     : isWarning
-    ? "text-yellow-400"
+    ? "text-warning"
     : "text-foreground";
 
   return (
@@ -52,10 +52,10 @@ const SharedTaskCard = ({ task }: { task: Task }) => {
         <div className={`text-4xl font-mono font-bold ${countdownColor}`}>
           {isCompleted ? "✓" : display}
         </div>
-        {isCompleted && <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Completada</Badge>}
+        {isCompleted && <Badge className="bg-success/20 text-success border-success/30">Completada</Badge>}
         {isOverdue && !isCompleted && <Badge variant="destructive">Vencida</Badge>}
         {!isOverdue && !isCompleted && !isWarning && <Badge variant="secondary">Activa</Badge>}
-        {isWarning && <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Próxima a vencer</Badge>}
+        {isWarning && <Badge className="bg-warning/20 text-warning border-warning/30">Próxima a vencer</Badge>}
       </CardContent>
     </Card>
   );

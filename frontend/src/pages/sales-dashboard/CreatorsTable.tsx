@@ -200,9 +200,9 @@ const CreatorsTable = ({ rows, comparedRows }: Props) => {
                         <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Variación</p>
                         <p className="text-xs font-medium tabular-nums">
                           {c.variation === null ? (
-                            <span className="text-emerald-500">Nuevo</span>
+                            <span className="text-success">Nuevo</span>
                           ) : c.variation !== undefined ? (
-                            <span className={cn(c.variation >= 0 ? "text-emerald-500" : "text-destructive")}>
+                            <span className={cn(c.variation >= 0 ? "text-success" : "text-destructive")}>
                               {c.variation >= 0 ? "+" : ""}{c.variation.toFixed(1)}%
                             </span>
                           ) : "—"}

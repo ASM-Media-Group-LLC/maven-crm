@@ -406,7 +406,7 @@ export default function NominaPage() {
           {loadingPeriods ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
               <KpiCard label="Total Periodos" value={String(periods.length)} icon={DollarSign} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Borradores" value={String(totalBorradores)} icon={Clock} color="bg-amber-500" subtitle={periods.length > 0 ? `${((totalBorradores / periods.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("borradores")} />
+              <KpiCard label="Borradores" value={String(totalBorradores)} icon={Clock} color="bg-warning" subtitle={periods.length > 0 ? `${((totalBorradores / periods.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("borradores")} />
               <KpiCard label="Monto Bruto Total" value={fmt(totalBruto)} icon={DollarSign} color="bg-emerald-500" subtitle="Suma bruta" onClick={() => setKpiPopup("bruto")} />
               <KpiCard label="Monto Neto Total" value={fmt(totalNeto)} icon={CheckCircle} color="bg-violet-500" subtitle="Suma neta" onClick={() => setKpiPopup("neto")} />
             </>

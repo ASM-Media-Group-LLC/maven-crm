@@ -77,7 +77,7 @@ const AuditoriaRoleMatrix = ({ matrix }: Props) => {
                   <>
                     <TableCell key={`${role}-${mod}-access`} className="text-center px-2 border-l">
                       {hasAccess ? (
-                        <Check className="h-3.5 w-3.5 text-emerald-500 mx-auto" />
+                        <Check className="h-3.5 w-3.5 text-success mx-auto" />
                       ) : (
                         <X className="h-3.5 w-3.5 text-muted-foreground/30 mx-auto" />
                       )}

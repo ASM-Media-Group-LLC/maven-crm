@@ -49,8 +49,8 @@ export default function IncomingCallModal({ call, onAccept, onDecline }: Props) 
             onClick={onAccept}
             className="flex flex-col items-center gap-1 group"
           >
-            <div className="h-14 w-14 rounded-full bg-green-500 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-              <Phone className="h-6 w-6 text-white" />
+            <div className="h-14 w-14 rounded-full bg-success flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+              <Phone className="h-6 w-6 text-success-foreground" />
             </div>
             <span className="text-xs text-muted-foreground">{isOngoing ? "Unirse" : "Aceptar"}</span>
           </button>

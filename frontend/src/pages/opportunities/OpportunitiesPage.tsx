@@ -43,8 +43,8 @@ type Stage = "interested" | "offered" | "negotiating" | "won" | "lost";
 const STAGES: { value: Stage; label: string; cls: string }[] = [
   { value: "interested", label: "Interesada", cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400" },
   { value: "offered", label: "Ofrecida", cls: "bg-violet-500/15 text-violet-600 dark:text-violet-400" },
-  { value: "negotiating", label: "Negociando", cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400" },
-  { value: "won", label: "Ganada", cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" },
+  { value: "negotiating", label: "Negociando", cls: "bg-warning/15 text-warning" },
+  { value: "won", label: "Ganada", cls: "bg-success/15 text-success" },
   { value: "lost", label: "Perdida", cls: "bg-muted text-muted-foreground" },
 ];
 const stageMeta = (v: string) => STAGES.find((s) => s.value === v) ?? STAGES[0];
@@ -170,9 +170,9 @@ const OpportunitiesPage = () => {
 
       {/* Resumen — qué hay cerca de cerrar */}
       <div className="flex flex-wrap gap-2">
-        <SummaryChip label="Cerca de cerrar" value={nearClose} accent="bg-amber-500/15 text-amber-600 dark:text-amber-400" hint="en negociación" />
+        <SummaryChip label="Cerca de cerrar" value={nearClose} accent="bg-warning/15 text-warning" hint="en negociación" />
         <SummaryChip label="Abiertas" value={openTotal} accent="bg-primary/10 text-primary" hint="interesada + ofrecida + negociando" />
-        <SummaryChip label="Ganadas" value={counts.won ?? 0} accent="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" />
+        <SummaryChip label="Ganadas" value={counts.won ?? 0} accent="bg-success/15 text-success" />
       </div>
 
       {/* #4 — Reclutamiento: confirmadas por firmar (del pipeline de Closers),
@@ -192,7 +192,7 @@ const OpportunitiesPage = () => {
               return (
                 <div key={c.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/40">
                   <span className="font-mono text-xs">{c.instagram_handle ?? "(sin handle)"}</span>
-                  <span className={`rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums ${big ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground"}`}>
+                  <span className={`rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums ${big ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
                     {fmtUsd(v)}/mes
                   </span>
                   {big && <span className="text-xs" title="Cierre grande">🔥</span>}
@@ -260,7 +260,7 @@ const OpportunitiesPage = () => {
                     </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{userName(o.assigned_to)}</td>
                     <td className="px-3 py-2 text-xs">
-                      <span className={`inline-flex items-center gap-1 ${overdue ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+                      <span className={`inline-flex items-center gap-1 ${overdue ? "text-destructive" : "text-muted-foreground"}`}>
                         {overdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
                         {fmtDate(o.next_followup_at)}
                       </span>

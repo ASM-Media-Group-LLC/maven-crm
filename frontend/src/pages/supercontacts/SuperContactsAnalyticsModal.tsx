@@ -309,7 +309,7 @@ const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-lg border p-4 text-center">
-                  <p className="text-3xl font-bold text-green-500">{enrichmentStats.enriched}</p>
+                  <p className="text-3xl font-bold text-success">{enrichmentStats.enriched}</p>
                   <p className="text-xs text-muted-foreground mt-1">Con datos completos</p>
                 </div>
                 <div className="rounded-lg border p-4 text-center">

@@ -299,9 +299,9 @@ export default function ControlFinancieroPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
-              <KpiCard label="Ingresos Totales" value={fmt(ingresos)} icon={TrendingUp} color="bg-emerald-500" subtitle="Invoices pagados" onClick={() => setKpiPopup("ingresos")} />
-              <KpiCard label="Egresos Totales" value={fmt(egresos)} icon={TrendingDown} color="bg-rose-500" subtitle="Nómina + comisiones" onClick={() => setKpiPopup("egresos")} />
-              <KpiCard label="Balance" value={fmt(balance)} icon={DollarSign} color={balance < 0 ? "bg-rose-500" : "bg-emerald-500"} subtitle={balance >= 0 ? "Positivo" : "Negativo"} onClick={() => setKpiPopup("balance")} />
+              <KpiCard label="Ingresos Totales" value={fmt(ingresos)} icon={TrendingUp} color="bg-success" subtitle="Invoices pagados" onClick={() => setKpiPopup("ingresos")} />
+              <KpiCard label="Egresos Totales" value={fmt(egresos)} icon={TrendingDown} color="bg-destructive" subtitle="Nómina + comisiones" onClick={() => setKpiPopup("egresos")} />
+              <KpiCard label="Balance" value={fmt(balance)} icon={DollarSign} color={balance < 0 ? "bg-destructive" : "bg-success"} subtitle={balance >= 0 ? "Positivo" : "Negativo"} onClick={() => setKpiPopup("balance")} />
               <KpiCard label="Margen" value={`${margenPct}%`} icon={BarChart3} color="bg-amber-500" subtitle="Sobre ingresos" onClick={() => setKpiPopup("margen")} />
             </>
           )}

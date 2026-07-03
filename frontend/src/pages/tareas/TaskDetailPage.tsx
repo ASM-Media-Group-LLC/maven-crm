@@ -41,8 +41,8 @@ interface TaskDetailPageProps {
 const statusOptions = [
   { value: "active", label: "Pendiente", className: "bg-secondary text-secondary-foreground" },
   { value: "in_progress", label: "En curso", className: "bg-blue-500/20 text-blue-400" },
-  { value: "paused", label: "Pausada", className: "bg-yellow-500/20 text-yellow-400" },
-  { value: "completed", label: "Completada", className: "bg-emerald-500/20 text-emerald-400" },
+  { value: "paused", label: "Pausada", className: "bg-warning/20 text-warning" },
+  { value: "completed", label: "Completada", className: "bg-success/20 text-success" },
 ];
 
 const TaskDetailPage = ({ task, open, onOpenChange, profiles, onEdit, onStatusChange, onPatchTask, onUpdateAssignees, onDelete }: TaskDetailPageProps) => {

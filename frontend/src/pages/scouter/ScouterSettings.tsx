@@ -1415,7 +1415,7 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
             title={account.active ? "Desactivar" : "Activar"}
           >
             {account.active ? (
-              <ToggleRight className="h-5 w-5 text-emerald-400" />
+              <ToggleRight className="h-5 w-5 text-success" />
             ) : (
               <ToggleLeft className="h-5 w-5" />
             )}
@@ -1423,7 +1423,7 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
           <Button
             size="sm"
             variant="ghost"
-            className="h-7 px-2 text-xs opacity-60 hover:opacity-100 hover:text-rose-400"
+            className="h-7 px-2 text-xs opacity-60 hover:opacity-100 hover:text-destructive"
             onClick={() => setConfirmDelete(true)}
             title="Eliminar"
           >
@@ -1445,7 +1445,7 @@ const SpammerAccountRow = ({ account }: { account: SpammerAccount }) => {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-rose-500 hover:bg-rose-600"
+              className="bg-destructive hover:bg-destructive/90"
             >
               {deleteAccount.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -1595,7 +1595,7 @@ const SpammerAccountsSection = () => {
                     <p className="mt-0.5 text-[10px] text-destructive">{handleError}</p>
                   )}
                   {!handleError && cleanedHandle && cleanedHandle !== newHandle.trim().replace(/^@+/, "") && (
-                    <p className="mt-0.5 text-[10px] text-emerald-500">
+                    <p className="mt-0.5 text-[10px] text-success">
                       Detectado: @{cleanedHandle}
                     </p>
                   )}

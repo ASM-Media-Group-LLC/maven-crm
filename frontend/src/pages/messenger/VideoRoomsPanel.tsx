@@ -155,7 +155,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
                       <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                         <Users className="h-3 w-3" /> {room.participants.length}
                         {room.isActive && (
-                          <Badge className="h-4 px-1.5 text-[9px] bg-emerald-500/20 text-emerald-500 border-0">
+                          <Badge className="h-4 px-1.5 text-[9px] bg-success/20 text-success border-0">
                             EN VIVO
                           </Badge>
                         )}

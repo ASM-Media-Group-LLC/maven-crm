@@ -8,9 +8,9 @@ interface Props {
 }
 
 const severityConfig = {
-  critical: { label: "Crítico", color: "bg-red-500/10 text-red-500 border-red-500/20", icon: AlertCircle },
-  high: { label: "Alto", color: "bg-amber-500/10 text-amber-500 border-amber-500/20", icon: AlertTriangle },
-  medium: { label: "Medio", color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20", icon: Info },
+  critical: { label: "Crítico", color: "bg-destructive/10 text-destructive border-destructive/20", icon: AlertCircle },
+  high: { label: "Alto", color: "bg-warning/10 text-warning border-warning/20", icon: AlertTriangle },
+  medium: { label: "Medio", color: "bg-warning/10 text-warning border-warning/20", icon: Info },
   low: { label: "Bajo", color: "bg-blue-500/10 text-blue-500 border-blue-500/20", icon: Info },
 };
 
@@ -19,11 +19,11 @@ const AuditoriaHealthChecks = ({ checks }: Props) => {
 
   if (totalIssues === 0) {
     return (
-      <div className="rounded-lg border bg-emerald-500/10 border-emerald-500/20 p-4 flex items-center gap-3">
-        <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
-          <Info className="h-4 w-4 text-emerald-500" />
+      <div className="rounded-lg border bg-success/10 border-success/20 p-4 flex items-center gap-3">
+        <div className="h-8 w-8 rounded-full bg-success/20 flex items-center justify-center">
+          <Info className="h-4 w-4 text-success" />
         </div>
-        <p className="text-sm font-medium text-emerald-500">Sin problemas detectados</p>
+        <p className="text-sm font-medium text-success">Sin problemas detectados</p>
       </div>
     );
   }

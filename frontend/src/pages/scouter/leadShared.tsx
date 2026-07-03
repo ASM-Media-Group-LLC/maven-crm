@@ -739,7 +739,7 @@ export const LeadDrawer = ({
               (el supervisor asigna el closer concreto después en /closers).
               source='scouter' mantiene el origen separado de leads del LG. */}
           {lead.converted_at ? (
-            <div className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
+            <div className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-success/10 text-success text-sm font-medium">
               <CheckCircle2 className="h-3.5 w-3.5" />
               En Pipeline Closers
             </div>

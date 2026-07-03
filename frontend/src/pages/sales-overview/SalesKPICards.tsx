@@ -52,7 +52,7 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       previousValue: null,
       subtitle: "crecimiento positivo",
       icon: TrendingUp,
-      bg: "bg-emerald-500",
+      bg: "bg-success",
     },
     {
       id: "at_risk",
@@ -62,7 +62,7 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       previousValue: null,
       subtitle: "necesitan atención",
       icon: AlertTriangle,
-      bg: "bg-rose-500",
+      bg: "bg-destructive",
     },
   ];
 
@@ -84,7 +84,7 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
               <p className="text-xs uppercase tracking-wider text-foreground/80 font-semibold">{card.title}</p>
               <p className="text-3xl font-bold tabular-nums leading-tight">{card.value}</p>
               {card.change !== 0 && (
-                <p className={`text-[10px] mt-1 ${card.change >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                <p className={`text-[10px] mt-1 ${card.change >= 0 ? "text-success" : "text-destructive"}`}>
                   {card.change >= 0 ? "+" : ""}{card.change.toFixed(1)}% vs anterior
                 </p>
               )}

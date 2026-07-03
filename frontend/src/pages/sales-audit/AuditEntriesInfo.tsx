@@ -30,7 +30,7 @@ const AuditEntriesInfo = ({ totalExcelEntries, totalSystemEntries, dateLabel, da
           <span>Entradas Sistema: <strong className="text-foreground">{totalSystemEntries}</strong></span>
         </div>
         {hasMismatch && (
-          <div className="flex items-center gap-2 text-amber-500">
+          <div className="flex items-center gap-2 text-warning">
             <AlertTriangle className="h-4 w-4" />
             <span className="font-medium">
               {diff > 0

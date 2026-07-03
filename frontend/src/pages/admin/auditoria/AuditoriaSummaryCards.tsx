@@ -10,7 +10,7 @@ const AuditoriaSummaryCards = ({ summary }: Props) => {
   const cards = [
     { label: "Total Usuarios", value: String(summary.total_users), icon: Users, color: "bg-blue-500" },
     { label: "Con Rol", value: String(summary.users_with_roles), icon: UserCheck, color: "bg-emerald-500" },
-    { label: "Sin Rol", value: String(summary.users_without_roles), icon: AlertTriangle, color: summary.users_without_roles > 0 ? "bg-rose-500" : "bg-slate-500" },
+    { label: "Sin Rol", value: String(summary.users_without_roles), icon: AlertTriangle, color: summary.users_without_roles > 0 ? "bg-destructive" : "bg-slate-500" },
     { label: "Roles Activos", value: String(summary.active_roles), icon: Shield, color: "bg-amber-500" },
     { label: "Permisos Config.", value: String(summary.total_permissions), icon: Key, color: "bg-violet-500" },
   ];

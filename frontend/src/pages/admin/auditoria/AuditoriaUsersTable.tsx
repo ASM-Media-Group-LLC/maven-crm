@@ -56,7 +56,7 @@ const AuditoriaUsersTable = ({ users, search }: Props) => {
                     Sin rol
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30">OK</Badge>
+                  <Badge variant="outline" className="bg-success/10 text-success border-success/30">OK</Badge>
                 )}
               </TableCell>
             </TableRow>

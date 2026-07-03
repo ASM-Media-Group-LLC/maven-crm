@@ -81,7 +81,7 @@ const formatCell = (row: EarningsRow, col: ColumnDef): string => {
 const TrendCell = ({ value }: { value: string | null | undefined }) => {
   if (!value) return <span className="text-muted-foreground">—</span>;
   if (value === "Creciendo")
-    return <span className="flex items-center gap-1 text-emerald-500"><TrendingUp className="h-3.5 w-3.5" />{value}</span>;
+    return <span className="flex items-center gap-1 text-success"><TrendingUp className="h-3.5 w-3.5" />{value}</span>;
   if (value === "Cayendo")
     return <span className="flex items-center gap-1 text-destructive"><TrendingDown className="h-3.5 w-3.5" />{value}</span>;
   return <span className="flex items-center gap-1 text-muted-foreground"><Minus className="h-3.5 w-3.5" />{value}</span>;
@@ -194,7 +194,7 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns 
                       ) : col.format === "signed_percent" ? (
                         <span className={
                           (row[col.key] as number | null) == null ? "text-muted-foreground" :
-                          (row[col.key] as number) > 0 ? "text-emerald-500 font-medium" :
+                          (row[col.key] as number) > 0 ? "text-success font-medium" :
                           (row[col.key] as number) < 0 ? "text-destructive font-medium" :
                           "text-muted-foreground"
                         }>

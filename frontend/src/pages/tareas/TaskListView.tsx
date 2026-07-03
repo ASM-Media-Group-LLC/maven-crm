@@ -84,15 +84,15 @@ const TaskListView = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete
       {
         key: "paused",
         label: "PAUSADAS",
-        color: "text-yellow-400",
-        badgeClass: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+        color: "text-warning",
+        badgeClass: "bg-warning/20 text-warning border-warning/30",
         tasks: paused,
       },
       {
         key: "completed",
         label: "COMPLETADAS",
-        color: "text-emerald-400",
-        badgeClass: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+        color: "text-success",
+        badgeClass: "bg-success/20 text-success border-success/30",
         tasks: completed,
       },
     ].filter(g => g.tasks.length > 0);

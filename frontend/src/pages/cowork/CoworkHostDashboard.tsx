@@ -203,10 +203,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           {/* Host Hub indicator */}
           <div className="p-3 border-b border-border/50">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Radio className={`h-3 w-3 ${hubConnected ? "text-emerald-500" : "text-muted-foreground/50"}`} />
+              <Radio className={`h-3 w-3 ${hubConnected ? "text-success" : "text-muted-foreground/50"}`} />
               <span>Coordinador Hub</span>
               {activeRoomLk ? (
-                <span className="text-[10px] text-amber-500/80 italic">en pausa (en sala)</span>
+                <span className="text-[10px] text-warning/80 italic">en pausa (en sala)</span>
               ) : hubConnected ? (
                 <Button
                   variant="ghost"
@@ -308,7 +308,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     </div>
                     <div className="flex gap-1 mt-1">
                       <Button
-                        size="sm" variant="ghost" className="h-5 text-[10px] text-emerald-500 gap-0.5 rounded-full"
+                        size="sm" variant="ghost" className="h-5 text-[10px] text-success gap-0.5 rounded-full"
                         onClick={async () => {
                           try { await cowork.approveScreenShare(req.id, true); toast.success("Aprobado"); } catch (e: any) { toast.error(e.message); }
                         }}
@@ -387,7 +387,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-[10px] font-medium text-primary-foreground">
                                     {initials}
                                   </div>
-                                  <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${online ? "bg-emerald-500" : "bg-muted-foreground/30"}`} />
+                                  <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${online ? "bg-success" : "bg-muted-foreground/30"}`} />
                                 </div>
                                 <span className="text-[11px] text-muted-foreground truncate w-full">{fullName}</span>
                                 {(() => {
@@ -395,8 +395,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                   if (!ms) return null;
                                   return (
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                      {ms.micOn ? <Mic className="h-3 w-3 text-emerald-500" /> : <MicOff className="h-3 w-3 text-destructive/70" />}
-                                      {ms.camOn ? <Video className="h-3 w-3 text-emerald-500" /> : <VideoOff className="h-3 w-3 text-destructive/70" />}
+                                      {ms.micOn ? <Mic className="h-3 w-3 text-success" /> : <MicOff className="h-3 w-3 text-destructive/70" />}
+                                      {ms.camOn ? <Video className="h-3 w-3 text-success" /> : <VideoOff className="h-3 w-3 text-destructive/70" />}
                                       {ms.screenShareOn && <Monitor className="h-3 w-3 text-primary" />}
                                     </div>
                                   );

@@ -70,7 +70,7 @@ const CloseEventoModal = ({ open, onOpenChange, event }: Props) => {
               }`}
             >
               <RadioGroupItem value="completed" className="mt-0.5" />
-              <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+              <CheckCircle className="h-5 w-5 text-success shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium">Se realizó exitosamente</p>
                 <p className="text-xs text-muted-foreground">El evento se llevó a cabo según lo planeado</p>

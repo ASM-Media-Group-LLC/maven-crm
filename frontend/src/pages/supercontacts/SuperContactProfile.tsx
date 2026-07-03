@@ -54,9 +54,9 @@ const MESSAGE_TYPES = [
   { value: "whatsapp", label: "WhatsApp" },
 ];
 const RESPONSE_STATUSES = [
-  { value: "pending", label: "Pendiente", color: "bg-yellow-500", icon: Clock },
-  { value: "positive", label: "Positiva", color: "bg-green-500", icon: CheckCircle },
-  { value: "negative", label: "Negativa", color: "bg-red-500", icon: XCircle },
+  { value: "pending", label: "Pendiente", color: "bg-warning", icon: Clock },
+  { value: "positive", label: "Positiva", color: "bg-success", icon: CheckCircle },
+  { value: "negative", label: "Negativa", color: "bg-destructive", icon: XCircle },
   { value: "no_response", label: "Sin respuesta", color: "bg-gray-400", icon: MinusCircle },
 ];
 
@@ -368,7 +368,7 @@ const SuperContactProfile = () => {
     const s = RESPONSE_STATUSES.find(rs => rs.value === status);
     if (!s) return null;
     const Icon = s.icon;
-    return <Icon className={`h-3.5 w-3.5 ${status === "positive" ? "text-green-500" : status === "negative" ? "text-red-500" : status === "pending" ? "text-yellow-500" : "text-muted-foreground"}`} />;
+    return <Icon className={`h-3.5 w-3.5 ${status === "positive" ? "text-success" : status === "negative" ? "text-destructive" : status === "pending" ? "text-warning" : "text-muted-foreground"}`} />;
   };
 
   const renderTimelineItem = (item: { date: string; type: "outreach" | "interaction"; data: any }, i: number) => (
@@ -426,9 +426,9 @@ const SuperContactProfile = () => {
         <CardContent className="p-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {isCheckOverdue ? (
-              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <AlertTriangle className="h-5 w-5 text-destructive" />
             ) : (
-              <CalendarCheck className="h-5 w-5 text-green-500" />
+              <CalendarCheck className="h-5 w-5 text-success" />
             )}
             <div>
               <p className="text-sm font-medium">
@@ -476,7 +476,7 @@ const SuperContactProfile = () => {
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Cuentas IG</p>
         </div>
         <div className="rounded-lg border p-3 text-center">
-          <p className="text-2xl font-bold text-green-500">{dashKPIs.responseRate}%</p>
+          <p className="text-2xl font-bold text-success">{dashKPIs.responseRate}%</p>
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Tasa +</p>
         </div>
         <div className="rounded-lg border p-3 text-center">
@@ -708,7 +708,7 @@ const SuperContactProfile = () => {
                     <span className="text-sm font-semibold">{brand}</span>
                     <Badge variant="outline" className="text-[10px] h-4 px-1">{entries.length}</Badge>
                     <span className="text-[10px] text-muted-foreground">{accounts.size} cuenta{accounts.size !== 1 ? "s" : ""}</span>
-                    {positive > 0 && <Badge className="text-[9px] h-4 px-1 bg-green-500/10 text-green-600 border-green-500/20">{positive} ✓</Badge>}
+                    {positive > 0 && <Badge className="text-[9px] h-4 px-1 bg-success/10 text-success border-success/20">{positive} ✓</Badge>}
                     <div className="ml-auto flex items-center gap-0.5">
                       <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => { setOutBrand(brand); setExpandedBrandForm(brand); setActiveBrandContext(brand); }}
                         title="Agregar contacto">
@@ -792,15 +792,15 @@ const SuperContactProfile = () => {
           <p className="text-xs text-muted-foreground">Total Contactos</p>
         </div>
         <div className="rounded-lg border p-4 text-center">
-          <p className="text-3xl font-bold text-green-500">{dashKPIs.positive}</p>
+          <p className="text-3xl font-bold text-success">{dashKPIs.positive}</p>
           <p className="text-xs text-muted-foreground">Respuestas +</p>
         </div>
         <div className="rounded-lg border p-4 text-center">
-          <p className="text-3xl font-bold text-red-500">{dashKPIs.negative}</p>
+          <p className="text-3xl font-bold text-destructive">{dashKPIs.negative}</p>
           <p className="text-xs text-muted-foreground">Respuestas −</p>
         </div>
         <div className="rounded-lg border p-4 text-center">
-          <p className="text-3xl font-bold text-yellow-500">{dashKPIs.pending}</p>
+          <p className="text-3xl font-bold text-warning">{dashKPIs.pending}</p>
           <p className="text-xs text-muted-foreground">Pendientes</p>
         </div>
       </div>

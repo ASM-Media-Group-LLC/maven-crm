@@ -16,12 +16,12 @@ const AuditSummaryCards = ({ totalExcel, totalSystem, matchCount, diffCount }: P
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       <KpiCard label="Total Excel (Gross)" value={fmt(totalExcel)} icon={FileSpreadsheet} color="bg-blue-500" />
       <KpiCard label="Total Sistema (Gross)" value={fmt(totalSystem)} icon={FileSpreadsheet} color="bg-violet-500" />
-      <KpiCard label="Coinciden" value={String(matchCount)} icon={CheckCircle} color="bg-emerald-500" />
+      <KpiCard label="Coinciden" value={String(matchCount)} icon={CheckCircle} color="bg-success" />
       <KpiCard
         label="Diferencias"
         value={String(diffCount)}
         icon={diffCount > 0 ? AlertTriangle : CheckCircle}
-        color={diffCount > 0 ? "bg-rose-500" : "bg-emerald-500"}
+        color={diffCount > 0 ? "bg-destructive" : "bg-success"}
       />
     </div>
   );

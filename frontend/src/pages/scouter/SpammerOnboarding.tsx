@@ -70,7 +70,7 @@ const StepDot = ({
       <div
         className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors ${
           done
-            ? "border-emerald-500 bg-emerald-500 text-white"
+            ? "border-success bg-success text-white"
             : active
             ? "border-amber-400 bg-amber-400/15 text-amber-400"
             : "border-border text-muted-foreground"
@@ -80,7 +80,7 @@ const StepDot = ({
       </div>
       <span
         className={`text-[10px] font-medium ${
-          active ? "text-amber-400" : done ? "text-emerald-400" : "text-muted-foreground"
+          active ? "text-amber-400" : done ? "text-success" : "text-muted-foreground"
         }`}
       >
         {label}
@@ -194,7 +194,7 @@ const ProfilePlaceholder = ({ handle }: { handle: string }) => (
         <span className="font-medium text-sm">@{handle}</span>
         <Badge
           variant="outline"
-          className="text-[10px] border-amber-400/40 text-amber-400"
+          className="text-[10px] border-warning/40 text-warning"
         >
           Pendiente de sync
         </Badge>
@@ -203,7 +203,7 @@ const ProfilePlaceholder = ({ handle }: { handle: string }) => (
         El perfil completo (seguidores, bio) se sincronizará automáticamente.
       </p>
     </div>
-    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+    <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
   </div>
 );
 
@@ -232,9 +232,9 @@ const Step2 = ({
       ))}
     </div>
 
-    <div className="flex items-start gap-2 rounded-lg border border-emerald-400/20 bg-emerald-400/5 px-3 py-2.5">
-      <CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
-      <p className="text-xs text-emerald-300">
+    <div className="flex items-start gap-2 rounded-lg border border-success/20 bg-success/5 px-3 py-2.5">
+      <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+      <p className="text-xs text-success">
         Todo listo. En el siguiente paso podrás asignar un nombre y nicho a cada cuenta
         para que la IA pueda asignarte tareas relevantes.
       </p>

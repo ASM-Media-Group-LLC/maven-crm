@@ -616,7 +616,7 @@ export default function FacturacionPage() {
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
               <KpiCard label="Total Invoices" value={String(invoices.length)} icon={FileText} color="bg-blue-500" subtitle="Todos" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pendientes" value={String(totalPendientes)} icon={Clock} color="bg-amber-500" subtitle="Enviadas + vencidas" onClick={() => setKpiPopup("pendientes")} />
+              <KpiCard label="Pendientes" value={String(totalPendientes)} icon={Clock} color="bg-warning" subtitle="Enviadas + vencidas" onClick={() => setKpiPopup("pendientes")} />
               <KpiCard label="Monto Total" value={fmt(totalMonto)} icon={DollarSign} color="bg-emerald-500" subtitle="Suma" onClick={() => setKpiPopup("monto")} />
               <KpiCard label="Fee Total" value={fmt(totalFee)} icon={DollarSign} color="bg-rose-500" subtitle="Fees cobrados" onClick={() => setKpiPopup("fee")} />
             </>

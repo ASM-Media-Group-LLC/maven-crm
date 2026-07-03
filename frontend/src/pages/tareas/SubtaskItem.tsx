@@ -31,8 +31,8 @@ interface SubtaskItemProps {
 const statusConfig: Record<string, { label: string; className: string; icon: typeof Circle }> = {
   pending: { label: "Pendiente", className: "bg-secondary text-secondary-foreground", icon: Circle },
   in_progress: { label: "En progreso", className: "bg-primary/20 text-primary border-primary/30", icon: Play },
-  paused: { label: "Pausada", className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/30", icon: Pause },
-  completed: { label: "Completada", className: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", icon: CheckCircle2 },
+  paused: { label: "Pausada", className: "bg-warning/20 text-warning border-warning/30", icon: Pause },
+  completed: { label: "Completada", className: "bg-success/20 text-success border-success/30", icon: CheckCircle2 },
 };
 
 const getStatusTransitions = (status: string) => {

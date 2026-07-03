@@ -179,8 +179,8 @@ export default function ComisionesPage() {
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
               <KpiCard label="Total Registros" value={String(commissions.length)} icon={TrendingUp} color="bg-blue-500" subtitle="Todas las comisiones" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Proyectadas" value={String(totalProyectadas)} icon={Clock} color="bg-amber-500" subtitle="Pendientes" onClick={() => setKpiPopup("proyectadas")} />
-              <KpiCard label="Confirmadas" value={String(totalConfirmadas)} icon={CheckCircle} color="bg-emerald-500" subtitle="Listas para pago" onClick={() => setKpiPopup("confirmadas")} />
+              <KpiCard label="Proyectadas" value={String(totalProyectadas)} icon={Clock} color="bg-warning" subtitle="Pendientes" onClick={() => setKpiPopup("proyectadas")} />
+              <KpiCard label="Confirmadas" value={String(totalConfirmadas)} icon={CheckCircle} color="bg-success" subtitle="Listas para pago" onClick={() => setKpiPopup("confirmadas")} />
               <KpiCard label="Monto Estimado" value={fmt(totalEstimado)} icon={DollarSign} color="bg-rose-500" subtitle="Suma estimada" onClick={() => setKpiPopup("monto")} />
             </>
           )}

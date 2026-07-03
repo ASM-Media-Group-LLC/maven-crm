@@ -162,7 +162,7 @@ const GlobalAnalyticsTab = ({ tasks, profiles, projects, isLoading, isError, err
         </Card>
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
-            <CheckSquare className="h-5 w-5 text-emerald-500" />
+            <CheckSquare className="h-5 w-5 text-success" />
             <div>
               <p className="text-2xl font-bold">{kpis.completed}</p>
               <p className="text-xs text-muted-foreground">Completadas</p>

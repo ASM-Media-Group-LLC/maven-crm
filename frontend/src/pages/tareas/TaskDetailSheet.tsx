@@ -34,8 +34,8 @@ interface TaskDetailSheetProps {
 const statusLabels: Record<string, { label: string; className: string }> = {
   active: { label: "Pendiente", className: "bg-secondary text-secondary-foreground" },
   in_progress: { label: "En curso", className: "bg-blue-500/20 text-blue-400" },
-  paused: { label: "Pausada", className: "bg-yellow-500/20 text-yellow-400" },
-  completed: { label: "Completada", className: "bg-emerald-500/20 text-emerald-400" },
+  paused: { label: "Pausada", className: "bg-warning/20 text-warning" },
+  completed: { label: "Completada", className: "bg-success/20 text-success" },
 };
 
 const TaskDetailSheet = ({ task, open, onOpenChange, profiles, onEdit, onStatusChange }: TaskDetailSheetProps) => {

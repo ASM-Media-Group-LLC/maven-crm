@@ -422,9 +422,9 @@ const AuditComparisonTable = ({ file }: Props) => {
               const expandedSource = expanded[r.creator];
               return (
                 <>
-                  <TableRow key={r.creator} className={val ? "bg-emerald-500/5" : ""}>
+                  <TableRow key={r.creator} className={val ? "bg-success/5" : ""}>
                     <TableCell className="font-medium capitalize">{r.creator}</TableCell>
-                    <TableCell className={`text-center ${entriesMismatch ? "text-amber-500 font-medium" : ""}`}>
+                    <TableCell className={`text-center ${entriesMismatch ? "text-warning font-medium" : ""}`}>
                       <button
                         className="underline decoration-dotted underline-offset-4 hover:text-primary transition-colors cursor-pointer"
                         onClick={() => toggleExpand(r.creator, "excel")}
@@ -432,7 +432,7 @@ const AuditComparisonTable = ({ file }: Props) => {
                         {r.excelEntries}
                       </button>
                     </TableCell>
-                    <TableCell className={`text-center ${entriesMismatch ? "text-amber-500 font-medium" : ""}`}>
+                    <TableCell className={`text-center ${entriesMismatch ? "text-warning font-medium" : ""}`}>
                       <button
                         className="underline decoration-dotted underline-offset-4 hover:text-primary transition-colors cursor-pointer"
                         onClick={() => toggleExpand(r.creator, "system")}
@@ -440,10 +440,10 @@ const AuditComparisonTable = ({ file }: Props) => {
                         {r.systemEntries}
                       </button>
                     </TableCell>
-                    <TableCell className={`text-right ${val === "excel" ? "font-bold text-emerald-500" : ""}`}>
+                    <TableCell className={`text-right ${val === "excel" ? "font-bold text-success" : ""}`}>
                       ${r.excelGross.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
-                    <TableCell className={`text-right ${val === "system" ? "font-bold text-emerald-500" : ""}`}>
+                    <TableCell className={`text-right ${val === "system" ? "font-bold text-success" : ""}`}>
                       ${r.systemGross.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell className={`text-right ${!isOk ? "text-destructive font-medium" : ""}`}>
@@ -454,9 +454,9 @@ const AuditComparisonTable = ({ file }: Props) => {
                     </TableCell>
                     <TableCell className="text-center">
                       {isOk ? (
-                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30">OK</Badge>
+                        <Badge variant="outline" className="bg-success/10 text-success border-success/30">OK</Badge>
                       ) : entriesMismatch ? (
-                        <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/30">Faltan datos</Badge>
+                        <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">Faltan datos</Badge>
                       ) : (
                         <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">Diferencia</Badge>
                       )}
@@ -464,8 +464,8 @@ const AuditComparisonTable = ({ file }: Props) => {
                     <TableCell className="text-center">
                       {val ? (
                         <div className="flex items-center justify-center gap-1">
-                          <CheckCircle className="h-4 w-4 text-emerald-500" />
-                          <span className="text-xs text-emerald-500 capitalize">{val === "excel" ? "Excel" : "Sistema"}</span>
+                          <CheckCircle className="h-4 w-4 text-success" />
+                          <span className="text-xs text-success capitalize">{val === "excel" ? "Excel" : "Sistema"}</span>
                         </div>
                       ) : !isOk ? (
                         <div className="flex gap-1 justify-center">

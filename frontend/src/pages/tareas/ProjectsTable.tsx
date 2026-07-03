@@ -135,7 +135,7 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, pro
         <TableCell className="text-center">{counts.pending}</TableCell>
         <TableCell className="text-center">{counts.in_progress}</TableCell>
         <TableCell className="text-center text-destructive">{counts.overdue}</TableCell>
-        <TableCell className="text-center text-emerald-400">{counts.completed}</TableCell>
+        <TableCell className="text-center text-success">{counts.completed}</TableCell>
         <TableCell>
           <div className="flex items-center gap-2">
             <Progress value={progress} className="h-1.5 flex-1" />

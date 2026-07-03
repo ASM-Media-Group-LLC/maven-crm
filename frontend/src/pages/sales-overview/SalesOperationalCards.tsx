@@ -57,13 +57,13 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
       id: "falling",
       title: "Bajando",
       icon: TrendingDown,
-      bg: "bg-amber-500",
+      bg: "bg-warning",
       content: (
         <div className="space-y-1 mt-1">
           {data.falling.slice(0, 2).map((c) => (
             <div key={c.creatorKey} className="flex items-center justify-between text-[11px]">
               <span className="truncate max-w-[110px] text-muted-foreground">{c.artisticName || "—"}</span>
-              <span className="text-amber-500 tabular-nums">{c.changePercent.toFixed(0)}%</span>
+              <span className="text-warning tabular-nums">{c.changePercent.toFixed(0)}%</span>
             </div>
           ))}
           {data.falling.length === 0 && <span className="text-[11px] text-muted-foreground">—</span>}
@@ -83,7 +83,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
       id: "alerts",
       title: "Alertas",
       icon: Bell,
-      bg: "bg-rose-500",
+      bg: "bg-destructive",
       content: (
         <p className="text-3xl font-bold tabular-nums leading-tight mt-1">{alertCount}</p>
       ),

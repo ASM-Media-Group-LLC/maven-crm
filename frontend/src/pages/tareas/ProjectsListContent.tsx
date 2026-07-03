@@ -187,10 +187,10 @@ const ProjectsListContent = () => {
 
   const kpis = [
     { label: "Total Proyectos", value: filteredProjects.length, icon: FolderOpen, color: "bg-blue-500" },
-    { label: "Pendientes", value: totalCounts.pending, icon: Clock, color: "bg-amber-500" },
+    { label: "Pendientes", value: totalCounts.pending, icon: Clock, color: "bg-warning" },
     { label: "En curso", value: totalCounts.in_progress, icon: Play, color: "bg-violet-500" },
-    { label: "Vencidas", value: totalCounts.overdue, icon: AlertTriangle, color: "bg-rose-500" },
-    { label: "Completadas", value: totalCounts.completed, icon: CheckSquare, color: "bg-emerald-500" },
+    { label: "Vencidas", value: totalCounts.overdue, icon: AlertTriangle, color: "bg-destructive" },
+    { label: "Completadas", value: totalCounts.completed, icon: CheckSquare, color: "bg-success" },
   ];
 
   const renderProjectActions = (project: TaskProject, stopProp: boolean = true) => (
@@ -339,7 +339,7 @@ const ProjectsListContent = () => {
                   <AlertTriangle className="h-3.5 w-3.5" /> {counts.overdue}
                 </span>
               )}
-              <span className="flex items-center gap-1 text-emerald-400 font-medium" title="Completadas">
+              <span className="flex items-center gap-1 text-success font-medium" title="Completadas">
                 <CheckSquare className="h-3.5 w-3.5" /> {counts.completed}
               </span>
             </div>

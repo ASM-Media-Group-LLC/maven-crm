@@ -643,7 +643,7 @@ const ReportScheduleModal = ({ open, onOpenChange, schedule }: Props) => {
           <div className="space-y-2">
             <Label>Métricas a incluir *</Label>
             {usingFallbackMetrics && (
-              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-700 dark:text-amber-300">
+              <div className="rounded-md border border-warning/40 bg-warning/10 px-2.5 py-2 text-[11px] text-warning">
                 ⚠ El rol "{roleName}" no tiene permisos explícitos configurados para los módulos del catálogo de reportes.
                 Te muestro <strong>todas</strong> las métricas del módulo <strong>{roleToModule(roleName)}</strong> para que elijas las que apliquen.
                 Si quieres restringir esto en el futuro, configurá permisos del rol en <em>Administración → Roles</em>.

@@ -57,7 +57,7 @@ export default function HorasPage() {
                 <>
                   {/* Cards estáticas — la tabla abajo ya muestra el detalle */}
                   <KpiCard label="Total Horas Extra" value={String(totalOvertimeHours)} icon={Clock} color="bg-blue-500" subtitle={`${uniqueEmps} empleados`} />
-                  <KpiCard label="Costo Total" value={fmt(totalOvertimeAmount)} icon={DollarSign} color="bg-rose-500" subtitle="Monto acumulado" />
+                  <KpiCard label="Costo Total" value={fmt(totalOvertimeAmount)} icon={DollarSign} color="bg-destructive" subtitle="Monto acumulado" />
                   <KpiCard label="Promedio por Empleado" value={uniqueEmps > 0 ? (totalOvertimeHours / uniqueEmps).toFixed(1) + "h" : "0h"} icon={Users} color="bg-violet-500" subtitle="Horas extra" />
                 </>
               )}

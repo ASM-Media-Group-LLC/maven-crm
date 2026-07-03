@@ -101,8 +101,8 @@ const ViewEventoModal = ({ open, onOpenChange, event, onEdit }: Props) => {
 
   const summaryItems = [
     { label: "Total", count: guests.length, className: "text-foreground" },
-    { label: "Confirmados", count: countByStatus("confirmed"), className: "text-emerald-600" },
-    { label: "Pendientes", count: countByStatus("pending"), className: "text-amber-600" },
+    { label: "Confirmados", count: countByStatus("confirmed"), className: "text-success" },
+    { label: "Pendientes", count: countByStatus("pending"), className: "text-warning" },
     { label: "Rechazados", count: countByStatus("rejected"), className: "text-destructive" },
     { label: "Sin respuesta", count: countByStatus("no_response"), className: "text-muted-foreground" },
   ];

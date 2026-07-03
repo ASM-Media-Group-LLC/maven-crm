@@ -48,9 +48,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const GUEST_STATUS: Record<string, { dot: string; label: string }> = {
-  confirmed: { dot: "bg-emerald-500", label: "Confirmado" },
-  cancelled: { dot: "bg-red-500", label: "Cancelado" },
-  pending: { dot: "bg-amber-500", label: "Pendiente" },
+  confirmed: { dot: "bg-success", label: "Confirmado" },
+  cancelled: { dot: "bg-destructive", label: "Cancelado" },
+  pending: { dot: "bg-warning", label: "Pendiente" },
 };
 
 const typeIcons: Record<string, React.ElementType> = {
@@ -315,9 +315,9 @@ const EventoSharePage = () => {
                         variant="outline"
                         className={cn(
                           "shrink-0 gap-1.5 text-[10px] font-medium border-transparent",
-                          g.status === "confirmed" && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-                          g.status === "cancelled" && "bg-red-500/10 text-red-600 dark:text-red-400",
-                          g.status === "pending" && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                          g.status === "confirmed" && "bg-success/10 text-success",
+                          g.status === "cancelled" && "bg-destructive/10 text-destructive",
+                          g.status === "pending" && "bg-warning/10 text-warning",
                         )}
                       >
                         <span className={cn("h-1.5 w-1.5 rounded-full", gs.dot)} />

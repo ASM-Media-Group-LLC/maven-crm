@@ -28,9 +28,9 @@ interface GlobalKanbanViewProps {
 const columns = [
   { id: "pending", label: "Pendiente", icon: Clock, color: "border-t-blue-500", bgHeader: "bg-blue-500/10 text-blue-400", dbStatus: "active" },
   { id: "in_progress", label: "En curso", icon: Play, color: "border-t-indigo-500", bgHeader: "bg-indigo-500/10 text-indigo-400", dbStatus: "in_progress" },
-  { id: "paused", label: "Pausada", icon: Pause, color: "border-t-yellow-500", bgHeader: "bg-yellow-500/10 text-yellow-400", dbStatus: "paused" },
-  { id: "overdue", label: "Vencida", icon: AlertTriangle, color: "border-t-red-500", bgHeader: "bg-red-500/10 text-red-400", dbStatus: "active" },
-  { id: "completed", label: "Completada", icon: CheckSquare, color: "border-t-emerald-500", bgHeader: "bg-emerald-500/10 text-emerald-400", dbStatus: "completed" },
+  { id: "paused", label: "Pausada", icon: Pause, color: "border-t-warning", bgHeader: "bg-warning/10 text-warning", dbStatus: "paused" },
+  { id: "overdue", label: "Vencida", icon: AlertTriangle, color: "border-t-destructive", bgHeader: "bg-destructive/10 text-destructive", dbStatus: "active" },
+  { id: "completed", label: "Completada", icon: CheckSquare, color: "border-t-success", bgHeader: "bg-success/10 text-success", dbStatus: "completed" },
 ];
 
 const priorityColors: Record<string, string> = {

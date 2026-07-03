@@ -241,7 +241,7 @@ const DiscoverButton = ({
         <button
           type="button"
           onClick={onStop}
-          className="flex items-center gap-1.5 rounded-full border border-red-400/40 bg-red-400/10 px-4 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-400/20"
+          className="flex items-center gap-1.5 rounded-full border border-destructive/40 bg-destructive/10 px-4 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20"
         >
           <StopCircle className="h-3.5 w-3.5" />
           Detener
@@ -369,7 +369,7 @@ const StopConfirmModal = ({
     <DialogContent className="sm:max-w-sm">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-amber-400" />
+          <AlertTriangle className="h-5 w-5 text-warning" />
           Detener escaneo
         </DialogTitle>
         <DialogDescription>
@@ -1132,7 +1132,7 @@ const ScouterDiscover = () => {
           {/* Queue stats + autopilot status */}
           <div className="text-center text-[11px] text-muted-foreground space-y-0.5">
             {(runningCount > 0 || queuedCount > 0) && (
-              <div className="font-medium text-emerald-400">
+              <div className="font-medium text-success">
                 {runningCount} ejecutando · {queuedCount} en cola
                 {queuedCount > 0 && (
                   <div className="text-[10px] opacity-75 mt-0.5">
@@ -1144,12 +1144,12 @@ const ScouterDiscover = () => {
               </div>
             )}
             {autopilotActive && !autopilotPaused && runningCount === 0 && queuedCount === 0 && (
-              <div className="text-emerald-400/80">
+              <div className="text-success/80">
                 Autopilot activo · esperando próxima ronda
               </div>
             )}
             {autopilotPaused && (
-              <div className="text-amber-400">
+              <div className="text-warning">
                 Autopilot pausado: budget agotado, vuelve mañana
               </div>
             )}

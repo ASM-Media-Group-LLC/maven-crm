@@ -159,9 +159,9 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const kpis = [
     { key: "pending" as KpiKey, label: "Pendientes", value: counts.pending, icon: Clock, color: "bg-blue-500" },
     { key: "in_progress" as KpiKey, label: "En curso", value: counts.in_progress, icon: Play, color: "bg-violet-500" },
-    { key: "paused" as KpiKey, label: "Pausadas", value: counts.paused, icon: Pause, color: "bg-amber-500" },
-    { key: "overdue" as KpiKey, label: "Vencidas", value: counts.overdue, icon: AlertTriangle, color: "bg-rose-500" },
-    { key: "completed" as KpiKey, label: "Completadas", value: counts.completed, icon: CheckSquare, color: "bg-emerald-500" },
+    { key: "paused" as KpiKey, label: "Pausadas", value: counts.paused, icon: Pause, color: "bg-warning" },
+    { key: "overdue" as KpiKey, label: "Vencidas", value: counts.overdue, icon: AlertTriangle, color: "bg-destructive" },
+    { key: "completed" as KpiKey, label: "Completadas", value: counts.completed, icon: CheckSquare, color: "bg-success" },
   ];
 
   return (

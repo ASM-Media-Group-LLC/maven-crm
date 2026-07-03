@@ -105,11 +105,11 @@ const AddSingleContactModal = ({ open, onOpenChange }: Props) => {
 
         {/* Duplicate Warning */}
         {duplicate && (
-          <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 space-y-2">
+          <div className="rounded-lg border border-warning/50 bg-warning/10 p-4 space-y-2">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
               <div className="space-y-1 text-sm">
-                <p className="font-semibold text-amber-600">¡Este contacto ya existe!</p>
+                <p className="font-semibold text-warning">¡Este contacto ya existe!</p>
                 <p><strong>Registrado en:</strong> {duplicate.sourceLabel}</p>
                 {duplicate.name && <p><strong>Nombre:</strong> {duplicate.name}</p>}
                 {duplicate.createdAt && <p><strong>Fecha:</strong> {formatDate(duplicate.createdAt)}</p>}

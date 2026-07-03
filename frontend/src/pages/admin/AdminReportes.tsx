@@ -238,7 +238,7 @@ const AdminReportes = () => {
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
                       <Mail className="h-3 w-3 shrink-0" />
                       {s.recipients.length === 0 ? (
-                        <span className="text-amber-500">Sin destinatarios</span>
+                        <span className="text-warning">Sin destinatarios</span>
                       ) : (
                         <span>
                           {s.recipients.length} {s.recipients.length === 1 ? "destinatario" : "destinatarios"}:{" "}
@@ -275,7 +275,7 @@ const AdminReportes = () => {
                       onClick={() => handleToggle(s)}
                       title={s.is_active ? "Pausar" : "Activar"}
                     >
-                      <Power className={`h-4 w-4 ${s.is_active ? "text-emerald-500" : "text-muted-foreground"}`} />
+                      <Power className={`h-4 w-4 ${s.is_active ? "text-success" : "text-muted-foreground"}`} />
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => handleEdit(s)} title="Editar">
                       <Edit3 className="h-4 w-4" />

@@ -141,10 +141,10 @@ export const EvaluationVerdictDialog = ({
     scorePct >= 80 ? "APROBADO" : scorePct >= 50 ? "A CRITERIO" : "NO APTO";
   const badgeColor =
     scorePct >= 80
-      ? "text-emerald-400"
+      ? "text-success"
       : scorePct >= 50
-      ? "text-amber-400"
-      : "text-rose-400";
+      ? "text-warning"
+      : "text-destructive";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -169,7 +169,7 @@ export const EvaluationVerdictDialog = ({
           </div>
 
           {missing > 0 && (
-            <div className="flex items-start gap-2 rounded-md border border-rose-500/40 bg-rose-500/5 p-2 text-xs text-rose-300">
+            <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
                 Faltan {missing} criterio(s) por calificar. Termina de calificarlos antes de enviar la evaluación.
@@ -196,8 +196,8 @@ export const EvaluationVerdictDialog = ({
                 onClick={() => setVerdict("apto")}
                 className={`flex items-center justify-center gap-2 rounded-md border-2 px-4 py-4 text-sm font-semibold transition-colors ${
                   verdict === "apto"
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-300"
-                    : "border-border hover:border-emerald-500/40"
+                    ? "border-success bg-success/10 text-success"
+                    : "border-border hover:border-success/40"
                 }`}
               >
                 <Check className="h-5 w-5" />
@@ -208,8 +208,8 @@ export const EvaluationVerdictDialog = ({
                 onClick={() => setVerdict("no_apto")}
                 className={`flex items-center justify-center gap-2 rounded-md border-2 px-4 py-4 text-sm font-semibold transition-colors ${
                   verdict === "no_apto"
-                    ? "border-rose-500 bg-rose-500/10 text-rose-300"
-                    : "border-border hover:border-rose-500/40"
+                    ? "border-destructive bg-destructive/10 text-destructive"
+                    : "border-border hover:border-destructive/40"
                 }`}
               >
                 <X className="h-5 w-5" />

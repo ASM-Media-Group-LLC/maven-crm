@@ -10,9 +10,9 @@ interface Props {
 }
 
 const actionConfig: Record<string, { label: string; icon: typeof Shield; color: string }> = {
-  role_assigned: { label: "Rol asignado", icon: Shield, color: "bg-emerald-500/10 text-emerald-500" },
+  role_assigned: { label: "Rol asignado", icon: Shield, color: "bg-success/10 text-success" },
   role_removed: { label: "Rol eliminado", icon: ShieldOff, color: "bg-destructive/10 text-destructive" },
-  role_changed: { label: "Rol cambiado", icon: ArrowRightLeft, color: "bg-amber-500/10 text-amber-500" },
+  role_changed: { label: "Rol cambiado", icon: ArrowRightLeft, color: "bg-warning/10 text-warning" },
   user_created: { label: "Usuario creado", icon: UserPlus, color: "bg-blue-500/10 text-blue-500" },
   user_deleted: { label: "Usuario eliminado", icon: UserMinus, color: "bg-destructive/10 text-destructive" },
   permission_changed: { label: "Permiso modificado", icon: Shield, color: "bg-violet-500/10 text-violet-500" },
