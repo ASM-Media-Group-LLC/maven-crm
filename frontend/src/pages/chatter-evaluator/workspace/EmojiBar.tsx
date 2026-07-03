@@ -7,16 +7,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-// DEFAULT_EMOJIS from the original Roleplaychatters index.html line 2145.
+// DEFAULT_EMOJIS del Roleplaychatters (index.html línea 2145): set PICANTE, pensado
+// para chats de OnlyFans. Se usa SOLO en el Chatter Evaluator / roleplay (su dominio).
 export const DEFAULT_EMOJIS = ["😏","🔥","💦","😈","❤️","🥵","😍","🙈","🍆","💋"];
+
+// Set NEUTRAL para el resto de chats de Maven (Messenger, bandeja WhatsApp, y a
+// futuro Telegram): reacciones de uso general, apropiadas para chat de equipo y de
+// clientes. Es solo el arranque por defecto — cada usuario sigue personalizando su
+// barra por sección (localStorage), y eso NO se toca.
+export const NEUTRAL_DEFAULT_EMOJIS = ["👍","❤️","😂","🙏","🎉","🔥","👏","✅","😅","💯"];
 
 // Estado de la barra de emojis PERSISTIDO por usuario (localStorage). Si el usuario
 // agrega/quita emojis, se conserva al refrescar. `scope` separa contextos (inbox vs
 // chatter) y `userId` lo aísla por usuario (en un navegador compartido cada uno tiene
-// su barra). Sin nada guardado, arranca con DEFAULT_EMOJIS.
+// su barra). Sin nada guardado, arranca con `defaults` (neutral por defecto; el
+// Chatter pasa DEFAULT_EMOJIS explícito).
 export function usePersistedEmojis(
   scope: string,
   userId?: string | null,
+  defaults: string[] = NEUTRAL_DEFAULT_EMOJIS,
 ): [string[], Dispatch<SetStateAction<string[]>>] {
   const key = `maven_emojibar_${scope}_${userId || "anon"}`;
   const [emojis, setEmojis] = useState<string[]>(() => {
@@ -27,7 +36,7 @@ export function usePersistedEmojis(
         if (Array.isArray(arr) && arr.every((x) => typeof x === "string")) return arr as string[];
       }
     } catch { /* localStorage no disponible o JSON inválido → defaults */ }
-    return [...DEFAULT_EMOJIS];
+    return [...defaults];
   });
   useEffect(() => {
     try { localStorage.setItem(key, JSON.stringify(emojis)); } catch { /* */ }
