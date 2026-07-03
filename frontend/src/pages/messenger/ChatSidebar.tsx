@@ -501,7 +501,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
           className={cn(
             "w-full flex items-center gap-2.5 px-2.5 py-2.5 sm:py-2 rounded-2xl text-left transition-all duration-150 group relative",
             isActive
-              ? "bg-primary/12"
+              ? "bg-primary/12 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r before:bg-gradient-to-b before:from-accent before:to-primary"
               : "hover:bg-primary/5",
             hasUnread && !isActive && "bg-primary/[0.04]"
           )}
