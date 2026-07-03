@@ -94,7 +94,7 @@ const ClosersKpiDetailDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-5 pb-4 pr-14 border-b border-border/40 bg-gradient-to-r from-primary/5 via-primary/0 to-primary/5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">

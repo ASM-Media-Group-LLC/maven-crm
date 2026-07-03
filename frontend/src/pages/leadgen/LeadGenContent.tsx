@@ -491,7 +491,7 @@ const LeadGenContent = () => {
           {(activeTab === "leads" || activeTab === "leads-hora") && (
             <>
               <Select value={qualityFilter || undefined} onValueChange={(v) => setQualityFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[120px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">Todos</SelectItem>
                   {QUALITY_OPTIONS.map(q => (
@@ -500,7 +500,7 @@ const LeadGenContent = () => {
                 </SelectContent>
               </Select>
               <Select value={agencyFilter || undefined} onValueChange={(v) => setAgencyFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Agencia" /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[160px] h-9"><SelectValue placeholder="Agencia" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">Todos</SelectItem>
                   {LEADGEN_COMPANIES.map(c => (
@@ -648,7 +648,7 @@ const LeadGenContent = () => {
                             </p>
                           </div>
                         </div>
-                        <div className="grid grid-cols-5 gap-px rounded-lg overflow-hidden border">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-px rounded-lg overflow-hidden border">
                           {["a+", "a", "b+", "b", "c"].map(q => (
                             <div key={q} className="bg-muted/30 p-2 text-center">
                               <p className="text-xs text-muted-foreground">{q.toUpperCase()}</p>

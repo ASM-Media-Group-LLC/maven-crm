@@ -70,7 +70,7 @@ const ProjectMiniSidebar = ({ currentProjectId }: ProjectMiniSidebarProps) => {
 
   if (collapsed) {
     return (
-      <div className="w-10 border-r bg-muted/20 flex flex-col items-center py-3 shrink-0">
+      <div className="w-10 border-r bg-muted/20 hidden md:flex flex-col items-center py-3 shrink-0">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsed(false)}>
@@ -108,7 +108,7 @@ const ProjectMiniSidebar = ({ currentProjectId }: ProjectMiniSidebarProps) => {
   }
 
   return (
-    <div className="w-56 border-r bg-muted/20 flex flex-col shrink-0">
+    <div className="w-56 border-r bg-muted/20 hidden md:flex flex-col shrink-0">
       <div className="flex items-center justify-between px-3 py-2 border-b">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Proyectos</span>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCollapsed(true)}>

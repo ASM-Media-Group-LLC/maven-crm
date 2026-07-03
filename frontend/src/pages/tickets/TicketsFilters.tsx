@@ -56,7 +56,7 @@ const TicketsFilters = ({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[220px]">
+        <div className="relative flex-1 w-full sm:min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por título, descripción, número de ticket..."
@@ -67,7 +67,7 @@ const TicketsFilters = ({
         </div>
 
         <Select value={priority || undefined} onValueChange={(v) => onPriorityChange(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="w-[130px]"><SelectValue placeholder="Prioridad" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[130px]"><SelectValue placeholder="Prioridad" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">Todas</SelectItem>
             {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
@@ -77,7 +77,7 @@ const TicketsFilters = ({
         </Select>
 
         <Select value={ticketType || undefined} onValueChange={(v) => onTicketTypeChange(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="w-[130px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[130px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">Todos</SelectItem>
             {Object.entries(TYPE_LABELS).map(([k, v]) => (
@@ -87,7 +87,7 @@ const TicketsFilters = ({
         </Select>
 
         <Select value={status || undefined} onValueChange={(v) => onStatusChange(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="w-[130px]"><SelectValue placeholder="Estado" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[130px]"><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">Todos</SelectItem>
             {Object.entries(STATUS_LABELS).map(([k, v]) => (
@@ -97,7 +97,7 @@ const TicketsFilters = ({
         </Select>
 
         <Select value={company || undefined} onValueChange={(v) => onCompanyChange(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Compañía" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[140px]"><SelectValue placeholder="Compañía" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">Todas</SelectItem>
             {COMPANIES.map((c) => (
@@ -107,7 +107,7 @@ const TicketsFilters = ({
         </Select>
 
         <Select value={assignedTo || undefined} onValueChange={(v) => onAssignedToChange(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Asignado" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Asignado" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">Todos</SelectItem>
             {TEAM_MEMBERS.map((m) => (

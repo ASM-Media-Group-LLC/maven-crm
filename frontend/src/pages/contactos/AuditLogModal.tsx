@@ -141,7 +141,7 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-[95vw] sm:max-w-5xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-warning" />
@@ -157,7 +157,7 @@ const AuditLogModal = ({ open, onOpenChange }: Props) => {
           <TooltipProvider>
             <div className="flex flex-col gap-4 flex-1 min-h-0">
               {/* KPIs */}
-              <div className="grid grid-cols-4 gap-3 shrink-0">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 shrink-0">
                 <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-muted-foreground">Total cambios</p>
                   <p className="text-2xl font-bold">{changes.length}</p>

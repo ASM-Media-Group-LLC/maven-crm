@@ -291,8 +291,8 @@ const ClosersContent = () => {
               })}
             </TabsList>
 
-            <div className="flex items-center gap-3 overflow-x-auto">
-              <div className="relative w-64">
+            <div className="flex flex-wrap items-center gap-3 overflow-x-auto">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por handle..."
@@ -306,7 +306,7 @@ const ClosersContent = () => {
                 value={agentFilter || ""}
                 onValueChange={(v) => setAgentFilter(v === "all" ? null : v)}
               >
-                <SelectTrigger className="w-44 h-10">
+                <SelectTrigger className="w-full sm:w-44 h-10">
                   <SelectValue placeholder="Agente" />
                 </SelectTrigger>
                 <SelectContent>
@@ -321,7 +321,7 @@ const ClosersContent = () => {
                 value={platformFilter || ""}
                 onValueChange={(v) => setPlatformFilter(v === "all" ? null : v)}
               >
-                <SelectTrigger className="w-40 h-10">
+                <SelectTrigger className="w-full sm:w-40 h-10">
                   <SelectValue placeholder="Plataforma" />
                 </SelectTrigger>
                 <SelectContent>
@@ -336,7 +336,7 @@ const ClosersContent = () => {
                 value={dateField}
                 onValueChange={(v) => setDateField(v as DateFieldType)}
               >
-                <SelectTrigger className="w-44 h-10">
+                <SelectTrigger className="w-full sm:w-44 h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

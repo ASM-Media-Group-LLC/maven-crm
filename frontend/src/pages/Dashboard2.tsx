@@ -842,7 +842,7 @@ const Dashboard2 = () => {
                 </div>
               )}
               {!isLoading && !isError && hasData && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* Revenue Bruto — clickable */}
                   <button
                     type="button"
@@ -1059,7 +1059,7 @@ const Dashboard2 = () => {
                         <p className="text-[11px] text-muted-foreground">vs período anterior</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
                       <div className="rounded-lg bg-success/10 p-2">
                         <p className="text-lg font-bold tabular-nums text-success">{growthStats.growing}</p>
                         <p className="text-[9px] text-muted-foreground">Creciendo</p>
@@ -1102,7 +1102,7 @@ const Dashboard2 = () => {
 
                 return (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {sections.map((s) => (
                         <button key={s.key} onClick={() => setAlertTab(alertTab === s.key ? null : s.key)}
                           className={`rounded-lg border-2 p-3 text-left transition-all ${alertTab === s.key ? `${s.border} ${s.bg} ring-2 ring-offset-1 ring-offset-background ring-primary/20` : "border-border bg-card hover:border-muted-foreground/30"}`}>
@@ -1251,7 +1251,7 @@ const Dashboard2 = () => {
               <TabsContent value="creator-reports" className="mt-4 space-y-3">
               {!isLoading && (
                 <div className="flex flex-wrap items-center gap-2.5 text-xs">
-                  <div className="relative flex-1 min-w-[160px] max-w-[220px]">
+                  <div className="relative flex-1 sm:min-w-[160px] max-w-full sm:max-w-[220px]">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                     <Input placeholder="Buscar creadora…" value={searchText} onChange={(e) => setSearchText(e.target.value)} className="pl-8 h-8 text-xs" />
                   </div>

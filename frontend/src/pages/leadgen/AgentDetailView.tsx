@@ -215,7 +215,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
         {/* KPI Cards + Quality Cards — auto-hide on scroll */}
         <div className={`shrink-0 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[400px] opacity-100"}`}>
         <div className="px-6 py-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card className="cursor-default transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
@@ -260,7 +260,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
 
         {/* Quality Cards */}
         <div className="px-6 pb-4">
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {qualityCardConfig.map((cat) => {
               const Icon = cat.icon;
               return (
@@ -295,14 +295,14 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
         {/* Tab Content */}
         {activeTab === "leads" && (
           <div className="flex-1 flex flex-col min-h-0 px-6 pb-6 pt-4 gap-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <div className="relative flex-1 max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input placeholder="Buscar lead..." className="pl-9 h-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
                 <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Seleccionar fechas" className="h-9" />
                 <Select value={filterCalidad || undefined} onValueChange={(v) => setFilterCalidad(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-[120px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todas</SelectItem>
                     <SelectItem value="a+">A+</SelectItem><SelectItem value="a">A</SelectItem>
@@ -311,7 +311,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                   </SelectContent>
                 </Select>
                 <Select value={filterContacto || undefined} onValueChange={(v) => setFilterContacto(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Contacto" /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-[120px] h-9"><SelectValue placeholder="Contacto" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todos</SelectItem>
                     <SelectItem value="con_telefono">Con Teléfono</SelectItem>

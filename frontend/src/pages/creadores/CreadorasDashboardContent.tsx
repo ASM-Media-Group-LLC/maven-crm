@@ -524,7 +524,7 @@ const CreadorasDashboardContent = () => {
           }
         }}
       >
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {statusPopup === "active" && `Creadoras Activas (${popupCreators.length})`}

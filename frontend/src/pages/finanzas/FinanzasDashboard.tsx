@@ -377,7 +377,7 @@ export default function FinanzasDashboard() {
         <div className="flex flex-wrap items-center gap-2">
           <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
           <Select value={costCenter || undefined} onValueChange={v => setCostCenter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Centro de Costo" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Centro de Costo" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">Todos</SelectItem>
               <SelectItem value="operaciones">Operaciones</SelectItem>
@@ -386,7 +386,7 @@ export default function FinanzasDashboard() {
             </SelectContent>
           </Select>
           <Select value={area || undefined} onValueChange={v => setArea(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-32"><SelectValue placeholder="Área" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-32"><SelectValue placeholder="Área" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">Todas</SelectItem>
               <SelectItem value="chatters">Chatters</SelectItem>
@@ -395,7 +395,7 @@ export default function FinanzasDashboard() {
             </SelectContent>
           </Select>
           <Select value={tipo} onValueChange={setTipo}>
-            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-32"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="ambos">Ambos</SelectItem>
               <SelectItem value="ingresos">Ingresos</SelectItem>
@@ -410,7 +410,7 @@ export default function FinanzasDashboard() {
         </div>
 
         {/* 8 KPI Cards — todas con el patrón estándar y onClick → modal */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />) : (
             <>
               <KpiCard label="Ingresos del Mes" value={fmt(curIngresos)} icon={TrendingUp} color="bg-success" subtitle={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs anterior`} onClick={() => setKpiPopup("ingresos")} />
@@ -431,7 +431,7 @@ export default function FinanzasDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
             Headcount y Costos de Personal
           </h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <KpiCard label="Empleados Activos" value={String(hrData?.headcount ?? 0)} icon={Users} color="bg-blue-500" subtitle="Headcount" onClick={() => setKpiPopup("headcount")} />
             <KpiCard label="Costo Prom/Emp" value={fmt(hrData?.costPerEmp ?? 0)} icon={Briefcase} color="bg-violet-500" subtitle="Nómina / headcount" onClick={() => setKpiPopup("costoEmp")} />
             <KpiCard label="Deducciones Mes" value={fmt(hrData?.dedTotal ?? 0)} icon={ArrowDown} color="bg-destructive" subtitle="Acumuladas" onClick={() => setKpiPopup("deducciones")} />

@@ -175,7 +175,7 @@ const LeadGenBaseDatosContent = () => {
       <div className="flex-1 overflow-auto">
         {/* KPI Cards */}
         <div className="px-6 py-4">
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">PÁGINA ACTUAL</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold">{totalLeads.toLocaleString()}</p><p className="text-xs text-muted-foreground">Filtrados</p></div><div><p className="text-2xl font-bold text-primary">{conContacto.toLocaleString()}</p><p className="text-xs text-muted-foreground">Con Contacto</p></div></div></CardContent></Card>
             <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">CATEGORÍA ALTA</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-emerald-400">{aPlus.toLocaleString()}</p><p className="text-xs text-muted-foreground">A+</p></div><div><p className="text-2xl font-bold text-green-400">{aCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">A</p></div></div></CardContent></Card>
             <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">CATEGORÍA MEDIA</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-yellow-400">{bPlus.toLocaleString()}</p><p className="text-xs text-muted-foreground">B+</p></div><div><p className="text-2xl font-bold text-orange-400">{bCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">B</p></div></div></CardContent></Card>
@@ -206,12 +206,12 @@ const LeadGenBaseDatosContent = () => {
 
           <Popover open={agenciaSelectOpen} onOpenChange={setAgenciaSelectOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="w-[180px] h-9 justify-between font-normal">
+              <Button variant="outline" className="w-full sm:w-[180px] h-9 justify-between font-normal">
                 {filterAgencia || "Agencia"}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0">
+            <PopoverContent className="w-[90vw] sm:w-[200px] p-0">
               <Command>
                 <CommandInput placeholder="Buscar agencia..." />
                 <CommandList>
@@ -231,12 +231,12 @@ const LeadGenBaseDatosContent = () => {
 
           <Popover open={agenteSelectOpen} onOpenChange={setAgenteSelectOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="w-[180px] h-9 justify-between font-normal">
+              <Button variant="outline" className="w-full sm:w-[180px] h-9 justify-between font-normal">
                 {filterAgente || "Agente"}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0">
+            <PopoverContent className="w-[90vw] sm:w-[200px] p-0">
               <Command>
                 <CommandInput placeholder="Buscar agente..." />
                 <CommandList>

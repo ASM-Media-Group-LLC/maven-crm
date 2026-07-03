@@ -78,8 +78,8 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
   })();
 
   return (
-    <div className="flex items-center gap-3 overflow-x-auto">
-      <div className="relative w-64 shrink-0">
+    <div className="flex flex-wrap items-center gap-3 sm:overflow-x-auto">
+      <div className="relative w-full sm:w-64 sm:shrink-0">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Buscar por ticket, nombre, handle..."
@@ -119,7 +119,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
             variant="outline"
             role="combobox"
             aria-expanded={agentOpen}
-            className="w-[180px] justify-between font-normal"
+            className="w-full sm:w-[180px] justify-between font-normal"
           >
             <span className="truncate">
               {filters.creadoPor || "Agente"}
@@ -168,7 +168,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
               variant="outline"
               role="combobox"
               aria-expanded={channelOpen}
-              className="w-[180px] justify-between font-normal shrink-0"
+              className="w-full sm:w-[180px] justify-between font-normal sm:shrink-0"
             >
               <span className="truncate">{channelButtonLabel}</span>
               <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
@@ -247,7 +247,7 @@ function FilterSelect({
 }) {
   return (
     <Select value={value || undefined} onValueChange={(v) => onChange(v === "__all__" ? "" : v)}>
-      <SelectTrigger className="w-[180px]">
+      <SelectTrigger className="w-full sm:w-[180px]">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
