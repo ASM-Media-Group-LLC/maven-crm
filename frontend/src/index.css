@@ -525,4 +525,26 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   .scrollbar-hide::-webkit-scrollbar {
     display: none;               /* Chrome/Safari/WebKit */
   }
+
+  /* Barra de scroll horizontal FINA y prolija para filas de chips que
+     scrollean (filtros de canal de la bandeja). Visible para poder navegar,
+     pero delgada y con thumb sutil que resalta al hover — no la barra cruda
+     del navegador. */
+  .scrollbar-thin-x {
+    scrollbar-width: thin;                                    /* Firefox */
+    scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+  }
+  .scrollbar-thin-x::-webkit-scrollbar {
+    height: 6px;
+  }
+  .scrollbar-thin-x::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin-x::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 9999px;
+  }
+  .scrollbar-thin-x:hover::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
 }

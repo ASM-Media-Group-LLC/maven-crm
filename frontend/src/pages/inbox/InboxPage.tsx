@@ -754,7 +754,7 @@ const InboxPage = () => {
         </div>
         {/* Filtro por CANAL (línea/número) — solo si hay más de uno. Ortogonal a los chips de abajo. */}
         {channels.length > 1 && (
-          <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin-x px-3 pb-2">
             <span className="shrink-0 pr-0.5 text-[11px] font-medium text-muted-foreground">Canal</span>
             <button
               type="button"
@@ -782,7 +782,7 @@ const InboxPage = () => {
           </div>
         )}
         {/* Filtros (chips): presets + mis listas personales + nueva lista + archivados */}
-        <div className="flex flex-wrap items-center gap-1.5 px-3 pb-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin-x px-3 pb-3">
           {([["todos", "Todos"], ["no_leidos", "No leídos"], ["favoritos", "Favoritos"]] as const).map(([key, label]) => (
             <button
               key={key}
@@ -864,7 +864,7 @@ const InboxPage = () => {
                             {c.favorite && <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />}
                             <span className={cn(
                               "ml-auto shrink-0 text-[10px] tabular-nums",
-                              unread ? "font-semibold text-green-500" : "text-muted-foreground",
+                              unread ? "font-semibold text-primary" : "text-muted-foreground",
                             )}>
                               {fmtTime(c.last_message_at)}
                             </span>
@@ -885,11 +885,11 @@ const InboxPage = () => {
                               {c.last_message_preview ?? "—"}
                             </span>
                             {(c.unread_count ?? 0) > 0 ? (
-                              <span className="ml-auto grid h-5 min-w-[20px] shrink-0 place-items-center rounded-full bg-green-500 px-1.5 text-[11px] font-bold text-white shadow-sm">
+                              <span className="ml-auto grid h-5 min-w-[20px] shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent to-primary px-1.5 text-[11px] font-bold text-white shadow-sm">
                                 {c.unread_count > 99 ? "99+" : c.unread_count}
                               </span>
                             ) : c.manually_unread ? (
-                              <span className="ml-auto h-2.5 w-2.5 shrink-0 rounded-full bg-green-500" title="No leído" />
+                              <span className="ml-auto h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-br from-accent to-primary" title="No leído" />
                             ) : null}
                           </div>
                         </div>

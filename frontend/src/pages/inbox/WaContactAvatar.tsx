@@ -17,6 +17,27 @@ function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
+// Cada contacto sin foto recibe un degradé VIBRANTE distinto (determinista por
+// id), con iniciales blancas — como el mockup del sistema de diseño. Antes todos
+// caían al mismo azul apagado y se veían iguales/monótonos.
+const AVATAR_GRADIENTS = [
+  "from-violet-500 to-blue-500",
+  "from-pink-500 to-orange-400",
+  "from-teal-400 to-blue-600",
+  "from-fuchsia-500 to-indigo-500",
+  "from-emerald-500 to-teal-600",
+  "from-rose-500 to-pink-600",
+  "from-amber-500 to-orange-600",
+  "from-cyan-500 to-blue-500",
+  "from-indigo-500 to-purple-600",
+  "from-sky-500 to-violet-600",
+];
+function avatarGradient(key: string): string {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length];
+}
+
 export function WaContactAvatar({
   conversationId,
   name,
@@ -44,7 +65,8 @@ export function WaContactAvatar({
   return (
     <span
       className={cn(
-        "grid shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-primary/30 to-primary/10 font-semibold text-primary",
+        "grid shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br font-bold text-white",
+        !url && avatarGradient(conversationId || name),
         className,
       )}
     >
