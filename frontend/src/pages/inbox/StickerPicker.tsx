@@ -36,6 +36,28 @@ async function toStickerWebp(file: File): Promise<Blob> {
   );
 }
 
+// Trae la galería (SELECT + signed URLs). Reusada por el useQuery y por el
+// prefetch al hover, para que al hacer clic ya esté lista (sin delay).
+async function fetchStickers(): Promise<StickerRow[]> {
+  const { data } = await (supabase as any)
+    .from("wa_stickers").select("id, storage_path").order("created_at", { ascending: false }).limit(60);
+  const rows = (data ?? []) as { id: string; storage_path: string }[];
+  if (!rows.length) return [] as StickerRow[];
+  const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrls(rows.map((r) => r.storage_path), 60 * 60 * 24 * 7);
+  return rows
+    .map((r, i) => ({ id: r.id, storage_path: r.storage_path, url: signed?.[i]?.signedUrl ?? "" }))
+    .filter((s) => s.url) as StickerRow[];
+}
+
+// La galería casi no cambia y los signed URLs valen 7 días → cacheamos fuerte
+// para que reabrir el picker sea instantáneo (antes re-consultaba en cada open).
+const STICKERS_QUERY = {
+  queryKey: ["wa-stickers"] as const,
+  queryFn: fetchStickers,
+  staleTime: 1000 * 60 * 30, // 30 min
+  gcTime: 1000 * 60 * 60,    // 1 h
+};
+
 export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -44,19 +66,14 @@ export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: stickers = [], isLoading } = useQuery({
-    queryKey: ["wa-stickers"],
-    queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from("wa_stickers").select("id, storage_path").order("created_at", { ascending: false }).limit(60);
-      const rows = (data ?? []) as { id: string; storage_path: string }[];
-      if (!rows.length) return [] as StickerRow[];
-      const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrls(rows.map((r) => r.storage_path), 60 * 60 * 24 * 7);
-      return rows
-        .map((r, i) => ({ id: r.id, storage_path: r.storage_path, url: signed?.[i]?.signedUrl ?? "" }))
-        .filter((s) => s.url) as StickerRow[];
-    },
+    ...STICKERS_QUERY,
     enabled: open,
+    refetchOnWindowFocus: false,
   });
+  // Prefetch al pasar el mouse / enfocar el botón: al hacer clic ya está en caché
+  // (mata el delay de la primera apertura). Cache compartida entre todas las
+  // superficies (mismo queryKey), así que la 2ª+ apertura es instantánea.
+  const prefetchStickers = () => { void qc.prefetchQuery(STICKERS_QUERY); };
 
   const onUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -92,7 +109,8 @@ export function StickerPicker({ onPick, disabled }: StickerPickerProps) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" title="Stickers" disabled={disabled}>
+        <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" title="Stickers" disabled={disabled}
+          onMouseEnter={prefetchStickers} onFocus={prefetchStickers}>
           <Sticker className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
