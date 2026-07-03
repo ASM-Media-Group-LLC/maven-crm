@@ -193,19 +193,31 @@ export const ChatComposer = ({
           </div>
         )}
 
-        {/* 2) Cajón de texto al medio (crece con el contenido). */}
-        <textarea
-          ref={taRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={onKeyDown}
-          onPaste={onPaste}
-          placeholder={placeholder}
-          disabled={disabled}
-          rows={1}
-          className="w-full resize-none rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
-          style={{ maxHeight: MAX_TEXTAREA_PX }}
-        />
+        {/* 2) Cajón de texto al medio (crece con el contenido). Enviar va DENTRO del cajón, borde derecho. */}
+        <div className="relative">
+          <textarea
+            ref={taRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            onPaste={onPaste}
+            placeholder={placeholder}
+            disabled={disabled}
+            rows={1}
+            className="w-full resize-none rounded-md border bg-transparent px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+            style={{ maxHeight: MAX_TEXTAREA_PX }}
+          />
+          <Button
+            type="button"
+            onClick={() => void doSend()}
+            disabled={!canSend}
+            size="icon"
+            className="absolute bottom-1.5 right-1.5 h-8 w-8 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90"
+            title="Enviar"
+          >
+            {spinning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </div>
 
         {/* 3) Acciones abajo: adjuntar + tools de la superficie + Enviar (derecha). */}
         <div className="flex items-center gap-1">
@@ -222,16 +234,6 @@ export const ChatComposer = ({
             <Paperclip className="h-4 w-4" />
           </Button>
           {toolbarExtra}
-          <Button
-            type="button"
-            onClick={() => void doSend()}
-            disabled={!canSend}
-            size="icon"
-            className="ml-auto h-9 w-9"
-            title="Enviar"
-          >
-            {spinning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
         </div>
       </div>
     </div>

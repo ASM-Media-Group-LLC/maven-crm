@@ -1406,32 +1406,44 @@ const InboxPage = () => {
               />
               {/* Cajón de texto al medio. Pegar imagen/video del portapapeles → se manda (mismo
                   flujo de media inmediata que el adjuntar de la bandeja). */}
-              <Input
-                ref={draftInputRef}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  }
-                }}
-                onPaste={(e) => {
-                  const items = Array.from(e.clipboardData?.items ?? []);
-                  for (const it of items) {
-                    if (it.kind === "file" && (it.type.startsWith("image/") || it.type.startsWith("video/"))) {
-                      const f = it.getAsFile();
-                      if (f) {
-                        e.preventDefault();
-                        sendMedia(f, f.type.startsWith("image/") ? "image" : "video", f.name || `pegado-${Date.now()}`);
-                        return;
+              <div className="relative">
+                <Input
+                  ref={draftInputRef}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const items = Array.from(e.clipboardData?.items ?? []);
+                    for (const it of items) {
+                      if (it.kind === "file" && (it.type.startsWith("image/") || it.type.startsWith("video/"))) {
+                        const f = it.getAsFile();
+                        if (f) {
+                          e.preventDefault();
+                          sendMedia(f, f.type.startsWith("image/") ? "image" : "video", f.name || `pegado-${Date.now()}`);
+                          return;
+                        }
                       }
                     }
-                  }
-                }}
-                placeholder="Escribí un mensaje…"
-                className="h-10"
-              />
+                  }}
+                  placeholder="Escribí un mensaje…"
+                  className="h-10 pr-11"
+                />
+                {/* Enviar DENTRO del cajón, borde derecho. */}
+                <Button
+                  onClick={() => sendMessage()}
+                  disabled={sending || !draft.trim()}
+                  size="icon"
+                  className="absolute right-1 top-1/2 h-8 w-8 shrink-0 -translate-y-1/2 rounded-full bg-gradient-to-br from-accent to-primary text-white shadow-sm hover:opacity-90"
+                  title="Enviar"
+                >
+                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
               {/* Acciones abajo */}
               <div className="flex items-center gap-1">
                 {canAccess("WhatsApp", "IA") && (
@@ -1488,15 +1500,6 @@ const InboxPage = () => {
                     else { setDraft((v) => (v.trim() ? v.trimEnd() + " " : "") + s.text); draftInputRef.current?.focus(); }
                   }}
                 />
-                <Button
-                  onClick={() => sendMessage()}
-                  disabled={sending || !draft.trim()}
-                  size="icon"
-                  className="ml-auto h-9 w-9 shrink-0"
-                  title="Enviar"
-                >
-                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
               </div>
             </div>
             )}
