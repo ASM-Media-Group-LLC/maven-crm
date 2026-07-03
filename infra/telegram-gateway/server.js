@@ -280,6 +280,32 @@ app.post("/message/sendText/:id", apiGuard, async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: String((e && e.message) || e) }); }
 });
 
+// Resuelve un username / t.me link / id numérico → peer (para ABRIR una conversación
+// desde Maven, ya que la bandeja necesita el peer_id nativo). Usa la cuenta DEFAULT y
+// devuelve qué account_id usó (así la conversación queda ligada a esa línea). Telegram
+// NO resuelve teléfono→usuario en frío → esto solo funciona con username/link/id.
+app.post("/resolve", apiGuard, async (req, res) => {
+  const to = ((req.body && req.body.to) || "").toString().trim();
+  if (!to) return res.status(400).json({ ok: false, error: "falta 'to'" });
+  try {
+    const accountId = defaultAccountId();
+    if (!accountId) return res.status(400).json({ ok: false, error: "no hay cuentas vinculadas" });
+    const c = await getClient(accountId);
+    const handle = to.replace(/^https?:\/\/(t\.me|telegram\.me)\//i, "").replace(/^@/, "");
+    const entity = await c.getEntity(/^\d+$/.test(handle) ? Number(handle) : handle);
+    const name = [entity && entity.firstName, entity && entity.lastName].filter(Boolean).join(" ").trim()
+      || (entity && entity.title) || null;
+    res.json({
+      ok: true,
+      account_id: accountId,
+      peer_id: entity && entity.id != null ? String(entity.id) : null,
+      username: (entity && entity.username) || null,
+      name,
+      phone: (entity && entity.phone) || null,
+    });
+  } catch (e) { res.status(404).json({ ok: false, error: String((e && e.message) || e) }); }
+});
+
 // ── Dashboard /manager ────────────────────────────────────────────────────────
 const MANAGER_HTML = fs.readFileSync(__dirname + "/manager.html", "utf8");
 const LOGIN_HTML = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Telegram Gateway — Acceso</title><script src="https://cdn.tailwindcss.com"></script></head>

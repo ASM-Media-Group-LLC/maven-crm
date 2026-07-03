@@ -5,6 +5,7 @@ import { es } from "date-fns/locale";
 import { ArrowLeft, Phone, Cake, Download, LogOut, ChevronRight, CheckCircle2 } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { WaChatButton, toE164 } from "@/components/WaChatButton";
+import { TgChatButton } from "@/components/TgChatButton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -202,6 +203,9 @@ const CreadorProfileContent = () => {
             <div className="flex flex-wrap items-center gap-2 mt-3">
               {c.whatsapp_number && (
                 <WaChatButton creatorId={c.id} phone={toE164({ whatsapp: c.whatsapp_number })} name={c.name} className="h-7 gap-1.5 px-2 text-xs text-emerald-600 hover:text-emerald-700" />
+              )}
+              {c.telegram_handle && (
+                <TgChatButton creatorId={c.id} telegramUsername={c.telegram_handle} name={c.name} />
               )}
               {c.instagram_handle && (
                 <a href={buildSocialUrl("instagram", c.instagram_handle)} target="_blank" rel="noopener noreferrer">

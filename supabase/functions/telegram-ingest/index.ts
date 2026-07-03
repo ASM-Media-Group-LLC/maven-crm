@@ -19,6 +19,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const PROJECT_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const INGEST_TOKEN = Deno.env.get("TELEGRAM_INGEST_TOKEN") ?? "";
+// Inbox v1 mono-tenant (igual que wa-inbox-send). Se setea explícito porque el default
+// current_tenant_id() da NULL para service_role → sin esto las filas quedan invisibles a
+// la RLS de la bandeja (tenant_id = current_tenant_id()).
+const TENANT_ID = "30869615-f579-4981-8a1f-dbebc61eae2d"; // ASM Tech
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -61,6 +65,7 @@ serve(async (req) => {
     .from("tg_conversations")
     .upsert(
       {
+        tenant_id: TENANT_ID,
         account_id: String(accountId),
         peer_id: String(peer.id),
         peer_username: peer.username ?? null,
@@ -81,6 +86,7 @@ serve(async (req) => {
     .from("tg_messages")
     .upsert(
       {
+        tenant_id: TENANT_ID,
         conversation_id: conv.id,
         direction,
         external_id: message.id != null ? String(message.id) : null,

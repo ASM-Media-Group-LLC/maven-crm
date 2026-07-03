@@ -46,6 +46,9 @@ verify_jwt = false  # webhook del telegram-gateway (sin JWT) — auth propia: to
 [functions.tg-inbox-send]
 verify_jwt = false  # envía saliente desde la bandeja de Telegram (auth propia: getUser + permiso Telegram/Bandeja + gating por dueño)
 
+[functions.tg-inbox-open]
+verify_jwt = false  # abre/crea conversación de Telegram desde un contacto/creadora (auth propia: getUser + permiso Telegram/Bandeja)
+
 [functions.wa-inbox-open]
 verify_jwt = false  # abre/crea conversación del inbox para un lead (auth propia: getUser + permiso + membresía de canal)
 
