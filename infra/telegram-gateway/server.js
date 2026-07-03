@@ -23,6 +23,7 @@ const crypto = require("crypto");
 const { TelegramClient, Api } = require("telegram");
 const { StringSession } = require("telegram/sessions");
 const { computeCheck } = require("telegram/Password");
+const { NewMessage } = require("telegram/events");
 
 const PORT = parseInt(process.env.PORT || "8091", 10);
 const API_KEY = process.env.API_KEY || "";
@@ -30,6 +31,8 @@ const MANAGER_PASSWORD = process.env.MANAGER_PASSWORD || "";
 const API_ID = Number(process.env.TELEGRAM_API_ID || 0);
 const API_HASH = process.env.TELEGRAM_API_HASH || "";
 const AUTH_DIR = process.env.AUTH_DIR || "/data";
+const INGEST_URL = process.env.INGEST_URL || "";       // edge telegram-ingest (bandeja); vacío = no-op
+const INGEST_TOKEN = process.env.INGEST_TOKEN || "";   // token compartido con telegram-ingest
 const LEGACY_SESSION_FILE = `${AUTH_DIR}/telegram.session`; // sesión mono-cuenta original
 const ACCOUNTS_DIR = `${AUTH_DIR}/accounts`;
 
@@ -108,6 +111,7 @@ async function getClient(id) {
       await c.connect();
       if (!(await c.isUserAuthorized())) throw new Error(`sesión de '${id}' inválida/expirada — re-logueá`);
       clients.set(id, c);
+      attachIngestListener(id, c);
       return c;
     })().finally(() => connecting.delete(id)));
   }
@@ -115,6 +119,52 @@ async function getClient(id) {
 }
 // Cuenta por defecto (Promolog y endpoints sin :id).
 async function getDefaultClient() { return getClient(defaultAccountId()); }
+
+// ── Ingest de entrantes → edge telegram-ingest (bandeja) ──────────────────────
+async function postIngest(accountId, peer, message) {
+  if (!INGEST_URL || !INGEST_TOKEN) return; // sin configurar → no-op (no rompe Promolog)
+  try {
+    await fetch(INGEST_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-telegram-ingest-token": INGEST_TOKEN },
+      body: JSON.stringify({ accountId, peer, message }),
+    });
+  } catch (e) { console.error(`[telegram-gateway] ingest POST falló (${accountId}):`, e.message); }
+}
+
+// Adjunta un handler de mensajes ENTRANTES (solo DMs de usuarios; canales/grupos los
+// sigue manejando Promolog aparte) que postea a la bandeja. Idempotente por cliente.
+function attachIngestListener(id, client) {
+  if (!client || client.__ingestAttached) return;
+  client.__ingestAttached = true;
+  client.addEventHandler(async (event) => {
+    try {
+      const msg = event && event.message;
+      if (!msg || msg.out) return;    // solo entrantes (no lo que enviamos nosotros)
+      if (!event.isPrivate) return;   // solo chats privados (DMs)
+      const sender = await msg.getSender().catch(() => null);
+      const peerId = msg.senderId != null ? String(msg.senderId)
+        : (sender && sender.id != null ? String(sender.id) : null);
+      if (!peerId) return;
+      const name = sender ? ([sender.firstName, sender.lastName].filter(Boolean).join(" ") || null) : null;
+      const type = msg.media ? (msg.photo ? "photo" : (msg.voice ? "voice" : (msg.document ? "document" : "media"))) : "text";
+      await postIngest(id, {
+        id: peerId,
+        username: (sender && sender.username) || null,
+        name,
+        phone: (sender && sender.phone) || null,
+      }, {
+        id: msg.id,
+        direction: "in",
+        text: msg.message || null,
+        type,
+        senderId: peerId,
+        date: msg.date,
+      });
+    } catch (e) { console.error(`[telegram-gateway] handler ingest (${id}):`, e.message); }
+  }, new NewMessage({}));
+  console.log(`[telegram-gateway] listener de bandeja adjunto a '${id}'`);
+}
 
 // Login web en curso, keyed por id de cuenta (una cuenta se loguea a la vez, pero
 // soportamos varios flows por si acaso). { client, phone, phoneCodeHash, label }
@@ -336,6 +386,7 @@ app.post("/manager/telegram/verify", async (req, res) => {
     writeSession(id, client.session.save());
     writeMeta(id, { label: label || id, createdAt: new Date().toISOString() });
     clients.set(id, client);
+    attachIngestListener(id, client);
     loginFlows.delete(id);
     const me = await client.getMe();
     res.json({ ok: true, id, account: me?.username || me?.firstName || String(me?.id) });
@@ -356,3 +407,15 @@ app.post("/manager/telegram/logout", async (req, res) => { await logoutAccount(d
 app.get("/", (req, res) => res.json({ service: "telegram-gateway", ok: true, accounts: listAccountIds().length }));
 
 app.listen(PORT, () => console.log(`[telegram-gateway] escuchando en :${PORT} — cuentas: ${listAccountIds().join(", ") || "(ninguna)"}`));
+
+// Boot: conectar todas las cuentas y dejar el listener de bandeja activo para
+// recibir entrantes en tiempo real (si no, la conexión es lazy = offline = no llegan
+// eventos). Cada cuenta falla de forma aislada; no rompe el arranque.
+if (INGEST_URL && INGEST_TOKEN) {
+  (async () => {
+    for (const id of listAccountIds()) {
+      try { const c = await getClient(id); attachIngestListener(id, c); }
+      catch (e) { console.error(`[telegram-gateway] boot connect '${id}' falló:`, e.message); }
+    }
+  })();
+}
