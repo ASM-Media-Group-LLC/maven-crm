@@ -668,7 +668,7 @@ const LeadGenContent = () => {
                   pageSize={50}
                   onPageChange={setAgentPage}
                 >
-                  <Table className="min-w-[700px]">
+                  <Table containerClassName="max-md:overflow-x-auto" className="min-w-[700px]">
                     <TableHeader>
                       <TableRow>
                         {/* Sortable headers: click toggle desc/asc.

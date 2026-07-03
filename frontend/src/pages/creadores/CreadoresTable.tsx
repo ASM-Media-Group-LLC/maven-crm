@@ -200,7 +200,7 @@ const CreadoresTable = ({ creators }: Props) => {
 
   return (
     <>
-    <Table containerClassName="overflow-visible" className="min-w-[900px]">
+    <Table containerClassName="overflow-visible max-md:overflow-x-auto" className="min-w-[900px]">
       <TableHeader>
         <TableRow>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creador" col="name" /></TableHead>
