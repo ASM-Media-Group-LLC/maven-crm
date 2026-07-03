@@ -103,6 +103,27 @@ const contactLabel = (c: ConvRow["contact"]): string =>
   (c?.instagram_handle ? "@" + c.instagram_handle.replace(/^@/, "") : "") ||
   "(sin nombre)";
 
+// Cada canal (línea/marca) tiene su propio color de chip en la lista — como en
+// el mockup (Content P. violeta, Unlock azul, Kash verde…). Color determinista
+// por id de canal para que sea estable entre renders. Decorativo (identidad de
+// marca), no semántico.
+const CHANNEL_CHIP_PALETTE = [
+  "bg-violet-500/15 text-violet-300",
+  "bg-blue-500/15 text-blue-300",
+  "bg-emerald-500/15 text-emerald-300",
+  "bg-amber-500/15 text-amber-300",
+  "bg-rose-500/15 text-rose-300",
+  "bg-cyan-500/15 text-cyan-300",
+  "bg-indigo-500/15 text-indigo-300",
+  "bg-teal-500/15 text-teal-300",
+];
+const channelChipClass = (key: string | null): string => {
+  if (!key) return "bg-muted text-muted-foreground";
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return CHANNEL_CHIP_PALETTE[h % CHANNEL_CHIP_PALETTE.length];
+};
+
 const statusMeta: Record<string, { label: string; variant: "secondary-soft" | "success-soft" | "warning-soft" }> = {
   open: { label: "Abierta", variant: "secondary-soft" },
   pending: { label: "Pendiente", variant: "warning-soft" },
@@ -733,7 +754,7 @@ const InboxPage = () => {
         </div>
         {/* Filtro por CANAL (línea/número) — solo si hay más de uno. Ortogonal a los chips de abajo. */}
         {channels.length > 1 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide px-3 pb-2">
+          <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2">
             <span className="shrink-0 pr-0.5 text-[11px] font-medium text-muted-foreground">Canal</span>
             <button
               type="button"
@@ -761,7 +782,7 @@ const InboxPage = () => {
           </div>
         )}
         {/* Filtros (chips): presets + mis listas personales + nueva lista + archivados */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide px-3 pb-3">
+        <div className="flex flex-wrap items-center gap-1.5 px-3 pb-3">
           {([["todos", "Todos"], ["no_leidos", "No leídos"], ["favoritos", "Favoritos"]] as const).map(([key, label]) => (
             <button
               key={key}
@@ -851,7 +872,10 @@ const InboxPage = () => {
                           <div className="flex items-center gap-2">
                             {!channelFilter && channels.length > 1 && c.channel_id && (
                               <span
-                                className="shrink-0 max-w-[90px] truncate rounded bg-muted px-1 py-0.5 text-[9px] font-medium text-muted-foreground"
+                                className={cn(
+                                  "shrink-0 max-w-[90px] truncate rounded px-1 py-0.5 text-[9px] font-medium",
+                                  channelChipClass(c.channel_id),
+                                )}
                                 title={channelLabel(c.channel_id) ?? undefined}
                               >
                                 {channelLabel(c.channel_id)}
