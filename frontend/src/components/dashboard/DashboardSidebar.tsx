@@ -106,7 +106,7 @@ const DashboardSidebar = () => {
     { title: t("nav.closers"), url: "/closers", icon: Phone, badge: closersCount || undefined, module: "Closers", submodule: undefined },
     { title: "Teléfonos", url: "/telefonos", icon: Smartphone, module: "Telefonos", submodule: undefined },
     { title: "WhatsApp", url: "/inbox", icon: WhatsAppIcon, badge: waInboxCount || undefined, module: "WhatsApp", submodule: undefined as string | undefined },
-    { title: "Telegram", url: "/telegram", icon: TelegramIcon, module: "Telegram", submodule: undefined as string | undefined },
+    { title: "Telegram", url: "/telegram/bandeja", icon: TelegramIcon, module: "Telegram", submodule: undefined as string | undefined },
     { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets", submodule: undefined },
     { title: "Chatter Evaluator", url: "/chatter-evaluator", icon: ClipboardCheck, module: "Chatters", submodule: "Evaluator" as string | undefined },
     { title: "Scouter Assist", url: "/scouter-assist", icon: Search, module: "Scouter Assist", submodule: undefined },
