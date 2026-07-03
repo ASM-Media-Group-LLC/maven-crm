@@ -716,7 +716,8 @@ const InboxPage = () => {
   return (
     <div className="flex h-full min-h-0">
       {/* ── Lista de conversaciones ─────────────────────────────────────── */}
-      <aside className="flex w-80 shrink-0 flex-col border-r border-border">
+      {/* Mobile: un panel a la vez (lista o conversación). Desktop (md+): ambos, idéntico a antes. */}
+      <aside className={cn("w-full shrink-0 flex-col border-r border-border md:w-80", selectedId ? "hidden md:flex" : "flex")}>
         {backNav?.backTo && (
           <button
             onClick={() => navigate(backNav.backTo!)}
@@ -956,7 +957,7 @@ const InboxPage = () => {
       </aside>
 
       {/* ── Hilo ────────────────────────────────────────────────────────── */}
-      <section className="flex min-w-0 flex-1 flex-col">
+      <section className={cn("min-w-0 flex-1 flex-col", selectedId ? "flex" : "hidden md:flex")}>
         {!selected ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
             <MessageSquare className="h-10 w-10 opacity-30" />
@@ -965,6 +966,15 @@ const InboxPage = () => {
         ) : (
           <>
             <header className="flex items-center gap-2 border-b border-border px-5 py-3">
+              <button
+                type="button"
+                onClick={() => setSelectedId(null)}
+                className="-ml-1 shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
+                title="Volver a la lista"
+                aria-label="Volver a la lista"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
               <WaContactAvatar conversationId={selected.id} name={contactLabel(selected.contact)} className="h-9 w-9 text-xs" />
               <div className="min-w-0">
                 {isAdmin ? (

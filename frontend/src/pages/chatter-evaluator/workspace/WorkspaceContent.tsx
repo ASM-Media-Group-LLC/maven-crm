@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ArrowLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -96,13 +98,17 @@ const WorkspaceContent = () => {
     }
   }, [infoOverride]);
   const isNarrow = useIsNarrow();
+  const isMobile = useIsMobile(); // <768px
   // Visibilidad de los rails:
   //   - Criterios: SOLO sigue el toggle manual del usuario.
   //   - Info personaje: 3-state — el usuario puede forzar show/hide
   //     y eso pisa el auto-hide. Sin override, en narrow se auto-oculta.
-  const criteriaHidden = criteriaHiddenByUser;
-  const infoHidden =
-    infoOverride === "hide" ? true : infoOverride === "show" ? false : isNarrow;
+  // En MOBILE los dos rails laterales se FUERZAN ocultos (no caben en 390px;
+  // el chat ocupa todo). Desktop (≥768px) queda idéntico.
+  const criteriaHidden = criteriaHiddenByUser || isMobile;
+  const infoHidden = isMobile
+    ? true
+    : infoOverride === "hide" ? true : infoOverride === "show" ? false : isNarrow;
 
   // Active session: priority is ?session=<id> in URL, else last from
   // localStorage, else the first open session.
@@ -304,10 +310,10 @@ const WorkspaceContent = () => {
             paddings y gaps para que entren nombre + reloj/tiempo + $.
             Pasamos selectedId/onSelect para que el click navegue al
             chat. El listado de cerradas vive en /chatter-evaluator/history. */}
-        <aside className="w-[220px] shrink-0 border-r border-border min-h-0">
+        <aside className={cn("w-full shrink-0 border-r border-border min-h-0 md:w-[220px]", isMobile && selectedId && "hidden")}>
           <SessionsPanel selectedId={selectedId} onSelect={setSelectedId} />
         </aside>
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <section className={cn("min-h-0 min-w-0 flex-1 flex-col overflow-hidden", isMobile && !selectedId ? "hidden" : "flex")}>
           {/* key por session.id → React remonta el ChatPanel cuando el
               examinador cambia de sesión. Sin esto, el componente reusa
               su estado local (input draft, uploading, recording, dialogs
@@ -315,6 +321,15 @@ const WorkspaceContent = () => {
               en la sesión A aparecía en B/C/etc. Remount = state limpia
               por sesión. Cuesto: si había draft sin enviar al cambiar,
               se pierde — es el trade-off aceptado para evitar el leak. */}
+          {selectedId && (
+            <button
+              type="button"
+              onClick={() => setSelectedId(null)}
+              className="flex shrink-0 items-center gap-1.5 border-b border-border px-3 py-2 text-sm font-medium text-primary hover:bg-muted/50 md:hidden"
+            >
+              <ArrowLeft className="h-4 w-4" /> Sesiones
+            </button>
+          )}
           <ChatPanel key={selectedSession?.id ?? "none"} session={selectedSession} />
         </section>
         {!infoHidden && (
