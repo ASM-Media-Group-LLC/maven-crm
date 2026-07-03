@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConversationWithDetails } from "./types";
 import { cn } from "@/lib/utils";
+import { avatarGradient } from "@/lib/avatarColor";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -391,7 +392,7 @@ export default function ChatSidebar({
                       <div className="relative shrink-0">
                         <Avatar className="h-7 w-7">
                           {p.avatar_url && <AvatarImage src={p.avatar_url} alt={p.full_name || ""} className="object-cover" />}
-                          <AvatarFallback className="text-[10px] font-semibold bg-primary/10 text-primary">
+                          <AvatarFallback className={cn("text-[10px] font-bold text-white bg-gradient-to-br", avatarGradient(p.id))}>
                             {getInitials(p.full_name || "?")}
                           </AvatarFallback>
                         </Avatar>
@@ -517,8 +518,8 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
                 <AvatarImage src={otherParticipant.profile.avatar_url} alt={conversation.displayName} className="object-cover" />
               )}
               <AvatarFallback className={cn(
-                "text-xs font-semibold",
-                isGroup ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary"
+                "text-xs font-bold text-white bg-gradient-to-br",
+                isGroup ? "from-violet-600 to-fuchsia-600" : avatarGradient(conversation.id)
               )}>
                 {isGroup ? <Users className="h-4 w-4" /> : getInitials(conversation.displayName)}
               </AvatarFallback>
