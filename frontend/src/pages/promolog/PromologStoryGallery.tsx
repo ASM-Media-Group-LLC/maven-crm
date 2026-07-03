@@ -57,7 +57,7 @@ const VerdictToggle = ({
         type="button"
         disabled={saving}
         onClick={(e) => { e.stopPropagation(); onSetVerdict(story, "Sí"); }}
-        className={`flex flex-1 items-center justify-center gap-1 px-2 py-1 transition-colors disabled:opacity-60 ${story.result === "Sí" ? "bg-emerald-500 text-white" : `${idle} hover:text-emerald-500`}`}
+        className={`flex flex-1 items-center justify-center gap-1 px-2 py-1 transition-colors disabled:opacity-60 ${story.result === "Sí" ? "bg-success text-white" : `${idle} hover:text-success`}`}
       >
         {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />} Sí
       </button>
@@ -65,7 +65,7 @@ const VerdictToggle = ({
         type="button"
         disabled={saving}
         onClick={(e) => { e.stopPropagation(); onSetVerdict(story, "No"); }}
-        className={`flex flex-1 items-center justify-center gap-1 px-2 py-1 transition-colors disabled:opacity-60 ${story.result === "No" ? "bg-red-500 text-white" : `${idle} hover:text-red-500`}`}
+        className={`flex flex-1 items-center justify-center gap-1 px-2 py-1 transition-colors disabled:opacity-60 ${story.result === "No" ? "bg-destructive text-white" : `${idle} hover:text-destructive`}`}
       >
         <XMark className="h-3 w-3" /> No
       </button>
@@ -178,7 +178,7 @@ const TgBubble = ({
     <div className="flex">
       <div className={`relative max-w-[92%] rounded-2xl rounded-tl-sm bg-white shadow-sm ${big ? "px-3 py-1.5" : "px-2 py-1"}`}>
         {promo && (
-          <span className={`absolute flex items-center justify-center rounded-full bg-emerald-500 text-white ${big ? "-right-1.5 -top-1.5 h-5 w-5" : "-right-1 -top-1 h-3.5 w-3.5"}`}>
+          <span className={`absolute flex items-center justify-center rounded-full bg-success text-white ${big ? "-right-1.5 -top-1.5 h-5 w-5" : "-right-1 -top-1 h-3.5 w-3.5"}`}>
             <Check className={big ? "h-3 w-3" : "h-2 w-2"} />
           </span>
         )}
@@ -403,7 +403,7 @@ const FbPost = ({ s, big, fill }: { s: PromologEntry; big?: boolean; fill?: bool
           </p>
         </div>
         {promo
-          ? <span className={`flex shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white ${big ? "h-5 w-5" : "h-3.5 w-3.5"}`}><Check className={big ? "h-3 w-3" : "h-2 w-2"} /></span>
+          ? <span className={`flex shrink-0 items-center justify-center rounded-full bg-success text-white ${big ? "h-5 w-5" : "h-3.5 w-3.5"}`}><Check className={big ? "h-3 w-3" : "h-2 w-2"} /></span>
           : <span className={`shrink-0 text-slate-400 ${big ? "text-base" : "text-[9px]"}`}>⋯</span>}
       </div>
 

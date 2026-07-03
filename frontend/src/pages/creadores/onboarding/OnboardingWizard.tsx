@@ -722,7 +722,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           </Button>
           {autoSaveText && (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-success" />
               {autoSaveText}
             </span>
           )}

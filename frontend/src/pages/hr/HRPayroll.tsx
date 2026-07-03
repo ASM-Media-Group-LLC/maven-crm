@@ -67,7 +67,7 @@ export default function HRPayroll() {
             <>
               <Kpi label="Costo mensual" value={usd(totals.cost)} icon={DollarSign} color="bg-blue-500" hint="Suma de costos del equipo" />
               <Kpi label="Ingreso atribuido" value={usd(totals.rev)} icon={TrendingUp} color="bg-violet-500" hint="Tajada agencia (chatters/BLU)" />
-              <Kpi label="Margen" value={usd(totals.margin)} icon={Wallet} color={totals.margin >= 0 ? "bg-emerald-500" : "bg-rose-500"} hint="Ingreso − costo (chatters)" tone={totals.margin >= 0 ? "ok" : "bad"} />
+              <Kpi label="Margen" value={usd(totals.margin)} icon={Wallet} color={totals.margin >= 0 ? "bg-success" : "bg-destructive"} hint="Ingreso − costo (chatters)" tone={totals.margin >= 0 ? "ok" : "bad"} />
               <Kpi label="Personas" value={String(totals.people)} icon={Users} color="bg-slate-500" hint="En el roster" />
             </>
           )}
@@ -143,7 +143,7 @@ export default function HRPayroll() {
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.revenue_usd != null ? usd(r.revenue_usd) : "—"}</td>
                       <td className={cn("px-3 py-2.5 text-right font-semibold tabular-nums",
-                        r.margin_usd == null ? "text-muted-foreground" : r.margin_usd >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                        r.margin_usd == null ? "text-muted-foreground" : r.margin_usd >= 0 ? "text-success" : "text-destructive")}>
                         {r.margin_usd != null ? usd(r.margin_usd) : "—"}
                       </td>
                       <td className="px-4 py-2.5"><Pencil className="h-3.5 w-3.5 text-muted-foreground/50" /></td>
@@ -172,7 +172,7 @@ function Kpi({ label, value, icon: Icon, color, hint, tone }: { label: string; v
         </div>
         <div className="min-w-0">
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
-          <div className={cn("text-xl font-bold leading-tight", tone === "ok" && "text-emerald-500", tone === "bad" && "text-rose-500")}>{value}</div>
+          <div className={cn("text-xl font-bold leading-tight", tone === "ok" && "text-success", tone === "bad" && "text-destructive")}>{value}</div>
           {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
         </div>
       </CardContent>

@@ -79,7 +79,7 @@ interface MsgRow {
 // 1 palomita = enviado (server ack), 2 = entregado, 2 azules = leído, ⚠ = no entregado.
 function StatusTick({ status }: { status: string | null }) {
   if (status === "failed")
-    return <AlertCircle className="h-3 w-3 text-red-300" aria-label="No entregado" />;
+    return <AlertCircle className="h-3 w-3 text-destructive" aria-label="No entregado" />;
   if (status === "read")
     return <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb]" aria-label="Leído" />;
   if (status === "delivered")
@@ -904,7 +904,7 @@ const InboxPage = () => {
                       {isAdmin && (
                         <>
                           <ContextMenuSeparator />
-                          <ContextMenuItem className="text-amber-600 focus:text-amber-600" onClick={() => setDestructive({ kind: "clear", id: c.id, label: contactLabel(c.contact) })}>
+                          <ContextMenuItem className="text-warning focus:text-warning" onClick={() => setDestructive({ kind: "clear", id: c.id, label: contactLabel(c.contact) })}>
                             <Eraser className="mr-2 h-4 w-4" /> Vaciar chat
                           </ContextMenuItem>
                           <ContextMenuItem className="text-destructive focus:text-destructive" onClick={() => setDestructive({ kind: "delete", id: c.id, label: contactLabel(c.contact) })}>
@@ -1024,7 +1024,7 @@ const InboxPage = () => {
                             className={cn(
                               "relative min-w-0 rounded-2xl px-3 py-2 text-sm",
                               isDeleted
-                                ? "border border-red-400 bg-red-100 text-red-950 dark:border-red-700 dark:bg-red-950/50 dark:text-red-50"
+                                ? "border border-destructive/30 bg-destructive/10 text-destructive"
                                 : isOut ? "bg-primary text-primary-foreground" : "bg-muted",
                               m.agent_reaction && "mb-2",
                             )}
@@ -1093,7 +1093,7 @@ const InboxPage = () => {
                               </p>
                             )}
                             {isDeleted && (
-                              <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium italic text-red-600 dark:text-red-300">
+                              <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium italic text-destructive dark:text-destructive">
                                 <Trash2 className="h-3 w-3" /> mensaje eliminado
                               </p>
                             )}
@@ -1101,7 +1101,7 @@ const InboxPage = () => {
                               className={cn(
                                 "mt-0.5 flex items-center justify-end gap-1 text-[10px] tabular-nums",
                                 isDeleted
-                                  ? "text-red-700/80 dark:text-red-300/80"
+                                  ? "text-destructive/80 dark:text-destructive/80"
                                   : isOut ? "text-primary-foreground/70" : "text-muted-foreground",
                               )}
                             >
@@ -1111,7 +1111,7 @@ const InboxPage = () => {
                             {isOut && !isDeleted && m.status === "failed" && (
                               <div className="mt-0.5 flex flex-col items-end gap-0.5">
                                 <p
-                                  className="flex items-center gap-1 text-[10px] font-medium text-red-400"
+                                  className="flex items-center gap-1 text-[10px] font-medium text-destructive"
                                   title="WhatsApp rechazó la entrega. Causa más común: el número no tiene WhatsApp o no es el correcto. Verificá el número del contacto."
                                 >
                                   <AlertCircle className="h-3 w-3" /> No entregado · revisá el número
@@ -1518,7 +1518,7 @@ const InboxPage = () => {
               {myLabels.map((lb) => (
                 <div key={lb.id} className="flex items-center justify-between rounded-md border border-border/60 px-2.5 py-1.5 text-sm">
                   <span className="inline-flex items-center gap-1.5"><Tags className="h-3.5 w-3.5 text-muted-foreground" />{lb.name}</span>
-                  <button type="button" onClick={() => deleteLabel(lb.id)} title="Borrar lista" className="text-muted-foreground transition-colors hover:text-rose-400">
+                  <button type="button" onClick={() => deleteLabel(lb.id)} title="Borrar lista" className="text-muted-foreground transition-colors hover:text-destructive">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>

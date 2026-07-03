@@ -132,7 +132,7 @@ function FinancialSummaryCards() {
   const cards = [
     { label: "Costo Nómina (mes)", value: `$${(payrollTotal ?? 0).toLocaleString("es-CO")}`, icon: DollarSignIcon, color: "bg-blue-500", path: "/finanzas/nomina" },
     { label: "Salario Promedio", value: `$${Math.round(avgSalary).toLocaleString("es-CO")}`, icon: Wallet, color: "bg-violet-500", path: "/finanzas/control" },
-    { label: "Deducciones Pend.", value: String(pendingDeductions ?? 0), icon: AlertTriangle, color: "bg-amber-500", path: "/hr/deducciones" },
+    { label: "Deducciones Pend.", value: String(pendingDeductions ?? 0), icon: AlertTriangle, color: "bg-warning", path: "/hr/deducciones" },
     { label: "Horas Extra Acum.", value: `${(overtimeHours ?? 0).toFixed(1)}h`, icon: Clock, color: "bg-emerald-500", path: "/finanzas/horas-variables" },
   ];
 
@@ -277,7 +277,7 @@ export default function HRDashboard() {
             <>
               <KpiCard label="Total Empleados" value={String(total)} icon={Users} color="bg-blue-500" subtitle="En nómina" onClick={() => setKpiPopup("total")} />
               <KpiCard label="Puntualidad equipo" value={avgPunct != null ? `${avgPunct}%` : "—"} icon={UserCheck} color="bg-emerald-500" subtitle={attRows.length ? `${attRows.length} trackeados · Hubstaff` : "Sin datos Hubstaff"} onClick={() => navigate("/hr/asistencia", { state: { fromHR: true } })} />
-              <KpiCard label="Ausencias Pend." value={String(pendingAbsences.length)} icon={AlertTriangle} color="bg-amber-500" subtitle="Pendientes de revisión" onClick={() => setKpiPopup("ausencias")} />
+              <KpiCard label="Ausencias Pend." value={String(pendingAbsences.length)} icon={AlertTriangle} color="bg-warning" subtitle="Pendientes de revisión" onClick={() => setKpiPopup("ausencias")} />
               <KpiCard label="En Onboarding" value={String(nuevos30d)} icon={UserPlus} color="bg-emerald-500" subtitle="Ingresos últimos 30d" onClick={() => setKpiPopup("onboarding")} />
             </>
           )}

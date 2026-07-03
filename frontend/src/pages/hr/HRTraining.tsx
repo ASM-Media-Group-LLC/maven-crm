@@ -334,10 +334,10 @@ function TrainingDashboard({ onAssign, onConfig, onViewDetail, onViewProgram }: 
               <HRMetricCard title="Total Asignadas" value={kpis.total} icon={ClipboardList} color="primary" className={statusFilter === "" ? "ring-2 ring-primary/50" : ""} />
             </div>
             <div className="cursor-pointer" onClick={() => handleKpiClick("in_progress")}>
-              <HRMetricCard title="En Progreso" value={kpis.inProgress} icon={Clock} color="warning" className={statusFilter === "in_progress" ? "ring-2 ring-amber-500/50" : ""} />
+              <HRMetricCard title="En Progreso" value={kpis.inProgress} icon={Clock} color="warning" className={statusFilter === "in_progress" ? "ring-2 ring-warning/50" : ""} />
             </div>
             <div className="cursor-pointer" onClick={() => handleKpiClick("completed")}>
-              <HRMetricCard title="Completadas" value={kpis.completed} icon={CheckCircle} color="success" className={statusFilter === "completed" ? "ring-2 ring-green-500/50" : ""} />
+              <HRMetricCard title="Completadas" value={kpis.completed} icon={CheckCircle} color="success" className={statusFilter === "completed" ? "ring-2 ring-success/50" : ""} />
             </div>
             <div className="cursor-pointer" onClick={() => handleKpiClick("overdue")}>
               <HRMetricCard title="Vencidas" value={kpis.overdue} icon={AlertTriangle} color="destructive" className={statusFilter === "overdue" ? "ring-2 ring-destructive/50" : ""} />
@@ -401,7 +401,7 @@ function TrainingDashboard({ onAssign, onConfig, onViewDetail, onViewProgram }: 
                         {mc && mc.total > 0 && (
                           <div className="flex items-center gap-2">
                             <Progress value={(mc.withContent / mc.total) * 100} className="h-1 flex-1" />
-                            <span className={cn("text-xs", mc.withContent === mc.total ? "text-green-600" : "text-amber-600")}>
+                            <span className={cn("text-xs", mc.withContent === mc.total ? "text-success" : "text-warning")}>
                               {mc.withContent}/{mc.total}
                             </span>
                           </div>
@@ -484,8 +484,8 @@ function TrainingDashboard({ onAssign, onConfig, onViewDetail, onViewProgram }: 
                               key={a.id}
                               className={cn(
                                 "text-[10px] px-1 py-0.5 rounded truncate cursor-pointer",
-                                a.status === "completed" ? "bg-green-500/15 text-green-700 dark:text-green-400" :
-                                a.status === "in_progress" ? "bg-amber-500/15 text-amber-700 dark:text-amber-400" :
+                                a.status === "completed" ? "bg-success/15 text-success dark:text-success" :
+                                a.status === "in_progress" ? "bg-warning/15 text-warning dark:text-warning" :
                                 "bg-primary/10 text-primary"
                               )}
                               onClick={() => onViewDetail(a)}
@@ -578,7 +578,7 @@ function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, o
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-1.5">
                         {a.completion_date ? new Date(a.completion_date).toLocaleDateString("es-CO") : "—"}
-                        {expiring && <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/30">Por vencer</Badge>}
+                        {expiring && <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/30">Por vencer</Badge>}
                       </div>
                     </TableCell>
                     <TableCell className="w-32">
@@ -657,7 +657,7 @@ function AssignmentsGrid({ assignments, isLoading, progressMap, moduleCounts, on
                   <p className="text-xs text-muted-foreground">{emp?.departments?.name || "—"}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {expiring && <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/30">Por vencer</Badge>}
+                  {expiring && <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/30">Por vencer</Badge>}
                   <Badge variant={getStatusBadgeVariant(a.status)}>
                     {TRAINING_STATUSES.find((s) => s.value === a.status)?.label ?? a.status}
                   </Badge>
@@ -1099,7 +1099,7 @@ function GeneralProgramConfigView({ onBack, onManageModules }: {
                         {p.duration_hours && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{p.duration_hours}h</span>}
                         <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{mc ? mc.total : 0} módulos</span>
                         {mc && mc.total > 0 && (
-                          <span className={cn("text-xs", mc.withContent === mc.total ? "text-green-600" : "text-amber-600")}>
+                          <span className={cn("text-xs", mc.withContent === mc.total ? "text-success" : "text-warning")}>
                             {mc.withContent}/{mc.total} con contenido
                           </span>
                         )}
@@ -1143,7 +1143,7 @@ function GeneralProgramConfigView({ onBack, onManageModules }: {
                         <TableCell>
                           <span className="text-sm">{mc ? mc.total : 0}</span>
                           {mc && mc.total > 0 && (
-                            <span className={cn("ml-1.5 text-xs", mc.withContent === mc.total ? "text-green-600" : "text-amber-600")}>
+                            <span className={cn("ml-1.5 text-xs", mc.withContent === mc.total ? "text-success" : "text-warning")}>
                               ({mc.withContent}/{mc.total})
                             </span>
                           )}

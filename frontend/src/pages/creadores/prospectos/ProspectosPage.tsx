@@ -132,9 +132,9 @@ export default function ProspectosPage() {
             ) : (
               <>
                 <KpiCard label="Total Casting" value={String(prospects.length)} icon={Users} color="bg-blue-500" subtitle="Todos los registros" />
-                <KpiCard label="Pendientes de Contacto" value={String(totalLeads)} icon={Clock} color="bg-amber-500" subtitle={prospects.length > 0 ? `${((totalLeads / prospects.length) * 100).toFixed(0)}% del total` : "—"} />
+                <KpiCard label="Pendientes de Contacto" value={String(totalLeads)} icon={Clock} color="bg-warning" subtitle={prospects.length > 0 ? `${((totalLeads / prospects.length) * 100).toFixed(0)}% del total` : "—"} />
                 <KpiCard label="En Negociación" value={String(totalNegociando)} icon={Target} color="bg-violet-500" subtitle={prospects.length > 0 ? `${((totalNegociando / prospects.length) * 100).toFixed(0)}% del total` : "—"} />
-                <KpiCard label="Tasa de Conversión" value={`${conversionRate}%`} icon={TrendingUp} color="bg-emerald-500" subtitle={`${totalConvertidos} convertidos`} />
+                <KpiCard label="Tasa de Conversión" value={`${conversionRate}%`} icon={TrendingUp} color="bg-success" subtitle={`${totalConvertidos} convertidos`} />
               </>
             )}
           </div>

@@ -372,9 +372,9 @@ export default function HRVacations() {
           ) : activeType === "vacaciones" ? (
             <>
               <KpiCard label="Total Solicitudes" value={String(totalRequests)} icon={CalendarDays} color="bg-blue-500" subtitle={`${currentYear}`} onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pendientes" value={String(pending)} icon={Clock} color="bg-amber-500" subtitle="Por aprobar" onClick={() => setKpiPopup("pending")} />
-              <KpiCard label="Aprobadas" value={String(approved)} icon={CheckCircle2} color="bg-emerald-500" subtitle="Confirmadas" onClick={() => setKpiPopup("approved")} />
-              <KpiCard label="Rechazadas" value={String(rejected)} icon={XCircle} color="bg-rose-500" subtitle="Denegadas" onClick={() => setKpiPopup("rejected")} />
+              <KpiCard label="Pendientes" value={String(pending)} icon={Clock} color="bg-warning" subtitle="Por aprobar" onClick={() => setKpiPopup("pending")} />
+              <KpiCard label="Aprobadas" value={String(approved)} icon={CheckCircle2} color="bg-success" subtitle="Confirmadas" onClick={() => setKpiPopup("approved")} />
+              <KpiCard label="Rechazadas" value={String(rejected)} icon={XCircle} color="bg-destructive" subtitle="Denegadas" onClick={() => setKpiPopup("rejected")} />
               <KpiCard label="Próximas" value={String(upcoming)} icon={CalendarClock} color="bg-violet-500" subtitle="Programadas" onClick={() => setKpiPopup("upcoming")} />
             </>
           ) : (
@@ -382,10 +382,10 @@ export default function HRVacations() {
               {/* "Días Usados / Disponibles" son métricas agregadas sin
                   lista propia: las dejamos estáticas (sin onClick). */}
               <KpiCard label="Días Usados" value={String(approvedThisYear)} icon={CalendarDays} color="bg-blue-500" subtitle={`De ${maxDays} anuales`} />
-              <KpiCard label="Disponibles" value={String(availableDays)} icon={CheckCircle2} color="bg-emerald-500" subtitle="Restantes" />
-              <KpiCard label="Pendientes" value={String(pending)} icon={Clock} color="bg-amber-500" subtitle="Por aprobar" onClick={() => setKpiPopup("pending")} />
+              <KpiCard label="Disponibles" value={String(availableDays)} icon={CheckCircle2} color="bg-success" subtitle="Restantes" />
+              <KpiCard label="Pendientes" value={String(pending)} icon={Clock} color="bg-warning" subtitle="Por aprobar" onClick={() => setKpiPopup("pending")} />
               <KpiCard label="Este Mes" value={String(approvedThisMonth)} icon={CalendarClock} color="bg-violet-500" subtitle={format(new Date(), "MMMM yyyy", { locale: es })} onClick={() => setKpiPopup("thisMonth")} />
-              <KpiCard label="Rechazadas" value={String(rejected)} icon={XCircle} color="bg-rose-500" subtitle="Denegadas" onClick={() => setKpiPopup("rejected")} />
+              <KpiCard label="Rechazadas" value={String(rejected)} icon={XCircle} color="bg-destructive" subtitle="Denegadas" onClick={() => setKpiPopup("rejected")} />
             </>
           )}
         </div>

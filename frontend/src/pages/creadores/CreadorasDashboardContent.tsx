@@ -24,10 +24,10 @@ const emptyFilters = { search: "", agency: "", status: "", category: "", country
 // con cuadrado coloreado + hover lift. La key se usa para navegar al
 // listado filtrado o al onboarding.
 const statusConfig = [
-  { key: "active",     label: "Activas",     icon: UserCheck,   bg: "bg-emerald-500" },
+  { key: "active",     label: "Activas",     icon: UserCheck,   bg: "bg-success" },
   { key: "onboarding", label: "En Onboarding", icon: Clock,     bg: "bg-blue-500" },
-  { key: "paused",     label: "Pausadas",    icon: PauseCircle, bg: "bg-amber-500" },
-  { key: "leaving",    label: "En retiro",   icon: LogOut,      bg: "bg-rose-500" },
+  { key: "paused",     label: "Pausadas",    icon: PauseCircle, bg: "bg-warning" },
+  { key: "leaving",    label: "En retiro",   icon: LogOut,      bg: "bg-destructive" },
   { key: "terminated", label: "Terminadas",  icon: XCircle,     bg: "bg-slate-500" },
 ];
 

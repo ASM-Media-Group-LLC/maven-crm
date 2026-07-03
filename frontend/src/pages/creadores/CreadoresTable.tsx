@@ -285,7 +285,7 @@ const CreadoresTable = ({ creators }: Props) => {
                             ? isActive ? "Activa — clic para desmarcar" : "Inactiva — clic para marcar"
                             : isActive ? "Activa en Blu/Infloww" : "Inactiva en Blu/Infloww"
                         }
-                        className="data-[state=checked]:bg-emerald-500"
+                        className="data-[state=checked]:bg-success"
                       />
                     </div>
                   );

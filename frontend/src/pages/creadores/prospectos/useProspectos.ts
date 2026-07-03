@@ -33,9 +33,9 @@ export const PROSPECT_STATUSES = [
 
 export const PROSPECT_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   lead: { bg: "bg-blue-500/15", text: "text-blue-400" },
-  contactado: { bg: "bg-yellow-500/15", text: "text-yellow-400" },
+  contactado: { bg: "bg-warning/15", text: "text-warning" },
   negociando: { bg: "bg-purple-500/15", text: "text-purple-400" },
-  convertido: { bg: "bg-green-500/15", text: "text-green-400" },
+  convertido: { bg: "bg-success/15", text: "text-success" },
   descartado: { bg: "bg-muted", text: "text-muted-foreground" },
 };
 

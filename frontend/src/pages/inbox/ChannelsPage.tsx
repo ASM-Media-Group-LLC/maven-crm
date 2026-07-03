@@ -60,9 +60,9 @@ const EMPTY_FORM = {
 
 // Salud de envío por línea (RPC wa_line_health): color del puntito según % de fallo 24h.
 const HEALTH_UI: Record<string, { dot: string; text: string; label: string }> = {
-  critico: { dot: "bg-rose-500", text: "font-semibold text-rose-500", label: "Crítico" },
-  alerta: { dot: "bg-amber-500", text: "text-amber-600", label: "Alerta" },
-  ok: { dot: "bg-emerald-500", text: "text-muted-foreground", label: "OK" },
+  critico: { dot: "bg-destructive", text: "font-semibold text-destructive", label: "Crítico" },
+  alerta: { dot: "bg-warning", text: "text-warning", label: "Alerta" },
+  ok: { dot: "bg-success", text: "text-muted-foreground", label: "OK" },
   sin_datos: { dot: "bg-muted-foreground/40", text: "text-muted-foreground", label: "Sin datos" },
 };
 interface LineHealth { channel_id: string; total: number; ok: number; sent_pend: number; failed: number; pct_fallo: number | null; health: string; }
@@ -284,7 +284,7 @@ const ChannelsPage = () => {
                       </Button>
                       <Button
                         variant="ghost" size="icon"
-                        className="h-7 w-7 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
+                        className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
                         title="Eliminar canal" onClick={() => setDeleting(c)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -469,7 +469,7 @@ const ChannelsPage = () => {
             <AlertDialogCancel disabled={deleteChannel.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); deleteChannel.mutate(); }}
-              className="bg-rose-500 text-white hover:bg-rose-600"
+              className="bg-destructive text-white hover:bg-destructive"
             >
               {deleteChannel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Eliminar"}
             </AlertDialogAction>

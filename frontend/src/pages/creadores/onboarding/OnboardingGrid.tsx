@@ -13,7 +13,7 @@ interface Props {
 }
 
 const statusConfig = {
-  Completado: { icon: CheckCircle2, className: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" },
+  Completado: { icon: CheckCircle2, className: "bg-success/10 text-success border-success/20" },
   Pendiente: { icon: Clock, className: "bg-muted text-muted-foreground border-border" },
   "En Progreso": { icon: Loader2, className: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
 };

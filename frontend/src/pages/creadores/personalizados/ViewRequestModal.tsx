@@ -16,17 +16,17 @@ interface Props {
 }
 
 const STATUS_OPTIONS = [
-  { value: "pendiente", label: "Pendiente", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
+  { value: "pendiente", label: "Pendiente", color: "bg-warning/20 text-warning border-warning/30" },
   { value: "en_progreso", label: "En Progreso", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
-  { value: "completado", label: "Completado", color: "bg-green-500/20 text-green-400 border-green-500/30" },
-  { value: "cancelado", label: "Cancelado", color: "bg-red-500/20 text-red-400 border-red-500/30" },
+  { value: "completado", label: "Completado", color: "bg-success/20 text-success border-success/30" },
+  { value: "cancelado", label: "Cancelado", color: "bg-destructive/20 text-destructive border-destructive/30" },
 ];
 
 const PRIORITY_COLORS: Record<string, string> = {
   baja: "bg-muted text-muted-foreground",
   normal: "bg-blue-500/20 text-blue-400",
   alta: "bg-orange-500/20 text-orange-400",
-  urgente: "bg-red-500/20 text-red-400",
+  urgente: "bg-destructive/20 text-destructive",
 };
 
 const ViewRequestModal = ({ request, open, onOpenChange }: Props) => {

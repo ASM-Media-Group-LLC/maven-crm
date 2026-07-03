@@ -191,8 +191,8 @@ export default function HRDeductions() {
           ) : (
             <>
               <KpiCard label="Total Deducciones" value={String(deductions.length)} icon={DollarSign} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pendientes" value={String(totalPending)} icon={Clock} color="bg-amber-500" subtitle={deductions.length > 0 ? `${((totalPending / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
-              <KpiCard label="Aplicadas" value={String(totalApplied)} icon={CheckCircle} color="bg-emerald-500" subtitle={deductions.length > 0 ? `${((totalApplied / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("applied")} />
+              <KpiCard label="Pendientes" value={String(totalPending)} icon={Clock} color="bg-warning" subtitle={deductions.length > 0 ? `${((totalPending / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
+              <KpiCard label="Aplicadas" value={String(totalApplied)} icon={CheckCircle} color="bg-success" subtitle={deductions.length > 0 ? `${((totalApplied / deductions.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("applied")} />
               <KpiCard label="Monto Total" value={formatAmount(totalAmount)} icon={Wallet} color="bg-rose-500" subtitle="Suma de todas las deducciones" onClick={() => setKpiPopup("amount")} />
             </>
           )}

@@ -460,7 +460,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
           <div className="flex items-center gap-2 text-sm font-semibold">
             <DollarSign className="h-4 w-4 text-primary" />
             ¿Modelo activa en Blu / Infloww?
-            <span className="text-rose-500">*</span>
+            <span className="text-destructive">*</span>
           </div>
         </AccordionTrigger>
         <AccordionContent>
@@ -477,7 +477,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                 onClick={() => onChange("bluInflowwActive", true)}
                 className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
                   data.bluInflowwActive === true
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    ? "border-success bg-success/10 text-success dark:text-success"
                     : "border-border bg-card hover:bg-muted/60"
                 }`}
               >
@@ -488,7 +488,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                 onClick={() => onChange("bluInflowwActive", false)}
                 className={`flex-1 rounded-md border px-4 py-3 text-sm font-medium transition-colors ${
                   data.bluInflowwActive === false
-                    ? "border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                    ? "border-destructive bg-destructive/10 text-destructive dark:text-destructive"
                     : "border-border bg-card hover:bg-muted/60"
                 }`}
               >

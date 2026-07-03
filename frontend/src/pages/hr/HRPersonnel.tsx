@@ -77,7 +77,7 @@ export default function HRPersonnel() {
                   <div className="flex items-center gap-1.5">
                     <Badge variant="secondary-soft" className="text-[10px]">{HR_ROLE_LABEL[p.role] ?? p.role}</Badge>
                     {p.in_hubstaff && (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-500">
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-success">
                         <Activity className="h-3 w-3" /> Hubstaff
                       </span>
                     )}

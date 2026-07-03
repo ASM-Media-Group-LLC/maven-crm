@@ -123,9 +123,9 @@ const resultBadgeVariant = (result: string): "success-soft" | "destructive-soft"
 };
 
 const ResultIcon = ({ result }: { result: string }) => {
-  if (result === "Sí") return <Check className="h-3.5 w-3.5 text-green-500" />;
+  if (result === "Sí") return <Check className="h-3.5 w-3.5 text-success" />;
   if (result === "No") return <XMark className="h-3.5 w-3.5 text-destructive" />;
-  if (result === "Parcial") return <Check className="h-3.5 w-3.5 text-yellow-500" />;
+  if (result === "Parcial") return <Check className="h-3.5 w-3.5 text-warning" />;
   return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
 };
 

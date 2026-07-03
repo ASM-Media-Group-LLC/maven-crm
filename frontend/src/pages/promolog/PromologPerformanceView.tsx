@@ -100,8 +100,8 @@ const PromologPerformanceView = ({ profiles }: Props) => {
     const parcial = agentEntries.filter(e => e.promoted === "partial").length;
     const total = agentEntries.length || 1;
     return [
-      { label: "Sí", count: si, pct: Math.round((si / total) * 100), color: "bg-emerald-500" },
-      { label: "Parcial", count: parcial, pct: Math.round((parcial / total) * 100), color: "bg-amber-500" },
+      { label: "Sí", count: si, pct: Math.round((si / total) * 100), color: "bg-success" },
+      { label: "Parcial", count: parcial, pct: Math.round((parcial / total) * 100), color: "bg-warning" },
       { label: "No", count: no, pct: Math.round((no / total) * 100), color: "bg-destructive" },
     ];
   }, [agentEntries]);

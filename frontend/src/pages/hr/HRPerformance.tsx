@@ -102,8 +102,8 @@ function ScoreStars({ score }: { score: number | null }) {
 // ─── Status badge helper ────────────────────────────────────────────────────
 function getStatusBadgeClasses(status: string) {
   switch (status) {
-    case "completed": return "bg-green-100 text-green-700 border-green-200";
-    case "pending": return "bg-amber-100 text-amber-700 border-amber-200";
+    case "completed": return "bg-success/15 text-success border-success/30";
+    case "pending": return "bg-warning/15 text-warning border-warning/30";
     case "draft": return "bg-gray-100 text-gray-600 border-gray-200";
     case "reviewed": return "bg-blue-100 text-blue-700 border-blue-200";
     default: return "";
@@ -309,7 +309,7 @@ export default function HRPerformance() {
             <>
               <KpiCard label="Calif. Promedio" value={avgScore ? avgScore.toFixed(1) : "—"} icon={Star} color="bg-amber-500" subtitle="Score general" onClick={() => setKpiPopup("avg")} />
               <KpiCard label="Evaluaciones" value={String(evals.length)} icon={TrendingUp} color="bg-blue-500" subtitle="Total registradas" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Completadas" value={String(completedCount)} icon={CheckCircle2} color="bg-emerald-500" subtitle={evals.length > 0 ? `${((completedCount / evals.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
+              <KpiCard label="Completadas" value={String(completedCount)} icon={CheckCircle2} color="bg-success" subtitle={evals.length > 0 ? `${((completedCount / evals.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
               <KpiCard label="Con Objetivos" value={String(withGoals)} icon={Target} color="bg-violet-500" subtitle={evals.length > 0 ? `${((withGoals / evals.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("withGoals")} />
             </>
           )}
@@ -433,7 +433,7 @@ export default function HRPerformance() {
                           <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
                             <div className="flex items-center gap-1">
                               <Tooltip><TooltipTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-green-600" onClick={() => statusMutation.mutate({ id: ev.id, status: "completed" })} disabled={ev.status === "completed"}>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-success" onClick={() => statusMutation.mutate({ id: ev.id, status: "completed" })} disabled={ev.status === "completed"}>
                                   <Check className="h-3.5 w-3.5" />
                                 </Button>
                               </TooltipTrigger><TooltipContent side="left">Aprobar</TooltipContent></Tooltip>
@@ -507,7 +507,7 @@ export default function HRPerformance() {
                         <p className="text-xs text-muted-foreground line-clamp-2">{ev.goals_next_period}</p>
                       )}
                       <div className="flex items-center gap-1 pt-1">
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-green-600" onClick={() => statusMutation.mutate({ id: ev.id, status: "completed" })} disabled={ev.status === "completed"}>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-success" onClick={() => statusMutation.mutate({ id: ev.id, status: "completed" })} disabled={ev.status === "completed"}>
                           <Check className="h-3.5 w-3.5" />
                         </Button>
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => statusMutation.mutate({ id: ev.id, status: "draft" })} disabled={ev.status === "draft"}>

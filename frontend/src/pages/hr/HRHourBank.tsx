@@ -226,8 +226,8 @@ const HRHourBank = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard label="Total Acumulado" value={`${totalAccumulated.toFixed(1)}h`} icon={Banknote} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
           <KpiCard label="Promedio/Empleado" value={`${avgPerEmployee.toFixed(1)}h`} icon={Users} color="bg-violet-500" onClick={() => setKpiPopup("avg")} />
-          <KpiCard label="Balance Alto (+30h)" value={String(highBalance)} icon={TrendingUp} color="bg-emerald-500" onClick={() => setKpiPopup("high")} />
-          <KpiCard label="Balance Bajo (<10h)" value={String(lowBalance)} icon={TrendingDown} color="bg-amber-500" onClick={() => setKpiPopup("low")} />
+          <KpiCard label="Balance Alto (+30h)" value={String(highBalance)} icon={TrendingUp} color="bg-success" onClick={() => setKpiPopup("high")} />
+          <KpiCard label="Balance Bajo (<10h)" value={String(lowBalance)} icon={TrendingDown} color="bg-warning" onClick={() => setKpiPopup("low")} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

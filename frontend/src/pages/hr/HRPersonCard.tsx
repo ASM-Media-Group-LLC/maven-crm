@@ -21,7 +21,7 @@ const hhmm = (min: number | null | undefined) => {
 };
 
 function Stat({ label, value, tone, hint }: { label: string; value: string; tone?: "ok" | "warn" | "bad"; hint?: string }) {
-  const toneCls = tone === "ok" ? "text-emerald-500" : tone === "warn" ? "text-amber-500" : tone === "bad" ? "text-rose-500" : "text-foreground";
+  const toneCls = tone === "ok" ? "text-success" : tone === "warn" ? "text-warning" : tone === "bad" ? "text-destructive" : "text-foreground";
   return (
     <div className="rounded-lg border border-border bg-card/40 p-3">
       <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
@@ -88,7 +88,7 @@ export default function HRPersonCard() {
             <div className="flex items-center gap-2">
               <Badge variant="secondary-soft" className="text-[11px]">{HR_ROLE_LABEL[identity.role] ?? identity.role}</Badge>
               {identity.in_hubstaff ? (
-                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500"><Activity className="h-3 w-3" /> Trackeado en Hubstaff</span>
+                <span className="inline-flex items-center gap-1 text-[11px] text-success"><Activity className="h-3 w-3" /> Trackeado en Hubstaff</span>
               ) : (
                 <span className="text-[11px] text-muted-foreground">Sin tracking de Hubstaff</span>
               )}

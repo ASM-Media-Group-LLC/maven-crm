@@ -379,16 +379,16 @@ const PromologDashboardView = ({
           footer={
             <div className="space-y-1">
               {activeCreatorsCount ? (
-                <p className={`text-[10px] ${coverGap > 0 ? "text-amber-400" : "text-muted-foreground"}`}>
+                <p className={`text-[10px] ${coverGap > 0 ? "text-warning" : "text-muted-foreground"}`}>
                   de {activeCreatorsCount} activas{coverGap > 0 ? ` · ${coverGap} sin escanear` : " · cobertura completa"}
                 </p>
               ) : null}
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-emerald-500/30">
+                <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success ring-1 ring-success/30">
                   <CheckCircle2 className="h-3 w-3" />
                   Promocionaron: <span className="tabular-nums">{creatorsPromotedCount}</span>
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-400 ring-1 ring-rose-500/30">
+                <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-semibold text-destructive ring-1 ring-destructive/30">
                   <XCircle className="h-3 w-3" />
                   No promocionaron: <span className="tabular-nums">{creatorsNotPromotedCount}</span>
                 </span>
@@ -400,7 +400,7 @@ const PromologDashboardView = ({
           label="Tasa de éxito"
           value={`${successRate}%`}
           icon={TrendingUp}
-          color="bg-emerald-500"
+          color="bg-success"
           onClick={() => onOpenKpiModal("completadas")}
           footer={
             <span className="text-[10px] text-muted-foreground">
@@ -412,7 +412,7 @@ const PromologDashboardView = ({
           label="Sin revisar"
           value={String(pendingCount)}
           icon={AlertTriangle}
-          color="bg-rose-500"
+          color="bg-destructive"
           onClick={() => onOpenKpiModal("no_chequeadas")}
         />
         <KpiCard
@@ -454,7 +454,7 @@ const PromologDashboardView = ({
         <PodioCard
           title="Top 3 — Menos Promoción"
           subtitle="Las que necesitan refuerzo del chatter"
-          icon={<AlertCircle className="h-4 w-4 text-rose-400" />}
+          icon={<AlertCircle className="h-4 w-4 text-destructive" />}
           items={bottomByVolume.map((c, i) => ({
             position: i,
             creatorId: c.creatorId,
@@ -562,10 +562,10 @@ const PromologDashboardView = ({
             </div>
             <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-sm bg-emerald-500" /> Sí
+                <span className="h-2 w-2 rounded-sm bg-success" /> Sí
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-sm bg-rose-500" /> No
+                <span className="h-2 w-2 rounded-sm bg-destructive" /> No
               </span>
             </div>
           </div>
@@ -588,13 +588,13 @@ const PromologDashboardView = ({
                     <div className="w-full flex-1 flex flex-col justify-end gap-px">
                       {d.no > 0 && (
                         <div
-                          className="w-full rounded-t-sm bg-rose-500/70 group-hover:bg-rose-500 transition-colors"
+                          className="w-full rounded-t-sm bg-destructive/70 group-hover:bg-destructive transition-colors"
                           style={{ height: `${noHeight}%` }}
                         />
                       )}
                       {d.si > 0 && (
                         <div
-                          className={`w-full ${d.no > 0 ? "" : "rounded-t-sm"} ${d.no === 0 ? "rounded-t-sm" : ""} bg-emerald-500/70 group-hover:bg-emerald-500 transition-colors`}
+                          className={`w-full ${d.no > 0 ? "" : "rounded-t-sm"} ${d.no === 0 ? "rounded-t-sm" : ""} bg-success/70 group-hover:bg-success transition-colors`}
                           style={{ height: `${siHeight}%` }}
                         />
                       )}
@@ -613,11 +613,11 @@ const PromologDashboardView = ({
       {/* ═══ Row 5: Acción Requerida ═══════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* (a) Acciones recomendadas — feed accionable (mismo payload del futuro bot asesor) */}
-        <Card className={recommendations.length > 0 ? "border-amber-500/30" : ""}>
+        <Card className={recommendations.length > 0 ? "border-warning/30" : ""}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Sparkles className={`h-4 w-4 ${recommendations.length > 0 ? "text-amber-400" : "text-muted-foreground"}`} />
+                <Sparkles className={`h-4 w-4 ${recommendations.length > 0 ? "text-warning" : "text-muted-foreground"}`} />
                 <div>
                   <h3 className="text-sm font-semibold">Acciones recomendadas</h3>
                   <p className="text-xs text-muted-foreground">Qué pedirle al chatter — priorizado</p>
@@ -629,8 +629,8 @@ const PromologDashboardView = ({
             </div>
             {recommendations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-4 text-center">
-                <CheckCircle2 className="h-6 w-6 text-emerald-400 mb-1" />
-                <p className="text-xs text-emerald-400 font-medium">Nada urgente 🎉</p>
+                <CheckCircle2 className="h-6 w-6 text-success mb-1" />
+                <p className="text-xs text-success font-medium">Nada urgente 🎉</p>
               </div>
             ) : (
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
@@ -657,11 +657,11 @@ const PromologDashboardView = ({
         </Card>
 
         {/* (b) Pendientes de revisar */}
-        <Card className={pendingEntries.length > 0 ? "border-amber-500/30" : ""}>
+        <Card className={pendingEntries.length > 0 ? "border-warning/30" : ""}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Eye className={`h-4 w-4 ${pendingEntries.length > 0 ? "text-amber-400" : "text-muted-foreground"}`} />
+                <Eye className={`h-4 w-4 ${pendingEntries.length > 0 ? "text-warning" : "text-muted-foreground"}`} />
                 <div>
                   <h3 className="text-sm font-semibold">Pendientes de revisar</h3>
                   <p className="text-xs text-muted-foreground">Stories que necesitan validación manual</p>
@@ -673,8 +673,8 @@ const PromologDashboardView = ({
             </div>
             {pendingEntries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-4 text-center">
-                <CheckCircle2 className="h-6 w-6 text-emerald-400 mb-1" />
-                <p className="text-xs text-emerald-400 font-medium">Sin pendientes 👌</p>
+                <CheckCircle2 className="h-6 w-6 text-success mb-1" />
+                <p className="text-xs text-success font-medium">Sin pendientes 👌</p>
               </div>
             ) : (
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
@@ -704,8 +704,8 @@ const PromologDashboardView = ({
 
 // Color del chip de prioridad en el feed de acciones recomendadas.
 const REC_TONE: Record<number, string> = {
-  1: "bg-rose-500/15 text-rose-400",
-  2: "bg-amber-500/15 text-amber-400",
+  1: "bg-destructive/15 text-destructive",
+  2: "bg-warning/15 text-warning",
   3: "bg-sky-500/15 text-sky-400",
 };
 
@@ -798,7 +798,7 @@ const DeltaSpan = ({ diff, suffix = "" }: { diff: number; suffix?: string }) => 
   if (diff === 0) return <span className="text-muted-foreground">=</span>;
   const up = diff > 0;
   return (
-    <span className={up ? "text-emerald-400" : "text-rose-400"}>
+    <span className={up ? "text-success" : "text-destructive"}>
       {up ? "▲" : "▼"}{Math.abs(diff)}{suffix}
     </span>
   );

@@ -540,9 +540,9 @@ export default function HRAttendance() {
           ) : (
             <>
               <KpiCard label="Total Registros" value={String(total)} icon={Users} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Presentes" value={String(presentes)} icon={UserCheck} color="bg-emerald-500" subtitle={total > 0 ? `${((presentes / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("presentes")} />
-              <KpiCard label="Tardanzas" value={String(tardanzas)} icon={Clock} color="bg-amber-500" subtitle={total > 0 ? `${((tardanzas / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("tardanzas")} />
-              <KpiCard label="Ausentes" value={String(ausentes)} icon={UserX} color="bg-rose-500" subtitle={total > 0 ? `${((ausentes / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("ausentes")} />
+              <KpiCard label="Presentes" value={String(presentes)} icon={UserCheck} color="bg-success" subtitle={total > 0 ? `${((presentes / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("presentes")} />
+              <KpiCard label="Tardanzas" value={String(tardanzas)} icon={Clock} color="bg-warning" subtitle={total > 0 ? `${((tardanzas / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("tardanzas")} />
+              <KpiCard label="Ausentes" value={String(ausentes)} icon={UserX} color="bg-destructive" subtitle={total > 0 ? `${((ausentes / total) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("ausentes")} />
             </>
           )}
         </div>

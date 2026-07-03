@@ -131,8 +131,8 @@ const HRAnnouncements = () => {
         {/* KPIs estilo estándar — clickeables (excepto Visualizaciones que es métrica agregada) */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <KpiCard label="Total" value={stats.total} icon={FileText} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
-          <KpiCard label="Activos" value={stats.active} icon={CheckCircle} color="bg-emerald-500" onClick={() => setKpiPopup("active")} />
-          <KpiCard label="Programados" value={stats.scheduled} icon={Clock} color="bg-amber-500" onClick={() => setKpiPopup("scheduled")} />
+          <KpiCard label="Activos" value={stats.active} icon={CheckCircle} color="bg-success" onClick={() => setKpiPopup("active")} />
+          <KpiCard label="Programados" value={stats.scheduled} icon={Clock} color="bg-warning" onClick={() => setKpiPopup("scheduled")} />
           <KpiCard label="Borradores" value={stats.draft} icon={Edit3} color="bg-slate-500" onClick={() => setKpiPopup("draft")} />
           <KpiCard label="Visualizaciones" value={stats.totalViews} icon={EyeIcon} color="bg-violet-500" />
         </div>

@@ -19,10 +19,10 @@ interface AgentDetailViewProps {
 }
 
 const TIMELINE_CONFIG: Record<string, { icon: typeof Play; color: string }> = {
-  start: { icon: Play, color: "text-green-500" },
-  high: { icon: Zap, color: "text-green-500" },
-  medium: { icon: TrendingUp, color: "text-amber-500" },
-  low: { icon: AlertTriangle, color: "text-red-500" },
+  start: { icon: Play, color: "text-success" },
+  high: { icon: Zap, color: "text-success" },
+  medium: { icon: TrendingUp, color: "text-warning" },
+  low: { icon: AlertTriangle, color: "text-destructive" },
   break: { icon: Coffee, color: "text-blue-500" },
   end: { icon: LogOut, color: "text-muted-foreground" },
 };
@@ -197,7 +197,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
                         )}
                         <span className="relative text-[10px] text-muted-foreground bg-background/80 px-1 rounded">{ss.timestamp}</span>
                         <div className="absolute bottom-1 right-1">
-                          <span className={`text-[9px] font-medium ${ss.activity > 60 ? "text-green-600" : ss.activity > 30 ? "text-amber-600" : "text-red-500"}`}>
+                          <span className={`text-[9px] font-medium ${ss.activity > 60 ? "text-success" : ss.activity > 30 ? "text-warning" : "text-destructive"}`}>
                             {ss.activity}%
                           </span>
                         </div>

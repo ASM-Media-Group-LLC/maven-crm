@@ -484,8 +484,8 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                         <div className="flex items-center justify-between gap-2">
                           <span className="inline-flex items-center gap-1.5 text-sm font-semibold"><Icon className="h-4 w-4" />Evidencia {opt.label}</span>
                           <div className="inline-flex overflow-hidden rounded-md border border-border text-[11px] font-semibold">
-                            <button type="button" onClick={() => setNetResult((r) => ({ ...r, [opt.value]: "si" }))} className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${res === "si" ? "bg-emerald-500 text-white" : "bg-muted/50 text-muted-foreground hover:text-emerald-500"}`}><Check className="h-3 w-3" />Sí</button>
-                            <button type="button" onClick={() => setNetResult((r) => ({ ...r, [opt.value]: "no" }))} className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${res === "no" ? "bg-red-500 text-white" : "bg-muted/50 text-muted-foreground hover:text-red-500"}`}><X className="h-3 w-3" />No</button>
+                            <button type="button" onClick={() => setNetResult((r) => ({ ...r, [opt.value]: "si" }))} className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${res === "si" ? "bg-success text-white" : "bg-muted/50 text-muted-foreground hover:text-success"}`}><Check className="h-3 w-3" />Sí</button>
+                            <button type="button" onClick={() => setNetResult((r) => ({ ...r, [opt.value]: "no" }))} className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${res === "no" ? "bg-destructive text-white" : "bg-muted/50 text-muted-foreground hover:text-destructive"}`}><X className="h-3 w-3" />No</button>
                           </div>
                         </div>
                         <div className="border-2 border-dashed border-input rounded-md p-3 text-center cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => document.getElementById(`tg-file-${opt.value}`)?.click()}>
@@ -603,8 +603,8 @@ const PromologEntryFormDialog = ({ open, onOpenChange, mode, creator, entry, day
                             </button>
                             {result === "si" && (
                               <div className="absolute inset-x-0 bottom-0 flex">
-                                <button type="button" onClick={() => setPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, promoted: true } : p)))} className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${ph.promoted ? "bg-emerald-600 text-white" : "bg-black/60 text-white/80 hover:bg-black/70"}`}>Sí</button>
-                                <button type="button" onClick={() => setPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, promoted: false } : p)))} className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${!ph.promoted ? "bg-rose-600 text-white" : "bg-black/60 text-white/80 hover:bg-black/70"}`}>No</button>
+                                <button type="button" onClick={() => setPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, promoted: true } : p)))} className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${ph.promoted ? "bg-success text-white" : "bg-black/60 text-white/80 hover:bg-black/70"}`}>Sí</button>
+                                <button type="button" onClick={() => setPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, promoted: false } : p)))} className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${!ph.promoted ? "bg-destructive text-white" : "bg-black/60 text-white/80 hover:bg-black/70"}`}>No</button>
                               </div>
                             )}
                           </div>

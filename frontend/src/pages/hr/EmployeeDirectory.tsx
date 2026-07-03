@@ -24,7 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 /* ── KPI Cards ── usan KpiCard estándar (gradient + hover lift) */
 const kpiCards = [
-  { label: "Total Activos", subtitle: "En operación", icon: UserCheck, key: "active" as const, color: "bg-emerald-500" },
+  { label: "Total Activos", subtitle: "En operación", icon: UserCheck, key: "active" as const, color: "bg-success" },
   { label: "Remotos", subtitle: "Trabajo remoto", icon: Wifi, key: "remote" as const, color: "bg-blue-500" },
   { label: "Híbridos", subtitle: "Modalidad híbrida", icon: Laptop, key: "hybrid" as const, color: "bg-amber-500" },
   { label: "Presenciales", subtitle: "En oficina", icon: Building2, key: "onsite" as const, color: "bg-violet-500" },

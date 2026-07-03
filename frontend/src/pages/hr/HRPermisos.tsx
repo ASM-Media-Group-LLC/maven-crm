@@ -441,8 +441,8 @@ export default function HRPermisos() {
           ) : (
             <>
               <KpiCard label="Total" value={String(total)} icon={FileText} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-amber-500" onClick={() => setKpiPopup("pendientes")} />
-              <KpiCard label="Aprobados" value={String(aprobados)} icon={CheckCircle2} color="bg-emerald-500" onClick={() => setKpiPopup("aprobados")} />
+              <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-warning" onClick={() => setKpiPopup("pendientes")} />
+              <KpiCard label="Aprobados" value={String(aprobados)} icon={CheckCircle2} color="bg-success" onClick={() => setKpiPopup("aprobados")} />
               <KpiCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} color="bg-violet-500" onClick={() => setKpiPopup("esteMes")} />
             </>
           )}

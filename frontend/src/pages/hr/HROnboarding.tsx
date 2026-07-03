@@ -221,8 +221,8 @@ export default function HROnboarding() {
             <>
               <KpiCard label="Total Onboarding" value={String(onboardings.length)} icon={Users} color="bg-blue-500" subtitle="Todos los procesos" onClick={() => setKpiPopup("total")} />
               <KpiCard label="Pendientes" value={String(totalPending)} icon={Clock} color="bg-violet-500" subtitle={onboardings.length > 0 ? `${((totalPending / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
-              <KpiCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} color="bg-amber-500" subtitle={onboardings.length > 0 ? `${((totalInProgress / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
-              <KpiCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} color="bg-emerald-500" subtitle={onboardings.length > 0 ? `${((totalCompleted / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
+              <KpiCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} color="bg-warning" subtitle={onboardings.length > 0 ? `${((totalInProgress / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <KpiCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} color="bg-success" subtitle={onboardings.length > 0 ? `${((totalCompleted / onboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
             </>
           )}
         </div>

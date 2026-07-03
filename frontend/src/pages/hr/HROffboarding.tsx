@@ -241,9 +241,9 @@ export default function HROffboarding() {
           ) : (
             <>
               <KpiCard label="Total Offboarding" value={String(offboardings.length)} icon={Users} color="bg-blue-500" subtitle="Todos los procesos" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} color="bg-amber-500" subtitle={offboardings.length > 0 ? `${((totalInProgress / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
-              <KpiCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} color="bg-emerald-500" subtitle={offboardings.length > 0 ? `${((totalCompleted / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
-              <KpiCard label="Pago Pendiente" value={String(totalPendingPayment)} icon={DollarSign} color="bg-rose-500" subtitle={offboardings.length > 0 ? `${((totalPendingPayment / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pendingPayment")} />
+              <KpiCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} color="bg-warning" subtitle={offboardings.length > 0 ? `${((totalInProgress / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <KpiCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} color="bg-success" subtitle={offboardings.length > 0 ? `${((totalCompleted / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("completed")} />
+              <KpiCard label="Pago Pendiente" value={String(totalPendingPayment)} icon={DollarSign} color="bg-destructive" subtitle={offboardings.length > 0 ? `${((totalPendingPayment / offboardings.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pendingPayment")} />
             </>
           )}
         </div>

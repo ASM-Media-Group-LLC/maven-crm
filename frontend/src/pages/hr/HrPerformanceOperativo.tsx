@@ -91,8 +91,8 @@ export default function HrPerformanceOperativo() {
                         <Td num>{usd(r.sales)}</Td>
                         <Td num>{usd(r.agency_revenue_usd)}</Td>
                         <Td num>{usd(r.cost_usd)}</Td>
-                        <Td num cls={(r.margin_usd ?? 0) >= 0 ? "text-emerald-500" : "text-rose-500"}>{usd(r.margin_usd)}</Td>
-                        <Td num cls={(r.roi_x ?? 0) >= 1 ? "text-emerald-500" : "text-rose-500"}>{r.roi_x != null ? `${r.roi_x}x` : "—"}</Td>
+                        <Td num cls={(r.margin_usd ?? 0) >= 0 ? "text-success" : "text-destructive"}>{usd(r.margin_usd)}</Td>
+                        <Td num cls={(r.roi_x ?? 0) >= 1 ? "text-success" : "text-destructive"}>{r.roi_x != null ? `${r.roi_x}x` : "—"}</Td>
                         <Td>{r.no_rentable ? <Pill tone="bad">no rentable</Pill> : r.sin_venta_blu ? <Pill tone="muted">sin venta BLU</Pill> : <Pill tone="ok">rentable</Pill>}</Td>
                       </Row>
                     ))}
@@ -191,7 +191,7 @@ function Td({ children, num, cls, className }: { children: React.ReactNode; num?
   );
 }
 function Pill({ children, tone }: { children: React.ReactNode; tone: "ok" | "bad" | "muted" }) {
-  const cls = tone === "ok" ? "bg-emerald-500/15 text-emerald-600" : tone === "bad" ? "bg-rose-500/15 text-rose-600" : "bg-muted text-muted-foreground";
+  const cls = tone === "ok" ? "bg-success/15 text-success" : tone === "bad" ? "bg-destructive/15 text-destructive" : "bg-muted text-muted-foreground";
   return <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}`}>{children}</span>;
 }
 function Empty({ cols }: { cols: number }) {

@@ -117,7 +117,7 @@ export default function HRStaffSchedules() {
                     <button key={s.profile_id} onClick={() => setSelected(s)}
                       className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted/50 ${selected?.profile_id === s.profile_id ? "bg-muted" : ""}`}>
                       <span className="flex-1 truncate">{s.name}</span>
-                      {s.hasSchedule && <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}
+                      {s.hasSchedule && <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />}
                       <Badge variant="secondary-soft" className="text-[10px]">{ROLE_LABEL[s.role] ?? s.role}</Badge>
                     </button>
                   ))}

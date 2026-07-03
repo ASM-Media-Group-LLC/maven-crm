@@ -32,15 +32,15 @@ const AGENT_STATUSES = [
 ];
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof Wifi; dotColor: string }> = {
-  activo: { label: "Activo", variant: "default", icon: Wifi, dotColor: "bg-green-500" },
-  inactivo: { label: "Inactivo", variant: "secondary", icon: WifiOff, dotColor: "bg-amber-500" },
+  activo: { label: "Activo", variant: "default", icon: Wifi, dotColor: "bg-success" },
+  inactivo: { label: "Inactivo", variant: "secondary", icon: WifiOff, dotColor: "bg-warning" },
   desconectado: { label: "Desconectado", variant: "outline", icon: WifiOff, dotColor: "bg-muted-foreground/40" },
   en_pausa: { label: "En Pausa", variant: "secondary", icon: Pause, dotColor: "bg-blue-500" },
 };
 
 // ─── Activity Bar ─────────────────────────────────────────────────────────────
 function ActivityBar({ value }: { value: number }) {
-  const color = value > 70 ? "bg-green-500" : value > 30 ? "bg-amber-500" : "bg-destructive";
+  const color = value > 70 ? "bg-success" : value > 30 ? "bg-warning" : "bg-destructive";
   return (
     <div className="flex items-center gap-2 min-w-[120px]">
       <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
@@ -140,7 +140,7 @@ export default function HRMonitoring() {
           subtitle="Monitoreo en tiempo real de agentes"
           actions={
             <>
-              <Badge variant="outline" className={`gap-1.5 px-3 py-1.5 text-xs font-medium ${config?.sync_enabled ? "border-green-500/50 text-green-600 bg-green-500/10" : "border-amber-500/50 text-amber-600 bg-amber-500/10"}`}>
+              <Badge variant="outline" className={`gap-1.5 px-3 py-1.5 text-xs font-medium ${config?.sync_enabled ? "border-success/50 text-success bg-success/10" : "border-warning/50 text-warning bg-warning/10"}`}>
                 <Wifi className="h-3 w-3" />
                 {config?.sync_enabled ? "Hubstaff Conectado" : "Hubstaff Pendiente"}
               </Badge>
@@ -232,7 +232,7 @@ export default function HRMonitoring() {
 
             {/* Connection status */}
             <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-              <div className={`h-3 w-3 rounded-full ${config?.sync_enabled ? "bg-green-500" : config?.api_token_set ? "bg-amber-500" : "bg-muted-foreground/40"}`} />
+              <div className={`h-3 w-3 rounded-full ${config?.sync_enabled ? "bg-success" : config?.api_token_set ? "bg-warning" : "bg-muted-foreground/40"}`} />
               <div className="flex-1">
                 <p className="text-sm font-medium">
                   {config?.sync_enabled ? "Conectado" : config?.api_token_set ? "Token configurado — Sync deshabilitado" : "Pendiente de configuración"}

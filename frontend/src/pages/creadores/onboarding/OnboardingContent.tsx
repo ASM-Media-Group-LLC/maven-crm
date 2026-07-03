@@ -60,9 +60,9 @@ const OnboardingContent = () => {
 
   const kpiCards = [
     { label: "Total", value: total, icon: Users, filter: "Todas", color: "bg-blue-500" },
-    { label: "Pendientes", value: pending, icon: Clock, filter: "Pendientes", color: "bg-amber-500" },
+    { label: "Pendientes", value: pending, icon: Clock, filter: "Pendientes", color: "bg-warning" },
     { label: "En Progreso", value: inProgress, icon: Loader2, filter: "En Progreso", color: "bg-violet-500" },
-    { label: "Completados", value: completed, icon: CheckCircle2, filter: "Completados", color: "bg-emerald-500" },
+    { label: "Completados", value: completed, icon: CheckCircle2, filter: "Completados", color: "bg-success" },
   ];
 
   const handleCardClick = (creator: OnboardingCreator) => {

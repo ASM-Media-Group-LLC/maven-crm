@@ -188,9 +188,9 @@ export default function HRApplicants() {
           ) : (
             <>
               <KpiCard label="Total Candidatos" value={String(applicants.length)} icon={Users} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
-              <KpiCard label="Pendientes" value={String(totalPending)} icon={Clock} color="bg-amber-500" subtitle={applicants.length > 0 ? `${((totalPending / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
+              <KpiCard label="Pendientes" value={String(totalPending)} icon={Clock} color="bg-warning" subtitle={applicants.length > 0 ? `${((totalPending / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("pending")} />
               <KpiCard label="En Entrevista" value={String(totalInterview)} icon={UserCheck} color="bg-violet-500" subtitle={applicants.length > 0 ? `${((totalInterview / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("interview")} />
-              <KpiCard label="Contratados" value={String(totalHired)} icon={CheckCircle} color="bg-emerald-500" subtitle={applicants.length > 0 ? `${((totalHired / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("hired")} />
+              <KpiCard label="Contratados" value={String(totalHired)} icon={CheckCircle} color="bg-success" subtitle={applicants.length > 0 ? `${((totalHired / applicants.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("hired")} />
             </>
           )}
         </div>

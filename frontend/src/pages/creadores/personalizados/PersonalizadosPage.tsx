@@ -25,19 +25,19 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 const getAlertIcon = (r: CustomContentRequest) => {
-  if (r.status === "completado") return <CheckCircle2 className="h-4 w-4 text-green-400" />;
+  if (r.status === "completado") return <CheckCircle2 className="h-4 w-4 text-success" />;
   if (!r.due_date) return <span className="text-muted-foreground">—</span>;
   const overdue = new Date(r.due_date) < new Date();
-  if (overdue) return <XCircle className="h-4 w-4 text-red-400" />;
-  return <Clock className="h-4 w-4 text-yellow-400" />;
+  if (overdue) return <XCircle className="h-4 w-4 text-destructive" />;
+  return <Clock className="h-4 w-4 text-warning" />;
 };
 
 
 const STATUS_COLORS: Record<string, string> = {
-  pendiente: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  pendiente: "bg-warning/20 text-warning border-warning/30",
   en_progreso: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  completado: "bg-green-500/20 text-green-400 border-green-500/30",
-  cancelado: "bg-red-500/20 text-red-400 border-red-500/30",
+  completado: "bg-success/20 text-success border-success/30",
+  cancelado: "bg-destructive/20 text-destructive border-destructive/30",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -51,7 +51,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   baja: "bg-muted text-muted-foreground",
   normal: "bg-blue-500/20 text-blue-400",
   alta: "bg-orange-500/20 text-orange-400",
-  urgente: "bg-red-500/20 text-red-400",
+  urgente: "bg-destructive/20 text-destructive",
 };
 
 const PersonalizadosPage = () => {
@@ -105,10 +105,10 @@ const PersonalizadosPage = () => {
         <div className="flex-1 overflow-auto px-6 py-6 space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
               <KpiCard label="Total Solicitudes" value={String(total)} icon={FileText} color="bg-blue-500" subtitle="Todas las solicitudes" onClick={() => setStatusFilter("all")} />
-              <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-amber-500" subtitle="Por gestionar" onClick={() => setStatusFilter("pendiente")} />
+              <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-warning" subtitle="Por gestionar" onClick={() => setStatusFilter("pendiente")} />
               <KpiCard label="En Progreso" value={String(enProgreso)} icon={Loader} color="bg-violet-500" subtitle="En proceso" onClick={() => setStatusFilter("en_progreso")} />
-              <KpiCard label="Completadas" value={String(completadas)} icon={CheckCircle2} color="bg-emerald-500" subtitle="Finalizadas" onClick={() => setStatusFilter("completada")} />
-              <KpiCard label="Alertas Críticas" value={String(alertas)} icon={AlertTriangle} color="bg-rose-500" subtitle={alertas > 0 ? "Solicitudes vencidas" : "Sin alertas"} />
+              <KpiCard label="Completadas" value={String(completadas)} icon={CheckCircle2} color="bg-success" subtitle="Finalizadas" onClick={() => setStatusFilter("completada")} />
+              <KpiCard label="Alertas Críticas" value={String(alertas)} icon={AlertTriangle} color="bg-destructive" subtitle={alertas > 0 ? "Solicitudes vencidas" : "Sin alertas"} />
             </div>
 
             <div className="flex flex-wrap gap-3">

@@ -190,8 +190,8 @@ const HROvertimeDetail = () => {
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard label="Total Horas" value={`${totalHours}h`} icon={Timer} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
-          <KpiCard label="Pendientes" value={String(pendingCount)} icon={AlertCircle} color="bg-amber-500" onClick={() => setKpiPopup("pending")} />
-          <KpiCard label="Aprobadas" value={String(approvedCount)} icon={CheckCircle2} color="bg-emerald-500" onClick={() => setKpiPopup("approved")} />
+          <KpiCard label="Pendientes" value={String(pendingCount)} icon={AlertCircle} color="bg-warning" onClick={() => setKpiPopup("pending")} />
+          <KpiCard label="Aprobadas" value={String(approvedCount)} icon={CheckCircle2} color="bg-success" onClick={() => setKpiPopup("approved")} />
           <KpiCard label="Pagadas" value={String(paidCount)} icon={Banknote} color="bg-violet-500" onClick={() => setKpiPopup("paid")} />
         </div>
 

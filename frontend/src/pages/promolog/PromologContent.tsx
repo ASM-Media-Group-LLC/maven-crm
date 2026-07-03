@@ -1615,10 +1615,10 @@ const PromologContent = () => {
               {kpiModalType === "creadores_escaneados" ? (
                 <span className="inline-flex items-center gap-2">
                   <span>{creatorsScannedCount} {creatorsScannedCount === 1 ? "creadora escaneada" : "creadoras escaneadas"}</span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-emerald-500/30">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-1.5 py-0.5 text-[10px] font-semibold text-success ring-1 ring-success/30">
                     <CheckCircle2 className="h-3 w-3" /> {creatorsPromotedCount}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-400 ring-1 ring-rose-500/30">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold text-destructive ring-1 ring-destructive/30">
                     <XCircle className="h-3 w-3" /> {creatorsNotPromotedCount}
                   </span>
                 </span>
@@ -1687,10 +1687,10 @@ const PromologContent = () => {
                           <div className="space-y-1.5 pl-1">
                             {/* Mini-subheader con desglose de la categoría */}
                             <div className="flex items-center gap-2 px-1 text-[10px] text-muted-foreground">
-                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-emerald-400">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-1.5 py-0.5 text-success">
                                 <CheckCircle2 className="h-2.5 w-2.5" /> {catPromoted}
                               </span>
-                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-1.5 py-0.5 text-rose-400">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-1.5 py-0.5 text-destructive">
                                 <XCircle className="h-2.5 w-2.5" /> {rows.length - catPromoted}
                               </span>
                             </div>

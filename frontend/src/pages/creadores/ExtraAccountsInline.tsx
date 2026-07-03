@@ -127,7 +127,7 @@ const ExtraAccountsInline = ({ creatorId, network, canManage, primaryFilled, onP
             {isWhatsapp ? (showValue ? a.username : "WhatsApp") : isOther ? a.username : `@${a.username}`}
           </button>
           {effectiveCanManage && (
-            <button type="button" onClick={() => remove(a.id)} title="Quitar" className="text-muted-foreground hover:text-rose-400">
+            <button type="button" onClick={() => remove(a.id)} title="Quitar" className="text-muted-foreground hover:text-destructive">
               <X className="h-3 w-3" />
             </button>
           )}

@@ -410,7 +410,7 @@ const PromobotPanel = () => {
                 </button>
               );
             })}
-            {netCount === 0 && <span className="text-[11px] text-rose-400">· elegí al menos una red</span>}
+            {netCount === 0 && <span className="text-[11px] text-destructive">· elegí al menos una red</span>}
           </div>
 
           {/* Buscador + lista de modelos */}
@@ -467,7 +467,7 @@ const PromobotPanel = () => {
         const ago = (h: number) => (h === Infinity ? "nunca" : h < 1 ? `${Math.round(h * 60)} min` : `${Math.round(h)} h`);
         const gap = totalEligible > 0 ? totalEligible - health.scannedToday : 0;
         return (
-          <Card className={stale ? "border-rose-500/40" : ""}>
+          <Card className={stale ? "border-destructive/40" : ""}>
             <CardContent className="space-y-3 p-4">
               <div className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-primary" />
@@ -478,7 +478,7 @@ const PromobotPanel = () => {
                 </span>
               </div>
               {stale && (
-                <div className="flex items-center gap-2 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   <span>
                     El bot no completa una corrida desde hace <b>{ago(staleH)}</b> (debería correr 1×/día).
@@ -516,8 +516,8 @@ const PromobotPanel = () => {
                 />
               </div>
               {fallen.length > 0 && (
-                <div className="flex items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
-                  <span className="text-amber-300">
+                <div className="flex items-center justify-between gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+                  <span className="text-warning">
                     {fallen.length} creadora(s) quedaron sin escanear hoy por corridas con error.
                   </span>
                   <Button
@@ -715,7 +715,7 @@ const HealthStat = ({
       {icon}
       <span className="text-[10px] font-semibold uppercase tracking-wider">{label}</span>
     </div>
-    <p className={`mt-0.5 text-lg font-bold tabular-nums ${tone === "bad" ? "text-rose-400" : tone === "warn" ? "text-amber-400" : ""}`}>
+    <p className={`mt-0.5 text-lg font-bold tabular-nums ${tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : ""}`}>
       {value}
     </p>
     <p className="truncate text-[10px] text-muted-foreground">{sub}</p>

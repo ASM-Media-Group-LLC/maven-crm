@@ -61,16 +61,16 @@ const promotedToResult = (promoted: string | null): string => {
 };
 
 const STATUS_STYLES: Record<DayStatus, string> = {
-  promo: "bg-emerald-500/10 border-emerald-500/40 hover:bg-emerald-500/20",
-  partial: "bg-amber-500/10 border-amber-500/40 hover:bg-amber-500/20",
-  no: "bg-red-500/10 border-red-500/40 hover:bg-red-500/20",
+  promo: "bg-success/10 border-success/40 hover:bg-success/20",
+  partial: "bg-warning/10 border-warning/40 hover:bg-warning/20",
+  no: "bg-destructive/10 border-destructive/40 hover:bg-destructive/20",
   none: "bg-muted/20 border-border",
 };
 
 const StatusDot = ({ status }: { status: DayStatus }) => {
-  if (status === "promo") return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white"><Check className="h-3.5 w-3.5" /></span>;
-  if (status === "partial") return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white"><Minus className="h-3.5 w-3.5" /></span>;
-  if (status === "no") return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white"><XIcon className="h-3.5 w-3.5" /></span>;
+  if (status === "promo") return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success text-white"><Check className="h-3.5 w-3.5" /></span>;
+  if (status === "partial") return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-warning text-white"><Minus className="h-3.5 w-3.5" /></span>;
+  if (status === "no") return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white"><XIcon className="h-3.5 w-3.5" /></span>;
   return <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground"><CircleDashed className="h-3.5 w-3.5" /></span>;
 };
 

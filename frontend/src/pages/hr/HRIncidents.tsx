@@ -198,8 +198,8 @@ export default function HRIncidents() {
             <>
               <KpiCard label="Total Incidentes" value={String(incidents.length)} icon={AlertTriangle} color="bg-blue-500" subtitle="Todos los registros" onClick={() => setKpiPopup("total")} />
               <KpiCard label="Abiertos" value={String(totalOpen)} icon={AlertCircle} color="bg-violet-500" subtitle={incidents.length > 0 ? `${((totalOpen / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("open")} />
-              <KpiCard label="En Proceso" value={String(totalInProgress)} icon={Clock} color="bg-amber-500" subtitle={incidents.length > 0 ? `${((totalInProgress / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
-              <KpiCard label="Críticos" value={String(totalCritical)} icon={ShieldAlert} color="bg-rose-500" subtitle={incidents.length > 0 ? `${((totalCritical / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("critical")} />
+              <KpiCard label="En Proceso" value={String(totalInProgress)} icon={Clock} color="bg-warning" subtitle={incidents.length > 0 ? `${((totalInProgress / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("inProgress")} />
+              <KpiCard label="Críticos" value={String(totalCritical)} icon={ShieldAlert} color="bg-destructive" subtitle={incidents.length > 0 ? `${((totalCritical / incidents.length) * 100).toFixed(0)}% del total` : "—"} onClick={() => setKpiPopup("critical")} />
             </>
           )}
         </div>

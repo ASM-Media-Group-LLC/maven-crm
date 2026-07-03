@@ -496,7 +496,7 @@ export default function HRAbsences() {
         {/* KPI Cards — clickeables, abren modal con la lista filtrada */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <KpiCard label="Total Faltas" value={String(totalFaltas)} icon={AlertTriangle} color="bg-blue-500" onClick={() => setKpiPopup("total")} />
-          <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-amber-500" onClick={() => setKpiPopup("pendientes")} />
+          <KpiCard label="Pendientes" value={String(pendientes)} icon={Clock} color="bg-warning" onClick={() => setKpiPopup("pendientes")} />
           <KpiCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} color="bg-violet-500" onClick={() => setKpiPopup("esteMes")} />
         </div>
 

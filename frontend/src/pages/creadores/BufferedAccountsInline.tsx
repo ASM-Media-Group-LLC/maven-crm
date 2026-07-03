@@ -43,7 +43,7 @@ const BufferedAccountsInline = ({ network, accounts, onChange }: Props) => {
       {accounts.map((a) => (
         <span key={a} className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[11px]">
           <span className={isOther ? "inline-block max-w-[160px] truncate align-bottom" : ""}>{isOther ? a : `@${a}`}</span>
-          <button type="button" onClick={() => onChange(accounts.filter((x) => x !== a))} title="Quitar" className="text-muted-foreground hover:text-rose-400">
+          <button type="button" onClick={() => onChange(accounts.filter((x) => x !== a))} title="Quitar" className="text-muted-foreground hover:text-destructive">
             <X className="h-3 w-3" />
           </button>
         </span>

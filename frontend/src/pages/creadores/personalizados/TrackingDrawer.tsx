@@ -64,8 +64,8 @@ const TrackingDrawer = ({ request, open, onOpenChange }: TrackingDrawerProps) =>
               const showOverdue = isLast && isOverdue && !isDone;
 
               let circleClass = "border-muted-foreground/30 text-muted-foreground";
-              if (isDone) circleClass = "border-green-500/40 bg-green-500/20 text-green-400";
-              if (showOverdue) circleClass = "border-red-500/40 bg-red-500/20 text-red-400";
+              if (isDone) circleClass = "border-success/40 bg-success/20 text-success";
+              if (showOverdue) circleClass = "border-destructive/40 bg-destructive/20 text-destructive";
 
               const Icon = showOverdue ? AlertOctagon : step.icon;
 
@@ -75,7 +75,7 @@ const TrackingDrawer = ({ request, open, onOpenChange }: TrackingDrawerProps) =>
                   {stepNum < 6 && (
                     <span
                       className={`absolute left-[11px] top-7 h-full w-px ${
-                        isDone ? "bg-green-500/40" : "bg-muted-foreground/20"
+                        isDone ? "bg-success/40" : "bg-muted-foreground/20"
                       }`}
                     />
                   )}
@@ -85,11 +85,11 @@ const TrackingDrawer = ({ request, open, onOpenChange }: TrackingDrawerProps) =>
                   >
                     <Icon className="h-3.5 w-3.5" />
                   </span>
-                  <p className={`text-sm font-medium ${showOverdue ? "text-red-400" : isDone ? "text-foreground" : "text-muted-foreground"}`}>
+                  <p className={`text-sm font-medium ${showOverdue ? "text-destructive" : isDone ? "text-foreground" : "text-muted-foreground"}`}>
                     {step.label}
                   </p>
                   {showOverdue && (
-                    <p className="text-xs font-semibold text-red-400 mt-0.5">TIEMPO LÍMITE EXCEDIDO</p>
+                    <p className="text-xs font-semibold text-destructive mt-0.5">TIEMPO LÍMITE EXCEDIDO</p>
                   )}
                 </li>
               );

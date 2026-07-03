@@ -288,8 +288,8 @@ const PromologEntryDetailDialog = ({
 
           {/* Buy link — sólo cuando la promo tiene link visible */}
           {entry.has_buy_link && (
-            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-1">
-              <p className="text-xs uppercase tracking-wider text-emerald-400 font-semibold flex items-center gap-1.5">
+            <div className="rounded-md border border-success/30 bg-success/5 p-3 space-y-1">
+              <p className="text-xs uppercase tracking-wider text-success font-semibold flex items-center gap-1.5">
                 <Check className="h-3 w-3" />
                 Link de compra detectado
               </p>

@@ -688,12 +688,12 @@ const Dashboard2 = () => {
           </div>
         </TableCell>
         <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : ""}`}>{fmt(c.total)}</TableCell>
-        <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : "text-emerald-600 dark:text-emerald-400"}`}>{fmt(c.net)}</TableCell>
+        <TableCell className={`text-right tabular-nums font-semibold ${isZero ? "text-muted-foreground" : "text-success"}`}>{fmt(c.net)}</TableCell>
         {(() => {
           const prev = prevMonthMap.get(c.creatorId);
           if (!prev || prev === 0) return <TableCell className="text-right tabular-nums text-xs text-muted-foreground">—</TableCell>;
           const change = ((c.total - prev) / prev) * 100;
-          const color = change > 0 ? "text-emerald-600 dark:text-emerald-400" : change < -10 ? "text-destructive" : "text-muted-foreground";
+          const color = change > 0 ? "text-success" : change < -10 ? "text-destructive" : "text-muted-foreground";
           return <TableCell className={`text-right tabular-nums text-xs font-medium ${color}`}>{change > 0 ? "↑" : "↓"} {Math.abs(change).toFixed(0)}%</TableCell>;
         })()}
         <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
@@ -948,7 +948,7 @@ const Dashboard2 = () => {
                       <div className="flex items-center justify-between gap-2 pt-3 mt-auto border-t border-border/50 text-xs">
                         <span className="text-muted-foreground">Net <span className="font-semibold text-foreground tabular-nums">{fmtK(grandTotal * 0.8)}</span></span>
                         {prevMonthTotal > 0 && (
-                          <span className={`font-bold ${totalChangePercent >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                          <span className={`font-bold ${totalChangePercent >= 0 ? "text-success" : "text-destructive"}`}>
                             {totalChangePercent >= 0 ? "↑" : "↓"}{Math.abs(totalChangePercent).toFixed(1)}%
                           </span>
                         )}
@@ -1051,8 +1051,8 @@ const Dashboard2 = () => {
                   {/* Growth Velocity */}
                   <div className="rounded-xl border border-border bg-card p-4 space-y-3">
                     <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                        <Activity className="h-4 w-4 text-emerald-500" />
+                      <div className="h-9 w-9 rounded-lg bg-success/10 flex items-center justify-center">
+                        <Activity className="h-4 w-4 text-success" />
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-foreground">Velocidad de Crecimiento</p>
@@ -1060,8 +1060,8 @@ const Dashboard2 = () => {
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="rounded-lg bg-emerald-500/10 p-2">
-                        <p className="text-lg font-bold tabular-nums text-emerald-500">{growthStats.growing}</p>
+                      <div className="rounded-lg bg-success/10 p-2">
+                        <p className="text-lg font-bold tabular-nums text-success">{growthStats.growing}</p>
                         <p className="text-[9px] text-muted-foreground">Creciendo</p>
                       </div>
                       <div className="rounded-lg bg-muted p-2">
@@ -1095,7 +1095,7 @@ const Dashboard2 = () => {
                 const sections = [
                   { key: "zero" as const, emoji: "🔴", label: "Inactivas ($0)", desc: "Vendían el mes pasado, ahora $0", items: zeros, border: "border-destructive/40", bg: "bg-destructive/10", text: "text-destructive" },
                   { key: "drop" as const, emoji: "🟠", label: "Caída > 30%", desc: "Revenue cayó más del 30%", items: drops, border: "border-orange-400/40", bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400" },
-                  { key: "fanLoss" as const, emoji: "🟡", label: "Perdiendo Fans", desc: "Fans netos negativos", items: fanLoss, border: "border-yellow-400/40", bg: "bg-yellow-500/10", text: "text-yellow-600 dark:text-yellow-400" },
+                  { key: "fanLoss" as const, emoji: "🟡", label: "Perdiendo Fans", desc: "Fans netos negativos", items: fanLoss, border: "border-warning/40", bg: "bg-warning/10", text: "text-warning" },
                 ];
                 const activeSection = sections.find((s) => s.key === alertTab);
                 const activeItems = activeSection?.items || [];
@@ -1360,7 +1360,7 @@ const Dashboard2 = () => {
                         <div className="text-right shrink-0 w-[110px]">
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Bruto</p>
                           <p className="text-base font-bold tabular-nums">{fmt(c.total)}</p>
-                          <p className="text-[10px] tabular-nums text-emerald-500">{fmt(c.net)} <span className="text-muted-foreground">net</span></p>
+                          <p className="text-[10px] tabular-nums text-success">{fmt(c.net)} <span className="text-muted-foreground">net</span></p>
                         </div>
                         <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
                       </button>
@@ -1497,7 +1497,7 @@ const Dashboard2 = () => {
                   const initials = c.name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
                   const stats = [
                     { label: "Bruto", value: fmt(c.total), highlight: true },
-                    { label: "Neto (80%)", value: fmt(c.net), highlight: true, color: "text-emerald-500" },
+                    { label: "Neto (80%)", value: fmt(c.net), highlight: true, color: "text-success" },
                     { label: "Subs", value: fmt(c.subs) },
                     { label: "Nuevas Subs", value: fmt(c.newSubs) },
                     { label: "Recurrentes", value: fmt(c.recurringSubs) },
@@ -2015,13 +2015,13 @@ const Dashboard2 = () => {
                           </div>
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
                             <p className="text-[10px] text-muted-foreground uppercase">Diferencia</p>
-                            <p className={`text-lg font-bold tabular-nums ${totalChangePercent >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                            <p className={`text-lg font-bold tabular-nums ${totalChangePercent >= 0 ? "text-success" : "text-destructive"}`}>
                               {totalChangePercent >= 0 ? "+" : ""}{fmtK(hlKpis.totalBruto - prevMonthTotal)}
                             </p>
                           </div>
                           <div className="rounded-xl border border-border bg-card p-3 text-center">
                             <p className="text-[10px] text-muted-foreground uppercase">Cambio %</p>
-                            <p className={`text-lg font-bold tabular-nums ${totalChangePercent >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                            <p className={`text-lg font-bold tabular-nums ${totalChangePercent >= 0 ? "text-success" : "text-destructive"}`}>
                               {totalChangePercent >= 0 ? "↑" : "↓"}{Math.abs(totalChangePercent).toFixed(1)}%
                             </p>
                           </div>
@@ -2052,14 +2052,14 @@ const Dashboard2 = () => {
                                   </TableCell>
                                   <TableCell className="text-right tabular-nums text-sm font-semibold">{fmt(c.total)}</TableCell>
                                   <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.prev > 0 ? fmt(c.prev) : "—"}</TableCell>
-                                  <TableCell className={`text-right tabular-nums text-sm font-medium ${c.delta >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                                  <TableCell className={`text-right tabular-nums text-sm font-medium ${c.delta >= 0 ? "text-success" : "text-destructive"}`}>
                                     {c.delta >= 0 ? "+" : ""}{fmtShort(c.delta)}
                                   </TableCell>
-                                  <TableCell className={`text-right tabular-nums text-sm font-medium ${c.change >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                                  <TableCell className={`text-right tabular-nums text-sm font-medium ${c.change >= 0 ? "text-success" : "text-destructive"}`}>
                                     {c.prev > 0 ? `${c.change >= 0 ? "+" : ""}${c.change.toFixed(0)}%` : "Nueva"}
                                   </TableCell>
                                   <TableCell className="text-center">
-                                    {c.change > 10 && <Badge variant="outline" className="text-[9px] h-5 border-emerald-500/40 text-emerald-500">↑ Crece</Badge>}
+                                    {c.change > 10 && <Badge variant="outline" className="text-[9px] h-5 border-success/40 text-success">↑ Crece</Badge>}
                                     {c.change <= 10 && c.change >= -10 && <Badge variant="outline" className="text-[9px] h-5 border-muted-foreground/30">= Estable</Badge>}
                                     {c.change < -10 && <Badge variant="outline" className="text-[9px] h-5 border-destructive/40 text-destructive">↓ Cae</Badge>}
                                   </TableCell>
@@ -2128,7 +2128,7 @@ const Dashboard2 = () => {
                                      <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtShort(c.avgPerFan)}</TableCell>
                                      <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.activeFans.toLocaleString()}</TableCell>
                                      <TableCell className="text-right tabular-nums text-sm">
-                                       <span className={c.retention > 50 ? "text-emerald-500" : c.retention > 30 ? "text-amber-500" : "text-destructive"}>
+                                       <span className={c.retention > 50 ? "text-success" : c.retention > 30 ? "text-warning" : "text-destructive"}>
                                          {c.retention.toFixed(0)}%
                                       </span>
                                     </TableCell>
@@ -2190,11 +2190,11 @@ const Dashboard2 = () => {
                                      </TableCell>
                                      <TableCell className="text-right tabular-nums text-sm font-semibold">{fmtShort(c.total)}</TableCell>
                                      <TableCell className="text-right tabular-nums text-sm text-primary">{fmtShort(c.target)}</TableCell>
-                                     <TableCell className="text-right tabular-nums text-sm text-emerald-500">+{fmtShort(c.gap)}</TableCell>
+                                     <TableCell className="text-right tabular-nums text-sm text-success">+{fmtShort(c.gap)}</TableCell>
                                     <TableCell>
                                       <div className="flex items-center gap-2">
                                         <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
-                                         <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(c.progress, 100)}%` }} />
+                                         <div className="h-full rounded-full bg-success transition-all" style={{ width: `${Math.min(c.progress, 100)}%` }} />
                                         </div>
                                          <span className="text-[10px] text-muted-foreground tabular-nums w-8">{c.progress.toFixed(0)}%</span>
                                       </div>
@@ -2236,7 +2236,7 @@ const Dashboard2 = () => {
                         </div>
                         {items.length === 0 ? (
                           <div className="flex items-center gap-2 py-2">
-                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                            <CheckCircle2 className="h-4 w-4 text-success" />
                             <p className="text-sm text-muted-foreground">Sin alertas en esta categoría</p>
                           </div>
                         ) : (
@@ -2277,14 +2277,14 @@ const Dashboard2 = () => {
                               <p className="text-[9px] text-muted-foreground">Caída</p>
                             </div>
                             <div className="text-center px-3">
-                              <p className="text-lg font-bold tabular-nums text-amber-500">{fanLoss.length}</p>
+                              <p className="text-lg font-bold tabular-nums text-warning">{fanLoss.length}</p>
                               <p className="text-[9px] text-muted-foreground">Fan Loss</p>
                             </div>
                           </div>
                         </div>
                         {renderSection("Inactivas — Revenue $0", "🔴", zeros, "border-destructive/30", "bg-destructive/5")}
                         {renderSection("Caída severa (>30%)", "🟠", drops, "border-orange-400/30", "bg-orange-500/5")}
-                        {renderSection("Pérdida de fans", "🟡", fanLoss, "border-yellow-400/30", "bg-yellow-500/5")}
+                        {renderSection("Pérdida de fans", "🟡", fanLoss, "border-warning/30", "bg-warning/5")}
                       </div>
                     );
                   })()}
@@ -2339,8 +2339,8 @@ const Dashboard2 = () => {
                                      <TableCell className="text-right tabular-nums text-sm">{fmtShort(c.subs)}</TableCell>
                                      <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{c.subPct.toFixed(0)}%</TableCell>
                                     <TableCell className="text-center text-xs">
-                                      <span className={concentrated ? "text-amber-500 font-semibold" : ""}>{dominant}</span>
-                                      {concentrated && <span className="text-[9px] text-amber-500 ml-1">⚠</span>}
+                                      <span className={concentrated ? "text-warning font-semibold" : ""}>{dominant}</span>
+                                      {concentrated && <span className="text-[9px] text-warning ml-1">⚠</span>}
                                     </TableCell>
                                   </TableRow>
                                 );
