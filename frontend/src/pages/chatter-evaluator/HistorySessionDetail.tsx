@@ -266,7 +266,7 @@ const HistorySessionDetail = () => {
                         className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${
                           isFan
                             ? "bg-muted text-foreground"
-                            : "bg-primary text-primary-foreground"
+                            : "bg-gradient-to-br from-accent to-primary text-white"
                         }`}
                       >
                         <div className="mb-0.5 text-[10px] font-semibold opacity-75">

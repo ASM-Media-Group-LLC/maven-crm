@@ -437,7 +437,7 @@ const MessageBubble = ({
               msg.deleted === "chatter"
                 ? "rounded-bl-sm bg-rose-500 text-white"
                 : isFan
-                ? "rounded-br-sm bg-primary text-primary-foreground"
+                ? "rounded-br-sm bg-gradient-to-br from-accent to-primary text-white shadow-sm"
                 : "rounded-bl-sm bg-muted text-foreground"
             }`}
           >
