@@ -13,6 +13,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import KpiCard from "@/components/dashboard/KpiCard";
+import { PageHeader } from "@/components/ui/page-header";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Smartphone, Loader2, Play, RefreshCw, Power, Clock, LayoutDashboard, Activity, ListChecks } from "lucide-react";
@@ -503,16 +504,16 @@ export default function TelefonosPage() {
 
   return (
     <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Teléfonos</h1>
-          <p className="text-sm text-muted-foreground">Operá tus teléfonos asignados sin salir de Maven.</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Actualizar
-        </Button>
-      </div>
+      <PageHeader
+        title="Teléfonos"
+        subtitle="Operá tus teléfonos asignados sin salir de Maven."
+        actions={
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Actualizar
+          </Button>
+        }
+      />
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>

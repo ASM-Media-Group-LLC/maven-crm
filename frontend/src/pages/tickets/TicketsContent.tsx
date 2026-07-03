@@ -11,6 +11,7 @@ import ViewTicketModal from "./ViewTicketModal";
 import EditTicketModal from "./EditTicketModal";
 import DeleteTicketDialog from "./DeleteTicketDialog";
 import { usePermissions } from "@/hooks/usePermissions";
+import { PageHeader } from "@/components/ui/page-header";
 
 const TicketsContent = () => {
   const { canAccess } = usePermissions();
@@ -80,20 +81,18 @@ const TicketsContent = () => {
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Customer Service</h1>
-            <p className="text-sm text-muted-foreground">
-              Gestión de soporte y escalaciones
-            </p>
-          </div>
-          {canCreate && (
-            <Button onClick={() => setModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Nuevo Ticket
-            </Button>
-          )}
-        </div>
+        <PageHeader
+          title="Customer Service"
+          subtitle="Gestión de soporte y escalaciones"
+          actions={
+            canCreate && (
+              <Button onClick={() => setModalOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                Nuevo Ticket
+              </Button>
+            )
+          }
+        />
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">

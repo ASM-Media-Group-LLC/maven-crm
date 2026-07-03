@@ -4,6 +4,7 @@ import {
   ListIcon, LayoutGrid, Rocket,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { MaskedPhone } from "@/components/MaskedPhone";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -112,15 +113,15 @@ export default function ProspectosPage() {
     <div className="flex flex-col h-full overflow-hidden">
         {/* Header */}
         <header className="shrink-0 bg-background/30 backdrop-blur-xl border-b border-white/10 px-6 pt-6 pb-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">Casting</h1>
-              <p className="text-sm text-muted-foreground">Gestiona perfiles y conviértelos en creadoras</p>
-            </div>
-            <Button size="sm" onClick={() => setShowAdd(true)}>
-              <Plus className="h-4 w-4 mr-1" />Nuevo Perfil
-            </Button>
-          </div>
+          <PageHeader
+            title="Casting"
+            subtitle="Gestiona perfiles y conviértelos en creadoras"
+            actions={
+              <Button size="sm" onClick={() => setShowAdd(true)}>
+                <Plus className="h-4 w-4 mr-1" />Nuevo Perfil
+              </Button>
+            }
+          />
         </header>
 
         {/* Scrollable */}

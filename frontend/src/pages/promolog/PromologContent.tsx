@@ -82,6 +82,7 @@ import { collectDayStories } from "./storyEvidence";
 import PromologPerformanceView from "./PromologPerformanceView";
 import AnalyticsSectionBanner from "@/components/analytics/AnalyticsSectionBanner";
 import DataTableShell from "@/components/ui/data-table-shell";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -958,27 +959,27 @@ const PromologContent = () => {
           El date range que vive acá afecta a los 3 subtabs (Dashboard,
           Promos, Agentes) — es la única fuente de verdad temporal. */}
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold">Promolog</h1>
-            <p className="text-sm text-muted-foreground">Seguimiento promocional diario</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <DateRangePresets
-              range={{ from: dateFrom ?? new Date(), to: dateTo ?? new Date() }}
-              activePreset={activeDatePreset}
-              onChange={(r, preset) => {
-                setDateFrom(r.from);
-                setDateTo(r.to);
-                setActiveDatePreset(preset);
-              }}
-            />
-            <Button variant="default" size="sm" className="h-9" onClick={() => setCreatorsModalOpen(true)}>
-              <Plus className="mr-1.5 h-4 w-4" />
-              Agregar Promo
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Promolog"
+          subtitle="Seguimiento promocional diario"
+          actions={
+            <>
+              <DateRangePresets
+                range={{ from: dateFrom ?? new Date(), to: dateTo ?? new Date() }}
+                activePreset={activeDatePreset}
+                onChange={(r, preset) => {
+                  setDateFrom(r.from);
+                  setDateTo(r.to);
+                  setActiveDatePreset(preset);
+                }}
+              />
+              <Button variant="default" size="sm" className="h-9" onClick={() => setCreatorsModalOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" />
+                Agregar Promo
+              </Button>
+            </>
+          }
+        />
       </header>
 
       {/* Tabs — SubtabNav (glow azul gradient + ring) para match

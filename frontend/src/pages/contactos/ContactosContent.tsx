@@ -22,6 +22,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import CategorySectionHeader from "@/components/dashboard/CategorySectionHeader";
 import { ListRowButton } from "@/components/ui/list-row";
 import { SubtabNav, SubtabNavItem } from "@/components/ui/subtab-nav";
+import { PageHeader } from "@/components/ui/page-header";
 import { CATEGORY_ORDER } from "@/hooks/useOperationsDashboard";
 import ContactosKPICards, { type ContactKpiKey } from "./ContactosKPICards";
 import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
@@ -453,38 +454,40 @@ const ContactosContent = () => {
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Directorio de Contactos</h1>
-            <p className="text-sm text-muted-foreground">
+        <PageHeader
+          title="Directorio de Contactos"
+          subtitle={
+            <>
               {funnelStats.pipelineVivo.toLocaleString("es")} en pipeline vivo
               <span className="text-muted-foreground/60"> · {totalCount.toLocaleString("es")} en el directorio</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* La analítica vive ahora FUSIONADA en el subtab Dashboard (no más
-                botón + popup). Auditoría queda como acceso discreto dentro del Dashboard.
-                El "calendario de movimiento" (rango de fechas) es GLOBAL: aplica a
-                todos los subtabs y también acota la analítica del Dashboard. */}
-            <DateRangePicker
-              from={filters.dateFrom ? parseISO(filters.dateFrom) : undefined}
-              to={filters.dateTo ? parseISO(filters.dateTo) : undefined}
-              onApply={(from, to) =>
-                updateFilters({
-                  dateFrom: from ? format(from, "yyyy-MM-dd") : "",
-                  dateTo: to ? format(to, "yyyy-MM-dd") : "",
-                })
-              }
-              placeholder="Fecha creación"
-              className="w-auto"
-            />
-            {/* Global en el header, como el calendario: visible en todos los subtabs. */}
-            <Button onClick={() => navigate("/contactos/nuevo")}>
-              <Plus className="mr-2 h-4 w-4" />
-              Agregar Contacto
-            </Button>
-          </div>
-        </div>
+            </>
+          }
+          actions={
+            <>
+              {/* La analítica vive ahora FUSIONADA en el subtab Dashboard (no más
+                  botón + popup). Auditoría queda como acceso discreto dentro del Dashboard.
+                  El "calendario de movimiento" (rango de fechas) es GLOBAL: aplica a
+                  todos los subtabs y también acota la analítica del Dashboard. */}
+              <DateRangePicker
+                from={filters.dateFrom ? parseISO(filters.dateFrom) : undefined}
+                to={filters.dateTo ? parseISO(filters.dateTo) : undefined}
+                onApply={(from, to) =>
+                  updateFilters({
+                    dateFrom: from ? format(from, "yyyy-MM-dd") : "",
+                    dateTo: to ? format(to, "yyyy-MM-dd") : "",
+                  })
+                }
+                placeholder="Fecha creación"
+                className="w-auto"
+              />
+              {/* Global en el header, como el calendario: visible en todos los subtabs. */}
+              <Button onClick={() => navigate("/contactos/nuevo")}>
+                <Plus className="mr-2 h-4 w-4" />
+                Agregar Contacto
+              </Button>
+            </>
+          }
+        />
       </header>
 
       <div className="flex-1 flex flex-col overflow-hidden p-6 gap-4">

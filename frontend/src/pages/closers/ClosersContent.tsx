@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, X, UserPlus, LayoutGrid, List, LayoutDashboard, ListChecks, Eye, TrendingUp } from "lucide-react";
 import DataTableShell from "@/components/ui/data-table-shell";
+import { PageHeader } from "@/components/ui/page-header";
 import { useCloserLeads, PLATFORMS, type DateFieldType, type CloserCreatorRow } from "./hooks/useCloserLeads";
 import { useClosersKpiPopup } from "./hooks/useClosersKpiPopup";
 import ClosersKPICards from "./components/ClosersKPICards";
@@ -125,34 +126,34 @@ const ClosersContent = () => {
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background/30 backdrop-blur-xl px-6 pt-6 pb-4 border-b border-white/10 shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Closers</h1>
-            <p className="text-sm text-muted-foreground">Pipeline de cierre de modelos</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <DateRangePicker
-              from={dateFrom}
-              to={dateTo}
-              onApply={(from, to) => {
-                setDateFrom(from);
-                setDateTo(to);
-              }}
-              placeholder="Seleccionar fechas"
-            />
-            {(isAdmin || isManager) && (
-              <ViewAsCloserPicker
-                value={viewAsCloserId}
-                onChange={(id, name) => setViewAsCloser(id, name)}
+        <PageHeader
+          title="Closers"
+          subtitle="Pipeline de cierre de modelos"
+          actions={
+            <>
+              <DateRangePicker
+                from={dateFrom}
+                to={dateTo}
+                onApply={(from, to) => {
+                  setDateFrom(from);
+                  setDateTo(to);
+                }}
+                placeholder="Seleccionar fechas"
               />
-            )}
-            {(isAdmin || isManager || canAssignCloser) && (
-              <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null, source: "closer" }); setAssignDialogOpen(true); }}>
-                <UserPlus className="h-4 w-4 mr-1" /> Asignar
-              </Button>
-            )}
-          </div>
-        </div>
+              {(isAdmin || isManager) && (
+                <ViewAsCloserPicker
+                  value={viewAsCloserId}
+                  onChange={(id, name) => setViewAsCloser(id, name)}
+                />
+              )}
+              {(isAdmin || isManager || canAssignCloser) && (
+                <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null, source: "closer" }); setAssignDialogOpen(true); }}>
+                  <UserPlus className="h-4 w-4 mr-1" /> Asignar
+                </Button>
+              )}
+            </>
+          }
+        />
       </header>
 
       {/* Banner sticky cuando el admin está viendo "como" otro closer.
